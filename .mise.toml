@@ -1,0 +1,7 @@
+[tools]
+erlang = "28.5"
+elixir = "1.20.3-otp-28"
+
+[env]
+# Local dev PostgreSQL 18 cluster listens on 5433 (14 owns the default 5432).
+PGPORT = "5433"
