@@ -1,449 +1,402 @@
-This is a web application written using the Phoenix web framework.
-
-## Project guidelines
-
-- Use `mix precommit` alias when you are done with all changes and fix any pending issues
-- Use the already included and available `:req` (`Req`) library for HTTP requests, **avoid** `:httpoison`, `:tesla`, and `:httpc`. Req is included by default and is the preferred HTTP client for Phoenix apps
-
-### Phoenix v1.8 guidelines
-
-- **Always** begin your LiveView templates with `<Layouts.app flash={@flash} ...>` which wraps all inner content
-- The `MyAppWeb.Layouts` module is aliased in the `my_app_web.ex` file, so you can use it without needing to alias it again
-- Anytime you run into errors with no `current_scope` assign:
-  - You failed to follow the Authenticated Routes guidelines, or you failed to pass `current_scope` to `<Layouts.app>`
-  - **Always** fix the `current_scope` error by moving your routes to the proper `live_session` and ensure you pass `current_scope` as needed
-- Phoenix v1.8 moved the `<.flash_group>` component to the `Layouts` module. You are **forbidden** from calling `<.flash_group>` outside of the `layouts.ex` module
-- Out of the box, `core_components.ex` imports an `<.icon name="hero-x-mark" class="w-5 h-5"/>` component for hero icons. **Always** use the `<.icon>` component for icons, **never** use `Heroicons` modules or similar
-- **Always** use the imported `<.input>` component for form inputs from `core_components.ex` when available. `<.input>` is imported and using it will save steps and prevent errors
-- If you override the default input classes (`<.input class="myclass px-2 py-1 rounded-lg">)`) class with your own values, no default classes are inherited, so your
-custom classes must fully style the input
-
-### JS and CSS guidelines
-
-- **Use Tailwind CSS classes and custom CSS rules** to create polished, responsive, and visually stunning interfaces.
-- Tailwindcss v4 **no longer needs a tailwind.config.js** and uses a new import syntax in `app.css`:
-
-      @import "tailwindcss" source(none);
-      @source "../css";
-      @source "../js";
-      @source "../../lib/my_app_web";
-
-- **Always use and maintain this import syntax** in the app.css file for projects generated with `phx.new`
-- **Never** use `@apply` when writing raw css
-- **Always** manually write your own tailwind-based components instead of using daisyUI for a unique, world-class design
-- Out of the box **only the app.js and app.css bundles are supported**
-  - You cannot reference an external vendor'd script `src` or link `href` in the layouts
-  - You must import the vendor deps into app.js and app.css to use them
-  - **Never write inline <script>custom js</script> tags within templates**
-
-### UI/UX & design guidelines
-
-- **Produce world-class UI designs** with a focus on usability, aesthetics, and modern design principles
-- Implement **subtle micro-interactions** (e.g., button hover effects, and smooth transitions)
-- Ensure **clean typography, spacing, and layout balance** for a refined, premium look
-- Focus on **delightful details** like hover effects, loading states, and smooth page transitions
-
-
-<!-- usage-rules-start -->
-
-<!-- phoenix:elixir-start -->
-## Elixir guidelines
-
-- Elixir lists **do not support index based access via the access syntax**
-
-  **Never do this (invalid)**:
-
-      i = 0
-      mylist = ["blue", "green"]
-      mylist[i]
-
-  Instead, **always** use `Enum.at`, pattern matching, or `List` for index based list access, ie:
-
-      i = 0
-      mylist = ["blue", "green"]
-      Enum.at(mylist, i)
-
-- Elixir variables are immutable, but can be rebound, so for block expressions like `if`, `case`, `cond`, etc
-  you *must* bind the result of the expression to a variable if you want to use it and you CANNOT rebind the result inside the expression, ie:
-
-      # INVALID: we are rebinding inside the `if` and the result never gets assigned
-      if connected?(socket) do
-        socket = assign(socket, :val, val)
-      end
-
-      # VALID: we rebind the result of the `if` to a new variable
-      socket =
-        if connected?(socket) do
-          assign(socket, :val, val)
-        end
-
-- **Never** nest multiple modules in the same file as it can cause cyclic dependencies and compilation errors
-- **Never** use map access syntax (`changeset[:field]`) on structs as they do not implement the Access behaviour by default. For regular structs, you **must** access the fields directly, such as `my_struct.field` or use higher level APIs that are available on the struct if they exist, `Ecto.Changeset.get_field/2` for changesets
-- Elixir's standard library has everything necessary for date and time manipulation. Familiarize yourself with the common `Time`, `Date`, `DateTime`, and `Calendar` interfaces by accessing their documentation as necessary. **Never** install additional dependencies unless asked or for date/time parsing (which you can use the `date_time_parser` package)
-- Don't use `String.to_atom/1` on user input (memory leak risk)
-- Predicate function names should not start with `is_` and should end in a question mark. Names like `is_thing` should be reserved for guards
-- Elixir's builtin OTP primitives like `DynamicSupervisor` and `Registry`, require names in the child spec, such as `{DynamicSupervisor, name: MyApp.MyDynamicSup}`, then you can use `DynamicSupervisor.start_child(MyApp.MyDynamicSup, child_spec)`
-- Use `Task.async_stream(collection, callback, options)` for concurrent enumeration with back-pressure. The majority of times you will want to pass `timeout: :infinity` as option
-
-## Mix guidelines
-
-- Read the docs and options before using tasks (by using `mix help task_name`)
-- To debug test failures, run tests in a specific file with `mix test test/my_test.exs` or run all previously failed tests with `mix test --failed`
-- `mix deps.clean --all` is **almost never needed**. **Avoid** using it unless you have good reason
-
-## Test guidelines
-
-- **Always use `start_supervised!/1`** to start processes in tests as it guarantees cleanup between tests
-- **Avoid** `Process.sleep/1` and `Process.alive?/1` in tests
-  - Instead of sleeping to wait for a process to finish, **always** use `Process.monitor/1` and assert on the DOWN message:
-
-      ref = Process.monitor(pid)
-      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
-
-   - Instead of sleeping to synchronize before the next call, **always** use `_ = :sys.get_state/1` to ensure the process has handled prior messages
-<!-- phoenix:elixir-end -->
-
-<!-- phoenix:phoenix-start -->
-## Phoenix guidelines
-
-- Remember Phoenix router `scope` blocks include an optional alias which is prefixed for all routes within the scope. **Always** be mindful of this when creating routes within a scope to avoid duplicate module prefixes.
-
-- You **never** need to create your own `alias` for route definitions! The `scope` provides the alias, ie:
-
-      scope "/admin", AppWeb.Admin do
-        pipe_through :browser
-
-        live "/users", UserLive, :index
-      end
-
-  the UserLive route would point to the `AppWeb.Admin.UserLive` module
-
-- `Phoenix.View` no longer is needed or included with Phoenix, don't use it
-<!-- phoenix:phoenix-end -->
-
-<!-- phoenix:ecto-start -->
-## Ecto Guidelines
-
-- **Always** preload Ecto associations in queries when they'll be accessed in templates, ie a message that needs to reference the `message.user.email`
-- Remember `import Ecto.Query` and other supporting modules when you write `seeds.exs`
-- `Ecto.Schema` fields always use the `:string` type, even for `:text`, columns, ie: `field :name, :string`
-- `Ecto.Changeset.validate_number/2` **DOES NOT SUPPORT the `:allow_nil` option**. By default, Ecto validations only run if a change for the given field exists and the change value is not nil, so such as option is never needed
-- You **must** use `Ecto.Changeset.get_field(changeset, :field)` to access changeset fields
-- Fields which are set programmatically, such as `user_id`, must not be listed in `cast` calls or similar for security purposes. Instead they must be explicitly set when creating the struct
-- **Always** invoke `mix ecto.gen.migration migration_name_using_underscores` when generating migration files, so the correct timestamp and conventions are applied
-<!-- phoenix:ecto-end -->
-
-<!-- phoenix:html-start -->
-## Phoenix HTML guidelines
-
-- Phoenix templates **always** use `~H` or .html.heex files (known as HEEx), **never** use `~E`
-- **Always** use the imported `Phoenix.Component.form/1` and `Phoenix.Component.inputs_for/1` function to build forms. **Never** use `Phoenix.HTML.form_for` or `Phoenix.HTML.inputs_for` as they are outdated
-- When building forms **always** use the already imported `Phoenix.Component.to_form/2` (`assign(socket, form: to_form(...))` and `<.form for={@form} id="msg-form">`), then access those forms in the template via `@form[:field]`
-- **Always** add unique DOM IDs to key elements (like forms, buttons, etc) when writing templates, these IDs can later be used in tests (`<.form for={@form} id="product-form">`)
-- For "app wide" template imports, you can import/alias into the `my_app_web.ex`'s `html_helpers` block, so they will be available to all LiveViews, LiveComponent's, and all modules that do `use MyAppWeb, :html` (replace "my_app" by the actual app name)
-
-- Elixir supports `if/else` but **does NOT support `if/else if` or `if/elsif`**. **Never use `else if` or `elseif` in Elixir**, **always** use `cond` or `case` for multiple conditionals.
-
-  **Never do this (invalid)**:
-
-      <%= if condition do %>
-        ...
-      <% else if other_condition %>
-        ...
-      <% end %>
-
-  Instead **always** do this:
-
-      <%= cond do %>
-        <% condition -> %>
-          ...
-        <% condition2 -> %>
-          ...
-        <% true -> %>
-          ...
-      <% end %>
-
-- HEEx require special tag annotation if you want to insert literal curly's like `{` or `}`. If you want to show a textual code snippet on the page in a `<pre>` or `<code>` block you *must* annotate the parent tag with `phx-no-curly-interpolation`:
-
-      <code phx-no-curly-interpolation>
-        let obj = {key: "val"}
-      </code>
-
-  Within `phx-no-curly-interpolation` annotated tags, you can use `{` and `}` without escaping them, and dynamic Elixir expressions can still be used with `<%= ... %>` syntax
-
-- HEEx class attrs support lists, but you must **always** use list `[...]` syntax. You can use the class list syntax to conditionally add classes, **always do this for multiple class values**:
-
-      <a class={[
-        "px-2 text-white",
-        @some_flag && "py-5",
-        if(@other_condition, do: "border-red-500", else: "border-blue-100"),
-        ...
-      ]}>Text</a>
-
-  and **always** wrap `if`'s inside `{...}` expressions with parens, like done above (`if(@other_condition, do: "...", else: "...")`)
-
-  and **never** do this, since it's invalid (note the missing `[` and `]`):
-
-      <a class={
-        "px-2 text-white",
-        @some_flag && "py-5"
-      }> ...
-      => Raises compile syntax error on invalid HEEx attr syntax
-
-- **Never** use `<% Enum.each %>` or non-for comprehensions for generating template content, instead **always** use `<%= for item <- @collection do %>`
-- HEEx HTML comments use `<%!-- comment --%>`. **Always** use the HEEx HTML comment syntax for template comments (`<%!-- comment --%>`)
-- HEEx allows interpolation via `{...}` and `<%= ... %>`, but the `<%= %>` **only** works within tag bodies. **Always** use the `{...}` syntax for interpolation within tag attributes, and for interpolation of values within tag bodies. **Always** interpolate block constructs (if, cond, case, for) within tag bodies using `<%= ... %>`.
-
-  **Always** do this:
-
-      <div id={@id}>
-        {@my_assign}
-        <%= if @some_block_condition do %>
-          {@another_assign}
-        <% end %>
-      </div>
-
-  and **Never** do this – the program will terminate with a syntax error:
-
-      <%!-- THIS IS INVALID NEVER EVER DO THIS --%>
-      <div id="<%= @invalid_interpolation %>">
-        {if @invalid_block_construct do}
-        {end}
-      </div>
-<!-- phoenix:html-end -->
-
-<!-- phoenix:liveview-start -->
-## Phoenix LiveView guidelines
-
-- **Never** use the deprecated `live_redirect` and `live_patch` functions, instead **always** use the `<.link navigate={href}>` and  `<.link patch={href}>` in templates, and `push_navigate` and `push_patch` functions LiveViews
-- **Avoid LiveComponent's** unless you have a strong, specific need for them
-- LiveViews should be named like `AppWeb.WeatherLive`, with a `Live` suffix. When you go to add LiveView routes to the router, the default `:browser` scope is **already aliased** with the `AppWeb` module, so you can just do `live "/weather", WeatherLive`
-
-### LiveView streams
-
-- **Always** use LiveView streams for collections for assigning regular lists to avoid memory ballooning and runtime termination with the following operations:
-  - basic append of N items - `stream(socket, :messages, [new_msg])`
-  - resetting stream with new items - `stream(socket, :messages, [new_msg], reset: true)` (e.g. for filtering items)
-  - prepend to stream - `stream(socket, :messages, [new_msg], at: -1)`
-  - deleting items - `stream_delete(socket, :messages, msg)`
-
-- When using the `stream/3` interfaces in the LiveView, the LiveView template must 1) always set `phx-update="stream"` on the parent element, with a DOM id on the parent element like `id="messages"` and 2) consume the `@streams.stream_name` collection and use the id as the DOM id for each child. For a call like `stream(socket, :messages, [new_msg])` in the LiveView, the template would be:
-
-      <div id="messages" phx-update="stream">
-        <div :for={{id, msg} <- @streams.messages} id={id}>
-          {msg.text}
-        </div>
-      </div>
-
-- LiveView streams are *not* enumerable, so you cannot use `Enum.filter/2` or `Enum.reject/2` on them. Instead, if you want to filter, prune, or refresh a list of items on the UI, you **must refetch the data and re-stream the entire stream collection, passing reset: true**:
-
-      def handle_event("filter", %{"filter" => filter}, socket) do
-        # re-fetch the messages based on the filter
-        messages = list_messages(filter)
-
-        {:noreply,
-         socket
-         |> assign(:messages_empty?, messages == [])
-         # reset the stream with the new messages
-         |> stream(:messages, messages, reset: true)}
-      end
-
-- LiveView streams *do not support counting or empty states*. If you need to display a count, you must track it using a separate assign. For empty states, you can use Tailwind classes:
-
-      <div id="tasks" phx-update="stream">
-        <div class="hidden only:block">No tasks yet</div>
-        <div :for={{id, task} <- @streams.tasks} id={id}>
-          {task.name}
-        </div>
-      </div>
-
-  The above only works if the empty state is the only HTML block alongside the stream for-comprehension.
-
-- When updating an assign that should change content inside any streamed item(s), you MUST re-stream the items
-  along with the updated assign:
-
-      def handle_event("edit_message", %{"message_id" => message_id}, socket) do
-        message = Chat.get_message!(message_id)
-        edit_form = to_form(Chat.change_message(message, %{content: message.content}))
-
-        # re-insert message so @editing_message_id toggle logic takes effect for that stream item
-        {:noreply,
-         socket
-         |> stream_insert(:messages, message)
-         |> assign(:editing_message_id, String.to_integer(message_id))
-         |> assign(:edit_form, edit_form)}
-      end
-
-  And in the template:
-
-      <div id="messages" phx-update="stream">
-        <div :for={{id, message} <- @streams.messages} id={id} class="flex group">
-          {message.username}
-          <%= if @editing_message_id == message.id do %>
-            <%!-- Edit mode --%>
-            <.form for={@edit_form} id="edit-form-#{message.id}" phx-submit="save_edit">
-              ...
-            </.form>
-          <% end %>
-        </div>
-      </div>
-
-- **Never** use the deprecated `phx-update="append"` or `phx-update="prepend"` for collections
-
-### LiveView JavaScript interop
-
-- Remember anytime you use `phx-hook="MyHook"` and that JS hook manages its own DOM, you **must** also set the `phx-update="ignore"` attribute
-- **Always** provide an unique DOM id alongside `phx-hook` otherwise a compiler error will be raised
-
-LiveView hooks come in two flavors, 1) colocated js hooks for "inline" scripts defined inside HEEx,
-and 2) external `phx-hook` annotations where JavaScript object literals are defined and passed to the `LiveSocket` constructor.
-
-#### Inline colocated js hooks
-
-**Never** write raw embedded `<script>` tags in heex as they are incompatible with LiveView.
-Instead, **always use a colocated js hook script tag (`:type={Phoenix.LiveView.ColocatedHook}`)
-when writing scripts inside the template**:
-
-    <input type="text" name="user[phone_number]" id="user-phone-number" phx-hook=".PhoneNumber" />
-    <script :type={Phoenix.LiveView.ColocatedHook} name=".PhoneNumber">
-      export default {
-        mounted() {
-          this.el.addEventListener("input", e => {
-            let match = this.el.value.replace(/\D/g, "").match(/^(\d{3})(\d{3})(\d{4})$/)
-            if(match) {
-              this.el.value = `${match[1]}-${match[2]}-${match[3]}`
-            }
-          })
-        }
-      }
-    </script>
-
-- colocated hooks are automatically integrated into the app.js bundle
-- colocated hooks names **MUST ALWAYS** start with a `.` prefix, i.e. `.PhoneNumber`
-
-#### External phx-hook
-
-External JS hooks (`<div id="myhook" phx-hook="MyHook">`) must be placed in `assets/js/` and passed to the
-LiveSocket constructor:
-
-    const MyHook = {
-      mounted() { ... }
-    }
-    let liveSocket = new LiveSocket("/live", Socket, {
-      hooks: { MyHook }
-    });
-
-#### Pushing events between client and server
-
-Use LiveView's `push_event/3` when you need to push events/data to the client for a phx-hook to handle.
-**Always** return or rebind the socket on `push_event/3` when pushing events:
-
-    # re-bind socket so we maintain event state to be pushed
-    socket = push_event(socket, "my_event", %{...})
-
-    # or return the modified socket directly:
-    def handle_event("some_event", _, socket) do
-      {:noreply, push_event(socket, "my_event", %{...})}
-    end
-
-Pushed events can then be picked up in a JS hook with `this.handleEvent`:
-
-    mounted() {
-      this.handleEvent("my_event", data => console.log("from server:", data));
-    }
-
-Clients can also push an event to the server and receive a reply with `this.pushEvent`:
-
-    mounted() {
-      this.el.addEventListener("click", e => {
-        this.pushEvent("my_event", { one: 1 }, reply => console.log("got reply from server:", reply));
-      })
-    }
-
-Where the server handled it via:
-
-    def handle_event("my_event", %{"one" => 1}, socket) do
-      {:reply, %{two: 2}, socket}
-    end
-
-### LiveView tests
-
-- `Phoenix.LiveViewTest` module and `LazyHTML` (included) for making your assertions
-- Form tests are driven by `Phoenix.LiveViewTest`'s `render_submit/2` and `render_change/2` functions
-- Come up with a step-by-step test plan that splits major test cases into small, isolated files. You may start with simpler tests that verify content exists, gradually add interaction tests
-- **Always reference the key element IDs you added in the LiveView templates in your tests** for `Phoenix.LiveViewTest` functions like `element/2`, `has_element/2`, selectors, etc
-- **Never** tests again raw HTML, **always** use `element/2`, `has_element/2`, and similar: `assert has_element?(view, "#my-form")`
-- Instead of relying on testing text content, which can change, favor testing for the presence of key elements
-- Focus on testing outcomes rather than implementation details
-- Be aware that `Phoenix.Component` functions like `<.form>` might produce different HTML than expected. Test against the output HTML structure, not your mental model of what you expect it to be
-- When facing test failures with element selectors, add debug statements to print the actual HTML, but use `LazyHTML` selectors to limit the output, ie:
-
-      html = render(view)
-      document = LazyHTML.from_fragment(html)
-      matches = LazyHTML.filter(document, "your-complex-selector")
-      IO.inspect(matches, label: "Matches")
-
-### Form handling
-
-#### Creating a form from params
-
-If you want to create a form based on `handle_event` params:
-
-    def handle_event("submitted", params, socket) do
-      {:noreply, assign(socket, form: to_form(params))}
-    end
-
-When you pass a map to `to_form/1`, it assumes said map contains the form params, which are expected to have string keys.
-
-You can also specify a name to nest the params:
-
-    def handle_event("submitted", %{"user" => user_params}, socket) do
-      {:noreply, assign(socket, form: to_form(user_params, as: :user))}
-    end
-
-#### Creating a form from changesets
-
-When using changesets, the underlying data, form params, and errors are retrieved from it. The `:as` option is automatically computed too. E.g. if you have a user schema:
-
-    defmodule MyApp.Users.User do
-      use Ecto.Schema
-      ...
-    end
-
-And then you create a changeset that you pass to `to_form`:
-
-    %MyApp.Users.User{}
-    |> Ecto.Changeset.change()
-    |> to_form()
-
-Once the form is submitted, the params will be available under `%{"user" => user_params}`.
-
-In the template, the form form assign can be passed to the `<.form>` function component:
-
-    <.form for={@form} id="todo-form" phx-change="validate" phx-submit="save">
-      <.input field={@form[:field]} type="text" />
-    </.form>
-
-Always give the form an explicit, unique DOM ID, like `id="todo-form"`.
-
-#### Avoiding form errors
-
-**Always** use a form assigned via `to_form/2` in the LiveView, and the `<.input>` component in the template. In the template **always access forms this**:
-
-    <%!-- ALWAYS do this (valid) --%>
-    <.form for={@form} id="my-form">
-      <.input field={@form[:field]} type="text" />
-    </.form>
-
-And **never** do this:
-
-    <%!-- NEVER do this (invalid) --%>
-    <.form for={@changeset} id="my-form">
-      <.input field={@changeset[:field]} type="text" />
-    </.form>
-
-- You are FORBIDDEN from accessing the changeset in the template as it will cause errors
-- **Never** use `<.form let={f} ...>` in the template, instead **always use `<.form for={@form} ...>`**, then drive all form references from the form assign as in `@form[:field]`. The UI should **always** be driven by a `to_form/2` assigned in the LiveView module that is derived from a changeset
-<!-- phoenix:liveview-end -->
-
-<!-- usage-rules-end -->
+# Bilimbi Agent and Architect Guidelines
+
+Bilimbi is the Phoenix and Elixir implementation of the Belimbing application
+platform. These rules are part of the product's engineering system. Follow
+them when adding or changing code, tests, migrations, documentation, assets, or
+configuration.
+
+Read this file and `DESIGN.md` before making changes. The source Belimbing
+project is the reference for business meaning and schema compatibility, not a
+template for copying Laravel implementation details.
+
+## 1. Project context
+
+Bilimbi is built with:
+
+- Elixir 1.20.3 on Erlang/OTP 28.5, pinned in `.mise.toml`;
+- Phoenix 1.8.10 and Phoenix LiveView 1.2.9;
+- Ecto 3.14.1, Ecto SQL 3.14.0, Postgrex 0.22.4, and PostgreSQL 18;
+- HEEx, Phoenix components, Tailwind CSS 4.3.0, and esbuild 0.25.4;
+- ExUnit and `Phoenix.LiveViewTest`;
+- Req 0.7.2 for HTTP requests;
+- Bandit 1.12.4 as the HTTP server;
+- Swoosh 1.27.0 for email where email is required.
+
+These versions record the current engineering baseline; `.mise.toml`,
+`mix.lock`, and binary versions in `config/config.exs` remain authoritative.
+Use the conventions and features of these versions rather than habits from
+older Elixir or Phoenix releases. Check for the latest stable compatible
+releases at milestone boundaries and update this list with the pins. Keep
+`mix.lock` committed. Do not use prerelease dependencies unless the task
+explicitly requires one and the decision is documented.
+
+The repository currently contains a single generated Phoenix application. The
+accepted target is the flat Mix umbrella defined by
+`docs/architecture/decisions/0001-flat-bilimbi-umbrella-topology.md`, where
+Base, Core, and Web are separate OTP applications and umbrella children below
+`bilimbi/`. Do not deepen the generated root application as an alternative
+architecture.
+
+`Base` and `Core` remain ownership boundaries rather than superclass
+hierarchies. OTP application boundaries support their dependency, supervision,
+and lifecycle contracts; they do not replace deep Module APIs or become
+product vocabulary. A business application is the complete Bilimbi deployment,
+not one OTP application inside it.
+
+## 2. Current scope
+
+The initial Bilimbi implementation contains the Platform Baseline and its web
+host:
+
+```text
+bilimbi/base/
+bilimbi/core/
+bilimbi/web/
+```
+
+Convert the scaffold to the accepted umbrella as one coordinated change before
+placing production modules in this target topology. Do not add optional
+Domains or Extensions yet. Their future existence may be described in
+architecture documentation, but their implementation is deferred until Base
+and Core are stable and a real second business Domain requires it.
+
+The initial goal is compatibility with Belimbing's existing PostgreSQL schema.
+Bilimbi should map that schema accurately rather than create a parallel one with
+similar names.
+
+## 3. Development philosophy
+
+Build production-grade foundations from the beginning. An initialization phase
+allows design freedom, not shortcuts.
+
+### Core principles
+
+- **Low entropy:** Fix small inconsistencies when encountered. For larger
+  corrections, document the plan rather than silently carrying drift.
+- **Strategic programming:** Spend deliberate design effort on boundaries and
+  contracts when a real future variation justifies it. Do not build speculative
+  frameworks.
+- **Progressive evolution:** Build the best design current knowledge supports.
+  Refactor, simplify, delete, relocate, rename, or improve abstractions as
+  understanding improves.
+- **Deep modules:** Hide difficult implementation behind a small, stable API.
+  Do not leak schemas, queries, table names, or workflow internals across
+  module boundaries.
+- **Exceptional experience:** UI quality is architecture. Every interface must
+  follow `DESIGN.md`.
+- **Information architecture:** Organize UI by user workflow and code by
+  ownership/change boundary. Bridge differences explicitly.
+- **Honesty:** Names, persisted values, APIs, documentation, and UI copy must
+  be truthful and grounded in code and data.
+- **Opinionated defaults:** Prefer one good blessed path over option sprawl.
+  Business modules remain adaptable; the shared shell and platform conventions
+  should be clear.
+
+## 4. Application ownership and dependency direction
+
+### Base
+
+`Bilimbi.Base` owns framework infrastructure and cross-cutting platform
+mechanisms: database access conventions, authentication primitives,
+authorization, tenancy context, settings, audit infrastructure, telemetry, and
+shared contracts.
+
+Base must not depend on Core business implementations.
+
+### Core
+
+`Bilimbi.Core` is the required enterprise domain. It owns foundational business
+modules such as User, Company, Employee, Address, and Geonames.
+
+Core may depend on Base. Core modules should collaborate through public APIs,
+behaviours, or explicit events—not another module's private queries or tables.
+
+### Web
+
+`BilimbiWeb` contains Phoenix adapters: routers, controllers, LiveViews,
+function components, layouts, and web-specific presentation. A web module may
+call a Base or Core API. Base and Core modules must not depend on `BilimbiWeb`.
+
+Recommended placement:
+
+```text
+bilimbi/core/lib/bilimbi/core/company.ex
+bilimbi/core/lib/bilimbi/core/company/schema.ex
+bilimbi/core/lib/bilimbi/core/company/queries.ex
+bilimbi/web/lib/bilimbi_web/core/company_live/index.ex
+bilimbi/web/lib/bilimbi_web/core/company_live/index.html.heex
+```
+
+The domain API is the deep module. The LiveView is its UI adapter.
+
+## 5. Stable identities and schema compatibility
+
+Belimbing is the reference for durable business meaning and PostgreSQL schema.
+Compatibility includes more than table names:
+
+- column names and nullability;
+- primary and foreign keys;
+- PostgreSQL types and sequences;
+- indexes, unique constraints, partial indexes, and triggers;
+- JSON shapes and status values;
+- timestamp precision and timezone semantics;
+- soft-delete behaviour;
+- tenant, company, user, and employee relationships;
+- polymorphic records and durable identifiers.
+
+Use stable logical IDs such as `core/company` in documentation and future
+registries. Do not derive persisted identity from a current filesystem path or
+Elixir module name.
+
+### Existing database rules
+
+- Treat Belimbing's schema as canonical during the port.
+- Do not invent a replacement table merely because its Ecto schema would be
+  cleaner.
+- Do not rename existing tables or columns without an explicit compatibility
+  migration decision.
+- Map existing sources explicitly in Ecto when needed with `schema/2`,
+  `@primary_key`, `@foreign_key_type`, or field `source:` options.
+- Model Laravel polymorphic columns explicitly; Ecto associations do not
+  automatically reproduce Laravel morph relationships.
+- Treat soft deletes as an explicit query and context policy. Ecto does not
+  provide an automatic global soft-delete scope.
+- Map `json`/`jsonb`, UUIDs, bigint IDs, decimals, and timestamps according to
+  the actual PostgreSQL column, not a guessed Elixir type.
+- Preserve PostgreSQL sequence correctness when inserting into existing tables.
+- Treat PHP serialized values and PHP class names in durable payloads as a
+  compatibility concern. Do not deserialize them as ordinary Elixir terms.
+
+Do not generate new Bilimbi migrations against an existing Belimbing database until
+the table ownership and compatibility plan for that change is explicit. Ecto's
+migration ledger must not be confused with Laravel's migration ledger. When
+Bilimbi begins owning migrations, use an explicitly named Ecto migration source
+and establish a compatibility baseline first.
+
+## 6. Deep-module design
+
+Each module should provide a small public API around its business capability.
+Prefer functions such as:
+
+```elixir
+Bilimbi.Core.Company.list_companies(scope)
+Bilimbi.Core.Company.get_company(scope, id)
+Bilimbi.Core.Company.create_company(scope, attrs)
+```
+
+Keep schemas, queries, changesets, database locking, and internal workflows
+behind the module API. A caller should not need to know which table or query
+implements the operation.
+
+Use a behaviour when there is a real stable seam or more than one meaningful
+implementation. Use a protocol when dispatch genuinely depends on the data
+type. Do not introduce behaviours, protocols, or macros merely to imitate PHP
+interfaces or inheritance.
+
+Events publish facts. They should not embed consumer-specific implementation
+codes. Synchronous collaboration should use a documented API or behaviour.
+Optional future integrations must not make a Core module fail to boot.
+
+## 7. Elixir conventions
+
+- Use one primary module per file. Keep related nested modules in separate
+  files unless the code is a deliberately tiny private helper.
+- Prefer pattern matching, guards, `case`, `cond`, and `with` over deeply
+  nested conditionals.
+- Remember that data is immutable. Rebind the result of `if`, `case`, `cond`,
+  and `with` when the result is needed afterward.
+- Elixir lists do not support index access. Use pattern matching, `Enum.at/2`,
+  or the appropriate `List` function.
+- Do not use map access syntax on ordinary structs. Access fields directly or
+  use the struct's documented API. For changesets, use
+  `Ecto.Changeset.get_field/2`.
+- Predicate functions end in `?`; reserve `is_` names for guards.
+- Never call `String.to_atom/1` on user input.
+- Prefer standard library date/time types and functions. Do not add a package
+  for a problem the standard library already solves.
+- Use `Task.async_stream/3` for concurrent collection work with back-pressure;
+  use `timeout: :infinity` when the operation is intentionally unbounded.
+- Name OTP processes in child specifications, for example
+  `{DynamicSupervisor, name: Bilimbi.SomeSupervisor}`.
+- Prefer plain modules and data over macros. Add macros only when they remove a
+  proven, repeated source of complexity.
+
+## 8. Dependencies and HTTP
+
+Use the already included `Req` library for HTTP requests. Do not add or use
+`HTTPoison`, `Tesla`, or `:httpc`.
+
+Do not add dependencies casually. Before adding one, check whether the
+standard library, Phoenix, Ecto, or an existing dependency already provides
+the capability. Record a meaningful reason in the change when a new dependency
+is necessary.
+
+Keep dependency versions current and compatible, update `mix.lock`, compile,
+format, and test after updates.
+
+## 9. Phoenix application conventions
+
+- Use verified routes and the `~p` sigil for internal paths.
+- Router scopes already provide their configured module alias. Do not add
+  duplicate route aliases.
+- Do not use deprecated `live_redirect` or `live_patch`. Use `<.link
+  navigate={...}>`, `<.link patch={...}>`, `push_navigate/2`, and
+  `push_patch/2`.
+- LiveViews use a `Live` suffix, such as
+  `BilimbiWeb.Core.CompanyLive.Index`.
+- Keep business rules out of controllers and LiveViews. They coordinate
+  request state and call domain APIs.
+- Use the existing `BilimbiWeb.Layouts` and `BilimbiWeb.CoreComponents` instead
+  of creating parallel shared foundations.
+
+### Layouts and authenticated routes
+
+Every LiveView template begins with the application layout:
+
+```heex
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  ...
+</Layouts.app>
+```
+
+Pass `current_scope` whenever the route is authenticated. If an assign is
+missing, fix the route's `live_session` and scope propagation rather than
+adding a fallback value in the template.
+
+The `<.flash_group>` component belongs only in `BilimbiWeb.Layouts`. Do not call
+or recreate it elsewhere.
+
+## 10. HEEx, forms, and components
+
+- Use `~H` or `.html.heex`; never use old `~E` templates.
+- Use the imported `<.form>` and `<.input>` components.
+- Assign forms with `to_form/1` or `to_form/2`; templates consume
+  `@form[:field]`, never a raw changeset.
+- Give every important form, button, table, and interaction a unique DOM ID.
+- Use HEEx `[...]` class lists for multiple or conditional classes.
+- Use `{...}` interpolation in attributes and tag bodies; use `<%= ... %>` for
+  block constructs such as `if`, `case`, `cond`, and `for`.
+- Use `<%!-- ... --%>` for HEEx comments.
+- Use `<.icon>` for icons.
+- Do not use `Enum.each/2` to generate template content; use a HEEx `for`.
+- Prefer function components for reusable markup. Avoid LiveComponents unless
+  they need their own state and event lifecycle.
+
+Templates may be colocated with their owning LiveView through `embed_templates`
+or a nearby `.html.heex` file. Colocation does not move the view into the
+domain namespace or allow the view to bypass the domain API.
+
+## 11. LiveView state and collections
+
+LiveViews are processes with server-side state. Keep state minimal, explicit,
+and recoverable. The browser is not the source of truth for authorization or
+business invariants.
+
+Use streams for collections that can grow or change over time:
+
+```elixir
+stream(socket, :companies, companies)
+```
+
+The template must provide a DOM ID and consume the stream:
+
+```heex
+<div id="companies" phx-update="stream">
+  <div :for={{id, company} <- @streams.companies} id={id}>
+    {company.name}
+  </div>
+</div>
+```
+
+Streams are not enumerable and do not provide counts. Track counts separately,
+and refetch plus `reset: true` when filtering or refreshing a collection.
+Re-stream items when an assign changes the content of a streamed item.
+
+Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
+
+## 12. JavaScript and CSS
+
+- Use Tailwind CSS and focused custom CSS for the design in `DESIGN.md`.
+- Maintain the Tailwind v4 `source(none)` and `@source` imports in
+  `assets/css/app.css`.
+- Do not use `@apply` in raw CSS.
+- Build the design system with hand-written Tailwind-based components. Do not
+  make daisyUI or another component library the product design system.
+- Do not add external script or stylesheet URLs to layouts. Import vendor code
+  through the supported asset bundles.
+- Do not write raw inline `<script>` tags in HEEx.
+- Use colocated hooks with `:type={Phoenix.LiveView.ColocatedHook}` for small
+  template-local behaviour; hook names start with `.`.
+- External hooks live in `assets/js/`, are registered with `LiveSocket`, and
+  have a unique DOM ID plus `phx-update="ignore"` when they manage their own
+  DOM.
+- Use `push_event/3` for server-to-hook events and rebind the returned socket.
+- Keep client-side behaviour small. Business rules and authorization remain on
+  the server.
+
+## 13. Ecto conventions
+
+- Use `Ecto.Schema` for persistence mapping and context modules for public
+  operations.
+- Use `Ecto.Changeset` for casts and validation.
+- Never cast programmatically assigned fields such as `user_id`, `tenant_id`,
+  or actor IDs from untrusted form parameters.
+- Use `Ecto.Changeset.get_field/2` for changeset values.
+- Preload associations before accessing them in templates.
+- Import `Ecto.Query` explicitly where query macros are used.
+- Use explicit query scopes for tenant and soft-delete filtering.
+- Name constraints and indexes deliberately, especially on PostgreSQL.
+- Generate migrations with `mix ecto.gen.migration`, but first confirm that
+  the migration belongs to Bilimbi's compatibility plan and will not alter an
+  existing Belimbing table unexpectedly.
+
+## 14. Tests
+
+Test outcomes and public contracts rather than implementation details.
+
+- Use ExUnit and `Phoenix.LiveViewTest`.
+- Use `start_supervised!/1` for processes in tests.
+- Do not use `Process.sleep/1` or `Process.alive?/1` to synchronize tests.
+  Monitor processes and assert on `:DOWN`, or use `_ = :sys.get_state/1` when
+  a process must first handle prior messages.
+- Test LiveViews through `element/2`, `has_element?/2`, and stable DOM IDs,
+  not raw HTML strings or fragile prose.
+- Use `render_submit/2` and `render_change/2` for forms.
+- Test authorization, tenant boundaries, soft deletes, and schema-compatible
+  persistence as observable outcomes.
+- Split large behaviours into focused test files and begin with simple
+  presence/contract tests before interaction-heavy tests.
+
+## 15. Documentation and AI workflow
+
+For every change:
+
+1. Read the relevant root and local guidance.
+2. Identify the owning Base/Core module and its public API.
+3. Check the Belimbing source when business meaning or schema compatibility is
+   uncertain.
+4. Make the smallest complete change, including tests and documentation that
+   belong to it.
+5. Run focused tests while iterating.
+6. Run `mix precommit` before handing off.
+
+When a convention is important enough for an AI agent to follow, express it as
+one of:
+
+- a compiler-enforced structure;
+- a test;
+- a clear local `AGENTS.md` rule;
+- a documented public contract;
+- a deterministic command.
+
+Do not rely on an unwritten convention.
+
+## 16. Version control
+
+- Keep commits focused and descriptive.
+- Never commit secrets, local credentials, generated build output, or local AI
+  permission files.
+- Preserve unrelated user changes.
+- Do not use destructive commands such as `git reset --hard` or
+  `git checkout --` without explicit authorization.
+- Keep the working tree clean when handing off work.

@@ -35,5 +35,5 @@ bilimbi-*.tar
 npm-debug.log
 /assets/node_modules/
 
-# Local AI/editor permissions and settings.
-/.claude/
+# Claude is part of the project AI team; only personal overrides stay local.
+/.claude/settings.local.json
