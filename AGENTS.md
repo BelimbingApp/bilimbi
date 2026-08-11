@@ -30,12 +30,10 @@ releases at milestone boundaries and update this list with the pins. Keep
 `mix.lock` committed. Do not use prerelease dependencies unless the task
 explicitly requires one and the decision is documented.
 
-The repository currently contains a single generated Phoenix application. The
-accepted target is the flat Mix umbrella defined by
-`docs/architecture/decisions/0001-flat-bilimbi-umbrella-topology.md`, where
+The repository uses the flat Mix umbrella defined by
+`docs/architecture/decisions/0001-mix-umbrella-topology.md`, where
 Base, Core, and Web are separate OTP applications and umbrella children below
-`bilimbi/`. Do not deepen the generated root application as an alternative
-architecture.
+`apps/`.
 
 `Base` and `Core` remain ownership boundaries rather than superclass
 hierarchies. OTP application boundaries support their dependency, supervision,
@@ -49,20 +47,20 @@ The initial Bilimbi implementation contains the Platform Baseline and its web
 host:
 
 ```text
-bilimbi/base/
-bilimbi/core/
-bilimbi/web/
+apps/base/
+apps/core/
+apps/web/
 ```
 
-Convert the scaffold to the accepted umbrella as one coordinated change before
-placing production modules in this target topology. Do not add optional
-Domains or Extensions yet. Their future existence may be described in
-architecture documentation, but their implementation is deferred until Base
-and Core are stable and a real second business Domain requires it.
+Do not add optional Domains or Extensions yet. Their future existence may be
+described in architecture documentation, but their implementation is deferred
+until Base and Core are stable and a real second business Domain requires it.
 
 The initial goal is compatibility with Belimbing's existing PostgreSQL schema.
-Bilimbi should map that schema accurately rather than create a parallel one with
-similar names.
+Bilimbi maps that schema accurately and owns Ecto migrations that can create a
+fresh compatible schema. Existing Belimbing databases use the explicit
+verify-and-adopt contract in
+`docs/architecture/decisions/0002-compatible-schema-baselines.md`.
 
 ## 3. Development philosophy
 
@@ -120,11 +118,11 @@ call a Base or Core API. Base and Core modules must not depend on `BilimbiWeb`.
 Recommended placement:
 
 ```text
-bilimbi/core/lib/bilimbi/core/company.ex
-bilimbi/core/lib/bilimbi/core/company/schema.ex
-bilimbi/core/lib/bilimbi/core/company/queries.ex
-bilimbi/web/lib/bilimbi_web/core/company_live/index.ex
-bilimbi/web/lib/bilimbi_web/core/company_live/index.html.heex
+apps/core/lib/bilimbi/core/company.ex
+apps/core/lib/bilimbi/core/company/schema.ex
+apps/core/lib/bilimbi/core/company/queries.ex
+apps/web/lib/bilimbi_web/core/company_live/index.ex
+apps/web/lib/bilimbi_web/core/company_live/index.html.heex
 ```
 
 The domain API is the deep module. The LiveView is its UI adapter.
@@ -167,11 +165,37 @@ Elixir module name.
 - Treat PHP serialized values and PHP class names in durable payloads as a
   compatibility concern. Do not deserialize them as ordinary Elixir terms.
 
-Do not generate new Bilimbi migrations against an existing Belimbing database until
-the table ownership and compatibility plan for that change is explicit. Ecto's
-migration ledger must not be confused with Laravel's migration ledger. When
-Bilimbi begins owning migrations, use an explicitly named Ecto migration source
-and establish a compatibility baseline first.
+Bilimbi records migration versions in `bilimbi_schema_migrations`; never read
+from, write to, rename, or repurpose Laravel's `migrations` table. Migration
+files stay with their owner:
+
+```text
+apps/base/priv/repo/migrations/
+apps/core/priv/repo/migrations/
+```
+
+Run the required baseline through `mix bilimbi.migrate`, which merges both
+paths with strict version ordering. Do not use broad `create_if_not_exists`
+operations to make a migration appear safe on an existing database. Verify an
+existing Belimbing database with `mix bilimbi.schema.verify`, then baseline it
+with `mix bilimbi.schema.adopt`; adoption must refuse structural drift.
+
+The explicit-tenancy compatibility source is Belimbing merge commit
+`e70b4d33c0b10790e681f4c2b5095d85a53bc918`. Resolve the platform operator only
+through `tenants.is_platform_operator`, and resolve a tenant's primary company
+only through `tenant_primary_companies`. Numeric ID 1 has no runtime meaning;
+it is bounded historical migration input only.
+
+`companies.tenant_id` is non-null and has no default. Every Company write must
+receive or derive an explicit, validated tenant. Do not infer a primary company
+from row age. Base Tenancy owns operator resolution and must not query Core
+Company tables; Core Company owns primary-company resolution, assignment,
+transfer, and provisioning.
+
+When their owning slices are ported, preserve the canonical explicit-tenancy
+constraints for Address and Authz. Custom roles require a live owning company;
+system roles are company-less. AI provider configuration lookup requires an
+owning company ID and must not resolve credentials from tenant identity alone.
 
 ## 6. Deep-module design
 
@@ -322,6 +346,26 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
 - Do not use `@apply` in raw CSS.
 - Build the design system with hand-written Tailwind-based components. Do not
   make daisyUI or another component library the product design system.
+- The `@theme` block in `apps/web/assets/css/app.css` is the only place a color
+  is chosen. Components and templates use the semantic roles it declares —
+  `canvas`, `surface`, `surface-sunken`, `line`, `ink`, `action`, `brand`,
+  `success`, `warning`, `danger` — as ordinary Tailwind utilities such as
+  `bg-surface`, `text-ink-muted`, `border-line`, `text-danger`.
+- A raw palette class such as `stone-200` or `emerald-600` outside that
+  `@theme` block is a defect. It is greppable, so treat it as one:
+
+  ```bash
+  grep -rnE '\b(bg|text|border|ring|shadow|divide|accent)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]+' apps/*/lib
+  ```
+
+- Add a semantic role when a workflow genuinely needs one, not when a single
+  screen wants a shade. Roles carry meaning; `brand` is identity and never
+  reports status.
+- `phx.gen.live`, `phx.gen.html`, and `phx.gen.schema` emit only calls into
+  `BilimbiWeb.CoreComponents`, so their output needs no styling pass.
+  `phx.gen.auth` is the exception: its templates hardcode daisyUI classes
+  (`btn btn-primary`, `btn-soft`, `alert alert-outline`, `alert alert-info`).
+  Convert those to semantic roles in the same change that runs the generator.
 - Do not add external script or stylesheet URLs to layouts. Import vendor code
   through the supported asset bundles.
 - Do not write raw inline `<script>` tags in HEEx.

@@ -1,0 +1,87 @@
+@import "tailwindcss" source(none);
+@import "phoenix-colocated/web/colocated.css";
+@source "../css";
+@source "../js";
+@source "../../lib/bilimbi_web";
+@source "../../../../_build/dev/phoenix-colocated/web/*/";
+
+@plugin "../vendor/heroicons";
+
+/* Semantic color roles — the shared theme rules required by DESIGN.md.
+ *
+ * Components and templates use these roles (`bg-surface`, `text-ink-muted`,
+ * `border-line`, `text-danger`) and never a raw Tailwind palette color. A
+ * `stone-*` or `emerald-*` class outside this file is a defect: it puts a
+ * color decision somewhere it can only be changed one occurrence at a time.
+ *
+ * A module may add a role here when its workflow genuinely needs one. Adding a
+ * shade because a single screen wanted it is how a palette stops meaning
+ * anything.
+ */
+@theme {
+  /* Surfaces — a warm operational base. */
+  --color-canvas: var(--color-stone-50);
+  --color-surface: var(--color-white);
+  --color-surface-sunken: var(--color-stone-50);
+  --color-surface-muted: var(--color-stone-100);
+
+  /* Structure. */
+  --color-line: var(--color-stone-200);
+  --color-line-subtle: var(--color-stone-100);
+  --color-line-strong: var(--color-stone-300);
+
+  /* Text, strongest first. */
+  --color-ink-strong: var(--color-stone-950);
+  --color-ink: var(--color-stone-900);
+  --color-ink-muted: var(--color-stone-600);
+  --color-ink-subtle: var(--color-stone-500);
+  --color-ink-faint: var(--color-stone-400);
+  --color-ink-inverse: var(--color-white);
+
+  /* Primary action — confident and quiet. Operational software, not a CTA. */
+  --color-action: var(--color-stone-900);
+  --color-action-hover: var(--color-stone-700);
+  --color-action-ink: var(--color-white);
+
+  /* Product identity. Never used for status: a color that also means "good"
+   * cannot report anything. */
+  --color-brand: var(--color-lime-300);
+  --color-brand-surface: var(--color-lime-100);
+  --color-brand-line: var(--color-lime-300);
+  --color-brand-strong: var(--color-lime-600);
+  --color-brand-ink: var(--color-lime-950);
+
+  /* Status — honest feedback only. */
+  --color-success: var(--color-emerald-600);
+  --color-success-surface: var(--color-emerald-50);
+  --color-success-line: var(--color-emerald-200);
+  --color-success-ink: var(--color-emerald-900);
+
+  --color-warning: var(--color-amber-500);
+  --color-warning-surface: var(--color-amber-50);
+  --color-warning-line: var(--color-amber-300);
+  --color-warning-ink: var(--color-amber-900);
+
+  --color-danger: var(--color-red-600);
+  --color-danger-surface: var(--color-red-50);
+  --color-danger-line: var(--color-red-200);
+  --color-danger-ink: var(--color-red-900);
+}
+
+@custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
+@custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
+@custom-variant phx-change-loading (.phx-change-loading&, .phx-change-loading &);
+
+[data-phx-session],
+[data-phx-teleported-src] {
+  display: contents;
+}
+
+::selection {
+  background: var(--color-brand);
+  color: var(--color-brand-ink);
+}
+
+body {
+  min-width: 20rem;
+}

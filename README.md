@@ -17,8 +17,8 @@ Bilimbi provides a durable foundation for building business applications:
   required enterprise primitives.
 - A Phoenix web interface using LiveView, HEEx, Tailwind CSS, and verified
   routes.
-- Ecto mappings compatible with Belimbing's existing PostgreSQL tables and
-  data conventions.
+- Bilimbi-owned Ecto baselines compatible with Belimbing's existing PostgreSQL
+  tables, constraints, and data conventions.
 
 Bilimbi is a general business-application platform, not a fixed business
 suite. An ERP is one intended kind of application that can be composed from its
@@ -30,11 +30,12 @@ how the application should be extended and how it should feel to use.
 
 ## Current status
 
-Bilimbi is in its foundation phase. The current repository is a clean Phoenix
-application scaffold. The accepted target is a flat Mix umbrella rooted at
-`bilimbi/`; the scaffold has not yet been converted. Base and Core will be
-established first, while optional Domains and deployment-owned Extensions are
-intentionally not implemented yet.
+Bilimbi is in its foundation phase. The repository uses a conventional Mix
+umbrella rooted at the repository, with Base, Core, and Web as its Platform
+Baseline. The first Company slice owns Ecto migrations that can create the
+current compatible Base Tenancy and Core Company schema, or verify and adopt an
+existing Belimbing database. Optional Domains and deployment-owned Extensions
+are intentionally not implemented yet.
 
 The first major compatibility target is the existing Belimbing PostgreSQL
 schema. Bilimbi should map that schema accurately instead of creating a second,
@@ -53,29 +54,50 @@ mix phx.server
 
 Open [http://localhost:4000](http://localhost:4000).
 
+`mix setup` creates the database, runs the Base and Core compatibility
+migrations, and builds the web assets. The baseline creates no tenant or
+company rows; platform-operator and primary-company provisioning are explicit
+setup steps and numeric IDs carry no runtime meaning.
+
+To use an existing Belimbing database, configure its connection and adopt it
+instead of running fresh creation migrations:
+
+```bash
+mix bilimbi.schema.verify
+mix bilimbi.schema.adopt
+mix phx.server
+```
+
+Adoption refuses schema drift and records the verified baselines in
+`bilimbi_schema_migrations`. Laravel's `migrations` table is never changed.
+
 Useful commands:
 
 ```bash
 mix format
 mix test
+mix bilimbi.migrate
+mix bilimbi.migrations
+mix bilimbi.schema.verify
 mix precommit
 ```
 
 `mix precommit` is the required final check for a change. It compiles with
-warnings as errors, formats the project, and runs the test suite.
+warnings as errors, unlocks unused dependencies, formats the project, and runs
+the test suite.
 
 ## Architecture at a glance
 
 ```text
-bilimbi/                  # Mix umbrella root
+apps/
 ├── base/                 # Platform infrastructure and shared contracts
 ├── core/                 # Required enterprise Domain
 └── web/                  # Phoenix endpoint and shared UI shell
 ```
 
 Future optional Domain and Extension sources will mount as direct umbrella
-children, such as `bilimbi/people` or `bilimbi/sb_group`. See
-[ADR 0001](./docs/architecture/decisions/0001-flat-bilimbi-umbrella-topology.md)
+children, such as `apps/people` or `apps/sb_group`. See
+[ADR 0001](./docs/architecture/decisions/0001-mix-umbrella-topology.md)
 for the accepted topology and its lifecycle boundaries.
 
 Base and Core are ownership boundaries, not superclass hierarchies. A domain
@@ -110,13 +132,25 @@ The compatibility work includes:
 Ecto schemas and queries should be written against the compatibility contract.
 Do not invent a cleaner parallel schema without an explicit migration decision.
 
+The current contract uses `tenants.is_platform_operator` for the installation
+operator and `tenant_primary_companies` for each tenant's designated company.
+`companies.tenant_id` is always explicit and has no database default. ID 1 is
+only historical migration input in Belimbing, never a Bilimbi runtime role.
+
+Bilimbi-owned migrations live with their owning application below
+`apps/base/priv/repo/migrations` and `apps/core/priv/repo/migrations`. Fresh
+installations use `mix bilimbi.migrate`; existing databases use the explicit
+verify-and-adopt workflow described in
+[ADR 0002](./docs/architecture/decisions/0002-compatible-schema-baselines.md).
+
 ## Documentation
 
 | Topic | Link |
 |---|---|
 | Agent and coding rules | [AGENTS.md](./AGENTS.md) |
 | Product and interface design | [DESIGN.md](./DESIGN.md) |
-| Flat umbrella topology | [ADR 0001](./docs/architecture/decisions/0001-flat-bilimbi-umbrella-topology.md) |
+| Mix umbrella topology | [ADR 0001](./docs/architecture/decisions/0001-mix-umbrella-topology.md) |
+| Compatible schema baselines | [ADR 0002](./docs/architecture/decisions/0002-compatible-schema-baselines.md) |
 | Source Belimbing project | [BelimbingApp/belimbing](https://github.com/BelimbingApp/belimbing) |
 | Phoenix documentation | [phoenix.hexdocs.pm](https://phoenix.hexdocs.pm/) |
 | Elixir documentation | [hexdocs.pm/elixir](https://hexdocs.pm/elixir/) |

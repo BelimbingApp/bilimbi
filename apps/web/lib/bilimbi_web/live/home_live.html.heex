@@ -1,0 +1,125 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <section id="platform-overview" class="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
+    <div class="max-w-2xl">
+      <p class="mb-5 inline-flex items-center gap-2 rounded-full border border-brand-line/80 bg-brand-surface px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-brand-ink">
+        <span class="size-1.5 rounded-full bg-brand-strong"></span> Base → Core → Web
+      </p>
+
+      <h1 class="text-pretty text-4xl font-semibold tracking-[-0.04em] text-ink-strong sm:text-5xl">
+        One real business fact, across the whole platform.
+      </h1>
+
+      <p class="mt-5 max-w-xl text-pretty text-base leading-7 text-ink-muted sm:text-lg">
+        Bilimbi resolves the explicitly marked platform-operator tenant through Base,
+        then its designated primary company through Core and Phoenix LiveView.
+      </p>
+
+      <dl class="mt-10 grid grid-cols-3 gap-3 border-t border-line pt-6 text-sm">
+        <div>
+          <dt class="text-xs font-medium uppercase tracking-wider text-ink-faint">Foundation</dt>
+          <dd class="mt-1 font-semibold text-ink">Base</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-medium uppercase tracking-wider text-ink-faint">Business</dt>
+          <dd class="mt-1 font-semibold text-ink">Core</dd>
+        </div>
+        <div>
+          <dt class="text-xs font-medium uppercase tracking-wider text-ink-faint">Interface</dt>
+          <dd class="mt-1 font-semibold text-ink">Web</dd>
+        </div>
+      </dl>
+    </div>
+
+    <%= if @company_state == :ready do %>
+      <article
+        id="platform-operator-company"
+        data-company-id={@platform_operator_company.id}
+        data-tenant-id={@platform_operator_company.tenant_id}
+        class="overflow-hidden rounded-3xl border border-line bg-surface shadow-xl shadow-ink/[0.06]"
+      >
+        <div class="border-b border-line-subtle bg-surface-sunken/80 px-6 py-4">
+          <div class="flex items-center justify-between gap-4">
+            <p class="text-xs font-semibold uppercase tracking-[0.16em] text-ink-subtle">
+              Platform operator company
+            </p>
+            <span
+              id="company-status"
+              class={[
+                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold capitalize",
+                @platform_operator_company.status == "active" &&
+                  "bg-success-surface text-success-ink",
+                @platform_operator_company.status != "active" &&
+                  "bg-warning-surface text-warning-ink"
+              ]}
+            >
+              <span class="size-1.5 rounded-full bg-current opacity-70"></span>
+              {@platform_operator_company.status}
+            </span>
+          </div>
+        </div>
+
+        <div class="px-6 py-7 sm:px-8 sm:py-8">
+          <div class="grid size-12 place-items-center rounded-2xl bg-action text-action-ink shadow-sm">
+            <.icon name="hero-building-office-2" class="size-6" />
+          </div>
+
+          <h2 id="company-name" class="mt-5 text-2xl font-semibold tracking-tight text-ink-strong">
+            {Bilimbi.Core.Company.Summary.display_name(@platform_operator_company)}
+          </h2>
+
+          <p :if={@platform_operator_company.legal_name} class="mt-1 text-sm text-ink-subtle">
+            {@platform_operator_company.name}
+          </p>
+
+          <div class="mt-7 rounded-2xl bg-surface-sunken px-4 py-3">
+            <p class="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-ink-faint">
+              Stable code
+            </p>
+            <code id="company-code" class="mt-1 block text-sm font-semibold text-ink">
+              {@platform_operator_company.code}
+            </code>
+          </div>
+        </div>
+
+        <footer class="flex items-center gap-2 border-t border-line-subtle px-6 py-4 text-xs text-ink-subtle sm:px-8">
+          <.icon name="hero-shield-check" class="size-4 text-success" /> Explicit assignment for
+          <code class="font-semibold text-ink">
+            tenant {@platform_operator_company.tenant_id}
+          </code>
+        </footer>
+      </article>
+    <% else %>
+      <article
+        id="company-setup-state"
+        data-state={@company_state}
+        class="rounded-3xl border border-dashed border-warning-line bg-warning-surface/70 p-7 sm:p-8"
+      >
+        <div class="grid size-11 place-items-center rounded-2xl bg-warning/20 text-warning-ink">
+          <.icon name="hero-wrench-screwdriver" class="size-5" />
+        </div>
+        <h2 class="mt-5 text-lg font-semibold tracking-tight text-ink-strong">
+          <%= if @company_state == :not_provisioned do %>
+            Platform operator not fully provisioned
+          <% else %>
+            <%= if @company_state == :invariant_violation do %>
+              Platform identity needs repair
+            <% else %>
+              Database compatibility unavailable
+            <% end %>
+          <% end %>
+        </h2>
+        <p class="mt-2 text-sm leading-6 text-ink-muted">
+          <%= if @company_state == :not_provisioned do %>
+            Provision the operator tenant and assign its primary company before continuing.
+          <% else %>
+            <%= if @company_state == :invariant_violation do %>
+              The explicit operator or primary-company relationship is invalid. Verify the schema and repair its data.
+            <% else %>
+              Bilimbi could not read the compatible Company schema. Check the database connection and baseline.
+            <% end %>
+          <% end %>
+        </p>
+      </article>
+    <% end %>
+  </section>
+</Layouts.app>
