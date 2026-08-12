@@ -55,4 +55,45 @@ defmodule Bilimbi.Base.Tenancy.TestFixtures do
       ]
     )
   end
+
+  @doc """
+  A minimal tenant-owned table, standing in for a real Core-owned one.
+
+  Base cannot depend on a Core module to prove that scoping works, so it owns
+  the smallest tenant-owned shape that exercises the contract.
+  """
+  def create_scoped_records_table! do
+    SQL.query!(
+      Repo,
+      """
+      CREATE TEMPORARY TABLE scoped_records (
+        id bigserial PRIMARY KEY,
+        tenant_id bigint NOT NULL,
+        label varchar(255) NOT NULL
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+  end
+
+  def insert_scoped_record!(tenant_id, label) do
+    SQL.query!(
+      Repo,
+      "INSERT INTO scoped_records (tenant_id, label) VALUES ($1, $2)",
+      [tenant_id, label]
+    )
+  end
+
+  defmodule ScopedRecord do
+    @moduledoc false
+
+    use Ecto.Schema
+
+    @primary_key {:id, :id, autogenerate: true}
+
+    schema "scoped_records" do
+      field :tenant_id, :id
+      field :label, :string
+    end
+  end
 end
