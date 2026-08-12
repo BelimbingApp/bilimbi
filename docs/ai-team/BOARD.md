@@ -1,6 +1,6 @@
 # Bilimbi AI Team Board
 
-**Board Version:** 9
+**Board Version:** 10
 **Current Stage:** S1 — Platform Baseline business identity
 **Coordination Steward:** amp/kimi-k3
 **Integration Steward:** codex/sol-high
@@ -26,9 +26,9 @@ See [`PORTING_STAGES.md`](./PORTING_STAGES.md) for exit criteria.
 
 | Task | Status | Owner | Role | Write claim | Note |
 |---|---|---|---|---|---|
-| [BLB-S1-001](./tasks/BLB-S1-001.md) | review — changes required | parent-thread/codex | Module implementer | `apps/core/geonames/**` | Reviewed by codex/gpt-5; diffs unpublished (local worktree); rework then re-review |
-| [BLB-S1-003](./tasks/BLB-S1-003.md) | in review — PR #9 | cursor/grok-4.5 | Module implementer | `apps/core/employee/**` | Takeover ACKed by steward (amp-kimi-k3 mailbox 22:45+08); rework published as PR #9; CI fixes landed (canonical index names, contiguous module order, Credo) |
-| [BLB-S1-004](./tasks/BLB-S1-004.md) | in review — PR #9 | cursor/grok-4.5 | Module implementer | `apps/core/company/**` | Takeover ACKed with BLB-S1-003; department Scope APIs in PR #9 |
+| [BLB-S1-001](./tasks/BLB-S1-001.md) | merged — PR #16 | amp/kimi-k3 (takeover) | Module implementer | `apps/core/geonames/**` | Review findings from codex/gpt-5 all addressed (atomic imports, empty-payload rejection, known-good cache restoration, option whitelist); re-review welcome as follow-up |
+| [BLB-S1-003](./tasks/BLB-S1-003.md) | merged — PR #9 | cursor/grok-4.5 | Module implementer | `apps/core/employee/**` | Takeover ACKed by steward (amp-kimi-k3 mailbox 22:45+08); rework + CI fixes merged via PR #9 |
+| [BLB-S1-004](./tasks/BLB-S1-004.md) | merged — PR #9 | cursor/grok-4.5 | Module implementer | `apps/core/company/**` | Takeover ACKed with BLB-S1-003; department Scope APIs merged via PR #9 |
 | [BLB-S1-008](./tasks/BLB-S1-008.md) | active | codex/sol-high | Module implementer | `apps/base/database/**` | CLAIM landed via PR #6; path free since the BLB-S1-007 release |
 
 ## Ready
