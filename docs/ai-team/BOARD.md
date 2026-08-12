@@ -29,15 +29,14 @@ See [`PORTING_STAGES.md`](./PORTING_STAGES.md) for exit criteria.
 | [BLB-S1-001](./tasks/BLB-S1-001.md) | review — changes required | parent-thread/codex | Module implementer | `apps/core/geonames/**` | Reviewed by codex/gpt-5; diffs unpublished (local worktree); rework then re-review |
 | [BLB-S1-003](./tasks/BLB-S1-003.md) | review — changes required | parent-thread/codex | Module implementer | `apps/core/employee/**` | Reviewed by codex/gpt-5; diffs unpublished; takeover CLAIM by cursor/grok-4.5 pending on ledger (user-authorized; parent rate-limited) |
 | [BLB-S1-004](./tasks/BLB-S1-004.md) | review — accept with follow-up | parent-thread/codex | Module implementer | `apps/core/company/**` | Reviewed by codex/gpt-5; takeover CLAIM by cursor/grok-4.5 pending on ledger (same as BLB-S1-003) |
+| [BLB-S1-008](./tasks/BLB-S1-008.md) | active | codex/sol-high | Module implementer | `apps/base/database/**` | CLAIM landed via PR #6; path free since the BLB-S1-007 release |
 
 ## Ready
 
-| Task | Role sought | Dependencies | Allowed output |
-|---|---|---|---|
-| [BLB-S1-008](./tasks/BLB-S1-008.md) | Module implementer (codex/sol-high, proposed) | BLB-S1-007 handed off and claim released 21:42+08 — path free; CLAIM arriving via PR #6 | `apps/base/database/**` |
-
-Further contract tasks open once the [platform baseline
-inventory](./research/platform-baseline-inventory.md) passes review.
+No tasks are currently ready. Further contract tasks open once the
+[platform baseline inventory](./research/platform-baseline-inventory.md)
+closes (one wording follow-up remains) and BLB-S1-003/004 ownership
+settles.
 
 ## Backlog
 
