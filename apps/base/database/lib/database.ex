@@ -17,7 +17,13 @@ defmodule Bilimbi.Base.Database do
     ProductionSeed.for_module!(otp_app, local_id, callback, opts)
   end
 
-  @doc "Runs production seeds through Bilimbi's durable execution ledger."
+  @doc """
+  Runs production seeds through Bilimbi's durable execution ledger.
+
+  A `:skipped` result means the callback was not invoked during this run. The
+  persisted ledger state remains `:completed` for a previously completed seed;
+  callbacks that themselves return `:skipped` persist that terminal state.
+  """
   @spec run_production_seeds([ProductionSeed.t()], keyword()) ::
           {:ok, [map()]} | {:error, map()}
   def run_production_seeds(seeds, opts \\ []) do

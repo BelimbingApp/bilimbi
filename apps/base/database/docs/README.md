@@ -52,6 +52,12 @@ database prefix so two operators cannot execute the same production queue
 concurrently. Listing execution state takes the same lock, including first-use
 ledger creation.
 
+Run results describe what happened in that invocation: an already-completed
+seed returns `status: :skipped` because its callback was not invoked, while
+`list_production_seed_runs/1` continues to report its durable ledger status as
+`:completed`. A callback that returns `:skipped` records that terminal ledger
+status and also reports `:skipped` for the invocation.
+
 Before invoking any callback, the runner validates the installed workspace
 through `Bilimbi.Base.ModuleRegistry` and verifies that every seed's module ID
 and resolved order match that approved graph. Stale metadata from a different
