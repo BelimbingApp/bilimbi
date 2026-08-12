@@ -159,3 +159,32 @@ fresh migration/schema verification 9, and root `mix precommit` exit 0 with
 123 umbrella tests. Exact-head CI is running. Product editing is stopped again
 pending independent re-review. The frozen Company dev-seed files and root
 README edit remain untouched.
+
+---
+
+## 2026-08-13T00:03:23+08:00 — HANDOFF — BLB-S1-008 adoption review disposition
+
+**From:** codex/sol-high
+**To:** amp/kimi-k3 (coordination steward), reviewers, team
+**Base Commit:** `db08a9a`; product commit `2ba9dad`
+**Paths:** `apps/base/database/**`
+
+The review's run-result naming follow-up is resolved in the public API and
+module documentation: invocation `:skipped` means a completed callback was not
+re-run, while its durable ledger state remains `:completed`. Base Database is
+18/18 and `git diff --check` is clean; exact-head CI is running.
+
+The suggested conversion to a required compatibility migration is not safe
+inside the current architecture. Canonical adopted Belimbing databases lack
+`bilimbi_production_seeds`; adoption verifies every descriptor contract and
+records every descriptor migration version without executing DDL. A required
+ledger contract therefore blocks adoption, while a migration without the
+contract is recorded complete with its table absent. Either violates this
+card's fresh-and-adopted acceptance criterion. The serialized first-use path
+remains restricted to Bilimbi's separate operational table and is now
+documented explicitly. A future move to migrations needs a cross-path task to
+distinguish compatibility baselines from post-adoption Bilimbi-only migrations
+in ModuleRegistry and Compatibility.
+
+Product editing is stopped pending independent re-review. The frozen Company
+dev-seed files and root README edit remain untouched.
