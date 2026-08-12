@@ -2,13 +2,15 @@
 
 **Reviewer:** claude/opus-5
 **Role:** Reviewer (independent; not the implementer)
-**Reviewed Commit/Diff:** PR #18 at `da8a58e`
+**Reviewed Commit/Diff:** PR #18 at `da8a58e`, re-reviewed at exact head `e48d82c`
 **Task Card:** [BLB-S1-008](../tasks/BLB-S1-008.md)
-**Date:** 2026-08-13
+**Date:** 2026-08-13 (first pass 00:23+08; re-review 01:50+08)
 
 ## Verdict
 
-`accept with follow-up`
+`accept` at `e48d82c`. (First pass at `da8a58e` was `accept with follow-up`; see
+[Re-review](#re-review-at-e48d82c) — every finding is cleared, and one of mine
+was wrong.)
 
 The ledger is a genuine improvement on the capability my own inventory flagged
 as missing (§6), and in two respects it is deliberately better than the
@@ -177,3 +179,57 @@ isolated experiment rather than by exercising the task.
   (finding 2).
 - Optional: comment the `hashtext` key space (finding 3) and correct the
   `powershell` fences (finding 4).
+
+
+## Re-review at `e48d82c`
+
+Requested by the implementer after `dacf727`. Reviewed the full
+`da8a58e..e48d82c` diff. **All four findings are cleared, and finding 2 was my
+error.**
+
+**Finding 1 (Major) — cleared.** `provider_module!/1` now tries
+`Module.safe_concat/1`, falls back to `Module.concat/1` on `ArgumentError`, and
+then requires `Code.ensure_loaded?/1` before accepting the module. That is the
+shape I suggested and it keeps the property that mattered: a bogus name cannot
+reach the seed queue. `provider_seeds!/1` went further than I asked and now
+checks the `:behaviour` attribute rather than trusting `function_exported?`
+alone, so a duck-typed module exporting `production_seeds/0` by coincidence is
+rejected too. A separate-VM regression test covers the unloaded-module case.
+
+**Finding 2 (Minor) — withdrawn; I misread the code.** I described `--provider`
+as *selecting a subset*, and warned that a partial selection would fail
+dependency validation. It never selected a subset:
+
+```elixir
+providers = discovered_providers() ++ Enum.map(..., &provider_module!/1)
+```
+
+`--provider` has always been **additive** to the discovered queue, at
+`da8a58e` as much as now. The failure I described can only occur in the much
+narrower case where an explicitly added provider depends on a provider that is
+not registered at all, which is genuinely worth documenting — and
+`docs/README.md` now says exactly that, including the instruction to pass the
+other provider too. So the documentation is better than before, but it improved
+in spite of my reasoning rather than because of it. Recording this plainly so
+the finding is not cited later as evidence of a defect that did not exist.
+
+**Finding 3 (Minor) — cleared.** `lock!/2` now carries a comment stating the
+32-bit key space and that a collision only over-serializes unrelated prefixes
+rather than allowing their queues to overlap.
+
+**Finding 4 (Minor) — cleared.** The `powershell` fences are gone; the docs use
+`console`.
+
+**Not previously reviewed by me, and worth noting as strengthening the design.**
+`e48d82c` adds first-use verification of the ledger's own shape — columns,
+constraints, and indexes are checked against `information_schema` before the
+runner will use an existing `bilimbi_production_seeds` table. That closes a gap
+I did not raise: `CREATE TABLE IF NOT EXISTS` silently accepts a table of the
+right name and the wrong shape, so a hand-altered or partially-migrated ledger
+would previously have been trusted. Failing closed there is right.
+
+**Verdict at `e48d82c`: `accept`.** No outstanding findings from this reviewer.
+I did not run the suite at this head either — `apps/base/database/**` remains
+BLB-S1-008's active write claim, released by me after BLB-S1-007 — so this
+remains a code-level review, with the exact-head CI and the implementer's own
+runs covering execution.
