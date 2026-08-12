@@ -48,7 +48,10 @@ defmodule Bilimbi.Core.Employee.Migrations.CreateCompatibilityBaseline do
     create index(:employees, [:employee_type])
     create index(:employees, [:email])
     create index(:employees, [:status])
-    create unique_index(:employees, [:company_id, :employee_number])
+
+    create unique_index(:employees, [:company_id, :employee_number],
+             name: :employees_company_id_employee_number_unique
+           )
 
     schema = quoted_prefix()
 
@@ -69,7 +72,7 @@ defmodule Bilimbi.Core.Employee.Migrations.CreateCompatibilityBaseline do
       timestamps(type: :naive_datetime, null: true, inserted_at: :created_at)
     end
 
-    create unique_index(:employee_types, [:code])
+    create unique_index(:employee_types, [:code], name: :employee_types_code_unique)
     create index(:employee_types, [:company_id])
     create index(:employee_types, [:company_id, :code])
   end

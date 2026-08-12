@@ -81,14 +81,16 @@ defmodule Bilimbi.Core.Company do
   @spec department_belongs_to_company?(Scope.t(), pos_integer(), pos_integer()) :: boolean()
   def department_belongs_to_company?(%Scope{} = scope, company_id, department_id)
       when is_integer(department_id) and department_id > 0 do
-    with {:ok, _company} <- get_company(scope, company_id) do
-      Repo.exists?(
-        from(department in Department,
-          where: department.id == ^department_id and department.company_id == ^company_id
+    case get_company(scope, company_id) do
+      {:ok, _company} ->
+        Repo.exists?(
+          from(department in Department,
+            where: department.id == ^department_id and department.company_id == ^company_id
+          )
         )
-      )
-    else
-      {:error, :not_found} -> false
+
+      {:error, :not_found} ->
+        false
     end
   end
 

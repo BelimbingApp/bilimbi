@@ -11,7 +11,8 @@
     "base/tenancy",
     "core/company",
     "core/geonames",
-    "core/address"
+    "core/address",
+    "core/employee"
   ],
   migrations: nil,
   schema_contract: nil

@@ -1,4 +1,6 @@
 defmodule Mix.Tasks.Bilimbi.Employee.Types.Bootstrap do
+  @moduledoc "Ensures Bilimbi's canonical system employee types exist"
+
   use Mix.Task
 
   @shortdoc "Ensures Bilimbi's canonical system employee types exist"
