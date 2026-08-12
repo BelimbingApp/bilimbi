@@ -23,6 +23,16 @@ database prefix. Existing Belimbing databases keep their Laravel
 `base_database_seeders` table unchanged; Bilimbi never adopts PHP class names
 as seed identity and never reads, updates, renames, or drops that table.
 
+The operational ledger is deliberately initialized by this runner rather than
+contributed to the compatibility-baseline migration set. Existing Belimbing
+databases do not contain this Bilimbi-owned table, while schema adoption records
+every installed baseline migration without executing its DDL. Treating the
+ledger as a required compatibility table would therefore either block adoption
+or mark its creation migration complete while leaving the table absent. The
+runner serializes first-use initialization under its per-prefix advisory lock;
+it does not use this path to alter or conceal drift in canonical business
+tables.
+
 Owning modules implement
 `Bilimbi.Base.Database.ProductionSeedProvider` and explicitly register the
 provider as `:bilimbi_production_seed_provider` in their own OTP application
