@@ -284,13 +284,11 @@ defmodule Bilimbi.Core.Geonames.Importer do
   defp parts(line, minimum) do
     line = line |> String.trim_trailing("\n") |> String.trim_trailing("\r")
 
-    cond do
-      line == "" or String.starts_with?(line, "#") ->
-        :skip
-
-      true ->
-        fields = String.split(line, "\t", trim: false)
-        if length(fields) >= minimum, do: {:ok, fields}, else: :skip
+    if line == "" or String.starts_with?(line, "#") do
+      :skip
+    else
+      fields = String.split(line, "\t", trim: false)
+      if length(fields) >= minimum, do: {:ok, fields}, else: :skip
     end
   end
 

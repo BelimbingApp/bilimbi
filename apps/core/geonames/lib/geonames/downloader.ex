@@ -18,12 +18,10 @@ defmodule Bilimbi.Core.Geonames.Downloader do
     etag_path = destination <> ".etag"
 
     with :ok <- File.mkdir_p(Path.dirname(destination)) do
-      cond do
-        not force? and fresh_without_etag?(destination, etag_path, ttl_days) ->
-          {:ok, cached_result(destination, nil, nil)}
-
-        true ->
-          request(url, destination, etag_path, force?, opts)
+      if not force? and fresh_without_etag?(destination, etag_path, ttl_days) do
+        {:ok, cached_result(destination, nil, nil)}
+      else
+        request(url, destination, etag_path, force?, opts)
       end
     end
   end

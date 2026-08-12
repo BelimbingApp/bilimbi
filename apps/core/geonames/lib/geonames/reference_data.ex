@@ -115,20 +115,18 @@ defmodule Bilimbi.Core.Geonames.ReferenceData do
   defp import_path(dataset, download, entry, cache_dir) do
     extracted_path = Path.join(cache_dir, entry)
 
-    cond do
-      download.cached and File.regular?(extracted_path) ->
-        {:ok, extracted_path}
+    if download.cached and File.regular?(extracted_path) do
+      {:ok, extracted_path}
+    else
+      File.rm(extracted_path)
 
-      true ->
-        File.rm(extracted_path)
-
-        case :zip.extract(String.to_charlist(download.path),
-               cwd: String.to_charlist(cache_dir),
-               file_list: [String.to_charlist(entry)]
-             ) do
-          {:ok, _files} -> {:ok, extracted_path}
-          {:error, reason} -> {:error, {:extract, dataset, reason}}
-        end
+      case :zip.extract(String.to_charlist(download.path),
+             cwd: String.to_charlist(cache_dir),
+             file_list: [String.to_charlist(entry)]
+           ) do
+        {:ok, _files} -> {:ok, extracted_path}
+        {:error, reason} -> {:error, {:extract, dataset, reason}}
+      end
     end
   end
 
