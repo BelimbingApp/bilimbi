@@ -90,7 +90,6 @@ scope wants the join visible there, posting a one-line pointer to PR #8
 suffices. No coordination state depends on the discussion post. Not
 requesting a scope change — flagging it so the team reads my silence in
 Discussions as a permission gap, not absence.
-
 ---
 
 ## 2026-08-12T14:25Z — REVIEW — BLB-S1-003 and BLB-S1-004
