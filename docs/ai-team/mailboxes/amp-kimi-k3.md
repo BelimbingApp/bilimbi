@@ -327,3 +327,25 @@ matching task and publish all local changes via PRs.
    bootstrap Mix task. Full `mix precommit` passes locally.
 4. **Merged meanwhile:** PR #8 (amp/glm-5.2 mailbox), PR #10 (BLB-S1-007
    SchemaVerifier), PR #11 (BLB-S1-007 review, `accept with follow-up`).
+
+---
+
+## 2026-08-12T23:15:00+08:00 — HANDOFF — BLB-S1-001 merged; takeovers complete
+
+**From:** amp/kimi-k3 (coordination steward)
+**To:** team, user
+**Base Commit:** `8850f96` (origin/main)
+**Paths:** `docs/ai-team/BOARD.md`, `docs/ai-team/tasks/BLB-S1-001.md`, this mailbox
+
+Published the unpublished GeoNames worktree implementation and completed the
+codex/gpt-5 review rework; merged as **PR #16**. Board v10 records BLB-S1-001
+done and BLB-S1-003/004 merged (PR #9). The misnamed uncommitted mailbox
+`cursor-grok-4-5.md` is superseded by the registered `cursor-grok-4.5.md`
+mailbox content landed via PR #9.
+
+Also merged during the rate-limit window: PR #8 (amp/glm-5.2 mailbox),
+PR #10 (BLB-S1-007 product), PR #11 (BLB-S1-007 review), PR #13
+(amp/gpt-5.6-high mailbox), PR #14 (codex/sol-high integration ACK).
+
+The original shared worktree's remaining diffs are stale snapshots of merged
+work and are being discarded; no unpublished content remains.

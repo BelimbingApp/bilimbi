@@ -216,11 +216,27 @@ contract stays green whether or not the contributor is installed.
 
 The consequence for planning is concrete: **Core User needs no Company-side
 edit and no follow-on task.** Its own migration adds the column, index, and FK
-together. Base/Authz gets the same treatment — Base creates `base_authz_roles`
-with a bare `company_id` and declares the FK plus the
-`base_authz_roles_custom_company_check` constraint as an optional group, and
-Core/Company contributes it. That is what lets Base/Authz be ported without
-Base depending on Core.
+together.
+
+Base/Authz gets the same treatment — Base creates `base_authz_roles` with a
+bare `company_id`, declares the contribution as an optional group, and
+Core/Company supplies it. That is what lets Base/Authz be ported without Base
+depending on Core. When that task is written, the group has exactly **two**
+PostgreSQL members, both installed by
+`app/Core/Company/Database/Migrations/0200_01_07_001007_scope_custom_authz_roles.php`:
+
+- the `base_authz_roles_company_foreign` foreign key to `companies`;
+- the `base_authz_roles_custom_company_check` constraint,
+  `CHECK (is_system = (company_id IS NULL))` (line 153).
+
+That migration also creates `base_authz_roles_custom_company_insert` and
+`base_authz_roles_custom_company_update` triggers, and they must **not** go in
+the group. `createCustomRoleCompanyConstraint()` branches on the driver: the
+`CHECK` is the `pgsql` path and returns early, while the triggers are the
+`sqlite` fallback expressing the same rule where a check constraint was not
+used (lines 147-177). Bilimbi is PostgreSQL-only, so those triggers never
+exist in a Bilimbi database. Requiring them would make the group permanently
+incomplete and verification permanently red.
 
 ### 4.2 Deliberately absent foreign keys
 
@@ -364,10 +380,15 @@ invents a fourth pattern.
 
    Tenancy is derived, not stored. `users` has **no `tenant_id`** and no soft
    deletes, and `company_id` is **nullable**.
-   `app/Core/User/Livewire/Users/Index.php:107-111` joins `companies` and
-   filters `companies.tenant_id`, so a user with a null `company_id` is
-   invisible to every tenant-scoped list. Reproduce that inner join; do not add
-   a `tenant_id` column Belimbing does not have.
+   `app/Core/User/Livewire/Users/Index.php:110-111` uses
+   `leftJoin('companies', 'users.company_id', '=', 'companies.id')` followed by
+   `where('companies.tenant_id', …)`. The `WHERE` lands on the right-side
+   table, so a user with a null `company_id` is filtered out and is invisible
+   to every tenant-scoped list. Reproduce that mechanism — left join plus
+   tenant filter — rather than an inner join; the outcome matches here, but
+   only because of where the filter sits, and a later read that moves the
+   tenant predicate into the join condition would silently change which users
+   are returned. Do not add a `tenant_id` column Belimbing does not have.
 
 `notifications` deserves its own note: UUID primary key, not bigint
 (`0200_01_20_000005:23`), because Laravel's `NotificationSender` assigns
