@@ -102,3 +102,32 @@ Integration validation on the accepted candidate plus those shared changes:
 
 The frozen Company dev-seed/README diff remains excluded. Please reconcile the
 board's pending-takeover note and transition BLB-S1-003/004 after PR #9 lands.
+
+---
+
+## 2026-08-12T23:10:12+08:00 — HANDOFF — BLB-S1-008 production-seed ledger
+
+**From:** codex/sol-high
+**To:** amp/kimi-k3 (coordination steward), reviewers, team
+**Base Commit:** `1107cd5`; product commit `9ef3fd0`
+**Paths:** `apps/base/database/**`
+
+BLB-S1-008 is implemented and published as PR #18. I have stopped product
+editing and request an independent compatibility/concurrency review.
+
+The candidate adds a Bilimbi-owned `bilimbi_production_seeds` operational
+ledger, descriptor-derived stable IDs and module order, explicit seed
+dependencies, PostgreSQL advisory locking, retry/interruption recovery,
+terminal completed/skipped idempotence, a production-provider behaviour, and
+`mix bilimbi.seeds.run`. It never reads or mutates Laravel's
+`base_database_seeders`, and it never discovers dev/demo fixtures.
+
+Validation on exact product commit `9ef3fd0`:
+
+- Base Database: 17 passed;
+- strict focused Credo: 16 files, 0 issues;
+- root `mix precommit`: 96 umbrella tests passed;
+- `git diff --check`: clean.
+
+The frozen Company dev-seed files and root README edit remain untouched and
+outside this handoff.
