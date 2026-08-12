@@ -49,7 +49,21 @@ Each attempt is recorded as `running`, then `completed`, `failed`, or
 retryable, and rows left `running` by an interrupted process are marked failed
 and retried on the next run. The runner holds a PostgreSQL advisory lock per
 database prefix so two operators cannot execute the same production queue
-concurrently.
+concurrently. Listing execution state takes the same lock, including first-use
+ledger creation.
+
+Before invoking any callback, the runner validates the installed workspace
+through `Bilimbi.Base.ModuleRegistry` and verifies that every seed's module ID
+and resolved order match that approved graph. Stale metadata from a different
+workspace build is rejected before the ledger or reference data is touched.
+
+Callbacks own the atomicity and idempotency of their reference-data writes.
+The ledger makes completed callbacks at-most-once from the runner's point of
+view, but it does not wrap arbitrary callbacks in one database transaction:
+large imports and callbacks coordinating external resources may need their own
+transaction boundaries. A retryable callback must therefore roll back partial
+database work or safely resume/reapply it before returning `{:error, reason}`
+or raising.
 
 Development, demonstration, and test fixtures are intentionally outside this
 provider contract and are never discovered by `mix bilimbi.seeds.run`.

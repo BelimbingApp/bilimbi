@@ -7,6 +7,8 @@ defmodule Bilimbi.Base.Database.ProductionSeed do
   their first argument and return `:ok`, `:skipped`, or `{:error, reason}`.
   """
 
+  alias Bilimbi.Base.ModuleRegistry
+
   @id_pattern ~r/^[a-z0-9][a-z0-9_-]*(\/[a-z0-9][a-z0-9_-]*)+$/
   @local_id_pattern ~r/^[a-z0-9][a-z0-9_-]*(\/[a-z0-9][a-z0-9_-]*)*$/
 
@@ -32,8 +34,12 @@ defmodule Bilimbi.Base.Database.ProductionSeed do
     end
 
     descriptor =
-      Application.get_env(otp_app, :bilimbi_module) ||
-        raise ArgumentError, "#{inspect(otp_app)} has no installed Bilimbi module metadata"
+      ModuleRegistry.installed_modules!()
+      |> Enum.find(&(&1.otp_app == otp_app))
+      |> case do
+        nil -> raise ArgumentError, "#{inspect(otp_app)} has no installed Bilimbi module metadata"
+        descriptor -> descriptor
+      end
 
     new!(
       id: descriptor.id <> "/" <> local_id,

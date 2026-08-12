@@ -4,6 +4,7 @@ defmodule Mix.Tasks.Bilimbi.Seeds.Run do
   use Mix.Task
 
   alias Bilimbi.Base.Database
+  alias Bilimbi.Base.ModuleRegistry
 
   @shortdoc "Runs pending Bilimbi production seeds"
   @provider_key :bilimbi_production_seed_provider
@@ -40,9 +41,9 @@ defmodule Mix.Tasks.Bilimbi.Seeds.Run do
   end
 
   defp discovered_providers do
-    Application.loaded_applications()
-    |> Enum.flat_map(fn {app, _description, _version} ->
-      app
+    ModuleRegistry.installed_modules!()
+    |> Enum.flat_map(fn descriptor ->
+      descriptor.otp_app
       |> Application.get_env(@provider_key, [])
       |> List.wrap()
     end)

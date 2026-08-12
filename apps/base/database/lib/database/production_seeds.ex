@@ -3,6 +3,7 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
 
   alias Bilimbi.Base.Database.ProductionSeed
   alias Bilimbi.Base.Database.SchemaVerifier
+  alias Bilimbi.Base.ModuleRegistry
   alias Ecto.Adapters.SQL
 
   @table "bilimbi_production_seeds"
@@ -13,7 +14,7 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
   def run(repo, seeds, opts \\ []) do
     prefix = Keyword.get(opts, :prefix, "public")
     table = qualified_table(prefix)
-    ordered = order!(seeds)
+    ordered = order!(seeds, ModuleRegistry.installed_modules!())
 
     repo.checkout(fn ->
       lock!(repo, prefix)
@@ -31,20 +32,30 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
 
   @spec list_runs(Ecto.Repo.t(), keyword()) :: [map()]
   def list_runs(repo, opts \\ []) do
-    table = qualified_table(Keyword.get(opts, :prefix, "public"))
-    ensure_ledger!(repo, table)
+    prefix = Keyword.get(opts, :prefix, "public")
+    table = qualified_table(prefix)
 
-    SQL.query!(
-      repo,
-      """
-      SELECT seed_id, module_id, module_order, status, attempts,
-             started_at, completed_at, error_message
-      FROM #{table}
-      ORDER BY module_order, seed_id
-      """,
-      []
-    ).rows
-    |> Enum.map(&run_from_row/1)
+    repo.checkout(fn ->
+      lock!(repo, prefix)
+
+      try do
+        ensure_ledger!(repo, table)
+
+        SQL.query!(
+          repo,
+          """
+          SELECT seed_id, module_id, module_order, status, attempts,
+                 started_at, completed_at, error_message
+          FROM #{table}
+          ORDER BY module_order, seed_id
+          """,
+          []
+        ).rows
+        |> Enum.map(&run_from_row/1)
+      after
+        unlock!(repo, prefix)
+      end
+    end)
   end
 
   defp ensure_ledger!(repo, table) do
@@ -214,10 +225,25 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
     status
   end
 
-  defp order!(seeds) when is_list(seeds) do
+  defp order!(seeds, modules) when is_list(seeds) do
     unless Enum.all?(seeds, &match?(%ProductionSeed{}, &1)) do
       raise ArgumentError, "production seeds must be ProductionSeed structs"
     end
+
+    modules_by_id = Map.new(modules, &{&1.id, &1})
+
+    Enum.each(seeds, fn seed ->
+      module =
+        Map.get(modules_by_id, seed.module_id) ||
+          raise ArgumentError,
+                "production seed #{seed.id} belongs to uninstalled module #{seed.module_id}"
+
+      unless seed.module_order == module.order do
+        raise ArgumentError,
+              "production seed #{seed.id} has stale module order #{seed.module_order}; " <>
+                "installed order is #{module.order}"
+      end
+    end)
 
     by_id = Map.new(seeds, &{&1.id, &1})
 

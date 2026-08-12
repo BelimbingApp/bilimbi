@@ -4,6 +4,7 @@ defmodule Bilimbi.Base.Database.ProductionSeedsTest do
   alias Bilimbi.Base.Database
   alias Bilimbi.Base.Database.ProductionSeed
   alias Bilimbi.Base.Database.SchemaVerifier
+  alias Bilimbi.Base.ModuleRegistry
   alias Ecto.Adapters.SQL
 
   setup do
@@ -17,23 +18,23 @@ defmodule Bilimbi.Base.Database.ProductionSeedsTest do
 
   test "runs in deterministic module and dependency order", context do
     seeds = [
-      seed("core/sample/zeta", 3, insert_event(context, "zeta"), ["core/sample/alpha"]),
-      seed("base/reference/only", 0, insert_event(context, "base")),
-      seed("core/sample/alpha", 3, insert_event(context, "alpha"))
+      seed("base/database/zeta", insert_event(context, "zeta"), ["base/database/alpha"]),
+      seed("base/module_registry/only", insert_event(context, "base")),
+      seed("base/database/alpha", insert_event(context, "alpha"))
     ]
 
     assert {:ok,
             [
-              %{id: "base/reference/only", status: :completed},
-              %{id: "core/sample/alpha", status: :completed},
-              %{id: "core/sample/zeta", status: :completed}
+              %{id: "base/module_registry/only", status: :completed},
+              %{id: "base/database/alpha", status: :completed},
+              %{id: "base/database/zeta", status: :completed}
             ]} = run(seeds, context)
 
     assert event_ids(context) == ["base", "alpha", "zeta"]
   end
 
   test "registration is idempotent and completed seeds are skipped", context do
-    definition = seed("core/sample/idempotent", 2, insert_event(context, "once"))
+    definition = seed("base/database/idempotent", insert_event(context, "once"))
 
     assert {:ok, [%{status: :completed}]} = run([definition], context)
     assert {:ok, [%{status: :skipped}]} = run([definition], context)
@@ -53,13 +54,13 @@ defmodule Bilimbi.Base.Database.ProductionSeedsTest do
         SQL.query!(
           repo,
           "SELECT attempts FROM #{ledger(context)} WHERE seed_id = $1",
-          ["core/sample/retry"]
+          ["base/database/retry"]
         ).rows
 
       if attempts == 1, do: {:error, :temporary_failure}, else: insert(context, "retried", repo)
     end
 
-    definition = seed("core/sample/retry", 2, callback)
+    definition = seed("base/database/retry", callback)
     definition_id = definition.id
 
     assert {:error, %{seed_id: ^definition_id, reason: :temporary_failure}} =
@@ -80,7 +81,7 @@ defmodule Bilimbi.Base.Database.ProductionSeedsTest do
   end
 
   test "interrupted running entries become retryable", context do
-    definition = seed("core/sample/interrupted", 2, insert_event(context, "attempt"))
+    definition = seed("base/database/interrupted", insert_event(context, "attempt"))
     assert {:ok, [%{status: :completed}]} = run([definition], context)
 
     SQL.query!(
@@ -98,7 +99,7 @@ defmodule Bilimbi.Base.Database.ProductionSeedsTest do
   end
 
   test "callbacks can record an observable skipped terminal state", context do
-    definition = seed("core/sample/not-applicable", 2, fn _repo -> :skipped end)
+    definition = seed("base/database/not-applicable", fn _repo -> :skipped end)
 
     assert {:ok, [%{status: :skipped}]} = run([definition], context)
     assert {:ok, [%{status: :skipped}]} = run([definition], context)
@@ -129,7 +130,7 @@ defmodule Bilimbi.Base.Database.ProductionSeedsTest do
     )
 
     assert {:ok, [%{status: :completed}]} =
-             run([seed("core/sample/adopted", 2, fn _repo -> :ok end)], context)
+             run([seed("base/database/adopted", fn _repo -> :ok end)], context)
 
     assert SQL.query!(
              Repo,
@@ -141,41 +142,83 @@ defmodule Bilimbi.Base.Database.ProductionSeedsTest do
   end
 
   test "rejects duplicate, missing, backward, and cyclic dependencies", context do
-    one = seed("core/sample/one", 2, fn _repo -> :ok end)
-    duplicate = seed("core/sample/one", 2, fn _repo -> :ok end)
+    one = seed("base/database/one", fn _repo -> :ok end)
+    duplicate = seed("base/database/one", fn _repo -> :ok end)
 
     assert_raise ArgumentError, "production seed IDs must be unique", fn ->
       run([one, duplicate], context)
     end
 
-    missing = seed("core/sample/missing", 2, fn _repo -> :ok end, ["core/sample/absent"])
+    missing =
+      seed("base/database/missing", fn _repo -> :ok end, ["base/database/absent"])
 
     assert_raise ArgumentError, ~r/declares missing dependency/, fn ->
       run([missing], context)
     end
 
-    later = seed("core/later/value", 3, fn _repo -> :ok end)
-    backward = seed("base/early/value", 0, fn _repo -> :ok end, [later.id])
+    later = seed("base/database/later", fn _repo -> :ok end)
+
+    backward =
+      seed("base/module_registry/backward", fn _repo -> :ok end, [later.id])
 
     assert_raise ArgumentError, ~r/depends on later module seed/, fn ->
       run([backward, later], context)
     end
 
-    left = seed("core/sample/left", 2, fn _repo -> :ok end, ["core/sample/right"])
-    right = seed("core/sample/right", 2, fn _repo -> :ok end, [left.id])
+    left =
+      seed("base/database/left", fn _repo -> :ok end, ["base/database/right"])
+
+    right = seed("base/database/right", fn _repo -> :ok end, [left.id])
 
     assert_raise ArgumentError, ~r/dependency cycle/, fn ->
       run([left, right], context)
     end
   end
 
-  defp seed(id, order, callback, dependencies \\ []) do
+  test "rejects stale workspace metadata before ledger or callback mutation", context do
+    definition =
+      seed("base/database/stale-graph", fn _repo ->
+        send(self(), :seed_callback_invoked)
+        :ok
+      end)
+
+    descriptor = Application.fetch_env!(:bilimbi_base_database, :bilimbi_module)
+
+    on_exit(fn ->
+      Application.put_env(:bilimbi_base_database, :bilimbi_module, descriptor)
+    end)
+
+    Application.put_env(
+      :bilimbi_base_database,
+      :bilimbi_module,
+      Map.put(descriptor, :graph_fingerprint, "stale-test-fingerprint")
+    )
+
+    assert_raise ArgumentError, ~r/compiled from different workspace graphs/, fn ->
+      run([definition], context)
+    end
+
+    refute_received :seed_callback_invoked
+
+    assert [[nil]] =
+             SQL.query!(
+               Repo,
+               "SELECT to_regclass($1)",
+               [context.prefix <> ".bilimbi_production_seeds"]
+             ).rows
+  end
+
+  defp seed(id, callback, dependencies \\ []) do
     module_id = id |> String.split("/") |> Enum.take(2) |> Enum.join("/")
+
+    descriptor =
+      ModuleRegistry.installed_modules!()
+      |> Enum.find(&(&1.id == module_id))
 
     ProductionSeed.new!(
       id: id,
       module_id: module_id,
-      module_order: order,
+      module_order: descriptor.order,
       callback: callback,
       dependencies: dependencies
     )
