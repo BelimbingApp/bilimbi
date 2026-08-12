@@ -339,16 +339,35 @@ invents a fourth pattern.
 
 1. **Geonames import** (BLB-S1-001, in flight).
 2. **Employee** (BLB-S1-003, in flight) — Core, required, per §8.1.
-3. **Seeder ledger** (§6) — small, unblocks the reference-data gate.
-4. **Core User, identity only.** Port `users`, `password_reset_tokens`,
-   `user_pins`, `user_database_queries`, `notifications`, plus the
-   `company_external_accesses.user_id` FK per §4.1. Public API covers
-   creation, company/employee affiliation, and lookup.
+3. **Verifier column types** (§8.7) — blocks Core User outright. Small,
+   independent, and every later stage needs it too.
+4. **Seeder ledger** (§6) — small, unblocks the reference-data gate.
+5. **Core User, identity only.** Port `users`, `password_reset_tokens`,
+   `user_pins`, `user_database_queries`, `notifications`, and the
+   `core/user external-access owner` optional group per §4.1 — column, index,
+   and FK in one migration, with no Company-side edit. Public API covers
+   company/employee affiliation and lookup.
    **Explicitly defer** authentication, sessions, password reset flow,
    authorization, preferences, and the `Core/AI` model-hint code in
    `User::getLastUsedModel()` to S2/S4. This split is what §5 makes possible
    and it is the only way User fits inside S1 without dragging Authz and
    Settings in with it.
+
+   One consequence of that deferral needs deciding rather than assuming:
+   `users.password` is non-null, and `mix.lock` has no `bcrypt_elixir`,
+   `argon2_elixir`, or `pbkdf2_elixir`. Either the S1 slice stores an
+   already-hashed credential supplied by its caller and never hashes — Belimbing
+   stores Laravel bcrypt (`$2y$…`) crypt-format strings, so validating that
+   shape preserves the canonical format — or S1 absorbs a hashing dependency
+   and the `mix.lock` claim that comes with it. §8.2 is the same question seen
+   from the scope side.
+
+   Tenancy is derived, not stored. `users` has **no `tenant_id`** and no soft
+   deletes, and `company_id` is **nullable**.
+   `app/Core/User/Livewire/Users/Index.php:107-111` joins `companies` and
+   filters `companies.tenant_id`, so a user with a null `company_id` is
+   invisible to every tenant-scoped list. Reproduce that inner join; do not add
+   a `tenant_id` column Belimbing does not have.
 
 `notifications` deserves its own note: UUID primary key, not bigint
 (`0200_01_20_000005:23`), because Laravel's `NotificationSender` assigns
@@ -437,19 +456,51 @@ adopts this ledger, it inherits strings that name classes that no longer exist
 under any topology. Whether Bilimbi reuses the table or starts a parallel one
 is a compatibility decision.
 
+**8.7 The verifier's column-type vocabulary blocks four modules — decide who
+fixes it.** `Bilimbi.Base.Database.SchemaVerifier.type_matches?/2` has eleven
+clauses — `{:varchar, n}`, `{:timestamp, n}`, `{:numeric, p, s}`, `:bigint`,
+`:boolean`, `:date`, `:double_precision`, `:integer`, `:json`, `:smallint`,
+`:text` — and **no catch-all clause**. Four PostgreSQL types in Belimbing's
+Base/Core schema fall outside it. Mappings confirmed against
+`vendor/laravel/framework/.../Grammars/PostgresGrammar.php` at
+`laravel/framework ^13.14.0`, not assumed:
+
+| Type | PostgreSQL | Blocks | Evidence |
+|---|---|---|---|
+| `char(n)` | `character` | **Core/User**, Base/Workflow, Base/Database | `user_pins.url_hash` is `char(32)`, an MD5 backing `(user_id, url_hash)` unique |
+| `uuid` | `uuid` | **Core/User** | `notifications.id`; a bigint `id()` "breaks every insert" per the migration comment |
+| `jsonb` | `jsonb` | Base/Audit | `base_audit_mutations`, `base_audit_actions` — distinct from the `:json` used everywhere else |
+| `inet` | `inet` | Base/Audit | `ipAddress()` maps to `inet`, **not** `varchar(45)`, in Laravel 13 |
+
+Core/AI additionally uses `ulid` ×4, which Laravel emits as `char(26)` — the
+same `character` gap.
+
+No existing contract uses any of these, which is why nothing has hit it yet.
+Core User is the first module that needs two of them, so this is now on the S1
+critical path.
+
+The missing catch-all is worth a separate judgement: with no fallback clause, a
+contract naming an unsupported type raises `FunctionClauseError` instead of
+reporting drift. A verifier that crashes on an unknown type is less safe than
+one that reports it, and that call belongs to Base Database's owner.
+
 ## 9. Suggested non-overlapping task split
 
 Each claims one module directory. None overlaps another's write paths.
 
 | Task | Role | Claim | Depends on |
 |---|---|---|---|
-| Seeder ledger contract | Module implementer | `apps/base/database/**` | — |
-| Module contribution contract | Compatibility architect | ADR (integration-owned) | — |
-| Core User contract | Compatibility architect | research/ADR | BLB-S1-003 handoff |
-| Core User implementation | Module implementer | `apps/core/user/**` | Core User contract |
-| `company_external_accesses.user_id` FK | Module implementer | `apps/core/company/**` | Core User; conflicts with BLB-S1-004 — serialize |
+| Verifier column types (§8.7) | Module implementer | `apps/base/database/**` | — |
+| Seeder ledger contract (§6) | Module implementer | `apps/base/database/**` | Serialize with the above — same module |
+| Module contribution contract (§8.3) | Compatibility architect | ADR (integration-owned) | — |
+| Core User foundation | Module implementer | `apps/core/user/**` | Verifier types; BLB-S1-003 handoff |
 | Base Settings | Module implementer | `apps/base/settings/**` | Contribution contract |
 | Base Authz | Module implementer | `apps/base/authz/**` | Settings, BLB-S1-003 handoff |
+
+Core User no longer needs a separate contract task or a Company-side FK task:
+§4.1 establishes that the `core/user external-access owner` optional group is
+already declared, so one module claim delivers the whole capability. It does
+need the verifier types first — that dependency is hard, not advisory.
 
 The Core User implementation and the Company FK task touch different modules
 but land in one schema change; the integration steward should sequence them, or
