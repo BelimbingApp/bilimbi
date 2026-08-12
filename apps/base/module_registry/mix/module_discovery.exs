@@ -253,8 +253,12 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     end
   rescue
     error ->
-      raise ArgumentError,
-            "malformed Bilimbi #{label} descriptor #{path}: #{Exception.message(error)}"
+      reraise ArgumentError,
+              [
+                message:
+                  "malformed Bilimbi #{label} descriptor #{path}: #{Exception.message(error)}"
+              ],
+              __STACKTRACE__
   end
 
   defp validate_keyword_keys!(value, expected_keys, path) do

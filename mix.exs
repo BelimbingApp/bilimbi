@@ -21,7 +21,12 @@ defmodule Bilimbi.Umbrella.MixProject do
   defp deps do
     [
       # Required to format HEEx from the umbrella root.
-      {:phoenix_live_view, "~> 1.2.0"}
+      {:phoenix_live_view, "~> 1.2.0"},
+      # Project-wide, open-source development and CI checks.
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.15.0", only: [:dev, :test], runtime: false}
     ]
   end
 

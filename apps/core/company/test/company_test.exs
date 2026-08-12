@@ -1,8 +1,8 @@
 defmodule Bilimbi.Core.CompanyTest do
   use Bilimbi.Base.Database.DataCase, async: true
 
-  alias Bilimbi.Core.Company
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.PrimaryCompanyManager
   alias Bilimbi.Core.Company.SchemaContract
   alias Bilimbi.Core.Company.Summary

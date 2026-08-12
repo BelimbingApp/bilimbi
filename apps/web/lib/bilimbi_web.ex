@@ -88,8 +88,8 @@ defmodule BilimbiWeb do
       import BilimbiWeb.CoreComponents
 
       # Common modules used in templates
-      alias Phoenix.LiveView.JS
       alias BilimbiWeb.Layouts
+      alias Phoenix.LiveView.JS
 
       # Routes generation with the ~p sigil
       unquote(verified_routes())
