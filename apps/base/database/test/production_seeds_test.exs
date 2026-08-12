@@ -192,6 +192,57 @@ defmodule Bilimbi.Base.Database.ProductionSeedsTest do
     end
   end
 
+  test "rejects a complete ledger whose status default could suppress callbacks", context do
+    SQL.query!(
+      Repo,
+      """
+      CREATE TABLE #{ledger(context)} (
+        seed_id varchar(255) PRIMARY KEY,
+        module_id varchar(255) NOT NULL,
+        module_order integer NOT NULL,
+        status varchar(20) NOT NULL DEFAULT 'completed',
+        attempts integer NOT NULL DEFAULT 0,
+        started_at timestamp(0) without time zone,
+        completed_at timestamp(0) without time zone,
+        error_message text,
+        inserted_at timestamp(0) without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at timestamp(0) without time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT bilimbi_production_seeds_status_check
+          CHECK (status IN ('pending', 'running', 'completed', 'failed', 'skipped'))
+      )
+      """,
+      []
+    )
+
+    definition =
+      seed("base/database/wrong-default", fn _repo ->
+        send(self(), :seed_callback_invoked)
+        :ok
+      end)
+
+    assert_raise ArgumentError, ~r/status: expected default/, fn ->
+      run([definition], context)
+    end
+
+    refute_received :seed_callback_invoked
+  end
+
+  test "rejects a ledger missing the required status constraint", context do
+    assert {:ok, []} = run([], context)
+
+    SQL.query!(
+      Repo,
+      "ALTER TABLE #{ledger(context)} DROP CONSTRAINT bilimbi_production_seeds_status_check",
+      []
+    )
+
+    assert_raise ArgumentError,
+                 ~r/missing constraint bilimbi_production_seeds_status_check/,
+                 fn ->
+                   run([], context)
+                 end
+  end
+
   test "rejects stale workspace metadata before ledger or callback mutation", context do
     definition =
       seed("base/database/stale-graph", fn _repo ->

@@ -37,9 +37,10 @@ every installed baseline migration without executing its DDL. Treating the
 ledger as a required compatibility table would therefore either block adoption
 or mark its creation migration complete while leaving the table absent. The
 runner serializes first-use initialization under its per-prefix advisory lock.
-After create-if-missing, the runner verifies the ledger column nullability/types
-and required indexes against the expected shape and fails closed on drift; it
-does not use this path to alter or conceal drift in canonical business tables.
+After create-if-missing, the runner verifies the ledger column types,
+nullability, precision and defaults, its allowed-status constraint, and its
+required indexes against the expected shape and fails closed on drift; it does
+not use this path to alter or conceal drift in canonical business tables.
 
 Owning modules implement
 `Bilimbi.Base.Database.ProductionSeedProvider` and explicitly register the

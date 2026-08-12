@@ -8,6 +8,7 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
 
   @table "bilimbi_production_seeds"
   @interrupted_error "Seed execution was interrupted before completion and will be retried."
+  @status_constraint_definition "CHECK (status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying, 'skipped'::character varying]::text[]))"
 
   @spec run(Ecto.Repo.t(), [ProductionSeed.t()], keyword()) ::
           {:ok, [map()]} | {:error, map()}
@@ -82,6 +83,7 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
 
     {prefix, bare_table} = split_qualified_table(table)
     verify_ledger_columns!(repo, prefix, bare_table)
+    verify_ledger_constraints!(repo, prefix, bare_table)
 
     SQL.query!(
       repo,
@@ -100,7 +102,8 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
       SQL.query!(
         repo,
         """
-        SELECT column_name, data_type, character_maximum_length, is_nullable
+        SELECT column_name, data_type, character_maximum_length,
+               datetime_precision, is_nullable, column_default
         FROM information_schema.columns
         WHERE table_schema = $1 AND table_name = $2
         """,
@@ -108,25 +111,32 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
       )
 
     actual =
-      Map.new(result.rows, fn [name, type, length, nullable] ->
-        {name, %{type: type, length: length, nullable: nullable == "YES"}}
+      Map.new(result.rows, fn [name, type, length, precision, nullable, default] ->
+        {name,
+         %{
+           type: type,
+           length: length,
+           precision: precision,
+           nullable: nullable == "YES",
+           default: default
+         }}
       end)
 
     expected = %{
-      "seed_id" => {"character varying", 255, false},
-      "module_id" => {"character varying", 255, false},
-      "module_order" => {"integer", nil, false},
-      "status" => {"character varying", 20, false},
-      "attempts" => {"integer", nil, false},
-      "started_at" => {"timestamp without time zone", nil, true},
-      "completed_at" => {"timestamp without time zone", nil, true},
-      "error_message" => {"text", nil, true},
-      "inserted_at" => {"timestamp without time zone", nil, false},
-      "updated_at" => {"timestamp without time zone", nil, false}
+      "seed_id" => {"character varying", 255, nil, false, nil},
+      "module_id" => {"character varying", 255, nil, false, nil},
+      "module_order" => {"integer", nil, nil, false, nil},
+      "status" => {"character varying", 20, nil, false, "'pending'::character varying"},
+      "attempts" => {"integer", nil, nil, false, "0"},
+      "started_at" => {"timestamp without time zone", nil, 0, true, nil},
+      "completed_at" => {"timestamp without time zone", nil, 0, true, nil},
+      "error_message" => {"text", nil, nil, true, nil},
+      "inserted_at" => {"timestamp without time zone", nil, 0, false, "CURRENT_TIMESTAMP"},
+      "updated_at" => {"timestamp without time zone", nil, 0, false, "CURRENT_TIMESTAMP"}
     }
 
     errors =
-      Enum.flat_map(expected, fn {name, {type, length, nullable}} ->
+      Enum.flat_map(expected, fn {name, {type, length, precision, nullable, default}} ->
         case Map.fetch(actual, name) do
           :error ->
             ["missing column #{name}"]
@@ -151,6 +161,22 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
                 do: acc,
                 else: ["#{name}: expected nullable=#{nullable}, got #{column.nullable}" | acc]
             end)
+            |> then(fn acc ->
+              if column.precision == precision,
+                do: acc,
+                else: [
+                  "#{name}: expected precision #{inspect(precision)}, got #{inspect(column.precision)}"
+                  | acc
+                ]
+            end)
+            |> then(fn acc ->
+              if column.default == default,
+                do: acc,
+                else: [
+                  "#{name}: expected default #{inspect(default)}, got #{inspect(column.default)}"
+                  | acc
+                ]
+            end)
         end
       end)
 
@@ -159,6 +185,65 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
       |> Map.keys()
       |> Enum.reject(&Map.has_key?(expected, &1))
       |> Enum.map(&"unexpected column #{&1}")
+
+    raise_ledger_drift!(errors ++ unexpected)
+  end
+
+  defp verify_ledger_constraints!(repo, prefix, table) do
+    result =
+      SQL.query!(
+        repo,
+        """
+        SELECT c.conname, c.convalidated, pg_get_constraintdef(c.oid, true)
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE n.nspname = $1 AND t.relname = $2 AND c.contype = 'c'
+        """,
+        [prefix, table]
+      )
+
+    actual =
+      Map.new(result.rows, fn [name, validated, definition] ->
+        {name, %{validated: validated, definition: definition}}
+      end)
+
+    expected = %{
+      "bilimbi_production_seeds_status_check" => %{
+        validated: true,
+        definition: @status_constraint_definition
+      }
+    }
+
+    errors =
+      Enum.flat_map(expected, fn {name, spec} ->
+        case Map.fetch(actual, name) do
+          :error ->
+            ["missing constraint #{name}"]
+
+          {:ok, constraint} ->
+            []
+            |> then(fn acc ->
+              if constraint.validated == spec.validated,
+                do: acc,
+                else: [
+                  "#{name}: expected validated=#{spec.validated}, got #{constraint.validated}"
+                  | acc
+                ]
+            end)
+            |> then(fn acc ->
+              if constraint.definition == spec.definition,
+                do: acc,
+                else: ["#{name}: definition does not match the required status domain" | acc]
+            end)
+        end
+      end)
+
+    unexpected =
+      actual
+      |> Map.keys()
+      |> Enum.reject(&Map.has_key?(expected, &1))
+      |> Enum.map(&"unexpected constraint #{&1}")
 
     raise_ledger_drift!(errors ++ unexpected)
   end
