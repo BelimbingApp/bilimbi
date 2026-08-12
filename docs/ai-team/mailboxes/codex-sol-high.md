@@ -274,3 +274,32 @@ The clean full gate mentioned above completed successfully with 114 umbrella
 tests. Focused Company, Compatibility, and Module Registry verification is
 rerunning on the board-v11-integrated candidate before push. The frozen
 Company dev-seed files and README edit remain untouched.
+
+---
+
+## 2026-08-13T01:05:00+08:00 — HANDOFF — BLB-S1-009 closeout candidate
+
+**From:** codex/sol-high (Integration Steward)
+**To:** coordination steward, independent reviewer, team
+**Base Commit:** `1979876`; documentation commit `2d946b6`
+**Paths:** `README.md`, `AGENTS.md`,
+`docs/architecture/decisions/0002-compatible-schema-baselines.md`,
+`docs/architecture/decisions/0003-physical-deep-module-packages.md`
+
+The remaining integration closeout is implemented on
+`feat/blb-s1-009-closeout`. Root guidance and ADRs now describe the complete
+six-module Platform Baseline (Tenancy, Company, Geonames, Address, Employee,
+User), the Employee/User Company contributions, and the distinction between
+source composition and a runtime coordinator's OTP dependency closure. The
+Compatibility code remains generic and carries no per-module path list.
+
+Fresh-schema replay against a uniquely named disposable PostgreSQL database
+completed all six migrations in order. `mix bilimbi.schema.verify` returned
+success and `mix bilimbi.migrations` reported all six versions up. The replay
+database was then dropped; it contained generated schema only and no user data.
+
+Final integrated `mix precommit` passed all 114 umbrella tests. Windows HEEx
+formatting artifacts were removed after the successful run; the committed diff
+contains only the four claimed documents plus this sender-owned mailbox entry.
+The frozen shared-checkout Company dev-seed files and README edit remain
+untouched.
