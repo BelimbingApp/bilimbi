@@ -1,6 +1,7 @@
 defmodule Bilimbi.Core.AddressTest do
   use Bilimbi.Base.Database.DataCase, async: true
 
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
 
   import Bilimbi.Core.Address.TestFixtures
@@ -17,12 +18,15 @@ defmodule Bilimbi.Core.AddressTest do
     insert_company!(%{id: 73, tenant_id: 41, code: "operator"})
     insert_company!(%{id: 74, tenant_id: 42, code: "customer"})
 
-    :ok
+    {:ok, operator} = Tenancy.scope(41)
+    {:ok, customer} = Tenancy.scope(42)
+
+    %{operator: operator, customer: customer}
   end
 
-  test "creates and reads addresses only inside the explicit tenant" do
+  test "creates and reads addresses only inside the explicit tenant", context do
     assert {:ok, address} =
-             Address.create_address(41, %{
+             Address.create_address(context.operator, %{
                tenant_id: 42,
                label: "HQ",
                line1: "1 Platform Road",
@@ -34,62 +38,73 @@ defmodule Bilimbi.Core.AddressTest do
     assert address.label == "HQ"
     assert address.verification_status == "unverified"
 
-    assert {:ok, [same_address]} = Address.list_addresses(41)
+    assert {:ok, [same_address]} = Address.list_addresses(context.operator)
     assert same_address.id == address.id
-    assert {:ok, []} = Address.list_addresses(42)
-    assert {:error, :address_not_found} = Address.get_address(42, address.id)
+    assert {:ok, []} = Address.list_addresses(context.customer)
+    assert {:error, :address_not_found} = Address.get_address(context.customer, address.id)
   end
 
-  test "rejects missing and soft-deleted tenants" do
-    assert {:error, :tenant_not_found} = Address.create_address(999, %{label: "Nowhere"})
+  # A raw tenant ID or a bare tenant identity is not a scope. These are also
+  # rejected statically by the type checker; the values are made opaque here so
+  # the runtime clause itself is what gets asserted.
+  test "cannot be called without a scope", context do
+    for not_a_scope <- [41, nil, context.operator.tenant] do
+      assert_raise FunctionClauseError, fn -> Address.list_addresses(opaque(not_a_scope)) end
+      assert_raise FunctionClauseError, fn -> Address.get_address(opaque(not_a_scope), 1) end
 
-    Ecto.Adapters.SQL.query!(
-      Bilimbi.Base.Repo,
-      "UPDATE tenants SET deleted_at = '2026-08-12 12:00:00' WHERE id = 42",
-      []
-    )
-
-    assert {:error, :tenant_not_found} = Address.create_address(42, %{label: "Closed"})
+      assert_raise FunctionClauseError, fn ->
+        Address.create_address(opaque(not_a_scope), %{label: "Unscoped"})
+      end
+    end
   end
 
-  test "returns changeset errors for unknown geographic references" do
+  test "returns changeset errors for unknown geographic references", context do
     assert {:error, country_changeset} =
-             Address.create_address(41, %{label: "Unknown country", country_iso: "ZZ"})
+             Address.create_address(context.operator, %{
+               label: "Unknown country",
+               country_iso: "ZZ"
+             })
 
     assert {:country_iso, {_message, _metadata}} =
              List.keyfind(country_changeset.errors, :country_iso, 0)
 
     assert {:error, admin1_changeset} =
-             Address.create_address(41, %{label: "Unknown region", admin1_code: "MY.99"})
+             Address.create_address(context.operator, %{
+               label: "Unknown region",
+               admin1_code: "MY.99"
+             })
 
     assert {:admin1_code, {_message, _metadata}} =
              List.keyfind(admin1_changeset.errors, :admin1_code, 0)
   end
 
-  test "updates without allowing tenant reassignment and soft deletes" do
-    assert {:ok, address} = Address.create_address(41, %{label: "Old label"})
+  test "updates without allowing tenant reassignment and soft deletes", context do
+    assert {:ok, address} = Address.create_address(context.operator, %{label: "Old label"})
 
     assert {:ok, updated} =
-             Address.update_address(41, address.id, %{label: "New label", tenant_id: 42})
+             Address.update_address(context.operator, address.id, %{
+               label: "New label",
+               tenant_id: 42
+             })
 
     assert updated.label == "New label"
     assert updated.tenant_id == 41
 
-    assert :ok = Address.delete_address(41, address.id)
-    assert {:ok, []} = Address.list_addresses(41)
-    assert {:error, :address_not_found} = Address.get_address(41, address.id)
+    assert :ok = Address.delete_address(context.operator, address.id)
+    assert {:ok, []} = Address.list_addresses(context.operator)
+    assert {:error, :address_not_found} = Address.get_address(context.operator, address.id)
   end
 
-  test "attaches an address to a same-tenant company using compatible morph identity" do
-    assert {:ok, address} = Address.create_address(41, %{label: "HQ"})
+  test "attaches an address to a same-tenant company using compatible morph identity", context do
+    assert {:ok, address} = Address.create_address(context.operator, %{label: "HQ"})
 
     assert {:ok, :attached} =
-             Address.attach_to_company(41, address.id, 73, %{
+             Address.attach_to_company(context.operator, address.id, 73, %{
                is_primary: true,
                priority: 1
              })
 
-    assert {:ok, [attached]} = Address.list_company_addresses(41, 73)
+    assert {:ok, [attached]} = Address.list_company_addresses(context.operator, 73)
     assert attached.id == address.id
 
     assert [["App\\Core\\Company\\Models\\Company"]] =
@@ -100,10 +115,11 @@ defmodule Bilimbi.Core.AddressTest do
              ).rows
   end
 
-  test "fails closed for cross-tenant and soft-deleted owners" do
-    assert {:ok, address} = Address.create_address(41, %{label: "HQ"})
+  test "fails closed for cross-tenant and soft-deleted owners", context do
+    assert {:ok, address} = Address.create_address(context.operator, %{label: "HQ"})
 
-    assert {:error, :company_not_found} = Address.attach_to_company(41, address.id, 74)
+    assert {:error, :company_not_found} =
+             Address.attach_to_company(context.operator, address.id, 74)
 
     Ecto.Adapters.SQL.query!(
       Bilimbi.Base.Repo,
@@ -111,19 +127,24 @@ defmodule Bilimbi.Core.AddressTest do
       []
     )
 
-    assert {:error, :company_not_found} = Address.attach_to_company(41, address.id, 73)
-    assert {:error, :company_not_found} = Address.list_company_addresses(41, 73)
+    assert {:error, :company_not_found} =
+             Address.attach_to_company(context.operator, address.id, 73)
+
+    assert {:error, :company_not_found} =
+             Address.list_company_addresses(context.operator, 73)
   end
 
-  test "rejects invalid attachment date ranges" do
-    assert {:ok, address} = Address.create_address(41, %{label: "Temporary"})
+  test "rejects invalid attachment date ranges", context do
+    assert {:ok, address} = Address.create_address(context.operator, %{label: "Temporary"})
 
     assert {:error, changeset} =
-             Address.attach_to_company(41, address.id, 73, %{
+             Address.attach_to_company(context.operator, address.id, 73, %{
                valid_from: ~D[2026-08-12],
                valid_to: ~D[2026-08-11]
              })
 
     assert {:valid_to, {_message, []}} = List.keyfind(changeset.errors, :valid_to, 0)
   end
+
+  defp opaque(value), do: :erlang.element(1, {value})
 end

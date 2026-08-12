@@ -11,8 +11,10 @@ defmodule Bilimbi.Core.Company do
   require Logger
 
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.InvariantError, as: TenantInvariantError
   alias Bilimbi.Base.Tenancy.NotProvisionedError, as: TenantNotProvisionedError
+  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company.PrimaryCompanyInvariantError
   alias Bilimbi.Core.Company.PrimaryCompanyManager
   alias Bilimbi.Core.Company.PrimaryCompanyNotProvisionedError
@@ -21,13 +23,11 @@ defmodule Bilimbi.Core.Company do
 
   @type lookup_error :: :not_provisioned | :invariant_violation | :database_unavailable
 
-  @spec get_company(pos_integer(), pos_integer()) :: {:ok, Summary.t()} | {:error, :not_found}
-  def get_company(tenant_id, company_id) do
+  @spec get_company(Scope.t(), pos_integer()) :: {:ok, Summary.t()} | {:error, :not_found}
+  def get_company(%Scope{} = scope, company_id) do
     query =
-      from company in Schema,
-        where:
-          company.id == ^company_id and company.tenant_id == ^tenant_id and
-            is_nil(company.deleted_at)
+      from company in Tenancy.scope_query(Schema, scope),
+        where: company.id == ^company_id and is_nil(company.deleted_at)
 
     case Repo.one(query) do
       nil -> {:error, :not_found}

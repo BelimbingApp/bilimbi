@@ -504,6 +504,23 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
 - Preload associations before accessing them in templates.
 - Import `Ecto.Query` explicitly where query macros are used.
 - Use explicit query scopes for tenant and soft-delete filtering.
+- **A module API that reads or writes tenant-owned data takes a
+  `Bilimbi.Base.Tenancy.Scope`, never a raw tenant ID.** The scope is built
+  once at the edge with `Tenancy.scope/1`; downstream modules do not re-resolve
+  or re-validate the tenant, and no operation below that point carries a
+  `:tenant_not_found` failure.
+- **Begin such a read with `Tenancy.scope_query/2`.** It has one clause, so a
+  missing or `nil` tenant raises instead of returning an unfiltered query. A
+  hand-written `tenant_id` comparison in a caller-facing read is a defect. It
+  is greppable, so treat it as one:
+
+  ```bash
+  grep -rnE 'tenant_id\s*==\s*\^' apps/*/*/lib
+  ```
+
+  The surviving matches must be invariant checks inside the module that owns
+  the table — row locking, or a deliberate cross-tenant uniqueness proof — and
+  each one should say so in a comment or function name.
 - Name constraints and indexes deliberately, especially on PostgreSQL.
 - Generate migrations with `mix ecto.gen.migration`, but first confirm that
   the migration belongs to Bilimbi's compatibility plan and will not alter an

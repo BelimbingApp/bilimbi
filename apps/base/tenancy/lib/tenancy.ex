@@ -12,6 +12,7 @@ defmodule Bilimbi.Base.Tenancy do
   alias Bilimbi.Base.Tenancy.Identity
   alias Bilimbi.Base.Tenancy.InvariantError
   alias Bilimbi.Base.Tenancy.NotProvisionedError
+  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.Tenancy.Tenant
 
   @spec platform_operator() :: Identity.t() | nil
@@ -65,6 +66,40 @@ defmodule Bilimbi.Base.Tenancy do
       %Tenant{deleted_at: nil} = tenant -> {:ok, Identity.from_schema(tenant)}
       %Tenant{} -> {:error, :soft_deleted}
     end
+  end
+
+  @doc """
+  Builds the tenant scope that every tenant-owned operation is performed under.
+
+  Resolving the tenant is this function's job and no other module's. A caller
+  that holds a `Scope` holds proof that the tenant existed and was live when
+  the unit of work began.
+  """
+  @spec scope(pos_integer()) :: {:ok, Scope.t()} | {:error, :not_found | :soft_deleted}
+  def scope(tenant_id) when is_integer(tenant_id) and tenant_id > 0 do
+    with {:ok, tenant} <- fetch_tenant(tenant_id) do
+      {:ok, Scope.for_tenant(tenant)}
+    end
+  end
+
+  @doc """
+  Constrains a query on a tenant-owned table to the scope's tenant.
+
+  This is the sanctioned way to begin a read of tenant-owned data on behalf of
+  a caller. It has exactly one clause, so a `nil`, a bare integer, or a
+  forgotten argument raises instead of quietly producing an unfiltered query —
+  the failure mode for a missing tenant filter is a crash, never a cross-tenant
+  read.
+
+  The first binding is named `:scoped` so correlated subqueries can refer to it
+  with `parent_as(:scoped)`. Call this before adding any other clause; it
+  introduces the source binding.
+  """
+  @spec scope_query(Ecto.Queryable.t(), Scope.t()) :: Ecto.Query.t()
+  def scope_query(queryable, %Scope{} = scope) do
+    tenant_id = Scope.tenant_id(scope)
+
+    from record in queryable, as: :scoped, where: record.tenant_id == ^tenant_id
   end
 
   @doc """
