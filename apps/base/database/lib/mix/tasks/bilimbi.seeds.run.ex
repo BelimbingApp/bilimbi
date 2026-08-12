@@ -4,6 +4,7 @@ defmodule Mix.Tasks.Bilimbi.Seeds.Run do
   use Mix.Task
 
   alias Bilimbi.Base.Database
+  alias Bilimbi.Base.Database.ProductionSeedProvider
   alias Bilimbi.Base.ModuleRegistry
 
   @shortdoc "Runs pending Bilimbi production seeds"
@@ -62,6 +63,37 @@ defmodule Mix.Tasks.Bilimbi.Seeds.Run do
       Mix.raise("#{inspect(provider)} is not a production seed provider")
     end
 
-    provider.production_seeds()
+    behaviours =
+      provider.module_info(:attributes)
+      |> Keyword.get_values(:behaviour)
+      |> List.flatten()
+
+    unless ProductionSeedProvider in behaviours do
+      Mix.raise(
+        "#{inspect(provider)} must implement Bilimbi.Base.Database.ProductionSeedProvider"
+      )
+    end
+
+    otp_app =
+      Application.get_application(provider) ||
+        Mix.raise("#{inspect(provider)} is not loaded from an OTP application")
+
+    descriptor =
+      ModuleRegistry.installed_modules!()
+      |> Enum.find(&(&1.otp_app == otp_app)) ||
+        Mix.raise("#{inspect(otp_app)} has no installed Bilimbi module metadata")
+
+    seeds = provider.production_seeds()
+
+    Enum.each(seeds, fn seed ->
+      unless seed.module_id == descriptor.id do
+        Mix.raise(
+          "production seed #{seed.id} belongs to #{seed.module_id}, but provider " <>
+            "#{inspect(provider)} is installed as #{descriptor.id}"
+        )
+      end
+    end)
+
+    seeds
   end
 end

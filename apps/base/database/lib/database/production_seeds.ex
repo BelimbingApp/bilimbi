@@ -80,6 +80,9 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
       []
     )
 
+    {prefix, bare_table} = split_qualified_table(table)
+    verify_ledger_columns!(repo, prefix, bare_table)
+
     SQL.query!(
       repo,
       """
@@ -88,6 +91,151 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
       """,
       []
     )
+
+    verify_ledger_indexes!(repo, prefix, bare_table)
+  end
+
+  defp verify_ledger_columns!(repo, prefix, table) do
+    result =
+      SQL.query!(
+        repo,
+        """
+        SELECT column_name, data_type, character_maximum_length, is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = $1 AND table_name = $2
+        """,
+        [prefix, table]
+      )
+
+    actual =
+      Map.new(result.rows, fn [name, type, length, nullable] ->
+        {name, %{type: type, length: length, nullable: nullable == "YES"}}
+      end)
+
+    expected = %{
+      "seed_id" => {"character varying", 255, false},
+      "module_id" => {"character varying", 255, false},
+      "module_order" => {"integer", nil, false},
+      "status" => {"character varying", 20, false},
+      "attempts" => {"integer", nil, false},
+      "started_at" => {"timestamp without time zone", nil, true},
+      "completed_at" => {"timestamp without time zone", nil, true},
+      "error_message" => {"text", nil, true},
+      "inserted_at" => {"timestamp without time zone", nil, false},
+      "updated_at" => {"timestamp without time zone", nil, false}
+    }
+
+    errors =
+      Enum.flat_map(expected, fn {name, {type, length, nullable}} ->
+        case Map.fetch(actual, name) do
+          :error ->
+            ["missing column #{name}"]
+
+          {:ok, column} ->
+            []
+            |> then(fn acc ->
+              if column.type == type,
+                do: acc,
+                else: ["#{name}: expected #{type}, got #{column.type}" | acc]
+            end)
+            |> then(fn acc ->
+              if column.length == length,
+                do: acc,
+                else: [
+                  "#{name}: expected length #{inspect(length)}, got #{inspect(column.length)}"
+                  | acc
+                ]
+            end)
+            |> then(fn acc ->
+              if column.nullable == nullable,
+                do: acc,
+                else: ["#{name}: expected nullable=#{nullable}, got #{column.nullable}" | acc]
+            end)
+        end
+      end)
+
+    unexpected =
+      actual
+      |> Map.keys()
+      |> Enum.reject(&Map.has_key?(expected, &1))
+      |> Enum.map(&"unexpected column #{&1}")
+
+    raise_ledger_drift!(errors ++ unexpected)
+  end
+
+  defp verify_ledger_indexes!(repo, prefix, table) do
+    result =
+      SQL.query!(
+        repo,
+        """
+        SELECT i.relname AS index_name,
+               ix.indisunique AS unique,
+               array_agg(a.attname ORDER BY x.ordinality) AS columns
+        FROM pg_class t
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        JOIN pg_index ix ON ix.indrelid = t.oid
+        JOIN pg_class i ON i.oid = ix.indexrelid
+        JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS x(attnum, ordinality) ON true
+        JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = x.attnum
+        WHERE n.nspname = $1 AND t.relname = $2
+        GROUP BY i.relname, ix.indisunique
+        """,
+        [prefix, table]
+      )
+
+    actual =
+      Map.new(result.rows, fn [name, unique, columns] ->
+        {name, %{unique: unique, columns: columns}}
+      end)
+
+    expected = %{
+      "bilimbi_production_seeds_pkey" => %{unique: true, columns: ["seed_id"]},
+      "bilimbi_production_seeds_status_order_index" => %{
+        unique: false,
+        columns: ["status", "module_order", "seed_id"]
+      }
+    }
+
+    errors =
+      Enum.flat_map(expected, fn {name, spec} ->
+        case Map.fetch(actual, name) do
+          :error ->
+            ["missing index #{name}"]
+
+          {:ok, index} ->
+            []
+            |> then(fn acc ->
+              if index.unique == spec.unique,
+                do: acc,
+                else: ["#{name}: expected unique=#{spec.unique}, got #{index.unique}" | acc]
+            end)
+            |> then(fn acc ->
+              if index.columns == spec.columns,
+                do: acc,
+                else: [
+                  "#{name}: expected columns #{inspect(spec.columns)}, got #{inspect(index.columns)}"
+                  | acc
+                ]
+            end)
+        end
+      end)
+
+    raise_ledger_drift!(errors)
+  end
+
+  defp raise_ledger_drift!([]), do: :ok
+
+  defp raise_ledger_drift!(messages) do
+    raise ArgumentError,
+          "bilimbi_production_seeds ledger shape drift: " <>
+            Enum.join(Enum.sort(messages), "; ")
+  end
+
+  defp split_qualified_table(qualified_table) do
+    case Regex.run(~r/^"([^"]+)"\."([^"]+)"$/, qualified_table) do
+      [_, prefix, table] -> {prefix, table}
+      _ -> raise ArgumentError, "invalid qualified ledger table: #{qualified_table}"
+    end
   end
 
   defp recover_interrupted!(repo, table) do
