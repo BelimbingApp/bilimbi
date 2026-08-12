@@ -350,9 +350,7 @@ defmodule Bilimbi.Core.Company.SchemaContract do
       foreign_keys: %{
         "company_departments_company_id_foreign" => foreign_key("company_id", "companies"),
         "company_departments_department_type_id_foreign" =>
-          foreign_key("department_type_id", "company_department_types")
-      },
-      optional_foreign_keys: %{
+          foreign_key("department_type_id", "company_department_types"),
         "company_departments_head_id_foreign" => foreign_key("head_id", "employees", :nilify_all)
       }
     }
