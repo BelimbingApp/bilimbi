@@ -35,9 +35,9 @@ at the repository. Base, Core, and Web are its top-level composition
 applications; each declared deep module below Base or Core is a self-contained
 local Mix package discovered from its descriptor. The current foundation owns
 Ecto migrations that can create the compatible Base Tenancy, Core Company,
-Core Geonames, and Core Address schema, or verify and adopt an existing
-Belimbing database. Optional Domains and deployment-owned Extensions are
-intentionally not implemented yet.
+Core Geonames, Core Address, Core Employee, and Core User schema, or verify and
+adopt an existing Belimbing database. Optional Domains and deployment-owned
+Extensions are intentionally not implemented yet.
 
 The first major compatibility target is the existing Belimbing PostgreSQL
 schema. Bilimbi should map that schema accurately instead of creating a second,
@@ -126,6 +126,8 @@ apps/
 │   ├── company/                  # core/company module package
 │   ├── geonames/                 # Geographic reference-data package
 │   ├── address/                  # core/address module package
+│   ├── employee/                 # core/employee module package
+│   ├── user/                     # core/user module package
 │   └── compatibility/            # Shared migration/adoption coordinator
 └── web/                          # Phoenix endpoint and shared UI shell
 ```
@@ -134,13 +136,13 @@ The complete physical boundary of Base Tenancy is `apps/base/tenancy/`, not a
 directory below its `lib/`. Consequently its source begins at
 `apps/base/tenancy/lib/tenancy.ex` while the Elixir namespace remains
 `Bilimbi.Base.Tenancy`. The same rule applies to Company, Geonames, Address,
-and every future declared module.
+Employee, User, and every future declared module.
 
 A composition container never lists child packages by name. Every immediate
 child directory containing `bilimbi.module.exs` is an installed module; the
 shared discovery code validates all installed descriptors and generates the
 container's local Mix path dependencies. Mounting `apps/base/mailer/` or a
-future `apps/people/employee/` is therefore the source-installation action.
+future `apps/sales/order/` is therefore the source-installation action.
 Dependency resolution and compilation must still run afterward.
 
 The discovery helper itself belongs to `apps/base/module_registry/mix/` and is
@@ -148,7 +150,10 @@ covered by that package's formatter and tests. Mix writes its validated,
 resolved module position and graph fingerprint into OTP application metadata;
 a shared compiler refreshes that metadata across all module packages whenever
 the installed descriptor set changes. Runtime migration discovery consumes
-that approved order instead of maintaining a second graph algorithm.
+that approved order instead of maintaining a second graph algorithm. Because
+runtime discovery can see only loaded OTP applications, the Compatibility
+descriptor declares stable dependencies on every current migration or schema
+contract contributor even though its code contains no module-specific paths.
 
 The descriptor is the source of truth for stable module ID, layer, OTP
 application ID, namespace, declared module dependencies, and migration
@@ -158,8 +163,8 @@ and upward dependency edges. Modules are ordered dependency-first with stable
 module ID as the deterministic tie-breaker.
 
 Future optional Domains are composition applications below `apps/`. For
-example, a People distribution can compose a self-contained Employee module at
-`apps/people/employee/`, with namespace `Bilimbi.People.Employee`. A module
+example, a Sales distribution can compose a self-contained Order module at
+`apps/sales/order/`, with namespace `Bilimbi.Sales.Order`. A module
 directory may be mounted as a nested Git repository and composed as a local Mix
 path dependency without scattering its files through the platform tree. See
 [ADR 0003](./docs/architecture/decisions/0003-physical-deep-module-packages.md).
@@ -204,8 +209,10 @@ only historical migration input in Belimbing, never a Bilimbi runtime role.
 Bilimbi-owned migrations live inside their owning module, currently
 `apps/base/tenancy/priv/repo/migrations`,
 `apps/core/company/priv/repo/migrations`,
-`apps/core/geonames/priv/repo/migrations`, and
-`apps/core/address/priv/repo/migrations`. The Compatibility coordinator obtains
+`apps/core/geonames/priv/repo/migrations`,
+`apps/core/address/priv/repo/migrations`,
+`apps/core/employee/priv/repo/migrations`, and
+`apps/core/user/priv/repo/migrations`. The Compatibility coordinator obtains
 these paths from installed module descriptors; it contains no per-module path
 list. Each migration module uses its owning public namespace. Structural and
 live-data invariants are likewise implemented by the contributing module's
@@ -221,6 +228,13 @@ Core Address preserves Belimbing's camel-cased legacy columns and polymorphic
 Company identity behind a snake-cased Elixir API. Every Address operation takes
 an explicit tenant, and its Geonames normalization foreign keys are now part of
 the required verified contract.
+
+Core Employee preserves Belimbing's employee and employee-type tables and
+completes the Company department-head foreign key. Core User preserves the
+user, password-reset, pin, saved-query, and notification tables and completes
+Company's external-access user contribution. Both modules own their baselines,
+contracts, and tenant/company-scoped APIs while Compatibility only coordinates
+their descriptor-declared contributions.
 
 ## Documentation
 

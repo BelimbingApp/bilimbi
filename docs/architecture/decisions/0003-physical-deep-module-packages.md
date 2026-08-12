@@ -6,7 +6,7 @@
 **Scope:** Deep-module filesystem boundaries, descriptor-driven Mix
 composition, nested Git distribution, tests, documentation, assets, and
 migration ownership
-**Last Updated:** 2026-08-12
+**Last Updated:** 2026-08-13
 
 ## Context
 
@@ -54,17 +54,19 @@ project_root/
 │   │   ├── company/                  # core/company module
 │   │   ├── geonames/                 # core/geonames module
 │   │   ├── address/                  # core/address module
+│   │   ├── employee/                 # core/employee module
+│   │   ├── user/                     # core/user module
 │   │   └── compatibility/            # core/compatibility module
 │   ├── web/                          # Phoenix host and shared shell
-│   ├── people/                       # Optional Domain composition/bundle
+│   ├── sales/                        # Optional Domain composition/bundle
 │   │   ├── mix.exs
 │   │   ├── bilimbi.container.exs
-│   │   └── employee/                 # people/employee module/Git mount
+│   │   └── order/                    # sales/order module/Git mount
 │   │       ├── mix.exs
 │   │       ├── bilimbi.module.exs
 │   │       ├── lib/
-│   │       │   ├── employee.ex
-│   │       │   └── employee/
+│   │       │   ├── order.ex
+│   │       │   └── order/
 │   │       ├── priv/repo/migrations/
 │   │       ├── test/
 │   │       ├── docs/
@@ -89,7 +91,7 @@ context below `lib/`:
 |---|---|---|
 | `apps/base/tenancy/` | `lib/tenancy.ex` | `Bilimbi.Base.Tenancy` |
 | `apps/core/company/` | `lib/company.ex` | `Bilimbi.Core.Company` |
-| `apps/people/employee/` | `lib/employee.ex` | `Bilimbi.People.Employee` |
+| `apps/sales/order/` | `lib/order.ex` | `Bilimbi.Sales.Order` |
 
 Elixir namespaces remain globally qualified. Mix compiles source recursively
 from `lib/`; it does not derive a module name from the filesystem path.
@@ -116,7 +118,7 @@ stable container ID and layer. Its `mix.exs` calls the shared discovery helper
 and never enumerates Database, Tenancy, Company, Address, Compatibility, or any
 other child. Discovery treats each immediate non-hidden child directory as an
 installed module and requires `bilimbi.module.exs` at that child's root. Thus
-mounting `apps/base/mailer/` or `apps/people/employee/` is sufficient to change
+mounting `apps/base/mailer/` or `apps/sales/order/` is sufficient to change
 source composition; Mix dependency resolution and compilation incorporate it.
 
 Base ModuleRegistry physically owns the source-loadable helper at
@@ -173,6 +175,16 @@ that positions are contiguous, layer-monotonic, and dependency-safe, then
 consumes them directly. It does not maintain a second topological-sort
 implementation.
 
+Source composition and runtime visibility are distinct. Discovery makes a
+mounted module available as a path package, but ModuleRegistry can enumerate
+only loaded OTP applications in a runtime consumer's dependency closure. A
+runtime coordinator's descriptor must therefore declare stable dependencies
+on every installed contributor it must enumerate. Compatibility depends on
+each current migration or schema-contract contributor while its code continues
+to discover descriptors, paths, and contracts generically; it contains no
+module-specific path list. A workspace-boundary regression must fail if an
+installed contributor is missing from that runtime closure.
+
 The Base and Core containers are deliberately composition-only and have no
 `lib/`, `priv/`, or `test/` directory and no application callback. Runtime
 processes, resources, and tests are owned by child packages. Their Mix projects
@@ -220,8 +232,8 @@ higher-layer dependants, but its table DDL is defined only in its own test
 support. Web integration tests create business state through public module APIs.
 
 Base and Core modules are required parts of the Platform Baseline. A Domain
-such as People is optional and may be distributed as a bundle repository that
-composes independently mounted child module repositories such as Employee.
+such as Sales is optional and may be distributed as a bundle repository that
+composes independently mounted child module repositories such as Order.
 Source installation and runtime enablement remain separate concerns.
 
 ## Alternatives Considered
