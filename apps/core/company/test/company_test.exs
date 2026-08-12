@@ -2,6 +2,7 @@ defmodule Bilimbi.Core.CompanyTest do
   use Bilimbi.Base.Database.DataCase, async: true
 
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.PrimaryCompanyManager
   alias Bilimbi.Core.Company.SchemaContract
@@ -73,10 +74,12 @@ defmodule Bilimbi.Core.CompanyTest do
     insert_company!()
     insert_company!(%{id: 74, code: "successor"})
 
-    assert {:ok, :assigned} = Company.assign_primary_company(41, 73)
-    assert {:ok, :unchanged} = Company.assign_primary_company(41, 73)
-    assert {:error, {:already_assigned, 73}} = Company.assign_primary_company(41, 74)
-    assert {:ok, :transferred} = Company.transfer_primary_company(41, 74)
+    {:ok, scope} = Tenancy.scope(41)
+
+    assert {:ok, :assigned} = Company.assign_primary_company(scope, 73)
+    assert {:ok, :unchanged} = Company.assign_primary_company(scope, 73)
+    assert {:error, {:already_assigned, 73}} = Company.assign_primary_company(scope, 74)
+    assert {:ok, :transferred} = Company.transfer_primary_company(scope, 74)
     assert PrimaryCompanyManager.require_for_tenant!(41).id == 74
   end
 
@@ -85,8 +88,60 @@ defmodule Bilimbi.Core.CompanyTest do
     insert_tenant!(%{id: 42, name: "Customer", is_platform_operator: false})
     insert_company!()
 
+    {:ok, other_scope} = Tenancy.scope(42)
+
     assert {:error, {:company_tenant_mismatch, 41}} =
-             Company.assign_primary_company(42, 73)
+             Company.assign_primary_company(other_scope, 73)
+  end
+
+  describe "get_company/2" do
+    setup do
+      insert_tenant!()
+      insert_tenant!(%{id: 42, name: "Customer", is_platform_operator: false})
+      insert_company!(%{legal_name: "Bilimbi Industries Sdn. Bhd."})
+
+      {:ok, owner} = Tenancy.scope(41)
+      {:ok, other} = Tenancy.scope(42)
+
+      %{owner: owner, other: other}
+    end
+
+    test "reads a company owned by the scope's tenant", %{owner: owner} do
+      assert {:ok, %Summary{id: 73, tenant_id: 41, name: "Bilimbi Industries"}} =
+               Company.get_company(owner, 73)
+    end
+
+    test "cannot see another tenant's company", %{other: other} do
+      assert {:error, :not_found} = Company.get_company(other, 73)
+    end
+
+    test "cannot see a soft-deleted company", %{owner: owner} do
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        "UPDATE companies SET deleted_at = '2026-08-12 12:00:00' WHERE id = 73",
+        []
+      )
+
+      assert {:error, :not_found} = Company.get_company(owner, 73)
+    end
+
+    # Also rejected statically by the type checker; the values are made opaque
+    # here so the runtime clause itself is what gets asserted.
+    test "cannot be called without a scope", %{owner: owner} do
+      for not_a_scope <- [41, nil, Scope.tenant(owner)] do
+        assert_raise FunctionClauseError, fn ->
+          Company.get_company(opaque(not_a_scope), 73)
+        end
+
+        assert_raise FunctionClauseError, fn ->
+          Company.assign_primary_company(opaque(not_a_scope), 73)
+        end
+
+        assert_raise FunctionClauseError, fn ->
+          Company.transfer_primary_company(opaque(not_a_scope), 73)
+        end
+      end
+    end
   end
 
   test "provisions the platform operator and company idempotently" do
@@ -123,4 +178,6 @@ defmodule Bilimbi.Core.CompanyTest do
 
     assert Tenancy.platform_operator() == nil
   end
+
+  defp opaque(value), do: :erlang.element(1, {value})
 end
