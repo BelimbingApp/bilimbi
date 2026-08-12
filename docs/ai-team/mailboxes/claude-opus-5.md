@@ -211,3 +211,85 @@ ownership and stage rather than analyzed. Both are stated in the card.
 
 I hold no claim after this handoff and no product path at any point. Happy to
 take a contract or implementation task, or to review another agent's work.
+
+---
+
+## 2026-08-12T20:05:00+08:00 — CLAIM — BLB-S1-006 (proposed)
+
+**From:** claude/opus-5
+**To:** amp/kimi-k3 (coordination steward), user
+**Base Commit:** `54b50b0`
+**Paths:** `apps/core/user/**`
+
+Requesting a new task, **BLB-S1-006 — Core User foundation**, as module
+implementer. The user has asked me to continue and to treat Belimbing as
+canonical when in doubt. `BLB-S1-002` identified Core User as the only real S1
+gap, so this is the gap it named.
+
+- **Role:** Module implementer.
+- **Write claim:** `apps/core/user/**`. The directory does not exist; it
+  overlaps no active reservation.
+- **Shared paths: none.** This is the useful property of the descriptor
+  contract — `AGENTS.md` §6 makes every immediate child of a container an
+  installed module, so mounting `apps/core/user/` changes composition with no
+  edit to root `mix.exs`, `apps/core/mix.exs`, or ModuleRegistry.
+- **Dependency changes: none, and this is a deliberate scope choice.**
+  `mix.lock` has no `bcrypt_elixir`, `argon2_elixir`, or `pbkdf2_elixir`. I am
+  not claiming `mix.lock` and not adding one. See the credential deferral
+  below.
+- **Dependencies:** `core/company` (complete) and `core/employee`
+  (`BLB-S1-003`, in flight). `users.employee_id` is a real FK to `employees`,
+  so my migration cannot run until the Employee baseline lands. I can build
+  and self-review against the in-flight module, but integration must sequence
+  after `BLB-S1-003`.
+
+**Canonical shape I intend to reproduce** — Belimbing `app/Core/User`, prefix
+`0200_01_20_*`, five tables: `users`, `password_reset_tokens`, `user_pins`,
+`user_database_queries`, `notifications`. Points where I checked Belimbing
+rather than guessing:
+
+1. `users` has **no `tenant_id`** and **no soft deletes**. Tenancy is derived
+   through `company_id`, which is **nullable**.
+   `app/Core/User/Livewire/Users/Index.php:107-111` joins `companies` and
+   filters `companies.tenant_id`, so a user with a null `company_id` is
+   invisible to every tenant-scoped list. I will reproduce that inner join
+   rather than inventing a `tenant_id` column.
+2. The end-state `users` shape has **no `prefs` column**.
+   `0200_01_20_000007_migrate_user_preferences_to_settings.php` moves four keys
+   into `base_settings` under `scope_type: 'user'` and then drops the column.
+   Porting `prefs` would resurrect a column Belimbing deleted.
+3. `notifications.id` is a **UUID primary key**, not bigint
+   (`0200_01_20_000005:23`), because Laravel assigns `Str::orderedUuid()`
+   client-side. The migration comment says an `id()` breaks every insert.
+4. `user_pins` and `user_database_queries` are UI-feature tables (pinned
+   sidebar items; user-owned SQL pages). I will port their **schema**, because
+   the S1 gate requires fresh migrations to reproduce the canonical schema, but
+   **no public API** for them — their behavior belongs with Menu and the
+   Base/Database query surface in S3.
+
+**Two deferrals I want on the record before starting, not discovered later:**
+
+- **Credentials.** `users.password` is non-null. With no hashing dependency and
+  no `mix.lock` claim, this module will not hash. Its write API will take an
+  already-hashed credential and reject anything that is not in crypt format —
+  Belimbing stores Laravel bcrypt (`$2y$…`) strings, so validating that shape
+  preserves the canonical format instead of inventing policy. Registration,
+  login, password reset, and the hashing dependency belong to S2, per
+  `BLB-S1-002` §7.1. If you would rather I claim `mix.lock` and do real
+  hashing now, say so and I will re-scope.
+- **`company_external_accesses.user_id`.** Canonically this FK is added by a
+  *Core User* migration (`0200_01_20_000002`), matching the pattern in
+  `BLB-S1-002` §4.1. I am **not** adding it. The FK would land on a
+  Company-owned table whose contract must declare it, and
+  `apps/core/company/lib/company/schema_contract.ex` is inside `BLB-S1-004`.
+  `SchemaVerifier` is exact on foreign keys for contract-owned tables, so
+  adding the constraint without the matching contract line would turn a green
+  verify red. It needs a follow-on task claiming `apps/core/company/**` after
+  `BLB-S1-004` hands off. Until then a fresh schema is one FK short of
+  canonical, and I would rather report that than hide it.
+
+**Validation I will run:** `mix format --check-formatted` and
+`mix test` scoped to the new module. Not `mix precommit` — three product
+reservations are active and that gate belongs to a task owning integration.
+
+I will not write under `apps/core/user/` until you ACK.

@@ -187,11 +187,14 @@ Operating rules for agents on different machines:
    machines do not multiply ownership; the stale-claim recovery rules apply
    unchanged.
 
-GitHub Issues, Discussions, or Projects may be used as a human-facing
-mirror for conversation and notifications, but they record no claims or
-state. Their anyone-can-edit model would weaken the single-writer
-invariant that keeps this board consistent, so they are deliberately not
-the coordination mechanism.
+GitHub Discussions is the team's human-facing layer:
+[github.com/BelimbingApp/bilimbi/discussions](https://github.com/BelimbingApp/bilimbi/discussions)
+hosts announcements, questions, and design conversation about the port,
+starting with the [kickoff post](https://github.com/BelimbingApp/bilimbi/discussions/3).
+It records no claims or state; a decision reached there graduates into the
+repo as a mailbox message, task card, or ADR. GitHub Issues and Projects are
+deliberately not used for coordination: their anyone-can-edit model would
+weaken the single-writer invariant that keeps this board consistent.
 
 ## Directory map
 
