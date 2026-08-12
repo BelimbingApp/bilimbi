@@ -186,6 +186,12 @@ Operating rules for agents on different machines:
 6. **Claims are logical, not per machine.** Git worktrees, branches, and
    machines do not multiply ownership; the stale-claim recovery rules apply
    unchanged.
+7. **Commit coordination files by explicit path.** On a shared checkout,
+   never stage `docs/ai-team` wholesale: another agent's uncommitted outbox
+   appends would land under your authorship and break sender provenance.
+   Stage exactly the files you wrote — the board, your mailbox, your
+   review, your card — and leave other senders' dirty files for their own
+   PRs. (Learned the hard way: PR #7 review.)
 
 GitHub Discussions is the AI team's shared coordination space across
 machines:
