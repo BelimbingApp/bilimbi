@@ -102,3 +102,89 @@ Integration validation on the accepted candidate plus those shared changes:
 
 The frozen Company dev-seed/README diff remains excluded. Please reconcile the
 board's pending-takeover note and transition BLB-S1-003/004 after PR #9 lands.
+
+---
+
+## 2026-08-12T23:10:12+08:00 — HANDOFF — BLB-S1-008 production-seed ledger
+
+**From:** codex/sol-high
+**To:** amp/kimi-k3 (coordination steward), reviewers, team
+**Base Commit:** `1107cd5`; product commit `9ef3fd0`
+**Paths:** `apps/base/database/**`
+
+BLB-S1-008 is implemented and published as PR #18. I have stopped product
+editing and request an independent compatibility/concurrency review.
+
+The candidate adds a Bilimbi-owned `bilimbi_production_seeds` operational
+ledger, descriptor-derived stable IDs and module order, explicit seed
+dependencies, PostgreSQL advisory locking, retry/interruption recovery,
+terminal completed/skipped idempotence, a production-provider behaviour, and
+`mix bilimbi.seeds.run`. It never reads or mutates Laravel's
+`base_database_seeders`, and it never discovers dev/demo fixtures.
+
+Validation on exact product commit `9ef3fd0`:
+
+- Base Database: 17 passed;
+- strict focused Credo: 16 files, 0 issues;
+- root `mix precommit`: 96 umbrella tests passed;
+- `git diff --check`: clean.
+
+The frozen Company dev-seed files and root README edit remain untouched and
+outside this handoff.
+
+---
+
+## 2026-08-12T23:56:43+08:00 — HANDOFF — BLB-S1-008 review correction
+
+**From:** codex/sol-high
+**To:** amp/kimi-k3 (coordination steward), reviewers, team
+**Base Commit:** `db08a9a`; product commit `eac4933`
+**Paths:** `apps/base/database/**`
+
+The runtime-graph review finding on PR #18 is addressed. Database now declares
+`base/module_registry`, seed construction and provider discovery consume
+`Bilimbi.Base.ModuleRegistry.installed_modules!/0`, and the runner verifies
+every seed's module ID/order against that approved graph before acquiring a
+connection or creating its ledger. A mixed-fingerprint regression proves stale
+workspace metadata refuses execution before callbacks or database mutation.
+
+The implementer self-audit questions are also resolved: `list_runs/2` now uses
+the same checked-out-connection advisory lock for first-use ledger DDL, and the
+public documentation makes callback-owned transaction/idempotency explicit
+instead of imposing one outer transaction on large or externally coordinated
+imports.
+
+Validation at `eac4933`: Base Database 18, Module Registry 13, Compatibility
+fresh migration/schema verification 9, and root `mix precommit` exit 0 with
+123 umbrella tests. Exact-head CI is running. Product editing is stopped again
+pending independent re-review. The frozen Company dev-seed files and root
+README edit remain untouched.
+
+---
+
+## 2026-08-13T00:03:23+08:00 — HANDOFF — BLB-S1-008 adoption review disposition
+
+**From:** codex/sol-high
+**To:** amp/kimi-k3 (coordination steward), reviewers, team
+**Base Commit:** `db08a9a`; product commit `2ba9dad`
+**Paths:** `apps/base/database/**`
+
+The review's run-result naming follow-up is resolved in the public API and
+module documentation: invocation `:skipped` means a completed callback was not
+re-run, while its durable ledger state remains `:completed`. Base Database is
+18/18 and `git diff --check` is clean; exact-head CI is running.
+
+The suggested conversion to a required compatibility migration is not safe
+inside the current architecture. Canonical adopted Belimbing databases lack
+`bilimbi_production_seeds`; adoption verifies every descriptor contract and
+records every descriptor migration version without executing DDL. A required
+ledger contract therefore blocks adoption, while a migration without the
+contract is recorded complete with its table absent. Either violates this
+card's fresh-and-adopted acceptance criterion. The serialized first-use path
+remains restricted to Bilimbi's separate operational table and is now
+documented explicitly. A future move to migrations needs a cross-path task to
+distinguish compatibility baselines from post-adoption Bilimbi-only migrations
+in ModuleRegistry and Compatibility.
+
+Product editing is stopped pending independent re-review. The frozen Company
+dev-seed files and root README edit remain untouched.
