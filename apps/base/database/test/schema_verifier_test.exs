@@ -57,6 +57,18 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
     assert "widgets: incomplete optional contribution parent lookup" in errors
   end
 
+  test "verifies foreign-key update actions", %{schema: schema} do
+    drifted =
+      put_in(
+        widget_spec(),
+        [:foreign_keys, "widgets_parent_foreign", :on_update],
+        :cascade
+      )
+
+    assert {:error, errors} = SchemaVerifier.verify(Repo, [drifted], prefix: schema)
+    assert "widgets: incompatible foreign key widgets_parent_foreign" in errors
+  end
+
   test "rejects unsafe PostgreSQL identifiers" do
     assert_raise ArgumentError, ~r/invalid PostgreSQL identifier/, fn ->
       SchemaVerifier.quote_identifier!("public; DROP SCHEMA public")

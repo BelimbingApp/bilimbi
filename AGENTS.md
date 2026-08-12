@@ -46,13 +46,14 @@ not one OTP application inside it.
 ## 2. Current scope
 
 The initial Bilimbi implementation contains the Platform Baseline and its web
-host. Base Tenancy, Core Company, and Core Address are active foundation
-slices:
+host. Base Tenancy, Core Company, Core Geonames, and Core Address are active
+foundation slices:
 
 ```text
 apps/base/database/
 apps/base/tenancy/
 apps/core/company/
+apps/core/geonames/
 apps/core/address/
 apps/core/compatibility/
 apps/web/
@@ -188,6 +189,7 @@ files stay with their owner:
 ```text
 apps/base/tenancy/priv/repo/migrations/
 apps/core/company/priv/repo/migrations/
+apps/core/geonames/priv/repo/migrations/
 apps/core/address/priv/repo/migrations/
 ```
 
@@ -210,12 +212,14 @@ from row age. Base Tenancy owns operator resolution and must not query Core
 Company tables; Core Company owns primary-company resolution, assignment,
 transfer, and provisioning.
 
-Core Address preserves the canonical non-null `addresses.tenant_id`, named
-index, and restricted tenant foreign key. Its Geonames foreign keys remain an
-all-or-nothing optional contribution until Core Geonames is ported. When Authz
-is ported, custom roles require a live owning company; system roles are
-company-less. AI provider configuration lookup requires an owning company ID
-and must not resolve credentials from tenant identity alone.
+Core Geonames owns the canonical country, first-level administrative division,
+postcode, and city lookup tables. Core Address preserves the canonical
+non-null `addresses.tenant_id`, named index, restricted tenant foreign key, and
+its two Geonames normalization foreign keys. Fresh installation creates empty
+Geonames tables; reference-data import remains separately owned seeding work.
+When Authz is ported, custom roles require a live owning company; system roles
+are company-less. AI provider configuration lookup requires an owning company
+ID and must not resolve credentials from tenant identity alone.
 
 ## 6. Deep-module design
 
@@ -264,11 +268,14 @@ dependency, dependency cycle, layer/container mismatch, or forbidden upward
 dependency. Valid modules are ordered dependency-first and then by stable
 module ID; layer order is Base → Core → Domain → Extension.
 
-Base ModuleRegistry owns the source-loadable Mix helper under its own `mix/`
+Base ModuleRegistry owns the source-loadable Mix helpers under its own `mix/`
 directory. That directory must remain in the package formatter. Mix records the
-validated resolved position in each OTP application's descriptor metadata;
-runtime consumers use that position and must not implement a second dependency
-graph algorithm.
+validated resolved position and workspace-graph fingerprint in each OTP
+application's descriptor metadata. Every module project includes the shared
+`:bilimbi_graph` compiler before Mix's standard compilers; when composition
+changes, it refreshes each package's application metadata. Runtime consumers
+verify one graph fingerprint, use the approved positions, and must not
+implement a second dependency graph algorithm.
 
 The shared database module owns one Repo. Compatibility discovers migration
 paths from installed runtime descriptor metadata and executes them through the

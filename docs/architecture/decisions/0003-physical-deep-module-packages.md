@@ -52,6 +52,7 @@ project_root/
 │   │   ├── mix.exs
 │   │   ├── bilimbi.container.exs
 │   │   ├── company/                  # core/company module
+│   │   ├── geonames/                 # core/geonames module
 │   │   ├── address/                  # core/address module
 │   │   └── compatibility/            # core/compatibility module
 │   ├── web/                          # Phoenix host and shared shell
@@ -162,9 +163,15 @@ simultaneously eligible modules, layer and then stable module ID are the
 tie-breakers.
 
 Mix stores each validated descriptor together with its zero-based resolved
-position in OTP application metadata. Runtime ModuleRegistry verifies that the
-positions are contiguous, layer-monotonic, and dependency-safe, then consumes
-them directly. It does not maintain a second topological-sort implementation.
+position and workspace-graph fingerprint in OTP application metadata. Each
+module package runs the shared `:bilimbi_graph` compiler before Mix's standard
+compilers. The compiler fingerprints every installed container and module
+descriptor and refreshes a package's application resource when that graph
+changes, including when an independently mounted sibling shifts existing
+positions. Runtime ModuleRegistry requires one common fingerprint, verifies
+that positions are contiguous, layer-monotonic, and dependency-safe, then
+consumes them directly. It does not maintain a second topological-sort
+implementation.
 
 The Base and Core containers are deliberately composition-only and have no
 `lib/`, `priv/`, or `test/` directory and no application callback. Runtime
@@ -250,6 +257,8 @@ ownership remains local.
   `bilimbi/core` below every module's `lib/`.
 - Parent composition applications stay small and express installed modules as
   descriptor-discovered path dependencies.
+- Descriptor graph changes invalidate every module package's generated
+  application metadata before runtime discovery consumes resolved positions.
 - Adding an immediate child directory without a valid descriptor fails fast;
   containers cannot silently ignore a partly installed module.
 - The same composition mechanism applies to mandatory Base/Core and optional

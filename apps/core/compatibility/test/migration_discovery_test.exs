@@ -11,10 +11,11 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
     assert Enum.map(migration_modules, & &1.id) == [
              "base/tenancy",
              "core/company",
+             "core/geonames",
              "core/address"
            ]
 
-    assert Enum.map(migration_modules, & &1.order) == [2, 3, 4]
+    assert Enum.map(migration_modules, & &1.order) == [2, 3, 4, 5]
 
     assert migration_paths ==
              Enum.map(migration_modules, fn descriptor ->
@@ -26,6 +27,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
     assert Enum.map(Compatibility.migration_entries(), &elem(&1, 1)) == [
              Bilimbi.Base.Tenancy.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Core.Company.Migrations.CreateCompatibilityBaseline,
+             Bilimbi.Core.Geonames.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Core.Address.Migrations.CreateCompatibilityBaseline
            ]
   end

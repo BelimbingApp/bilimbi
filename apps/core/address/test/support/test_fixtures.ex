@@ -3,6 +3,7 @@ defmodule Bilimbi.Core.Address.TestFixtures do
 
   alias Bilimbi.Base.Repo
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyTestFixtures
+  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesTestFixtures
   alias Ecto.Adapters.SQL
 
   def create_company_identity_tables! do
@@ -15,6 +16,18 @@ defmodule Bilimbi.Core.Address.TestFixtures do
 
   def insert_company!(attributes \\ %{}) do
     apply(CompanyTestFixtures, :insert_company!, [attributes])
+  end
+
+  def create_geonames_tables! do
+    apply(GeonamesTestFixtures, :create_geonames_tables!, [])
+  end
+
+  def insert_country!(attributes \\ %{}) do
+    apply(GeonamesTestFixtures, :insert_country!, [attributes])
+  end
+
+  def insert_admin1!(attributes \\ %{}) do
+    apply(GeonamesTestFixtures, :insert_admin1!, [attributes])
   end
 
   def create_address_tables! do
@@ -45,7 +58,13 @@ defmodule Bilimbi.Core.Address.TestFixtures do
         created_at timestamp(0) without time zone,
         updated_at timestamp(0) without time zone,
         deleted_at timestamp(0) without time zone,
-        tenant_id bigint NOT NULL
+        tenant_id bigint NOT NULL,
+        CONSTRAINT addresses_country_iso_foreign
+          FOREIGN KEY (country_iso) REFERENCES geonames_countries (iso)
+          ON DELETE SET NULL,
+        CONSTRAINT addresses_admin1code_foreign
+          FOREIGN KEY ("admin1Code") REFERENCES geonames_admin1 (code)
+          ON DELETE SET NULL
       ) ON COMMIT PRESERVE ROWS
       """,
       []

@@ -45,9 +45,9 @@ The resulting cross-module contract is:
 - `tenant_primary_companies` has no timestamps. Its tenant is both the primary
   key and a restricted foreign key. Its company is unique, and its composite
   foreign key requires company and tenant ownership to match.
-- Address tenancy and Authz role ownership have their own exact constraints,
-  described below, but remain owned by their modules when those modules are
-  ported.
+- Address tenancy and Geonames normalization have their own active exact
+  constraints described below. Authz role ownership remains reserved for its
+  owning module when that slice is ported.
 
 ## Decision
 
@@ -62,6 +62,7 @@ Migration files remain with their owning deep module:
 ```text
 apps/base/tenancy/priv/repo/migrations/
 apps/core/company/priv/repo/migrations/
+apps/core/geonames/priv/repo/migrations/
 apps/core/address/priv/repo/migrations/
 ```
 
@@ -70,10 +71,13 @@ The Compatibility coordinator discovers every installed module descriptor
 whose `migrations` field is non-null and composes those paths through the shared
 Repo and ledger. It uses globally unique Ecto versions with strict deterministic
 ordering: declared dependencies first, then Base → Core → Domain → Extension
-and stable module ID as tie-breakers. The current declarations make Base
-Tenancy run before Core Company, which runs before Core Address. Ownership is
-expressed by the module descriptor and path; version numbers provide global
-execution order rather than permanent numeric ranges for layers.
+and stable module ID as tie-breakers. Migration versions remain globally
+monotonic as modules are added. Because Bilimbi has not yet been distributed,
+the current ledger is a clean sequence of four module baselines: Tenancy,
+Company, Geonames, then Address. Address's baseline runs after Geonames and
+creates its normalization foreign keys directly. Ownership is expressed by
+the module descriptor and path; version numbers provide global execution order
+rather than permanent numeric ranges for layers.
 
 ### Current-state compatibility baselines
 
@@ -83,8 +87,11 @@ The first Bilimbi migrations create the canonical end state:
    unique index. It inserts no tenant.
 2. Core creates the complete current Company schema, including explicit tenant
    ownership, tenant-safe parentage, and `tenant_primary_companies`.
-3. Core creates the current Address schema, including explicit tenant
-   ownership and compatible polymorphic attachments.
+3. Core creates the canonical Geonames country, administrative-division,
+   postcode, and city tables.
+4. Core creates the current Address schema, including explicit tenant
+   ownership, compatible polymorphic attachments, and its two Geonames
+   normalization foreign keys.
 
 The Core Company baseline owns:
 
@@ -97,11 +104,12 @@ The Core Company baseline owns:
 - `company_department_types`;
 - `company_departments`.
 
-The Core Address baseline owns `addresses` and `addressables`. It preserves
-Belimbing's existing camel-cased PostgreSQL columns through explicit Ecto
-`source:` mappings. The Geonames normalization foreign keys are an optional
-all-or-nothing contribution until the Geonames tables are ported; adoption
-requires both exact keys when either is present.
+The Core Geonames baseline owns `geonames_countries`, `geonames_admin1`,
+`geonames_postcodes`, and `geonames_cities`. Its country foreign keys preserve
+Belimbing's update-cascade and delete-restrict actions. The Core Address
+baseline owns `addresses` and `addressables`, including both normalization
+foreign keys to Geonames. It preserves Belimbing's existing camel-cased
+PostgreSQL columns through explicit Ecto `source:` mappings.
 
 The historical locale-source rename and data backfills are not replayed on an
 empty schema. They remain provenance for adopting upgraded Belimbing data.
@@ -131,7 +139,8 @@ does not claim every Belimbing seeder has been ported.
 
 - creates `bilimbi_schema_migrations` and never creates Laravel's ledger;
 - creates the complete in-scope schema at the pinned current state;
-- creates no identity-bearing tenant or company row;
+- creates no identity-bearing tenant or company row and no Geonames reference
+  rows;
 - requires explicit platform-operator and primary-company provisioning.
 
 Ordinary `create` operations deliberately fail if target tables already exist.
@@ -146,6 +155,12 @@ An existing database uses an explicit two-step contract:
    identity invariants with the pinned contract.
 2. `mix bilimbi.schema.adopt` repeats verification and, only after success,
    records the Bilimbi baseline versions without executing their DDL.
+
+An existing Bilimbi ledger that is an exact prefix of the current baseline may
+be advanced by the same verify-and-adopt command. This handles a previously
+adopted Belimbing database whose newly owned tables and constraints already
+exist. A fresh Bilimbi database missing those structures fails verification and
+runs the later migrations normally; a non-prefix ledger remains a conflict.
 
 Verification checks owned columns, types, nullability, defaults, named indexes
 including the partial predicate, single and composite foreign keys, and
@@ -202,8 +217,9 @@ numbers as roles is not.
 - Base Database owns the shared Repo, each module owns its compatibility
   contract and migrations, and Core Compatibility discovers and coordinates
   all installed contributions into the current Platform Baseline.
-- Authz, User, Employee, Geonames, and AI compatibility obligations remain
-  explicit and will be activated with their owning slices.
+- Authz, User, Employee, and AI compatibility obligations remain explicit and
+  will be activated with their owning slices. Geonames reference-data import
+  remains separate from its now-active schema and lookup slice.
 - The pinned source commit must change deliberately whenever the compatible
   Belimbing schema changes.
 - Business code accepts explicit tenant or company identity and never infers a

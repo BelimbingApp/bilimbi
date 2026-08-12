@@ -36,7 +36,8 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
   @type foreign_key_spec :: %{
           required(:columns) => [String.t()],
           required(:references) => {String.t(), [String.t()]},
-          required(:on_delete) => :cascade | :nilify_all | :nothing | :restrict
+          required(:on_delete) => :cascade | :nilify_all | :nothing | :restrict,
+          optional(:on_update) => :cascade | :nilify_all | :nothing | :restrict
         }
 
   @type table_spec :: %{
@@ -160,7 +161,8 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
                array_agg(source_attribute.attname ORDER BY source_key.ordinality),
                target_table.relname,
                array_agg(target_attribute.attname ORDER BY source_key.ordinality),
-               constraint_info.confdeltype::text
+               constraint_info.confdeltype::text,
+               constraint_info.confupdtype::text
         FROM pg_constraint AS constraint_info
         JOIN pg_class AS source_table ON source_table.oid = constraint_info.conrelid
         JOIN pg_namespace AS namespace ON namespace.oid = source_table.relnamespace
@@ -180,18 +182,19 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
           AND source_table.relname = $2
           AND constraint_info.contype = 'f'
         GROUP BY constraint_info.conname, target_table.relname,
-                 constraint_info.confdeltype
+                 constraint_info.confdeltype, constraint_info.confupdtype
         ORDER BY constraint_info.conname
         """,
         [schema, table]
       )
 
-    Map.new(result.rows, fn [name, columns, target_table, target_columns, on_delete] ->
+    Map.new(result.rows, fn [name, columns, target_table, target_columns, on_delete, on_update] ->
       {name,
        %{
          columns: columns,
          references: {target_table, target_columns},
-         on_delete: decode_on_delete(on_delete)
+         on_delete: decode_action(on_delete),
+         on_update: decode_action(on_update)
        }}
     end)
   end
@@ -279,7 +282,7 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
       |> Enum.flat_map(fn name ->
         expected_object = Map.get(expected, name) || Map.fetch!(optional, name)
 
-        if expected_object == actual[name],
+        if normalize_named_object(kind, expected_object) == actual[name],
           do: [],
           else: ["#{table}: incompatible #{kind} #{name}"]
       end)
@@ -319,6 +322,8 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
   defp type_matches?(:bigint, actual), do: actual.type == "bigint"
   defp type_matches?(:boolean, actual), do: actual.type == "boolean"
   defp type_matches?(:date, actual), do: actual.type == "date"
+  defp type_matches?(:double_precision, actual), do: actual.type == "double precision"
+  defp type_matches?(:integer, actual), do: actual.type == "integer"
   defp type_matches?(:json, actual), do: actual.type == "json"
   defp type_matches?(:smallint, actual), do: actual.type == "smallint"
   defp type_matches?(:text, actual), do: actual.type == "text"
@@ -349,11 +354,16 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
   defp maybe_error(errors, true, _message), do: errors
   defp maybe_error(errors, false, message), do: [message | errors]
 
-  defp decode_on_delete("c"), do: :cascade
-  defp decode_on_delete("a"), do: :nothing
-  defp decode_on_delete("n"), do: :nilify_all
-  defp decode_on_delete("r"), do: :restrict
-  defp decode_on_delete(value), do: value
+  defp normalize_named_object("foreign key", object),
+    do: Map.put_new(object, :on_update, :nothing)
+
+  defp normalize_named_object(_kind, object), do: object
+
+  defp decode_action("c"), do: :cascade
+  defp decode_action("a"), do: :nothing
+  defp decode_action("n"), do: :nilify_all
+  defp decode_action("r"), do: :restrict
+  defp decode_action(value), do: value
 
   defp normalize_predicate(nil), do: nil
 

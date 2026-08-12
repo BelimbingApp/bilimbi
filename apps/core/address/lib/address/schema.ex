@@ -84,5 +84,7 @@ defmodule Bilimbi.Core.Address.Schema do
     |> validate_length(:parser_version, max: 255)
     |> validate_length(:verification_status, max: 255)
     |> foreign_key_constraint(:tenant_id, name: :addresses_tenant_foreign)
+    |> foreign_key_constraint(:country_iso, name: :addresses_country_iso_foreign)
+    |> foreign_key_constraint(:admin1_code, name: :addresses_admin1code_foreign)
   end
 end

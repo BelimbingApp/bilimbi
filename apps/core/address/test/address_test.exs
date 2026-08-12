@@ -7,8 +7,11 @@ defmodule Bilimbi.Core.AddressTest do
 
   setup do
     create_company_identity_tables!()
+    create_geonames_tables!()
     create_address_tables!()
 
+    insert_country!()
+    insert_admin1!()
     insert_tenant!(%{id: 41, name: "Operator"})
     insert_tenant!(%{id: 42, name: "Customer", is_platform_operator: false})
     insert_company!(%{id: 73, tenant_id: 41, code: "operator"})
@@ -47,6 +50,20 @@ defmodule Bilimbi.Core.AddressTest do
     )
 
     assert {:error, :tenant_not_found} = Address.create_address(42, %{label: "Closed"})
+  end
+
+  test "returns changeset errors for unknown geographic references" do
+    assert {:error, country_changeset} =
+             Address.create_address(41, %{label: "Unknown country", country_iso: "ZZ"})
+
+    assert {:country_iso, {_message, _metadata}} =
+             List.keyfind(country_changeset.errors, :country_iso, 0)
+
+    assert {:error, admin1_changeset} =
+             Address.create_address(41, %{label: "Unknown region", admin1_code: "MY.99"})
+
+    assert {:admin1_code, {_message, _metadata}} =
+             List.keyfind(admin1_changeset.errors, :admin1_code, 0)
   end
 
   test "updates without allowing tenant reassignment and soft deletes" do

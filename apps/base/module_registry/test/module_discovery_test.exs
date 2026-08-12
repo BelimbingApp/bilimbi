@@ -76,11 +76,21 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
     first = put_module!(root, "base", "first")
     second = put_module!(root, "base", "second", dependencies: ["base/first"])
 
-    assert [bilimbi_module: %{id: "base/first", order: 0}] =
+    assert [bilimbi_module: %{id: "base/first", order: 0, graph_fingerprint: fingerprint}] =
              MixDiscovery.application_env(first)
 
-    assert [bilimbi_module: %{id: "base/second", order: 1}] =
+    assert [bilimbi_module: %{id: "base/second", order: 1, graph_fingerprint: ^fingerprint}] =
              MixDiscovery.application_env(second)
+  end
+
+  test "workspace fingerprint changes when source composition changes", %{root: root} do
+    put_container!(root, "base", :base)
+    put_module!(root, "base", "first")
+    first_fingerprint = MixDiscovery.workspace_fingerprint(root)
+
+    put_module!(root, "base", "second", dependencies: ["base/first"])
+
+    refute MixDiscovery.workspace_fingerprint(root) == first_fingerprint
   end
 
   test "rejects missing and malformed descriptors", %{root: root} do

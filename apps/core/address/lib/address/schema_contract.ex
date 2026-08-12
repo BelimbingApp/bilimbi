@@ -2,8 +2,8 @@ defmodule Bilimbi.Core.Address.SchemaContract do
   @moduledoc """
   Pinned PostgreSQL contract for the Core Address compatibility baseline.
 
-  The Geonames foreign keys are a deferred all-or-nothing contribution. Their
-  columns and indexes remain owned by Address and are always present.
+  Address owns its normalization columns and foreign keys; Core Geonames owns
+  the referenced lookup tables.
   """
 
   @behaviour Bilimbi.Base.Database.SchemaContract
@@ -53,22 +53,12 @@ defmodule Bilimbi.Core.Address.SchemaContract do
         "addresses_tenant_index" => index(["tenant_id"])
       },
       foreign_keys: %{
-        "addresses_tenant_foreign" => foreign_key("tenant_id", "tenants", "id", :restrict)
-      },
-      optional_foreign_keys: %{
+        "addresses_tenant_foreign" => foreign_key("tenant_id", "tenants", "id", :restrict),
         "addresses_country_iso_foreign" =>
           foreign_key("country_iso", "geonames_countries", "iso", :nilify_all),
         "addresses_admin1code_foreign" =>
           foreign_key("admin1Code", "geonames_admin1", "code", :nilify_all)
-      },
-      optional_groups: [
-        %{
-          name: "core/geonames address normalization",
-          columns: [],
-          indexes: [],
-          foreign_keys: ["addresses_country_iso_foreign", "addresses_admin1code_foreign"]
-        }
-      ]
+      }
     }
   end
 

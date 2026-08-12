@@ -26,6 +26,9 @@ defmodule Mix.Tasks.Bilimbi.Schema.Adopt do
       {:ok, :adopted} ->
         Mix.shell().info("Existing Belimbing schema verified and adopted by Bilimbi.")
 
+      {:ok, :advanced} ->
+        Mix.shell().info("Verified schema and advanced the existing Bilimbi baseline ledger.")
+
       {:ok, :already_adopted} ->
         Mix.shell().info("Bilimbi compatibility baselines are already recorded.")
 

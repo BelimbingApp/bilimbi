@@ -17,6 +17,8 @@ defmodule Bilimbi.Core.Company.MixProject do
       deps_path: Path.join(@workspace_root, "deps"),
       lockfile: Path.join(@workspace_root, "mix.lock"),
       elixir: "~> 1.20",
+      compilers: [:bilimbi_graph] ++ Mix.compilers(),
+      bilimbi_module_root: __DIR__,
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),

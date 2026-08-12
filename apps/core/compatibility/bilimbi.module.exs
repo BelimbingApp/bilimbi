@@ -10,6 +10,7 @@
     "base/module_registry",
     "base/tenancy",
     "core/company",
+    "core/geonames",
     "core/address"
   ],
   migrations: nil,

@@ -62,7 +62,7 @@ defmodule Bilimbi.Core.Compatibility do
   end
 
   @spec adopt(Ecto.Repo.t(), keyword()) ::
-          {:ok, :adopted | :already_adopted}
+          {:ok, :adopted | :advanced | :already_adopted}
           | {:error, {:schema_drift, [String.t()]} | {:ledger_conflict, [integer()]}}
   def adopt(repo \\ Repo, opts \\ []) do
     schema = Keyword.get(opts, :prefix, "public")
@@ -91,19 +91,31 @@ defmodule Bilimbi.Core.Compatibility do
     case ledger_versions(repo, schema) do
       :missing ->
         create_ledger!(repo, schema)
-        record_baselines!(repo, schema)
+        record_versions!(repo, schema, baseline_versions())
         {:ok, :adopted}
 
       [] ->
-        record_baselines!(repo, schema)
+        record_versions!(repo, schema, baseline_versions())
         {:ok, :adopted}
 
       versions ->
-        if versions == baseline_versions() do
-          {:ok, :already_adopted}
-        else
-          repo.rollback({:ledger_conflict, versions})
-        end
+        adopt_existing_ledger(repo, schema, versions)
+    end
+  end
+
+  defp adopt_existing_ledger(repo, schema, versions) do
+    baselines = baseline_versions()
+
+    cond do
+      versions == baselines ->
+        {:ok, :already_adopted}
+
+      Enum.take(baselines, length(versions)) == versions ->
+        record_versions!(repo, schema, Enum.drop(baselines, length(versions)))
+        {:ok, :advanced}
+
+      true ->
+        repo.rollback({:ledger_conflict, versions})
     end
   end
 
@@ -142,13 +154,13 @@ defmodule Bilimbi.Core.Compatibility do
     )
   end
 
-  defp record_baselines!(repo, schema) do
+  defp record_versions!(repo, schema, versions) do
     now = DateTime.utc_now() |> DateTime.to_naive() |> NaiveDateTime.truncate(:second)
-    rows = Enum.map(baseline_versions(), &%{version: &1, inserted_at: now})
+    rows = Enum.map(versions, &%{version: &1, inserted_at: now})
 
     {count, _} = repo.insert_all(migration_source(repo), rows, prefix: schema)
 
-    if count != length(rows) do
+    if count != length(versions) do
       repo.rollback({:ledger_conflict, ledger_versions(repo, schema)})
     end
   end

@@ -33,10 +33,11 @@ how the application should be extended and how it should feel to use.
 Bilimbi is in its foundation phase. The repository uses a Mix umbrella rooted
 at the repository. Base, Core, and Web are its top-level composition
 applications; each declared deep module below Base or Core is a self-contained
-local Mix package discovered from its descriptor. The current foundation owns Ecto migrations that can create
-the compatible Base Tenancy, Core Company, and Core Address schema, or verify
-and adopt an existing Belimbing database. Optional Domains and
-deployment-owned Extensions are intentionally not implemented yet.
+local Mix package discovered from its descriptor. The current foundation owns
+Ecto migrations that can create the compatible Base Tenancy, Core Company,
+Core Geonames, and Core Address schema, or verify and adopt an existing
+Belimbing database. Optional Domains and deployment-owned Extensions are
+intentionally not implemented yet.
 
 The first major compatibility target is the existing Belimbing PostgreSQL
 schema. Bilimbi should map that schema accurately instead of creating a second,
@@ -123,6 +124,7 @@ apps/
 ├── core/                         # Mandatory composition application
 │   ├── bilimbi.container.exs     # Declares the Core layer
 │   ├── company/                  # core/company module package
+│   ├── geonames/                 # Geographic reference-data package
 │   ├── address/                  # core/address module package
 │   └── compatibility/            # Shared migration/adoption coordinator
 └── web/                          # Phoenix endpoint and shared UI shell
@@ -131,8 +133,8 @@ apps/
 The complete physical boundary of Base Tenancy is `apps/base/tenancy/`, not a
 directory below its `lib/`. Consequently its source begins at
 `apps/base/tenancy/lib/tenancy.ex` while the Elixir namespace remains
-`Bilimbi.Base.Tenancy`. The same rule applies to Company, Address, and every
-future declared module.
+`Bilimbi.Base.Tenancy`. The same rule applies to Company, Geonames, Address,
+and every future declared module.
 
 A composition container never lists child packages by name. Every immediate
 child directory containing `bilimbi.module.exs` is an installed module; the
@@ -143,9 +145,10 @@ Dependency resolution and compilation must still run afterward.
 
 The discovery helper itself belongs to `apps/base/module_registry/mix/` and is
 covered by that package's formatter and tests. Mix writes its validated,
-resolved module position into OTP application metadata; runtime migration
-discovery consumes that approved order instead of maintaining a second graph
-algorithm.
+resolved module position and graph fingerprint into OTP application metadata;
+a shared compiler refreshes that metadata across all module packages whenever
+the installed descriptor set changes. Runtime migration discovery consumes
+that approved order instead of maintaining a second graph algorithm.
 
 The descriptor is the source of truth for stable module ID, layer, OTP
 application ID, namespace, declared module dependencies, and migration
@@ -200,7 +203,8 @@ only historical migration input in Belimbing, never a Bilimbi runtime role.
 
 Bilimbi-owned migrations live inside their owning module, currently
 `apps/base/tenancy/priv/repo/migrations`,
-`apps/core/company/priv/repo/migrations`, and
+`apps/core/company/priv/repo/migrations`,
+`apps/core/geonames/priv/repo/migrations`, and
 `apps/core/address/priv/repo/migrations`. The Compatibility coordinator obtains
 these paths from installed module descriptors; it contains no per-module path
 list. Each migration module uses its owning public namespace. Structural and
@@ -210,10 +214,13 @@ schema contract and invoked generically by Compatibility. Fresh installations us
 workflow described in
 [ADR 0002](./docs/architecture/decisions/0002-compatible-schema-baselines.md).
 
+Core Geonames preserves Belimbing's country, administrative-division,
+postcode, and city tables behind read models and lookup APIs. Fresh schemas
+contain no reference rows until a separately owned import or seeding step runs.
 Core Address preserves Belimbing's camel-cased legacy columns and polymorphic
 Company identity behind a snake-cased Elixir API. Every Address operation takes
-an explicit tenant. Its Geonames foreign keys remain a strict optional
-contribution until the Geonames slice is ported.
+an explicit tenant, and its Geonames normalization foreign keys are now part of
+the required verified contract.
 
 ## Documentation
 

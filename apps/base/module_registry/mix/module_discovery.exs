@@ -22,6 +22,8 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     :schema_contract
   ]
 
+  Code.require_file("compile_bilimbi_graph.exs", __DIR__)
+
   @type descriptor :: %{
           id: String.t(),
           kind: :module,
@@ -91,7 +93,8 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   @spec application_env(String.t()) :: keyword()
   def application_env(module_root) do
     module_root = Path.expand(module_root)
-    modules = module_root |> workspace_root!() |> discover_workspace!()
+    workspace_root = workspace_root!(module_root)
+    modules = discover_workspace!(workspace_root)
 
     order =
       Enum.find_index(modules, &(&1.path == module_root)) ||
@@ -102,8 +105,31 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
       |> Enum.at(order)
       |> Map.drop([:path, :container_id, :container_layer, :container_path])
       |> Map.put(:order, order)
+      |> Map.put(:graph_fingerprint, workspace_fingerprint(workspace_root))
 
     [bilimbi_module: descriptor]
+  end
+
+  @doc "Returns a stable digest of all installed container and module descriptors."
+  @spec workspace_fingerprint(String.t()) :: String.t()
+  def workspace_fingerprint(path) do
+    workspace_root = workspace_root!(path)
+
+    descriptor_source =
+      [
+        Path.join(workspace_root, "apps/*/#{@container_file}"),
+        Path.join(workspace_root, "apps/*/*/#{@module_file}")
+      ]
+      |> Enum.flat_map(&Path.wildcard/1)
+      |> Enum.sort()
+      |> Enum.map_join("\0", fn descriptor_path ->
+        relative_path = Path.relative_to(descriptor_path, workspace_root)
+        relative_path <> "\0" <> File.read!(descriptor_path)
+      end)
+
+    :sha256
+    |> :crypto.hash(descriptor_source)
+    |> Base.encode16(case: :lower)
   end
 
   @doc "Discovers and validates all installed modules in a source workspace."

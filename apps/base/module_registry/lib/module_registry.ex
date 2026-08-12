@@ -24,9 +24,21 @@ defmodule Bilimbi.Base.ModuleRegistry do
     modules
     |> validate_unique!(:id, "stable module ID")
     |> validate_unique!(:otp_app, "OTP application ID")
+    |> validate_unique_graph_fingerprint!()
     |> validate_unique!(:order, "resolved module order")
     |> Enum.sort_by(& &1.order)
     |> validate_resolved_order!()
+  end
+
+  defp validate_unique_graph_fingerprint!(modules) do
+    fingerprints = modules |> Enum.map(& &1.graph_fingerprint) |> Enum.uniq()
+
+    if length(fingerprints) > 1 do
+      raise ArgumentError,
+            "installed module metadata was compiled from different workspace graphs; recompile the workspace"
+    end
+
+    modules
   end
 
   @spec migration_modules!() :: [map()]

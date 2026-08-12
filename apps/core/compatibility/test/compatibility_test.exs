@@ -53,6 +53,15 @@ defmodule Bilimbi.Core.CompatibilityTest do
                []
              ).rows
 
+    for table <- ~w(geonames_countries geonames_admin1 geonames_postcodes geonames_cities) do
+      assert [[0]] =
+               SQL.query!(
+                 MigrationTestRepo,
+                 "SELECT count(*) FROM \"#{schema}\".\"#{table}\"",
+                 []
+               ).rows
+    end
+
     SQL.query!(
       MigrationTestRepo,
       "SELECT setval(to_regclass($1), 40, true)",
@@ -110,6 +119,26 @@ defmodule Bilimbi.Core.CompatibilityTest do
                []
              )
 
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".geonames_countries (
+        iso, iso3, iso_numeric, country, population, continent
+      )
+      VALUES ('MY', 'MYS', '458', 'Malaysia', 0, 'AS')
+      """,
+      []
+    )
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".geonames_admin1 (code, name)
+      VALUES ('MY.14', 'Kuala Lumpur')
+      """,
+      []
+    )
+
     assert %Postgrex.Result{num_rows: 1} =
              SQL.query!(
                MigrationTestRepo,
@@ -162,15 +191,15 @@ defmodule Bilimbi.Core.CompatibilityTest do
                []
              )
 
-    assert [[address_id, 41, "unverified"]] =
+    assert [[address_id, 41, "MY", "MY.14", "unverified"]] =
              SQL.query!(
                MigrationTestRepo,
                """
-               INSERT INTO "#{schema}".addresses (
-                 tenant_id, label, normalization_notes
-               )
-               VALUES (41, 'Operator HQ', '["verified source"]'::json)
-               RETURNING id, tenant_id, "verificationStatus"
+                INSERT INTO "#{schema}".addresses (
+                 tenant_id, label, country_iso, "admin1Code", normalization_notes
+                )
+               VALUES (41, 'Operator HQ', 'MY', 'MY.14', '["verified source"]'::json)
+               RETURNING id, tenant_id, country_iso, "admin1Code", "verificationStatus"
                """,
                []
              ).rows
@@ -213,6 +242,25 @@ defmodule Bilimbi.Core.CompatibilityTest do
              Compatibility.adopt(MigrationTestRepo, prefix: schema)
   end
 
+  test "adoption advances a verified prefix from an earlier Bilimbi baseline", %{schema: schema} do
+    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+    previous_versions = Enum.take(Compatibility.baseline_versions(), 3)
+
+    SQL.query!(
+      MigrationTestRepo,
+      "DELETE FROM \"#{schema}\".bilimbi_schema_migrations WHERE version > $1",
+      [List.last(previous_versions)]
+    )
+
+    assert recorded_versions(MigrationTestRepo, schema) == previous_versions
+
+    assert {:ok, :advanced} =
+             Compatibility.adopt(MigrationTestRepo, prefix: schema)
+
+    assert recorded_versions(MigrationTestRepo, schema) ==
+             Compatibility.baseline_versions()
+  end
+
   test "adoption refuses schema drift and leaves no Bilimbi ledger", %{schema: schema} do
     Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
     drop_bilimbi_ledger!(MigrationTestRepo, schema)
@@ -244,34 +292,21 @@ defmodule Bilimbi.Core.CompatibilityTest do
     assert "company_external_accesses: incomplete optional contribution core/user external-access owner" in errors
   end
 
-  test "verification refuses a partial Geonames contribution to Address", %{schema: schema} do
+  test "verification requires Address's Geonames foreign keys", %{schema: schema} do
     Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
 
     SQL.query!(
       MigrationTestRepo,
       """
-      CREATE TABLE "#{schema}".geonames_countries (
-        iso varchar(2) PRIMARY KEY
-      )
-      """,
-      []
-    )
-
-    SQL.query!(
-      MigrationTestRepo,
-      """
       ALTER TABLE "#{schema}".addresses
-      ADD CONSTRAINT addresses_country_iso_foreign
-      FOREIGN KEY (country_iso)
-      REFERENCES "#{schema}".geonames_countries (iso)
-      ON DELETE SET NULL
+      DROP CONSTRAINT addresses_admin1code_foreign
       """,
       []
     )
 
     assert {:error, errors} = Compatibility.verify(MigrationTestRepo, prefix: schema)
 
-    assert "addresses: incomplete optional contribution core/geonames address normalization" in errors
+    assert "addresses: missing foreign key addresses_admin1code_foreign" in errors
   end
 
   test "verification refuses the historical implicit tenant default", %{schema: schema} do

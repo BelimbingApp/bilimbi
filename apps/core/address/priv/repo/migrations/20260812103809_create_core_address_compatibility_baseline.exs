@@ -1,6 +1,8 @@
 defmodule Bilimbi.Core.Address.Migrations.CreateCompatibilityBaseline do
   use Ecto.Migration
 
+  alias Bilimbi.Base.Database.SchemaVerifier
+
   def up do
     create table(:addresses, primary_key: false) do
       add :id, :bigserial, primary_key: true
@@ -43,6 +45,24 @@ defmodule Bilimbi.Core.Address.Migrations.CreateCompatibilityBaseline do
 
     create index(:addresses, [:tenant_id], name: :addresses_tenant_index)
 
+    schema = quoted_prefix()
+
+    execute """
+    ALTER TABLE #{schema}.addresses
+    ADD CONSTRAINT addresses_country_iso_foreign
+    FOREIGN KEY (country_iso)
+    REFERENCES #{schema}.geonames_countries (iso)
+    ON DELETE SET NULL
+    """
+
+    execute """
+    ALTER TABLE #{schema}.addresses
+    ADD CONSTRAINT addresses_admin1code_foreign
+    FOREIGN KEY ("admin1Code")
+    REFERENCES #{schema}.geonames_admin1 (code)
+    ON DELETE SET NULL
+    """
+
     create table(:addressables, primary_key: false) do
       add :id, :bigserial, primary_key: true
 
@@ -71,5 +91,9 @@ defmodule Bilimbi.Core.Address.Migrations.CreateCompatibilityBaseline do
   def down do
     drop table(:addressables)
     drop table(:addresses)
+  end
+
+  defp quoted_prefix do
+    SchemaVerifier.quote_identifier!(prefix() || "public")
   end
 end
