@@ -457,6 +457,8 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
   end
 
   defp lock!(repo, prefix) do
+    # hashtext/1 has a 32-bit key space. A collision only over-serializes two
+    # unrelated prefixes; it cannot allow their seed queues to overlap.
     SQL.query!(repo, "SELECT pg_advisory_lock(hashtext($1))", [lock_key(prefix)])
   end
 

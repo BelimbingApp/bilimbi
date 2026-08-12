@@ -52,19 +52,22 @@ orders unrelated seeds by module order and logical ID.
 
 Run every installed production provider with:
 
-```powershell
+```console
 mix bilimbi.seeds.run
 ```
 
 An operator may add an already-compiled provider explicitly:
 
-```powershell
+```console
 mix bilimbi.seeds.run --provider Bilimbi.Core.Employee.ProductionSeeds
 ```
 
 Explicit providers must implement `ProductionSeedProvider`, load from an
 installed Bilimbi module OTP app, and emit seeds whose `module_id` matches
-that module. Weak duck-typed modules are rejected.
+that module. Weak duck-typed modules are rejected. The explicit provider is
+added to the normally discovered queue; if one of its seeds depends on another
+unregistered provider, pass that provider explicitly as well. A missing
+dependency fails graph validation before the ledger or callback data changes.
 Each attempt is recorded as `running`, then `completed`, `failed`, or
 `skipped`. Completed and skipped seeds are not invoked again. Failed seeds are
 retryable, and rows left `running` by an interrupted process are marked failed

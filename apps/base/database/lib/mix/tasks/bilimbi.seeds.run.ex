@@ -50,10 +50,22 @@ defmodule Mix.Tasks.Bilimbi.Seeds.Run do
     end)
   end
 
-  defp provider_module!(name) do
-    name
-    |> String.split(".", trim: true)
-    |> Module.safe_concat()
+  @doc false
+  def provider_module!(name) do
+    segments = String.split(name, ".", trim: true)
+
+    provider =
+      try do
+        Module.safe_concat(segments)
+      rescue
+        ArgumentError -> Module.concat(segments)
+      end
+
+    if Code.ensure_loaded?(provider) do
+      provider
+    else
+      Mix.raise("unknown production seed provider: #{name}")
+    end
   rescue
     ArgumentError -> Mix.raise("unknown production seed provider: #{name}")
   end

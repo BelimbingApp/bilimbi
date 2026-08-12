@@ -29,4 +29,57 @@ defmodule Bilimbi.Base.Database.ProductionSeedTest do
       )
     end
   end
+
+  test "resolves an explicit provider whose module atom is not loaded yet" do
+    elixir = System.find_executable("elixir")
+    elixirc = System.find_executable("elixirc")
+
+    assert elixir
+    assert elixirc
+
+    fixture_dir =
+      Path.join(
+        System.tmp_dir!(),
+        "bilimbi-unloaded-provider-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(fixture_dir)
+
+    on_exit(fn -> File.rm_rf!(fixture_dir) end)
+
+    source_path = Path.join(fixture_dir, "unloaded_provider.ex")
+
+    File.write!(source_path, """
+    defmodule Bilimbi.Base.Database.UnloadedProviderFixture do
+    end
+    """)
+
+    assert {_, 0} =
+             System.cmd(elixirc, ["-o", fixture_dir, source_path], stderr_to_stdout: true)
+
+    assert File.exists?(
+             Path.join(fixture_dir, "Elixir.Bilimbi.Base.Database.UnloadedProviderFixture.beam")
+           )
+
+    script =
+      ~s|Code.prepend_path(Base.decode64!("#{Base.encode64(fixture_dir)}")); provider = Mix.Tasks.Bilimbi.Seeds.Run.provider_module!("Bilimbi.Base.Database.UnloadedProviderFixture"); IO.puts(Atom.to_string(provider))|
+
+    assert {output, 0} =
+             System.cmd(
+               elixir,
+               [
+                 "--erl",
+                 "-noinput",
+                 "-pa",
+                 Mix.Project.compile_path(),
+                 "-pa",
+                 fixture_dir,
+                 "-e",
+                 script
+               ],
+               stderr_to_stdout: true
+             )
+
+    assert output =~ "Elixir.Bilimbi.Base.Database.UnloadedProviderFixture"
+  end
 end
