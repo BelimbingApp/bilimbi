@@ -37,6 +37,35 @@ defmodule Bilimbi.Core.CompanyTest do
     assert Company.addressable_identity() == "App\\Core\\Company\\Models\\Company"
   end
 
+  test "validates department ownership through the Company boundary" do
+    insert_tenant!()
+    insert_company!()
+    insert_tenant!(%{id: 42, name: "Other tenant", is_platform_operator: false})
+    insert_company!(%{id: 74, tenant_id: 42, code: "other_company"})
+    create_departments_table!()
+    insert_department!(101, 73)
+    insert_department!(102, 74)
+
+    {:ok, owner} = Tenancy.scope(41)
+    {:ok, other} = Tenancy.scope(42)
+
+    assert Company.department_belongs_to_company?(owner, 73, 101)
+    refute Company.department_belongs_to_company?(owner, 73, 102)
+    refute Company.department_belongs_to_company?(other, 73, 101)
+    refute Company.department_belongs_to_company?(owner, 73, -1)
+
+    soft_deleted_company_id = 76
+
+    insert_company!(%{
+      id: soft_deleted_company_id,
+      code: "soft_deleted_company",
+      deleted_at: ~N[2026-08-11 12:00:00]
+    })
+
+    insert_department!(103, soft_deleted_company_id)
+    refute Company.department_belongs_to_company?(owner, soft_deleted_company_id, 103)
+  end
+
   test "returns a setup state when explicit identity is not provisioned" do
     assert {:error, :not_provisioned} = Company.platform_operator_company()
 
@@ -139,6 +168,10 @@ defmodule Bilimbi.Core.CompanyTest do
 
         assert_raise FunctionClauseError, fn ->
           Company.transfer_primary_company(opaque(not_a_scope), 73)
+        end
+
+        assert_raise FunctionClauseError, fn ->
+          Company.department_belongs_to_company?(opaque(not_a_scope), 73, 101)
         end
       end
     end
