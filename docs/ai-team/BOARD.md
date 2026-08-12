@@ -1,10 +1,11 @@
 # Bilimbi AI Team Board
 
-**Board Version:** 6
+**Board Version:** 7
 **Current Stage:** S1 — Platform Baseline business identity
 **Coordination Steward:** amp/kimi-k3
-**Integration Steward:** Unassigned
-**Baseline Commit:** `54b50b0`
+**Integration Steward:** codex/sol-high
+**Baseline Commit:** `163734d` (origin/main; `main` is PR-protected — all
+coordination and product changes land via reviewed PR with green checks)
 **Team Discussion:** [GitHub Discussions](https://github.com/BelimbingApp/bilimbi/discussions) — the team's cross-machine conversation space; this board remains the ledger of record
 **Last Updated:** 2026-08-12
 
@@ -25,16 +26,20 @@ See [`PORTING_STAGES.md`](./PORTING_STAGES.md) for exit criteria.
 
 | Task | Status | Owner | Role | Write claim | Note |
 |---|---|---|---|---|---|
-| [BLB-S1-001](./tasks/BLB-S1-001.md) | active — grandfathered | parent-thread/codex | Module implementer | `apps/core/geonames/**` | Uncommitted work existed before this board; do not touch or stage it |
-| [BLB-S1-003](./tasks/BLB-S1-003.md) | active — grandfathered | parent-thread/codex | Module implementer | `apps/core/employee/**` | A 19:34+08 relocation to a `people` Domain container was reverted by its owner; module is back in Core with a coherent descriptor; see `BLB-S1-005` |
-| [BLB-S1-004](./tasks/BLB-S1-004.md) | active — grandfathered | parent-thread/codex | Module implementer | `apps/core/company/**` | Registered by amp/kimi-k3; do not touch or stage it |
-| [BLB-S1-002](./tasks/BLB-S1-002.md) | active | claude/opus-5 | Source analyst | `docs/ai-team/research/platform-baseline-inventory.md` | Research only; no product path claimed |
+| [BLB-S1-001](./tasks/BLB-S1-001.md) | review — changes required | parent-thread/codex | Module implementer | `apps/core/geonames/**` | Reviewed by codex/gpt-5; diffs unpublished (local worktree); rework then re-review |
+| [BLB-S1-003](./tasks/BLB-S1-003.md) | review — changes required | parent-thread/codex | Module implementer | `apps/core/employee/**` | Reviewed by codex/gpt-5; diffs unpublished (local worktree); rework then re-review |
+| [BLB-S1-004](./tasks/BLB-S1-004.md) | review — accept with follow-up | parent-thread/codex | Module implementer | `apps/core/company/**` | Reviewed by codex/gpt-5; follow-up assertion lands at integration |
+| [BLB-S1-006](./tasks/BLB-S1-006.md) | active | claude/opus-5 | Module implementer | `apps/core/user/**` | Gated on BLB-S1-007; credentials are pre-hashed only (user-ratified deferral) |
+| [BLB-S1-007](./tasks/BLB-S1-007.md) | active | claude/opus-5 | Module implementer | `apps/base/database/**` | SchemaVerifier `:uuid`/`{:char,n}`/`:jsonb`/`:inet`; user-decided scope; warrants careful independent review |
 
 ## Ready
 
-No tasks are currently ready. The steward opens contract tasks from the
-accepted [platform baseline inventory](./research/platform-baseline-inventory.md)
-once `BLB-S1-002` passes review.
+| Task | Role sought | Dependencies | Allowed output |
+|---|---|---|---|
+| [BLB-S1-008](./tasks/BLB-S1-008.md) | Module implementer (codex/sol-high, proposed) | BLB-S1-007 handoff (same path); mailbox CLAIM via PR | `apps/base/database/**` |
+
+Further contract tasks open once the [platform baseline
+inventory](./research/platform-baseline-inventory.md) passes review.
 
 ## Backlog
 
@@ -44,18 +49,25 @@ Audit, and their Web workflows must not be started as one broad parallel port.
 
 ## Review
 
-No tasks are awaiting review.
+| Task | Owner | Reviewer | Note |
+|---|---|---|---|
+| [BLB-S1-002](./tasks/BLB-S1-002.md) | claude/opus-5 | amp/kimi-k3 | Handed off (amended) 2026-08-12T20:44+08; §8.7 verifier finding already spawned BLB-S1-007 |
 
 ## Blocked
 
-No registered tasks are blocked. `BLB-S1-005` was closed 2026-08-12 as
-resolved-by-reversion: the `people` Domain relocation it questioned was
-reverted by its owner, satisfying the card's acceptance criterion. See the
-task card for the recorded evidence.
+| Task | Owner | Blocked on | Evidence |
+|---|---|---|---|
+| [BLB-S1-009](./tasks/BLB-S1-009.md) | codex/sol-high | Review clearance for BLB-S1-001/003; publication of the module diffs via PR; rebase onto post-PR-#1 main | Reviews in `reviews/`; diffs exist only in the parent machine's worktree |
+
+`BLB-S1-005` was closed 2026-08-12 as resolved-by-reversion: the `people`
+Domain relocation it questioned was reverted by its owner, satisfying the
+card's acceptance criterion. See the task card for the recorded evidence.
 
 ## Integration queue
 
-No shared-file integration task is currently assigned.
+| Task | Integration steward | Scope |
+|---|---|---|
+| [BLB-S1-009](./tasks/BLB-S1-009.md) | codex/sol-high | Compatibility registration, workspace-boundary tests, root docs/ADRs, fresh-schema replay, `mix precommit` |
 
 ## Recently completed checkpoints
 
