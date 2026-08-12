@@ -99,4 +99,25 @@ defmodule Bilimbi.Core.Company.TestFixtures do
       [tenant_id, company_id]
     )
   end
+
+  def create_departments_table! do
+    SQL.query!(
+      Repo,
+      """
+      CREATE TEMPORARY TABLE company_departments (
+        id bigserial PRIMARY KEY,
+        company_id bigint NOT NULL
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+  end
+
+  def insert_department!(id, company_id) do
+    SQL.query!(
+      Repo,
+      "INSERT INTO company_departments (id, company_id) VALUES ($1, $2)",
+      [id, company_id]
+    )
+  end
 end

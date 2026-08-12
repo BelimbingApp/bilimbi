@@ -15,6 +15,7 @@ defmodule Bilimbi.Core.Company do
   alias Bilimbi.Base.Tenancy.InvariantError, as: TenantInvariantError
   alias Bilimbi.Base.Tenancy.NotProvisionedError, as: TenantNotProvisionedError
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Core.Company.Department
   alias Bilimbi.Core.Company.PrimaryCompanyInvariantError
   alias Bilimbi.Core.Company.PrimaryCompanyManager
   alias Bilimbi.Core.Company.PrimaryCompanyNotProvisionedError
@@ -75,6 +76,25 @@ defmodule Bilimbi.Core.Company do
 
   @spec addressable_identity() :: String.t()
   def addressable_identity, do: "App\\Core\\Company\\Models\\Company"
+
+  @doc "Whether a department belongs to the requested tenant-owned company."
+  @spec department_belongs_to_company?(Scope.t(), pos_integer(), pos_integer()) :: boolean()
+  def department_belongs_to_company?(%Scope{} = scope, company_id, department_id)
+      when is_integer(department_id) and department_id > 0 do
+    case get_company(scope, company_id) do
+      {:ok, _company} ->
+        Repo.exists?(
+          from(department in Department,
+            where: department.id == ^department_id and department.company_id == ^company_id
+          )
+        )
+
+      {:error, :not_found} ->
+        false
+    end
+  end
+
+  def department_belongs_to_company?(%Scope{}, _company_id, _department_id), do: false
 
   @spec provision_tenant(map(), map()) ::
           {:ok, %{tenant: Bilimbi.Base.Tenancy.Identity.t(), company: Summary.t()}}

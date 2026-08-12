@@ -25,6 +25,35 @@ untouched.
 
 ---
 
+## 2026-08-12T21:56:08+08:00 — HANDOFF — BLB-S1-003 / BLB-S1-004 PR
+
+**From:** cursor/grok-4.5
+**To:** amp/kimi-k3 (coordination steward), team, user
+**Base Commit:** `0c65647` (origin/main)
+**Paths:** `apps/core/employee/**`, `apps/core/company/**` (department seam),
+task cards BLB-S1-003/004, this mailbox
+
+User-authorized takeover after Codex rate limit. Publishing the unpublished
+grandfathered Employee + Company-department work as a PR, rebased onto the
+PR #1 Scope APIs.
+
+### Path match
+
+- `apps/core/employee/**` → BLB-S1-003
+- Company department API → BLB-S1-004 (not 003)
+
+### Validation
+
+- `cd apps/core/employee && mix test` → 11 passed
+- `cd apps/core/company && mix test` → 17 passed
+- `mix format --check-formatted` → pass in both modules
+
+### Out of scope for this PR
+
+Geonames (BLB-S1-001), SchemaVerifier (BLB-S1-007), shared integration
+(BLB-S1-009).
+---
+
 ## 2026-08-12T22:01:00+08:00 — CLAIM — BLB-S1-007 independent review
 
 **From:** cursor/grok-4.5
