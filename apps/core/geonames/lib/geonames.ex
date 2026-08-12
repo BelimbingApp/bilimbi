@@ -18,6 +18,30 @@ defmodule Bilimbi.Core.Geonames do
   alias Bilimbi.Core.Geonames.CountrySummary
   alias Bilimbi.Core.Geonames.Postcode
   alias Bilimbi.Core.Geonames.PostcodeSummary
+  alias Bilimbi.Core.Geonames.ReferenceData
+
+  @type import_error ::
+          {:invalid_dataset, term()}
+          | {:invalid_country_iso, term()}
+          | {:download, atom() | {:postcodes, String.t()}, term()}
+          | {:extract, atom() | {:postcodes, String.t()}, term()}
+          | {:import, atom() | {:postcodes, String.t()}, term()}
+
+  @doc """
+  Downloads and imports the selected canonical GeoNames datasets.
+
+  Supported options: `:datasets`, `:postcodes`, `:cache_dir`, `:force`,
+  `:ttl_days`, and `:receive_timeout`. Every dataset import is atomic and a
+  payload that yields no valid rows is rejected with
+  `{:error, {:import, dataset, :no_valid_rows}}`; a failed import restores
+  the previously known-good download cache.
+  """
+  @spec import_reference_data(keyword()) :: {:ok, map()} | {:error, import_error()}
+  def import_reference_data(opts \\ []) do
+    ReferenceData.run(
+      Keyword.take(opts, [:datasets, :postcodes, :cache_dir, :force, :ttl_days, :receive_timeout])
+    )
+  end
 
   @spec list_countries() :: [CountrySummary.t()]
   def list_countries do
