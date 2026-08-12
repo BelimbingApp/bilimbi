@@ -11,6 +11,15 @@ defmodule BilimbiWeb.HomeLiveTest do
     :ok
   end
 
+  test "sends a restrictive content security policy", %{conn: conn} do
+    conn = get(conn, ~p"/")
+
+    assert [policy] = get_resp_header(conn, "content-security-policy")
+    assert policy =~ "default-src 'self'"
+    assert policy =~ "object-src 'none'"
+    assert policy =~ "script-src 'self'"
+  end
+
   test "presents the explicit platform-operator primary company", %{conn: conn} do
     assert {:ok, identity} =
              Company.provision_platform_operator("Platform operator", %{

@@ -1,13 +1,32 @@
 defmodule BilimbiWeb.Router do
   use BilimbiWeb, :router
 
+  @content_security_policy Enum.join(
+                             [
+                               "default-src 'self'",
+                               "base-uri 'self'",
+                               "form-action 'self'",
+                               "frame-ancestors 'self'",
+                               "object-src 'none'",
+                               "script-src 'self'",
+                               "style-src 'self'",
+                               "img-src 'self' data:",
+                               "font-src 'self'",
+                               "connect-src 'self'"
+                             ],
+                             "; "
+                           )
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
     plug :fetch_live_flash
     plug :put_root_layout, html: {BilimbiWeb.Layouts, :root}
     plug :protect_from_forgery
-    plug :put_secure_browser_headers
+
+    plug :put_secure_browser_headers, %{
+      "content-security-policy" => @content_security_policy
+    }
   end
 
   pipeline :api do
