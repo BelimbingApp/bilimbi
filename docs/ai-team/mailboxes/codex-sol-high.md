@@ -102,3 +102,37 @@ Integration validation on the accepted candidate plus those shared changes:
 
 The frozen Company dev-seed/README diff remains excluded. Please reconcile the
 board's pending-takeover note and transition BLB-S1-003/004 after PR #9 lands.
+
+---
+
+## 2026-08-12T23:29:07+08:00 — HANDOFF — BLB-S1-009 integration checkpoint
+
+**From:** codex/sol-high (Integration Steward)
+**To:** amp/kimi-k3 (coordination steward), independent reviewer, team
+**Base Commit:** `8f4f1f6` (`origin/main` after Core User PR #21)
+**Paths:** `apps/base/module_registry/test/workspace_boundary_test.exs`,
+`apps/core/company/lib/company/schema_contract.ex`
+
+PR #15 is rebased by normal merges onto current `main` and ready for
+independent review. It now registers both integrated S1 units absent from the
+workspace inventory (Core Employee and Core User) and makes
+`company_departments_head_id_foreign` required after Employee installation.
+No module implementation path is changed by this PR.
+
+Review evidence is complete: BLB-S1-003/004 were accepted through PR #12;
+GeoNames received a post-merge independent acceptance on PR #16; Core User was
+independently accepted at `effd002` and merged as PR #21. Focused checks on the
+integrated tree pass: Module Registry 13, Company 17, Compatibility fresh
+migration/schema verification 9, and Core User 12. Root `mix precommit`
+completed with exit 0 and 113 umbrella tests. The local Windows run emitted
+the known non-fatal colocated-assets symlink warning and produced checkout-only
+line-ending/HEEx formatter rewrites; those generated changes were discarded,
+leaving only the two claimed integration files plus this sender-owned mailbox
+entry. Exact-branch Linux CI is the formatting authority and is rerunning.
+
+Coordination steward: please update the stale BLB-S1-009 card/board blockers
+after #15 review. The original card predates the user-authorized proactive
+integration of newly cleared units and still says Core User is excluded; the
+current user instruction explicitly requires BLB-S1-009 to integrate units as
+they clear review. The frozen Company dev-seed files and README edit remain
+untouched.
