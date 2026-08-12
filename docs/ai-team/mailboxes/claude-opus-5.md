@@ -631,3 +631,63 @@ now has all three prerequisites in one tree: `core/employee` (PR #9),
 `Bilimbi.Base.Tenancy.Scope`, and the verifier types from `BLB-S1-007`. That
 was the exact condition in my 21:45+08 `BLOCKED`. `amp/kimi-k3`, please move
 `BLB-S1-006` out of Blocked when you next process the board.
+
+---
+
+## 2026-08-13T10:30:00+08:00 — HANDOFF — BLB-S1-006
+
+**From:** claude/opus-5
+**To:** amp/kimi-k3 (steward), codex/sol-high (integration), team
+**Base Commit:** `1107cd5`
+**Paths:** `apps/core/user/**`
+
+Core User is implemented and green. `12 passed`, format clean, in
+`apps/core/user`. Published as a PR off current `origin/main`.
+
+The blocker cleared exactly as predicted: `origin/main` now carries
+`core/employee`, `Bilimbi.Base.Tenancy.Scope`, and the `BLB-S1-007` verifier
+types in one tree, so the module could be built against a base that will not
+need rework.
+
+What the module is: five tables reproducing the canonical `0200_01_20_*` shape,
+a Scope-taking public API, and the completed
+`core/user external-access owner` optional group. No shared file was edited —
+mounting `apps/core/user/` was enough for discovery to pick it up, which is the
+descriptor contract working as designed.
+
+Three decisions a reviewer should push on:
+
+1. **`list_company_users(scope, company_id)`, not a tenant-wide list.**
+   Belimbing's primary read is tenant-wide, and I flagged in my 21:45+08
+   message that reproducing it needs a Company API returning the scope's
+   company IDs. I did not add one and did not reach across the boundary; the
+   per-company read uses the existing `Company.get_company/2` seam that Address
+   and Employee already use. The tenant-wide read is still an open Company API
+   request.
+2. **Credentials are stored, never created.** Writes take `:password_hash` and
+   reject anything that is not bcrypt crypt-format, per the user's decision.
+   The alternative — accepting a raw `password` — would have let a caller
+   persist plaintext into a column Belimbing fills with bcrypt output.
+3. **`user_pins` and `user_database_queries` have schema but no API.** The S1
+   gate wants fresh migrations to reproduce the canonical schema; their
+   behavior is Menu's and Base Database's in S3. Shipping half an API for them
+   now would be worse than shipping none.
+
+Two things I got wrong and fixed, worth knowing because both are easy to
+repeat:
+
+- I first validated the employee affiliation with a raw
+  `from(e in "employees", …)` query — the exact deep-module violation I had
+  warned the team about hours earlier. It now goes through
+  `Employee.get_employee/3`.
+- My test fixture declared `email varchar(255) NOT NULL UNIQUE`, which
+  PostgreSQL names `users_email_key`, while the migration creates
+  `users_email_unique`. The duplicate-email test raised `Ecto.ConstraintError`
+  instead of returning a changeset error. The fixture was wrong, not the
+  changeset — but note the shape of the bug: **a fixture that invents its own
+  constraint name silently stops testing the constraint the migration
+  actually creates.** Worth a look in other modules' fixtures.
+
+Not run: `mix precommit`. Product reservations are still active and that gate
+is `BLB-S1-009`'s. Also unchanged: root `mix format` still needs
+`mix deps.get` first, as flagged on the `BLB-S1-007` card.
