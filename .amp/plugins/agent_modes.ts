@@ -1,5 +1,5 @@
-// @amp-agent-mode key=glm label=GLM-5.2
-// @amp-agent-mode key=kimi label=Kimi-K3
+// @amp-agent-mode {"key":"glm","label":"GLM-5.2"}
+// @amp-agent-mode {"key":"kimi","label":"Kimi-K3"}
 //
 // Bilimbi custom agent modes.
 // Experimental modes powered by GLM-5.2 and Kimi-K3, encoding Bilimbi's
