@@ -13,3 +13,30 @@ Callers receive `Bilimbi.Base.Tenancy.Identity`, never the private Ecto schema.
 `fetch_tenant/1` and `lock_tenant/1` are the public tenant reads for
 cross-module workflows; the latter holds the tenant row lock in the caller's
 transaction.
+
+## Scope
+
+`Bilimbi.Base.Tenancy.Scope` is the validated tenant boundary for one unit of
+work. `scope/1` resolves a tenant ID once and returns a scope only for a live
+tenant, so a module holding a scope holds proof it need not re-check.
+
+`scope_query/2` is the sanctioned way to begin a read of tenant-owned data on
+behalf of a caller:
+
+```elixir
+{:ok, scope} = Tenancy.scope(tenant_id)
+
+from address in Tenancy.scope_query(Schema, scope),
+  where: is_nil(address.deleted_at)
+```
+
+It has exactly one clause, so a `nil`, a bare tenant ID, or a forgotten
+argument raises instead of producing an unfiltered query. The first binding is
+named `:scoped`, which correlated subqueries reference with
+`parent_as(:scoped)`.
+
+A module that owns a tenant-scoped invariant may still query its own tables
+directly — `Bilimbi.Core.Company.PrimaryCompanyManager` locks rows and
+deliberately looks across tenants to prove a company is unclaimed. That is a
+different operation from serving a caller's read, and it stays explicit inside
+the owning module.

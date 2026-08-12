@@ -11,6 +11,7 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Identity
+  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company.PrimaryCompanyInvariantError
   alias Bilimbi.Core.Company.PrimaryCompanyNotProvisionedError
   alias Bilimbi.Core.Company.Schema
@@ -31,12 +32,11 @@ defmodule Bilimbi.Core.Company.PrimaryCompanyManager do
 
   defp find_for_resolved_tenant(tenant) do
     query =
-      from company in Schema,
+      from company in Tenancy.scope_query(Schema, Scope.for_tenant(tenant)),
         join: assignment in TenantPrimaryCompany,
         on:
           assignment.company_id == company.id and
             assignment.tenant_id == company.tenant_id,
-        where: assignment.tenant_id == ^tenant.id,
         select:
           {%Summary{
              id: company.id,

@@ -20,6 +20,7 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
   @type column_spec :: %{
           required(:type) =>
             atom()
+            | {:char, pos_integer()}
             | {:numeric, pos_integer(), non_neg_integer()}
             | {:varchar, pos_integer()}
             | {:timestamp, non_neg_integer()},
@@ -311,6 +312,10 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
     actual.type == "character varying" and actual.length == length
   end
 
+  defp type_matches?({:char, length}, actual) do
+    actual.type == "character" and actual.length == length
+  end
+
   defp type_matches?({:timestamp, precision}, actual) do
     actual.type == "timestamp without time zone" and actual.datetime_precision == precision
   end
@@ -323,10 +328,17 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
   defp type_matches?(:boolean, actual), do: actual.type == "boolean"
   defp type_matches?(:date, actual), do: actual.type == "date"
   defp type_matches?(:double_precision, actual), do: actual.type == "double precision"
+  defp type_matches?(:inet, actual), do: actual.type == "inet"
   defp type_matches?(:integer, actual), do: actual.type == "integer"
   defp type_matches?(:json, actual), do: actual.type == "json"
+  defp type_matches?(:jsonb, actual), do: actual.type == "jsonb"
   defp type_matches?(:smallint, actual), do: actual.type == "smallint"
   defp type_matches?(:text, actual), do: actual.type == "text"
+  defp type_matches?(:uuid, actual), do: actual.type == "uuid"
+
+  # A contract naming a type this module does not model is drift to report, not
+  # a crash. Mirrors the closing clause of default_matches?/2.
+  defp type_matches?(_expected, _actual), do: false
 
   defp default_matches?(nil, nil), do: true
 
