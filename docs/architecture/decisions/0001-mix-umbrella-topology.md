@@ -1,11 +1,18 @@
 # ADR 0001: Mix umbrella application topology
 
 **Document Type:** Architecture Decision Record
-**Status:** Accepted
+**Status:** Superseded by ADR 0003
 **Agents:** codex/sol-high
 **Scope:** Repository topology, Mix umbrella composition, application identity,
 and independently sourced Domains and Extensions
-**Last Updated:** 2026-08-11
+**Last Updated:** 2026-08-12
+
+ADR 0003 retains the repository-root umbrella and the direct Base/Core/Web
+applications, but supersedes this record's flat internal source topology, its
+namespace-derived Base/Core paths, and its rejection of module-level Mix
+packages. The Decision, Alternatives, and Consequences below are retained only
+as historical rationale; do not use them as current module-placement or
+composition guidance.
 
 ## Context
 

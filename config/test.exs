@@ -1,6 +1,6 @@
 import Config
 
-config :base, Bilimbi.Base.Repo,
+config :bilimbi_base_database, Bilimbi.Base.Repo,
   username: System.get_env("PGUSER", "bilimbi"),
   password: System.get_env("PGPASSWORD", "bilimbi_dev_ca658ad7d8b5"),
   hostname: System.get_env("PGHOST", "localhost"),
@@ -13,8 +13,6 @@ config :web, BilimbiWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "MRty3402yaFk5Y1BBT0o3cqcXutsDD8jd0H3eALvFlKUJsWJjN609o5+P3RE94JQ",
   server: false
-
-config :base, Bilimbi.Base.Mailer, adapter: Swoosh.Adapters.Test
 
 config :swoosh, :api_client, false
 config :logger, level: :warning

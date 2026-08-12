@@ -30,12 +30,13 @@ how the application should be extended and how it should feel to use.
 
 ## Current status
 
-Bilimbi is in its foundation phase. The repository uses a conventional Mix
-umbrella rooted at the repository, with Base, Core, and Web as its Platform
-Baseline. The first Company slice owns Ecto migrations that can create the
-current compatible Base Tenancy and Core Company schema, or verify and adopt an
-existing Belimbing database. Optional Domains and deployment-owned Extensions
-are intentionally not implemented yet.
+Bilimbi is in its foundation phase. The repository uses a Mix umbrella rooted
+at the repository. Base, Core, and Web are its top-level composition
+applications; each declared deep module below Base or Core is a self-contained
+local Mix package discovered from its descriptor. The current foundation owns Ecto migrations that can create
+the compatible Base Tenancy, Core Company, and Core Address schema, or verify
+and adopt an existing Belimbing database. Optional Domains and
+deployment-owned Extensions are intentionally not implemented yet.
 
 The first major compatibility target is the existing Belimbing PostgreSQL
 schema. Bilimbi should map that schema accurately instead of creating a second,
@@ -71,6 +72,28 @@ mix phx.server
 Adoption refuses schema drift and records the verified baselines in
 `bilimbi_schema_migrations`. Laravel's `migrations` table is never changed.
 
+After a fresh migration or an unprovisioned adoption, establish explicit
+operator identity with:
+
+```bash
+mix bilimbi.platform.provision \
+  --tenant-name "Platform operator" \
+  --company-name "Example Operations" \
+  --company-code "example_operations"
+```
+
+The operation is idempotent: rerunning it resolves the existing marked tenant
+and primary-company assignment rather than relying on a numeric ID.
+
+Provision a customer tenant and its primary company atomically with:
+
+```bash
+mix bilimbi.tenant.provision \
+  --tenant-name "Acme tenant" \
+  --company-name "Acme Sdn. Bhd." \
+  --company-code "acme"
+```
+
 Useful commands:
 
 ```bash
@@ -79,6 +102,8 @@ mix test
 mix bilimbi.migrate
 mix bilimbi.migrations
 mix bilimbi.schema.verify
+mix help bilimbi.platform.provision
+mix help bilimbi.tenant.provision
 mix precommit
 ```
 
@@ -90,15 +115,51 @@ the test suite.
 
 ```text
 apps/
-├── base/                 # Platform infrastructure and shared contracts
-├── core/                 # Required enterprise Domain
-└── web/                  # Phoenix endpoint and shared UI shell
+├── base/                         # Mandatory composition application
+│   ├── bilimbi.container.exs     # Declares the Base layer
+│   ├── database/                 # base/database module package
+│   ├── module_registry/          # Runtime installed-module registry
+│   └── tenancy/                  # base/tenancy module package
+├── core/                         # Mandatory composition application
+│   ├── bilimbi.container.exs     # Declares the Core layer
+│   ├── company/                  # core/company module package
+│   ├── address/                  # core/address module package
+│   └── compatibility/            # Shared migration/adoption coordinator
+└── web/                          # Phoenix endpoint and shared UI shell
 ```
 
-Future optional Domain and Extension sources will mount as direct umbrella
-children, such as `apps/people` or `apps/sb_group`. See
-[ADR 0001](./docs/architecture/decisions/0001-mix-umbrella-topology.md)
-for the accepted topology and its lifecycle boundaries.
+The complete physical boundary of Base Tenancy is `apps/base/tenancy/`, not a
+directory below its `lib/`. Consequently its source begins at
+`apps/base/tenancy/lib/tenancy.ex` while the Elixir namespace remains
+`Bilimbi.Base.Tenancy`. The same rule applies to Company, Address, and every
+future declared module.
+
+A composition container never lists child packages by name. Every immediate
+child directory containing `bilimbi.module.exs` is an installed module; the
+shared discovery code validates all installed descriptors and generates the
+container's local Mix path dependencies. Mounting `apps/base/mailer/` or a
+future `apps/people/employee/` is therefore the source-installation action.
+Dependency resolution and compilation must still run afterward.
+
+The discovery helper itself belongs to `apps/base/module_registry/mix/` and is
+covered by that package's formatter and tests. Mix writes its validated,
+resolved module position into OTP application metadata; runtime migration
+discovery consumes that approved order instead of maintaining a second graph
+algorithm.
+
+The descriptor is the source of truth for stable module ID, layer, OTP
+application ID, namespace, declared module dependencies, and migration
+contribution. Discovery rejects malformed or missing descriptors, duplicate
+stable or OTP IDs, missing dependencies, cycles, container/layer mismatches,
+and upward dependency edges. Modules are ordered dependency-first with stable
+module ID as the deterministic tie-breaker.
+
+Future optional Domains are composition applications below `apps/`. For
+example, a People distribution can compose a self-contained Employee module at
+`apps/people/employee/`, with namespace `Bilimbi.People.Employee`. A module
+directory may be mounted as a nested Git repository and composed as a local Mix
+path dependency without scattering its files through the platform tree. See
+[ADR 0003](./docs/architecture/decisions/0003-physical-deep-module-packages.md).
 
 Base and Core are ownership boundaries, not superclass hierarchies. A domain
 module exposes a small public API and hides its schemas, queries, and internal
@@ -137,11 +198,22 @@ operator and `tenant_primary_companies` for each tenant's designated company.
 `companies.tenant_id` is always explicit and has no database default. ID 1 is
 only historical migration input in Belimbing, never a Bilimbi runtime role.
 
-Bilimbi-owned migrations live with their owning application below
-`apps/base/priv/repo/migrations` and `apps/core/priv/repo/migrations`. Fresh
-installations use `mix bilimbi.migrate`; existing databases use the explicit
-verify-and-adopt workflow described in
+Bilimbi-owned migrations live inside their owning module, currently
+`apps/base/tenancy/priv/repo/migrations`,
+`apps/core/company/priv/repo/migrations`, and
+`apps/core/address/priv/repo/migrations`. The Compatibility coordinator obtains
+these paths from installed module descriptors; it contains no per-module path
+list. Each migration module uses its owning public namespace. Structural and
+live-data invariants are likewise implemented by the contributing module's
+schema contract and invoked generically by Compatibility. Fresh installations use
+`mix bilimbi.migrate`; existing databases use the explicit verify-and-adopt
+workflow described in
 [ADR 0002](./docs/architecture/decisions/0002-compatible-schema-baselines.md).
+
+Core Address preserves Belimbing's camel-cased legacy columns and polymorphic
+Company identity behind a snake-cased Elixir API. Every Address operation takes
+an explicit tenant. Its Geonames foreign keys remain a strict optional
+contribution until the Geonames slice is ported.
 
 ## Documentation
 
@@ -149,8 +221,9 @@ verify-and-adopt workflow described in
 |---|---|
 | Agent and coding rules | [AGENTS.md](./AGENTS.md) |
 | Product and interface design | [DESIGN.md](./DESIGN.md) |
-| Mix umbrella topology | [ADR 0001](./docs/architecture/decisions/0001-mix-umbrella-topology.md) |
+| Original Mix umbrella topology | [ADR 0001](./docs/architecture/decisions/0001-mix-umbrella-topology.md) |
 | Compatible schema baselines | [ADR 0002](./docs/architecture/decisions/0002-compatible-schema-baselines.md) |
+| Physical deep-module packages | [ADR 0003](./docs/architecture/decisions/0003-physical-deep-module-packages.md) |
 | Source Belimbing project | [BelimbingApp/belimbing](https://github.com/BelimbingApp/belimbing) |
 | Phoenix documentation | [phoenix.hexdocs.pm](https://phoenix.hexdocs.pm/) |
 | Elixir documentation | [hexdocs.pm/elixir](https://hexdocs.pm/elixir/) |

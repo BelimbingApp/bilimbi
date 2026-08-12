@@ -15,7 +15,7 @@ if config_env() == :dev do
         ~r"apps/web/priv/gettext/.*\.po$"E,
         ~r"apps/web/lib/bilimbi_web/router\.ex$"E,
         ~r"apps/web/lib/bilimbi_web/(controllers|live|components)/.*\.(ex|heex)$"E,
-        ~r"apps/core/lib/bilimbi/core/.*\.ex$"E
+        ~r"apps/[^/]+/[^/]+/lib/.*\.ex$"E
       ]
     ]
 end
@@ -30,7 +30,7 @@ if config_env() == :prod do
 
   maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
 
-  config :base, Bilimbi.Base.Repo,
+  config :bilimbi_base_database, Bilimbi.Base.Repo,
     url: database_url,
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
     socket_options: maybe_ipv6

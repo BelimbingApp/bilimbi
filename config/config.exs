@@ -1,12 +1,10 @@
 import Config
 
-config :base,
+config :bilimbi_base_database,
   ecto_repos: [Bilimbi.Base.Repo],
   generators: [timestamp_type: :utc_datetime]
 
-config :base, Bilimbi.Base.Repo, migration_source: "bilimbi_schema_migrations"
-
-config :base, Bilimbi.Base.Mailer, adapter: Swoosh.Adapters.Local
+config :bilimbi_base_database, Bilimbi.Base.Repo, migration_source: "bilimbi_schema_migrations"
 
 config :web, BilimbiWeb.Endpoint,
   url: [host: "localhost"],

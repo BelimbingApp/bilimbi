@@ -15,7 +15,7 @@ database_options =
       [url: url]
   end
 
-config :base,
+config :bilimbi_base_database,
        Bilimbi.Base.Repo,
        database_options ++
          [

@@ -18,7 +18,7 @@ Bilimbi is built with:
 - Ecto 3.14.1, Ecto SQL 3.14.0, Postgrex 0.22.4, and PostgreSQL 18;
 - HEEx, Phoenix components, Tailwind CSS 4.3.0, and esbuild 0.25.4;
 - ExUnit and `Phoenix.LiveViewTest`;
-- Req 0.7.2 for HTTP requests;
+- Req 0.7.2 for Web's Swoosh API client and declared outbound HTTP;
 - Bandit 1.12.4 as the HTTP server;
 - Swoosh 1.27.0 for email where email is required.
 
@@ -30,10 +30,12 @@ releases at milestone boundaries and update this list with the pins. Keep
 `mix.lock` committed. Do not use prerelease dependencies unless the task
 explicitly requires one and the decision is documented.
 
-The repository uses the flat Mix umbrella defined by
-`docs/architecture/decisions/0001-mix-umbrella-topology.md`, where
-Base, Core, and Web are separate OTP applications and umbrella children below
-`apps/`.
+The repository uses the composed Mix topology defined by
+`docs/architecture/decisions/0003-physical-deep-module-packages.md`. Base,
+Core, and Web are direct umbrella children below `apps/`. Base and Core are
+composition applications; their declared deep modules are nested local Mix
+path packages discovered from `bilimbi.module.exs`. Future Domain and Extension
+composition applications use the same discovery contract.
 
 `Base` and `Core` remain ownership boundaries rather than superclass
 hierarchies. OTP application boundaries support their dependency, supervision,
@@ -44,11 +46,15 @@ not one OTP application inside it.
 ## 2. Current scope
 
 The initial Bilimbi implementation contains the Platform Baseline and its web
-host:
+host. Base Tenancy, Core Company, and Core Address are active foundation
+slices:
 
 ```text
-apps/base/
-apps/core/
+apps/base/database/
+apps/base/tenancy/
+apps/core/company/
+apps/core/address/
+apps/core/compatibility/
 apps/web/
 ```
 
@@ -109,6 +115,14 @@ modules such as User, Company, Employee, Address, and Geonames.
 Core may depend on Base. Core modules should collaborate through public APIs,
 behaviours, or explicit events—not another module's private queries or tables.
 
+### Future Domains and Extensions
+
+An optional Domain may depend on Base and Core and may compose explicitly
+declared sibling modules from the same Domain. An Extension may depend on Base,
+Core, or Domain contracts. Base cannot depend on a higher layer, Core cannot
+depend on a Domain or Extension, a Domain cannot depend on an Extension, and
+Extensions cannot form a hidden Extension layer among themselves.
+
 ### Web
 
 `BilimbiWeb` contains Phoenix adapters: routers, controllers, LiveViews,
@@ -118,9 +132,11 @@ call a Base or Core API. Base and Core modules must not depend on `BilimbiWeb`.
 Recommended placement:
 
 ```text
-apps/core/lib/bilimbi/core/company.ex
-apps/core/lib/bilimbi/core/company/schema.ex
-apps/core/lib/bilimbi/core/company/queries.ex
+apps/core/company/lib/company.ex
+apps/core/company/lib/company/schema.ex
+apps/core/company/lib/company/queries.ex
+apps/core/company/priv/repo/migrations/
+apps/core/company/test/
 apps/web/lib/bilimbi_web/core/company_live/index.ex
 apps/web/lib/bilimbi_web/core/company_live/index.html.heex
 ```
@@ -170,12 +186,14 @@ from, write to, rename, or repurpose Laravel's `migrations` table. Migration
 files stay with their owner:
 
 ```text
-apps/base/priv/repo/migrations/
-apps/core/priv/repo/migrations/
+apps/base/tenancy/priv/repo/migrations/
+apps/core/company/priv/repo/migrations/
+apps/core/address/priv/repo/migrations/
 ```
 
-Run the required baseline through `mix bilimbi.migrate`, which merges both
-paths with strict version ordering. Do not use broad `create_if_not_exists`
+Run the required baseline through `mix bilimbi.migrate`, which discovers every
+installed descriptor that contributes migrations and merges those paths with
+strict Base → Core → Domain → Extension ordering. Do not use broad `create_if_not_exists`
 operations to make a migration appear safe on an existing database. Verify an
 existing Belimbing database with `mix bilimbi.schema.verify`, then baseline it
 with `mix bilimbi.schema.adopt`; adoption must refuse structural drift.
@@ -192,12 +210,100 @@ from row age. Base Tenancy owns operator resolution and must not query Core
 Company tables; Core Company owns primary-company resolution, assignment,
 transfer, and provisioning.
 
-When their owning slices are ported, preserve the canonical explicit-tenancy
-constraints for Address and Authz. Custom roles require a live owning company;
-system roles are company-less. AI provider configuration lookup requires an
-owning company ID and must not resolve credentials from tenant identity alone.
+Core Address preserves the canonical non-null `addresses.tenant_id`, named
+index, and restricted tenant foreign key. Its Geonames foreign keys remain an
+all-or-nothing optional contribution until Core Geonames is ported. When Authz
+is ported, custom roles require a live owning company; system roles are
+company-less. AI provider configuration lookup requires an owning company ID
+and must not resolve credentials from tenant identity alone.
 
 ## 6. Deep-module design
+
+The physical module directory is the ownership, packaging, and future nested-
+Git boundary. For example, the complete Base Tenancy module boundary is
+`apps/base/tenancy/`. It must contain its own `mix.exs`, `lib/`, tests,
+documentation, `bilimbi.module.exs` descriptor, and any owned migrations or
+assets.
+
+Inside that boundary, `lib/` starts at the module. Do not repeat the platform
+and layer path below `lib/`:
+
+```text
+apps/base/tenancy/
+├── mix.exs
+├── bilimbi.module.exs
+├── lib/
+│   ├── tenancy.ex
+│   └── tenancy/
+├── priv/repo/migrations/
+├── test/
+└── docs/
+```
+
+`lib/tenancy.ex` still declares `Bilimbi.Base.Tenancy`; filesystem flattening
+does not shorten or weaken the globally qualified Elixir namespace. The public
+facade, private implementation, migrations, tests, docs, descriptor, and
+optional assets must not be split across the parent composition application.
+
+Every Base, Core, Domain, or Extension composition container has a
+`bilimbi.container.exs` descriptor. Its `mix.exs` must call the shared generic
+discovery mechanism and must not name any installed child module. Every
+immediate child directory is treated as an installed module and must contain a
+valid `bilimbi.module.exs`; mounting or removing that one directory changes the
+container's source composition.
+
+The module descriptor is the sole declaration of its stable module ID, layer,
+OTP application ID, namespace, module dependencies, required/optional state,
+migration path, and optional compatibility contract. Its `mix.exs` derives
+local module path dependencies and application metadata from that descriptor;
+do not repeat module dependency names manually.
+
+Discovery must fail during dependency resolution for a malformed or missing
+descriptor, duplicate stable ID, duplicate OTP application ID, missing
+dependency, dependency cycle, layer/container mismatch, or forbidden upward
+dependency. Valid modules are ordered dependency-first and then by stable
+module ID; layer order is Base → Core → Domain → Extension.
+
+Base ModuleRegistry owns the source-loadable Mix helper under its own `mix/`
+directory. That directory must remain in the package formatter. Mix records the
+validated resolved position in each OTP application's descriptor metadata;
+runtime consumers use that position and must not implement a second dependency
+graph algorithm.
+
+The shared database module owns one Repo. Compatibility discovers migration
+paths from installed runtime descriptor metadata and executes them through the
+single `bilimbi_schema_migrations` ledger; it must not hard-code Tenancy,
+Company, Address, or any future contributor.
+
+A descriptor's schema contract owns both structural table specifications and
+any live-data invariants understood by that module. Compatibility iterates
+installed contracts generically; never place tenant-, company-, address-, or
+future module-specific SQL in the coordinator. Migration modules must use the
+owning descriptor namespace.
+
+`Bilimbi.Base.Repo` is the deliberate platform-wide public name for the one
+shared Repo even though its physical owner and primary package namespace are
+Base Database. Do not generalize this documented Ecto convention into
+permission for other modules to escape their declared namespaces.
+
+The Base and Core composition applications contain no `lib/`, `priv/`, or
+`test/` directory. Do not place schemas, services, application callbacks,
+mailers, namespace marker modules, migrations, seeds, runtime resources,
+fixtures, or tests directly under `apps/base` or `apps/core`; create or use the
+owning child module instead. The container Mix projects delegate `mix test` to
+each child package so test helpers and support compile inside their owner.
+External library dependencies belong to the module that uses them, never to a
+composition-only container for possible future use.
+
+Cross-module tests may load lower-layer test support from declared module
+dependencies, but table DDL and fixtures remain defined once by their owning
+module. Base Database owns the shared SQL sandbox case. Web tests set up
+business identity through public module APIs rather than writing domain tables.
+
+Generate a migration from the owning module root or pass its explicit
+`--migrations-path`. Confirm the generated file remains below that module's
+`priv/repo/migrations`; never generate it into the Base or Core composition
+application and move ownership later by convention.
 
 Each module should provide a small public API around its business capability.
 Prefer functions such as:
@@ -247,8 +353,10 @@ Optional future integrations must not make a Core module fail to boot.
 
 ## 8. Dependencies and HTTP
 
-Use the already included `Req` library for HTTP requests. Do not add or use
-`HTTPoison`, `Tesla`, or `:httpc`.
+When a module needs outbound HTTP, add `Req` to that owning module and use it
+for HTTP requests. Web currently owns Req for its configured Swoosh API client.
+Do not place Req in a composition container merely because a future child may
+need it, and do not add or use `HTTPoison`, `Tesla`, or `:httpc`.
 
 Do not add dependencies casually. Before adding one, check whether the
 standard library, Phoenix, Ecto, or an existing dependency already provides

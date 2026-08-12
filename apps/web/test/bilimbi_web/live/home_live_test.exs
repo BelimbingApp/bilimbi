@@ -1,24 +1,23 @@
 defmodule BilimbiWeb.HomeLiveTest do
   use BilimbiWeb.ConnCase, async: false
 
-  import Bilimbi.Core.CompanyFixtures
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Core.Company
+  alias Bilimbi.Core.Company.TestFixtures
+
   setup do
-    create_company_identity_tables!()
+    TestFixtures.create_company_identity_tables!()
     :ok
   end
 
   test "presents the explicit platform-operator primary company", %{conn: conn} do
-    insert_tenant!()
-
-    insert_company!(%{
-      name: "Bilimbi Operations",
-      legal_name: "Bilimbi Operations Sdn. Bhd.",
-      code: "bilimbi_operations"
-    })
-
-    assign_primary_company!()
+    assert {:ok, identity} =
+             Company.provision_platform_operator("Platform operator", %{
+               name: "Bilimbi Operations",
+               legal_name: "Bilimbi Operations Sdn. Bhd.",
+               code: "bilimbi_operations"
+             })
 
     {:ok, view, _html} = live(conn, ~p"/")
 
@@ -26,7 +25,8 @@ defmodule BilimbiWeb.HomeLiveTest do
 
     assert has_element?(
              view,
-             "#platform-operator-company[data-company-id='73'][data-tenant-id='41']"
+             "#platform-operator-company[data-company-id='#{identity.company.id}']" <>
+               "[data-tenant-id='#{identity.tenant.id}']"
            )
 
     assert has_element?(view, "#company-name", "Bilimbi Operations Sdn. Bhd.")

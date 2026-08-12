@@ -30,15 +30,6 @@ defmodule Bilimbi.Umbrella.MixProject do
       setup: ["cmd mix setup", "bilimbi.migrate"],
       "ecto.setup": ["ecto.create -r Bilimbi.Base.Repo", "bilimbi.migrate"],
       "ecto.reset": ["ecto.drop -r Bilimbi.Base.Repo", "ecto.setup"],
-      "bilimbi.migrate": [
-        "ecto.migrate -r Bilimbi.Base.Repo --strict-version-order --migrations-path apps/base/priv/repo/migrations --migrations-path apps/core/priv/repo/migrations"
-      ],
-      "bilimbi.migrations": [
-        "ecto.migrations -r Bilimbi.Base.Repo --migrations-path apps/base/priv/repo/migrations --migrations-path apps/core/priv/repo/migrations"
-      ],
-      "bilimbi.rollback": [
-        "ecto.rollback -r Bilimbi.Base.Repo --migrations-path apps/base/priv/repo/migrations --migrations-path apps/core/priv/repo/migrations"
-      ],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
     ]
   end

@@ -66,7 +66,9 @@ in flight, waiting, blocked, or complete.
 
 Reuse shared `BilimbiWeb.CoreComponents` and layout components before inventing
 new markup. Shared components belong in the web foundation; workflow-specific
-markup belongs with the owning Core module.
+presentation, documentation, and optional assets belong inside the owning
+deep-module directory even when the Phoenix host adapts them into routes or
+layouts.
 
 Use the shared `<.icon>` component for icons. Do not call Heroicons modules
 directly from templates.

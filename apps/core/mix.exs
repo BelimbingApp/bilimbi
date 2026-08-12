@@ -1,3 +1,8 @@
+[discovery_file] =
+  Path.wildcard(Path.expand("../../apps/base/*/mix/module_discovery.exs", __DIR__))
+
+Code.require_file(discovery_file)
+
 defmodule Bilimbi.Core.MixProject do
   use Mix.Project
 
@@ -10,33 +15,18 @@ defmodule Bilimbi.Core.MixProject do
       deps_path: "../../deps",
       lockfile: "../../mix.lock",
       elixir: "~> 1.20",
-      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps()
     ]
   end
 
-  def application do
-    [
-      mod: {Bilimbi.Core.Application, []},
-      extra_applications: [:logger]
-    ]
-  end
-
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
-  defp elixirc_paths(_env), do: ["lib"]
-
-  defp deps do
-    [
-      {:base, in_umbrella: true}
-    ]
-  end
+  defp deps, do: Bilimbi.Base.ModuleRegistry.MixDiscovery.container_dependencies(__DIR__)
 
   defp aliases do
     [
       setup: ["deps.get"],
-      test: ["ecto.create --quiet -r Bilimbi.Base.Repo", "test"]
+      test: Bilimbi.Base.ModuleRegistry.MixDiscovery.container_test_commands(__DIR__)
     ]
   end
 end

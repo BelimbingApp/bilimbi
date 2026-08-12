@@ -57,17 +57,23 @@ Bilimbi owns Ecto migrations and records them in
 `bilimbi_schema_migrations`. It never reads from, writes to, renames, or
 repurposes Laravel's `migrations` table.
 
-Migration files remain with their owning application:
+Migration files remain with their owning deep module:
 
 ```text
-apps/base/priv/repo/migrations/   # Base infrastructure, including Tenancy
-apps/core/priv/repo/migrations/   # Core business schema, including Company
+apps/base/tenancy/priv/repo/migrations/
+apps/core/company/priv/repo/migrations/
+apps/core/address/priv/repo/migrations/
 ```
 
-The Platform Baseline migrator merges both paths and uses globally unique Ecto
-versions with strict ordering. Base Tenancy runs before Core Company. Ownership
-is expressed by the path; version numbers provide order rather than permanent
-numeric ranges for layers.
+These are the current contributing paths, not a hard-coded coordinator list.
+The Compatibility coordinator discovers every installed module descriptor
+whose `migrations` field is non-null and composes those paths through the shared
+Repo and ledger. It uses globally unique Ecto versions with strict deterministic
+ordering: declared dependencies first, then Base → Core → Domain → Extension
+and stable module ID as tie-breakers. The current declarations make Base
+Tenancy run before Core Company, which runs before Core Address. Ownership is
+expressed by the module descriptor and path; version numbers provide global
+execution order rather than permanent numeric ranges for layers.
 
 ### Current-state compatibility baselines
 
@@ -77,6 +83,8 @@ The first Bilimbi migrations create the canonical end state:
    unique index. It inserts no tenant.
 2. Core creates the complete current Company schema, including explicit tenant
    ownership, tenant-safe parentage, and `tenant_primary_companies`.
+3. Core creates the current Address schema, including explicit tenant
+   ownership and compatible polymorphic attachments.
 
 The Core Company baseline owns:
 
@@ -89,6 +97,12 @@ The Core Company baseline owns:
 - `company_department_types`;
 - `company_departments`.
 
+The Core Address baseline owns `addresses` and `addressables`. It preserves
+Belimbing's existing camel-cased PostgreSQL columns through explicit Ecto
+`source:` mappings. The Geonames normalization foreign keys are an optional
+all-or-nothing contribution until the Geonames tables are ported; adoption
+requires both exact keys when either is present.
+
 The historical locale-source rename and data backfills are not replayed on an
 empty schema. They remain provenance for adopting upgraded Belimbing data.
 
@@ -97,12 +111,8 @@ later add the department-head foreign key. The Company verifier treats each as
 an optional all-or-nothing contribution until its owning Bilimbi module exists.
 It does not fabricate a dependency on absent `users` or `employees` tables.
 
-Address and Authz are also deferred to their owners, without weakening their
-canonical contracts:
+Authz remains deferred to its owner without weakening its canonical contract:
 
-- `addresses.tenant_id` must eventually be non-null with no default, index
-  `addresses_tenant_index`, and restricted foreign key
-  `addresses_tenant_foreign` to `tenants.id`.
 - `base_authz_roles.company_id` is null only for system roles. The restricted
   `base_authz_roles_company_foreign` and exact check
   `base_authz_roles_custom_company_check` enforce
@@ -116,8 +126,8 @@ does not claim every Belimbing seeder has been ported.
 
 ### Fresh installation
 
-`mix bilimbi.migrate` runs the Base and Core paths together. `mix setup`
-includes this command. A fresh migration:
+`mix bilimbi.migrate` runs all installed descriptor-contributed paths together.
+`mix setup` includes this command. A fresh migration:
 
 - creates `bilimbi_schema_migrations` and never creates Laravel's ledger;
 - creates the complete in-scope schema at the pinned current state;
@@ -141,6 +151,13 @@ Verification checks owned columns, types, nullability, defaults, named indexes
 including the partial predicate, single and composite foreign keys, and
 important live-data invariants. Unexpected owned structure is drift. A partial
 or foreign Bilimbi ledger is an error.
+
+Each installed module's descriptor identifies its schema contract. That
+contract owns both its structural table specifications and its live-data
+invariant callback: Tenancy verifies platform-operator identity, and Company
+verifies primary-company assignments. Core Compatibility only discovers,
+orders, and aggregates those contracts; it contains no Tenancy-, Company-, or
+Address-specific SQL.
 
 An empty explicit identity is valid before provisioning. A marked but
 soft-deleted operator, multiple marked operators, or a missing, cross-tenant,
@@ -182,9 +199,10 @@ numbers as roles is not.
 - Bilimbi can create a fresh, explicit-tenancy Company foundation without
   Laravel.
 - Existing Belimbing databases require deliberate, drift-sensitive adoption.
-- Base owns generic verification and Tenancy; Core owns Company and composes
-  the current Platform Baseline.
-- Address, Authz, User, Employee, and AI compatibility obligations remain
+- Base Database owns the shared Repo, each module owns its compatibility
+  contract and migrations, and Core Compatibility discovers and coordinates
+  all installed contributions into the current Platform Baseline.
+- Authz, User, Employee, Geonames, and AI compatibility obligations remain
   explicit and will be activated with their owning slices.
 - The pinned source commit must change deliberately whenever the compatible
   Belimbing schema changes.
