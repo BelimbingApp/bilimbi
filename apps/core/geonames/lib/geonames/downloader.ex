@@ -1,0 +1,119 @@
+defmodule Bilimbi.Core.Geonames.Downloader do
+  @moduledoc false
+
+  @default_ttl_days 7
+  @default_timeout 300_000
+
+  @type result :: %{
+          path: String.t(),
+          cached: boolean(),
+          status: non_neg_integer() | nil,
+          etag: String.t() | nil
+        }
+
+  @spec download(String.t(), String.t(), keyword()) :: {:ok, result()} | {:error, term()}
+  def download(url, destination, opts \\ []) when is_binary(url) and is_binary(destination) do
+    ttl_days = Keyword.get(opts, :ttl_days, @default_ttl_days)
+    force? = Keyword.get(opts, :force, false)
+    etag_path = destination <> ".etag"
+
+    with :ok <- File.mkdir_p(Path.dirname(destination)) do
+      if not force? and fresh_without_etag?(destination, etag_path, ttl_days) do
+        {:ok, cached_result(destination, nil, nil)}
+      else
+        request(url, destination, etag_path, force?, opts)
+      end
+    end
+  end
+
+  defp request(url, destination, etag_path, force?, opts) do
+    stored_etag =
+      if force? or not File.regular?(destination), do: nil, else: read_etag(etag_path)
+
+    temporary_path = destination <> ".download-#{System.unique_integer([:positive])}"
+    headers = if stored_etag, do: [{"if-none-match", stored_etag}], else: []
+
+    request_options =
+      opts
+      |> Keyword.get(:req_options, [])
+      |> Keyword.merge(
+        url: url,
+        headers: headers,
+        into: File.stream!(temporary_path, [:write]),
+        receive_timeout: Keyword.get(opts, :receive_timeout, @default_timeout),
+        retry: false
+      )
+
+    case Req.get(request_options) do
+      {:ok, %Req.Response{status: 304}} when not is_nil(stored_etag) ->
+        File.rm(temporary_path)
+        {:ok, cached_result(destination, 304, stored_etag)}
+
+      {:ok, %Req.Response{status: status} = response} when status in 200..299 ->
+        etag = response |> Req.Response.get_header("etag") |> List.first()
+
+        with :ok <- replace_file(temporary_path, destination),
+             :ok <- store_etag(etag_path, etag) do
+          {:ok, %{path: destination, cached: false, status: status, etag: etag}}
+        end
+
+      {:ok, %Req.Response{status: status}} ->
+        File.rm(temporary_path)
+        {:error, {:http_status, status}}
+
+      {:error, exception} ->
+        File.rm(temporary_path)
+        {:error, {:request, exception}}
+    end
+  end
+
+  defp fresh_without_etag?(destination, etag_path, ttl_days)
+       when is_integer(ttl_days) and ttl_days >= 0 do
+    with true <- File.regular?(destination),
+         false <- File.regular?(etag_path),
+         {:ok, %{mtime: modified_at}} <- File.stat(destination, time: :posix) do
+      modified_at >= System.os_time(:second) - ttl_days * 86_400
+    else
+      _other -> false
+    end
+  end
+
+  defp fresh_without_etag?(_destination, _etag_path, _ttl_days), do: false
+
+  defp read_etag(path) do
+    case File.read(path) do
+      {:ok, contents} ->
+        case String.trim(contents) do
+          "" -> nil
+          etag -> etag
+        end
+
+      {:error, _reason} ->
+        nil
+    end
+  end
+
+  defp store_etag(path, nil), do: File.rm(path) |> normalize_rm()
+  defp store_etag(path, etag), do: File.write(path, etag)
+
+  defp normalize_rm(:ok), do: :ok
+  defp normalize_rm({:error, :enoent}), do: :ok
+  defp normalize_rm(error), do: error
+
+  defp replace_file(source, destination) do
+    case File.rename(source, destination) do
+      :ok ->
+        :ok
+
+      {:error, :eexist} ->
+        with :ok <- File.rm(destination), do: File.rename(source, destination)
+
+      error ->
+        error
+    end
+  end
+
+  defp cached_result(path, status, etag) do
+    %{path: path, cached: true, status: status, etag: etag}
+  end
+end
