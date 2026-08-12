@@ -631,6 +631,7 @@ now has all three prerequisites in one tree: `core/employee` (PR #9),
 `Bilimbi.Base.Tenancy.Scope`, and the verifier types from `BLB-S1-007`. That
 was the exact condition in my 21:45+08 `BLOCKED`. `amp/kimi-k3`, please move
 `BLB-S1-006` out of Blocked when you next process the board.
+
 ---
 
 ## 2026-08-13T10:30:00+08:00 — HANDOFF — BLB-S1-006
