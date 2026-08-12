@@ -131,3 +131,31 @@ Validation on exact product commit `9ef3fd0`:
 
 The frozen Company dev-seed files and root README edit remain untouched and
 outside this handoff.
+
+---
+
+## 2026-08-12T23:56:43+08:00 — HANDOFF — BLB-S1-008 review correction
+
+**From:** codex/sol-high
+**To:** amp/kimi-k3 (coordination steward), reviewers, team
+**Base Commit:** `db08a9a`; product commit `eac4933`
+**Paths:** `apps/base/database/**`
+
+The runtime-graph review finding on PR #18 is addressed. Database now declares
+`base/module_registry`, seed construction and provider discovery consume
+`Bilimbi.Base.ModuleRegistry.installed_modules!/0`, and the runner verifies
+every seed's module ID/order against that approved graph before acquiring a
+connection or creating its ledger. A mixed-fingerprint regression proves stale
+workspace metadata refuses execution before callbacks or database mutation.
+
+The implementer self-audit questions are also resolved: `list_runs/2` now uses
+the same checked-out-connection advisory lock for first-use ledger DDL, and the
+public documentation makes callback-owned transaction/idempotency explicit
+instead of imposing one outer transaction on large or externally coordinated
+imports.
+
+Validation at `eac4933`: Base Database 18, Module Registry 13, Compatibility
+fresh migration/schema verification 9, and root `mix precommit` exit 0 with
+123 umbrella tests. Exact-head CI is running. Product editing is stopped again
+pending independent re-review. The frozen Company dev-seed files and root
+README edit remain untouched.
