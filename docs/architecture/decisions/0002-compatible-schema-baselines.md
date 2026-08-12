@@ -5,7 +5,7 @@
 **Agents:** codex/sol-high
 **Scope:** Bilimbi migration ownership, Belimbing schema compatibility,
 installation, adoption, and explicit tenant/company identity
-**Last Updated:** 2026-08-12
+**Last Updated:** 2026-08-13
 
 ## Context
 
@@ -46,8 +46,10 @@ The resulting cross-module contract is:
   key and a restricted foreign key. Its company is unique, and its composite
   foreign key requires company and tenant ownership to match.
 - Address tenancy and Geonames normalization have their own active exact
-  constraints described below. Authz role ownership remains reserved for its
-  owning module when that slice is ported.
+  constraints described below. Employee and User now own their active schema
+  slices and complete their declared Company foreign-key contributions. Authz
+  role ownership remains reserved for its owning module when that slice is
+  ported.
 
 ## Decision
 
@@ -64,6 +66,8 @@ apps/base/tenancy/priv/repo/migrations/
 apps/core/company/priv/repo/migrations/
 apps/core/geonames/priv/repo/migrations/
 apps/core/address/priv/repo/migrations/
+apps/core/employee/priv/repo/migrations/
+apps/core/user/priv/repo/migrations/
 ```
 
 These are the current contributing paths, not a hard-coded coordinator list.
@@ -73,11 +77,13 @@ Repo and ledger. It uses globally unique Ecto versions with strict deterministic
 ordering: declared dependencies first, then Base → Core → Domain → Extension
 and stable module ID as tie-breakers. Migration versions remain globally
 monotonic as modules are added. Because Bilimbi has not yet been distributed,
-the current ledger is a clean sequence of four module baselines: Tenancy,
-Company, Geonames, then Address. Address's baseline runs after Geonames and
-creates its normalization foreign keys directly. Ownership is expressed by
-the module descriptor and path; version numbers provide global execution order
-rather than permanent numeric ranges for layers.
+the current ledger is a clean sequence of six module baselines: Tenancy,
+Company, Geonames, Address, Employee, then User. Address's baseline runs after
+Geonames and creates its normalization foreign keys directly. Employee and
+User follow Company and complete their respective cross-module foreign keys.
+Ownership is expressed by the module descriptor and path; version numbers
+provide global execution order rather than permanent numeric ranges for
+layers.
 
 ### Current-state compatibility baselines
 
@@ -92,6 +98,10 @@ The first Bilimbi migrations create the canonical end state:
 4. Core creates the current Address schema, including explicit tenant
    ownership, compatible polymorphic attachments, and its two Geonames
    normalization foreign keys.
+5. Core creates the current Employee schema and completes the Company
+   department-head foreign key.
+6. Core creates the current User schema and completes Company's external-access
+   user column, index, and foreign key as one contribution.
 
 The Core Company baseline owns:
 
@@ -111,13 +121,20 @@ baseline owns `addresses` and `addressables`, including both normalization
 foreign keys to Geonames. It preserves Belimbing's existing camel-cased
 PostgreSQL columns through explicit Ecto `source:` mappings.
 
+The Core Employee baseline owns `employees` and `employee_types`; its migration
+adds `company_departments_head_id_foreign` after `employees` exists. The Core
+User baseline owns `users`, `password_reset_tokens`, `user_pins`,
+`user_database_queries`, and `notifications`; its migration adds
+`company_external_accesses.user_id`, the matching active-state index, and its
+foreign key as the complete external-access owner contribution.
+
 The historical locale-source rename and data backfills are not replayed on an
 empty schema. They remain provenance for adopting upgraded Belimbing data.
 
-User may later add the external-access `user_id` contribution and Employee may
-later add the department-head foreign key. The Company verifier treats each as
-an optional all-or-nothing contribution until its owning Bilimbi module exists.
-It does not fabricate a dependency on absent `users` or `employees` tables.
+Company verifies the department-head foreign key as required because Employee
+is part of the Platform Baseline. It retains the User-owned external-access
+elements as one all-or-nothing contribution so a partially applied User slice
+fails verification instead of being mistaken for a compatible schema.
 
 Authz remains deferred to its owner without weakening its canonical contract:
 
@@ -217,9 +234,9 @@ numbers as roles is not.
 - Base Database owns the shared Repo, each module owns its compatibility
   contract and migrations, and Core Compatibility discovers and coordinates
   all installed contributions into the current Platform Baseline.
-- Authz, User, Employee, and AI compatibility obligations remain explicit and
-  will be activated with their owning slices. Geonames reference-data import
-  remains separate from its now-active schema and lookup slice.
+- Authz and AI compatibility obligations remain explicit and will be activated
+  with their owning slices. Geonames reference-data import remains separate
+  from its active schema and lookup slice.
 - The pinned source commit must change deliberately whenever the compatible
   Belimbing schema changes.
 - Business code accepts explicit tenant or company identity and never infers a

@@ -46,8 +46,8 @@ not one OTP application inside it.
 ## 2. Current scope
 
 The initial Bilimbi implementation contains the Platform Baseline and its web
-host. Base Tenancy, Core Company, Core Geonames, and Core Address are active
-foundation slices:
+host. Base Tenancy, Core Company, Core Geonames, Core Address, Core Employee,
+and Core User are active foundation slices:
 
 ```text
 apps/base/database/
@@ -55,6 +55,8 @@ apps/base/tenancy/
 apps/core/company/
 apps/core/geonames/
 apps/core/address/
+apps/core/employee/
+apps/core/user/
 apps/core/compatibility/
 apps/web/
 ```
@@ -191,6 +193,8 @@ apps/base/tenancy/priv/repo/migrations/
 apps/core/company/priv/repo/migrations/
 apps/core/geonames/priv/repo/migrations/
 apps/core/address/priv/repo/migrations/
+apps/core/employee/priv/repo/migrations/
+apps/core/user/priv/repo/migrations/
 ```
 
 Run the required baseline through `mix bilimbi.migrate`, which discovers every
@@ -276,6 +280,16 @@ application's descriptor metadata. Every module project includes the shared
 changes, it refreshes each package's application metadata. Runtime consumers
 verify one graph fingerprint, use the approved positions, and must not
 implement a second dependency graph algorithm.
+
+Source composition and runtime visibility are separate obligations. Mounting a
+valid module makes it a discovered path package, but a runtime coordinator can
+enumerate only OTP applications in its dependency closure. A coordinator's
+descriptor must therefore declare stable module dependencies on every current
+contributor it must discover at runtime. Core Compatibility depends on each
+installed migration or schema-contract contributor while still discovering
+paths and contracts generically; neither its code nor its descriptor carries a
+module-specific path list. Workspace-boundary tests must fail when a declared
+contributor is absent from that runtime closure.
 
 The shared database module owns one Repo. Compatibility discovers migration
 paths from installed runtime descriptor metadata and executes them through the
