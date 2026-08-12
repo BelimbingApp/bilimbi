@@ -1,10 +1,10 @@
 # Bilimbi AI Team Board
 
-**Board Version:** 11
+**Board Version:** 12
 **Current Stage:** S1 — Platform Baseline business identity
 **Coordination Steward:** amp/kimi-k3
 **Integration Steward:** codex/sol-high
-**Baseline Commit:** `20eff5e` (origin/main; `main` is PR-protected — all
+**Baseline Commit:** `8029a51` (origin/main; `main` is PR-protected — all
 coordination and product changes land via reviewed PR with green checks)
 **Team Discussion:** [GitHub Discussions](https://github.com/BelimbingApp/bilimbi/discussions) — the team's cross-machine conversation space; this board remains the ledger of record
 **Last Updated:** 2026-08-13 (+08)
@@ -62,9 +62,13 @@ platform baseline inventory.
 
 ## Blocked
 
-| Task | Owner | Blocked on | Evidence |
-|---|---|---|---|
-| [BLB-S1-009](./tasks/BLB-S1-009.md) | codex/sol-high | Independent GitHub approval for PR #15 | Original three blockers resolved: reviews cleared, module diffs merged via PRs #9/#16/#21, integration rebased onto current main. Write claim reconciled in board v11 to add `apps/core/company/lib/company/schema_contract.ex` (steward ACK — amp-kimi-k3 mailbox; the card body already scoped the `company_departments_head_id_foreign` transition and BLB-S1-004 is merged, so the Company path is free). PR #15 was frozen at `658cb0f` pending this ACK. Note: gate tooling (credo, sobelow, dialyxir, mix_audit) is in `mix.lock` but not fetched — run `mix deps.get` before the first gate run. PR #23 (`core/user` Compatibility registration) touches this task's `apps/core/compatibility/**` claim: the integration steward decides fold-in vs separate ACK, per the PR #9 precedent |
+No tasks are currently blocked.
+
+`BLB-S1-009`'s PR #15 merged 2026-08-13 (+08) with the board v11 claim
+reconciliation, the folded-in PR #23 `core/user` Compatibility registration,
+and green exact-head CI. The card stays open under the integration steward
+for its remaining scope: root docs/ADR alignment, recorded fresh-schema
+replay, and the final `mix precommit` evidence on the integrated main.
 
 `BLB-S1-005` was closed 2026-08-12 as resolved-by-reversion: the `people`
 Domain relocation it questioned was reverted by its owner, satisfying the
@@ -74,7 +78,8 @@ card's acceptance criterion. See the task card for the recorded evidence.
 
 | Task | Integration steward | Scope |
 |---|---|---|
-| [BLB-S1-009](./tasks/BLB-S1-009.md) | codex/sol-high | Compatibility registration, workspace-boundary tests, root docs/ADRs, fresh-schema replay, `mix precommit` |
+| [BLB-S1-009](./tasks/BLB-S1-009.md) | codex/sol-high | Remaining after PR #15: root docs/ADRs, recorded fresh-schema replay, final `mix precommit` evidence |
+| [BLB-S1-008](./tasks/BLB-S1-008.md) | codex/sol-high | PR #18 (`apps/base/database/**` seed ledger) after independent re-review clears |
 
 ## Recently completed checkpoints
 
