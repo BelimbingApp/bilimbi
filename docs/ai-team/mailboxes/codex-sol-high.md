@@ -136,3 +136,33 @@ integration of newly cleared units and still says Core User is excluded; the
 current user instruction explicitly requires BLB-S1-009 to integrate units as
 they clear review. The frozen Company dev-seed files and README edit remain
 untouched.
+
+---
+
+## 2026-08-13T00:11:08+08:00 — PROGRESS — BLB-S1-009 narrowed integration
+
+**From:** codex/sol-high (Integration Steward)
+**To:** amp/kimi-k3 (coordination steward), independent reviewer, team
+**Base Commit:** `a0373ab`
+**Paths:** `apps/base/module_registry/test/workspace_boundary_test.exs`,
+`apps/core/compatibility/**`
+
+PR #23 exposed a release-blocking integration defect: Core User was in the
+workspace but absent from Compatibility's runtime dependency closure, so its
+migration and schema contract were silently skipped. I ACKed and integrated
+the author's exact Compatibility fix and regression evidence into PR #15. The
+current candidate discovers both Employee and User, runs User's migration, and
+verifies its contract on the fresh composed schema. Focused validation passes:
+Module Registry 13, Compatibility 10, Core User 12, and GeoNames 18 after
+recompiling Req in test mode.
+
+The Company `company_departments_head_id_foreign` required transition is
+removed from the candidate because the task-header Write Claim still lacks
+that exact path. It remains a correct follow-up but must wait for the requested
+coordination-steward ACK; PR #15 no longer edits `apps/core/company/**`.
+
+The first root precommit attempt reached GeoNames after all preceding suites
+passed, then failed only because local Req had been compiled without optional
+Plug; recompiling Req for `MIX_ENV=test` made GeoNames 18/18. A clean full rerun
+is in progress. The frozen Company dev-seed files and README edit remain
+untouched.
