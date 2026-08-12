@@ -508,7 +508,10 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   `Bilimbi.Base.Tenancy.Scope`, never a raw tenant ID.** The scope is built
   once at the edge with `Tenancy.scope/1`; downstream modules do not re-resolve
   or re-validate the tenant, and no operation below that point carries a
-  `:tenant_not_found` failure.
+  `:tenant_not_found` failure. Match `%Scope{}` in the function head so a raw
+  ID raises at runtime and is rejected statically by the type checker. Base
+  Tenancy's own resolvers take an ID because resolving one is their job, and so
+  does provisioning that creates the tenant it will scope.
 - **Begin such a read with `Tenancy.scope_query/2`.** It has one clause, so a
   missing or `nil` tenant raises instead of returning an unfiltered query. A
   hand-written `tenant_id` comparison in a caller-facing read is a defect. It
