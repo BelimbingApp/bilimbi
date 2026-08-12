@@ -23,15 +23,23 @@ database prefix. Existing Belimbing databases keep their Laravel
 `base_database_seeders` table unchanged; Bilimbi never adopts PHP class names
 as seed identity and never reads, updates, renames, or drops that table.
 
+Adoption therefore does **not** import Laravel completion state. A Belimbing
+database whose PHP seeders already ran still starts with an empty Bilimbi
+ledger, and the next `mix bilimbi.seeds.run` will invoke every registered
+Bilimbi seed. That is intentional: PHP FQCNs are not Bilimbi seed IDs. Every
+production callback must be idempotent (or safely resumable) so adoption
+re-runs cannot duplicate or corrupt reference data.
+
 The operational ledger is deliberately initialized by this runner rather than
 contributed to the compatibility-baseline migration set. Existing Belimbing
 databases do not contain this Bilimbi-owned table, while schema adoption records
 every installed baseline migration without executing its DDL. Treating the
 ledger as a required compatibility table would therefore either block adoption
 or mark its creation migration complete while leaving the table absent. The
-runner serializes first-use initialization under its per-prefix advisory lock;
-it does not use this path to alter or conceal drift in canonical business
-tables.
+runner serializes first-use initialization under its per-prefix advisory lock.
+After create-if-missing, the runner verifies the ledger column nullability/types
+and required indexes against the expected shape and fails closed on drift; it
+does not use this path to alter or conceal drift in canonical business tables.
 
 Owning modules implement
 `Bilimbi.Base.Database.ProductionSeedProvider` and explicitly register the
@@ -54,6 +62,9 @@ An operator may add an already-compiled provider explicitly:
 mix bilimbi.seeds.run --provider Bilimbi.Core.Employee.ProductionSeeds
 ```
 
+Explicit providers must implement `ProductionSeedProvider`, load from an
+installed Bilimbi module OTP app, and emit seeds whose `module_id` matches
+that module. Weak duck-typed modules are rejected.
 Each attempt is recorded as `running`, then `completed`, `failed`, or
 `skipped`. Completed and skipped seeds are not invoked again. Failed seeds are
 retryable, and rows left `running` by an interrupted process are marked failed

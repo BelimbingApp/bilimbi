@@ -175,6 +175,23 @@ defmodule Bilimbi.Base.Database.ProductionSeedsTest do
     end
   end
 
+  test "fails closed when an existing ledger has drifted from the expected shape", context do
+    SQL.query!(
+      Repo,
+      """
+      CREATE TABLE #{ledger(context)} (
+        seed_id varchar(255) PRIMARY KEY,
+        module_id varchar(255) NOT NULL
+      )
+      """,
+      []
+    )
+
+    assert_raise ArgumentError, ~r/ledger shape drift/, fn ->
+      run([seed("base/database/drift", fn _repo -> :ok end)], context)
+    end
+  end
+
   test "rejects stale workspace metadata before ledger or callback mutation", context do
     definition =
       seed("base/database/stale-graph", fn _repo ->
