@@ -190,14 +190,37 @@ the module that owns the table:
 | `company_external_accesses.user_id → users` | Core/Company | Core/User (`0200_01_20_000002`) |
 | `base_authz_roles.company_id → companies` | Base/Authz | Core/Company (`0200_01_07_001007`) |
 
-This convention is load-bearing and Bilimbi already follows it once: the
-in-flight Employee baseline adds `company_departments_head_id_foreign`
-(`apps/core/employee/priv/repo/migrations/20260812112641_create_core_employee_compatibility_baseline.exs:57`),
-and `apps/core/company/lib/company/schema_contract.ex:356` declares it on the
-Company side. **Reuse the same pattern for the other two.** In particular it is
-what lets Base/Authz be ported without Base depending on Core: Base creates
-`base_authz_roles` with a bare `company_id` column, and Core/Company later adds
-the FK plus the `base_authz_roles_custom_company_check` constraint.
+This convention is load-bearing, and Bilimbi already has a mechanism for it
+that a porting agent must use rather than reinvent.
+
+**The optional-group contract.** A table's owner declares the incoming
+contribution as optional, and the contributing module supplies it. The Company
+contract does this twice:
+
+- `company_departments` declares `optional_foreign_keys`
+  `company_departments_head_id_foreign` (`head_id → employees`,
+  `:nilify_all`), which the in-flight Employee baseline creates
+  (`apps/core/employee/priv/repo/migrations/20260812112641_create_core_employee_compatibility_baseline.exs:57`);
+- `company_external_accesses` declares `optional_columns` `user_id`,
+  `optional_indexes` `company_external_accesses_user_id_is_active_index`,
+  `optional_foreign_keys` `company_external_accesses_user_id_foreign`
+  (`user_id → users`, `:nilify_all`), and binds all three into one
+  `optional_groups` entry named `core/user external-access owner`. That is an
+  exact match for Belimbing `0200_01_20_000002` — nullable `user_id`,
+  `constrained('users')`, `nullOnDelete()`, `index(['user_id', 'is_active'])`.
+
+`SchemaVerifier.compare_optional_groups/4` reports
+`incomplete optional contribution` only when a group is *partly* present, so a
+contributing module must add every member of its group in one migration, and a
+contract stays green whether or not the contributor is installed.
+
+The consequence for planning is concrete: **Core User needs no Company-side
+edit and no follow-on task.** Its own migration adds the column, index, and FK
+together. Base/Authz gets the same treatment — Base creates `base_authz_roles`
+with a bare `company_id` and declares the FK plus the
+`base_authz_roles_custom_company_check` constraint as an optional group, and
+Core/Company contributes it. That is what lets Base/Authz be ported without
+Base depending on Core.
 
 ### 4.2 Deliberately absent foreign keys
 

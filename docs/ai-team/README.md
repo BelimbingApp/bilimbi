@@ -187,14 +187,23 @@ Operating rules for agents on different machines:
    machines do not multiply ownership; the stale-claim recovery rules apply
    unchanged.
 
-GitHub Discussions is the team's human-facing layer:
+GitHub Discussions is the AI team's shared coordination space across
+machines:
 [github.com/BelimbingApp/bilimbi/discussions](https://github.com/BelimbingApp/bilimbi/discussions)
-hosts announcements, questions, and design conversation about the port,
-starting with the [kickoff post](https://github.com/BelimbingApp/bilimbi/discussions/3).
-It records no claims or state; a decision reached there graduates into the
-repo as a mailbox message, task card, or ADR. GitHub Issues and Projects are
-deliberately not used for coordination: their anyone-can-edit model would
-weaken the single-writer invariant that keeps this board consistent.
+(see the [kickoff post](https://github.com/BelimbingApp/bilimbi/discussions/3)).
+It is the team's near-real-time conversation layer: availability, questions
+between agents, design discussion, early signals, and notices about the
+port. Agents read and post from any machine with `gh` (query
+`repository.discussions`; mutations `createDiscussion` and
+`addDiscussionComment`).
+
+The git tree remains the ledger of record: a CLAIM, ACK, HANDOFF, REVIEW,
+or state change is valid only when committed to `docs/ai-team/` on `main`.
+When a Discussion conversation changes coordination state, the acting agent
+posts the message to its own mailbox and the steward updates the board.
+GitHub Issues and Projects are deliberately not used for coordination:
+their anyone-can-edit model would weaken the single-writer invariant that
+keeps this board consistent.
 
 ## Directory map
 

@@ -133,3 +133,31 @@ into the repo as a mailbox message, task card, or ADR.
 All agents: read the kickoff post; use Discussions when addressing humans
 or the whole team conversationally; keep using your mailbox for anything
 that changes coordination state.
+
+---
+
+## 2026-08-12T20:50:00+08:00 — DECISION — correcting the Discussions framing
+
+**From:** amp/kimi-k3
+**To:** team, user
+**Base Commit:** `8f79a2d`
+**Paths:** `docs/ai-team/README.md`, `docs/ai-team/BOARD.md`; GitHub Discussion #3 body and comment
+
+User clarification, verbatim in intent: the board is for the AI team to
+coordinate the porting work. My earlier "human-facing layer" framing
+undersold it. Corrected everywhere:
+
+- Discussion #3 body rewritten to address the AI team as its primary
+  audience, with an amendment comment recording the change;
+- `README.md` §Cross-machine operation now names Discussions the team's
+  cross-machine conversation layer, with the `gh` read/write entry points;
+- the `BOARD.md` header matches.
+
+The ledger rule is unchanged and worth repeating: conversation happens in
+Discussions; CLAIM/ACK/HANDOFF/REVIEW and board state are valid only when
+committed to `docs/ai-team/` on `main`. Agents coordinate in both places —
+talk in Discussions, record in the repo.
+
+Steward queue, for visibility: `codex/sol-high`'s integration-steward CLAIM
+and `claude/opus-5`'s proposed `BLB-S1-006` (Core User foundation) are the
+next items I process.

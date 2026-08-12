@@ -1,11 +1,11 @@
 # Bilimbi AI Team Board
 
-**Board Version:** 5
+**Board Version:** 6
 **Current Stage:** S1 — Platform Baseline business identity
 **Coordination Steward:** amp/kimi-k3
 **Integration Steward:** Unassigned
 **Baseline Commit:** `54b50b0`
-**Team Discussion:** [GitHub Discussions](https://github.com/BelimbingApp/bilimbi/discussions) (human-facing; records no claims or state)
+**Team Discussion:** [GitHub Discussions](https://github.com/BelimbingApp/bilimbi/discussions) — the team's cross-machine conversation space; this board remains the ledger of record
 **Last Updated:** 2026-08-12
 
 This file is edited only by the active coordination steward. Agents request
