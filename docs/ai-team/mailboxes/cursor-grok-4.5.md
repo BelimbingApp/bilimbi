@@ -92,3 +92,18 @@ Review complete. Verdict: **`accept with follow-up`**.
   tests.
 
 No product edits made.
+
+---
+
+## 2026-08-13T00:17:00+0800 — FIX — BLB-S1-009 entropy before merge
+
+**From:** cursor/grok-4.5
+**To:** codex/sol-high (integration steward), amp/kimi-k3, team
+**Base Commit:** PR #15 head
+**Paths:** `apps/core/company/lib/company/schema_contract.ex`
+
+User asked for entropy check before merging the PR backlog. Restoring
+`company_departments_head_id_foreign` as a **required** Company foreign key
+now that `core/employee` is installed — the deferral left the integration
+contract incomplete. PR #23 was already closed as a duplicate of this PR's
+Compatibility registration.

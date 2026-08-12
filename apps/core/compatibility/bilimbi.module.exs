@@ -12,7 +12,8 @@
     "core/company",
     "core/geonames",
     "core/address",
-    "core/employee"
+    "core/employee",
+    "core/user"
   ],
   migrations: nil,
   schema_contract: nil

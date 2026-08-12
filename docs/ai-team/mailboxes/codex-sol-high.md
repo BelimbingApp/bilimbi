@@ -134,6 +134,40 @@ outside this handoff.
 
 ---
 
+## 2026-08-12T23:29:07+08:00 — HANDOFF — BLB-S1-009 integration checkpoint
+
+**From:** codex/sol-high (Integration Steward)
+**To:** amp/kimi-k3 (coordination steward), independent reviewer, team
+**Base Commit:** `8f4f1f6` (`origin/main` after Core User PR #21)
+**Paths:** `apps/base/module_registry/test/workspace_boundary_test.exs`,
+`apps/core/company/lib/company/schema_contract.ex`
+
+PR #15 is rebased by normal merges onto current `main` and ready for
+independent review. It now registers both integrated S1 units absent from the
+workspace inventory (Core Employee and Core User) and makes
+`company_departments_head_id_foreign` required after Employee installation.
+No module implementation path is changed by this PR.
+
+Review evidence is complete: BLB-S1-003/004 were accepted through PR #12;
+GeoNames received a post-merge independent acceptance on PR #16; Core User was
+independently accepted at `effd002` and merged as PR #21. Focused checks on the
+integrated tree pass: Module Registry 13, Company 17, Compatibility fresh
+migration/schema verification 9, and Core User 12. Root `mix precommit`
+completed with exit 0 and 113 umbrella tests. The local Windows run emitted
+the known non-fatal colocated-assets symlink warning and produced checkout-only
+line-ending/HEEx formatter rewrites; those generated changes were discarded,
+leaving only the two claimed integration files plus this sender-owned mailbox
+entry. Exact-branch Linux CI is the formatting authority and is rerunning.
+
+Coordination steward: please update the stale BLB-S1-009 card/board blockers
+after #15 review. The original card predates the user-authorized proactive
+integration of newly cleared units and still says Core User is excluded; the
+current user instruction explicitly requires BLB-S1-009 to integrate units as
+they clear review. The frozen Company dev-seed files and README edit remain
+untouched.
+
+---
+
 ## 2026-08-12T23:56:43+08:00 — HANDOFF — BLB-S1-008 review correction
 
 **From:** codex/sol-high
@@ -188,3 +222,55 @@ in ModuleRegistry and Compatibility.
 
 Product editing is stopped pending independent re-review. The frozen Company
 dev-seed files and root README edit remain untouched.
+
+---
+
+## 2026-08-13T00:11:08+08:00 — PROGRESS — BLB-S1-009 narrowed integration
+
+**From:** codex/sol-high (Integration Steward)
+**To:** amp/kimi-k3 (coordination steward), independent reviewer, team
+**Base Commit:** `a0373ab`
+**Paths:** `apps/base/module_registry/test/workspace_boundary_test.exs`,
+`apps/core/compatibility/**`
+
+PR #23 exposed a release-blocking integration defect: Core User was in the
+workspace but absent from Compatibility's runtime dependency closure, so its
+migration and schema contract were silently skipped. I ACKed and integrated
+the author's exact Compatibility fix and regression evidence into PR #15. The
+current candidate discovers both Employee and User, runs User's migration, and
+verifies its contract on the fresh composed schema. Focused validation passes:
+Module Registry 13, Compatibility 10, Core User 12, and GeoNames 18 after
+recompiling Req in test mode.
+
+The Company `company_departments_head_id_foreign` required transition is
+removed from the candidate because the task-header Write Claim still lacks
+that exact path. It remains a correct follow-up but must wait for the requested
+coordination-steward ACK; PR #15 no longer edits `apps/core/company/**`.
+
+The first root precommit attempt reached GeoNames after all preceding suites
+passed, then failed only because local Req had been compiled without optional
+Plug; recompiling Req for `MIX_ENV=test` made GeoNames 18/18. A clean full rerun
+is in progress. The frozen Company dev-seed files and README edit remain
+untouched.
+
+---
+
+## 2026-08-13T00:18:35+08:00 — PROGRESS — BLB-S1-009 Company path ACK activated
+
+**From:** codex/sol-high (Integration Steward)
+**To:** amp/kimi-k3 (coordination steward), independent reviewer, team
+**Base Commit:** `5582b65` (board v11)
+**Paths:** `apps/base/module_registry/test/workspace_boundary_test.exs`,
+`apps/core/compatibility/**`,
+`apps/core/company/lib/company/schema_contract.ex`
+
+Board v11 and the coordination-steward mailbox are now committed to main with
+the exact Company schema-contract path ACK. PR #15 therefore restores the
+card's required `company_departments_head_id_foreign` transition after the
+Employee module installation. This is the previously reviewed one-line
+contract promotion, not a new Company implementation change.
+
+The clean full gate mentioned above completed successfully with 114 umbrella
+tests. Focused Company, Compatibility, and Module Registry verification is
+rerunning on the board-v11-integrated candidate before push. The frozen
+Company dev-seed files and README edit remain untouched.

@@ -281,15 +281,34 @@ defmodule Bilimbi.Core.CompatibilityTest do
   test "verification refuses a partial cross-module contribution", %{schema: schema} do
     Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
 
+    # Core User installs this optional group whole -- column, index, and
+    # foreign key. Break it by removing one member rather than by adding the
+    # column, which now already exists.
     SQL.query!(
       MigrationTestRepo,
-      ~s(ALTER TABLE "#{schema}".company_external_accesses ADD COLUMN user_id bigint),
+      """
+      ALTER TABLE "#{schema}".company_external_accesses
+      DROP CONSTRAINT company_external_accesses_user_id_foreign
+      """,
       []
     )
 
     assert {:error, errors} = Compatibility.verify(MigrationTestRepo, prefix: schema)
 
     assert "company_external_accesses: incomplete optional contribution core/user external-access owner" in errors
+  end
+
+  test "the migration graph includes every installed contributor", %{schema: schema} do
+    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+
+    # Regression guard for the defect this test was added with: a module whose
+    # OTP application is not in Compatibility's dependency closure is invisible
+    # to Application.loaded_applications/0, so its migrations silently never
+    # run and its schema contract is never verified. Core User shipped that way.
+    assert relation(MigrationTestRepo, schema, "users") != nil
+    assert relation(MigrationTestRepo, schema, "notifications") != nil
+
+    assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
   end
 
   test "verification requires Address's Geonames foreign keys", %{schema: schema} do
