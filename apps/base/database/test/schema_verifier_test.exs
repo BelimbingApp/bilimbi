@@ -69,6 +69,33 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
     assert "widgets: incompatible foreign key widgets_parent_foreign" in errors
   end
 
+  test "accepts uuid, char, jsonb, and inet columns", %{schema: schema} do
+    assert :ok = SchemaVerifier.verify(Repo, [gadget_spec()], prefix: schema)
+  end
+
+  test "reports drift on uuid, char, jsonb, and inet columns", %{schema: schema} do
+    drifted =
+      gadget_spec()
+      |> put_in([:columns, "id", :type], :bigint)
+      |> put_in([:columns, "url_hash", :type], {:char, 16})
+      |> put_in([:columns, "payload", :type], :json)
+      |> put_in([:columns, "ip_address", :type], {:varchar, 45})
+
+    assert {:error, errors} = SchemaVerifier.verify(Repo, [drifted], prefix: schema)
+
+    assert "gadgets.id: incompatible type" in errors
+    assert "gadgets.url_hash: incompatible type" in errors
+    assert "gadgets.payload: incompatible type" in errors
+    assert "gadgets.ip_address: incompatible type" in errors
+  end
+
+  test "reports an unmodelled contract type instead of raising", %{schema: schema} do
+    spec = put_in(widget_spec(), [:columns, "name", :type], :money)
+
+    assert {:error, errors} = SchemaVerifier.verify(Repo, [spec], prefix: schema)
+    assert "widgets.name: incompatible type" in errors
+  end
+
   test "rejects unsafe PostgreSQL identifiers" do
     assert_raise ArgumentError, ~r/invalid PostgreSQL identifier/, fn ->
       SchemaVerifier.quote_identifier!("public; DROP SCHEMA public")
@@ -100,6 +127,23 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
       ~s|CREATE UNIQUE INDEX widgets_name_unique ON "#{schema}".widgets (name)|,
       []
     )
+
+    # Mirrors the Belimbing types no contract could express before:
+    # notifications.id (uuid), user_pins.url_hash (char), the audit tables'
+    # jsonb payloads, and their ipAddress() column, which Laravel 13 emits as
+    # inet rather than varchar(45).
+    SQL.query!(
+      Repo,
+      """
+      CREATE TABLE "#{schema}".gadgets (
+        id uuid PRIMARY KEY,
+        url_hash char(32) NOT NULL,
+        payload jsonb,
+        ip_address inet
+      )
+      """,
+      []
+    )
   end
 
   defp widget_spec do
@@ -122,6 +166,22 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
           on_delete: :restrict
         }
       }
+    }
+  end
+
+  defp gadget_spec do
+    %{
+      name: "gadgets",
+      columns: %{
+        "id" => column(:uuid, false),
+        "url_hash" => column({:char, 32}, false),
+        "payload" => column(:jsonb),
+        "ip_address" => column(:inet)
+      },
+      indexes: %{
+        "gadgets_pkey" => index(["id"], true)
+      },
+      foreign_keys: %{}
     }
   end
 
