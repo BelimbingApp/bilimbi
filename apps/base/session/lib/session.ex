@@ -78,6 +78,35 @@ defmodule Bilimbi.Base.Session do
     end
   end
 
+  @doc """
+  Terminates a user's durable sessions except the caller's current session.
+
+  Returns the number of rows terminated as `{:ok, count}`. The caller must
+  supply a positive durable user ID and a non-empty current session ID; invalid
+  input has no fallback that could widen the deletion.
+
+  The delete participates in an existing shared Repo transaction when one is
+  open. It affects rows matched by this statement, not a credential epoch or a
+  permanent login lockout: a session established after the statement outside
+  that serialization can remain or appear later.
+
+  Session payloads are opaque and are neither read nor returned by this
+  lifecycle operation.
+  """
+  @spec terminate_user_sessions(pos_integer(), String.t()) :: {:ok, non_neg_integer()}
+  def terminate_user_sessions(user_id, current_session_id)
+      when is_integer(user_id) and user_id > 0 and is_binary(current_session_id) and
+             byte_size(current_session_id) > 0 do
+    {count, _rows} =
+      Repo.delete_all(
+        from(session in Schema,
+          where: session.user_id == ^user_id and session.id != ^current_session_id
+        )
+      )
+
+    {:ok, count}
+  end
+
   @spec prune_expired(non_neg_integer()) :: non_neg_integer()
   def prune_expired(before_last_activity)
       when is_integer(before_last_activity) and before_last_activity >= 0 do
