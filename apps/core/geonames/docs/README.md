@@ -31,3 +31,23 @@ country's rows transactionally.
 
 Callers use the public facade for country, administrative-division, and
 postcode lookups. Table schemas and query details remain private to the module.
+
+## Read-only indexes
+
+The module also owns the bounded read models used by its three administration
+indexes. They are global reference-data queries, not tenant-scoped operations:
+
+```elixir
+Geonames.page_countries(query)
+Geonames.page_admin1(query)
+Geonames.admin1_filter_countries()
+Geonames.page_postcodes(query)
+Geonames.list_postcode_country_summaries(query)
+```
+
+The page queries return `Bilimbi.Core.Geonames.Page` with schema-free entries,
+20-row defaults, page sizes clamped to 20/50/100/300, allow-listed sorting,
+and deterministic ties. Postcode country totals are a separately sortable,
+unpaginated summary bounded by the imported-country set. Exact
+`lookup_postcode/2` remains the address-workflow lookup; prefix postcode and
+city combobox searches are intentionally outside this module UI slice.

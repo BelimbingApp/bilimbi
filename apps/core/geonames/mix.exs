@@ -37,7 +37,12 @@ defmodule Bilimbi.Core.Geonames.MixProject do
   defp elixirc_paths(_env), do: ["lib"]
 
   defp deps do
-    [{:ecto_sql, "~> 3.14"}, {:req, "~> 0.7"}, {:plug, "~> 1.20", only: :test}] ++
+    [
+      {:ecto_sql, "~> 3.14"},
+      {:phoenix_live_view, "~> 1.2.0"},
+      {:req, "~> 0.7"},
+      {:plug, "~> 1.20", only: :test}
+    ] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 

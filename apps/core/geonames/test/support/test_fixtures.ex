@@ -116,9 +116,12 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
           area: 329_847.0,
           population: 34_100_000,
           continent: "AS",
+          phone: nil,
           currency_code: "MYR",
           currency_name: "Ringgit",
-          geoname_id: 1_733_045
+          geoname_id: 1_733_045,
+          created_at: nil,
+          updated_at: nil
         },
         attributes
       )
@@ -128,9 +131,9 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
       """
       INSERT INTO geonames_countries (
         iso, iso3, iso_numeric, country, capital, area, population,
-        continent, currency_code, currency_name, geoname_id
+        continent, phone, currency_code, currency_name, geoname_id, created_at, updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       """,
       [
         attributes.iso,
@@ -141,9 +144,12 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
         attributes.area,
         attributes.population,
         attributes.continent,
+        attributes.phone,
         attributes.currency_code,
         attributes.currency_name,
-        attributes.geoname_id
+        attributes.geoname_id,
+        attributes.created_at,
+        attributes.updated_at
       ]
     )
   end
@@ -151,14 +157,31 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
   def insert_admin1!(attributes \\ %{}) do
     attributes =
       Map.merge(
-        %{code: "MY.14", name: "Kuala Lumpur", alt_name: nil, geoname_id: 1_733_046},
+        %{
+          code: "MY.14",
+          name: "Kuala Lumpur",
+          alt_name: nil,
+          geoname_id: 1_733_046,
+          created_at: nil,
+          updated_at: nil
+        },
         attributes
       )
 
     SQL.query!(
       Repo,
-      "INSERT INTO geonames_admin1 (code, name, alt_name, geoname_id) VALUES ($1, $2, $3, $4)",
-      [attributes.code, attributes.name, attributes.alt_name, attributes.geoname_id]
+      """
+      INSERT INTO geonames_admin1 (code, name, alt_name, geoname_id, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      """,
+      [
+        attributes.code,
+        attributes.name,
+        attributes.alt_name,
+        attributes.geoname_id,
+        attributes.created_at,
+        attributes.updated_at
+      ]
     )
   end
 
@@ -172,7 +195,9 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
           admin1_code: "MY.14",
           latitude: Decimal.new("3.1390000"),
           longitude: Decimal.new("101.6869000"),
-          accuracy: 4
+          accuracy: 4,
+          created_at: nil,
+          updated_at: nil
         },
         attributes
       )
@@ -181,9 +206,10 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
       Repo,
       """
       INSERT INTO geonames_postcodes (
-        country_iso, postcode, place_name, "admin1Code", latitude, longitude, accuracy
+        country_iso, postcode, place_name, "admin1Code", latitude, longitude, accuracy, created_at,
+        updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       """,
       [
         attributes.country_iso,
@@ -192,7 +218,9 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
         attributes.admin1_code,
         attributes.latitude,
         attributes.longitude,
-        attributes.accuracy
+        attributes.accuracy,
+        attributes.created_at,
+        attributes.updated_at
       ]
     )
   end

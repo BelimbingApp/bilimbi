@@ -39,6 +39,36 @@ defmodule Bilimbi.Core.GeonamesTest do
     assert Geonames.get_country("missing") == nil
   end
 
+  test "returns a source-faithful bounded Countries index page" do
+    insert_country!(%{
+      iso: "JP",
+      iso3: "JPN",
+      iso_numeric: "392",
+      country: "Japan",
+      capital: "Tokyo",
+      population: 125_000_000,
+      continent: "AS",
+      currency_code: "JPY",
+      currency_name: "Yen",
+      geoname_id: 1_862_730
+    })
+
+    page = Geonames.page_countries(%{"search" => "ja", "page_size" => "21"})
+
+    assert page.page == 1
+    assert page.page_size == 50
+    assert page.total_entries == 1
+    assert page.total_pages == 1
+    assert [%{iso: "JP", country: "Japan", capital: "Tokyo"}] = page.entries
+
+    assert [%{iso: "JP"} | _rest] = Geonames.page_countries(%{"sortBy" => "population"}).entries
+
+    assert [%{country: "Japan"} | _rest] =
+             Geonames.page_countries(%{"sort_by" => "untrusted column", "sort_dir" => "desc"}).entries
+
+    assert Geonames.page_countries(%{"page_size" => "1000"}).page_size == 300
+  end
+
   test "lists only administrative divisions owned by the requested country" do
     assert Enum.map(Geonames.list_admin1("my"), &{&1.code, &1.country_iso}) == [
              {"MY.14", "MY"},
@@ -48,12 +78,53 @@ defmodule Bilimbi.Core.GeonamesTest do
     assert Geonames.list_admin1("M") == []
   end
 
+  test "returns global Admin1 pages with country-name search and a bounded country filter" do
+    assert [%{code: "US.CA", country_name: "United States"}] =
+             Geonames.page_admin1(%{"search" => "united"}).entries
+
+    assert Enum.map(Geonames.admin1_filter_countries(), &{&1.iso, &1.country}) == [
+             {"MY", "Malaysia"},
+             {"US", "United States"}
+           ]
+
+    assert [%{code: "US.CA"}] = Geonames.page_admin1(%{"country_iso" => " us "}).entries
+    assert Geonames.page_admin1(%{"country_iso" => "US;DROP"}).entries == []
+    assert Geonames.page_admin1(%{"country_iso" => "SG"}).entries == []
+  end
+
   test "looks up postcode localities through the snake-cased public model" do
     assert [postcode] = Geonames.lookup_postcode("my", " 50000 ")
     assert postcode.place_name == "Kuala Lumpur"
     assert postcode.admin1_code == "MY.14"
     assert postcode.latitude == Decimal.new("3.1390000")
     assert Geonames.lookup_postcode("US", "50000") == []
+  end
+
+  test "returns searchable postcode pages and independent country summaries" do
+    insert_postcode!(%{
+      country_iso: "US",
+      postcode: "94105",
+      place_name: "San Francisco",
+      admin1_code: "US.CA"
+    })
+
+    insert_postcode!(%{
+      country_iso: "US",
+      postcode: "10001",
+      place_name: "New York",
+      admin1_code: "US.NY"
+    })
+
+    assert [%{postcode: "94105", country_name: "United States"}] =
+             Geonames.page_postcodes(%{"search" => "united"}).entries
+
+    assert [
+             %{country_iso: "US", record_count: 2},
+             %{country_iso: "MY", record_count: 1}
+           ] = Geonames.list_postcode_country_summaries(%{"sort_by" => "record_count"})
+
+    assert Enum.map(Geonames.list_postcode_country_summaries(%{"search" => "no match"}), & &1.country_iso) ==
+             ["MY", "US"]
   end
 
   test "resolves a city by durable GeoNames identity" do
