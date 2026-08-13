@@ -73,18 +73,18 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
             ← Employees
           </.link>
         </p>
-        
+
         <.header>
           {@employee.full_name}
           <:subtitle>
             <code class="text-ink-subtle">{@employee.employee_number}</code>
           </:subtitle>
-          
+
           <:actions>
             <.badge kind={if @employee.status == "active", do: :success, else: :neutral}>
               {@employee.status}
             </.badge>
-            
+
             <.link
               :if={allowed?(@current_scope, "admin.employee.update")}
               navigate={~p"/employees/#{@employee.id}/edit"}
@@ -95,33 +95,33 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
             </.link>
           </:actions>
         </.header>
-        
+
         <div class="mt-5">
           <.list>
             <:item title="Short name">
               {display_or_dash(@employee.short_name)}
             </:item>
-            
+
             <:item title="Designation">
               {display_or_dash(@employee.designation)}
             </:item>
-            
+
             <:item title="Type">{@employee.employee_type}</:item>
-            
+
             <:item title="Email">
               {display_or_dash(@employee.email)}
             </:item>
-            
+
             <:item title="Employment start">
               {display_or_dash(@employee.employment_start)}
             </:item>
-            
+
             <:item title="Employment end">
               {display_or_dash(@employee.employment_end)}
             </:item>
           </.list>
         </div>
-        
+
         <div
           :if={allowed?(@current_scope, "admin.employee.delete")}
           id="employee-danger"
@@ -130,12 +130,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
           <div class="flex items-center justify-between gap-4">
             <div>
               <h2 class="text-sm font-semibold text-ink-strong">Delete this employee</h2>
-              
+
               <p class="mt-0.5 text-xs text-ink-subtle">
                 Removes the employment record. The platform orchestrator cannot be deleted.
               </p>
             </div>
-            
+
             <.button
               id="employee-delete"
               phx-click="delete"

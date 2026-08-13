@@ -205,14 +205,14 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
             ← Employees
           </.link>
         </p>
-        
+
         <.header>
           {@page_title}
           <:subtitle>
             Employment records belong to {@current_scope.user["company_name"]}.
           </:subtitle>
         </.header>
-        
+
         <.form
           for={@form}
           id="employee-form"
@@ -269,7 +269,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
             <.button id="employee-save" variant="primary" type="submit" phx-disable-with="Saving…">
               Save employee
             </.button>
-            
+
             <.link
               navigate={~p"/employees"}
               class="text-sm font-medium text-ink-muted hover:text-ink"

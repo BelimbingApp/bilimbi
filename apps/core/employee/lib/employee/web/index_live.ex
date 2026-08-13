@@ -41,7 +41,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
         <.header>
           Employees
           <:subtitle>People employed by {@current_scope.user["company_name"]}</:subtitle>
-          
+
           <:actions>
             <.link
               :if={allowed?(@current_scope, "admin.employee-type.list")}
@@ -51,7 +51,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
             >
               Employee types
             </.link>
-            
+
             <.button
               :if={allowed?(@current_scope, "admin.employee.create")}
               id="employee-new"
@@ -62,7 +62,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
             </.button>
           </:actions>
         </.header>
-        
+
         <div class="mt-5">
           <.table id="employees" rows={@streams.employees}>
             <:col :let={{_id, employee}} label="Name">
@@ -72,18 +72,18 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
               >
                 {Employee.Summary.display_name(employee)}
               </.link>
-              
+
               <span :if={employee.designation} class="block text-xs text-ink-subtle">
                 {employee.designation}
               </span>
             </:col>
-            
+
             <:col :let={{_id, employee}} label="No.">
               <code class="text-xs font-medium">{employee.employee_number}</code>
             </:col>
-            
+
             <:col :let={{_id, employee}} label="Type">{employee.employee_type}</:col>
-            
+
             <:col :let={{_id, employee}} label="Status">
               <.badge kind={if employee.status == "active", do: :success, else: :neutral}>
                 {employee.status}

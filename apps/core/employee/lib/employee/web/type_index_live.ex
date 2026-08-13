@@ -42,11 +42,11 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
             ← Employees
           </.link>
         </p>
-        
+
         <.header>
           Employee types
           <:subtitle>System types are company-less; custom types belong to this company.</:subtitle>
-          
+
           <:actions>
             <.button
               :if={allowed?(@current_scope, "admin.employee-type.create")}
@@ -58,15 +58,15 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
             </.button>
           </:actions>
         </.header>
-        
+
         <div class="mt-5">
           <.table id="employee-types" rows={@streams.employee_types}>
             <:col :let={{_id, type}} label="Label">{type.label}</:col>
-            
+
             <:col :let={{_id, type}} label="Code">
               <code class="text-xs font-medium">{type.code}</code>
             </:col>
-            
+
             <:col :let={{_id, type}} label="Kind">
               <.badge kind={if type.is_system, do: :neutral, else: :success}>
                 {if type.is_system, do: "system", else: "custom"}

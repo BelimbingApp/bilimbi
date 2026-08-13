@@ -88,12 +88,12 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
             ← Employee types
           </.link>
         </p>
-        
+
         <.header>
           {@page_title}
           <:subtitle>Custom types belong to this company. System type codes are reserved.</:subtitle>
         </.header>
-        
+
         <.form
           for={@form}
           id="employee-type-form"
@@ -112,7 +112,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
             >
               Save type
             </.button>
-            
+
             <.link
               navigate={~p"/employee-types"}
               class="text-sm font-medium text-ink-muted hover:text-ink"
