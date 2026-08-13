@@ -19,7 +19,6 @@ defmodule Bilimbi.Core.User.Web.FormLive do
     name: :string,
     email: :string,
     password: :string,
-    password_confirmation: :string,
     company_id: :integer
   }
 
@@ -140,14 +139,13 @@ defmodule Bilimbi.Core.User.Web.FormLive do
   defp form_changeset(params, mode) do
     required =
       if mode == :new,
-        do: [:company_id, :name, :email, :password, :password_confirmation],
+        do: [:company_id, :name, :email, :password],
         else: [:name, :email]
 
     {%{}, @field_types}
     |> cast(params, Map.keys(@field_types))
     |> validate_required(required)
     |> validate_length(:password, min: 8)
-    |> validate_confirmation(:password, required: mode == :new)
     |> Map.put(:action, :validate)
   end
 
@@ -180,7 +178,6 @@ defmodule Bilimbi.Core.User.Web.FormLive do
 
           <%= if @mode == :new do %>
             <.input field={@form[:password]} id="user-password" type="password" label="Password" autocomplete="new-password" placeholder="Enter password" required />
-            <.input field={@form[:password_confirmation]} id="user-password-confirmation" type="password" label="Confirm Password" autocomplete="new-password" placeholder="Confirm password" required />
           <% end %>
 
           <div class="mt-2 flex items-center gap-4">
