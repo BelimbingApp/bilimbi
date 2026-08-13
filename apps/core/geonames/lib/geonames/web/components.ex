@@ -3,12 +3,12 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
 
   use Bilimbi.Base.UI, :html
 
-  attr :id, :string, required: true
-  attr :label, :string, required: true
-  attr :sort, :string, required: true
-  attr :sort_by, :string, required: true
-  attr :sort_dir, :string, required: true
-  attr :align, :atom, values: [:left, :right], default: :left
+  attr(:id, :string, required: true)
+  attr(:label, :string, required: true)
+  attr(:sort, :string, required: true)
+  attr(:sort_by, :string, required: true)
+  attr(:sort_dir, :string, required: true)
+  attr(:align, :atom, values: [:left, :right], default: :left)
 
   def sortable_heading(assigns) do
     ~H"""
@@ -42,8 +42,8 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
     """
   end
 
-  attr :id, :string, required: true
-  attr :page, :any, required: true
+  attr(:id, :string, required: true)
+  attr(:page, :any, required: true)
 
   def pagination(assigns) do
     ~H"""
@@ -97,6 +97,7 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
     |> NaiveDateTime.to_date()
     |> Date.to_iso8601()
   end
+
   def format_date(_value), do: "—"
 
   defp sort_icon(sort, sort, "asc"), do: "hero-chevron-up"
@@ -112,6 +113,7 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
   end
 
   defp page_position(%{total_pages: 0}), do: "Page 0 of 0"
+
   defp page_position(%{page: page, total_pages: total_pages}) do
     "Page #{page} of #{total_pages}"
   end

@@ -63,7 +63,7 @@ defmodule Bilimbi.Core.GeonamesTest do
 
     assert [%{iso: "JP"} | _rest] = Geonames.page_countries(%{"sortBy" => "population"}).entries
 
-    assert [%{country: "Japan"} | _rest] =
+    assert [%{country: "United States"} | _rest] =
              Geonames.page_countries(%{
                "sort_by" => "untrusted column",
                "sort_dir" => "desc"
@@ -119,7 +119,7 @@ defmodule Bilimbi.Core.GeonamesTest do
     })
 
     assert [%{postcode: "94105", country_name: "United States"}] =
-             Geonames.page_postcodes(%{"search" => "united"}).entries
+             Geonames.page_postcodes(%{"search" => "San Francisco"}).entries
 
     assert [
              %{country_iso: "US", record_count: 2},

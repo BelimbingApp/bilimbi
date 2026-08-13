@@ -46,7 +46,11 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
   def handle_event("page", %{"page" => page}, socket) do
     state =
-      Map.put(socket.assigns.index_state, :page, bounded_page(page, socket.assigns.postcodes_page))
+      Map.put(
+        socket.assigns.index_state,
+        :page,
+        bounded_page(page, socket.assigns.postcodes_page)
+      )
 
     {:noreply, push_patch(socket, to: postcodes_path(state))}
   end
@@ -346,15 +350,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
   end
 
   defp postcodes_path(state) do
-    ~p"/geonames/postcodes?#{%{
-      search: state.search,
-      page: state.page,
-      perPage: state.per_page,
-      sortBy: state.sort_by,
-      sortDir: state.sort_dir,
-      summarySortBy: state.summary_sort_by,
-      summarySortDir: state.summary_sort_dir
-    }}"
+    ~p"/geonames/postcodes?#{%{search: state.search, page: state.page, perPage: state.per_page, sortBy: state.sort_by, sortDir: state.sort_dir, summarySortBy: state.summary_sort_by, summarySortDir: state.summary_sort_dir}}"
   end
 
   defp page_size_options, do: Enum.map(@page_sizes, &{"#{&1} rows", &1})
@@ -370,11 +366,14 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
   defp normalize_summary_direction(direction, _sort_by) when direction in ["asc", "desc"],
     do: direction
+
   defp normalize_summary_direction(_direction, sort_by), do: default_summary_direction(sort_by)
 
   defp default_direction(sort_by), do: Map.get(@initial_directions, sort_by, "asc")
+
   defp default_summary_direction(sort_by),
     do: Map.get(@summary_initial_directions, sort_by, "asc")
+
   defp flip_direction("asc"), do: "desc"
   defp flip_direction(_direction), do: "asc"
 

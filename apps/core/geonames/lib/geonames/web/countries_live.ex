@@ -39,7 +39,11 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
 
   def handle_event("page", %{"page" => page}, socket) do
     state =
-      Map.put(socket.assigns.index_state, :page, bounded_page(page, socket.assigns.countries_page))
+      Map.put(
+        socket.assigns.index_state,
+        :page,
+        bounded_page(page, socket.assigns.countries_page)
+      )
 
     {:noreply, push_patch(socket, to: countries_path(state))}
   end
@@ -228,13 +232,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   end
 
   defp countries_path(state) do
-    ~p"/geonames/countries?#{%{
-      search: state.search,
-      page: state.page,
-      perPage: state.per_page,
-      sortBy: state.sort_by,
-      sortDir: state.sort_dir
-    }}"
+    ~p"/geonames/countries?#{%{search: state.search, page: state.page, perPage: state.per_page, sortBy: state.sort_by, sortDir: state.sort_dir}}"
   end
 
   defp page_size_options, do: Enum.map(@page_sizes, &{"#{&1} rows", &1})

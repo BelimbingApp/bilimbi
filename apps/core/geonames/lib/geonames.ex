@@ -170,7 +170,12 @@ defmodule Bilimbi.Core.Geonames do
   @spec page_postcodes(index_query()) :: Page.t(PostcodeIndex.t())
   def page_postcodes(query \\ %{}) do
     options =
-      normalize_index_query(query, @postcode_sort_fields, :country_name, @postcode_initial_directions)
+      normalize_index_query(
+        query,
+        @postcode_sort_fields,
+        :country_name,
+        @postcode_initial_directions
+      )
 
     Postcode
     |> postcode_with_country_name()
@@ -463,8 +468,14 @@ defmodule Bilimbi.Core.Geonames do
   end
 
   defp country_filter_keys do
-    [:country_iso, "country_iso", :filter_country_iso, "filter_country_iso", :filterCountryIso,
-     "filterCountryIso"]
+    [
+      :country_iso,
+      "country_iso",
+      :filter_country_iso,
+      "filter_country_iso",
+      :filterCountryIso,
+      "filterCountryIso"
+    ]
   end
 
   defp normalize_search(value) when is_binary(value) do

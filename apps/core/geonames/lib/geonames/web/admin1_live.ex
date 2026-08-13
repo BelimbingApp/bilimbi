@@ -221,14 +221,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
   end
 
   defp admin1_path(state) do
-    ~p"/geonames/admin1?#{%{
-      search: state.search,
-      filterCountryIso: state.country_iso,
-      page: state.page,
-      perPage: state.per_page,
-      sortBy: state.sort_by,
-      sortDir: state.sort_dir
-    }}"
+    ~p"/geonames/admin1?#{%{search: state.search, filterCountryIso: state.country_iso, page: state.page, perPage: state.per_page, sortBy: state.sort_by, sortDir: state.sort_dir}}"
   end
 
   defp country_options(countries), do: Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
