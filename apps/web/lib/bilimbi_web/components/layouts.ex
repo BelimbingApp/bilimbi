@@ -32,7 +32,16 @@ defmodule BilimbiWeb.Layouts do
       <div class="flex w-full max-w-sm flex-col gap-5">
         <.link navigate={~p"/"} class="flex flex-col items-center gap-2.5" aria-label="Bilimbi home">
           <span class="grid size-10 place-items-center rounded-xl bg-brand shadow-sm shadow-brand-ink/10">
-            <.icon name="hero-squares-2x2" class="size-5 text-brand-ink" />
+            <img
+              src={~p"/images/logo.svg"}
+              alt=""
+              class="size-6 object-contain"
+              width="24"
+              height="24"
+              decoding="async"
+              loading="eager"
+              aria-hidden="true"
+            />
           </span>
           <span class="text-base font-semibold tracking-tight text-ink-strong">Bilimbi</span>
         </.link>
@@ -78,7 +87,16 @@ defmodule BilimbiWeb.Layouts do
           aria-label="Bilimbi dashboard"
         >
           <span class="grid size-8 place-items-center rounded-lg bg-brand">
-            <.icon name="hero-squares-2x2" class="size-4 text-brand-ink" />
+            <img
+              src={~p"/images/logo.svg"}
+              alt=""
+              class="size-5 object-contain"
+              width="20"
+              height="20"
+              decoding="async"
+              loading="eager"
+              aria-hidden="true"
+            />
           </span>
           <span class="text-sm font-semibold tracking-tight text-ink-strong">Bilimbi</span>
         </.link>
