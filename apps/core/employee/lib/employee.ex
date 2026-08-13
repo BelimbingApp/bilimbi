@@ -20,6 +20,8 @@ defmodule Bilimbi.Core.Employee do
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee.EmployeeType
+  alias Bilimbi.Core.Employee.AdministrationIndex
+  alias Bilimbi.Core.Employee.AdministrationPage
   alias Bilimbi.Core.Employee.Schema
   alias Bilimbi.Core.Employee.Summary
   alias Bilimbi.Core.Employee.TypeSummary
@@ -55,6 +57,28 @@ defmodule Bilimbi.Core.Employee do
           | :database_unavailable
 
   @type provision_status :: :created | :existing
+
+  @doc """
+  Returns one bounded, deterministic administration page for a live company.
+
+  Options are a plain keyword list. Supported values are `:page`, `:page_size`,
+  `:search`, `:type_filter` (`:all`, `:human`, or `:agent`), `:sort_by`
+  (`:full_name`, `:employee_type_label`, or `:status`), and `:sort_dir`
+  (`:asc` or `:desc`). The source `company_name` sort is intentionally absent:
+  this API admits exactly one validated company, so it would be constant and a
+  Company-table join would not be truthful or useful here.
+  """
+  @spec list_administration_page(Scope.t(), pos_integer(), keyword()) ::
+          {:ok, AdministrationPage.t()} | {:error, :company_not_found | :invalid_options}
+  def list_administration_page(%Scope{} = scope, company_id, options \\ [])
+      when is_integer(company_id) and company_id > 0 do
+    with {:ok, normalized_options} <- AdministrationIndex.normalize_options(options),
+         {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+      {:ok, AdministrationIndex.page(company_id, normalized_options)}
+    end
+  end
+
+  def list_administration_page(%Scope{}, _company_id, _options), do: {:error, :company_not_found}
 
   @spec list_employees(Scope.t(), pos_integer()) ::
           {:ok, [Summary.t()]} | {:error, :company_not_found}
