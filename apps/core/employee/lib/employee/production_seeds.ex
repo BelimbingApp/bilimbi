@@ -12,7 +12,7 @@ defmodule Bilimbi.Core.Employee.ProductionSeeds do
       Database.production_seed!(
         :bilimbi_core_employee,
         "system-types",
-        fn _repo -> Employee.ensure_system_types() end
+        fn repo -> Employee.ensure_system_types(repo) end
       )
     ]
   end
