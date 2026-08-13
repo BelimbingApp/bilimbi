@@ -23,6 +23,20 @@ must use that API instead of duplicating the persisted string.
 Core User's tenant-wide list consumes `list_tenant_company_ids/1` so it never
 queries `companies` directly (BLB-S1-010 option a).
 
+## Transactional live-company proof
+
+`lock_live_company/2` is the Company collaboration seam for a sibling workflow
+that already holds an explicit shared `Bilimbi.Base.Repo` transaction. It locks
+one live Company row through the supplied `%Bilimbi.Base.Tenancy.Scope{}` and
+returns `LiveCompanyProof`, a schema-free value containing only its id. Missing,
+cross-tenant, deleted, and malformed ids all return `{:error, :not_found}`;
+calling outside an explicit transaction returns `{:error, :transaction_required}`.
+
+The proof remains valid only until that transaction commits or rolls back. A
+cross-module workflow acquires locks in this order: Company, then Employee,
+then User; within each record kind, ids ascend. It must not take an Employee or
+User lock before calling `lock_live_company/2`.
+
 ## External access
 
 `company_external_accesses` is owned here. `user_id` is an optional opaque

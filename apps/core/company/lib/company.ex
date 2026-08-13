@@ -18,6 +18,7 @@ defmodule Bilimbi.Core.Company do
   alias Bilimbi.Core.Company.Department
   alias Bilimbi.Core.Company.ExternalAccess
   alias Bilimbi.Core.Company.ExternalAccessSummary
+  alias Bilimbi.Core.Company.LiveCompanyProof
   alias Bilimbi.Core.Company.PrimaryCompanyInvariantError
   alias Bilimbi.Core.Company.PrimaryCompanyManager
   alias Bilimbi.Core.Company.PrimaryCompanyNotProvisionedError
@@ -38,6 +39,29 @@ defmodule Bilimbi.Core.Company do
     case Repo.one(query) do
       nil -> {:error, :not_found}
       company -> {:ok, Summary.from_schema(company)}
+    end
+  end
+
+  @doc """
+  Locks one live Company row for a sibling workflow already inside the shared Repo transaction.
+
+  The result proves only the Company identity. It is schema-free and valid only
+  until the current `Bilimbi.Base.Repo` transaction commits or rolls back.
+  Callers that acquire more than one module's records must lock Company rows
+  first, then Employee rows, then User rows; within each kind, acquire ids in
+  ascending order. Do not call this after taking an Employee or User row lock.
+
+  Returns `{:error, :transaction_required}` when called outside an explicit
+  shared Repo transaction. Missing, deleted, cross-tenant, and malformed
+  Company identities all return the generic `{:error, :not_found}` outcome.
+  """
+  @spec lock_live_company(Scope.t(), term()) ::
+          {:ok, LiveCompanyProof.t()} | {:error, :not_found | :transaction_required}
+  def lock_live_company(%Scope{} = scope, company_id) do
+    if Repo.in_transaction?() do
+      lock_scoped_live_company(scope, company_id)
+    else
+      {:error, :transaction_required}
     end
   end
 
@@ -306,6 +330,28 @@ defmodule Bilimbi.Core.Company do
           end
 
         {:ok, Enum.map(Repo.all(query), &ExternalAccessSummary.from_schema/1)}
+    end
+  end
+
+  defp lock_scoped_live_company(_scope, company_id)
+       when not (is_integer(company_id) and company_id > 0),
+       do: {:error, :not_found}
+
+  defp lock_scoped_live_company(%Scope{} = scope, company_id) do
+    tenant_id = Scope.tenant_id(scope)
+
+    query =
+      from(company in Tenancy.scope_query(Schema, scope),
+        where: company.id == ^company_id and is_nil(company.deleted_at),
+        lock: "FOR UPDATE"
+      )
+
+    case Repo.one(query) do
+      %Schema{tenant_id: ^tenant_id, deleted_at: nil, id: ^company_id} ->
+        {:ok, LiveCompanyProof.from_id(company_id)}
+
+      _company ->
+        {:error, :not_found}
     end
   end
 
