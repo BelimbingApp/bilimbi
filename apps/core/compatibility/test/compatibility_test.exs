@@ -53,6 +53,13 @@ defmodule Bilimbi.Core.CompatibilityTest do
                []
              ).rows
 
+    assert [[0]] =
+             SQL.query!(
+               MigrationTestRepo,
+               "SELECT count(*) FROM \"#{schema}\".sessions",
+               []
+             ).rows
+
     for table <- ~w(geonames_countries geonames_admin1 geonames_postcodes geonames_cities) do
       assert [[0]] =
                SQL.query!(
