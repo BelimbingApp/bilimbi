@@ -29,7 +29,10 @@ defmodule Bilimbi.Core.Employee.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      env: Bilimbi.Base.ModuleRegistry.MixDiscovery.application_env(__DIR__)
+      env:
+        [
+          bilimbi_production_seed_provider: Bilimbi.Core.Employee.ProductionSeeds
+        ] ++ Bilimbi.Base.ModuleRegistry.MixDiscovery.application_env(__DIR__)
     ]
   end
 
