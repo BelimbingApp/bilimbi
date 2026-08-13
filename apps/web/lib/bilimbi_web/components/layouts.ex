@@ -17,6 +17,8 @@ defmodule BilimbiWeb.Layouts do
 
   use BilimbiWeb, :html
 
+  alias BilimbiWeb.UserAuth
+
   embed_templates "layouts/*"
 
   @doc """
@@ -120,6 +122,7 @@ defmodule BilimbiWeb.Layouts do
             Dashboard
           </.nav_item>
           <.nav_item
+            :if={UserAuth.allowed?(@current_scope, "admin.company.list")}
             navigate={~p"/companies"}
             icon="hero-building-office-2"
             active={@active_nav == :companies}
@@ -128,6 +131,7 @@ defmodule BilimbiWeb.Layouts do
             Companies
           </.nav_item>
           <.nav_item
+            :if={UserAuth.allowed?(@current_scope, "admin.user.list")}
             navigate={~p"/users"}
             icon="hero-users"
             active={@active_nav == :users}

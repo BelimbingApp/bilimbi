@@ -36,7 +36,10 @@ defmodule BilimbiWeb.CompanyLive.Index do
               >
                 {Company.Summary.display_name(company)}
               </.link>
-              <span :if={company.legal_name} class="block text-xs text-ink-subtle">
+              <span
+                :if={company.legal_name && company.legal_name != company.name}
+                class="block text-xs text-ink-subtle"
+              >
                 {company.name}
               </span>
             </:col>

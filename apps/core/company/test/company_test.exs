@@ -178,6 +178,32 @@ defmodule Bilimbi.Core.CompanyTest do
     end
   end
 
+  describe "fetch_tenant_id_for_company/1" do
+    test "resolves a live company before a Web scope exists" do
+      insert_tenant!()
+      insert_company!()
+
+      assert {:ok, 41} = Company.fetch_tenant_id_for_company(73)
+    end
+
+    test "fails closed for absent, soft-deleted, and invalid companies" do
+      insert_tenant!()
+      insert_company!(%{deleted_at: ~N[2026-08-12 12:00:00]})
+
+      for company_id <- [73, 74, 0, -1, nil, "73"] do
+        assert {:error, :not_found} = Company.fetch_tenant_id_for_company(company_id)
+      end
+    end
+
+    test "leaves live-tenant proof to Tenancy.scope/1" do
+      insert_tenant!(%{deleted_at: ~N[2026-08-12 12:00:00]})
+      insert_company!()
+
+      assert {:ok, 41} = Company.fetch_tenant_id_for_company(73)
+      assert {:error, :soft_deleted} = Tenancy.scope(41)
+    end
+  end
+
   describe "list_companies/1 and list_tenant_company_ids/1" do
     setup do
       insert_tenant!()

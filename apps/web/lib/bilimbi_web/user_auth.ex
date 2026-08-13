@@ -4,26 +4,34 @@ defmodule BilimbiWeb.UserAuth do
   LiveView `on_mount` hooks for the authenticated shell.
 
   Business rules stay in the deep modules — `Bilimbi.Core.User` verifies
-  credentials, `Bilimbi.Base.Tenancy` proves the tenant. This module only
-  carries the proof from the login edge into the Phoenix session and back.
+  credentials, `Bilimbi.Base.Tenancy` proves the tenant, `Bilimbi.Base.Session`
+  owns the durable session row, and `Bilimbi.Base.Authz` decides capabilities.
+  This module only carries proof across the Phoenix boundary.
 
   ## Session shape
 
-  The session stores a small, server-signed map under `"current_user"`: the
-  user's `Bilimbi.Core.User.Summary` fields plus the `tenant_id` resolved at
-  the login edge. On every request `fetch_current_scope/2` re-proves the
-  tenant through `Tenancy.scope/1`, so a soft-deleted tenant ends the
-  session's usefulness immediately. User display fields (name, email) are
-  presentation data refreshed at each login.
+  The Phoenix cookie stores only stable IDs under `"current_user"`:
+  `session_id`, `user_id`, and `company_id`. Display fields and tenant
+  identity are never taken from the cookie. Every HTTP and LiveView
+  boundary rehydrates from live data:
+
+    1. `Session.fetch_session/1` — a terminated row ends the cookie;
+    2. the durable row's `user_id` must match the cookie;
+    3. `Company.fetch_tenant_id_for_company/1` then `Tenancy.scope/1`;
+    4. `User.get_user/3` must return that user in that company.
+
+  Any miss fails closed and the request is unauthenticated. Login writes
+  a cryptographically strong session id through `Session.put_session/3`
+  with an opaque payload; logout calls `Session.delete_session/1` before
+  dropping the cookie.
 
   ## Cross-module seam
 
-  `Bilimbi.Core.Company.fetch_tenant_id_for_company/1` — a public
-  company → tenant read for the login edge — is requested on issue #87
-  and lands with PR #95. Until it is merged the seam resolves only the
-  platform-operator company, which covers the development seed. The
-  fallback is honest about its limits (`{:error, :tenant_unavailable}`)
-  rather than guessing.
+  `Bilimbi.Core.Company.fetch_tenant_id_for_company/1` is the public
+  company → tenant read for the login edge (issue #87, PR #95) — the same
+  exception class as `User.authenticate/2`'s unscoped email lookup. It
+  fails closed for absent, soft-deleted, or invalid IDs; tenant liveness
+  is re-proven by `Tenancy.scope/1` on every request.
   """
 
   import Plug.Conn
@@ -31,6 +39,10 @@ defmodule BilimbiWeb.UserAuth do
 
   use BilimbiWeb, :verified_routes
 
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.Decision
+  alias Bilimbi.Base.Session
+  alias Bilimbi.Base.Session.Entry
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
@@ -41,6 +53,9 @@ defmodule BilimbiWeb.UserAuth do
   @return_to_key "user_return_to"
   @login_token_salt "session-login"
   @login_token_max_age 120
+  # Opaque compatibility payload. Web never interprets session contents.
+  @opaque_payload "{}"
+  @denied_message "You do not have access to that page."
 
   # ------------------------------------------------------------------
   # Login edge
@@ -61,9 +76,9 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   @doc """
-  Signs a short-lived token carrying the rehydration map for
-  `SessionController`. The map — not just the user id — is signed so a
-  tampered hidden field cannot smuggle another tenant into the session.
+  Signs a short-lived token carrying the stable IDs for
+  `SessionController`. The map is signed so a tampered hidden field cannot
+  smuggle another user or company into the session write.
   """
   @spec sign_login_token(map()) :: binary()
   def sign_login_token(%{} = session_user) do
@@ -82,48 +97,31 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   @doc """
-  Builds the session map for a freshly authenticated user: summary fields
-  plus the tenant resolved through the company seam. This is the one place
-  a tenant is resolved from a user; every later request starts from the
-  signed session value and re-proves it.
+  Builds the login-token payload for a freshly authenticated user: stable
+  IDs only, after the company → tenant seam proves a tenant is available.
+  Display fields are loaded later from live User and Company rows.
   """
   @spec session_user(Summary.t()) :: {:ok, map()} | {:error, :tenant_unavailable}
   def session_user(%Summary{} = user) do
-    with {:ok, tenant_id} <- tenant_id_for_user(user) do
+    with {:ok, _tenant_id} <- tenant_id_for_user(user) do
       {:ok,
        %{
          "user_id" => user.id,
-         "name" => user.name,
-         "email" => user.email,
-         "company_id" => user.company_id,
-         "company_name" => company_name_for(tenant_id, user.company_id),
-         "tenant_id" => tenant_id
+         "company_id" => user.company_id
        }}
     end
   end
 
-  # Display-only company name for the workspace strip; resolved through the
-  # scoped public API once the tenant is proven. A missing or unreadable
-  # company never blocks login — the strip just falls back to "Workspace".
-  defp company_name_for(tenant_id, company_id) do
-    with {:ok, scope} <- Tenancy.scope(tenant_id),
-         {:ok, company} <- Company.get_company(scope, company_id) do
-      Bilimbi.Core.Company.Summary.display_name(company)
-    else
-      _ -> nil
-    end
-  end
-
   # Belimbing resolves the tenant from the user's current company
-  # (TenantContext). Bilimbi's public company → tenant read for the
-  # unauthenticated edge is pending (issue #87); until then the development
-  # platform-operator company is the only resolvable case.
+  # (TenantContext). The public company → tenant read fails closed for
+  # absent, soft-deleted, or invalid IDs; tenant liveness itself is
+  # re-proven by Tenancy.scope/1 on every request.
   defp tenant_id_for_user(%Summary{company_id: nil}), do: {:error, :tenant_unavailable}
 
   defp tenant_id_for_user(%Summary{company_id: company_id}) do
-    case Company.platform_operator_company() do
-      {:ok, %{id: id, tenant_id: tenant_id}} when id == company_id -> {:ok, tenant_id}
-      _ -> {:error, :tenant_unavailable}
+    case Company.fetch_tenant_id_for_company(company_id) do
+      {:ok, tenant_id} -> {:ok, tenant_id}
+      {:error, :not_found} -> {:error, :tenant_unavailable}
     end
   end
 
@@ -131,19 +129,93 @@ defmodule BilimbiWeb.UserAuth do
   # Session lifecycle
   # ------------------------------------------------------------------
 
-  @doc "Stores the signed session map, renews the session, and redirects."
-  def log_in_user(conn, session_user, return_to \\ nil) do
-    destination = return_to || get_session(conn, @return_to_key) || ~p"/dashboard"
+  @doc """
+  Persists a durable Base Session row, stores only stable IDs in the
+  Phoenix cookie, renews the session, and redirects.
+  """
+  def log_in_user(conn, session_user, return_to \\ nil)
 
-    conn
-    |> configure_session(renew: true)
-    |> delete_session(@return_to_key)
-    |> put_session(@session_key, session_user)
-    |> redirect(to: destination)
+  def log_in_user(conn, %{"user_id" => user_id, "company_id" => company_id}, return_to)
+      when is_integer(user_id) and is_integer(company_id) do
+    case persist_durable_session(conn, user_id, company_id) do
+      {:ok, session_id} ->
+        destination = return_to || get_session(conn, @return_to_key) || ~p"/dashboard"
+
+        conn
+        |> configure_session(renew: true)
+        |> delete_session(@return_to_key)
+        |> put_session(@session_key, %{
+          "session_id" => session_id,
+          "user_id" => user_id,
+          "company_id" => company_id
+        })
+        |> redirect(to: destination)
+
+      :error ->
+        reject_login(conn)
+    end
   end
 
-  @doc "Drops the session entirely and redirects to the login screen."
+  def log_in_user(conn, _session_user, _return_to), do: reject_login(conn)
+
+  defp reject_login(conn) do
+    conn
+    |> configure_session(renew: true)
+    |> clear_session()
+    |> put_flash(:error, "That sign-in expired. Please sign in again.")
+    |> redirect(to: ~p"/")
+  end
+
+  defp persist_durable_session(conn, user_id, company_id) do
+    with {:ok, tenant_id} <- Company.fetch_tenant_id_for_company(company_id),
+         {:ok, %Scope{} = scope} <- Tenancy.scope(tenant_id),
+         {:ok, %Summary{id: ^user_id}} <- User.get_user(scope, company_id, user_id) do
+      session_id = generate_session_id()
+
+      attributes = %{
+        user_id: user_id,
+        ip_address: request_ip(conn),
+        user_agent: request_user_agent(conn),
+        last_activity: System.system_time(:second)
+      }
+
+      case Session.put_session(session_id, @opaque_payload, attributes) do
+        {:ok, %Entry{}} -> {:ok, session_id}
+        {:error, _changeset} -> :error
+      end
+    else
+      _ -> :error
+    end
+  end
+
+  defp generate_session_id do
+    :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
+  end
+
+  defp request_ip(conn) do
+    case conn.remote_ip do
+      ip when is_tuple(ip) -> ip |> :inet.ntoa() |> to_string()
+      _ -> nil
+    end
+  end
+
+  defp request_user_agent(conn) do
+    case get_req_header(conn, "user-agent") do
+      [user_agent | _] -> user_agent
+      _ -> nil
+    end
+  end
+
+  @doc "Deletes the durable session row, drops the cookie, and redirects to login."
   def log_out_user(conn) do
+    case get_session(conn, @session_key) do
+      %{"session_id" => session_id} when is_binary(session_id) ->
+        Session.delete_session(session_id)
+
+      _ ->
+        :ok
+    end
+
     conn
     |> configure_session(renew: true)
     |> clear_session()
@@ -155,20 +227,20 @@ defmodule BilimbiWeb.UserAuth do
   # ------------------------------------------------------------------
 
   @doc """
-  Loads `conn.assigns.current_scope` from the session. The assign is a map
-  `%{user: map, scope: Scope.t()}` or `nil`; templates read
-  `@current_scope.user.name` and module calls use `@current_scope.scope`.
+  Loads `conn.assigns.current_scope` from live identity. The assign is a map
+  `%{user: map, scope: Scope.t(), actor: Authz.Actor.t(), capabilities: [String.t()]}`
+  or `nil`. Templates read `@current_scope.user["name"]`; module calls use
+  `@current_scope.scope`.
 
-  A session whose tenant no longer proves out is dropped: the request falls
-  through as unauthenticated.
+  A cookie whose session, user, company, or tenant no longer proves out is
+  dropped: the request falls through as unauthenticated.
   """
   def fetch_current_scope(conn, _opts) do
-    with %{} = session_user <- get_session(conn, @session_key),
-         %{"tenant_id" => tenant_id} <- session_user,
-         {:ok, %Scope{} = scope} <- Tenancy.scope(tenant_id) do
-      assign(conn, :current_scope, %{user: session_user, scope: scope})
-    else
-      _ ->
+    case current_scope_from(get_session(conn, @session_key)) do
+      %{scope: %Scope{}} = current_scope ->
+        assign(conn, :current_scope, current_scope)
+
+      nil ->
         conn
         |> assign(:session_expired, not is_nil(get_session(conn, @session_key)))
         |> maybe_clear_stale_session()
@@ -222,6 +294,41 @@ defmodule BilimbiWeb.UserAuth do
     end
   end
 
+  @doc """
+  Requires a live Authz allow for `capability`. Denied requests redirect to
+  the dashboard; UI hiding is not this plug's job.
+  """
+  def require_capability(conn, capability) when is_binary(capability) do
+    case conn.assigns[:current_scope] do
+      %{actor: actor} ->
+        case Authz.can(actor, capability) do
+          %Decision{allowed: true} ->
+            conn
+
+          %Decision{} ->
+            conn
+            |> put_flash(:error, @denied_message)
+            |> redirect(to: ~p"/dashboard")
+            |> halt()
+        end
+
+      _ ->
+        conn
+        |> maybe_put_return_to()
+        |> redirect(to: ~p"/")
+        |> halt()
+    end
+  end
+
+  @doc "Whether the rehydrated scope lists `capability` among its effective allows."
+  @spec allowed?(map() | nil, String.t()) :: boolean()
+  def allowed?(%{capabilities: capabilities}, capability)
+      when is_list(capabilities) and is_binary(capability) do
+    capability in capabilities
+  end
+
+  def allowed?(_current_scope, _capability), do: false
+
   # ------------------------------------------------------------------
   # LiveView on_mount
   # ------------------------------------------------------------------
@@ -250,15 +357,72 @@ defmodule BilimbiWeb.UserAuth do
     end
   end
 
+  def on_mount({:require_capability, capability}, _params, _session, socket)
+      when is_binary(capability) do
+    actor = socket.assigns.current_scope.actor
+
+    case Authz.can(actor, capability) do
+      %Decision{allowed: true} ->
+        {:cont, socket}
+
+      %Decision{} ->
+        {:halt,
+         socket
+         |> Phoenix.LiveView.put_flash(:error, @denied_message)
+         |> Phoenix.LiveView.redirect(to: ~p"/dashboard")}
+    end
+  end
+
   defp mount_current_scope(socket, session) do
-    Phoenix.Component.assign_new(socket, :current_scope, fn ->
-      with %{} = session_user <- session[@session_key],
-           %{"tenant_id" => tenant_id} <- session_user,
-           {:ok, %Scope{} = scope} <- Tenancy.scope(tenant_id) do
-        %{user: session_user, scope: scope}
-      else
-        _ -> nil
-      end
-    end)
+    Phoenix.Component.assign(socket, :current_scope, current_scope_from(session[@session_key]))
+  end
+
+  defp current_scope_from(%{
+         "session_id" => session_id,
+         "user_id" => user_id,
+         "company_id" => company_id
+       })
+       when is_binary(session_id) and session_id != "" and is_integer(user_id) and user_id > 0 and
+              is_integer(company_id) and company_id > 0 do
+    with {:ok, %Entry{} = entry} <- Session.fetch_session(session_id),
+         true <- entry.user_id == user_id,
+         {:ok, tenant_id} <- Company.fetch_tenant_id_for_company(company_id),
+         {:ok, %Scope{} = scope} <- Tenancy.scope(tenant_id),
+         {:ok, %Summary{} = user} <- User.get_user(scope, company_id, user_id) do
+      actor = Authz.actor(:user, user.id, scope, company_id)
+      %{allowed: allowed} = Authz.effective_capabilities(actor)
+
+      %{
+        user: presentation_user(user, scope),
+        scope: scope,
+        actor: actor,
+        capabilities: allowed
+      }
+    else
+      _ -> nil
+    end
+  end
+
+  defp current_scope_from(_session_user), do: nil
+
+  defp presentation_user(%Summary{} = user, %Scope{} = scope) do
+    %{
+      "user_id" => user.id,
+      "name" => user.name,
+      "email" => user.email,
+      "company_id" => user.company_id,
+      "company_name" => company_name_for(scope, user.company_id)
+    }
+  end
+
+  # Display-only company name for the workspace strip. A missing or
+  # unreadable company never blocks an otherwise proven session.
+  defp company_name_for(_scope, nil), do: nil
+
+  defp company_name_for(%Scope{} = scope, company_id) do
+    case Company.get_company(scope, company_id) do
+      {:ok, company} -> Company.Summary.display_name(company)
+      _ -> nil
+    end
   end
 end

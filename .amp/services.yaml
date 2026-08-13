@@ -1,8 +1,0 @@
-services:
-  web:
-    command: >
-      bash -lc 'export PATH="$HOME/.local/bin:$PATH";
-      eval "$(mise activate bash)";
-      cd /home/user/workspace/repo && mix phx.server'
-    port: 4000
-    portal: true

@@ -19,6 +19,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       code: "elsewhere"
     })
 
+    UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
     :ok
   end
 
@@ -27,7 +28,14 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/companies")
     end
 
+    test "redirects away when the actor lacks admin.company.list", %{conn: conn} do
+      assert {:error, {:redirect, %{to: "/dashboard"}}} =
+               conn |> log_in_as() |> live(~p"/companies")
+    end
+
     test "lists only the current tenant's companies", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies")
 
       assert has_element?(view, "#companies td", "Bilimbi Industries")
@@ -36,8 +44,13 @@ defmodule BilimbiWeb.CompanyLiveTest do
   end
 
   describe "Show" do
+    test "redirects away when the actor lacks admin.company.view", %{conn: conn} do
+      assert {:error, {:redirect, %{to: "/dashboard"}}} =
+               conn |> log_in_as() |> live(~p"/companies/73")
+    end
+
     test "renders the company with its users", %{conn: conn} do
-      UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
@@ -47,11 +60,15 @@ defmodule BilimbiWeb.CompanyLiveTest do
     end
 
     test "redirects away for another tenant's company", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+
       assert {:error, {:live_redirect, %{to: "/companies"}}} =
                conn |> log_in_as() |> live(~p"/companies/74")
     end
 
     test "redirects away for a missing company", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+
       assert {:error, {:live_redirect, %{to: "/companies"}}} =
                conn |> log_in_as() |> live(~p"/companies/9999")
     end

@@ -11,6 +11,7 @@ defmodule BilimbiWeb.DashboardLive do
 
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
+  alias BilimbiWeb.UserAuth
 
   @impl true
   def mount(_params, _session, socket) do
@@ -58,9 +59,14 @@ defmodule BilimbiWeb.DashboardLive do
             id="stat-companies"
             label="Companies"
             count={length(@companies)}
-            navigate={~p"/companies"}
+            navigate={if UserAuth.allowed?(@current_scope, "admin.company.list"), do: ~p"/companies"}
           />
-          <.stat_card id="stat-users" label="Users" count={length(@users)} navigate={~p"/users"} />
+          <.stat_card
+            id="stat-users"
+            label="Users"
+            count={length(@users)}
+            navigate={if UserAuth.allowed?(@current_scope, "admin.user.list"), do: ~p"/users"}
+          />
           <div
             id="stat-tenant"
             class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
@@ -71,9 +77,14 @@ defmodule BilimbiWeb.DashboardLive do
             <p class="mt-1 truncate text-sm font-semibold text-ink-strong">
               {@current_scope.scope.tenant.name}
             </p>
-            <p class="mt-0.5 text-xs tabular-nums text-ink-subtle">
-              #{@current_scope.scope.tenant.id} · {@current_scope.scope.tenant.status}
-            </p>
+            <div class="mt-1.5 flex items-center gap-2">
+              <span class="text-xs tabular-nums text-ink-subtle">#{@current_scope.scope.tenant.id}</span>
+              <.badge kind={
+                if @current_scope.scope.tenant.status == "active", do: :success, else: :warning
+              }>
+                {@current_scope.scope.tenant.status}
+              </.badge>
+            </div>
           </div>
         </div>
 
@@ -104,6 +115,7 @@ defmodule BilimbiWeb.DashboardLive do
                 {@current_company.status}
               </.badge>
               <.link
+                :if={UserAuth.allowed?(@current_scope, "admin.company.view")}
                 navigate={~p"/companies/#{@current_company.id}"}
                 id="dashboard-company-open"
                 class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
@@ -115,9 +127,10 @@ defmodule BilimbiWeb.DashboardLive do
         </section>
 
         <section id="dashboard-recent-users" class="mt-6">
-          <div class="mb-2 flex items-baseline justify-between">
+          <div class="mb-2 flex items-center justify-between">
             <h2 class="text-sm font-semibold text-ink-strong">People in this workspace</h2>
             <.link
+              :if={UserAuth.allowed?(@current_scope, "admin.user.list")}
               navigate={~p"/users"}
               class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
             >
@@ -130,7 +143,7 @@ defmodule BilimbiWeb.DashboardLive do
             </:col>
             <:col :let={user} label="Email">{user.email}</:col>
             <:col :let={user} label="Email verified">
-              <.badge kind={if user.email_verified_at, do: :success, else: :neutral}>
+              <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
                 {if user.email_verified_at, do: "verified", else: "unverified"}
               </.badge>
             </:col>
@@ -150,22 +163,42 @@ defmodule BilimbiWeb.DashboardLive do
   attr :id, :string, required: true
   attr :label, :string, required: true
   attr :count, :integer, required: true
-  attr :navigate, :string, required: true
+  attr :navigate, :string, default: nil
 
-  defp stat_card(assigns) do
+  defp stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
     ~H"""
     <.link
       navigate={@navigate}
       id={@id}
       class="group rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
     >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-        {@label}
-      </p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
+      <.stat_card_body label={@label} count={@count} />
     </.link>
+    """
+  end
+
+  defp stat_card(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+    >
+      <.stat_card_body label={@label} count={@count} />
+    </div>
+    """
+  end
+
+  attr :label, :string, required: true
+  attr :count, :integer, required: true
+
+  defp stat_card_body(assigns) do
+    ~H"""
+    <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+      {@label}
+    </p>
+    <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+      {@count}
+    </p>
     """
   end
 end
