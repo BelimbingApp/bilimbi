@@ -35,7 +35,7 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
     {:ok,
      socket
      |> assign(:page_title, "Create Address")
-     |> assign(:active_nav, :addresses)
+     |> assign(:active_nav, "admin.address")
      |> assign(:countries, Geonames.list_countries())
      |> assign(:form_params, params)
      |> assign(:auto_location, %{admin1_code: false, locality: false})

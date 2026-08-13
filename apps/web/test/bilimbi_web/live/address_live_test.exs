@@ -76,6 +76,7 @@ defmodule BilimbiWeb.AddressLiveTest do
     assert has_element?(view, "#address-#{branch.id}", "Branch")
     refute has_element?(view, "#addresses-table", "Other tenant")
     assert has_element?(view, "#address-create[href='/addresses/create']")
+    assert has_element?(view, "#nav-admin-address[aria-current='page']")
 
     view
     |> element("#addresses-filters")
@@ -115,6 +116,7 @@ defmodule BilimbiWeb.AddressLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/create")
 
     assert has_element?(view, "#address-form")
+    assert has_element?(view, "#nav-admin-address[aria-current='page']")
     assert has_element?(view, "#address-country option[value='MY']", "Malaysia")
 
     view

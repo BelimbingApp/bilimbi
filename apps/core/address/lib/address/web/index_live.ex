@@ -54,7 +54,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={:addresses}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
       <div id="addresses-index" class="mx-auto max-w-7xl">
         <.header>
           Addresses
@@ -245,7 +245,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
 
     socket
     |> assign(:page_title, "Addresses")
-    |> assign(:active_nav, :addresses)
+    |> assign(:active_nav, "admin.address")
     |> assign(:addresses_page, page)
     |> assign(:filters_form, to_form(%{"search" => state.search}, as: :filters))
     |> assign(:index_state, state)
