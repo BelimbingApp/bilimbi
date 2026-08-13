@@ -153,3 +153,66 @@ jobs:
 
       - name: Verify the precommit suite made no changes
         run: git diff --exit-code
+
+  first_build:
+    name: Elixir first-build routes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    env:
+      MIX_ENV: test
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Erlang and Elixir
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          otp-version: "28.5"
+          elixir-version: "1.20.3"
+          version-type: strict
+
+      - name: Restore deps cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: deps
+          key: ${{ runner.os }}-beam-first-build-${{ hashFiles('mix.lock') }}
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      # Regression for issue #136: RouteContract bakes @routes at compile time
+      # from the route manifest written by the :bilimbi_graph compiler. On a
+      # clean first build the manifest must exist in _build/<env>/ before
+      # base/ui compiles, otherwise RouteContract and DiscoveredRoutes bake an
+      # empty route table. Deleting _build/test forces that ordering.
+      - name: Clean build artifacts
+        run: rm -rf _build/test
+
+      - name: Compile from clean
+        run: mix compile --warnings-as-errors
+
+      - name: Verify first-build route manifest
+        run: |
+          mix run --no-start --no-compile -e '
+            router_paths = BilimbiWeb.Router.__routes__() |> Enum.map(& &1.path)
+
+            unless "/system/sessions" in router_paths do
+              raise "first-build regression: /system/sessions missing from BilimbiWeb.Router.__routes__/0"
+            end
+
+            unless "/tenancy/tenants" in router_paths do
+              raise "first-build regression: /tenancy/tenants missing from BilimbiWeb.Router.__routes__/0"
+            end
+
+            unless Bilimbi.Base.UI.RouteContract.verified_route?([], ["system", "sessions"]) do
+              raise "first-build regression: RouteContract.verified_route?/2 did not match /system/sessions"
+            end
+
+            unless Bilimbi.Base.UI.RouteContract.verified_route?([], ["tenancy", "tenants"]) do
+              raise "first-build regression: RouteContract.verified_route?/2 did not match /tenancy/tenants"
+            end
+
+            IO.puts("first-build route manifest regression: OK")
+          '
