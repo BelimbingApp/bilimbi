@@ -132,9 +132,9 @@ defmodule Bilimbi.Core.Employee do
     end
   end
 
-  @spec ensure_system_types() :: :ok | {:error, :invariant_violation}
-  def ensure_system_types do
-    with :ok <- assert_system_type_bootstrap_safe() do
+  @spec ensure_system_types(Ecto.Repo.t()) :: :ok | {:error, :invariant_violation}
+  def ensure_system_types(repo \\ Repo) do
+    with :ok <- assert_system_type_bootstrap_safe(repo) do
       now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
       rows =
@@ -147,7 +147,7 @@ defmodule Bilimbi.Core.Employee do
           })
         end)
 
-      Repo.insert_all(EmployeeType, rows,
+      repo.insert_all(EmployeeType, rows,
         conflict_target: [:code],
         on_conflict: {:replace, [:label, :is_system, :company_id, :updated_at]}
       )
@@ -341,7 +341,7 @@ defmodule Bilimbi.Core.Employee do
     end
   end
 
-  defp assert_system_type_bootstrap_safe do
+  defp assert_system_type_bootstrap_safe(repo) do
     conflicts =
       from(type in EmployeeType,
         where:
@@ -349,7 +349,7 @@ defmodule Bilimbi.Core.Employee do
             (type.is_system != true or not is_nil(type.company_id)),
         select: type.code
       )
-      |> Repo.all()
+      |> repo.all()
 
     if conflicts == [] do
       :ok
