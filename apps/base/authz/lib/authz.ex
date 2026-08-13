@@ -10,6 +10,7 @@ defmodule Bilimbi.Base.Authz do
   import Ecto.Query
 
   alias Bilimbi.Base.Authz.Actor
+  alias Bilimbi.Base.Authz.Administration
   alias Bilimbi.Base.Authz.AuthorizationDeniedError
   alias Bilimbi.Base.Authz.DatabaseDecisionLogger
   alias Bilimbi.Base.Authz.Decision
@@ -84,11 +85,44 @@ defmodule Bilimbi.Base.Authz do
   @spec list_roles(Scope.t()) :: [Bilimbi.Base.Authz.RoleSummary.t()]
   def list_roles(%Scope{} = scope), do: RoleService.list_roles(scope, registry!())
 
+  @doc "Lists scoped roles through a bounded administration page."
+  @spec list_roles(Scope.t(), keyword()) ::
+          Bilimbi.Base.Authz.Page.t(Bilimbi.Base.Authz.RoleSummary.t())
+  def list_roles(%Scope{} = scope, opts) when is_list(opts) do
+    Administration.list_roles(scope, opts, registry!())
+  end
+
+  @doc "Fetches one scoped role with its capability keys and scoped principal assignments."
+  @spec get_role(Scope.t(), pos_integer()) ::
+          {:ok, Bilimbi.Base.Authz.RoleDetails.t()} | {:error, :not_found}
+  def get_role(%Scope{} = scope, role_id), do: RoleService.get_role(scope, role_id, registry!())
+
   @spec create_role(Scope.t(), pos_integer(), map()) ::
           {:ok, Bilimbi.Base.Authz.RoleSummary.t()}
           | {:error, :company_not_found | Ecto.Changeset.t()}
   def create_role(%Scope{} = scope, company_id, attributes) do
     RoleService.create_role(scope, company_id, attributes, registry!())
+  end
+
+  @doc "Updates a custom role; system roles and cross-scope companies are rejected."
+  @spec update_role(Scope.t(), pos_integer(), map()) ::
+          {:ok, Bilimbi.Base.Authz.RoleSummary.t()}
+          | {:error,
+             :role_not_found
+             | :system_role
+             | :company_not_found
+             | :role_has_principals
+             | :invalid_company_id
+             | Ecto.Changeset.t()}
+  def update_role(%Scope{} = scope, role_id, attributes) when is_map(attributes) do
+    RoleService.update_role(scope, role_id, attributes, registry!())
+  end
+
+  @doc "Deletes a custom role and intentionally database-cascades its grants and assignments."
+  @spec delete_role(Scope.t(), pos_integer()) ::
+          {:ok, :deleted} | {:error, :role_not_found | :system_role | Ecto.Changeset.t()}
+  def delete_role(%Scope{} = scope, role_id) do
+    RoleService.delete_role(scope, role_id, registry!())
   end
 
   @spec replace_role_capabilities(Scope.t(), pos_integer(), [String.t()]) ::
@@ -109,6 +143,13 @@ defmodule Bilimbi.Base.Authz do
       role_id,
       registry!()
     )
+  end
+
+  @doc "Removes one scoped principal-role assignment by its durable assignment ID."
+  @spec unassign_role(Scope.t(), pos_integer(), pos_integer()) ::
+          {:ok, :unassigned | :not_found} | {:error, :role_not_found}
+  def unassign_role(%Scope{} = scope, role_id, assignment_id) do
+    RoleService.unassign_role(scope, role_id, assignment_id, registry!())
   end
 
   @spec put_principal_capability(
@@ -138,6 +179,29 @@ defmodule Bilimbi.Base.Authz do
       allowed?,
       registry!()
     )
+  end
+
+  @doc "Removes one visible persisted direct capability by its durable grant ID."
+  @spec remove_principal_capability(
+          Scope.t(),
+          pos_integer()
+        ) :: {:ok, :removed | :not_found}
+  def remove_principal_capability(%Scope{} = scope, grant_id) do
+    RoleService.remove_principal_capability(scope, grant_id, registry!())
+  end
+
+  @doc "Lists scoped direct principal capabilities through a bounded page."
+  @spec list_principal_capabilities(Scope.t(), keyword()) ::
+          Bilimbi.Base.Authz.Page.t(Bilimbi.Base.Authz.PrincipalCapabilitySummary.t())
+  def list_principal_capabilities(%Scope{} = scope, opts \\ []) when is_list(opts) do
+    Administration.list_principal_capabilities(scope, opts, registry!())
+  end
+
+  @doc "Lists scoped decision logs through a bounded payload-safe page."
+  @spec list_decision_logs(Scope.t(), keyword()) ::
+          Bilimbi.Base.Authz.Page.t(Bilimbi.Base.Authz.DecisionLogSummary.t())
+  def list_decision_logs(%Scope{} = scope, opts \\ []) when is_list(opts) do
+    Administration.list_decision_logs(scope, opts, registry!())
   end
 
   @spec reconcile_system_roles(keyword()) ::

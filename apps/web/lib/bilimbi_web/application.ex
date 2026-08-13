@@ -11,6 +11,7 @@ defmodule BilimbiWeb.Application do
       BilimbiWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:web, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: BilimbiWeb.PubSub},
+      BilimbiWeb.RateLimit,
       BilimbiWeb.Endpoint
     ]
 

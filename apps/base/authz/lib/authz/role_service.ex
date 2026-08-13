@@ -5,8 +5,10 @@ defmodule Bilimbi.Base.Authz.RoleService do
 
   alias Bilimbi.Base.Authz.PrincipalCapability
   alias Bilimbi.Base.Authz.PrincipalRole
+  alias Bilimbi.Base.Authz.PrincipalRoleSummary
   alias Bilimbi.Base.Authz.Role
   alias Bilimbi.Base.Authz.RoleCapability
+  alias Bilimbi.Base.Authz.RoleDetails
   alias Bilimbi.Base.Authz.RoleSummary
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Scope
@@ -25,6 +27,45 @@ defmodule Bilimbi.Base.Authz.RoleService do
     |> Enum.map(&RoleSummary.from_schema/1)
   end
 
+  @spec get_role(Scope.t(), pos_integer(), map()) :: {:ok, RoleDetails.t()} | {:error, :not_found}
+  def get_role(%Scope{} = scope, role_id, registry) when is_integer(role_id) and role_id > 0 do
+    case eligible_role(scope, role_id, registry) do
+      nil ->
+        {:error, :not_found}
+
+      %Role{} = role ->
+        visibility = company_visibility(scope, registry)
+
+        capabilities =
+          from(grant in RoleCapability,
+            where: grant.role_id == ^role.id,
+            order_by: [asc: grant.capability_key, asc: grant.id],
+            select: grant.capability_key
+          )
+          |> Repo.all()
+
+        principal_roles =
+          from(assignment in PrincipalRole,
+            where: assignment.role_id == ^role.id,
+            where: ^visibility,
+            order_by: [
+              asc: assignment.principal_type,
+              asc: assignment.principal_id,
+              asc: assignment.id
+            ]
+          )
+          |> Repo.all()
+          |> Enum.map(&PrincipalRoleSummary.from_schema/1)
+
+        {:ok,
+         %RoleDetails{
+           role: RoleSummary.from_schema(role, length(capabilities), length(principal_roles)),
+           capabilities: capabilities,
+           principal_roles: principal_roles
+         }}
+    end
+  end
+
   @spec create_role(Scope.t(), pos_integer(), map(), map()) ::
           {:ok, RoleSummary.t()} | {:error, :company_not_found | Ecto.Changeset.t()}
   def create_role(%Scope{} = scope, company_id, attributes, registry) when is_map(attributes) do
@@ -38,6 +79,56 @@ defmodule Bilimbi.Base.Authz.RoleService do
       end
     else
       {:error, :company_not_found}
+    end
+  end
+
+  @spec update_role(Scope.t(), pos_integer(), map(), map()) ::
+          {:ok, RoleSummary.t()}
+          | {:error,
+             :role_not_found
+             | :system_role
+             | :company_not_found
+             | :role_has_principals
+             | :invalid_company_id
+             | Ecto.Changeset.t()}
+  def update_role(%Scope{} = scope, role_id, attributes, registry) when is_map(attributes) do
+    case eligible_role(scope, role_id, registry) do
+      nil ->
+        {:error, :role_not_found}
+
+      %Role{is_system: true} ->
+        {:error, :system_role}
+
+      %Role{} = role ->
+        with {:ok, company_id} <- requested_company_id(attributes, role.company_id),
+             :ok <- validate_target_company(scope, company_id, registry),
+             :ok <- validate_scope_change(role, company_id) do
+          role
+          |> Role.update_custom_changeset(company_id, attributes)
+          |> Repo.update()
+          |> case do
+            {:ok, updated_role} -> {:ok, RoleSummary.from_schema(updated_role)}
+            {:error, changeset} -> {:error, changeset}
+          end
+        end
+    end
+  end
+
+  @spec delete_role(Scope.t(), pos_integer(), map()) ::
+          {:ok, :deleted} | {:error, :role_not_found | :system_role | Ecto.Changeset.t()}
+  def delete_role(%Scope{} = scope, role_id, registry) do
+    case eligible_role(scope, role_id, registry) do
+      nil ->
+        {:error, :role_not_found}
+
+      %Role{is_system: true} ->
+        {:error, :system_role}
+
+      %Role{} = role ->
+        case Repo.delete(role) do
+          {:ok, _role} -> {:ok, :deleted}
+          {:error, changeset} -> {:error, changeset}
+        end
     end
   end
 
@@ -121,6 +212,29 @@ defmodule Bilimbi.Base.Authz.RoleService do
     end
   end
 
+  @spec unassign_role(Scope.t(), pos_integer(), pos_integer(), map()) ::
+          {:ok, :unassigned | :not_found} | {:error, :role_not_found}
+  def unassign_role(%Scope{} = scope, role_id, assignment_id, registry)
+      when is_integer(role_id) and role_id > 0 and is_integer(assignment_id) and
+             assignment_id > 0 do
+    if eligible_role(scope, role_id, registry) do
+      visibility = company_visibility(scope, registry)
+
+      {count, _rows} =
+        Repo.delete_all(
+          from(assignment in PrincipalRole,
+            where: assignment.id == ^assignment_id,
+            where: assignment.role_id == ^role_id,
+            where: ^visibility
+          )
+        )
+
+      {:ok, if(count == 1, do: :unassigned, else: :not_found)}
+    else
+      {:error, :role_not_found}
+    end
+  end
+
   @spec put_principal_capability(
           Scope.t(),
           pos_integer(),
@@ -172,6 +286,26 @@ defmodule Bilimbi.Base.Authz.RoleService do
     end
   end
 
+  @spec remove_principal_capability(
+          Scope.t(),
+          pos_integer(),
+          map()
+        ) :: {:ok, :removed | :not_found}
+  def remove_principal_capability(%Scope{} = scope, grant_id, registry)
+      when is_integer(grant_id) and grant_id > 0 do
+    visibility = company_visibility(scope, registry)
+
+    {count, _rows} =
+      Repo.delete_all(
+        from(grant in PrincipalCapability,
+          where: grant.id == ^grant_id,
+          where: ^visibility
+        )
+      )
+
+    {:ok, if(count == 1, do: :removed, else: :not_found)}
+  end
+
   defp eligible_role(scope, role_id, registry) do
     company_ids = directory!(registry).company_ids(scope)
 
@@ -190,6 +324,54 @@ defmodule Bilimbi.Base.Authz.RoleService do
     unknown = capabilities -- registry.capabilities
 
     if unknown == [], do: {:ok, capabilities}, else: {:error, {:unknown_capabilities, unknown}}
+  end
+
+  defp requested_company_id(attributes, current_company_id) do
+    case Map.fetch(attributes, :company_id) do
+      {:ok, value} ->
+        normalize_company_id(value)
+
+      :error ->
+        case Map.fetch(attributes, "company_id") do
+          {:ok, value} -> normalize_company_id(value)
+          :error -> {:ok, current_company_id}
+        end
+    end
+  end
+
+  defp normalize_company_id(value) when is_integer(value) and value > 0, do: {:ok, value}
+
+  defp normalize_company_id(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {company_id, ""} when company_id > 0 -> {:ok, company_id}
+      _other -> {:error, :invalid_company_id}
+    end
+  end
+
+  defp normalize_company_id(_value), do: {:error, :invalid_company_id}
+
+  defp validate_target_company(scope, company_id, registry) do
+    if directory!(registry).company_in_scope?(scope, company_id),
+      do: :ok,
+      else: {:error, :company_not_found}
+  end
+
+  defp validate_scope_change(%Role{company_id: company_id}, company_id), do: :ok
+
+  defp validate_scope_change(%Role{id: role_id}, _company_id) do
+    if Repo.exists?(from(assignment in PrincipalRole, where: assignment.role_id == ^role_id)),
+      do: {:error, :role_has_principals},
+      else: :ok
+  end
+
+  defp company_visibility(%Scope{} = scope, registry) do
+    company_ids = directory!(registry).company_ids(scope)
+
+    if Scope.platform_operator?(scope) do
+      dynamic([row], row.company_id in ^company_ids or is_nil(row.company_id))
+    else
+      dynamic([row], row.company_id in ^company_ids)
+    end
   end
 
   defp directory!(%{company_directory: nil}) do

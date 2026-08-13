@@ -10,4 +10,6 @@ defmodule Bilimbi.Base.Authz.PrincipalRole do
     field :role_id, :id
     timestamps(type: :naive_datetime, inserted_at: :created_at)
   end
+
+  @type t :: %__MODULE__{}
 end

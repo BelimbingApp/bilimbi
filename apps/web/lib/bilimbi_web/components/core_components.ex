@@ -88,6 +88,76 @@ defmodule BilimbiWeb.CoreComponents do
   end
 
   @doc """
+  Renders an inline status alert (Belimbing's `x-ui.alert` counterpart).
+
+  Kinds map to the honest status roles: `:info`, `:success`, `:warning`,
+  `:error`.
+
+  ## Examples
+
+      <.alert kind={:warning}>Your session expired. Sign in again to continue.</.alert>
+  """
+  attr :kind, :atom, values: [:info, :success, :warning, :error], default: :info
+  attr :class, :any, default: nil
+  attr :rest, :global
+  slot :inner_block, required: true
+
+  def alert(assigns) do
+    ~H"""
+    <div
+      role="alert"
+      class={[
+        "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm",
+        @kind == :info && "border-line bg-surface-sunken text-ink",
+        @kind == :success && "border-success-line bg-success-surface text-success-ink",
+        @kind == :warning && "border-warning-line bg-warning-surface text-warning-ink",
+        @kind == :error && "border-danger-line bg-danger-surface text-danger-ink",
+        @class
+      ]}
+      {@rest}
+    >
+      <.icon
+        name={
+          case @kind do
+            :info -> "hero-information-circle"
+            :success -> "hero-check-circle"
+            :warning -> "hero-exclamation-triangle"
+            :error -> "hero-exclamation-circle"
+          end
+        }
+        class="mt-0.5 size-4 shrink-0"
+      />
+      <div class="min-w-0">{render_slot(@inner_block)}</div>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders a compact status badge with a state dot, for entity statuses such
+  as `"active"` or `"archived"`. Neutral by default; pass `kind` for a
+  status color.
+  """
+  attr :kind, :atom, values: [:neutral, :success, :warning, :danger], default: :neutral
+  attr :class, :any, default: nil
+  slot :inner_block, required: true
+
+  def badge(assigns) do
+    ~H"""
+    <span class={[
+      "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium capitalize",
+      @kind == :neutral && "bg-surface-muted text-ink-muted",
+      @kind == :success && "bg-success-surface text-success-ink",
+      @kind == :warning && "bg-warning-surface text-warning-ink",
+      @kind == :danger && "bg-danger-surface text-danger-ink",
+      @class
+    ]}>
+      <span class="size-1.5 rounded-full bg-current opacity-70"></span>
+      {render_slot(@inner_block)}
+    </span>
+    """
+  end
+
+  @doc """
   Renders a button with navigation support.
 
   ## Examples
@@ -96,7 +166,8 @@ defmodule BilimbiWeb.CoreComponents do
       <.button phx-click="go" variant="primary">Send!</.button>
       <.button navigate={~p"/"}>Home</.button>
   """
-  attr :rest, :global, include: ~w(href navigate patch method download name value disabled)
+  attr :rest, :global, include: ~w(href navigate patch method download name value disabled type)
+
   attr :class, :any
   attr :variant, :string, values: ~w(primary)
   slot :inner_block, required: true
@@ -107,16 +178,18 @@ defmodule BilimbiWeb.CoreComponents do
       nil => "border border-line-strong bg-surface text-ink hover:bg-surface-sunken"
     }
 
+    # A caller-supplied class extends the button; it must not replace the
+    # variant, or `<.button variant="primary" class="w-full">` silently
+    # renders an unstyled button.
     assigns =
-      assign_new(assigns, :class, fn ->
-        [
-          "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
-          "shadow-sm transition focus-visible:outline-none focus-visible:ring-2",
-          "focus-visible:ring-action/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-          "disabled:cursor-not-allowed disabled:opacity-50",
-          Map.fetch!(variants, assigns[:variant])
-        ]
-      end)
+      assign(assigns, :class, [
+        "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
+        "shadow-sm transition focus-visible:outline-none focus-visible:ring-2",
+        "focus-visible:ring-action/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        Map.fetch!(variants, assigns[:variant]),
+        assigns[:class]
+      ])
 
     if rest[:href] || rest[:navigate] || rest[:patch] do
       ~H"""
