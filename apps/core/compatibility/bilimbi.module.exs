@@ -9,6 +9,7 @@
     "base/database",
     "base/module_registry",
     "base/authz",
+    "base/session",
     "base/settings",
     "base/tenancy",
     "base/audit",

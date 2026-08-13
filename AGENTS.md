@@ -46,12 +46,13 @@ not one OTP application inside it.
 ## 2. Current scope
 
 The initial Bilimbi implementation contains the Platform Baseline and its web
-host. Base Settings, Base Tenancy, Base Authz, Base Audit, Core Company,
-Core Geonames, Core Address, Core Employee, and Core User are active foundation
-slices:
+host. Base Session, Base Settings, Base Tenancy, Base Authz, Base Audit, Core
+Company, Core Geonames, Core Address, Core Employee, and Core User are active
+foundation slices:
 
 ```text
 apps/base/database/
+apps/base/session/
 apps/base/settings/
 apps/base/tenancy/
 apps/base/authz/
@@ -193,6 +194,7 @@ from, write to, rename, or repurpose Laravel's `migrations` table. Migration
 files stay with their owner:
 
 ```text
+apps/base/session/priv/repo/migrations/
 apps/base/settings/priv/repo/migrations/
 apps/base/tenancy/priv/repo/migrations/
 apps/base/authz/priv/repo/migrations/
@@ -210,6 +212,13 @@ strict Base → Core → Domain → Extension ordering. Do not use broad `create
 operations to make a migration appear safe on an existing database. Verify an
 existing Belimbing database with `mix bilimbi.schema.verify`, then baseline it
 with `mix bilimbi.schema.adopt`; adoption must refuse structural drift.
+
+Base Session owns the compatible durable `sessions` table without depending on
+Core User or Web. Treat `payload` as opaque compatibility data: Base may store,
+fetch, list metadata, terminate, and prune sessions, but it must not interpret
+Laravel payloads or attach authentication semantics. Operational listings must
+not expose payloads, and terminating another session must protect the caller's
+current session ID.
 
 The explicit-tenancy compatibility source is Belimbing merge commit
 `e70b4d33c0b10790e681f4c2b5095d85a53bc918`. Resolve the platform operator only
