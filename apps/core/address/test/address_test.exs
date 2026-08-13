@@ -178,6 +178,14 @@ defmodule Bilimbi.Core.AddressTest do
       assert_raise FunctionClauseError, fn ->
         Address.create_address(opaque(not_a_scope), %{label: "Unscoped"})
       end
+
+      assert_raise FunctionClauseError, fn ->
+        Address.list_available_company_addresses(opaque(not_a_scope), 73)
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        Address.create_and_attach_to_company(opaque(not_a_scope), 73, %{label: "Unscoped"})
+      end
     end
   end
 
@@ -235,6 +243,117 @@ defmodule Bilimbi.Core.AddressTest do
              Ecto.Adapters.SQL.query!(
                Bilimbi.Base.Repo,
                "SELECT addressable_type, kind, is_primary, priority FROM addressables",
+               []
+             ).rows
+  end
+
+  test "lists live same-tenant addresses not already linked to the Company", context do
+    insert_company!(%{id: 75, tenant_id: 41, code: "operator-secondary"})
+
+    assert {:ok, linked} = Address.create_address(context.operator, %{label: "Linked"})
+    assert {:ok, alpha} = Address.create_address(context.operator, %{label: "Alpha"})
+    assert {:ok, zulu} = Address.create_address(context.operator, %{label: "Zulu"})
+    assert {:ok, deleted} = Address.create_address(context.operator, %{label: "Deleted"})
+    assert {:ok, _other_tenant} = Address.create_address(context.customer, %{label: "Aardvark"})
+
+    assert {:ok, :attached} = Address.attach_to_company(context.operator, linked.id, 73)
+    assert {:ok, :attached} = Address.attach_to_company(context.operator, zulu.id, 75)
+    assert :ok = Address.delete_address(context.operator, deleted.id)
+
+    assert {:ok, available} =
+             Address.list_available_company_addresses(context.operator, 73)
+
+    assert Enum.map(available, & &1.id) == [alpha.id, zulu.id]
+
+    assert {:error, :company_not_found} =
+             Address.list_available_company_addresses(context.operator, 74)
+  end
+
+  test "creates a manual address and Company attachment atomically", context do
+    assert {:ok, address} =
+             Address.create_and_attach_to_company(
+               context.operator,
+               73,
+               %{
+                 tenant_id: 42,
+                 label: "New branch",
+                 source: "imported",
+                 verification_status: "verified"
+               },
+               %{kind: ["branch"], is_primary: true, priority: 2}
+             )
+
+    assert address.tenant_id == 41
+    assert address.verification_status == "unverified"
+
+    assert [[41, "manual", "unverified", ["branch"], true, 2, valid_from]] =
+             Ecto.Adapters.SQL.query!(
+               Bilimbi.Base.Repo,
+               """
+               SELECT addresses.tenant_id, addresses.source, addresses."verificationStatus",
+                      addressables.kind, addressables.is_primary, addressables.priority,
+                      addressables.valid_from
+               FROM addresses
+               JOIN addressables ON addressables.address_id = addresses.id
+               """,
+               []
+             ).rows
+
+    assert valid_from == Date.utc_today()
+  end
+
+  test "rolls back create-and-attach when either changeset or the Company is invalid", context do
+    assert {:error, address_changeset} =
+             Address.create_and_attach_to_company(context.operator, 73, %{
+               label: "Unknown country",
+               country_iso: "ZZ"
+             })
+
+    assert {:country_iso, {_message, _metadata}} =
+             List.keyfind(address_changeset.errors, :country_iso, 0)
+
+    assert {:error, attachment_changeset} =
+             Address.create_and_attach_to_company(
+               context.operator,
+               73,
+               %{label: "Invalid attachment"},
+               %{kind: ["warehouse"]}
+             )
+
+    assert {:kind, {"contains an unsupported address kind", []}} =
+             List.keyfind(attachment_changeset.errors, :kind, 0)
+
+    assert {:error, date_changeset} =
+             Address.create_and_attach_to_company(
+               context.operator,
+               73,
+               %{"label" => "Invalid dates"},
+               %{"valid_to" => Date.add(Date.utc_today(), -1)}
+             )
+
+    assert {:valid_to, {"must be on or after valid_from", []}} =
+             List.keyfind(date_changeset.errors, :valid_to, 0)
+
+    assert {:error, :company_not_found} =
+             Address.create_and_attach_to_company(context.operator, 74, %{
+               label: "Cross-tenant owner"
+             })
+
+    Ecto.Adapters.SQL.query!(
+      Bilimbi.Base.Repo,
+      "UPDATE companies SET deleted_at = '2026-08-12 12:00:00' WHERE id = 73",
+      []
+    )
+
+    assert {:error, :company_not_found} =
+             Address.create_and_attach_to_company(context.operator, 73, %{
+               label: "Deleted owner"
+             })
+
+    assert [[0, 0]] =
+             Ecto.Adapters.SQL.query!(
+               Bilimbi.Base.Repo,
+               "SELECT (SELECT COUNT(*) FROM addresses), (SELECT COUNT(*) FROM addressables)",
                []
              ).rows
   end
