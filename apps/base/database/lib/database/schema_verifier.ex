@@ -65,7 +65,11 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
   @spec quote_identifier!(String.t()) :: String.t()
   def quote_identifier!(identifier) do
     validate_identifier!(identifier)
-    ~s("#{identifier}")
+    # A quoted PostgreSQL identifier escapes an embedded double quote by
+    # doubling it. The validator above already rejects one, so this is
+    # defense in depth: safety must not depend solely on the regex never
+    # being relaxed.
+    ~s("#{String.replace(identifier, "\"", "\"\"")}")
   end
 
   defp verify_table(repo, schema, spec) do

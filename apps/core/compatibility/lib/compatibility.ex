@@ -66,7 +66,9 @@ defmodule Bilimbi.Core.Compatibility do
           | {:error, {:schema_drift, [String.t()]} | {:ledger_conflict, [integer()]}}
   def adopt(repo \\ Repo, opts \\ []) do
     schema = Keyword.get(opts, :prefix, "public")
-    validate_identifier!(schema)
+    # Validate the schema identifier early for a clean failure before the
+    # transaction starts. The shared quoter re-validates as it builds SQL.
+    _ = SchemaVerifier.quote_identifier!(schema)
 
     case repo.transaction(fn -> adopt_in_transaction(repo, schema, opts) end) do
       {:ok, result} -> result
@@ -131,7 +133,7 @@ defmodule Bilimbi.Core.Compatibility do
         result =
           SQL.query!(
             repo,
-            "SELECT version FROM #{quote_identifier(schema)}.#{quote_identifier(migration_source)} ORDER BY version",
+            "SELECT version FROM #{SchemaVerifier.quote_identifier!(schema)}.#{SchemaVerifier.quote_identifier!(migration_source)} ORDER BY version",
             []
           )
 
@@ -145,7 +147,7 @@ defmodule Bilimbi.Core.Compatibility do
     SQL.query!(
       repo,
       """
-      CREATE TABLE #{quote_identifier(schema)}.#{quote_identifier(migration_source)} (
+      CREATE TABLE #{SchemaVerifier.quote_identifier!(schema)}.#{SchemaVerifier.quote_identifier!(migration_source)} (
         version bigint PRIMARY KEY,
         inserted_at timestamp(0) without time zone NOT NULL
       )
@@ -183,17 +185,9 @@ defmodule Bilimbi.Core.Compatibility do
     if errors == [], do: :ok, else: {:error, errors}
   end
 
-  defp quote_identifier(identifier), do: ~s("#{identifier}")
-
   defp migration_source(repo) do
     repo.config()
     |> Keyword.fetch!(:migration_source)
-  end
-
-  defp validate_identifier!(identifier) do
-    unless Regex.match?(~r/^[a-z_][a-z0-9_]*$/, identifier) do
-      raise ArgumentError, "invalid PostgreSQL identifier: #{inspect(identifier)}"
-    end
   end
 
   defp migration_version!(path) do
