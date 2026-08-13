@@ -7,5 +7,6 @@
   namespace: Bilimbi.Base.Audit,
   dependencies: ["base/database", "base/tenancy"],
   migrations: "priv/repo/migrations",
-  schema_contract: Bilimbi.Base.Audit.SchemaContract
+  schema_contract: Bilimbi.Base.Audit.SchemaContract,
+  contribution_provider: nil
 ]

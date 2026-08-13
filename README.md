@@ -120,6 +120,7 @@ apps/
 │   ├── bilimbi.container.exs     # Declares the Base layer
 │   ├── database/                 # base/database module package
 │   ├── module_registry/          # Runtime installed-module registry
+│   ├── settings/                 # base/settings module package
 │   ├── tenancy/                  # base/tenancy module package
 │   └── audit/                    # base/audit module package
 ├── core/                         # Mandatory composition application
@@ -136,7 +137,7 @@ apps/
 The complete physical boundary of Base Tenancy is `apps/base/tenancy/`, not a
 directory below its `lib/`. Consequently its source begins at
 `apps/base/tenancy/lib/tenancy.ex` while the Elixir namespace remains
-`Bilimbi.Base.Tenancy`. The same rule applies to Audit, Company, Geonames, Address,
+`Bilimbi.Base.Tenancy`. The same rule applies to Settings, Audit, Company, Geonames, Address,
 Employee, User, and every future declared module.
 
 A composition container never lists child packages by name. Every immediate
@@ -208,6 +209,7 @@ operator and `tenant_primary_companies` for each tenant's designated company.
 only historical migration input in Belimbing, never a Bilimbi runtime role.
 
 Bilimbi-owned migrations live inside their owning module, currently
+`apps/base/settings/priv/repo/migrations`,
 `apps/base/tenancy/priv/repo/migrations`,
 `apps/base/audit/priv/repo/migrations`,
 `apps/core/company/priv/repo/migrations`,

@@ -19,7 +19,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              "core/user"
            ]
 
-    assert Enum.map(migration_modules, & &1.order) == [2, 3, 4, 5, 6, 7, 8]
+    assert Enum.map(migration_modules, & &1.order) == [2, 3, 4, 5, 6, 7, 8, 9]
 
     assert migration_paths ==
              Enum.map(migration_modules, fn descriptor ->
