@@ -141,9 +141,11 @@ owned by Base ModuleRegistry:
 
 Each `Route.t()` carries the path, the LiveView or controller module, the
 capability required for authorization, the live session name, and any
-pipeline configuration. The host router iterates
-`ModuleRegistry.installed_modules!()` in resolved module order and injects
-each contribution as a Phoenix Router scope via macros at compile time.
+pipeline configuration. The host router reads route metadata from
+compile-time descriptor data — not from `ModuleRegistry.installed_modules!()`,
+which is a runtime API that calls `Application.loaded_applications/0`. The
+compile-time data path and the `~p` verification path are separate; §8 below
+records the acyclic compile DAG.
 
 The host `apps/web/lib/bilimbi_web/router.ex` becomes a shell:
 
@@ -220,10 +222,12 @@ exports them and consuming LiveViews `import` or `use` the facade.
 
 Module LiveViews use `use Bilimbi.Base.UI, :live_view` instead of
 `use BilimbiWeb, :live_view`. The `__using__` macro brings in the HTML
-helpers, verified routes, and shared components. Module LiveViews that need
-the endpoint (for socket configuration) get it through the standard Phoenix
-compile-time mechanism — the endpoint module is injected at compile time and
-does not require a runtime `:web` dependency.
+helpers, translation functions, and shared components. Verified routes (`~p`)
+are available through the standard `Phoenix.VerifiedRoutes` mechanism; §8
+records how `~p` verification works without a compile-time `:web` dependency.
+Module LiveViews that need the endpoint (for socket configuration) get it
+through the standard Phoenix compile-time mechanism — the endpoint module is
+injected at compile time and does not require a runtime `:web` dependency.
 
 `UserAuth`'s `on_mount` hooks (`require_authenticated`,
 `require_capability`, `redirect_if_authenticated`) move to
@@ -277,6 +281,79 @@ on each installed module that contributes routes, declared through the same
 descriptor graph — but it does not name them manually. The dependency edges
 are derived from the `web:` descriptor keys at Mix resolution time, the same
 way migration paths are derived from `migrations:` keys.
+
+### 8. Compile DAG — verified routes without a cycle
+
+Module LiveViews use `~p`, and `~p` calls
+`BilimbiWeb.Router.verified_route?/2` at compile time. The host router
+injects module routes at compile time. If the router reads route data by
+calling module functions, and module LiveViews require the router to be
+compiled, the pair is cyclic on a clean build. This section resolves the
+cycle by separating the route-metadata path from the `~p` verification path.
+
+#### Route metadata: descriptor `.app` env, not runtime API or module calls
+
+The `:bilimbi_graph` compiler runs before standard compilers in every module's
+`mix.exs`. It resolves the workspace graph from `bilimbi.module.exs` files on
+disk and writes the resolved descriptor metadata — including `web:` keys and
+the ordered module list — into each OTP application's `.app` env under
+`:bilimbi_module`. This happens at Mix compile time, before any Elixir module
+is compiled.
+
+The host router macro reads route metadata from the compile-time `.app` env of
+installed applications, **not** from `ModuleRegistry.installed_modules!/0`
+(which is a runtime API that calls `Application.loaded_applications/0`) and
+**not** by calling each module's `Web.Router.routes/0` at compile time. The
+`Web.Router` module implementing the `Router` behaviour exists for runtime
+introspection and tests, but the host router's macro expansion uses the
+pre-computed descriptor metadata that the graph compiler already wrote.
+
+Phoenix routes reference LiveView modules as **atoms** (e.g.
+`live "/users", Bilimbi.Core.User.Web.IndexLive`), not as compiled modules.
+The atom is data; the LiveView module is loaded when the route is hit at
+runtime, not when the route is compiled. So the host router can define all
+module routes without any module LiveView being compiled first.
+
+#### `~p` verification: on-demand router compilation
+
+When a module LiveView containing `~p` compiles, Phoenix calls
+`BilimbiWeb.Router.verified_route?/2`. If the router module is not yet
+compiled, Elixir compiles it on demand. This on-demand compilation succeeds
+because the router's own dependencies — `phoenix`, `BilimbiWeb.Endpoint`,
+request-level plugs — are Hex or `:web`-internal modules that do not depend on
+the module's LiveViews. The router's macro expansion reads descriptor metadata
+from `.app` env, which is already written. No module LiveView or `Web.Router`
+function call is needed for the router to compile.
+
+After the on-demand router compilation completes, `~p` verification resolves
+against the now-compiled `verified_route?/2` function, and the module LiveView
+finishes compiling. The cycle is broken because:
+
+1. The host router compiles from descriptor metadata, not from module code.
+2. The host router references LiveView modules as atoms, not compiled modules.
+3. `~p` triggers on-demand router compilation, which is self-contained.
+4. No module OTP app declares `:web` in its `deps/`.
+
+#### Invalidation contract
+
+The `:bilimbi_graph` compiler writes a fingerprint marker in each module's
+compile path. When the workspace graph changes (a module is mounted,
+unmounted, or its `web:` key changes), the fingerprint changes and old markers
+are removed. The host router macro declares `@external_resource` on the
+workspace fingerprint file, so Mix detects the stale external resource and
+recompiles `BilimbiWeb.Router` — not merely refreshes `.app` metadata. This is
+the same mechanism the graph compiler already uses; the router adds one
+`@external_resource` line to participate in it.
+
+#### What this rules out
+
+- **Calling `ModuleRegistry.installed_modules!()` at compile time** — it is a
+  runtime API. The host router reads `.app` env instead.
+- **Calling `Web.Router.routes/0` at compile time** — would require the
+  module to compile before the router, recreating the cycle. The router uses
+  pre-computed descriptor metadata instead.
+- **Module LiveViews declaring `:web` in `deps/`** — that is the reverse
+  dependency §4 forbids. On-demand compilation handles `~p` without it.
 
 ## Alternatives considered
 
@@ -380,7 +457,10 @@ This ADR records the decision. The migration is separate work, sequenced as:
 3. **Route behavior** — define `Bilimbi.Base.ModuleRegistry.Route` and the
    `Router` callback in Base ModuleRegistry.
 4. **Host router macro** — implement the discovered-route expansion macro in
-   `apps/web/lib/bilimbi_web/router.ex`.
+   `apps/web/lib/bilimbi_web/router.ex`. Reads route metadata from
+   compile-time descriptor `.app` env (not `ModuleRegistry.installed_modules!/0`).
+   Declares `@external_resource` on the workspace fingerprint file for
+   invalidation. See §8 for the full compile DAG.
 5. **Amend AGENTS.md** — update §4, §6, §9, and §10 to reflect the new
    placement, descriptor key, and `use Bilimbi.Base.UI, :live_view`. This
    must happen before step 6.
