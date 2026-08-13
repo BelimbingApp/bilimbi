@@ -30,6 +30,7 @@ defmodule BilimbiWeb.TenantsLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/tenancy/tenants")
 
     assert has_element?(view, "h1", "Tenants")
+    assert has_element?(view, "#nav-admin-tenancy-tenant[aria-current='page']")
     assert has_element?(view, "#tenants")
     assert has_element?(view, "#tenants td", "Platform operator")
     refute has_element?(view, "#tenants-add")

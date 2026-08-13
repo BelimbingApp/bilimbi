@@ -49,8 +49,11 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
     assert has_element?(view, "#app-sidebar")
     assert has_element?(view, "#nav-dashboard[aria-current='page']")
-    refute has_element?(view, "#nav-companies")
-    refute has_element?(view, "#nav-users")
+    # Ids come from the modules' menu contributions, so assert one that is
+    # present -- a renamed id must fail these refutes rather than pass vacuously.
+    assert has_element?(view, "#nav-dashboard")
+    refute has_element?(view, "#nav-admin-company")
+    refute has_element?(view, "#nav-admin-user")
     refute has_element?(view, "#dashboard-company-open")
     assert has_element?(view, "#app-user-name", "Ada Lovelace")
     assert has_element?(view, "#app-logout")
@@ -61,8 +64,14 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
-    assert has_element?(view, "#nav-companies")
-    assert has_element?(view, "#nav-users")
+    assert has_element?(view, "#nav-admin-company")
+    assert has_element?(view, "#nav-admin-user")
+
+    # A LiveView marks itself current by naming its menu item. Nothing else
+    # connects the two, so a screen naming an id the menu does not define
+    # highlights nothing -- and the sidebar looks fine while it happens.
+    assert has_element?(view, "#nav-dashboard[aria-current='page']")
+    refute has_element?(view, "#nav-admin-company[aria-current='page']")
     assert has_element?(view, "#dashboard-company-open")
     assert has_element?(view, "#stat-companies[href='/companies']")
     assert has_element?(view, "#stat-users[href='/users']")

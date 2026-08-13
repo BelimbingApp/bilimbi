@@ -21,7 +21,7 @@ defmodule Bilimbi.Core.User.Web.IndexLive do
     {:ok,
      socket
      |> assign(:page_title, "User Management")
-     |> assign(:active_nav, :users)
+     |> assign(:active_nav, "admin.user")
      |> assign(:company_names, Map.new(companies, &{&1.id, Company.Summary.display_name(&1)}))
      |> stream(:users, users)}
   end

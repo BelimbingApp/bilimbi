@@ -58,7 +58,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={:geonames}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.geonames.postcode">
       <div id="postcodes-index" class="mx-auto max-w-7xl space-y-5">
         <.header>Geonames Postcodes</.header>
 

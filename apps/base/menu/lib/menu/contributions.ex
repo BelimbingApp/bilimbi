@@ -20,6 +20,10 @@ defmodule Bilimbi.Base.Menu.Contributions do
   # Ids, labels and parents are Belimbing's, unchanged.
   defp admin_roots do
     [
+      # The workspace home. Not an admin item, but it is navigation, and the
+      # sidebar is now entirely contribution-driven -- a hardcoded exception
+      # would reintroduce the second source of truth this replaced.
+      %{id: "dashboard", label: "Dashboard", icon: "home", route: "/dashboard", order: 0},
       %{id: "admin", label: "Administration", icon: "cog-6-tooth", order: 900},
       %{id: "admin.system", label: "System", parent: "admin", order: 90},
       %{id: "admin.system.database", label: "Database", parent: "admin.system", order: 10},

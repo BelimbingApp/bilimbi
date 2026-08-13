@@ -5,7 +5,7 @@
   required: true,
   otp_app: :bilimbi_base_ui,
   namespace: Bilimbi.Base.UI,
-  dependencies: ["base/module_registry"],
+  dependencies: ["base/menu", "base/module_registry"],
   migrations: nil,
   web: nil,
   schema_contract: nil,

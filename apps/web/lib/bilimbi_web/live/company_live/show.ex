@@ -29,7 +29,7 @@ defmodule BilimbiWeb.CompanyLive.Show do
         {:ok,
          socket
          |> assign(:page_title, Company.Summary.display_name(company))
-         |> assign(:active_nav, :companies)
+         |> assign(:active_nav, "admin.company")
          |> assign(:company, company)
          |> stream(:company_users, users)
          |> stream(:company_employees, employees)}

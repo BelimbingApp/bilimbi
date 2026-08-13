@@ -40,6 +40,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(view, "#companies td", "Bilimbi Industries")
       refute has_element?(view, "#companies td", "Elsewhere")
+      assert has_element?(view, "#nav-admin-company[aria-current='page']")
     end
   end
 

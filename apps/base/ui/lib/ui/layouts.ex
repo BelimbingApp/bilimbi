@@ -28,14 +28,14 @@ defmodule Bilimbi.Base.UI.Layouts do
     endpoint: Bilimbi.Base.UI.ScriptPath,
     statics: ~w(assets fonts images favicon.ico robots.txt)
 
-  embed_templates "layouts/*"
+  embed_templates("layouts/*")
 
   @doc """
   The centered credential layout. Renders its own flash group because the
   workspace shell is absent here.
   """
-  attr :flash, :map, required: true
-  slot :inner_block, required: true
+  attr(:flash, :map, required: true)
+  slot(:inner_block, required: true)
 
   def auth(assigns) do
     ~H"""
@@ -79,10 +79,15 @@ defmodule Bilimbi.Base.UI.Layouts do
   The authenticated workspace shell. Requires `@current_scope` — routes must
   run through the authenticated pipeline rather than tolerating a fallback.
   """
-  attr :flash, :map, required: true
-  attr :current_scope, :map, required: true
-  attr :active_nav, :atom, default: nil
-  slot :inner_block, required: true
+  attr(:flash, :map, required: true)
+  attr(:current_scope, :map, required: true)
+  # Required, not defaulted: a screen that forgets this renders a sidebar where
+  # nothing is current, and the page still looks right. Two screens shipped
+  # exactly that way before a reviewer caught it by reading, because a *missing*
+  # attribute leaves nothing to grep for. Required makes it a compile error.
+  # Pass nil deliberately for a page that owns no menu item.
+  attr(:active_nav, :string, required: true)
+  slot(:inner_block, required: true)
 
   def app(assigns) do
     ~H"""
@@ -122,32 +127,12 @@ defmodule Bilimbi.Base.UI.Layouts do
           <p class="hidden px-2 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint select-none lg:block">
             Workspace
           </p>
-          <.nav_item
-            navigate={~p"/dashboard"}
-            icon="hero-home"
-            active={@active_nav == :dashboard}
-            id="nav-dashboard"
-          >
-            Dashboard
-          </.nav_item>
-          <.nav_item
-            :if={allowed?(@current_scope, "admin.company.list")}
-            navigate={~p"/companies"}
-            icon="hero-building-office-2"
-            active={@active_nav == :companies}
-            id="nav-companies"
-          >
-            Companies
-          </.nav_item>
-          <.nav_item
-            :if={allowed?(@current_scope, "admin.user.list")}
-            navigate={~p"/users"}
-            icon="hero-users"
-            active={@active_nav == :users}
-            id="nav-users"
-          >
-            Users
-          </.nav_item>
+          <.nav_branch
+            :for={node <- Bilimbi.Base.UI.Nav.tree(@current_scope)}
+            node={node}
+            active_nav={@active_nav}
+            depth={0}
+          />
         </nav>
 
         <div id="app-user" class="border-t border-line-subtle px-1.5 py-3 lg:px-3">
@@ -208,11 +193,11 @@ defmodule Bilimbi.Base.UI.Layouts do
     """
   end
 
-  attr :navigate, :string, required: true
-  attr :icon, :string, required: true
-  attr :active, :boolean, default: false
-  attr :id, :string, required: true
-  slot :inner_block, required: true
+  attr(:navigate, :string, required: true)
+  attr(:icon, :string, required: true)
+  attr(:active, :boolean, default: false)
+  attr(:id, :string, required: true)
+  slot(:inner_block, required: true)
 
   defp nav_item(assigns) do
     ~H"""
@@ -237,10 +222,43 @@ defmodule Bilimbi.Base.UI.Layouts do
     """
   end
 
-  defp allowed?(%{capabilities: caps}, cap) when is_list(caps) and is_binary(cap),
-    do: cap in caps
+  attr(:node, :map, required: true)
+  attr(:active_nav, :string, default: nil)
+  attr(:depth, :integer, default: 0)
 
-  defp allowed?(_scope, _cap), do: false
+  defp nav_branch(assigns) do
+    ~H"""
+    <.nav_item
+      :if={@node.item.route}
+      navigate={@node.item.route}
+      icon={nav_icon(@node.item.icon)}
+      active={@active_nav == @node.item.id}
+      id={"nav-" <> String.replace(@node.item.id, ".", "-")}
+    >
+      {@node.item.label}
+    </.nav_item>
+
+    <p
+      :if={is_nil(@node.item.route) and @node.children != []}
+      class="hidden px-2 pt-3 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint select-none lg:block"
+    >
+      {@node.item.label}
+    </p>
+
+    <.nav_branch
+      :for={child <- @node.children}
+      node={child}
+      active_nav={@active_nav}
+      depth={@depth + 1}
+    />
+    """
+  end
+
+  # Menu contributions carry bare Heroicon names so a module never encodes the
+  # host's icon-set prefix. A fully qualified name is passed through unchanged.
+  defp nav_icon(nil), do: "hero-square-3-stack-3d"
+  defp nav_icon("hero-" <> _ = name), do: name
+  defp nav_icon(name) when is_binary(name), do: "hero-" <> name
 
   defp user_initials(name) when is_binary(name) do
     name
@@ -252,8 +270,8 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   defp user_initials(_), do: "?"
 
-  attr :flash, :map, required: true
-  attr :id, :string, default: "flash-group"
+  attr(:flash, :map, required: true)
+  attr(:id, :string, default: "flash-group")
 
   def flash_group(assigns) do
     ~H"""

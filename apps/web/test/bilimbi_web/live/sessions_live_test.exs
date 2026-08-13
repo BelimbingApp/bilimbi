@@ -37,6 +37,11 @@ defmodule BilimbiWeb.SessionsLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/sessions")
 
     assert has_element?(view, "h1", "Sessions")
+
+    # The sidebar row for this page must be marked current. A screen that
+    # names no menu item still renders correctly, so nothing but an assertion
+    # notices -- which is how this shipped unhighlighted in the first place.
+    assert has_element?(view, "#nav-admin-system-session[aria-current='page']")
     assert has_element?(view, "#sessions")
     assert has_element?(view, "#sessions-search")
     assert has_element?(view, "#sessions td", "User 91")

@@ -12,12 +12,12 @@ defmodule Bilimbi.Core.Geonames.Contributions do
           label: "Geonames",
           icon: "globe-alt",
           parent: "admin",
-          route: "/geonames",
           capability: "admin.geonames.list",
           order: 50
         },
         %{
           id: "admin.geonames.country",
+          icon: "flag",
           label: "Countries",
           parent: "admin.geonames",
           route: "/geonames/countries",
@@ -25,6 +25,7 @@ defmodule Bilimbi.Core.Geonames.Contributions do
         },
         %{
           id: "admin.geonames.admin1-division",
+          icon: "map",
           label: "Admin1 Divisions",
           parent: "admin.geonames",
           route: "/geonames/admin1",
@@ -32,6 +33,7 @@ defmodule Bilimbi.Core.Geonames.Contributions do
         },
         %{
           id: "admin.geonames.postcode",
+          icon: "map-pin",
           label: "Postcodes",
           parent: "admin.geonames",
           route: "/geonames/postcodes",

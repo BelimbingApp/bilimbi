@@ -13,7 +13,7 @@ defmodule BilimbiWeb.CompanyLive.Index do
     {:ok,
      socket
      |> assign(:page_title, "Companies")
-     |> assign(:active_nav, :companies)
+     |> assign(:active_nav, "admin.company")
      |> stream(:companies, companies)}
   end
 
