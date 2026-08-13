@@ -1,6 +1,14 @@
 defmodule BilimbiWeb.Router do
   use BilimbiWeb, :router
 
+  import BilimbiWeb.UserAuth,
+    only: [
+      fetch_current_scope: 2,
+      require_authenticated: 2,
+      redirect_if_authenticated: 2,
+      require_capability: 2
+    ]
+
   @content_security_policy Enum.join(
                              [
                                "default-src 'self'",
@@ -27,16 +35,90 @@ defmodule BilimbiWeb.Router do
     plug :put_secure_browser_headers, %{
       "content-security-policy" => @content_security_policy
     }
+
+    plug :fetch_current_scope
   end
 
   pipeline :api do
     plug :accepts, ["json"]
   end
 
+  pipeline :ensure_company_list do
+    plug :require_authenticated
+    plug :require_capability, "admin.company.list"
+  end
+
+  pipeline :ensure_company_view do
+    plug :require_authenticated
+    plug :require_capability, "admin.company.view"
+  end
+
+  pipeline :ensure_user_list do
+    plug :require_authenticated
+    plug :require_capability, "admin.user.list"
+  end
+
+  # The homepage is the sign-in screen; authenticated visitors are forwarded
+  # to their workspace.
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :redirect_if_authenticated]
+
+    live_session :anonymous,
+      on_mount: [{BilimbiWeb.UserAuth, :redirect_if_authenticated}] do
+      live "/", LoginLive
+    end
+  end
+
   scope "/", BilimbiWeb do
     pipe_through :browser
 
-    live "/", HomeLive
+    post "/session", SessionController, :create
+    delete "/session", SessionController, :delete
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :require_authenticated]
+
+    live_session :authenticated,
+      on_mount: [{BilimbiWeb.UserAuth, :require_authenticated}] do
+      live "/dashboard", DashboardLive
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_company_list]
+
+    live_session :companies_index,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.company.list"}}
+      ] do
+      live "/companies", CompanyLive.Index
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_company_view]
+
+    live_session :companies_show,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.company.view"}}
+      ] do
+      live "/companies/:id", CompanyLive.Show
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_user_list]
+
+    live_session :users_index,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.user.list"}}
+      ] do
+      live "/users", UserLive.Index
+    end
   end
 
   # Other scopes may use custom stacks.
@@ -48,8 +130,8 @@ defmodule BilimbiWeb.Router do
   if Application.compile_env(:web, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put
     # it behind authentication and allow only admins to access it.
-    # If your application does not have an admins-only section yet,
-    # you can use Plug.BasicAuth to set up some basic authentication
+    # If you do not have an admins-only section yet, you can
+    # use Plug.BasicAuth to set up some basic authentication
     # as long as you are also using SSL (which you should anyway).
     import Phoenix.LiveDashboard.Router
 
