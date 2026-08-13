@@ -25,6 +25,24 @@ defmodule Bilimbi.Base.TenancyTest do
     assert Tenancy.require_platform_operator!().id == 41
   end
 
+  test "lists and counts live tenants without leaking the Ecto schema" do
+    insert_tenant!(%{id: 41, name: "Zulu operator"})
+    insert_tenant!(%{id: 42, name: "Alpha customer", is_platform_operator: false})
+    insert_tenant!(%{
+      id: 43,
+      name: "Gone",
+      is_platform_operator: false,
+      deleted_at: ~N[2026-08-12 12:00:00]
+    })
+
+    tenants = Tenancy.list_tenants()
+
+    assert Enum.map(tenants, & &1.name) == ["Alpha customer", "Zulu operator"]
+    assert Enum.map(tenants, & &1.id) == [42, 41]
+    refute Enum.any?(tenants, &Map.has_key?(&1, :__meta__))
+    assert Tenancy.count_tenants() == 2
+  end
+
   test "exposes tenant identity without leaking the Ecto schema and owns locked reads" do
     insert_tenant!(%{id: 41, is_platform_operator: false})
 
