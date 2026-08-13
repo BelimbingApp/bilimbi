@@ -8,6 +8,7 @@
   dependencies: [
     "base/database",
     "base/module_registry",
+    "base/authz",
     "base/settings",
     "base/tenancy",
     "base/audit",

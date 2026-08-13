@@ -8,5 +8,5 @@
   dependencies: ["base/module_registry"],
   migrations: nil,
   schema_contract: nil,
-  contribution_provider: nil
+  contribution_provider: Bilimbi.Base.Database.Contributions
 ]

@@ -9,7 +9,8 @@ defmodule Bilimbi.Base.Database.SchemaContract do
   alias Bilimbi.Base.Database.SchemaVerifier
 
   @callback tables() :: [SchemaVerifier.table_spec()]
+  @callback contributions() :: [SchemaVerifier.table_contribution_spec()]
   @callback verify_invariants(Ecto.Repo.t(), keyword()) :: :ok | {:error, [String.t()]}
 
-  @optional_callbacks verify_invariants: 2
+  @optional_callbacks contributions: 0, verify_invariants: 2
 end

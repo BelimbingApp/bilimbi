@@ -56,7 +56,15 @@ defmodule Bilimbi.Core.Compatibility do
 
     table_specs = Enum.flat_map(contracts, & &1.tables())
 
-    with :ok <- SchemaVerifier.verify(repo, table_specs, opts) do
+    contributions =
+      Enum.flat_map(contracts, fn contract ->
+        if function_exported?(contract, :contributions, 0),
+          do: contract.contributions(),
+          else: []
+      end)
+
+    with :ok <- SchemaVerifier.verify(repo, table_specs, opts),
+         :ok <- SchemaVerifier.verify_contributions(repo, contributions, opts) do
       verify_invariants(contracts, repo, opts)
     end
   end

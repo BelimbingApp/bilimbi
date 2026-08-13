@@ -103,18 +103,22 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
   test "the production seed command records real reference data once", %{env: env} do
     run_mix!("bilimbi.migrate", ["--quiet"], env)
 
-    assert run_mix!("bilimbi.seeds.run", [], env) =~
-             "completed: core/employee/system-types"
+    required_seed_ids = ["base/authz/system-roles", "core/employee/system-types"]
+    first_output = run_mix!("bilimbi.seeds.run", [], env)
+    second_output = run_mix!("bilimbi.seeds.run", [], env)
 
-    assert run_mix!("bilimbi.seeds.run", [], env) =~
-             "skipped: core/employee/system-types"
+    Enum.each(required_seed_ids, fn seed_id ->
+      assert first_output =~ "completed: #{seed_id}"
+      assert second_output =~ "skipped: #{seed_id}"
+    end)
 
-    assert [run] =
-             Database.list_production_seed_runs(repo: PlatformBaselineTestRepo)
+    runs =
+      Database.list_production_seed_runs(repo: PlatformBaselineTestRepo)
+      |> Map.new(&{&1.id, &1})
 
-    assert run.id == "core/employee/system-types"
-    assert run.status == :completed
-    assert run.attempts == 1
+    Enum.each(required_seed_ids, fn seed_id ->
+      assert %{status: :completed, attempts: 1} = Map.fetch!(runs, seed_id)
+    end)
 
     assert [[5]] =
              SQL.query!(

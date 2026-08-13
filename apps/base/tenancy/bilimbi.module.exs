@@ -5,8 +5,8 @@
   required: true,
   otp_app: :bilimbi_base_tenancy,
   namespace: Bilimbi.Base.Tenancy,
-  dependencies: ["base/database"],
+  dependencies: ["base/database", "base/module_registry"],
   migrations: "priv/repo/migrations",
   schema_contract: Bilimbi.Base.Tenancy.SchemaContract,
-  contribution_provider: nil
+  contribution_provider: Bilimbi.Base.Tenancy.Contributions
 ]
