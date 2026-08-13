@@ -206,13 +206,13 @@ defmodule BilimbiWeb.LoginLive do
               autocomplete="current-password"
               required
             />
-            <span
+            <.link
+              navigate={~p"/forgot-password"}
               id="login-forgot-password"
               class="absolute inset-x-0 -top-0.5 text-right text-xs text-ink-subtle"
-              title="Password reset arrives with the Core User authentication slice"
             >
               Forgot your password?
-            </span>
+            </.link>
           </div>
 
           <.button

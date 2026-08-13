@@ -26,6 +26,7 @@ defmodule BilimbiWeb.LoginLiveTest do
     assert has_element?(view, "#login-form[action='/session'][method='post']")
     assert has_element?(view, "#login-email[autocomplete='email']")
     assert has_element?(view, "#login-password[autocomplete='current-password']")
+    assert has_element?(view, "#login-forgot-password[href='/forgot-password']")
     assert has_element?(view, "#login-submit", "Log in")
   end
 

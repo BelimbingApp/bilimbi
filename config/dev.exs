@@ -36,6 +36,7 @@ config :web, BilimbiWeb.Endpoint,
   ]
 
 config :web, dev_routes: true
+config :web, BilimbiWeb.Mailer, adapter: Swoosh.Adapters.Local
 
 config :logger, :default_formatter, format: "[$level] $message\n"
 
