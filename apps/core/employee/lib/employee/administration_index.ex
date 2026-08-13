@@ -52,7 +52,12 @@ defmodule Bilimbi.Core.Employee.AdministrationIndex do
 
   @spec page(pos_integer(), normalized_options()) :: AdministrationPage.t()
   def page(company_id, options) do
-    query = company_id |> base_query() |> apply_search(options.search) |> apply_type_filter(options.type_filter)
+    query =
+      company_id
+      |> base_query()
+      |> apply_search(options.search)
+      |> apply_type_filter(options.type_filter)
+
     total_entries = query |> exclude(:order_by) |> Repo.aggregate(:count, :id)
     total_pages = page_count(total_entries, options.page_size)
 
@@ -88,7 +93,9 @@ defmodule Bilimbi.Core.Employee.AdministrationIndex do
   defp apply_search(query, search) do
     pattern = "%#{escape_like(search)}%"
 
-    where(query, [employee, _employee_type],
+    where(
+      query,
+      [employee, _employee_type],
       fragment("? ILIKE ? ESCAPE E'\\\\'", employee.full_name, ^pattern) or
         fragment("? ILIKE ? ESCAPE E'\\\\'", employee.short_name, ^pattern) or
         fragment("? ILIKE ? ESCAPE E'\\\\'", employee.employee_number, ^pattern) or
@@ -99,7 +106,9 @@ defmodule Bilimbi.Core.Employee.AdministrationIndex do
   end
 
   defp apply_type_filter(query, :all), do: query
-  defp apply_type_filter(query, :agent), do: where(query, [employee, _employee_type], employee.employee_type == "agent")
+
+  defp apply_type_filter(query, :agent),
+    do: where(query, [employee, _employee_type], employee.employee_type == "agent")
 
   defp apply_type_filter(query, :human),
     do: where(query, [employee, _employee_type], employee.employee_type != "agent")
@@ -140,7 +149,9 @@ defmodule Bilimbi.Core.Employee.AdministrationIndex do
   defp sort_dir(value) when value in [:asc, :desc], do: {:ok, value}
   defp sort_dir(_value), do: :error
 
-  defp unique_keys?(options), do: options |> Keyword.keys() |> Enum.uniq() |> length() == length(options)
+  defp unique_keys?(options),
+    do: options |> Keyword.keys() |> Enum.uniq() |> length() == length(options)
+
   defp page_count(0, _page_size), do: 0
   defp page_count(total_entries, page_size), do: div(total_entries + page_size - 1, page_size)
 

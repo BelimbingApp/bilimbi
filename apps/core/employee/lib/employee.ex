@@ -70,7 +70,9 @@ defmodule Bilimbi.Core.Employee do
   """
   @spec list_administration_page(Scope.t(), pos_integer(), keyword()) ::
           {:ok, AdministrationPage.t()} | {:error, :company_not_found | :invalid_options}
-  def list_administration_page(%Scope{} = scope, company_id, options \\ [])
+  def list_administration_page(scope, company_id, options \\ [])
+
+  def list_administration_page(%Scope{} = scope, company_id, options)
       when is_integer(company_id) and company_id > 0 do
     with {:ok, normalized_options} <- AdministrationIndex.normalize_options(options),
          {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do

@@ -3,7 +3,15 @@ defmodule Bilimbi.Core.Employee.AdministrationPage do
 
   alias Bilimbi.Core.Employee.AdministrationEntry
 
-  @enforce_keys [:entries, :page, :page_size, :total_entries, :total_pages, :has_prev?, :has_next?]
+  @enforce_keys [
+    :entries,
+    :page,
+    :page_size,
+    :total_entries,
+    :total_pages,
+    :has_prev?,
+    :has_next?
+  ]
   defstruct [:entries, :page, :page_size, :total_entries, :total_pages, :has_prev?, :has_next?]
 
   @type t :: %__MODULE__{

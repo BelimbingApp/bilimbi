@@ -85,16 +85,21 @@ defmodule Bilimbi.Core.EmployeeTest do
           {"ALPHA-NUMBER", "Charlie", "full_time", "active", %{}},
           {"EMP-SEARCH-EMAIL", "Delta", "agent", "inactive", %{email: "alpha@example.test"}},
           {"EMP-SEARCH-DESIGNATION", "Echo", "agent", "pending", %{designation: "Alpha Lead"}},
-          {"EMP-SEARCH-JOB", "Foxtrot", "full_time", "terminated", %{job_description: "alpha specialist"}},
+          {"EMP-SEARCH-JOB", "Foxtrot", "full_time", "terminated",
+           %{job_description: "alpha specialist"}},
           {"EMP-OTHER", "Zulu", "full_time", "active", %{}}
         ] do
       assert {:ok, _employee} =
-               Employee.create_employee(owner, 73, Map.merge(attrs, %{
-                 employee_number: number,
-                 full_name: name,
-                 employee_type: type,
-                 status: status
-               }))
+               Employee.create_employee(
+                 owner,
+                 73,
+                 Map.merge(attrs, %{
+                   employee_number: number,
+                   full_name: name,
+                   employee_type: type,
+                   status: status
+                 })
+               )
     end
 
     assert {:ok, page} = Employee.list_administration_page(owner, 73, search: "alpha")
@@ -102,7 +107,14 @@ defmodule Bilimbi.Core.EmployeeTest do
     assert page.total_pages == 1
     refute page.has_prev?
     refute page.has_next?
-    assert Enum.map(page.entries, & &1.full_name) == ["Alpha Match", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"]
+    assert Enum.map(page.entries, & &1.full_name) == [
+             "Alpha Match",
+             "Bravo",
+             "Charlie",
+             "Delta",
+             "Echo",
+             "Foxtrot"
+           ]
 
     assert {:ok, agents} = Employee.list_administration_page(owner, 73, type_filter: :agent)
     assert Enum.map(agents.entries, & &1.full_name) == ["Delta", "Echo"]
@@ -116,6 +128,25 @@ defmodule Bilimbi.Core.EmployeeTest do
     assert Enum.map(status_desc.entries, & &1.status) ==
              ["terminated", "pending", "inactive", "active", "active", "active", "active"]
 
+    assert {:ok, full_name_desc} =
+             Employee.list_administration_page(owner, 73, sort_by: :full_name, sort_dir: :desc)
+
+    assert Enum.map(full_name_desc.entries, & &1.full_name) == [
+             "Zulu",
+             "Foxtrot",
+             "Echo",
+             "Delta",
+             "Charlie",
+             "Bravo",
+             "Alpha Match"
+           ]
+
+    assert {:ok, status_asc} =
+             Employee.list_administration_page(owner, 73, sort_by: :status, sort_dir: :asc)
+
+    assert Enum.map(status_asc.entries, & &1.status) ==
+             ["active", "active", "active", "active", "inactive", "pending", "terminated"]
+
     assert {:ok, type_desc} =
              Employee.list_administration_page(owner, 73,
                sort_by: :employee_type_label,
@@ -126,9 +157,20 @@ defmodule Bilimbi.Core.EmployeeTest do
              ["full_time", "full_time", "full_time", "full_time", "full_time", "agent", "agent"]
     assert Enum.map(type_desc.entries, & &1.employee_type_label) ==
              ["Full Time", "Full Time", "Full Time", "Full Time", "Full Time", "Agent", "Agent"]
+
+    assert {:ok, type_asc} =
+             Employee.list_administration_page(owner, 73,
+               sort_by: :employee_type_label,
+               sort_dir: :asc
+             )
+
+    assert Enum.map(type_asc.entries, & &1.employee_type) ==
+             ["agent", "agent", "full_time", "full_time", "full_time", "full_time", "full_time"]
   end
 
-  test "escapes literal LIKE wildcard input and keeps administration entries narrow", %{owner: owner} do
+  test "escapes literal LIKE wildcard input and keeps administration entries narrow", %{
+    owner: owner
+  } do
     assert {:ok, literal} =
              Employee.create_employee(owner, 73, %{
                employee_number: "EMP-100%_LITERAL",
@@ -168,6 +210,7 @@ defmodule Bilimbi.Core.EmployeeTest do
   test "administration pages reject invalid options and invalid company values", %{owner: owner} do
     for options <- [
           %{page: 1},
+          [page: 1, "bad"],
           [unknown: :value],
           [page: 0],
           [page: "1"],
@@ -191,7 +234,11 @@ defmodule Bilimbi.Core.EmployeeTest do
     owner: owner,
     other: other
   } do
-    assert {:ok, _} = Employee.create_employee(other, 74, %{employee_number: "OTHER-ADMIN", full_name: "Other"})
+    assert {:ok, _} =
+             Employee.create_employee(other, 74, %{
+               employee_number: "OTHER-ADMIN",
+               full_name: "Other"
+             })
     assert {:error, :company_not_found} = Employee.list_administration_page(owner, 74)
 
     Ecto.Adapters.SQL.query!(
@@ -223,7 +270,34 @@ defmodule Bilimbi.Core.EmployeeTest do
     assert Enum.map(first.entries, & &1.id) == [4, 3]
     assert Enum.map(second.entries, & &1.id) == [2, 1]
 
-    assert {:ok, empty} = Employee.list_administration_page(owner, 73, search: "missing", page: 3)
+    for {sort_by, sort_dir} <- [
+          {:full_name, :asc},
+          {:full_name, :desc},
+          {:employee_type_label, :asc},
+          {:employee_type_label, :desc},
+          {:status, :asc},
+          {:status, :desc}
+        ] do
+      assert {:ok, ordered} =
+               Employee.list_administration_page(owner, 73,
+                 page_size: 4,
+                 sort_by: sort_by,
+                 sort_dir: sort_dir
+               )
+
+      assert Enum.map(ordered.entries, & &1.id) == [4, 3, 2, 1]
+    end
+
+    assert {:ok, past_end} =
+             Employee.list_administration_page(owner, 73, page: 3, page_size: 2)
+    assert past_end.entries == []
+    assert past_end.total_entries == 4
+    assert past_end.total_pages == 2
+    assert past_end.has_prev?
+    refute past_end.has_next?
+
+    assert {:ok, empty} =
+             Employee.list_administration_page(owner, 73, search: "missing", page: 3)
     assert empty.entries == []
     assert empty.total_entries == 0
     assert empty.total_pages == 0
