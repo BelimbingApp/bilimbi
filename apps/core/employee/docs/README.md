@@ -46,9 +46,11 @@ by Core Company's public `lock_live_company/2` contract rather than by copying
 Company's private query or inventing a second tenant predicate. Employees are
 hard-deleted in the compatible schema; the lock contract does not invent a
 soft-delete or employment-status definition of "live". Missing, cross-tenant,
-and company-mismatched identities deliberately collapse to `:not_found`, and
-the protected `SYS-001` platform orchestrator fails closed through this generic
-affiliation seam with `:invariant_violation`.
+and company-mismatched identities deliberately collapse to `:not_found`. Only
+the protected `SYS-001` plus `agent` platform-orchestrator pair fails closed
+through this generic affiliation seam with `:invariant_violation`; a non-agent
+legacy `SYS-001` row remains an ordinary affiliation under Employee's existing
+invariant.
 
 Cross-module writers use one strict lock order: **Company → Employee → User**.
 Within each module they lock ascending IDs. A returned proof is useful only

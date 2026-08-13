@@ -254,7 +254,7 @@ defmodule Bilimbi.Core.Employee.AffiliationLockTest do
     assert {:ok, {:error, :not_found}} = Task.await(contender, 5_000)
   end
 
-  test "the protected platform orchestrator is the only invariant error", %{
+  test "only the protected SYS-001 agent pair is an invariant error", %{
     schema: schema,
     owner_scope: scope
   } do
@@ -264,6 +264,14 @@ defmodule Bilimbi.Core.Employee.AffiliationLockTest do
 
       assert {:ok, {:ok, %AffiliationProof{id: 101}}} =
                Repo.transaction(fn -> Employee.lock_affiliation(scope, 73, 101) end)
+
+      assert {:ok, {:ok, %AffiliationProof{id: 106, company_id: 73} = proof}} =
+               Repo.transaction(fn -> Employee.lock_affiliation(scope, 73, 106) end)
+
+      assert Map.from_struct(proof) == %{id: 106, company_id: 73}
+      refute is_struct(proof, Schema)
+      refute Map.has_key?(proof, :__meta__)
+      assert Ecto.Queryable.impl_for(proof) == nil
 
       assert {:ok, {:error, :not_found}} =
                Repo.transaction(fn -> Employee.lock_affiliation(scope, 76, 999) end)
@@ -520,7 +528,8 @@ defmodule Bilimbi.Core.Employee.AffiliationLockTest do
         (102, 74, 'EMP-102', 'Foreign Employee', 'full_time', 'active'),
         (103, 76, 'EMP-103', 'Other Company Employee', 'full_time', 'active'),
         (104, 73, 'EMP-104', 'Terminated Employee', 'full_time', 'terminated'),
-        (105, 76, 'SYS-001', 'Protected Orchestrator', 'agent', 'active')
+        (105, 76, 'SYS-001', 'Protected Orchestrator', 'agent', 'active'),
+        (106, 73, 'SYS-001', 'Legacy Non-Agent', 'full_time', 'active')
       """,
       []
     )

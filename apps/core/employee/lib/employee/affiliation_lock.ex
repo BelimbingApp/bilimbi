@@ -11,6 +11,7 @@ defmodule Bilimbi.Core.Employee.AffiliationLock do
   alias Bilimbi.Core.Employee.Schema
 
   @platform_orchestrator_number "SYS-001"
+  @platform_orchestrator_type "agent"
 
   @spec lock(Scope.t(), term(), term()) ::
           {:ok, AffiliationProof.t()}
@@ -57,7 +58,8 @@ defmodule Bilimbi.Core.Employee.AffiliationLock do
          %Schema{
            id: employee_id,
            company_id: company_id,
-           employee_number: @platform_orchestrator_number
+           employee_number: @platform_orchestrator_number,
+           employee_type: @platform_orchestrator_type
          },
          company_id,
          employee_id
