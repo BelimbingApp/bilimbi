@@ -28,6 +28,7 @@ defmodule Bilimbi.Base.TenancyTest do
   test "lists and counts live tenants without leaking the Ecto schema" do
     insert_tenant!(%{id: 41, name: "Zulu operator"})
     insert_tenant!(%{id: 42, name: "Alpha customer", is_platform_operator: false})
+
     insert_tenant!(%{
       id: 43,
       name: "Gone",
