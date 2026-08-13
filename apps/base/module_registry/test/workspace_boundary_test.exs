@@ -30,6 +30,13 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
       migrations: "priv/repo/migrations"
     },
     %{
+      root: Path.join(@base_root, "audit"),
+      id: "base/audit",
+      app: :bilimbi_base_audit,
+      facade: "lib/audit.ex",
+      migrations: "priv/repo/migrations"
+    },
+    %{
       root: Path.join(@core_root, "company"),
       id: "core/company",
       app: :bilimbi_core_company,

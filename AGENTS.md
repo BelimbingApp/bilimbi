@@ -46,12 +46,13 @@ not one OTP application inside it.
 ## 2. Current scope
 
 The initial Bilimbi implementation contains the Platform Baseline and its web
-host. Base Tenancy, Core Company, Core Geonames, Core Address, Core Employee,
-and Core User are active foundation slices:
+host. Base Tenancy, Base Audit, Core Company, Core Geonames, Core Address,
+Core Employee, and Core User are active foundation slices:
 
 ```text
 apps/base/database/
 apps/base/tenancy/
+apps/base/audit/
 apps/core/company/
 apps/core/geonames/
 apps/core/address/
@@ -190,6 +191,7 @@ files stay with their owner:
 
 ```text
 apps/base/tenancy/priv/repo/migrations/
+apps/base/audit/priv/repo/migrations/
 apps/core/company/priv/repo/migrations/
 apps/core/geonames/priv/repo/migrations/
 apps/core/address/priv/repo/migrations/

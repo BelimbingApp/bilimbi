@@ -34,9 +34,9 @@ Bilimbi is in its foundation phase. The repository uses a Mix umbrella rooted
 at the repository. Base, Core, and Web are its top-level composition
 applications; each declared deep module below Base or Core is a self-contained
 local Mix package discovered from its descriptor. The current foundation owns
-Ecto migrations that can create the compatible Base Tenancy, Core Company,
-Core Geonames, Core Address, Core Employee, and Core User schema, or verify and
-adopt an existing Belimbing database. Optional Domains and deployment-owned
+Ecto migrations that can create the compatible Base Tenancy, Base Audit, Core
+Company, Core Geonames, Core Address, Core Employee, and Core User schema, or
+verify and adopt an existing Belimbing database. Optional Domains and deployment-owned
 Extensions are intentionally not implemented yet.
 
 The first major compatibility target is the existing Belimbing PostgreSQL
@@ -120,7 +120,8 @@ apps/
 │   ├── bilimbi.container.exs     # Declares the Base layer
 │   ├── database/                 # base/database module package
 │   ├── module_registry/          # Runtime installed-module registry
-│   └── tenancy/                  # base/tenancy module package
+│   ├── tenancy/                  # base/tenancy module package
+│   └── audit/                    # base/audit module package
 ├── core/                         # Mandatory composition application
 │   ├── bilimbi.container.exs     # Declares the Core layer
 │   ├── company/                  # core/company module package
@@ -135,7 +136,7 @@ apps/
 The complete physical boundary of Base Tenancy is `apps/base/tenancy/`, not a
 directory below its `lib/`. Consequently its source begins at
 `apps/base/tenancy/lib/tenancy.ex` while the Elixir namespace remains
-`Bilimbi.Base.Tenancy`. The same rule applies to Company, Geonames, Address,
+`Bilimbi.Base.Tenancy`. The same rule applies to Audit, Company, Geonames, Address,
 Employee, User, and every future declared module.
 
 A composition container never lists child packages by name. Every immediate
@@ -208,6 +209,7 @@ only historical migration input in Belimbing, never a Bilimbi runtime role.
 
 Bilimbi-owned migrations live inside their owning module, currently
 `apps/base/tenancy/priv/repo/migrations`,
+`apps/base/audit/priv/repo/migrations`,
 `apps/core/company/priv/repo/migrations`,
 `apps/core/geonames/priv/repo/migrations`,
 `apps/core/address/priv/repo/migrations`,
@@ -235,6 +237,10 @@ user, password-reset, pin, saved-query, and notification tables and completes
 Company's external-access user contribution. Both modules own their baselines,
 contracts, and tenant/company-scoped APIs while Compatibility only coordinates
 their descriptor-declared contributions.
+
+Base Audit preserves Belimbing's `base_audit_mutations` and
+`base_audit_actions` tables: jsonb payloads, `inet` `ip_address`, nullable
+`tenant_id`, no foreign keys, and `occurred_at` as the only timestamp.
 
 ## Documentation
 

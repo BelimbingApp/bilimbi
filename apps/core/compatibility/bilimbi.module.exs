@@ -9,6 +9,7 @@
     "base/database",
     "base/module_registry",
     "base/tenancy",
+    "base/audit",
     "core/company",
     "core/geonames",
     "core/address",
