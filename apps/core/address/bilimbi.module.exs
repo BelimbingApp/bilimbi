@@ -10,6 +10,7 @@
     "base/module_registry",
     "base/tenancy",
     "core/company",
+    "core/employee",
     "core/geonames"
   ],
   migrations: "priv/repo/migrations",

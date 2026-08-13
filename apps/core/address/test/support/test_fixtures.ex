@@ -2,12 +2,18 @@ defmodule Bilimbi.Core.Address.TestFixtures do
   @moduledoc false
 
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Core.Address.Addressable
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyTestFixtures
+  alias Bilimbi.Core.Employee.TestFixtures, as: EmployeeTestFixtures
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesTestFixtures
   alias Ecto.Adapters.SQL
 
   def create_company_identity_tables! do
     apply(CompanyTestFixtures, :create_company_identity_tables!, [])
+  end
+
+  def create_owner_identity_tables! do
+    apply(EmployeeTestFixtures, :create_employee_tables!, [])
   end
 
   def insert_tenant!(attributes \\ %{}) do
@@ -89,6 +95,24 @@ defmodule Bilimbi.Core.Address.TestFixtures do
       """,
       []
     )
+  end
+
+  def insert_attachment!(attributes) do
+    attributes =
+      Map.merge(
+        %{
+          kind: [],
+          is_primary: false,
+          priority: 0,
+          valid_from: nil,
+          valid_to: nil
+        },
+        attributes
+      )
+
+    Addressable
+    |> struct!(attributes)
+    |> Repo.insert!()
   end
 
   def soft_delete_address!(address_id) do

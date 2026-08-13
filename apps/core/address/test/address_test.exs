@@ -3,12 +3,15 @@ defmodule Bilimbi.Core.AddressTest do
 
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
+  alias Bilimbi.Core.Address.Detail
   alias Bilimbi.Core.Address.Page
+  alias Bilimbi.Core.Company
+  alias Bilimbi.Core.Employee
 
   import Bilimbi.Core.Address.TestFixtures
 
   setup do
-    create_company_identity_tables!()
+    create_owner_identity_tables!()
     create_geonames_tables!()
     create_address_tables!()
 
@@ -16,8 +19,9 @@ defmodule Bilimbi.Core.AddressTest do
     insert_admin1!()
     insert_tenant!(%{id: 41, name: "Operator"})
     insert_tenant!(%{id: 42, name: "Customer", is_platform_operator: false})
-    insert_company!(%{id: 73, tenant_id: 41, code: "operator"})
-    insert_company!(%{id: 74, tenant_id: 42, code: "customer"})
+    insert_company!(%{id: 73, tenant_id: 41, name: "Alpha Company", code: "operator"})
+    insert_company!(%{id: 74, tenant_id: 42, name: "Other Company", code: "customer"})
+    :ok = Employee.ensure_system_types()
 
     {:ok, operator} = Tenancy.scope(41)
     {:ok, customer} = Tenancy.scope(42)
@@ -43,6 +47,190 @@ defmodule Bilimbi.Core.AddressTest do
     assert same_address.id == address.id
     assert {:ok, []} = Address.list_addresses(context.customer)
     assert {:error, :address_not_found} = Address.get_address(context.customer, address.id)
+  end
+
+  test "returns source and normalized-location detail without exposing schemas", context do
+    assert {:ok, address} =
+             Address.create_address(context.operator, %{
+               label: "HQ",
+               phone: "+60 3 1234 5678",
+               line1: "1 Platform Road",
+               line2: "Level 2",
+               locality: "Kuala Lumpur",
+               postcode: "50000",
+               country_iso: "MY",
+               admin1_code: "MY.14",
+               raw_input: "1 Platform Road, Kuala Lumpur",
+               source: "import",
+               source_ref: "legacy-42",
+               parser_version: "2.1",
+               parse_confidence: Decimal.new("0.9876"),
+               parsed_at: ~N[2026-08-12 09:30:00],
+               normalized_at: ~N[2026-08-12 09:31:00],
+               normalization_notes: ["postcode matched"],
+               verification_status: "verified",
+               metadata: %{"batch" => 7}
+             })
+
+    assert {:ok, %Detail{} = detail} =
+             Address.get_address_detail(context.operator, address.id)
+
+    assert detail.id == address.id
+    assert detail.tenant_id == 41
+    assert detail.country_name == "Malaysia"
+    assert detail.admin1_name == "Kuala Lumpur"
+    assert detail.source == "import"
+    assert detail.source_ref == "legacy-42"
+    assert detail.parser_version == "2.1"
+    assert detail.parse_confidence == Decimal.new("0.9876")
+    assert detail.raw_input == "1 Platform Road, Kuala Lumpur"
+    assert detail.normalization_notes == ["postcode matched"]
+    assert detail.metadata == %{"batch" => 7}
+    assert detail.linked_owners == []
+
+    assert {:error, :address_not_found} =
+             Address.get_address_detail(context.customer, address.id)
+  end
+
+  test "projects and sorts only live same-tenant Company and Employee owners", context do
+    insert_company!(%{
+      id: 75,
+      tenant_id: 41,
+      name: "Zulu Company",
+      code: "operator-secondary"
+    })
+
+    insert_company!(%{
+      id: 76,
+      tenant_id: 41,
+      name: "Deleted Company",
+      code: "operator-deleted"
+    })
+
+    assert {:ok, employee} =
+             Employee.create_employee(context.operator, 73, %{
+               employee_number: "EMP-OWNER",
+               full_name: "Bravo Employee"
+             })
+
+    assert {:ok, cross_tenant_employee} =
+             Employee.create_employee(context.customer, 74, %{
+               employee_number: "EMP-OTHER",
+               full_name: "Other Employee"
+             })
+
+    assert {:ok, deleted_company_employee} =
+             Employee.create_employee(context.operator, 76, %{
+               employee_number: "EMP-DELETED",
+               full_name: "Deleted Company Employee"
+             })
+
+    assert {:ok, address} = Address.create_address(context.operator, %{label: "Shared"})
+
+    assert {:ok, :attached} =
+             Address.attach_to_company(context.operator, address.id, 73, %{
+               kind: ["shipping"],
+               priority: 5,
+               valid_from: ~D[2026-01-02],
+               valid_to: ~D[2026-01-05]
+             })
+
+    assert {:ok, :attached} =
+             Address.attach_to_company(context.operator, address.id, 75, %{
+               kind: ["billing"],
+               is_primary: true,
+               priority: 1,
+               valid_from: ~D[2026-01-03]
+             })
+
+    insert_attachment!(%{
+      address_id: address.id,
+      addressable_type: Employee.addressable_identity(),
+      addressable_id: employee.id,
+      kind: ["branch"],
+      priority: 3,
+      valid_from: ~D[2026-01-01],
+      valid_to: ~D[2026-01-04]
+    })
+
+    for {type, owner_id} <- [
+          {Company.addressable_identity(), 74},
+          {Employee.addressable_identity(), cross_tenant_employee.id},
+          {Company.addressable_identity(), 76},
+          {Employee.addressable_identity(), deleted_company_employee.id},
+          {Company.addressable_identity(), 999_999},
+          {"App\\Domain\\Unknown\\Models\\Owner", 1}
+        ] do
+      insert_attachment!(%{
+        address_id: address.id,
+        addressable_type: type,
+        addressable_id: owner_id
+      })
+    end
+
+    Ecto.Adapters.SQL.query!(
+      Bilimbi.Base.Repo,
+      "UPDATE companies SET deleted_at = '2026-08-12 12:00:00' WHERE id = 76",
+      []
+    )
+
+    assert_owner_order(context.operator, address.id, :type, :asc, [
+      {:company, 73},
+      {:company, 75},
+      {:employee, employee.id}
+    ])
+
+    assert_owner_order(context.operator, address.id, :name, :asc, [
+      {:company, 73},
+      {:employee, employee.id},
+      {:company, 75}
+    ])
+
+    assert_owner_order(context.operator, address.id, :kind, :asc, [
+      {:company, 75},
+      {:employee, employee.id},
+      {:company, 73}
+    ])
+
+    assert_owner_order(context.operator, address.id, :is_primary, :desc, [
+      {:company, 75},
+      {:employee, employee.id},
+      {:company, 73}
+    ])
+
+    assert_owner_order(context.operator, address.id, :priority, :asc, [
+      {:company, 75},
+      {:employee, employee.id},
+      {:company, 73}
+    ])
+
+    assert_owner_order(context.operator, address.id, :valid_from, :asc, [
+      {:employee, employee.id},
+      {:company, 73},
+      {:company, 75}
+    ])
+
+    assert_owner_order(context.operator, address.id, :valid_to, :asc, [
+      {:company, 75},
+      {:employee, employee.id},
+      {:company, 73}
+    ])
+
+    assert {:ok, detail} = Address.get_address_detail(context.operator, address.id)
+
+    assert Enum.map(detail.linked_owners, & &1.name) == [
+             "Alpha Company",
+             "Zulu Company",
+             "Bravo Employee"
+           ]
+
+    assert_raise ArgumentError, fn ->
+      Address.get_address_detail(context.operator, address.id, owner_sort_by: :created_at)
+    end
+
+    assert_raise ArgumentError, fn ->
+      Address.get_address_detail(context.operator, address.id, owner_sort_dir: :sideways)
+    end
   end
 
   test "lists a bounded searchable administration page inside the explicit tenant", context do
@@ -174,6 +362,10 @@ defmodule Bilimbi.Core.AddressTest do
       end
 
       assert_raise FunctionClauseError, fn -> Address.get_address(opaque(not_a_scope), 1) end
+
+      assert_raise FunctionClauseError, fn ->
+        Address.get_address_detail(opaque(not_a_scope), 1)
+      end
 
       assert_raise FunctionClauseError, fn ->
         Address.create_address(opaque(not_a_scope), %{label: "Unscoped"})
@@ -497,6 +689,16 @@ defmodule Bilimbi.Core.AddressTest do
              })
 
     assert {:valid_to, {_message, []}} = List.keyfind(changeset.errors, :valid_to, 0)
+  end
+
+  defp assert_owner_order(scope, address_id, sort_by, sort_dir, expected) do
+    assert {:ok, detail} =
+             Address.get_address_detail(scope, address_id,
+               owner_sort_by: sort_by,
+               owner_sort_dir: sort_dir
+             )
+
+    assert Enum.map(detail.linked_owners, &{&1.owner_type, &1.owner_id}) == expected
   end
 
   defp opaque(value), do: :erlang.element(1, {value})

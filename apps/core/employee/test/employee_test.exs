@@ -68,8 +68,28 @@ defmodule Bilimbi.Core.EmployeeTest do
     assert {:ok, fetched} = Employee.get_employee(owner, 73, employee.id)
     assert fetched.employee_number == "EMP-001"
 
+    assert {:ok, scope_fetched} = Employee.get_employee(owner, employee.id)
+    assert scope_fetched.id == employee.id
+
     assert {:error, :company_not_found} = Employee.get_employee(other, 73, employee.id)
+    assert {:error, :employee_not_found} = Employee.get_employee(other, employee.id)
     assert {:error, :employee_not_found} = Employee.get_employee(owner, 73, employee.id + 1)
+  end
+
+  test "scope-wide lookup excludes employees whose owning company is deleted", %{owner: owner} do
+    assert {:ok, employee} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-ARCHIVED",
+               full_name: "Archived Company Employee"
+             })
+
+    Ecto.Adapters.SQL.query!(
+      Bilimbi.Base.Repo,
+      "UPDATE companies SET deleted_at = '2026-08-12 12:00:00' WHERE id = 73",
+      []
+    )
+
+    assert {:error, :employee_not_found} = Employee.get_employee(owner, employee.id)
   end
 
   test "rejects cross-company departments, supervisors, and employee types", %{
@@ -277,6 +297,10 @@ defmodule Bilimbi.Core.EmployeeTest do
 
       assert_raise FunctionClauseError, fn ->
         Employee.get_employee(opaque(not_a_scope), 73, 1)
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        Employee.get_employee(opaque(not_a_scope), 1)
       end
 
       assert_raise FunctionClauseError, fn ->
