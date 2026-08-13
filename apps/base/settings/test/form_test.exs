@@ -17,6 +17,11 @@ defmodule Bilimbi.Base.Settings.FormTest do
 
   @user Scope.user(10, 20, 30)
 
+  # Sorts after "tests.a-then-overlong" so the valid field is written first and
+  # has something to roll back. 256 chars: accepted by the definition
+  # validator, rejected by the settings schema's varchar(255).
+  @overlong "tests.z" <> String.duplicate("x", 249)
+
   setup do
     create_settings_table!()
     install_test_registry!()
@@ -45,7 +50,7 @@ defmodule Bilimbi.Base.Settings.FormTest do
     end
 
     test "groups/0 lists what screens may ask for" do
-      assert Form.groups() == ["appearance", "operator", "profile"]
+      assert Form.groups() == ["appearance", "operator", "overlong", "profile"]
     end
 
     test "reports a value as inherited until it is set at this scope" do
@@ -199,6 +204,26 @@ defmodule Bilimbi.Base.Settings.FormTest do
       assert Settings.get("tests.theme", @user) == "mine"
     end
 
+    test "a persistence failure rolls back every earlier write in the same save" do
+      # Planning catches cast failures before any write. It cannot catch a
+      # failure only the database knows about, so the plan runs in one
+      # transaction. Reproduction is real, not mocked: the definition
+      # validator accepts a key the settings schema's varchar(255) rejects.
+      fields = Form.fields(["overlong"], @user)
+      assert Enum.map(fields, & &1.key) == ["tests.a-then-overlong", @overlong]
+
+      assert {:error, @overlong, message} =
+               Form.save(
+                 %{"tests.a-then-overlong" => "written", @overlong => "boom"},
+                 fields,
+                 @user
+               )
+
+      # Interpolated, not the raw Ecto template: a user must not read "%{count}".
+      assert message == "key should be at most 255 character(s)"
+      refute Settings.overridden?("tests.a-then-overlong", @user)
+    end
+
     test "casts a submitted string to the declared type" do
       fields = Form.fields(["operator"], @user)
 
@@ -320,6 +345,22 @@ defmodule Bilimbi.Base.Settings.FormTest do
                 type: :string,
                 scopes: [:global],
                 default: "x"
+              },
+              "tests.a-then-overlong" => %{
+                type: :string,
+                scopes: [:user],
+                default: "",
+                label: "Writes first",
+                help: "Sorts before the overlong key so it commits first.",
+                editable: "overlong"
+              },
+              @overlong => %{
+                type: :string,
+                scopes: [:user],
+                default: "",
+                label: "Rejected by the schema",
+                help: "The definition validator accepts this key; the schema does not.",
+                editable: "overlong"
               }
             },
             runtime_claims: []

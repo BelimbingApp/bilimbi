@@ -31,6 +31,7 @@ defmodule Bilimbi.Base.Settings.Form do
   "set it to the mask".
   """
 
+  alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Definition
   alias Bilimbi.Base.Settings.Scope
@@ -139,7 +140,26 @@ defmodule Bilimbi.Base.Settings.Form do
     end
   end
 
+  # One transaction, because planning cannot see every failure. A cast error is
+  # caught before any write, but a persistence error is only discovered by
+  # attempting it -- the schema enforces limits the definition validator does
+  # not, so a changeset can still come back mid-apply. Without the rollback,
+  # that reports failure while leaving earlier writes and clears committed:
+  # the same half-applied save, arriving through a door planning cannot close.
   defp apply_plan(plan) do
+    Repo.transaction(fn ->
+      case run_plan(plan) do
+        {:error, key, message} -> Repo.rollback({key, message})
+        result -> result
+      end
+    end)
+    |> case do
+      {:ok, result} -> {:ok, result}
+      {:error, {key, message}} -> {:error, key, message}
+    end
+  end
+
+  defp run_plan(plan) do
     Enum.reduce_while(plan, {[], [], []}, fn {field, step}, {written, cleared, unchanged} ->
       case run(step, field) do
         :unchanged -> {:cont, {written, cleared, [field.key | unchanged]}}
@@ -153,12 +173,11 @@ defmodule Bilimbi.Base.Settings.Form do
         {:error, key, message}
 
       {written, cleared, unchanged} ->
-        {:ok,
-         %{
-           written: Enum.reverse(written),
-           cleared: Enum.reverse(cleared),
-           unchanged: Enum.reverse(unchanged)
-         }}
+        %{
+          written: Enum.reverse(written),
+          cleared: Enum.reverse(cleared),
+          unchanged: Enum.reverse(unchanged)
+        }
     end
   end
 
@@ -323,9 +342,15 @@ defmodule Bilimbi.Base.Settings.Form do
     end
   end
 
+  # Ecto messages carry their numbers in opts -- dropping them leaves the user
+  # reading "at most %{count} character(s)".
   defp changeset_message(changeset) do
     changeset
-    |> Ecto.Changeset.traverse_errors(fn {message, _opts} -> message end)
+    |> Ecto.Changeset.traverse_errors(fn {message, opts} ->
+      Enum.reduce(opts, message, fn {key, value}, acc ->
+        String.replace(acc, "%{#{key}}", to_string(value))
+      end)
+    end)
     |> Enum.map_join("; ", fn {field, messages} -> "#{field} #{Enum.join(messages, ", ")}" end)
   end
 
