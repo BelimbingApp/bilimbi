@@ -144,6 +144,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
           Repo.transaction(fn ->
             %{rows: [[73]]} =
               SQL.query!(Repo, "SELECT id FROM companies WHERE id = 73 FOR UPDATE", [])
+
             send(parent, :delete_holder_locked)
             await_message!(:soft_delete_and_commit)
 
