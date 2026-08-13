@@ -155,8 +155,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     modules
     |> Enum.filter(&contributor?/1)
     |> Enum.map(& &1.id)
-    |> Enum.reject(&(&1 == "core/compatibility"))
-    |> Enum.reject(&MapSet.member?(closure, &1))
+    |> Enum.reject(&(&1 == "core/compatibility" or MapSet.member?(closure, &1)))
     |> Enum.sort()
   end
 
