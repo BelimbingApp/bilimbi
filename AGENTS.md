@@ -264,9 +264,13 @@ container's source composition.
 
 The module descriptor is the sole declaration of its stable module ID, layer,
 OTP application ID, namespace, module dependencies, required/optional state,
-migration path, and optional compatibility contract. Its `mix.exs` derives
-local module path dependencies and application metadata from that descriptor;
-do not repeat module dependency names manually.
+migration path, optional compatibility contract, and optional contribution
+provider. Every descriptor carries `contribution_provider`; use `nil` when the
+module contributes nothing. A non-nil provider implements the ModuleRegistry
+behavior and returns immutable plain terms below only `:settings`, `:authz`,
+and `:menu`, as decided by ADR 0004. Its `mix.exs` derives local module path
+dependencies and application metadata from that descriptor; do not repeat
+module dependency names manually.
 
 Discovery must fail during dependency resolution for a malformed or missing
 descriptor, duplicate stable ID, duplicate OTP application ID, missing

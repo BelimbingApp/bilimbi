@@ -7,5 +7,6 @@
   namespace: Bilimbi.Core.Address,
   dependencies: ["base/database", "base/tenancy", "core/company", "core/geonames"],
   migrations: "priv/repo/migrations",
-  schema_contract: Bilimbi.Core.Address.SchemaContract
+  schema_contract: Bilimbi.Core.Address.SchemaContract,
+  contribution_provider: nil
 ]

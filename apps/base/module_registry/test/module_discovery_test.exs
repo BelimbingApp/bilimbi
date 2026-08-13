@@ -93,6 +93,30 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
     refute MixDiscovery.workspace_fingerprint(root) == first_fingerprint
   end
 
+  test "validates and publishes the descriptor-owned contribution provider", %{root: root} do
+    put_container!(root, "base", :base)
+
+    module_root =
+      put_module!(root, "base", "settings",
+        contribution_provider: Test.Base.Settings.Contributions
+      )
+
+    assert [
+             bilimbi_module: %{
+               contribution_provider: Test.Base.Settings.Contributions
+             }
+           ] = MixDiscovery.application_env(module_root)
+
+    File.rm_rf!(module_root)
+    put_module!(root, "base", "settings", contribution_provider: "not-a-module")
+
+    assert_raise ArgumentError,
+                 ~r/contribution_provider must be nil or a non-nil module atom/,
+                 fn ->
+                   MixDiscovery.discover_workspace!(root)
+                 end
+  end
+
   test "rejects missing and malformed descriptors", %{root: root} do
     base = put_container!(root, "base", :base)
     File.mkdir_p!(Path.join(base, "missing"))
@@ -237,7 +261,8 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
       namespace: Module.concat([Test, Macro.camelize(container), Macro.camelize(name)]),
       dependencies: Keyword.get(overrides, :dependencies, []),
       migrations: Keyword.get(overrides, :migrations, nil),
-      schema_contract: Keyword.get(overrides, :schema_contract, nil)
+      schema_contract: Keyword.get(overrides, :schema_contract, nil),
+      contribution_provider: Keyword.get(overrides, :contribution_provider, nil)
     ]
 
     File.write!(

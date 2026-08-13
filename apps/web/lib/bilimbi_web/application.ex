@@ -5,6 +5,8 @@ defmodule BilimbiWeb.Application do
 
   @impl true
   def start(_type, _args) do
+    Bilimbi.Base.ModuleRegistry.ContributionRegistry.install!()
+
     children = [
       BilimbiWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:web, :dns_cluster_query) || :ignore},

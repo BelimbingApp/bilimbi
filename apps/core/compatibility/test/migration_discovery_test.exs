@@ -9,6 +9,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
     migration_paths = Compatibility.migration_paths()
 
     assert Enum.map(migration_modules, & &1.id) == [
+             "base/settings",
              "base/tenancy",
              "base/audit",
              "core/company",
@@ -29,6 +30,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
 
     assert Enum.map(Compatibility.migration_entries(), &elem(&1, 1)) == [
              Bilimbi.Base.Tenancy.Migrations.CreateCompatibilityBaseline,
+             Bilimbi.Base.Settings.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Core.Company.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Core.Geonames.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Core.Address.Migrations.CreateCompatibilityBaseline,

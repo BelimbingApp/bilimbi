@@ -7,5 +7,6 @@
   namespace: Bilimbi.Core.User,
   dependencies: ["base/database", "base/tenancy", "core/company", "core/employee"],
   migrations: "priv/repo/migrations",
-  schema_contract: Bilimbi.Core.User.SchemaContract
+  schema_contract: Bilimbi.Core.User.SchemaContract,
+  contribution_provider: nil
 ]

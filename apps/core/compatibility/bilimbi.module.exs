@@ -8,6 +8,7 @@
   dependencies: [
     "base/database",
     "base/module_registry",
+    "base/settings",
     "base/tenancy",
     "base/audit",
     "core/company",
@@ -17,5 +18,6 @@
     "core/user"
   ],
   migrations: nil,
-  schema_contract: nil
+  schema_contract: nil,
+  contribution_provider: nil
 ]
