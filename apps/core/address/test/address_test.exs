@@ -119,6 +119,7 @@ defmodule Bilimbi.Core.AddressTest do
   test "updates and detaches Company pivot metadata without deleting the address", context do
     assert {:ok, address} = Address.create_address(context.operator, %{label: "Branch"})
     assert {:ok, :attached} = Address.attach_to_company(context.operator, address.id, 73)
+    assert {:ok, :attached} = Address.attach_to_company(context.operator, address.id, 73)
 
     assert {:ok, :updated} =
              Address.update_company_attachment(context.operator, address.id, 73, %{
@@ -129,14 +130,29 @@ defmodule Bilimbi.Core.AddressTest do
                valid_to: ~D[2026-08-13]
              })
 
-    assert [[["branch"], true, 3, ~D[2026-08-12], ~D[2026-08-13]]] =
+    assert [
+             [["branch"], true, 3, ~D[2026-08-12], ~D[2026-08-13]],
+             [["branch"], true, 3, ~D[2026-08-12], ~D[2026-08-13]]
+           ] =
              Ecto.Adapters.SQL.query!(
                Bilimbi.Base.Repo,
-               "SELECT kind, is_primary, priority, valid_from, valid_to FROM addressables",
+               """
+               SELECT kind, is_primary, priority, valid_from, valid_to
+               FROM addressables
+               ORDER BY id
+               """,
                []
              ).rows
 
     assert :ok = Address.detach_from_company(context.operator, address.id, 73)
+
+    assert [[0]] =
+             Ecto.Adapters.SQL.query!(
+               Bilimbi.Base.Repo,
+               "SELECT COUNT(*) FROM addressables",
+               []
+             ).rows
+
     assert {:ok, []} = Address.list_company_addresses(context.operator, 73)
     assert {:ok, same_address} = Address.get_address(context.operator, address.id)
     assert same_address.id == address.id

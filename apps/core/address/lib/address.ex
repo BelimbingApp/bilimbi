@@ -131,12 +131,16 @@ defmodule Bilimbi.Core.Address do
     Repo.transaction(fn ->
       address = lock_address!(scope, address_id)
       _company = require_company!(scope, company_id)
-      attachment = require_company_attachment!(address.id, company_id)
+      attachments = lock_company_attachments!(address.id, company_id)
 
-      case attachment |> Addressable.update_changeset(attributes) |> Repo.update() do
-        {:ok, _attachment} -> :updated
-        {:error, changeset} -> Repo.rollback(changeset)
-      end
+      Enum.each(attachments, fn attachment ->
+        case attachment |> Addressable.update_changeset(attributes) |> Repo.update() do
+          {:ok, _attachment} -> :ok
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end)
+
+      :updated
     end)
     |> case do
       {:ok, :updated} -> {:ok, :updated}
@@ -146,18 +150,15 @@ defmodule Bilimbi.Core.Address do
 
   @doc "Removes one Company's link to an address without deleting the address."
   @spec detach_from_company(Scope.t(), pos_integer(), pos_integer()) ::
-          :ok
-          | {:error,
-             :address_not_found | :attachment_not_found | :company_not_found | Ecto.Changeset.t()}
+          :ok | {:error, :address_not_found | :attachment_not_found | :company_not_found}
   def detach_from_company(%Scope{} = scope, address_id, company_id) do
     Repo.transaction(fn ->
       address = lock_address!(scope, address_id)
       _company = require_company!(scope, company_id)
-      attachment = require_company_attachment!(address.id, company_id)
 
-      case Repo.delete(attachment) do
-        {:ok, _attachment} -> :ok
-        {:error, changeset} -> Repo.rollback(changeset)
+      case Repo.delete_all(company_attachments_query(address.id, company_id)) do
+        {0, nil} -> Repo.rollback(:attachment_not_found)
+        {_deleted_count, nil} -> :ok
       end
     end)
     |> case do
@@ -220,24 +221,25 @@ defmodule Bilimbi.Core.Address do
     end
   end
 
-  defp require_company_attachment!(address_id, company_id) do
-    case company_attachment(address_id, company_id) do
-      nil -> Repo.rollback(:attachment_not_found)
-      attachment -> attachment
+  defp lock_company_attachments!(address_id, company_id) do
+    attachments =
+      address_id
+      |> company_attachments_query(company_id)
+      |> lock("FOR UPDATE")
+      |> Repo.all()
+
+    case attachments do
+      [] -> Repo.rollback(:attachment_not_found)
+      attachments -> attachments
     end
   end
 
-  defp company_attachment(address_id, company_id) do
-    Repo.one(
-      from(attachment in Addressable,
-        where:
-          attachment.address_id == ^address_id and
-            attachment.addressable_type == ^Company.addressable_identity() and
-            attachment.addressable_id == ^company_id,
-        order_by: [asc: attachment.id],
-        limit: 1,
-        lock: "FOR UPDATE"
-      )
+  defp company_attachments_query(address_id, company_id) do
+    from(attachment in Addressable,
+      where:
+        attachment.address_id == ^address_id and
+          attachment.addressable_type == ^Company.addressable_identity() and
+          attachment.addressable_id == ^company_id
     )
   end
 
