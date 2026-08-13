@@ -1,3 +1,5 @@
+Code.require_file(Path.expand("../base/module_registry/mix/module_discovery.exs", __DIR__))
+
 defmodule Bilimbi.Web.MixProject do
   use Mix.Project
 
@@ -14,7 +16,8 @@ defmodule Bilimbi.Web.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
-      compilers: [:phoenix_live_view] ++ Mix.compilers(),
+      compilers: [:bilimbi_graph, :phoenix_live_view] ++ Mix.compilers(),
+      bilimbi_workspace_root: Path.expand("../..", __DIR__),
       listeners: [Phoenix.CodeReloader]
     ]
   end

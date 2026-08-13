@@ -1,0 +1,98 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="mx-auto max-w-5xl">
+    <.header>
+      Tenants
+      <:subtitle>Each tenant is an isolated customer of this instance</:subtitle>
+      <:actions>
+        <.button
+          :if={"admin.tenancy.tenant.create" in @current_scope.capabilities}
+          id="tenants-add"
+          variant="primary"
+          phx-click="show_create"
+        >
+          <.icon name="hero-plus" class="size-4" /> Add Tenant
+        </.button>
+      </:actions>
+    </.header>
+
+    <div class="mt-5 overflow-x-auto rounded-xl border border-line bg-surface">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-line bg-surface-sunken">
+          <tr>
+            <.sort_th column="id" label="ID" sort_by={@sort_by} sort_dir={@sort_dir} />
+            <.sort_th column="name" label="Name" sort_by={@sort_by} sort_dir={@sort_dir} />
+            <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+              Parent
+            </th>
+            <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+              Sub-tenants
+            </th>
+            <.sort_th column="status" label="Status" sort_by={@sort_by} sort_dir={@sort_dir} />
+          </tr>
+        </thead>
+        <tbody id="tenants" phx-update="stream" class="divide-y divide-line-subtle">
+          <tr :for={{id, tenant} <- @streams.tenants} id={id} class="hover:bg-surface-sunken">
+            <td class="px-4 py-2.5 tabular-nums text-ink-muted">{tenant.id}</td>
+            <td class="px-4 py-2.5 text-ink">
+              <span class="font-medium text-ink-strong">{tenant.name}</span>
+              <.badge :if={tenant.is_platform_operator} class="ml-2">Platform operator</.badge>
+            </td>
+            <td class="px-4 py-2.5 text-ink-muted">{tenant.parent_name || "—"}</td>
+            <td class="px-4 py-2.5 tabular-nums text-ink-muted">{tenant.children_count}</td>
+            <td class="px-4 py-2.5">
+              <.badge kind={status_kind(tenant.status)}>{status_label(tenant.status)}</.badge>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p
+        :if={@tenants_count == 0}
+        class="px-4 py-8 text-center text-sm text-ink-muted"
+      >
+        No tenants found.
+      </p>
+    </div>
+  </div>
+
+  <div
+    :if={@show_create}
+    id="tenant-create-modal"
+    class="fixed inset-0 z-40 flex items-start justify-center bg-ink/40 p-6"
+  >
+    <div class="mt-16 w-full max-w-lg rounded-xl border border-line bg-surface p-6 shadow-sm">
+      <h2 class="text-lg font-medium tracking-tight text-ink-strong">Add Tenant</h2>
+
+      <.form for={@form} id="tenant-create-form" phx-submit="create" class="mt-6 space-y-4">
+        <.input
+          field={@form[:name]}
+          id="tenant-name"
+          label="Name"
+          placeholder="e.g. Acme Sdn Bhd"
+          required
+          maxlength="255"
+        />
+        <.input
+          field={@form[:parent_id]}
+          id="tenant-parent"
+          type="select"
+          label="Parent tenant"
+          prompt="None (top-level tenant)"
+          options={@parent_options}
+        />
+        <.input
+          field={@form[:status]}
+          id="tenant-status"
+          type="select"
+          label="Status"
+          required
+          options={[{"Active", "active"}, {"Suspended", "suspended"}]}
+        />
+
+        <div class="flex items-center gap-4 pt-2">
+          <.button variant="primary">Create</.button>
+          <.button type="button" phx-click="cancel_create">Cancel</.button>
+        </div>
+      </.form>
+    </div>
+  </div>
+</Layouts.app>

@@ -9,8 +9,8 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
     migration_paths = Compatibility.migration_paths()
 
     assert Enum.map(migration_modules, & &1.id) == [
-             "base/session",
              "base/settings",
+             "base/session",
              "base/tenancy",
              "base/audit",
              "base/authz",

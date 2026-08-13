@@ -15,7 +15,8 @@ cross-module workflows; the latter holds the tenant row lock in the caller's
 transaction. `list_tenants/0` and `count_tenants/0` enumerate live tenants as
 `Identity` values for administration and visibility; they omit soft-deleted
 rows and do not leak the schema. Web must authorize those reads with
-`admin.tenancy.tenant.list` rather than the operator marker.
+`admin.tenancy.tenant.list` rather than the operator marker. The module-owned
+admin adapter is `Bilimbi.Base.Tenancy.Web.TenantsLive` at `/tenancy/tenants`.
 
 ## Scope
 
