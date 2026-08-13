@@ -19,10 +19,10 @@ defmodule Bilimbi.Core.Employee do
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
-  alias Bilimbi.Core.Employee.AffiliationLock
-  alias Bilimbi.Core.Employee.AffiliationProof
   alias Bilimbi.Core.Employee.AdministrationIndex
   alias Bilimbi.Core.Employee.AdministrationPage
+  alias Bilimbi.Core.Employee.AffiliationLock
+  alias Bilimbi.Core.Employee.AffiliationProof
   alias Bilimbi.Core.Employee.EmployeeType
   alias Bilimbi.Core.Employee.Schema
   alias Bilimbi.Core.Employee.Summary
