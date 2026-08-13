@@ -14,6 +14,7 @@ config :web, BilimbiWeb.Endpoint,
   secret_key_base: "MRty3402yaFk5Y1BBT0o3cqcXutsDD8jd0H3eALvFlKUJsWJjN609o5+P3RE94JQ",
   server: false
 
+config :web, BilimbiWeb.Mailer, adapter: Swoosh.Adapters.Test
 config :swoosh, :api_client, false
 config :bilimbi_base_settings, :belimbing_app_key, "base64:#{Base.encode64(<<0::256>>)}"
 config :argon2_elixir, t_cost: 1, m_cost: 8, parallelism: 1

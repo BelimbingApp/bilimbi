@@ -66,6 +66,8 @@ defmodule BilimbiWeb.Router do
     live_session :anonymous,
       on_mount: [{BilimbiWeb.UserAuth, :redirect_if_authenticated}] do
       live "/", LoginLive
+      live "/forgot-password", ForgotPasswordLive
+      live "/reset-password/:token", ResetPasswordLive
     end
   end
 
