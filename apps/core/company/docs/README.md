@@ -12,3 +12,13 @@ modules.
 Company publishes `addressable_identity/0` as the source of truth for its
 durable Belimbing polymorphic identity. Modules that attach data to a Company
 must use that API instead of duplicating the persisted string.
+
+## Tenant-wide reads
+
+| Function | Soft-deleted companies |
+|---|---|
+| `list_companies/1` | Excluded — matches `get_company/2` |
+| `list_tenant_company_ids/1` | Included — Belimbing-compatible user listing seam |
+
+Core User's tenant-wide list consumes `list_tenant_company_ids/1` so it never
+queries `companies` directly (BLB-S1-010 option a).
