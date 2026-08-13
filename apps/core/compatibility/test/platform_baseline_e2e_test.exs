@@ -2,11 +2,13 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
   use ExUnit.Case, async: false
 
   alias Bilimbi.Base.Database
+  alias Bilimbi.Base.Database.ProductionSeed
   alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.Repo
   alias Bilimbi.Core.Compatibility
   alias Bilimbi.Core.Compatibility.MigrationTestRepo
   alias Bilimbi.Core.Compatibility.PlatformBaselineTestRepo
+  alias Bilimbi.Core.Employee.ProductionSeeds
   alias Ecto.Adapters.SQL
   alias Ecto.Adapters.SQL.Sandbox
 
@@ -103,6 +105,16 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
   test "the production seed command records real reference data once", %{env: env} do
     run_mix!("bilimbi.migrate", ["--quiet"], env)
 
+    assert [seed] = ProductionSeeds.production_seeds()
+    assert :ok = ProductionSeed.invoke(seed, PlatformBaselineTestRepo)
+
+    assert [[5]] =
+             SQL.query!(
+               PlatformBaselineTestRepo,
+               "SELECT count(*) FROM employee_types WHERE is_system",
+               []
+             ).rows
+
     assert run_mix!("bilimbi.seeds.run", [], env) =~
              "completed: core/employee/system-types"
 
@@ -115,13 +127,6 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
     assert run.id == "core/employee/system-types"
     assert run.status == :completed
     assert run.attempts == 1
-
-    assert [[5]] =
-             SQL.query!(
-               PlatformBaselineTestRepo,
-               "SELECT count(*) FROM employee_types WHERE is_system",
-               []
-             ).rows
   end
 
   defp run_mix!(task, args, env) do
