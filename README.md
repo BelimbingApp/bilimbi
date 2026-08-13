@@ -34,8 +34,8 @@ Bilimbi is in its foundation phase. The repository uses a Mix umbrella rooted
 at the repository. Base, Core, and Web are its top-level composition
 applications; each declared deep module below Base or Core is a self-contained
 local Mix package discovered from its descriptor. The current foundation owns
-Ecto migrations that can create the compatible Base Tenancy, Settings, and
-Authz plus Core Company, Geonames, Address, Employee, and User schema, or
+Ecto migrations that can create the compatible Base Settings, Tenancy, Authz,
+and Audit plus Core Company, Geonames, Address, Employee, and User schema, or
 verify and adopt an existing Belimbing database. Optional Domains and
 deployment-owned Extensions are intentionally not implemented yet.
 
@@ -122,7 +122,8 @@ apps/
 │   ├── module_registry/          # Runtime installed-module registry
 │   ├── settings/                 # Immutable definitions and scoped values
 │   ├── tenancy/                  # base/tenancy module package
-│   └── authz/                    # Capability, role, grant, and decision engine
+│   ├── authz/                    # Capability, role, grant, and decision engine
+│   └── audit/                    # base/audit module package
 ├── core/                         # Mandatory composition application
 │   ├── bilimbi.container.exs     # Declares the Core layer
 │   ├── company/                  # core/company module package
@@ -137,8 +138,8 @@ apps/
 The complete physical boundary of Base Tenancy is `apps/base/tenancy/`, not a
 directory below its `lib/`. Consequently its source begins at
 `apps/base/tenancy/lib/tenancy.ex` while the Elixir namespace remains
-`Bilimbi.Base.Tenancy`. The same rule applies to Settings, Authz, Company,
-Geonames, Address, Employee, User, and every future declared module.
+`Bilimbi.Base.Tenancy`. The same rule applies to Settings, Authz, Audit,
+Company, Geonames, Address, Employee, User, and every future declared module.
 
 A composition container never lists child packages by name. Every immediate
 child directory containing `bilimbi.module.exs` is an installed module; the
@@ -209,9 +210,10 @@ operator and `tenant_primary_companies` for each tenant's designated company.
 only historical migration input in Belimbing, never a Bilimbi runtime role.
 
 Bilimbi-owned migrations live inside their owning module, currently
-`apps/base/tenancy/priv/repo/migrations`,
 `apps/base/settings/priv/repo/migrations`,
+`apps/base/tenancy/priv/repo/migrations`,
 `apps/base/authz/priv/repo/migrations`,
+`apps/base/audit/priv/repo/migrations`,
 `apps/core/company/priv/repo/migrations`,
 `apps/core/geonames/priv/repo/migrations`,
 `apps/core/address/priv/repo/migrations`,
@@ -246,6 +248,10 @@ keys fail closed. System-role reconciliation is an explicit production-seed
 operation and never deletes principal grants. Core Company owns the later
 restricted company foreign key and exact system/custom-role ownership check,
 so Base does not depend upward on Core.
+
+Base Audit preserves Belimbing's `base_audit_mutations` and
+`base_audit_actions` tables: jsonb payloads, `inet` `ip_address`, nullable
+`tenant_id`, no foreign keys, and `occurred_at` as the only timestamp.
 
 ## Documentation
 
