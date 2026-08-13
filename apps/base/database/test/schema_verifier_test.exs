@@ -89,6 +89,16 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
     assert "gadgets.ip_address: incompatible type" in errors
   end
 
+  test "does not let char and varchar substitute for each other", %{schema: schema} do
+    as_varchar = put_in(gadget_spec(), [:columns, "url_hash", :type], {:varchar, 32})
+    assert {:error, errors} = SchemaVerifier.verify(Repo, [as_varchar], prefix: schema)
+    assert "gadgets.url_hash: incompatible type" in errors
+
+    as_char = put_in(widget_spec(), [:columns, "name", :type], {:char, 20})
+    assert {:error, errors} = SchemaVerifier.verify(Repo, [as_char], prefix: schema)
+    assert "widgets.name: incompatible type" in errors
+  end
+
   test "reports an unmodelled contract type instead of raising", %{schema: schema} do
     spec = put_in(widget_spec(), [:columns, "name", :type], :money)
 
