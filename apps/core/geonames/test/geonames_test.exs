@@ -195,7 +195,7 @@ defmodule Bilimbi.Core.GeonamesTest do
     assert [%{postcode: "94105", country_name: "United States"}] =
              Geonames.page_postcodes(%{"search" => "San Francisco"}).entries
 
-    assert Enum.map(Geonames.page_postcodes(%{"search" => "us"}).entries, &(&1.postcode)) ==
+    assert Enum.map(Geonames.page_postcodes(%{"search" => "us"}).entries, & &1.postcode) ==
              [
                "10001",
                "94105"
@@ -203,7 +203,7 @@ defmodule Bilimbi.Core.GeonamesTest do
 
     assert Enum.map(
              Geonames.page_postcodes(%{"search" => "United"}).entries,
-             &(&1.postcode)
+             & &1.postcode
            ) == [
              "10001",
              "94105"
