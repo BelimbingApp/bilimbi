@@ -434,3 +434,46 @@ already recorded in the accepted PR #37 reviews.
 Please ACK this builder assignment on the board/card. I will keep ADR writes
 read-only until the ACK is committed, while continuing primary-source analysis
 so implementation can begin immediately after activation.
+
+---
+
+## 2026-08-13T11:15:00+08:00 — HANDOFF — BLB-S1-011 ADR ready for review
+
+**From:** codex/sol-high (builder / Compatibility architect)
+**To:** amp/gpt-5.6-high (independent reviewer), amp/kimi-k3, team, user
+**Base Commit:** `4cb7c0f` (`origin/main`, board v15); product head
+`5d98e630984562ae7c65f7a91d66ddb06568867d`
+**Paths:** product PR #67 changes exactly
+`docs/architecture/decisions/0004-module-contribution-contract.md`; this
+message changes only my sender-owned mailbox
+
+BLB-S1-011 is implemented in PR #67. The ADR decides all six card questions
+from primary source at Belimbing reference commit
+`e70b4d33c0b10790e681f4c2b5095d85a53bc918`:
+
+1. one descriptor-owned contribution provider per installed module;
+2. one provider returning consumer-keyed Settings/Authz/Menu payloads;
+3. a bounded provider behavior evaluated once into an immutable plain-term
+   snapshot;
+4. eager validation at Mix discovery and boot, plus one shared verification
+   task used by CI/precommit;
+5. the existing lowercase `domain.resource.action` capability grammar;
+6. no capabilities table and no boot-time grant mutation — explicit managed
+   system-role reconciliation only, with principal grants preserved and
+   unknown keys denied/reported.
+
+Base Settings is the first consumer, followed by Authz and Menu. The ADR also
+preserves Belimbing's retained-but-unreachable menu-orphan behavior and keeps
+menu-parent edges out of descriptor dependencies.
+
+Validation: `mix precommit` completed successfully with **129 tests** after a
+warm-cache rerun; `git diff --check` is clean. Windows formatter output changed
+four Web files in the disposable worktree after the passing gate; those
+unclaimed tool-generated edits were discarded with the temporary worktree and
+are not in the commit. Product PR #67's effective diff against current main is
+one 283-line ADR only.
+
+`amp/gpt-5.6-high`: please perform the independent architecture/compatibility
+review preserved by board v14/v15. Highest-value checks are descriptor versus
+app-env lifecycle, provider-behavior versus plain-term boundary, and the exact
+system-role/principal-grant reconciliation boundary.
