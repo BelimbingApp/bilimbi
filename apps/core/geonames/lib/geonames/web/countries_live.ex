@@ -33,11 +33,14 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   end
 
   def handle_event("sort", %{"sort" => sort_by}, socket) do
-    {:noreply, push_patch(socket, to: countries_path(next_sort(socket.assigns.index_state, sort_by)))}
+    {:noreply,
+     push_patch(socket, to: countries_path(next_sort(socket.assigns.index_state, sort_by)))}
   end
 
   def handle_event("page", %{"page" => page}, socket) do
-    state = Map.put(socket.assigns.index_state, :page, bounded_page(page, socket.assigns.countries_page))
+    state =
+      Map.put(socket.assigns.index_state, :page, bounded_page(page, socket.assigns.countries_page))
+
     {:noreply, push_patch(socket, to: countries_path(state))}
   end
 
@@ -51,7 +54,12 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
         </.header>
 
         <div class="rounded-xl border border-line bg-surface">
-          <.form for={@filters_form} id="countries-filters" phx-change="filters" class="px-4 pt-4">
+          <.form
+            for={@filters_form}
+            id="countries-filters"
+            phx-change="filters"
+            class="px-4 pt-4"
+          >
             <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
               <.input
                 field={@filters_form[:search]}
@@ -75,27 +83,88 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
             <table class="w-full text-left text-sm">
               <thead class="border-y border-line bg-surface-sunken">
                 <tr>
-                  <.sortable_heading id="countries-sort-iso" label="ISO" sort="iso" sort_by={@index_state.sort_by} sort_dir={@index_state.sort_dir} />
-                  <.sortable_heading id="countries-sort-country" label="Country" sort="country" sort_by={@index_state.sort_by} sort_dir={@index_state.sort_dir} />
-                  <.sortable_heading id="countries-sort-capital" label="Capital" sort="capital" sort_by={@index_state.sort_by} sort_dir={@index_state.sort_dir} />
-                  <.sortable_heading id="countries-sort-phone" label="Phone" sort="phone" sort_by={@index_state.sort_by} sort_dir={@index_state.sort_dir} />
-                  <.sortable_heading id="countries-sort-currency" label="Currency" sort="currency_code" sort_by={@index_state.sort_by} sort_dir={@index_state.sort_dir} />
-                  <.sortable_heading id="countries-sort-population" label="Population" sort="population" sort_by={@index_state.sort_by} sort_dir={@index_state.sort_dir} align={:right} />
-                  <.sortable_heading id="countries-sort-updated" label="Updated" sort="updated_at" sort_by={@index_state.sort_by} sort_dir={@index_state.sort_dir} />
+                  <.sortable_heading
+                    id="countries-sort-iso"
+                    label="ISO"
+                    sort="iso"
+                    sort_by={@index_state.sort_by}
+                    sort_dir={@index_state.sort_dir}
+                  />
+                  <.sortable_heading
+                    id="countries-sort-country"
+                    label="Country"
+                    sort="country"
+                    sort_by={@index_state.sort_by}
+                    sort_dir={@index_state.sort_dir}
+                  />
+                  <.sortable_heading
+                    id="countries-sort-capital"
+                    label="Capital"
+                    sort="capital"
+                    sort_by={@index_state.sort_by}
+                    sort_dir={@index_state.sort_dir}
+                  />
+                  <.sortable_heading
+                    id="countries-sort-phone"
+                    label="Phone"
+                    sort="phone"
+                    sort_by={@index_state.sort_by}
+                    sort_dir={@index_state.sort_dir}
+                  />
+                  <.sortable_heading
+                    id="countries-sort-currency"
+                    label="Currency"
+                    sort="currency_code"
+                    sort_by={@index_state.sort_by}
+                    sort_dir={@index_state.sort_dir}
+                  />
+                  <.sortable_heading
+                    id="countries-sort-population"
+                    label="Population"
+                    sort="population"
+                    sort_by={@index_state.sort_by}
+                    sort_dir={@index_state.sort_dir}
+                    align={:right}
+                  />
+                  <.sortable_heading
+                    id="countries-sort-updated"
+                    label="Updated"
+                    sort="updated_at"
+                    sort_by={@index_state.sort_by}
+                    sort_dir={@index_state.sort_dir}
+                  />
                 </tr>
               </thead>
               <tbody id="countries-table" phx-update="stream" class="divide-y divide-line-subtle">
-                <tr :for={{id, country} <- @streams.countries} id={id} class="hover:bg-surface-sunken">
-                  <td class="whitespace-nowrap px-4 py-2.5 font-medium tabular-nums text-ink">{country.iso}</td>
+                <tr
+                  :for={{id, country} <- @streams.countries}
+                  id={id}
+                  class="hover:bg-surface-sunken"
+                >
+                  <td class="whitespace-nowrap px-4 py-2.5 font-medium tabular-nums text-ink">
+                    {country.iso}
+                  </td>
                   <td class="whitespace-nowrap px-4 py-2.5 text-ink">{country.country}</td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">{country.capital || "—"}</td>
-                  <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-ink-muted">{country.phone || "—"}</td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">{country.currency_code || "—"}</td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-ink-muted">{format_integer(country.population)}</td>
-                  <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-ink-muted">{format_date(country.updated_at)}</td>
+                  <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">
+                    {country.capital || "—"}
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-ink-muted">
+                    {country.phone || "—"}
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">
+                    {country.currency_code || "—"}
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-ink-muted">
+                    {format_integer(country.population)}
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-ink-muted">
+                    {format_date(country.updated_at)}
+                  </td>
                 </tr>
                 <tr :if={@countries_page.entries == []} id="countries-empty">
-                  <td colspan="7" class="px-4 py-8 text-center text-ink-muted">No countries found.</td>
+                  <td colspan="7" class="px-4 py-8 text-center text-ink-muted">
+                    No countries found.
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -123,7 +192,10 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
     socket
     |> assign(:page_title, "Countries")
     |> assign(:countries_page, countries_page)
-    |> assign(:filters_form, to_form(%{search: state.search, perPage: state.per_page}, as: :filters))
+    |> assign(
+      :filters_form,
+      to_form(%{search: state.search, perPage: state.per_page}, as: :filters)
+    )
     |> assign(:index_state, state)
     |> stream(:countries, countries_page.entries, reset: true)
   end
@@ -148,12 +220,21 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
       | page: 1,
         sort_by: sort_by,
         sort_dir:
-          if(state.sort_by == sort_by, do: flip_direction(state.sort_dir), else: default_direction(sort_by))
+          if(state.sort_by == sort_by,
+            do: flip_direction(state.sort_dir),
+            else: default_direction(sort_by)
+          )
     }
   end
 
   defp countries_path(state) do
-    ~p"/geonames/countries?#{%{search: state.search, page: state.page, perPage: state.per_page, sortBy: state.sort_by, sortDir: state.sort_dir}}"
+    ~p"/geonames/countries?#{%{
+      search: state.search,
+      page: state.page,
+      perPage: state.per_page,
+      sortBy: state.sort_by,
+      sortDir: state.sort_dir
+    }}"
   end
 
   defp page_size_options, do: Enum.map(@page_sizes, &{"#{&1} rows", &1})

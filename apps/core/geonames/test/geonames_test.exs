@@ -64,7 +64,10 @@ defmodule Bilimbi.Core.GeonamesTest do
     assert [%{iso: "JP"} | _rest] = Geonames.page_countries(%{"sortBy" => "population"}).entries
 
     assert [%{country: "Japan"} | _rest] =
-             Geonames.page_countries(%{"sort_by" => "untrusted column", "sort_dir" => "desc"}).entries
+             Geonames.page_countries(%{
+               "sort_by" => "untrusted column",
+               "sort_dir" => "desc"
+             }).entries
 
     assert Geonames.page_countries(%{"page_size" => "1000"}).page_size == 300
   end
@@ -123,8 +126,10 @@ defmodule Bilimbi.Core.GeonamesTest do
              %{country_iso: "MY", record_count: 1}
            ] = Geonames.list_postcode_country_summaries(%{"sort_by" => "record_count"})
 
-    assert Enum.map(Geonames.list_postcode_country_summaries(%{"search" => "no match"}), & &1.country_iso) ==
-             ["MY", "US"]
+    assert Enum.map(
+             Geonames.list_postcode_country_summaries(%{"search" => "no match"}),
+             & &1.country_iso
+           ) == ["MY", "US"]
   end
 
   test "resolves a city by durable GeoNames identity" do

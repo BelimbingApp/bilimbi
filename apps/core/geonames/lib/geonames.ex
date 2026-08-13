@@ -96,7 +96,8 @@ defmodule Bilimbi.Core.Geonames do
   """
   @spec page_countries(index_query()) :: Page.t(CountryIndex.t())
   def page_countries(query \\ %{}) do
-    options = normalize_index_query(query, @country_sort_fields, :country, @country_initial_directions)
+    options =
+      normalize_index_query(query, @country_sort_fields, :country, @country_initial_directions)
 
     Country
     |> maybe_search_countries(options.search)
@@ -121,7 +122,8 @@ defmodule Bilimbi.Core.Geonames do
   """
   @spec page_admin1(index_query()) :: Page.t(Admin1Index.t())
   def page_admin1(query \\ %{}) do
-    options = normalize_index_query(query, @admin1_sort_fields, :country_name, @admin1_initial_directions)
+    options =
+      normalize_index_query(query, @admin1_sort_fields, :country_name, @admin1_initial_directions)
 
     Admin1
     |> admin1_with_country_name()
@@ -167,7 +169,8 @@ defmodule Bilimbi.Core.Geonames do
   """
   @spec page_postcodes(index_query()) :: Page.t(PostcodeIndex.t())
   def page_postcodes(query \\ %{}) do
-    options = normalize_index_query(query, @postcode_sort_fields, :country_name, @postcode_initial_directions)
+    options =
+      normalize_index_query(query, @postcode_sort_fields, :country_name, @postcode_initial_directions)
 
     Postcode
     |> postcode_with_country_name()
@@ -184,7 +187,12 @@ defmodule Bilimbi.Core.Geonames do
   @spec list_postcode_country_summaries(index_query()) :: [PostcodeCountrySummary.t()]
   def list_postcode_country_summaries(query \\ %{}) do
     options =
-      normalize_index_query(query, @summary_sort_fields, :country_name, @summary_initial_directions)
+      normalize_index_query(
+        query,
+        @summary_sort_fields,
+        :country_name,
+        @summary_initial_directions
+      )
 
     from(postcode in Postcode,
       left_join: country in Country,
@@ -282,7 +290,9 @@ defmodule Bilimbi.Core.Geonames do
       |> limit(^options.page_size)
       |> select([postcode, country], {postcode, country.country})
       |> Repo.all()
-      |> Enum.map(fn {postcode, country_name} -> PostcodeIndex.from_schema(postcode, country_name) end)
+      |> Enum.map(fn {postcode, country_name} ->
+        PostcodeIndex.from_schema(postcode, country_name)
+      end)
 
     page(entries, options, total_entries)
   end

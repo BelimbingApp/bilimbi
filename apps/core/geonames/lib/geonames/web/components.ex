@@ -92,7 +92,11 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
 
   def format_integer(_value), do: "—"
 
-  def format_date(%NaiveDateTime{} = value), do: value |> NaiveDateTime.to_date() |> Date.to_iso8601()
+  def format_date(%NaiveDateTime{} = value) do
+    value
+    |> NaiveDateTime.to_date()
+    |> Date.to_iso8601()
+  end
   def format_date(_value), do: "—"
 
   defp sort_icon(sort, sort, "asc"), do: "hero-chevron-up"
@@ -108,5 +112,7 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
   end
 
   defp page_position(%{total_pages: 0}), do: "Page 0 of 0"
-  defp page_position(%{page: page, total_pages: total_pages}), do: "Page #{page} of #{total_pages}"
+  defp page_position(%{page: page, total_pages: total_pages}) do
+    "Page #{page} of #{total_pages}"
+  end
 end

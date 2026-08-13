@@ -50,7 +50,9 @@ defmodule BilimbiWeb.GeonamesLiveTest do
              conn |> log_in_as() |> live(~p"/geonames/countries")
   end
 
-  test "renders source-faithful read-only GeoNames indexes and their stable controls", %{conn: conn} do
+  test "renders source-faithful read-only GeoNames indexes and their stable controls", %{
+    conn: conn
+  } do
     grant_capabilities!(["admin.geonames.list"])
 
     {:ok, countries, _html} = conn |> log_in_as() |> live(~p"/geonames/countries")

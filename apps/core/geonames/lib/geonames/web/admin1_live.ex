@@ -34,11 +34,14 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
   end
 
   def handle_event("sort", %{"sort" => sort_by}, socket) do
-    {:noreply, push_patch(socket, to: admin1_path(next_sort(socket.assigns.index_state, sort_by)))}
+    {:noreply,
+     push_patch(socket, to: admin1_path(next_sort(socket.assigns.index_state, sort_by)))}
   end
 
   def handle_event("page", %{"page" => page}, socket) do
-    state = Map.put(socket.assigns.index_state, :page, bounded_page(page, socket.assigns.admin1_page))
+    state =
+      Map.put(socket.assigns.index_state, :page, bounded_page(page, socket.assigns.admin1_page))
+
     {:noreply, push_patch(socket, to: admin1_path(state))}
   end
 
@@ -53,7 +56,12 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
         </.header>
 
         <div class="rounded-xl border border-line bg-surface">
-          <.form for={@filters_form} id="admin1-filters" phx-change="filters" class="px-4 pt-4">
+          <.form
+            for={@filters_form}
+            id="admin1-filters"
+            phx-change="filters"
+            class="px-4 pt-4"
+          >
             <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_12rem]">
               <.input
                 field={@filters_form[:search]}
@@ -85,26 +93,66 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
             <table class="w-full text-left text-sm">
               <thead class="border-y border-line bg-surface-sunken">
                 <tr>
-                  <.sortable_heading id="admin1-sort-country" label="Country" sort="country_name" sort_by={@index_state.sort_by} sort_dir={@index_state.sort_dir} />
-                  <.sortable_heading id="admin1-sort-code" label="Code" sort="code" sort_by={@index_state.sort_by} sort_dir={@index_state.sort_dir} />
-                  <.sortable_heading id="admin1-sort-name" label="Name" sort="name" sort_by={@index_state.sort_by} sort_dir={@index_state.sort_dir} />
-                  <.sortable_heading id="admin1-sort-alt-name" label="Alt Name" sort="alt_name" sort_by={@index_state.sort_by} sort_dir={@index_state.sort_dir} />
-                  <.sortable_heading id="admin1-sort-updated" label="Updated" sort="updated_at" sort_by={@index_state.sort_by} sort_dir={@index_state.sort_dir} />
+                  <.sortable_heading
+                    id="admin1-sort-country"
+                    label="Country"
+                    sort="country_name"
+                    sort_by={@index_state.sort_by}
+                    sort_dir={@index_state.sort_dir}
+                  />
+                  <.sortable_heading
+                    id="admin1-sort-code"
+                    label="Code"
+                    sort="code"
+                    sort_by={@index_state.sort_by}
+                    sort_dir={@index_state.sort_dir}
+                  />
+                  <.sortable_heading
+                    id="admin1-sort-name"
+                    label="Name"
+                    sort="name"
+                    sort_by={@index_state.sort_by}
+                    sort_dir={@index_state.sort_dir}
+                  />
+                  <.sortable_heading
+                    id="admin1-sort-alt-name"
+                    label="Alt Name"
+                    sort="alt_name"
+                    sort_by={@index_state.sort_by}
+                    sort_dir={@index_state.sort_dir}
+                  />
+                  <.sortable_heading
+                    id="admin1-sort-updated"
+                    label="Updated"
+                    sort="updated_at"
+                    sort_by={@index_state.sort_by}
+                    sort_dir={@index_state.sort_dir}
+                  />
                 </tr>
               </thead>
               <tbody id="admin1-table" phx-update="stream" class="divide-y divide-line-subtle">
-                <tr :for={{id, admin1} <- @streams.admin1} id={id} class="hover:bg-surface-sunken">
+                <tr
+                  :for={{id, admin1} <- @streams.admin1}
+                  id={id}
+                  class="hover:bg-surface-sunken"
+                >
                   <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">
                     <span class="font-mono text-xs">{admin1.country_iso}</span>
                     <span class="ml-1">{admin1.country_name || admin1.country_iso}</span>
                   </td>
                   <td class="whitespace-nowrap px-4 py-2.5 font-mono text-ink">{admin1.code}</td>
                   <td class="whitespace-nowrap px-4 py-2.5 text-ink">{admin1.name}</td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">{admin1.alt_name || "—"}</td>
-                  <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-ink-muted">{format_date(admin1.updated_at)}</td>
+                  <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">
+                    {admin1.alt_name || "—"}
+                  </td>
+                  <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-ink-muted">
+                    {format_date(admin1.updated_at)}
+                  </td>
                 </tr>
                 <tr :if={@admin1_page.entries == []} id="admin1-empty">
-                  <td colspan="5" class="px-4 py-8 text-center text-ink-muted">No Admin1 divisions found.</td>
+                  <td colspan="5" class="px-4 py-8 text-center text-ink-muted">
+                    No Admin1 divisions found.
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -165,12 +213,22 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
       | page: 1,
         sort_by: sort_by,
         sort_dir:
-          if(state.sort_by == sort_by, do: flip_direction(state.sort_dir), else: default_direction(sort_by))
+          if(state.sort_by == sort_by,
+            do: flip_direction(state.sort_dir),
+            else: default_direction(sort_by)
+          )
     }
   end
 
   defp admin1_path(state) do
-    ~p"/geonames/admin1?#{%{search: state.search, filterCountryIso: state.country_iso, page: state.page, perPage: state.per_page, sortBy: state.sort_by, sortDir: state.sort_dir}}"
+    ~p"/geonames/admin1?#{%{
+      search: state.search,
+      filterCountryIso: state.country_iso,
+      page: state.page,
+      perPage: state.per_page,
+      sortBy: state.sort_by,
+      sortDir: state.sort_dir
+    }}"
   end
 
   defp country_options(countries), do: Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
