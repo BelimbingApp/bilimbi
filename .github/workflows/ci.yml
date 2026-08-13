@@ -92,7 +92,7 @@ jobs:
             deps
             _build/dev
             ~/.mix
-          key: ${{ runner.os }}-beam-dialyzer-${{ hashFiles('mix.lock') }}
+          key: ${{ runner.os }}-beam-dialyzer-${{ hashFiles('mix.lock', 'mix.exs', 'apps/**/mix.exs', 'apps/**/lib/**/*.ex') }}
 
       - name: Install dependencies
         run: mix deps.get
