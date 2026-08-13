@@ -84,6 +84,23 @@ defmodule Bilimbi.Core.Employee do
     end
   end
 
+  @doc "Resolves an employee through any live company visible to the tenant scope."
+  @spec get_employee(Scope.t(), pos_integer()) ::
+          {:ok, Summary.t()} | {:error, :employee_not_found}
+  def get_employee(%Scope{} = scope, employee_id) do
+    {:ok, companies} = Company.list_companies(scope)
+    company_ids = Enum.map(companies, & &1.id)
+
+    case Repo.one(
+           from(employee in Schema,
+             where: employee.id == ^employee_id and employee.company_id in ^company_ids
+           )
+         ) do
+      nil -> {:error, :employee_not_found}
+      employee -> {:ok, Summary.from_schema(employee)}
+    end
+  end
+
   @spec create_employee(Scope.t(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, :company_not_found | Changeset.t()}
   def create_employee(%Scope{} = scope, company_id, attributes) do

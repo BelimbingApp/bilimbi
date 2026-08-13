@@ -14,10 +14,14 @@ defmodule Bilimbi.Core.Address do
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Address.Addressable
+  alias Bilimbi.Core.Address.Detail
+  alias Bilimbi.Core.Address.LinkedOwner
   alias Bilimbi.Core.Address.Page
   alias Bilimbi.Core.Address.Schema
   alias Bilimbi.Core.Address.Summary
   alias Bilimbi.Core.Company
+  alias Bilimbi.Core.Employee
+  alias Bilimbi.Core.Geonames
 
   @default_page_size 15
   @maximum_page_size 100
@@ -26,6 +30,7 @@ defmodule Bilimbi.Core.Address do
     country_iso: :country_iso,
     verification_status: :verification_status
   }
+  @linked_owner_sort_fields ~w(type name kind is_primary priority valid_from valid_to)a
 
   @type error_reason ::
           :address_in_use | :address_not_found | :attachment_not_found | :company_not_found
@@ -74,6 +79,31 @@ defmodule Bilimbi.Core.Address do
     case get_schema(scope, address_id) do
       nil -> {:error, :address_not_found}
       address -> {:ok, Summary.from_schema(address)}
+    end
+  end
+
+  @doc "Returns Address detail and its live Company or Employee owner projections."
+  @spec get_address_detail(Scope.t(), pos_integer(), keyword()) ::
+          {:ok, Detail.t()} | {:error, :address_not_found}
+  def get_address_detail(%Scope{} = scope, address_id, opts \\ []) when is_list(opts) do
+    opts = Keyword.validate!(opts, owner_sort_by: :type, owner_sort_dir: :asc)
+    sort_by = owner_sort_by!(opts[:owner_sort_by])
+    sort_dir = sort_dir!(opts[:owner_sort_dir])
+
+    case get_schema(scope, address_id) do
+      nil ->
+        {:error, :address_not_found}
+
+      address ->
+        linked_owners = list_linked_owners(scope, address.id, sort_by, sort_dir)
+
+        {:ok,
+         Detail.from_schema(
+           address,
+           country_name(address.country_iso),
+           admin1_name(address.admin1_code),
+           linked_owners
+         )}
     end
   end
 
@@ -362,6 +392,99 @@ defmodule Bilimbi.Core.Address do
     Repo.exists?(from(attachment in Addressable, where: attachment.address_id == ^address_id))
   end
 
+  defp list_linked_owners(%Scope{} = scope, address_id, sort_by, sort_dir) do
+    from(attachment in Addressable,
+      where: attachment.address_id == ^address_id,
+      order_by: attachment.id
+    )
+    |> Repo.all()
+    |> Enum.flat_map(&linked_owner(scope, &1))
+    |> Enum.sort(&linked_owner_before?(&1, &2, sort_by, sort_dir))
+  end
+
+  defp linked_owner(%Scope{} = scope, attachment) do
+    company_identity = Company.addressable_identity()
+    employee_identity = Employee.addressable_identity()
+
+    case attachment.addressable_type do
+      ^company_identity ->
+        case Company.get_company(scope, attachment.addressable_id) do
+          {:ok, company} -> [linked_owner(attachment, :company, company.name)]
+          {:error, :not_found} -> []
+        end
+
+      ^employee_identity ->
+        case Employee.get_employee(scope, attachment.addressable_id) do
+          {:ok, employee} -> [linked_owner(attachment, :employee, employee.full_name)]
+          {:error, :employee_not_found} -> []
+        end
+
+      _unknown_type ->
+        []
+    end
+  end
+
+  defp linked_owner(attachment, owner_type, name) do
+    %LinkedOwner{
+      attachment_id: attachment.id,
+      owner_type: owner_type,
+      owner_id: attachment.addressable_id,
+      name: name,
+      kind: attachment.kind || [],
+      is_primary: attachment.is_primary,
+      priority: attachment.priority,
+      valid_from: attachment.valid_from,
+      valid_to: attachment.valid_to
+    }
+  end
+
+  defp linked_owner_before?(left, right, sort_by, sort_dir) do
+    left_value = linked_owner_sort_value(left, sort_by)
+    right_value = linked_owner_sort_value(right, sort_by)
+
+    cond do
+      left_value == right_value ->
+        {left.owner_id, left.attachment_id} <= {right.owner_id, right.attachment_id}
+
+      sort_dir == :asc ->
+        left_value < right_value
+
+      true ->
+        left_value > right_value
+    end
+  end
+
+  defp linked_owner_sort_value(owner, :type), do: Atom.to_string(owner.owner_type)
+  defp linked_owner_sort_value(owner, :name), do: owner.name
+  defp linked_owner_sort_value(owner, :kind), do: owner.kind |> Enum.sort() |> Enum.join(",")
+  defp linked_owner_sort_value(owner, :is_primary), do: if(owner.is_primary, do: 1, else: 0)
+  defp linked_owner_sort_value(owner, :priority), do: owner.priority || 0
+  defp linked_owner_sort_value(owner, :valid_from), do: date_sort_value(owner.valid_from)
+  defp linked_owner_sort_value(owner, :valid_to), do: date_sort_value(owner.valid_to)
+
+  defp date_sort_value(nil), do: ""
+  defp date_sort_value(date), do: Date.to_iso8601(date)
+
+  defp country_name(nil), do: nil
+
+  defp country_name(country_iso) do
+    case Geonames.get_country(country_iso) do
+      nil -> nil
+      country -> country.country
+    end
+  end
+
+  defp admin1_name(nil), do: nil
+
+  defp admin1_name(admin1_code) do
+    country_iso = admin1_code |> String.split(".", parts: 2) |> hd()
+
+    case Enum.find(Geonames.list_admin1(country_iso), &(&1.code == admin1_code)) do
+      nil -> nil
+      admin1 -> admin1.name
+    end
+  end
+
   defp page_query(query, opts) do
     page = page!(opts[:page])
     page_size = page_size!(opts[:page_size])
@@ -427,6 +550,13 @@ defmodule Bilimbi.Core.Address do
         raise ArgumentError,
               "sort_by must be one of #{inspect(Map.keys(@address_sort_fields))}, got: #{inspect(value)}"
     end
+  end
+
+  defp owner_sort_by!(value) when value in @linked_owner_sort_fields, do: value
+
+  defp owner_sort_by!(value) do
+    raise ArgumentError,
+          "owner_sort_by must be one of #{inspect(@linked_owner_sort_fields)}, got: #{inspect(value)}"
   end
 
   defp sort_dir!(value) when value in [:asc, :desc], do: value
