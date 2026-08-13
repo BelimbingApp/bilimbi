@@ -153,3 +153,55 @@ jobs:
 
       - name: Verify the precommit suite made no changes
         run: git diff --exit-code
+
+  coordination_surface:
+    name: Coordination surface
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Refuse coordination writes to docs/ai-team
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          set -euo pipefail
+
+          if [[ ",${LABELS}," == *",docs-onboarding,"* ]]; then
+            echo "Label 'docs-onboarding' present; allowing the change."
+            exit 0
+          fi
+
+          # Deletions are always fine -- removing coordination files is the goal.
+          changed=$(git diff --name-only --diff-filter=d "$BASE_SHA" "$HEAD_SHA" -- 'docs/ai-team/**' || true)
+
+          offending=$(printf '%s\n' "$changed" | grep -v '^$' \
+            | grep -vE '^docs/ai-team/(README\.md|PORTING_STAGES\.md|research/)' || true)
+
+          if [[ -n "$offending" ]]; then
+            echo "::error::Coordination work does not belong in docs/ai-team."
+            echo
+            echo "These files are the onboarding surface only:"
+            echo "  docs/ai-team/README.md"
+            echo "  docs/ai-team/PORTING_STAGES.md"
+            echo "  docs/ai-team/research/**"
+            echo
+            echo "Tasks, claims, handoffs, reviews, status and liveness belong in"
+            echo "GitHub Issues; conversation belongs in Discussions. See"
+            echo "docs/ai-team/README.md."
+            echo
+            echo "Offending paths:"
+            printf '  %s\n' $offending
+            echo
+            echo "If this really is an onboarding change, add the 'docs-onboarding' label."
+            exit 1
+          fi
+
+          echo "No coordination writes to docs/ai-team."

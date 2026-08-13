@@ -11,9 +11,14 @@ defmodule Bilimbi.Core.User do
   `company_id`. Belimbing's own list
   (`app/Core/User/Livewire/Users/Index.php:110-111`) left-joins `companies` and
   filters `companies.tenant_id`, so a user with no company is invisible to
-  every tenant-scoped read. Reads here go through a company the caller has
-  already proven, which produces the same visibility without this module
-  reaching into Company's tables.
+  every tenant-scoped read. Single-company reads go through
+  `Company.get_company/2`; the tenant-wide list goes through
+  `Company.list_tenant_company_ids/1` so this module never queries `companies`.
+
+  Soft-deleted companies: Belimbing's raw join still returns those users.
+  Bilimbi matches that visibility (BLB-S1-010 option a) via company ids that
+  include soft-deleted rows. Live-only company presentation remains
+  `Company.list_companies/1`.
 
   This module stores credentials and never creates them. `create_user/3` takes
   an already-hashed `:password_hash` and rejects anything that is not
@@ -53,6 +58,35 @@ defmodule Bilimbi.Core.User do
 
       {:ok, users}
     end
+  end
+
+  @doc """
+  Lists every user visible to the scope's tenant, ordered by id.
+
+  Visibility matches Belimbing's tenant-wide list: affiliation is through any
+  company owned by the tenant, including soft-deleted companies. Users with a
+  null `company_id` never appear. Company membership is resolved only through
+  `Company.list_tenant_company_ids/1`.
+  """
+  @spec list_users(Scope.t()) :: {:ok, [Summary.t()]}
+  def list_users(%Scope{} = scope) do
+    {:ok, company_ids} = Company.list_tenant_company_ids(scope)
+
+    users =
+      case company_ids do
+        [] ->
+          []
+
+        ids ->
+          from(user in Schema,
+            where: user.company_id in ^ids,
+            order_by: user.id
+          )
+          |> Repo.all()
+          |> Enum.map(&Summary.from_schema/1)
+      end
+
+    {:ok, users}
   end
 
   @spec get_user(Scope.t(), pos_integer(), pos_integer()) ::
