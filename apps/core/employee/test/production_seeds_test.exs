@@ -1,8 +1,8 @@
 defmodule Bilimbi.Core.Employee.ProductionSeedsTest do
   use ExUnit.Case, async: true
 
-  alias Bilimbi.Base.Database.ProductionSeed
   alias Bilimbi.Base.Database.ProductionSeedProvider
+  alias Bilimbi.Core.Employee
   alias Bilimbi.Core.Employee.EmployeeType
   alias Bilimbi.Core.Employee.ProductionSeeds
 
@@ -34,9 +34,8 @@ defmodule Bilimbi.Core.Employee.ProductionSeedsTest do
     assert ProductionSeedProvider in behaviours
   end
 
-  test "runs the system-type seed through the repo supplied by the runner" do
-    assert [seed] = ProductionSeeds.production_seeds()
-    assert :ok = ProductionSeed.invoke(seed, RepoSpy)
+  test "system-type reconciliation uses the repo supplied by the seed callback" do
+    assert :ok = Employee.ensure_system_types(RepoSpy)
 
     assert_received :repo_all
 
