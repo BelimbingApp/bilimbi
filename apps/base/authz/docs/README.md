@@ -21,18 +21,32 @@ own later migration, so Base never depends upward on Core.
 Administration adapters use `Bilimbi.Base.Authz`; they never query these five
 tables directly. The facade provides bounded, tenant-scoped pages for roles,
 decision logs, and direct principal capabilities. Page results expose stable
-read models and accept only documented search, filter, and sort options.
+read models and accept only documented search, filter, and sort options. System
+role catalog rows remain visible even when a tenant currently has no companies;
+assignment counts and details still follow the caller's company scope.
+
+Compatible installations may contain effective global principal-role and
+direct-capability rows whose `company_id` is null. Ordinary tenant scopes never
+see or remove those rows. A platform-operator scope sees them alongside its
+normal company scope and may remove them by durable row ID, which keeps global
+authority auditable without exposing it to a tenant administrator.
 
 `get_role/2` returns a role with immutable capability keys and only the
 principal assignments visible through the caller's company directory.
 `update_role/3`, `delete_role/2`, and `replace_role_capabilities/3` reject
 system roles. A custom role cannot move to another live company while any
-principal remains assigned. `unassign_role/3` removes one visible assignment
-by its durable ID.
+principal remains assigned. Deleting a custom role intentionally relies on
+database cascades to remove its grants and assignments. `unassign_role/3`
+removes one visible assignment by its durable ID.
 
 `put_principal_capability/6` persists either an allow or an explicit deny.
-`remove_principal_capability/5` is deliberately different: it deletes the
-persisted direct rule, including a stale capability key, so evaluation falls
-back to roles and the normal fail-closed behavior. Administration read models
-do not join Core User or Core Company presentation data; Web composes names
-through those owners' public APIs rather than making Base depend upward.
+`remove_principal_capability/2` is deliberately different: it deletes the
+visible persisted direct rule by durable grant ID, including a stale capability
+key, so evaluation falls back to roles and the normal fail-closed behavior.
+
+The pinned Belimbing screens search and sort joined User and Company names
+before pagination. This Base-only facade intentionally does not promise those
+cross-module totals or filters: its read models never join Core User or Core
+Company presentation data. Web may decorate the bounded results through those
+owners' public APIs, but an exact joined-name screen requires a separately
+owned integration query rather than making Base depend upward.

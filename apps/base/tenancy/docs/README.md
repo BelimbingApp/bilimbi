@@ -12,7 +12,10 @@ runtime role meaning.
 Callers receive `Bilimbi.Base.Tenancy.Identity`, never the private Ecto schema.
 `fetch_tenant/1` and `lock_tenant/1` are the public tenant reads for
 cross-module workflows; the latter holds the tenant row lock in the caller's
-transaction.
+transaction. `list_tenants/0` and `count_tenants/0` enumerate live tenants as
+`Identity` values for administration and visibility; they omit soft-deleted
+rows and do not leak the schema. Web must authorize those reads with
+`admin.tenancy.tenant.list` rather than the operator marker.
 
 ## Scope
 

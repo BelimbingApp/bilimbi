@@ -69,6 +69,34 @@ defmodule Bilimbi.Base.Tenancy do
   end
 
   @doc """
+  Lists live tenants as public identities, ordered by name then id.
+
+  Soft-deleted tenants are omitted. This is a platform-level read; Web must
+  gate it with `admin.tenancy.tenant.list` rather than inferring authority
+  from the operator marker. Callers receive `Identity` values, never schemas.
+  """
+  @spec list_tenants() :: [Identity.t()]
+  def list_tenants do
+    from(tenant in Tenant,
+      where: is_nil(tenant.deleted_at),
+      order_by: [asc: tenant.name, asc: tenant.id]
+    )
+    |> Repo.all()
+    |> Enum.map(&Identity.from_schema/1)
+  end
+
+  @doc """
+  Counts live tenants.
+
+  Used for management-surface visibility without querying the private schema.
+  Soft-deleted tenants are omitted, matching `list_tenants/0`.
+  """
+  @spec count_tenants() :: non_neg_integer()
+  def count_tenants do
+    Repo.aggregate(from(tenant in Tenant, where: is_nil(tenant.deleted_at)), :count)
+  end
+
+  @doc """
   Builds the tenant scope that every tenant-owned operation is performed under.
 
   Resolving the tenant is this function's job and no other module's. A caller
