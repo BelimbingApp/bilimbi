@@ -131,8 +131,13 @@ defmodule Bilimbi.Base.Authz.Administration do
     )
   end
 
-  @spec list_principal_role_assignments(Scope.t(), :user | :agent, pos_integer(), keyword(), map()) ::
-          Page.t(PrincipalRoleSummary.t())
+  @spec list_principal_role_assignments(
+          Scope.t(),
+          :user | :agent,
+          pos_integer(),
+          keyword(),
+          map()
+        ) :: Page.t(PrincipalRoleSummary.t())
   def list_principal_role_assignments(
         %Scope{} = scope,
         principal_type,

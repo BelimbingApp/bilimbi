@@ -191,7 +191,8 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert %Page{entries: assignments, total_entries: 2, total_pages: 1} =
              Authz.list_principal_role_assignments(tenant_scope, :user, 7, page_size: 2)
 
-    assert Enum.map(assignments, & &1.role_code) == Enum.sort(Enum.map(assignments, & &1.role_code))
+    assert Enum.map(assignments, & &1.role_code) ==
+             Enum.sort(Enum.map(assignments, & &1.role_code))
 
     assert %{
              company_id: 10,
