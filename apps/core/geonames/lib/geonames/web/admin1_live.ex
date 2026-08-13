@@ -184,7 +184,12 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
     |> assign(:filter_countries, Geonames.admin1_filter_countries())
     |> assign(
       :filters_form,
-      to_form(%{"search" => state.search, "countryIso" => state.country_iso, "perPage" => state.per_page},
+      to_form(
+        %{
+          "search" => state.search,
+          "countryIso" => state.country_iso,
+          "perPage" => state.per_page
+        },
         as: :filters
       )
     )

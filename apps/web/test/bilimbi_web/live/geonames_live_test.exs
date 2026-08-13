@@ -117,7 +117,9 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     admin1
     |> element("#admin1-filters")
-    |> render_change(%{"filters" => %{"search" => "missing", "countryIso" => "", "perPage" => "20"}})
+    |> render_change(%{
+      "filters" => %{"search" => "missing", "countryIso" => "", "perPage" => "20"}
+    })
 
     assert has_element?(admin1, "#admin1-empty")
 

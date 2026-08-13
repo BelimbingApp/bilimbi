@@ -549,7 +549,8 @@ defmodule Bilimbi.Core.Geonames do
       {:ok, iso} when byte_size(iso) == 2 ->
         if String.match?(iso, ~r/\A[A-Za-z]{2}\z/), do: {:ok, String.upcase(iso)}, else: :error
 
-      _other -> :error
+      _other ->
+        :error
     end
   end
 

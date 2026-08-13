@@ -107,7 +107,8 @@ defmodule Bilimbi.Core.GeonamesTest do
              & &1.iso
            ) == ["ZZ", "AA"]
 
-    assert %{page: 1, page_size: 300} = Geonames.page_countries(%{"page" => "0", "page_size" => "1000"})
+    assert %{page: 1, page_size: 300} =
+             Geonames.page_countries(%{"page" => "0", "page_size" => "1000"})
 
     assert %{page: 9, total_pages: 1, entries: []} =
              Geonames.page_countries(%{"search" => "Japan", "page" => "9"})
@@ -194,12 +195,16 @@ defmodule Bilimbi.Core.GeonamesTest do
     assert [%{postcode: "94105", country_name: "United States"}] =
              Geonames.page_postcodes(%{"search" => "San Francisco"}).entries
 
-    assert Enum.map(Geonames.page_postcodes(%{"search" => "us"}).entries, & &postcode.postcode) == [
-             "10001",
-             "94105"
-           ]
+    assert Enum.map(Geonames.page_postcodes(%{"search" => "us"}).entries, &(&1.postcode)) ==
+             [
+               "10001",
+               "94105"
+             ]
 
-    assert Enum.map(Geonames.page_postcodes(%{"search" => "United"}).entries, & &postcode.postcode) == [
+    assert Enum.map(
+             Geonames.page_postcodes(%{"search" => "United"}).entries,
+             &(&1.postcode)
+           ) == [
              "10001",
              "94105"
            ]
