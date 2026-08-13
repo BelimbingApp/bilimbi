@@ -46,12 +46,16 @@ not one OTP application inside it.
 ## 2. Current scope
 
 The initial Bilimbi implementation contains the Platform Baseline and its web
-host. Base Tenancy, Core Company, Core Geonames, Core Address, Core Employee,
-and Core User are active foundation slices:
+host. Base Settings, Base Tenancy, Base Authz, Base Audit, Core Company,
+Core Geonames, Core Address, Core Employee, and Core User are active foundation
+slices:
 
 ```text
 apps/base/database/
+apps/base/settings/
 apps/base/tenancy/
+apps/base/authz/
+apps/base/audit/
 apps/core/company/
 apps/core/geonames/
 apps/core/address/
@@ -189,9 +193,10 @@ from, write to, rename, or repurpose Laravel's `migrations` table. Migration
 files stay with their owner:
 
 ```text
-apps/base/tenancy/priv/repo/migrations/
 apps/base/settings/priv/repo/migrations/
+apps/base/tenancy/priv/repo/migrations/
 apps/base/authz/priv/repo/migrations/
+apps/base/audit/priv/repo/migrations/
 apps/core/company/priv/repo/migrations/
 apps/core/geonames/priv/repo/migrations/
 apps/core/address/priv/repo/migrations/

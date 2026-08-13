@@ -11,6 +11,7 @@
     "base/authz",
     "base/settings",
     "base/tenancy",
+    "base/audit",
     "core/company",
     "core/geonames",
     "core/address",
