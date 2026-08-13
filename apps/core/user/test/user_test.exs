@@ -1,16 +1,39 @@
 defmodule Bilimbi.Core.UserTest do
-  use Bilimbi.Base.Database.DataCase, async: true
+  use Bilimbi.Base.Database.DataCase, async: false
 
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
+  alias Bilimbi.Base.Settings.ContributionValidator
+  alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.User
+  alias Bilimbi.Core.User.Contributions
   alias Bilimbi.Core.User.Summary
 
   import Bilimbi.Core.User.TestFixtures
 
+  setup_all do
+    settings =
+      ContributionValidator.validate_contributions!([
+        %{
+          descriptor: %{id: "core/user"},
+          payload: Contributions.contributions().settings
+        }
+      ])
+
+    ContributionRegistry.put_snapshot_for_test!(%{
+      graph_fingerprint: "core-user-test",
+      consumers: %{settings: settings, authz: [], menu: []}
+    })
+
+    on_exit(&ContributionRegistry.clear_for_test!/0)
+    :ok
+  end
+
   setup do
     create_user_tables!()
+    SettingsFixtures.create_settings_table!()
 
     CompanyFixtures.insert_tenant!(%{id: 41, name: "Tenant A"})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41, name: "Company A", code: "a"})
@@ -91,20 +114,28 @@ defmodule Bilimbi.Core.UserTest do
   end
 
   describe "credentials" do
-    test "stores a supplied bcrypt hash unchanged", %{scope_a: scope_a} do
+    test "registers with an Argon2id hash and normalizes the email", %{scope_a: scope_a} do
       assert {:ok, %Summary{id: id}} = User.create_user(scope_a, 73, valid_attributes())
-      assert stored_password(id) == password_hash()
+      stored = stored_password(id)
+
+      assert String.starts_with?(stored, "$argon2id$")
+      assert Argon2.verify_pass("correct horse", stored)
+      refute stored == "correct horse"
+
+      assert {:ok, %Summary{email: "ada@example.com"}} =
+               User.get_user(scope_a, 73, id)
     end
 
-    test "rejects a plaintext password", %{scope_a: scope_a} do
-      attributes = Map.put(valid_attributes(), :password_hash, "hunter2")
+    test "rejects a short or pre-hashed credential", %{scope_a: scope_a} do
+      assert {:error, short_changeset} =
+               User.create_user(scope_a, 73, Map.put(valid_attributes(), :password, "short"))
 
-      assert {:error, changeset} = User.create_user(scope_a, 73, attributes)
-      assert %{password_hash: ["must be a bcrypt crypt-format hash"]} = errors_on(changeset)
-    end
+      assert %{password: ["should be at least 8 character(s)"]} = errors_on(short_changeset)
 
-    test "rejects a missing credential", %{scope_a: scope_a} do
-      attributes = Map.delete(valid_attributes(), :password_hash)
+      attributes =
+        valid_attributes()
+        |> Map.delete(:password)
+        |> Map.put(:password_hash, password_hash())
 
       assert {:error, changeset} = User.create_user(scope_a, 73, attributes)
       assert %{password: ["can't be blank"]} = errors_on(changeset)
@@ -115,6 +146,234 @@ defmodule Bilimbi.Core.UserTest do
 
       refute summary |> Map.from_struct() |> Map.has_key?(:password)
       refute summary |> Map.from_struct() |> Map.has_key?(:remember_token)
+    end
+
+    test "authenticates without exposing why a login failed" do
+      insert_user!(%{email: "login@example.com", password_hash: password_hash("right-password")})
+
+      assert {:ok, %Summary{id: 91}} = User.authenticate(" LOGIN@example.com ", "right-password")
+      assert {:error, :invalid_credentials} = User.authenticate("login@example.com", "wrong")
+      assert {:error, :invalid_credentials} = User.authenticate("missing@example.com", "wrong")
+    end
+
+    test "authenticates a hash produced with Belimbing's Laravel Argon2id parameters" do
+      hash = laravel_argon2_password_hash()
+      insert_user!(%{email: "laravel@example.com", password_hash: hash})
+
+      assert {:ok, %Summary{id: 91}} =
+               User.authenticate("laravel@example.com", "laravel-password")
+
+      assert stored_password(91) == hash
+    end
+
+    test "upgrades a Laravel $2y$ bcrypt credential after successful login" do
+      legacy_hash = legacy_password_hash("legacy-password")
+      insert_user!(%{email: "legacy@example.com", password_hash: legacy_hash})
+
+      assert stored_password(91) == legacy_hash
+      assert {:ok, %Summary{id: 91}} = User.authenticate("legacy@example.com", "legacy-password")
+
+      upgraded = stored_password(91)
+      assert String.starts_with?(upgraded, "$argon2id$")
+      assert Argon2.verify_pass("legacy-password", upgraded)
+    end
+
+    test "confirms and changes a password only inside the user's company", %{
+      scope_a: scope_a,
+      scope_b: scope_b
+    } do
+      insert_user!(%{password_hash: password_hash("old-password")})
+
+      assert :ok = User.confirm_password(scope_a, 73, 91, "old-password")
+      assert {:error, :invalid_password} = User.confirm_password(scope_a, 73, 91, "wrong")
+      assert {:error, :company_not_found} = User.confirm_password(scope_b, 73, 91, "old-password")
+
+      assert {:ok, %Summary{id: 91}} =
+               User.change_password(scope_a, 73, 91, "old-password", "new-password")
+
+      assert {:ok, %Summary{id: 91}} = User.authenticate("ada@example.com", "new-password")
+      assert {:error, :invalid_credentials} = User.authenticate("ada@example.com", "old-password")
+    end
+  end
+
+  describe "password reset" do
+    test "keeps unknown-account requests neutral and never calls delivery" do
+      assert :ok =
+               User.request_password_reset("missing@example.com", fn _user, _token ->
+                 flunk("delivery must not run for a missing account")
+               end)
+    end
+
+    test "stores only a hash, throttles repeats, and resets with a valid token" do
+      insert_user!(%{
+        email: "reset@example.com",
+        password_hash: password_hash("old-password"),
+        remember_token: "stale-token"
+      })
+
+      deliver = fn user, token ->
+        send(self(), {:password_reset, user, token})
+        :ok
+      end
+
+      assert :ok = User.request_password_reset("reset@example.com", deliver)
+      assert_receive {:password_reset, %Summary{id: 91}, token}
+      refute stored_reset_token("reset@example.com") == token
+
+      assert :ok = User.request_password_reset("reset@example.com", deliver)
+      refute_receive {:password_reset, _, _}
+
+      assert {:error, :invalid_or_expired_token} =
+               User.reset_password("reset@example.com", "wrong-token", "new-password")
+
+      assert {:ok, %Summary{id: 91}} =
+               User.reset_password("reset@example.com", token, "new-password")
+
+      assert {:ok, %Summary{id: 91}} = User.authenticate("reset@example.com", "new-password")
+      refute stored_remember_token(91) in [nil, "stale-token"]
+
+      assert {:error, :invalid_or_expired_token} =
+               User.reset_password("reset@example.com", token, "another-password")
+    end
+
+    test "rejects expired tokens and validates the replacement password" do
+      insert_user!(%{email: "reset@example.com"})
+
+      assert :ok =
+               User.request_password_reset(
+                 "reset@example.com",
+                 fn _user, token ->
+                   send(self(), {:password_reset, token})
+                   :ok
+                 end,
+                 throttle_seconds: 0
+               )
+
+      assert_receive {:password_reset, token}
+
+      assert {:error, changeset} =
+               User.reset_password("reset@example.com", token, "short")
+
+      assert %{password: ["should be at least 8 character(s)"]} = errors_on(changeset)
+
+      expire_reset_token!("reset@example.com")
+
+      assert {:error, :invalid_or_expired_token} =
+               User.reset_password("reset@example.com", token, "long-enough")
+    end
+  end
+
+  describe "email verification" do
+    @verification_secret String.duplicate("email-verification-secret-", 2)
+
+    test "verifies an unmodified email once and is then idempotent", %{scope_a: scope_a} do
+      insert_user!()
+
+      assert {:ok, token} =
+               User.issue_email_verification_token(
+                 scope_a,
+                 73,
+                 91,
+                 @verification_secret
+               )
+
+      assert {:ok, :verified, %Summary{email_verified_at: %NaiveDateTime{}}} =
+               User.verify_email(scope_a, 73, token, @verification_secret)
+
+      assert {:ok, :already_verified, %Summary{}} =
+               User.verify_email(scope_a, 73, token, @verification_secret)
+
+      assert {:error, :already_verified} =
+               User.issue_email_verification_token(
+                 scope_a,
+                 73,
+                 91,
+                 @verification_secret
+               )
+    end
+
+    test "rejects tampered, expired, and email-invalidated tokens", %{scope_a: scope_a} do
+      insert_user!()
+
+      assert {:ok, token} =
+               User.issue_email_verification_token(
+                 scope_a,
+                 73,
+                 91,
+                 @verification_secret
+               )
+
+      assert {:error, :invalid_or_expired_token} =
+               User.verify_email(scope_a, 73, token <> "tampered", @verification_secret)
+
+      assert {:ok, expired} =
+               User.issue_email_verification_token(
+                 scope_a,
+                 73,
+                 91,
+                 @verification_secret,
+                 signed_at: 0
+               )
+
+      assert {:error, :invalid_or_expired_token} =
+               User.verify_email(scope_a, 73, expired, @verification_secret)
+
+      assert {:ok, %Summary{email_verified_at: nil}} =
+               User.update_user(scope_a, 73, 91, %{email: "changed@example.com"})
+
+      assert {:error, :invalid_or_expired_token} =
+               User.verify_email(scope_a, 73, token, @verification_secret)
+    end
+  end
+
+  describe "user preferences" do
+    test "publishes the four canonical setting definitions" do
+      definitions = Contributions.contributions().settings.definitions
+
+      assert Map.keys(definitions) |> Enum.sort() == [
+               "ai.last_used_model_hints",
+               "ui.dashboard.layout",
+               "ui.landing_menu_id",
+               "ui.theme"
+             ]
+
+      assert definitions["ui.theme"] == %{
+               type: :string,
+               scopes: [:user],
+               default: "system",
+               label: "Theme",
+               help: "Choose a light, dark, or operating-system-controlled color theme.",
+               editable: "profile.appearance",
+               capability: "base.settings.user.manage"
+             }
+    end
+
+    test "resolves defaults and stores validated overrides inside the user boundary", %{
+      scope_a: scope_a,
+      scope_b: scope_b
+    } do
+      insert_user!()
+
+      assert {:ok, preferences} = User.user_preferences(scope_a, 73, 91)
+      assert preferences["ui.theme"] == "system"
+      assert preferences["ui.landing_menu_id"] == ""
+      assert preferences["ui.dashboard.layout"] == []
+      assert preferences["ai.last_used_model_hints"] == []
+
+      assert {:ok, "dark"} =
+               User.put_user_preference(scope_a, 73, 91, "ui.theme", "dark")
+
+      assert {:ok, "dark"} = User.get_user_preference(scope_a, 73, 91, "ui.theme")
+      assert :ok = User.delete_user_preference(scope_a, 73, 91, "ui.theme")
+      assert {:ok, "system"} = User.get_user_preference(scope_a, 73, 91, "ui.theme")
+
+      assert {:error, :invalid_preference} =
+               User.put_user_preference(scope_a, 73, 91, "ui.theme", "sepia")
+
+      assert {:error, :unsupported_preference} =
+               User.get_user_preference(scope_a, 73, 91, "unknown")
+
+      assert {:error, :company_not_found} = User.user_preferences(scope_b, 73, 91)
     end
   end
 
@@ -159,6 +418,13 @@ defmodule Bilimbi.Core.UserTest do
       assert {:error, changeset} = User.create_user(scope_a, 73, valid_attributes())
       assert %{email: ["has already been taken"]} = errors_on(changeset)
     end
+
+    test "changing an email clears its verification timestamp", %{scope_a: scope_a} do
+      insert_user!(%{email_verified_at: ~N[2026-08-13 12:00:00]})
+
+      assert {:ok, %Summary{email: "changed@example.com", email_verified_at: nil}} =
+               User.update_user(scope_a, 73, 91, %{email: "CHANGED@example.com"})
+    end
   end
 
   test "publishes the durable Laravel notifiable identity" do
@@ -166,7 +432,7 @@ defmodule Bilimbi.Core.UserTest do
   end
 
   defp valid_attributes do
-    %{name: "Ada Lovelace", email: "ada@example.com", password_hash: password_hash()}
+    %{name: "Ada Lovelace", email: " ADA@example.com ", password: "correct horse"}
   end
 
   defp errors_on(changeset) do

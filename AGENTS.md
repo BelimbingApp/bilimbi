@@ -220,6 +220,14 @@ Laravel payloads or attach authentication semantics. Operational listings must
 not expose payloads, and terminating another session must protect the caller's
 current session ID.
 
+Core User owns account credentials and lifecycle. New hashes are Argon2id;
+existing Laravel Argon2 hashes remain valid and successful legacy `$2y$`
+bcrypt logins are upgraded. Never accept a caller-supplied password hash or
+expose credential/reset-token schemas. Core provides neutral reset and signed
+verification primitives; Web owns routes, IP/login throttling, delivery,
+cookies, and the authenticated Session adapter. Public self-registration stays
+disabled unless a future architecture decision explicitly changes that policy.
+
 The explicit-tenancy compatibility source is Belimbing merge commit
 `e70b4d33c0b10790e681f4c2b5095d85a53bc918`. Resolve the platform operator only
 through `tenants.is_platform_operator`, and resolve a tenant's primary company
