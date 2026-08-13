@@ -9,6 +9,7 @@ defmodule Bilimbi.Base.Authz.Administration do
   alias Bilimbi.Base.Authz.PrincipalCapability
   alias Bilimbi.Base.Authz.PrincipalCapabilitySummary
   alias Bilimbi.Base.Authz.PrincipalRole
+  alias Bilimbi.Base.Authz.PrincipalRoleSummary
   alias Bilimbi.Base.Authz.Role
   alias Bilimbi.Base.Authz.RoleCapability
   alias Bilimbi.Base.Authz.RoleSummary
@@ -103,6 +104,8 @@ defmodule Bilimbi.Base.Authz.Administration do
       page_options!(opts,
         search: nil,
         allowed: nil,
+        principal_type: nil,
+        principal_id: nil,
         sort_by: :created_at,
         sort_dir: :desc
       )
@@ -113,6 +116,7 @@ defmodule Bilimbi.Base.Authz.Administration do
       from(grant in PrincipalCapability, where: ^visibility)
       |> maybe_search_principal_capabilities(search!(opts[:search]))
       |> maybe_filter_principal_allowed(allowed!(opts[:allowed]))
+      |> filter_principal(principal_filter!(opts[:principal_type], opts[:principal_id]))
 
     page_query(
       query,
@@ -124,6 +128,46 @@ defmodule Bilimbi.Base.Authz.Administration do
       ),
       opts,
       fn rows -> Enum.map(rows, &PrincipalCapabilitySummary.from_schema/1) end
+    )
+  end
+
+  @spec list_principal_role_assignments(Scope.t(), :user | :agent, pos_integer(), keyword(), map()) ::
+          Page.t(PrincipalRoleSummary.t())
+  def list_principal_role_assignments(
+        %Scope{} = scope,
+        principal_type,
+        principal_id,
+        opts,
+        registry
+      )
+      when is_list(opts) do
+    {principal_type, principal_id} = principal_filter!(principal_type, principal_id)
+    opts = page_options!(opts, [])
+    visibility = company_visibility(scope, company_ids(scope, registry))
+
+    query =
+      from(assignment in PrincipalRole,
+        join: role in Role,
+        on: role.id == assignment.role_id,
+        where: assignment.principal_type == ^principal_type,
+        where: assignment.principal_id == ^principal_id,
+        where: ^visibility
+      )
+
+    ordered_query =
+      query
+      |> order_by([assignment, role], asc: role.code, asc: assignment.id)
+      |> select([assignment, role], %{assignment: assignment, role: role})
+
+    page_query(
+      query,
+      ordered_query,
+      opts,
+      fn rows ->
+        Enum.map(rows, fn %{assignment: assignment, role: role} ->
+          PrincipalRoleSummary.from_schema(assignment, role)
+        end)
+      end
     )
   end
 
@@ -245,6 +289,14 @@ defmodule Bilimbi.Base.Authz.Administration do
     from(grant in query, where: grant.is_allowed == ^allowed)
   end
 
+  defp filter_principal(query, nil), do: query
+
+  defp filter_principal(query, {principal_type, principal_id}) do
+    from(grant in query,
+      where: grant.principal_type == ^principal_type and grant.principal_id == ^principal_id
+    )
+  end
+
   defp order_query(query, sort_by, opts, fields) do
     direction = sort_dir!(opts[:sort_dir])
     field = Map.fetch!(fields, sort_by)
@@ -267,6 +319,19 @@ defmodule Bilimbi.Base.Authz.Administration do
 
   defp allowed!(value) do
     raise ArgumentError, "allowed filter must be true, false, or nil, got: #{inspect(value)}"
+  end
+
+  defp principal_filter!(nil, nil), do: nil
+
+  defp principal_filter!(principal_type, principal_id)
+       when principal_type in [:user, :agent] and is_integer(principal_id) and principal_id > 0 do
+    {Atom.to_string(principal_type), principal_id}
+  end
+
+  defp principal_filter!(principal_type, principal_id) do
+    raise ArgumentError,
+          "principal filter must be a :user or :agent with a positive ID, got: " <>
+            inspect({principal_type, principal_id})
   end
 
   defp sort_by!(value, fields) do
