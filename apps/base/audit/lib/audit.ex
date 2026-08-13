@@ -2,10 +2,12 @@ defmodule Bilimbi.Base.Audit do
   @moduledoc """
   Public API for durable mutation and action facts.
 
-  Recording accepts caller-assigned identity (`tenant_id`, `company_id`, and
-  the actor pair) because rows outlive their subjects and `tenant_id` is
-  nullable. Listing is tenant-scoped: a `Bilimbi.Base.Tenancy.Scope` is
-  required, and null-tenant rows are invisible to every tenant.
+  Tenant identity is never taken from the attributes map. Scoped recording
+  derives `tenant_id` from a `Bilimbi.Base.Tenancy.Scope`. Unscoped recording
+  (`:unscoped`) forces `tenant_id` to null. `company_id` and the actor pair
+  are caller-assigned because rows outlive their subjects and have no foreign
+  keys. Listing is tenant-scoped: a scope is required, and null-tenant rows
+  are invisible to every tenant.
   """
 
   import Ecto.Query
@@ -18,20 +20,24 @@ defmodule Bilimbi.Base.Audit do
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Scope
 
-  @spec record_mutation(map()) :: {:ok, Mutation.t()} | {:error, Ecto.Changeset.t()}
-  def record_mutation(attributes) when is_map(attributes) do
-    attributes
-    |> MutationSchema.changeset()
-    |> Repo.insert()
-    |> map_mutation()
+  @spec record_mutation(Scope.t() | :unscoped, map()) ::
+          {:ok, Mutation.t()} | {:error, Ecto.Changeset.t()}
+  def record_mutation(%Scope{} = scope, attributes) when is_map(attributes) do
+    persist_mutation(attributes, Scope.tenant_id(scope))
   end
 
-  @spec record_action(map()) :: {:ok, Action.t()} | {:error, Ecto.Changeset.t()}
-  def record_action(attributes) when is_map(attributes) do
-    attributes
-    |> ActionSchema.changeset()
-    |> Repo.insert()
-    |> map_action()
+  def record_mutation(:unscoped, attributes) when is_map(attributes) do
+    persist_mutation(attributes, nil)
+  end
+
+  @spec record_action(Scope.t() | :unscoped, map()) ::
+          {:ok, Action.t()} | {:error, Ecto.Changeset.t()}
+  def record_action(%Scope{} = scope, attributes) when is_map(attributes) do
+    persist_action(attributes, Scope.tenant_id(scope))
+  end
+
+  def record_action(:unscoped, attributes) when is_map(attributes) do
+    persist_action(attributes, nil)
   end
 
   @spec list_mutations(Scope.t()) :: {:ok, [Mutation.t()]}
@@ -56,6 +62,20 @@ defmodule Bilimbi.Base.Audit do
       |> Enum.map(&Action.from_schema/1)
 
     {:ok, actions}
+  end
+
+  defp persist_mutation(attributes, tenant_id) do
+    attributes
+    |> MutationSchema.changeset(tenant_id)
+    |> Repo.insert()
+    |> map_mutation()
+  end
+
+  defp persist_action(attributes, tenant_id) do
+    attributes
+    |> ActionSchema.changeset(tenant_id)
+    |> Repo.insert()
+    |> map_action()
   end
 
   defp map_mutation({:ok, mutation}), do: {:ok, Mutation.from_schema(mutation)}

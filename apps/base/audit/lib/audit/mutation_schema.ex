@@ -5,8 +5,8 @@ defmodule Bilimbi.Base.Audit.MutationSchema do
 
   import Ecto.Changeset
 
-  @actor_types ~w(user agent console scheduler queue)
-  @assigned [:tenant_id, :company_id, :actor_type, :actor_id]
+  @actor_types ~w(user agent guest console scheduler queue)
+  @assigned [:company_id, :actor_type, :actor_id]
   @cast_fields [
     :actor_role,
     :ip_address,
@@ -24,7 +24,15 @@ defmodule Bilimbi.Base.Audit.MutationSchema do
     :trace_id,
     :occurred_at
   ]
-  @required [:actor_type, :actor_id, :auditable_type, :auditable_id, :event, :occurred_at]
+  @required [
+    :actor_type,
+    :actor_id,
+    :auditable_type,
+    :auditable_id,
+    :source,
+    :event,
+    :occurred_at
+  ]
 
   @primary_key {:id, :id, autogenerate: true}
 
@@ -52,11 +60,13 @@ defmodule Bilimbi.Base.Audit.MutationSchema do
 
   @type t :: %__MODULE__{}
 
-  @spec changeset(map()) :: Ecto.Changeset.t()
-  def changeset(attributes) when is_map(attributes) do
+  @spec changeset(map(), pos_integer() | nil) :: Ecto.Changeset.t()
+  def changeset(attributes, tenant_id)
+      when is_map(attributes) and (is_nil(tenant_id) or (is_integer(tenant_id) and tenant_id > 0)) do
     %__MODULE__{}
     |> cast(attributes, @cast_fields)
     |> put_assigned(attributes)
+    |> put_change(:tenant_id, tenant_id)
     |> update_change(:occurred_at, &truncate_occurred_at/1)
     |> validate_required(@required)
     |> validate_inclusion(:actor_type, @actor_types)
@@ -73,7 +83,8 @@ defmodule Bilimbi.Base.Audit.MutationSchema do
     |> validate_length(:trace_id, max: 12)
   end
 
-  # Identity columns arrive from the recording caller, never from a form cast.
+  # Company and actor identity arrive from the recording caller, never from a form cast.
+  # Tenant identity is supplied by the public API from a Scope or :unscoped, never the map.
   defp put_assigned(changeset, attributes) do
     Enum.reduce(@assigned, changeset, fn field, acc ->
       case fetch_attribute(attributes, field) do

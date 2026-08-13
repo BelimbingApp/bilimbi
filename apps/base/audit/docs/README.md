@@ -5,8 +5,10 @@
 
 The module records durable mutation and action facts. Rows outlive their
 actors and subjects: `company_id`, `tenant_id`, and the actor pair have
-**no foreign keys**. `tenant_id` is nullable so a row captured without a
-resolvable tenant stays null. Numeric ID 1 has no runtime meaning.
+**no foreign keys**. Recording takes a `Bilimbi.Base.Tenancy.Scope` or
+`:unscoped`; it never reads `tenant_id` from the attributes map. Unscoped
+rows stay null. Numeric ID 1 has no runtime meaning. Actor types are
+`user`, `agent`, `guest`, `console`, `scheduler`, and `queue`.
 
 Payloads are PostgreSQL `jsonb`. `ip_address` is `inet`, matching Laravel 13
 `ipAddress()` on PostgreSQL. There are no `created_at` / `updated_at` /
