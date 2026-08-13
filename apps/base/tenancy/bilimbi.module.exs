@@ -7,6 +7,7 @@
   namespace: Bilimbi.Base.Tenancy,
   dependencies: ["base/database", "base/module_registry"],
   migrations: "priv/repo/migrations",
+  web: nil,
   schema_contract: Bilimbi.Base.Tenancy.SchemaContract,
   contribution_provider: Bilimbi.Base.Tenancy.Contributions
 ]

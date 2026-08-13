@@ -232,6 +232,124 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
     assert MixDiscovery.missing_compatibility_contributors(modules) == []
   end
 
+  test "rejects a descriptor missing the web key", %{root: root} do
+    put_container!(root, "base", :base)
+    path = Path.join([root, "apps", "base", "broken"])
+    File.mkdir_p!(path)
+
+    File.write!(
+      Path.join(path, "bilimbi.module.exs"),
+      inspect(
+        [
+          id: "base/broken",
+          kind: :module,
+          layer: :base,
+          required: true,
+          otp_app: :test_base_broken,
+          namespace: Test.Base.Broken,
+          dependencies: [],
+          migrations: nil,
+          schema_contract: nil,
+          contribution_provider: nil
+        ],
+        pretty: true,
+        limit: :infinity
+      ) <> "\n"
+    )
+
+    assert_raise ArgumentError, ~r/expected keys/, fn ->
+      MixDiscovery.discover_workspace!(root)
+    end
+  end
+
+  test "accepts web: pointing at an existing route data file", %{root: root} do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    File.mkdir_p!(Path.join(module_root, "priv"))
+    File.write!(Path.join(module_root, "priv/web_routes.exs"), "[]\n")
+
+    assert [%{id: "base/ui", web: "priv/web_routes.exs"}] = MixDiscovery.discover_workspace!(root)
+  end
+
+  test "rejects web: pointing at a missing file", %{root: root} do
+    put_container!(root, "base", :base)
+    put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+
+    assert_raise ArgumentError, ~r/declared web route data file does not exist/, fn ->
+      MixDiscovery.discover_workspace!(root)
+    end
+  end
+
+  test "rejects web: containing a parent directory segment", %{root: root} do
+    put_container!(root, "base", :base)
+    put_module!(root, "base", "ui", web: "../other/web_routes.exs")
+
+    assert_raise ArgumentError, ~r/web must be nil or a safe relative path/, fn ->
+      MixDiscovery.discover_workspace!(root)
+    end
+  end
+
+  test "route manifest includes a module live route with its source", %{root: root} do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    File.mkdir_p!(Path.join(module_root, "priv"))
+
+    File.write!(
+      Path.join(module_root, "priv/web_routes.exs"),
+      """
+      [
+        %{path: "/widgets", live: Test.WidgetLive, session: :auth, capability: nil}
+      ]
+      """
+    )
+
+    MixDiscovery.write_route_manifest!(root)
+    {routes, _binding} = Code.eval_file(MixDiscovery.route_manifest_path(root))
+
+    assert [
+             %{
+               path: "/widgets",
+               live: Test.WidgetLive,
+               session: :auth,
+               capability: nil,
+               source: "base/ui"
+             }
+           ] = routes
+  end
+
+  test "route manifest appends host routes with source web", %{root: root} do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    File.mkdir_p!(Path.join(module_root, "priv"))
+    File.write!(Path.join(module_root, "priv/web_routes.exs"), "[%{path: \"/widgets\"}]\n")
+
+    File.mkdir_p!(Path.join([root, "apps", "web", "priv"]))
+
+    File.write!(
+      Path.join([root, "apps", "web", "priv", "web_routes.exs"]),
+      "[%{path: \"/\", live: Test.LoginLive, session: :anonymous, capability: nil}]\n"
+    )
+
+    MixDiscovery.write_route_manifest!(root)
+    {routes, _binding} = Code.eval_file(MixDiscovery.route_manifest_path(root))
+
+    assert Enum.map(routes, &{&1.path, &1.source}) == [
+             {"/widgets", "base/ui"},
+             {"/", "web"}
+           ]
+  end
+
+  test "workspace fingerprint changes when a web_routes.exs file changes", %{root: root} do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    File.mkdir_p!(Path.join(module_root, "priv"))
+    File.write!(Path.join(module_root, "priv/web_routes.exs"), "[]\n")
+    first = MixDiscovery.workspace_fingerprint(root)
+
+    File.write!(Path.join(module_root, "priv/web_routes.exs"), "[%{path: \"/x\"}]\n")
+    refute MixDiscovery.workspace_fingerprint(root) == first
+  end
+
   defp put_container!(root, id, layer) do
     path = Path.join([root, "apps", id])
     File.mkdir_p!(path)
@@ -261,6 +379,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
       namespace: Module.concat([Test, Macro.camelize(container), Macro.camelize(name)]),
       dependencies: Keyword.get(overrides, :dependencies, []),
       migrations: Keyword.get(overrides, :migrations, nil),
+      web: Keyword.get(overrides, :web, nil),
       schema_contract: Keyword.get(overrides, :schema_contract, nil),
       contribution_provider: Keyword.get(overrides, :contribution_provider, nil)
     ]

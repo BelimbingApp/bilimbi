@@ -29,7 +29,7 @@ defmodule BilimbiWeb.Router do
     plug :accepts, ["html"]
     plug :fetch_session
     plug :fetch_live_flash
-    plug :put_root_layout, html: {BilimbiWeb.Layouts, :root}
+    plug :put_root_layout, html: {Bilimbi.Base.UI.Layouts, :root}
     plug :protect_from_forgery
 
     plug :put_secure_browser_headers, %{
@@ -173,6 +173,14 @@ defmodule BilimbiWeb.Router do
       live "/users/:id/edit", UserLive.Form, :edit
     end
   end
+
+  @manifest_path Path.expand(
+                   "../../../../_build/#{Application.compile_env!(:web, :mix_env)}/bilimbi_routes.exs",
+                   __DIR__
+                 )
+  @external_resource @manifest_path
+  require BilimbiWeb.DiscoveredRoutes
+  BilimbiWeb.DiscoveredRoutes.inject()
 
   # Other scopes may use custom stacks.
   # scope "/api", BilimbiWeb do

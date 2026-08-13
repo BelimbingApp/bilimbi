@@ -23,6 +23,20 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
       migrations: nil
     },
     %{
+      root: Path.join(@base_root, "menu"),
+      id: "base/menu",
+      app: :bilimbi_base_menu,
+      facade: "lib/menu.ex",
+      migrations: nil
+    },
+    %{
+      root: Path.join(@base_root, "ui"),
+      id: "base/ui",
+      app: :bilimbi_base_ui,
+      facade: "lib/ui.ex",
+      migrations: nil
+    },
+    %{
       root: Path.join(@base_root, "settings"),
       id: "base/settings",
       app: :bilimbi_base_settings,
@@ -123,6 +137,7 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
       assert descriptor[:id] == module.id
       assert descriptor[:otp_app] == module.app
       assert descriptor[:migrations] == module.migrations
+      assert descriptor[:web] == nil
 
       if module.migrations do
         assert File.dir?(Path.join(module.root, module.migrations)), module.id
@@ -171,7 +186,7 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
 
       for module <- container_modules do
         refute mix_source =~ Atom.to_string(module.otp_app)
-        refute mix_source =~ Path.basename(module.path)
+        refute mix_source =~ ~s("#{Path.basename(module.path)}")
       end
     end
   end

@@ -19,6 +19,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     :namespace,
     :dependencies,
     :migrations,
+    :web,
     :schema_contract,
     :contribution_provider
   ]
@@ -34,6 +35,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
           namespace: module(),
           dependencies: [String.t()],
           migrations: nil | String.t(),
+          web: nil | String.t(),
           schema_contract: nil | module(),
           contribution_provider: nil | module(),
           path: String.t(),
@@ -117,21 +119,79 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   def workspace_fingerprint(path) do
     workspace_root = workspace_root!(path)
 
-    descriptor_source =
+    files =
       [
         Path.join(workspace_root, "apps/*/#{@container_file}"),
-        Path.join(workspace_root, "apps/*/*/#{@module_file}")
+        Path.join(workspace_root, "apps/*/*/#{@module_file}"),
+        Path.join(workspace_root, "apps/*/*/priv/web_routes.exs"),
+        Path.join(workspace_root, "apps/web/priv/web_routes.exs")
       ]
       |> Enum.flat_map(&Path.wildcard/1)
+      |> Enum.uniq()
       |> Enum.sort()
-      |> Enum.map_join("\0", fn descriptor_path ->
-        relative_path = Path.relative_to(descriptor_path, workspace_root)
-        relative_path <> "\0" <> File.read!(descriptor_path)
+
+    source =
+      Enum.map_join(files, "\0", fn file_path ->
+        relative_path = Path.relative_to(file_path, workspace_root)
+        relative_path <> "\0" <> File.read!(file_path)
       end)
 
     :sha256
-    |> :crypto.hash(descriptor_source)
+    |> :crypto.hash(source)
     |> Base.encode16(case: :lower)
+  end
+
+  @doc "Stable path of the compile-time route manifest for this workspace."
+  @spec route_manifest_path(String.t()) :: String.t()
+  def route_manifest_path(workspace_root) do
+    Path.join(workspace_root, "_build/#{Mix.env()}/bilimbi_routes.exs")
+  end
+
+  @doc """
+  Writes the compile-time route manifest from installed descriptors and the
+  optional host route file.
+
+  Reads descriptors from disk. Does not call the runtime registry.
+  """
+  @spec write_route_manifest!(String.t()) :: :ok
+  def write_route_manifest!(workspace_root) do
+    workspace_root = Path.expand(workspace_root)
+    modules = discover_workspace!(workspace_root)
+
+    module_routes =
+      Enum.flat_map(modules, fn descriptor ->
+        case descriptor.web do
+          path when is_binary(path) ->
+            descriptor.path
+            |> Path.join(path)
+            |> eval_routes!()
+            |> Enum.map(&normalize_route!(&1, descriptor.id))
+
+          nil ->
+            []
+        end
+      end)
+
+    host_file = Path.join(workspace_root, "apps/web/priv/web_routes.exs")
+
+    host_routes =
+      if File.regular?(host_file) do
+        host_file
+        |> eval_routes!()
+        |> Enum.map(&normalize_route!(&1, "web"))
+      else
+        []
+      end
+
+    contents = inspect(module_routes ++ host_routes, pretty: true, limit: :infinity) <> "\n"
+    manifest = route_manifest_path(workspace_root)
+
+    unless File.regular?(manifest) and File.read!(manifest) == contents do
+      File.mkdir_p!(Path.dirname(manifest))
+      File.write!(manifest, contents)
+    end
+
+    :ok
   end
 
   @doc """
@@ -352,6 +412,15 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
       malformed!(path, "declared migration directory does not exist")
     end
 
+    unless valid_relative_path?(descriptor.web) do
+      malformed!(path, "web must be nil or a safe relative path")
+    end
+
+    if descriptor.web &&
+         not File.regular?(Path.join(Path.dirname(path), descriptor.web)) do
+      malformed!(path, "declared web route data file does not exist")
+    end
+
     unless is_nil(descriptor.schema_contract) or is_atom(descriptor.schema_contract) do
       malformed!(path, "schema_contract must be nil or a module atom")
     end
@@ -517,6 +586,64 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   defp valid_optional_module?(nil), do: true
   defp valid_optional_module?(module) when is_atom(module), do: true
   defp valid_optional_module?(_module), do: false
+
+  defp eval_routes!(path) do
+    case Code.eval_file(path) do
+      {routes, _binding} when is_list(routes) ->
+        routes
+
+      {_other, _binding} ->
+        raise ArgumentError, "route data file #{path} must return a list of maps"
+    end
+  end
+
+  defp normalize_route!(route, source) when is_map(route) do
+    path = Map.get(route, :path)
+
+    unless is_binary(path) and String.starts_with?(path, "/") do
+      raise ArgumentError, "route path must be a binary starting with /"
+    end
+
+    if Map.has_key?(route, :live) do
+      live = Map.fetch!(route, :live)
+
+      unless is_atom(live) and not is_nil(live) do
+        raise ArgumentError, "route live must be a module atom"
+      end
+    end
+
+    verb = Map.get(route, :verb, :get)
+
+    unless is_atom(verb) and not is_nil(verb) do
+      raise ArgumentError, "route verb must be an atom"
+    end
+
+    session = Map.get(route, :session, :auth)
+
+    unless session in [:auth, :anonymous, :none] do
+      raise ArgumentError, "route session must be :auth, :anonymous, or :none"
+    end
+
+    capability = Map.get(route, :capability)
+
+    unless is_nil(capability) or is_binary(capability) do
+      raise ArgumentError, "route capability must be a binary or nil"
+    end
+
+    if Map.has_key?(route, :controller) do
+      controller = Map.fetch!(route, :controller)
+
+      unless is_atom(controller) and not is_nil(controller) do
+        raise ArgumentError, "route controller must be a module atom"
+      end
+    end
+
+    Map.put(route, :source, source)
+  end
+
+  defp normalize_route!(_route, _source) do
+    raise ArgumentError, "each route must be a map"
+  end
 
   defp malformed!(path, message) do
     raise ArgumentError, "malformed Bilimbi module descriptor #{path}: #{message}"
