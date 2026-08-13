@@ -5,8 +5,8 @@
   required: true,
   otp_app: :bilimbi_base_audit,
   namespace: Bilimbi.Base.Audit,
-  dependencies: ["base/database", "base/tenancy"],
+  dependencies: ["base/database", "base/module_registry", "base/tenancy"],
   migrations: "priv/repo/migrations",
   schema_contract: Bilimbi.Base.Audit.SchemaContract,
-  contribution_provider: nil
+  contribution_provider: Bilimbi.Base.Audit.Contributions
 ]

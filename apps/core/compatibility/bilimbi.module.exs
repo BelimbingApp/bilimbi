@@ -7,6 +7,7 @@
   namespace: Bilimbi.Core.Compatibility,
   dependencies: [
     "base/database",
+    "base/menu",
     "base/module_registry",
     "base/authz",
     "base/session",
