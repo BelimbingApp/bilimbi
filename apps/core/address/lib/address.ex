@@ -151,6 +151,63 @@ defmodule Bilimbi.Core.Address do
     end
   end
 
+  @doc "Creates a manual address and its Company attachment in one transaction."
+  @spec create_and_attach_to_company(Scope.t(), pos_integer(), map(), map()) ::
+          {:ok, Summary.t()} | {:error, :company_not_found | Ecto.Changeset.t()}
+  def create_and_attach_to_company(
+        %Scope{} = scope,
+        company_id,
+        address_attributes,
+        attachment_attributes \\ %{}
+      )
+      when is_map(address_attributes) and is_map(attachment_attributes) do
+    Repo.transaction(fn ->
+      _company = require_company!(scope, company_id)
+
+      address =
+        scope
+        |> Scope.tenant_id()
+        |> Schema.creation_changeset(address_attributes)
+        |> Ecto.Changeset.put_change(:source, "manual")
+        |> Ecto.Changeset.put_change(:verification_status, "unverified")
+        |> Repo.insert()
+        |> case do
+          {:ok, address} -> address
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+
+      attachment_attributes =
+        cond do
+          Map.has_key?(attachment_attributes, :valid_from) ->
+            attachment_attributes
+
+          Map.has_key?(attachment_attributes, "valid_from") ->
+            attachment_attributes
+
+          Enum.all?(Map.keys(attachment_attributes), &is_binary/1) ->
+            Map.put(attachment_attributes, "valid_from", Date.utc_today())
+
+          true ->
+            Map.put(attachment_attributes, :valid_from, Date.utc_today())
+        end
+
+      case address.id
+           |> Addressable.company_changeset(
+             company_id,
+             Company.addressable_identity(),
+             attachment_attributes
+           )
+           |> Repo.insert() do
+        {:ok, _attachment} -> Summary.from_schema(address)
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+    |> case do
+      {:ok, address} -> {:ok, address}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   @doc "Updates the compatible pivot metadata for one Company attachment."
   @spec update_company_attachment(Scope.t(), pos_integer(), pos_integer(), map()) ::
           {:ok, :updated}
@@ -216,6 +273,34 @@ defmodule Bilimbi.Core.Address do
               )
             ),
           order_by: address.id
+        )
+        |> Repo.all()
+        |> Enum.map(&Summary.from_schema/1)
+
+      {:ok, addresses}
+    end
+  end
+
+  @doc "Lists live tenant addresses not yet linked to the selected live Company."
+  @spec list_available_company_addresses(Scope.t(), pos_integer()) ::
+          {:ok, [Summary.t()]} | {:error, :company_not_found}
+  def list_available_company_addresses(%Scope{} = scope, company_id) do
+    with {:ok, _company} <- normalize_company_result(Company.get_company(scope, company_id)) do
+      company_addressable_identity = Company.addressable_identity()
+
+      addresses =
+        from(address in Tenancy.scope_query(Schema, scope),
+          where: is_nil(address.deleted_at),
+          where:
+            not exists(
+              from(attachment in Addressable,
+                where:
+                  attachment.address_id == parent_as(:scoped).id and
+                    attachment.addressable_type == ^company_addressable_identity and
+                    attachment.addressable_id == ^company_id
+              )
+            ),
+          order_by: [asc_nulls_last: address.label, asc: address.id]
         )
         |> Repo.all()
         |> Enum.map(&Summary.from_schema/1)
