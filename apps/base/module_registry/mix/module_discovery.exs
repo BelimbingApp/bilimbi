@@ -144,7 +144,13 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   @doc "Stable path of the compile-time route manifest for this workspace."
   @spec route_manifest_path(String.t()) :: String.t()
   def route_manifest_path(workspace_root) do
-    Path.join(workspace_root, "_build/#{Mix.env()}/bilimbi_routes.exs")
+    # Mix.env/0 returns :prod inside @recursive compilers that compile
+    # dependencies, even when the actual build path is _build/dev or _build/test.
+    # Derive the environment from Mix.Project.build_path/0 so the manifest always
+    # lands in the same _build/<env> directory that DiscoveredRoutes and
+    # RouteContract read from.
+    env_segment = Path.basename(Mix.Project.build_path())
+    Path.join(workspace_root, "_build/#{env_segment}/bilimbi_routes.exs")
   end
 
   @doc """
