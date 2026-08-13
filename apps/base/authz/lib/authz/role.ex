@@ -33,4 +33,17 @@ defmodule Bilimbi.Base.Authz.Role do
     |> foreign_key_constraint(:company_id, name: :base_authz_roles_company_foreign)
     |> check_constraint(:company_id, name: :base_authz_roles_custom_company_check)
   end
+
+  @spec update_custom_changeset(t(), pos_integer(), map()) :: Ecto.Changeset.t()
+  def update_custom_changeset(%__MODULE__{} = role, company_id, attributes) do
+    role
+    |> cast(attributes, [:name, :description])
+    |> put_change(:company_id, company_id)
+    |> validate_required([:company_id, :name, :code])
+    |> validate_length(:name, max: 255)
+    |> validate_length(:description, max: 1_000)
+    |> unique_constraint([:company_id, :code], name: :base_authz_roles_company_id_code_unique)
+    |> foreign_key_constraint(:company_id, name: :base_authz_roles_company_foreign)
+    |> check_constraint(:company_id, name: :base_authz_roles_custom_company_check)
+  end
 end
