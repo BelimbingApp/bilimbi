@@ -110,6 +110,57 @@ defmodule BilimbiWeb.UserShowTest do
     refute has_element?(view, "#users td", "Grace Hopper")
   end
 
+  test "shows a user whose company is archived, matching index visibility", %{conn: conn} do
+    CompanyFixtures.insert_company!(%{
+      id: 76,
+      tenant_id: 41,
+      code: "archived",
+      deleted_at: ~N[2026-08-11 12:00:00]
+    })
+
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 95,
+      company_id: 76,
+      name: "Ada Archived",
+      email: "archived@example.com"
+    })
+
+    grant_capabilities!(["admin.user.view"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/95")
+
+    assert has_element?(view, "h1", "Ada Archived")
+    refute has_element?(view, "#app-content", "does not exist in this workspace")
+  end
+
+  test "refuses to delete a user whose company is archived", %{conn: conn} do
+    CompanyFixtures.insert_company!(%{
+      id: 76,
+      tenant_id: 41,
+      code: "archived",
+      deleted_at: ~N[2026-08-11 12:00:00]
+    })
+
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 95,
+      company_id: 76,
+      name: "Ada Archived",
+      email: "archived@example.com"
+    })
+
+    grant_capabilities!(["admin.user.view", "admin.user.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/95")
+
+    view |> element("#user-delete") |> render_click()
+
+    assert has_element?(view, "#flash-group", "while their company is archived")
+  end
+
   test "refuses to delete the signed-in account", %{conn: conn} do
     UserFixtures.insert_user!(%{id: 91, company_id: 73})
     grant_capabilities!(["admin.user.view", "admin.user.delete"])

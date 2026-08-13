@@ -93,6 +93,36 @@ defmodule BilimbiWeb.UserFormTest do
   end
 
   describe "edit" do
+    test "refuses the write when the user's company is archived", %{conn: conn} do
+      CompanyFixtures.insert_company!(%{
+        id: 76,
+        tenant_id: 41,
+        code: "archived",
+        deleted_at: ~N[2026-08-11 12:00:00]
+      })
+
+      UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+      UserFixtures.insert_user!(%{
+        id: 95,
+        company_id: 76,
+        name: "Ada Archived",
+        email: "archived@example.com"
+      })
+
+      grant_capabilities!(["admin.user.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/95/edit")
+
+      assert has_element?(view, "#user-name[value='Ada Archived']")
+
+      view
+      |> form("#user-form", user: %{name: "Ada Renamed", email: "archived@example.com"})
+      |> render_submit()
+
+      assert has_element?(view, "#flash-group", "while their company is archived")
+    end
+
     test "redirects away when the actor lacks admin.user.update", %{conn: conn} do
       UserFixtures.insert_user!(%{id: 91, company_id: 73})
 

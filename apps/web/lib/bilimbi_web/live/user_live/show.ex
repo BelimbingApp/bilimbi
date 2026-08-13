@@ -1,11 +1,16 @@
 defmodule BilimbiWeb.UserLive.Show do
   @moduledoc """
-  One user in this tenant, via `Bilimbi.Core.User` scoped reads.
+  One user in this tenant, via `Bilimbi.Core.User.get_tenant_user/2`.
 
-  The tenant-wide `list_users/1` locates the user's company affiliation;
-  `get_user/3` then proves the record inside that company boundary. Both
-  reads are live, so a user moved or removed between renders is reported
-  as missing rather than served stale.
+  Visibility matches the tenant-wide index exactly: a user whose owning
+  company is soft-deleted is still readable here. Mutation stays gated
+  separately — edit and delete call the per-company domain operations,
+  which refuse when the owning company is not live, and the screen says so
+  rather than pretending the write went through.
+
+  The refusal to delete the signed-in account is this screen's courtesy
+  only; `Core.User.delete_user/3` deliberately stays a lifecycle primitive
+  with no self-delete rule.
   """
 
   use BilimbiWeb, :live_view
@@ -19,10 +24,7 @@ defmodule BilimbiWeb.UserLive.Show do
     scope = socket.assigns.current_scope.scope
 
     with {user_id, ""} <- Integer.parse(id),
-         {:ok, users} <- User.list_users(scope),
-         %User.Summary{company_id: company_id} when is_integer(company_id) <-
-           Enum.find(users, &(&1.id == user_id)),
-         {:ok, user} <- User.get_user(scope, company_id, user_id) do
+         {:ok, user} <- User.get_tenant_user(scope, user_id) do
       {:ok, companies} = Company.list_companies(scope)
 
       {:ok,
@@ -55,6 +57,14 @@ defmodule BilimbiWeb.UserLive.Show do
              socket
              |> put_flash(:info, "#{user.name} was deleted.")
              |> push_navigate(to: ~p"/users")}
+
+          {:error, :company_not_found} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "That user cannot be deleted while their company is archived."
+             )}
 
           {:error, _reason} ->
             {:noreply, put_flash(socket, :error, "That user could not be deleted.")}

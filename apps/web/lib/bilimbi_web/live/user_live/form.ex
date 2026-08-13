@@ -6,10 +6,15 @@ defmodule BilimbiWeb.UserLive.Form do
 
     * The form is a schemaless `Ecto.Changeset` owned by the LiveView and
       assigned with `to_form/2`; templates read `@form[:field]`.
-    * The domain API (`Bilimbi.Core.User`) stays the only writer. On a
-      domain changeset error, its messages are copied onto the form
-      changeset so the user sees field-level feedback without Web
-      duplicating business rules.
+    * The domain API (`Bilimbi.Core.User`) stays the only writer. The form
+      checks presence and password length only; the domain changeset is the
+      single source of name/email format and length rules, and its messages
+      are copied onto the form changeset so the user sees field-level
+      feedback without Web duplicating business rules.
+    * Edit resolves the record with the tenant-wide `get_tenant_user/2` so
+      visibility matches the index, then writes through the per-company
+      `update_user/4`; a user whose company is archived is editable in the
+      form but the write is refused with an explicit message.
     * Company affiliation is chosen from the live tenant company list and
       proven again inside `Core.User`; the form never trusts the id.
     * Edit does not move a user between companies and never touches the
@@ -53,10 +58,9 @@ defmodule BilimbiWeb.UserLive.Form do
     scope = socket.assigns.current_scope.scope
 
     with {user_id, ""} <- Integer.parse(id),
-         {:ok, users} <- User.list_users(scope),
-         %User.Summary{company_id: company_id} when is_integer(company_id) <-
-           Enum.find(users, &(&1.id == user_id)),
-         {:ok, user} <- User.get_user(scope, company_id, user_id) do
+         {:ok, %User.Summary{company_id: company_id} = user} <-
+           User.get_tenant_user(scope, user_id),
+         true <- is_integer(company_id) do
       socket
       |> assign(:page_title, "Edit #{user.name}")
       |> assign(:user, user)
@@ -90,7 +94,10 @@ defmodule BilimbiWeb.UserLive.Form do
         {:ok, user} ->
           {:noreply,
            socket
-           |> put_flash(:info, "#{user.name} can now sign in once their email is verified.")
+           |> put_flash(
+             :info,
+             "#{user.name} can now sign in; Bilimbi does not yet gate sign-in on email verification."
+           )
            |> push_navigate(to: ~p"/users/#{user.id}")}
 
         {:error, :company_not_found} ->
@@ -123,6 +130,14 @@ defmodule BilimbiWeb.UserLive.Form do
         {:error, %Changeset{} = domain_changeset} ->
           {:noreply, assign_form(socket, copy_domain_errors(changeset, domain_changeset))}
 
+        {:error, :company_not_found} ->
+          {:noreply,
+           put_flash(
+             socket,
+             :error,
+             "That user cannot be edited while their company is archived."
+           )}
+
         {:error, _reason} ->
           {:noreply, put_flash(socket, :error, "That user could not be updated.")}
       end
@@ -138,11 +153,11 @@ defmodule BilimbiWeb.UserLive.Form do
         :edit -> [:name, :email]
       end
 
+    # Presence is a form concern; name/email format and length rules live
+    # only in the Core User changeset and arrive via copy_domain_errors/2.
     {%{}, @field_types}
     |> cast(params, Map.keys(@field_types))
     |> validate_required(required)
-    |> validate_length(:name, max: 255)
-    |> validate_format(:email, ~r/^[^\s]+@[^\s]+$/, message: "must be a valid email address")
     |> validate_length(:password, min: 8)
     |> Map.put(:action, :validate)
   end

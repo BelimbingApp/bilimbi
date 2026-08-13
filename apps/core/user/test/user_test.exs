@@ -113,6 +113,35 @@ defmodule Bilimbi.Core.UserTest do
     end
   end
 
+  describe "get_tenant_user/2" do
+    test "reads a user whose company is soft-deleted, matching list visibility", %{
+      scope_a: scope_a
+    } do
+      CompanyFixtures.insert_company!(%{
+        id: 76,
+        tenant_id: 41,
+        code: "soft_deleted",
+        deleted_at: ~N[2026-08-11 12:00:00]
+      })
+
+      insert_user!(%{id: 95, company_id: 76, email: "soft@example.com"})
+
+      assert {:ok, %Summary{id: 95, company_id: 76}} = User.get_tenant_user(scope_a, 95)
+      assert {:error, :company_not_found} = User.get_user(scope_a, 76, 95)
+    end
+
+    test "excludes users in another tenant, with no company, or unknown", %{
+      scope_a: scope_a
+    } do
+      insert_user!(%{id: 92, company_id: 74, email: "b@example.com"})
+      insert_user!(%{id: 93, company_id: nil, email: "orphan@example.com"})
+
+      assert {:error, :user_not_found} = User.get_tenant_user(scope_a, 92)
+      assert {:error, :user_not_found} = User.get_tenant_user(scope_a, 93)
+      assert {:error, :user_not_found} = User.get_tenant_user(scope_a, 99)
+    end
+  end
+
   describe "credentials" do
     test "registers with an Argon2id hash and normalizes the email", %{scope_a: scope_a} do
       assert {:ok, %Summary{id: id}} = User.create_user(scope_a, 73, valid_attributes())

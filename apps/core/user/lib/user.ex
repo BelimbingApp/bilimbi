@@ -123,6 +123,40 @@ defmodule Bilimbi.Core.User do
     end
   end
 
+  @doc """
+  Reads one user under the scope's tenant-wide visibility.
+
+  This is the detail companion to `list_users/1`: it finds any user the
+  tenant list would return, including one whose owning company is
+  soft-deleted. Writes stay on the per-company operations, which still
+  require a live owning company; a caller that needs to mutate must resolve
+  through `get_user/3` and accept its `:company_not_found`.
+  """
+  @spec get_tenant_user(Scope.t(), pos_integer()) ::
+          {:ok, Summary.t()} | {:error, :user_not_found}
+  def get_tenant_user(%Scope{} = scope, user_id) do
+    {:ok, company_ids} = Company.list_tenant_company_ids(scope)
+
+    case company_ids do
+      [] ->
+        {:error, :user_not_found}
+
+      ids ->
+        case Repo.get_by(Schema, id: user_id) do
+          %Schema{company_id: company_id} = user
+          when is_integer(company_id) ->
+            if company_id in ids do
+              {:ok, Summary.from_schema(user)}
+            else
+              {:error, :user_not_found}
+            end
+
+          _other ->
+            {:error, :user_not_found}
+        end
+    end
+  end
+
   @doc "Creates an unverified account; Web must not expose this as public self-registration."
   @spec create_user(Scope.t(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, :company_not_found | Changeset.t()}
