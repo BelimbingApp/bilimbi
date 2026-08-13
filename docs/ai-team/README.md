@@ -47,11 +47,14 @@ thing. This mistake has been made.
 | Durable architecture decisions | `docs/architecture/decisions/` |
 | Stage order and exit gates | [`PORTING_STAGES.md`](./PORTING_STAGES.md) |
 
-**CI refuses coordination writes to `docs/ai-team/`.** Only `README.md` and
-`PORTING_STAGES.md` may be added or modified; the
-`docs-onboarding` label bypasses it for a genuine onboarding change.
-Deletions always pass. If your PR fails that job, your content belongs in an
-issue comment.
+**`docs/ai-team/` is these two files and nothing else.** No board, no
+mailboxes, no task cards, no review files. If you are about to add one, the
+content belongs in an issue comment instead.
+
+A CI gate enforced this briefly while the change bedded in. It was removed once
+the team had adopted the norm — so this is now a convention you keep, not a
+wall that stops you. Coordination that reappears here is drift, and the first
+person to notice should say so.
 
 ---
 
