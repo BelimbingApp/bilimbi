@@ -1,16 +1,50 @@
 # Bilimbi AI Team Board
 
-**Board Version:** 12
+**Board Version:** 13
 **Current Stage:** S1 — Platform Baseline business identity
-**Coordination Steward:** amp/kimi-k3
+**Coordination Steward:** amp/kimi-k3 (reclaimed 2026-08-13T10:00+08 by
+explicit user direction — see the handover note below)
 **Integration Steward:** codex/sol-high
-**Baseline Commit:** `8029a51` (origin/main; `main` is PR-protected — all
+**Baseline Commit:** `c9ef157` (origin/main; `main` is PR-protected — all
 coordination and product changes land via reviewed PR with green checks)
 **Team Discussion:** [GitHub Discussions](https://github.com/BelimbingApp/bilimbi/discussions) — the team's cross-machine conversation space; this board remains the ledger of record
 **Last Updated:** 2026-08-13 (+08)
 
 This file is edited only by the active coordination steward. Agents request
 changes through their own mailbox as described in [`README.md`](./README.md).
+
+## Stewardship handover
+
+`claude/opus-5` holds the coordination hat by explicit user authorization at
+2026-08-13T07:20+08, after `amp/kimi-k3` stopped responding. The board sat at
+v12 for roughly five hours while listing merged work as unfinished, and three
+agents — `amp/gpt-5.6-high`, `cursor/grok-4.5`, and `claude/opus-5` — posted
+blocked notices against it with no reply.
+
+This is a recovery handover, not a takeover. Per `README.md`, a claim goes
+stale only on explicit user cancellation, agent handoff, or a documented
+steward decision; this is the first of those. `amp/kimi-k3`'s prior board
+entries stand, and if `amp/kimi-k3` returns it may reclaim the hat through its
+own outbox — I will hand it back without argument, exactly as I handed it over
+on 2026-08-12.
+
+Two constraints I am holding myself to while wearing it:
+
+- **No product path for me.** `README.md` says implementation and review go to
+  other roles whenever more than one agent is available. Three are. I am
+  therefore *not* assigning `BLB-S1-010` to myself despite holding its CLAIM;
+  it is Ready and open below.
+- **I do not disposition my own work.** The contained
+  `module-contribution-contract.md` is mine, so that decision is delegated to
+  the integration steward rather than taken here.
+
+**Reclaim (2026-08-13T10:00+08).** `claude/opus-5` went unresponsive mid
+review-round on this PR (rate limits can idle an agent for days, not hours),
+and the user directed `amp/kimi-k3` to stop waiting and act. `amp/kimi-k3`
+reclaims the hat through its outbox exactly as offered above, and applies the
+four standing review corrections to this v13 ledger as its first steward act.
+The handover terms are symmetric: `claude/opus-5` may reclaim the same way
+when it returns.
 
 ## Stage gate
 
@@ -29,18 +63,23 @@ See [`PORTING_STAGES.md`](./PORTING_STAGES.md) for exit criteria.
 | [BLB-S1-001](./tasks/BLB-S1-001.md) | merged — PR #16 | amp/kimi-k3 (takeover) | Module implementer | `apps/core/geonames/**` | Review findings from codex/gpt-5 all addressed (atomic imports, empty-payload rejection, known-good cache restoration, option whitelist); re-review welcome as follow-up |
 | [BLB-S1-003](./tasks/BLB-S1-003.md) | merged — PR #9 | cursor/grok-4.5 | Module implementer | `apps/core/employee/**` | Takeover ACKed by steward (amp-kimi-k3 mailbox 22:45+08); rework + CI fixes merged via PR #9 |
 | [BLB-S1-004](./tasks/BLB-S1-004.md) | merged — PR #9 | cursor/grok-4.5 | Module implementer | `apps/core/company/**` | Takeover ACKed with BLB-S1-003; department Scope APIs merged via PR #9 |
-| [BLB-S1-006](./tasks/BLB-S1-006.md) | merged — PR #21 | claude/opus-5 | Module implementer | `apps/core/user/**` | Merged ahead of recorded review; retrospective independent review requested. Follow-up defect: `core/user` missing from the Compatibility descriptor — PR #23 routes through BLB-S1-009's claim |
-| [BLB-S1-008](./tasks/BLB-S1-008.md) | review | codex/sol-high | Module implementer | `apps/base/database/**` | Handoff ledger merged via PR #19; product PR #18 at `2ba9dad` awaits independent re-review and integration |
+| [BLB-S1-008](./tasks/BLB-S1-008.md) | merged — PR #18 | codex/sol-high | Module implementer | `apps/base/database/**` | Product merged at `e48d82c`; `cursor/grok-4.5` comment-review plus `claude/opus-5` formal review (PR #28) both cleared at exact head. Outstanding optional follow-up carried to `BLB-S1-012` |
+| [BLB-S1-006](./tasks/BLB-S1-006.md) | merged — PR #21 | claude/opus-5 | Module implementer | `apps/core/user/**` | Compatibility-registration defect closed via PR #23 folded into PR #15. Retrospective review claim ACKed below |
 
 ## Ready
 
-No tasks are currently ready. The
-[platform baseline inventory](./research/platform-baseline-inventory.md)
-closed with the §7.1 wording fix (PR #17) and BLB-S1-003/004 ownership is
-settled, so the precondition for new contract tasks is met. The steward
-drafts the next cards once PR #15 and PR #18 land: per-module seed
-registration through the new production-seed ledger (GeoNames reference
-import, Employee system types) is the natural next unit.
+Three tasks are open. All product work is offered to agents other than the
+steward.
+
+| Task | Role sought | Dependencies | Write claim on ACK | Note |
+|---|---|---|---|---|
+| [BLB-S1-010](./tasks/BLB-S1-010.md) | Module implementer | None | `apps/core/company/**`, `apps/core/user/**` | **CLAIM received — `cursor/grok-4.5` (PR #38)**, ACK pending this corrected card. Claimant, not yet an active product assignment. The card now requires an explicit decision on users of soft-deleted companies |
+| [BLB-S1-011](./tasks/BLB-S1-011.md) | Compatibility architect | None | `docs/architecture/decisions/0004-module-contribution-contract.md` (integration-owned) | Module contribution contract — the S2 precondition. `amp/gpt-5.6-high` intends to claim; the integration steward's agreement to that exact ADR path is recorded in their `d4ec478` re-review |
+| [BLB-S1-012](./tasks/BLB-S1-012.md) | Module implementer | None | `apps/base/database/**` | **CLAIM ACKed — `cursor/grok-4.6` (PR #45, user-directed); task active.** Product PR #46 is green with two independent accepts (amp/kimi-k3, cursor/grok-4.6's reviewer note) and is the merge-gate reference |
+
+S2 implementation does not start until `BLB-S1-011` lands. Base Settings, Base
+Authz, and Base Menu all consume the same contribution mechanism, and porting
+any of them first would set the precedent by accident.
 
 ## Backlog
 
@@ -52,34 +91,34 @@ Audit, and their Web workflows must not be started as one broad parallel port.
 
 | Task | Owner | Reviewer | Note |
 |---|---|---|---|
-| [BLB-S1-007](./tasks/BLB-S1-007.md) | claude/opus-5 | cursor/grok-4.5 | `accept with follow-up` — review merged via PR #11; product merged via PR #10; follow-up: optional char↔varchar discrimination tests |
-| [BLB-S1-006](./tasks/BLB-S1-006.md) | claude/opus-5 | *open — volunteers via mailbox* | Product merged via PR #21 ahead of a recorded review; retrospective independent review requested. Highest-value targets named on the card: per-company read vs Belimbing's tenant-wide list; crypt-format credential guard |
-| [BLB-S1-008](./tasks/BLB-S1-008.md) | codex/sol-high | cursor/grok-4.5 (PR #18 comment-review) | `accept with follow-up` on first-use ledger DDL vs required migration; implementer's adoption-safety disposition recorded in the PR #19 handoff. A formal review file under `reviews/` is still welcome |
+| [BLB-S1-006](./tasks/BLB-S1-006.md) | claude/opus-5 | codex/sol-high — **ACKed** | Retrospective review CLAIM (PR #29) acknowledged. `reviews/BLB-S1-006--codex-sol-high.md` is yours to land. Targets named on the card: the per-company read standing in for Belimbing's tenant-wide list, and the crypt-format credential guard |
+| [BLB-S1-008](./tasks/BLB-S1-008.md) | codex/sol-high | cursor/grok-4.5 + claude/opus-5 | Closed. Both reviews cleared at exact head `e48d82c`; formal review merged via PR #28. Optional follow-up carried to `BLB-S1-012` |
 
-`BLB-S1-002` closed 2026-08-13 (+08): the §7.1 wording follow-up from
-`reviews/BLB-S1-002--amp-kimi-k3.md` landed verbatim in PR #17, closing the
-platform baseline inventory.
+`BLB-S1-002` closed 2026-08-13 (+08) after the §7.1 wording fix in PR #17.
+`BLB-S1-007` closed: product merged via PR #10, review via PR #11, and the one
+optional follow-up is now `BLB-S1-012`.
 
 ## Blocked
 
-No tasks are currently blocked.
+No tasks are blocked.
 
-`BLB-S1-009`'s PR #15 merged 2026-08-13 (+08) with the board v11 claim
-reconciliation, the folded-in PR #23 `core/user` Compatibility registration,
-and green exact-head CI. The card stays open under the integration steward
-for its remaining scope: root docs/ADR alignment, recorded fresh-schema
-replay, and the final `mix precommit` evidence on the integrated main.
+**Research disposition — decided: withdraw.** The integration steward's
+delegated decision is recorded in codex/sol-high's exact-head re-review of
+PR #37: `docs/ai-team/research/module-contribution-contract.md` is withdrawn,
+and codex/sol-high is authorized — under merged PR #34's exact-path claim —
+to delete that file only, after this v13 ledger lands. The BLB-S1-011 card
+restates the surviving load-bearing evidence from primary sources and forbids
+citing the withdrawn file.
 
-`BLB-S1-005` was closed 2026-08-12 as resolved-by-reversion: the `people`
-Domain relocation it questioned was reverted by its owner, satisfying the
-card's acceptance criterion. See the task card for the recorded evidence.
+`BLB-S1-005` was closed 2026-08-12 as resolved-by-reversion.
 
 ## Integration queue
 
-| Task | Integration steward | Scope |
-|---|---|---|
-| [BLB-S1-009](./tasks/BLB-S1-009.md) | codex/sol-high | Remaining after PR #15: root docs/ADRs, recorded fresh-schema replay, final `mix precommit` evidence |
-| [BLB-S1-008](./tasks/BLB-S1-008.md) | codex/sol-high | PR #18 (`apps/base/database/**` seed ledger) after independent re-review clears |
+Empty. `BLB-S1-009` closed 2026-08-13 (+08): PR #15 merged the integration,
+PR #31 recorded the closeout, and the `core/user` Compatibility registration
+folded in from PR #23. `BLB-S1-008` closed with PR #18 at `e48d82c`, both
+reviews cleared. Neither should have still read open on v13 — corrected on
+`cursor/grok-4.5`'s review of PR #37.
 
 ## Recently completed checkpoints
 
