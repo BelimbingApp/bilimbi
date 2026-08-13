@@ -1,6 +1,6 @@
 # Platform Baseline Source Inventory
 
-**Task:** [BLB-S1-002](../tasks/BLB-S1-002.md)
+**Origin:** BLB-S1-002 (source analysis; task cards now live as GitHub Issues)
 **Document Type:** Source analysis (read-only)
 **Analyst:** claude/opus-5 — source analyst
 **Bilimbi Base Commit:** `54b50b0`
@@ -24,8 +24,12 @@ That tree is the code source of truth.
 `laravel/blb` paths or they are citing planning material.
 
 Analysis was restricted to reading. No product file, root doc, ADR, descriptor,
-migration, or lockfile was changed. Board and task-card edits are recorded in
-[`claude-opus-5.md`](../mailboxes/claude-opus-5.md).
+migration, or lockfile was changed.
+
+**Currency note.** Section 3's *State* column is maintained; the rest is the
+original analysis and its reviewed corrections. Where this document and the
+code disagree, the code wins — say so in an issue and correct this file in a
+PR rather than working around it.
 
 ## 2. The migration prefix ledger is the ownership map
 
@@ -82,15 +86,18 @@ tolerate on a live database.
 | Capability | Stable ID candidate | Tables | Schema deps | State |
 |---|---|---|---|---|
 | Tenancy | `base/tenancy` | `tenants` | none | **Complete** |
-| Geonames | `core/geonames` | `geonames_countries`, `geonames_admin1`, `geonames_postcodes`, `geonames_cities` | none | Schema complete; import in flight (BLB-S1-001) |
+| Geonames | `core/geonames` | `geonames_countries`, `geonames_admin1`, `geonames_postcodes`, `geonames_cities` | none | **Complete** — schema and reference-data import |
 | Address | `core/address` | `addresses`, `addressables` | `tenants`, `geonames_countries`, `geonames_admin1` | **Complete** |
-| Company | `core/company` | `companies`, `company_relationship_types`, `company_relationships`, `company_external_accesses`, `company_legal_entity_types`, `company_department_types`, `company_departments`, `tenant_primary_companies` | `tenants` | **Complete**; department seams in flight (BLB-S1-004) |
-| Employee | `core/employee` | `employees`, `employee_types` | `companies`, `company_departments` | In flight (BLB-S1-003); layer confirmed Core — [BLB-S1-005](../tasks/BLB-S1-005.md) |
-| User | `core/user` | `users`, `password_reset_tokens`, `user_pins`, `user_database_queries`, `notifications` | `companies`, `employees` | **Absent — the one real S1 gap** |
+| Company | `core/company` | `companies`, `company_relationship_types`, `company_relationships`, `company_external_accesses`, `company_legal_entity_types`, `company_department_types`, `company_departments`, `tenant_primary_companies` | `tenants` | **Complete** — incl. department Scope APIs and tenant-wide reads |
+| Employee | `core/employee` | `employees`, `employee_types` | `companies`, `company_departments` | **Complete** — layer confirmed Core after a Domain relocation was reverted |
+| User | `core/user` | `users`, `password_reset_tokens`, `user_pins`, `user_database_queries`, `notifications` | `companies`, `employees` | **Schema complete; identity API only.** Authentication, registration, reset and hashing are deferred to S2 |
 
-All 8 Company tables, all 4 Geonames tables, both Address tables, and `tenants`
-are created by Bilimbi migrations today. Core User has no counterpart at all:
-there is no `apps/core/user/`.
+All of S1's identity schema now exists in Bilimbi migrations. Nine modules are
+installed: `base/database`, `base/module_registry`, `base/tenancy`,
+`core/company`, `core/geonames`, `core/address`, `core/employee`, `core/user`,
+`core/compatibility`.
+
+What remains in S1 is operational rather than schema: see the open Issues.
 
 ### 3.2 Required Platform Baseline — Base mechanisms
 
@@ -99,7 +106,7 @@ there is no `apps/core/user/`.
 | Database/Repo | `base/database` | — | One shared Repo, sandbox case | **Complete** |
 | Module discovery | `base/module_registry` | — | Descriptor graph; replaces Belimbing's `base_database_migration_sources` + `app/Base/Foundation/ModuleManifest` | **Complete** |
 | Compatibility | `core/compatibility` | — | Verify/adopt, migration ledger | **Complete** |
-| Migration + seeder ledger | `base/database` | `base_database_tables`, `base_database_seeders`, `base_database_migration_sources` | Registry + observable seeder status | Partial — migration ledger exists as `bilimbi_schema_migrations`; **no seeder ledger** |
+| Migration + seeder ledger | `base/database` | `base_database_tables`, `base_database_seeders`, `base_database_migration_sources` | Registry + observable seeder status | **Complete** — `bilimbi_schema_migrations` plus the Bilimbi-owned `bilimbi_production_seeds` ledger. Laravel's `base_database_seeders` is deliberately never adopted |
 | Settings | `base/settings` | `base_settings` | Scoped runtime parameters | Absent |
 | Authz | `base/authz` | `base_authz_roles`, `base_authz_role_capabilities`, `base_authz_principal_roles`, `base_authz_principal_capabilities`, `base_authz_decision_logs` | Capability decisions | Absent |
 | Audit | `base/audit` | `base_audit_mutations`, `base_audit_actions` | Mutation/action trail | Absent |
@@ -430,7 +437,7 @@ contract question, not a port.
 **8.1 Employee's layer — resolved during this analysis, recorded for reuse.**
 Between 19:34 and 19:39+08 the worktree briefly contained a `people` Domain
 container with Employee relocated as `layer: :domain, required: false`. Raised
-as [BLB-S1-005](../tasks/BLB-S1-005.md) and closed by the steward as
+as `BLB-S1-005` and closed by the steward as
 resolved-by-reversion: `apps/people/` is gone and
 `apps/core/employee/bilimbi.module.exs` again declares
 `id: "core/employee", layer: :core, required: true`.
