@@ -14,7 +14,7 @@ The platform orchestrator is resolved by the explicit platform-operator
 company plus the durable employee number `SYS-001`; numeric employee ID `1`
 has no runtime meaning. `ensure_platform_orchestrator/0` provisions that record
 idempotently and refuses a conflicting non-agent record. AI activation and
-execution, User linkage, authorization, and web screens remain later slices.
+execution, and User linkage, remain later slices.
 
 `list_administration_page/3` is the bounded Employee-owned read model for an
 administration index. It requires a tenancy scope and one live company proven
@@ -56,3 +56,14 @@ Cross-module writers use one strict lock order: **Company → Employee → User*
 Within each module they lock ascending IDs. A returned proof is useful only
 inside the transaction that created it and must not be cached or treated as a
 capability after commit or rollback.
+
+## Web adapter
+
+Web adapters live under `lib/employee/web/` as `Bilimbi.Core.Employee.Web.*`
+and are discovered from `priv/web_routes.exs`. Screens are company-scoped
+through the signed-in `company_id`: there is no tenant-wide employee list.
+This is an initial module-owned adapter slice, not the complete pinned
+Belimbing workflow. Employee index controls, Employee Type edit/delete, and
+relationship-heavy form/show behavior remain deferred behind their public
+Core contracts. Deleting the platform orchestrator is refused as
+`:invariant_violation`, and the show screen reports that honestly.
