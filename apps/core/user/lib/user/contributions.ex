@@ -48,6 +48,17 @@ defmodule Bilimbi.Core.User.Contributions do
   @impl true
   def contributions do
     %{
+      menu: [
+        %{
+          id: "admin.user",
+          label: "Users",
+          icon: "users",
+          parent: "admin",
+          route: "/users",
+          capability: "admin.user.list",
+          order: 30
+        }
+      ],
       settings: %{definitions: @settings, runtime_claims: []},
       authz: %{
         capabilities: @read_capabilities ++ @write_capabilities,

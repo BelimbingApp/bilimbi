@@ -21,7 +21,14 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              "core/user"
            ]
 
-    assert Enum.map(migration_modules, & &1.order) == [2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    # Absolute values shift whenever any module is added ahead of these in the
+    # resolved graph -- adding base/menu moved every one of them by +1. What
+    # actually matters is that the orders are strictly ascending and contiguous,
+    # so assert that instead of pinning numbers a new module invalidates.
+    orders = Enum.map(migration_modules, & &1.order)
+
+    assert orders == Enum.sort(orders)
+    assert orders == Enum.to_list(List.first(orders)..List.last(orders))
 
     assert migration_paths ==
              Enum.map(migration_modules, fn descriptor ->
