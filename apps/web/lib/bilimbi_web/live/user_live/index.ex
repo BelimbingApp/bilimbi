@@ -11,6 +11,7 @@ defmodule BilimbiWeb.UserLive.Index do
 
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
+  alias BilimbiWeb.UserAuth
 
   @impl true
   def mount(_params, _session, socket) do
@@ -34,12 +35,27 @@ defmodule BilimbiWeb.UserLive.Index do
         <.header>
           Users
           <:subtitle>Every user affiliated with a company in this tenant</:subtitle>
+          <:actions>
+            <.button
+              :if={UserAuth.allowed?(@current_scope, "admin.user.create")}
+              id="user-new"
+              navigate={~p"/users/new"}
+              variant="primary"
+            >
+              New user
+            </.button>
+          </:actions>
         </.header>
 
         <div class="mt-5">
           <.table id="users" rows={@streams.users}>
             <:col :let={{_id, user}} label="Name">
-              <span class="font-medium">{user.name}</span>
+              <.link
+                navigate={~p"/users/#{user.id}"}
+                class="font-medium text-ink-strong hover:underline"
+              >
+                {user.name}
+              </.link>
             </:col>
             <:col :let={{_id, user}} label="Email">{user.email}</:col>
             <:col :let={{_id, user}} label="Company">

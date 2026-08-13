@@ -58,6 +58,21 @@ defmodule BilimbiWeb.Router do
     plug :require_capability, "admin.user.list"
   end
 
+  pipeline :ensure_user_view do
+    plug :require_authenticated
+    plug :require_capability, "admin.user.view"
+  end
+
+  pipeline :ensure_user_create do
+    plug :require_authenticated
+    plug :require_capability, "admin.user.create"
+  end
+
+  pipeline :ensure_user_update do
+    plug :require_authenticated
+    plug :require_capability, "admin.user.update"
+  end
+
   # The homepage is the sign-in screen; authenticated visitors are forwarded
   # to their workspace.
   scope "/", BilimbiWeb do
@@ -120,6 +135,42 @@ defmodule BilimbiWeb.Router do
         {BilimbiWeb.UserAuth, {:require_capability, "admin.user.list"}}
       ] do
       live "/users", UserLive.Index
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_user_create]
+
+    live_session :users_new,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.user.create"}}
+      ] do
+      live "/users/new", UserLive.Form, :new
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_user_view]
+
+    live_session :users_show,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.user.view"}}
+      ] do
+      live "/users/:id", UserLive.Show
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_user_update]
+
+    live_session :users_edit,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.user.update"}}
+      ] do
+      live "/users/:id/edit", UserLive.Form, :edit
     end
   end
 
