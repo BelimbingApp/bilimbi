@@ -15,3 +15,10 @@ returning deterministically ordered local path dependencies. Runtime validates
 that every package was compiled from the same graph and that the generated
 positions are complete and dependency-safe before exposing module and
 migration contributions.
+
+Source composition and runtime visibility stay separate. A coordinator such as
+Core Compatibility can enumerate only OTP applications in its Mix dependency
+closure. Workspace-boundary tests therefore fail when a source-discovered
+module that declares `migrations` or a `schema_contract` is absent from
+`core/compatibility`'s declared dependencies — the defect class that shipped
+Core User inert with green CI.

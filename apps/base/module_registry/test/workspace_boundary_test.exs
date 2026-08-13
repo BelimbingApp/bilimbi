@@ -102,6 +102,33 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
     end
   end
 
+  test "Compatibility's runtime closure includes every migration or schema-contract contributor" do
+    modules = MixDiscovery.discover_workspace!(@workspace_root)
+    missing = MixDiscovery.missing_compatibility_contributors(modules)
+
+    assert missing == [],
+           "Compatibility runtime closure is missing contributor#{plural(missing)} #{Enum.join(missing, ", ")}"
+  end
+
+  test "removing core/user from Compatibility's dependencies fails naming core/user" do
+    modules = MixDiscovery.discover_workspace!(@workspace_root)
+    user = Enum.find(modules, &(&1.id == "core/user"))
+
+    assert contributor_fixture?(user),
+           "core/user must still declare migrations or a schema_contract"
+
+    compatibility = Enum.find(modules, &(&1.id == "core/compatibility"))
+    omitted = List.delete(compatibility.dependencies, "core/user")
+    missing = MixDiscovery.missing_compatibility_contributors(modules, omitted)
+
+    assert "core/user" in missing
+
+    message =
+      "Compatibility runtime closure is missing contributor#{plural(missing)} #{Enum.join(missing, ", ")}"
+
+    assert message =~ "core/user"
+  end
+
   test "Base and Core compose immediate child modules without naming them" do
     modules = MixDiscovery.discover_workspace!(@workspace_root)
 
@@ -120,4 +147,13 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
       end
     end
   end
+
+  defp contributor_fixture?(nil), do: false
+
+  defp contributor_fixture?(module) do
+    is_binary(module.migrations) or not is_nil(module.schema_contract)
+  end
+
+  defp plural([_]), do: ""
+  defp plural(_missing), do: "s"
 end
