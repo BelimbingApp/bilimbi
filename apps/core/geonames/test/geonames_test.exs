@@ -175,6 +175,29 @@ defmodule Bilimbi.Core.GeonamesTest do
     assert Geonames.lookup_postcode("US", "50000") == []
   end
 
+  test "searches distinct postcode prefixes literally and returns at most ten values" do
+    insert_postcode!(%{postcode: "10001", place_name: "Duplicate locality"})
+
+    Enum.each(1..12, fn sequence ->
+      insert_postcode!(%{
+        postcode: "10#{String.pad_leading(Integer.to_string(sequence), 3, "0")}",
+        place_name: "Locality #{sequence}"
+      })
+    end)
+
+    insert_postcode!(%{postcode: "12%_\\34", place_name: "Literal characters"})
+    insert_postcode!(%{postcode: "12AX34", place_name: "Wildcard lookalike"})
+    insert_postcode!(%{country_iso: "US", postcode: "10000", place_name: "Other country"})
+
+    assert Geonames.search_postcodes(" my ", "") ==
+             Enum.map(1..10, &"10#{String.pad_leading(Integer.to_string(&1), 3, "0")}")
+
+    assert Geonames.search_postcodes("MY", " 12%_\\ ") == ["12%_\\34"]
+    assert Geonames.search_postcodes("US", "10") == ["10000"]
+    assert Geonames.search_postcodes("%_", "") == []
+    assert Geonames.search_postcodes("MY", nil) == []
+  end
+
   test "returns searchable postcode pages and independent country summaries" do
     insert_postcode!(%{
       country_iso: "US",
@@ -284,5 +307,72 @@ defmodule Bilimbi.Core.GeonamesTest do
     assert city.country_iso == "MY"
     assert city.timezone == "Asia/Kuala_Lumpur"
     assert Geonames.get_city_by_geoname_id(-1) == nil
+  end
+
+  test "searches city names, ASCII names, and alternate names with literal caller text" do
+    insert_city!(%{
+      geoname_id: 2_000_001,
+      name: "München",
+      ascii_name: "Munich",
+      alternate_names: "Muenchen,Monaco di Baviera",
+      admin1_code: "14",
+      population: 2_000_000
+    })
+
+    insert_city!(%{
+      geoname_id: 2_000_002,
+      name: "Percent%_\\Town",
+      ascii_name: "Percent%_\\Town",
+      alternate_names: "Literal%_\\Place",
+      admin1_code: "14",
+      population: 1_000_000
+    })
+
+    insert_city!(%{
+      geoname_id: 2_000_003,
+      name: "PercentAXTown",
+      ascii_name: "PercentAXTown",
+      alternate_names: "LiteralAXPlace",
+      admin1_code: "14",
+      population: 900_000
+    })
+
+    assert Geonames.search_city_names("my", "mun", admin1_code: "MY.14") == ["München"]
+
+    assert Geonames.search_city_names("MY", "baviera", admin1_code: "14") == ["München"]
+
+    assert Geonames.search_city_names("MY", " Percent%_\\ ", admin1_code: "my.14") == [
+             "Percent%_\\Town"
+           ]
+
+    assert Geonames.search_city_names("MY", "Literal%_\\", admin1_code: "14") == [
+             "Percent%_\\Town"
+           ]
+
+    assert Geonames.search_city_names("MY", "mun", admin1_code: "US.CA") == []
+    assert Geonames.search_city_names("MY", "mun", admin1_code: "MY.") == []
+    assert Geonames.search_city_names("%_", "") == []
+    assert Geonames.search_city_names("MY", nil) == []
+  end
+
+  test "bounds city candidates before exact deduplication and orders ties deterministically" do
+    Enum.each(1..16, fn sequence ->
+      insert_city!(%{
+        geoname_id: 3_000_000 + sequence,
+        name: if(sequence in [1, 2], do: "Candidate duplicate", else: "Candidate #{sequence}"),
+        ascii_name:
+          if(sequence in [1, 2], do: "Candidate duplicate", else: "Candidate #{sequence}"),
+        country_iso: "US",
+        admin1_code: "CA",
+        population: if(sequence in [3, 4], do: 1_999_997, else: 2_000_000 - sequence)
+      })
+    end)
+
+    names = Geonames.search_city_names("US", "", admin1_code: "US.CA")
+
+    assert length(names) == 14
+    assert Enum.take(names, 3) == ["Candidate duplicate", "Candidate 3", "Candidate 4"]
+    refute "Candidate 16" in names
+    assert Enum.all?(names, &is_binary/1)
   end
 end

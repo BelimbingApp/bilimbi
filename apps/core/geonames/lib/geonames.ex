@@ -64,6 +64,8 @@ defmodule Bilimbi.Core.Geonames do
   @admin1_initial_directions %{updated_at: :desc}
   @postcode_initial_directions %{updated_at: :desc}
   @summary_initial_directions %{record_count: :desc}
+  @postcode_search_limit 10
+  @city_search_limit 15
 
   @doc """
   Downloads and imports the selected canonical GeoNames datasets.
@@ -216,6 +218,59 @@ defmodule Bilimbi.Core.Geonames do
     |> sort_postcode_country_summaries(options)
   end
 
+  @doc """
+  Returns distinct postcode values for an Address form's country and prefix.
+
+  The global reference-data query treats the caller's prefix literally and is
+  bounded to ten values. An empty prefix returns the country's first ten
+  postcodes in ascending order.
+  """
+  @spec search_postcodes(String.t(), String.t()) :: [String.t()]
+  def search_postcodes(country_iso, prefix) do
+    with {:ok, iso} <- normalize_iso(country_iso),
+         {:ok, prefix} <- normalize_search_text(prefix) do
+      pattern = escape_like(prefix) <> "%"
+
+      from(entry in Postcode,
+        where: entry.country_iso == ^iso and ilike(entry.postcode, ^pattern),
+        select: entry.postcode,
+        distinct: true,
+        order_by: [asc: entry.postcode],
+        limit: @postcode_search_limit
+      )
+      |> Repo.all()
+    else
+      :error -> []
+    end
+  end
+
+  @doc """
+  Returns city names for an Address form's country, query, and optional Admin1.
+
+  Canonical and ASCII names use a literal prefix match, while alternate names
+  use a literal contains match. The database candidate set is bounded to 15 by
+  population before exact duplicate names are removed. `:admin1_code` accepts
+  either the raw GeoNames value or the module's full `CC.value` identity.
+  """
+  @spec search_city_names(String.t(), String.t(), keyword()) :: [String.t()]
+  def search_city_names(country_iso, query, opts \\ []) do
+    with {:ok, iso} <- normalize_iso(country_iso),
+         {:ok, query} <- normalize_search_text(query),
+         {:ok, admin1_code} <- normalize_city_admin1(Keyword.get(opts, :admin1_code), iso) do
+      City
+      |> where([city], city.country_iso == ^iso)
+      |> maybe_filter_city_admin1(admin1_code)
+      |> maybe_search_cities(query)
+      |> order_by([city], desc: city.population, asc: city.geoname_id)
+      |> limit(@city_search_limit)
+      |> select([city], city.name)
+      |> Repo.all()
+      |> Enum.uniq()
+    else
+      :error -> []
+    end
+  end
+
   @spec lookup_postcode(String.t(), String.t()) :: [PostcodeSummary.t()]
   def lookup_postcode(country_iso, postcode) do
     with {:ok, iso} <- normalize_iso(country_iso),
@@ -358,6 +413,26 @@ defmodule Bilimbi.Core.Geonames do
       where:
         ilike(postcode.postcode, ^pattern) or ilike(postcode.place_name, ^pattern) or
           ilike(postcode.country_iso, ^pattern) or ilike(country.country, ^pattern)
+    )
+  end
+
+  defp maybe_filter_city_admin1(query, nil), do: query
+
+  defp maybe_filter_city_admin1(query, admin1_code) do
+    from(city in query, where: city.admin1_code == ^admin1_code)
+  end
+
+  defp maybe_search_cities(query, ""), do: query
+
+  defp maybe_search_cities(query, search) do
+    escaped = escape_like(search)
+    prefix = escaped <> "%"
+    contains = "%" <> escaped <> "%"
+
+    from(city in query,
+      where:
+        ilike(city.name, ^prefix) or ilike(city.ascii_name, ^prefix) or
+          ilike(city.alternate_names, ^contains)
     )
   end
 
@@ -539,6 +614,43 @@ defmodule Bilimbi.Core.Geonames do
       {:ok, iso} -> iso
       :error -> :invalid
     end
+  end
+
+  defp normalize_search_text(value) when is_binary(value), do: {:ok, String.trim(value)}
+  defp normalize_search_text(_value), do: :error
+
+  defp normalize_city_admin1(nil, _iso), do: {:ok, nil}
+
+  defp normalize_city_admin1(value, iso) when is_binary(value) do
+    case String.trim(value) do
+      "" ->
+        {:ok, nil}
+
+      code ->
+        normalize_city_admin1_code(String.split(code, ".", parts: 2), iso)
+    end
+  end
+
+  defp normalize_city_admin1(_value, _iso), do: :error
+
+  defp normalize_city_admin1_code([raw_code], _iso),
+    do: {:ok, String.upcase(raw_code)}
+
+  defp normalize_city_admin1_code([country_iso, raw_code], iso) when raw_code != "" do
+    if String.upcase(country_iso) == iso do
+      {:ok, String.upcase(raw_code)}
+    else
+      :error
+    end
+  end
+
+  defp normalize_city_admin1_code(_parts, _iso), do: :error
+
+  defp escape_like(value) do
+    value
+    |> String.replace("\\", "\\\\")
+    |> String.replace("%", "\\%")
+    |> String.replace("_", "\\_")
   end
 
   defp total_pages(0, _page_size), do: 0
