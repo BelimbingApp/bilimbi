@@ -5,11 +5,18 @@ defmodule Bilimbi.Base.Authz.SystemRoleReconciler do
 
   alias Bilimbi.Base.Authz.Role
   alias Bilimbi.Base.Authz.RoleCapability
+  alias Ecto.Adapters.SQL
 
   @spec reconcile(Ecto.Repo.t(), map()) ::
           {:ok, %{roles: non_neg_integer(), capabilities: non_neg_integer()}} | {:error, term()}
   def reconcile(repo, registry) do
     repo.transaction(fn ->
+      SQL.query!(
+        repo,
+        "SELECT pg_advisory_xact_lock(hashtext('bilimbi-authz-system-role-reconcile'))",
+        []
+      )
+
       capability_count =
         registry.roles
         |> Enum.sort_by(&elem(&1, 0))
