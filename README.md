@@ -246,13 +246,6 @@ Company's external-access user contribution. Both modules own their baselines,
 contracts, and tenant/company-scoped APIs while Compatibility only coordinates
 their descriptor-declared contributions.
 
-Core User also owns the credential lifecycle behind those compatible tables:
-Argon2id account creation, Laravel Argon2 and legacy `$2y$` bcrypt login,
-transparent bcrypt upgrade, neutral password-reset requests, signed email
-verification, and the four canonical user-scoped settings. This is a Core API,
-not a public signup surface; Phoenix Web still owns routes, rate limiting,
-delivery, cookies, and the authenticated session adapter.
-
 Base Session preserves Belimbing's root `sessions` table as an opaque durable
 store with no dependency on Core User or Web. Its operational listing omits
 payloads, termination protects the caller's current session, and unreadable

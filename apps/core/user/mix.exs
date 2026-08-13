@@ -28,7 +28,7 @@ defmodule Bilimbi.Core.User.MixProject do
 
   def application do
     [
-      extra_applications: [:crypto, :logger],
+      extra_applications: [:logger],
       env: Bilimbi.Base.ModuleRegistry.MixDiscovery.application_env(__DIR__)
     ]
   end
@@ -37,12 +37,7 @@ defmodule Bilimbi.Core.User.MixProject do
   defp elixirc_paths(_env), do: ["lib"]
 
   defp deps do
-    [
-      {:argon2_elixir, "~> 4.1"},
-      {:bcrypt_elixir, "~> 3.3"},
-      {:ecto_sql, "~> 3.14"},
-      {:plug_crypto, "~> 2.2"}
-    ] ++
+    [{:ecto_sql, "~> 3.14"}] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 

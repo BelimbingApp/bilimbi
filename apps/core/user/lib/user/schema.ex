@@ -13,15 +13,16 @@ defmodule Bilimbi.Core.User.Schema do
     field :name, :string
     field :email, :string
     field :email_verified_at, :naive_datetime
-    field :password_hash, :string, source: :password, redact: true
-    field :password, :string, virtual: true, redact: true
+    field :password, :string
     field :remember_token, :string
     timestamps(type: :naive_datetime, inserted_at: :created_at)
   end
 
   @type t :: %__MODULE__{}
 
-  @profile_fields [:name, :email, :employee_id]
+  # `password` is deliberately absent. This module never accepts a credential
+  # through the same cast as ordinary attributes; see put_password_hash/2.
+  @fields [:name, :email, :email_verified_at, :employee_id]
 
   @doc """
   Builds a new user for a company that the caller has already proven.
@@ -29,59 +30,23 @@ defmodule Bilimbi.Core.User.Schema do
   `company_id` may be nil: Belimbing's `users.company_id` is nullable, and such
   a user simply belongs to no tenant-scoped list.
   """
-  @spec creation_changeset(pos_integer() | nil, map(), keyword()) :: Ecto.Changeset.t()
-  def creation_changeset(company_id, attributes, opts \\ []) do
+  @spec creation_changeset(pos_integer() | nil, map()) :: Ecto.Changeset.t()
+  def creation_changeset(company_id, attributes) do
     %__MODULE__{}
-    |> cast(attributes, @profile_fields ++ [:password])
+    |> cast(attributes, @fields)
     |> put_change(:company_id, company_id)
-    |> normalize_email_change()
+    |> put_password_hash(attributes)
     |> validate_required([:name, :email, :password])
-    |> validate_length(:password, min: 8)
     |> validate()
-    |> maybe_hash_password(opts)
   end
 
   @spec update_changeset(t(), map()) :: Ecto.Changeset.t()
   def update_changeset(%__MODULE__{} = user, attributes) do
     user
-    |> cast(attributes, @profile_fields)
-    |> normalize_email_change()
-    |> invalidate_changed_email()
-    |> validate_required([:name, :email, :password_hash])
+    |> cast(attributes, @fields)
+    |> put_password_hash(attributes)
+    |> validate_required([:name, :email, :password])
     |> validate()
-  end
-
-  @spec password_changeset(t(), map(), keyword()) :: Ecto.Changeset.t()
-  def password_changeset(%__MODULE__{} = user, attributes, opts \\ []) do
-    user
-    |> cast(attributes, [:password])
-    |> validate_required([:password])
-    |> validate_length(:password, min: 8)
-    |> maybe_hash_password(opts)
-  end
-
-  @doc false
-  @spec credential_upgrade_changeset(t(), String.t()) :: Ecto.Changeset.t()
-  def credential_upgrade_changeset(%__MODULE__{} = user, password_hash) do
-    change(user, password_hash: password_hash)
-  end
-
-  @doc false
-  @spec password_reset_changeset(t(), String.t(), String.t()) :: Ecto.Changeset.t()
-  def password_reset_changeset(%__MODULE__{} = user, password_hash, remember_token) do
-    change(user, password_hash: password_hash, remember_token: remember_token)
-  end
-
-  @doc false
-  @spec verify_email_changeset(t(), NaiveDateTime.t()) :: Ecto.Changeset.t()
-  def verify_email_changeset(%__MODULE__{} = user, verified_at) do
-    change(user, email_verified_at: verified_at)
-  end
-
-  @doc false
-  @spec normalize_email(String.t()) :: String.t()
-  def normalize_email(email) when is_binary(email) do
-    email |> String.trim() |> String.downcase()
   end
 
   defp validate(changeset) do
@@ -94,31 +59,37 @@ defmodule Bilimbi.Core.User.Schema do
     |> foreign_key_constraint(:employee_id, name: :users_employee_id_foreign)
   end
 
-  defp normalize_email_change(changeset) do
-    update_change(changeset, :email, &normalize_email/1)
-  end
+  # This module stores credentials; it never creates them.
+  #
+  # Belimbing persists Laravel bcrypt output, which is a crypt-format string
+  # (`$2y$<cost>$<22-char salt><31-char digest>`). Bilimbi has no hashing
+  # dependency yet and S1 deliberately does not add one, so the caller supplies
+  # an already-hashed credential under an unambiguous key and anything that is
+  # not crypt-format is rejected rather than silently stored as a plaintext
+  # password. Registration and verification arrive with authentication in S2.
+  @crypt_format ~r/^\$2[aby]\$\d{2}\$[.\/A-Za-z0-9]{53}$/
 
-  defp invalidate_changed_email(changeset) do
-    if get_change(changeset, :email) do
-      put_change(changeset, :email_verified_at, nil)
-    else
-      changeset
+  defp put_password_hash(changeset, attributes) do
+    case fetch_supplied_hash(attributes) do
+      :error ->
+        changeset
+
+      {:ok, hash} when is_binary(hash) ->
+        if Regex.match?(@crypt_format, hash) do
+          put_change(changeset, :password, hash)
+        else
+          add_error(changeset, :password_hash, "must be a bcrypt crypt-format hash")
+        end
+
+      {:ok, _other} ->
+        add_error(changeset, :password_hash, "must be a bcrypt crypt-format hash")
     end
   end
 
-  defp maybe_hash_password(changeset, opts) do
-    if changeset.valid? and Keyword.get(opts, :hash_password, true) do
-      case get_change(changeset, :password) do
-        password when is_binary(password) ->
-          changeset
-          |> put_change(:password_hash, Bilimbi.Core.User.Password.hash(password))
-          |> delete_change(:password)
-
-        _missing ->
-          changeset
-      end
-    else
-      changeset
+  defp fetch_supplied_hash(attributes) do
+    case Map.fetch(attributes, :password_hash) do
+      {:ok, value} -> {:ok, value}
+      :error -> Map.fetch(attributes, "password_hash")
     end
   end
 end
