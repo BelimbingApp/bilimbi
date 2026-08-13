@@ -77,7 +77,7 @@ defmodule BilimbiWeb.CompanyLive.Show do
             <:col :let={{_id, user}} label="Name"><span class="font-medium">{user.name}</span></:col>
             <:col :let={{_id, user}} label="Email">{user.email}</:col>
             <:col :let={{_id, user}} label="Email verified">
-              <.badge kind={if user.email_verified_at, do: :success, else: :neutral}>
+              <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
                 {if user.email_verified_at, do: "verified", else: "unverified"}
               </.badge>
             </:col>

@@ -56,7 +56,7 @@ defmodule BilimbiWeb.UserLive.Index do
               <% end %>
             </:col>
             <:col :let={{_id, user}} label="Email verified">
-              <.badge kind={if user.email_verified_at, do: :success, else: :neutral}>
+              <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
                 {if user.email_verified_at, do: "verified", else: "unverified"}
               </.badge>
             </:col>

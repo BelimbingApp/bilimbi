@@ -71,9 +71,14 @@ defmodule BilimbiWeb.DashboardLive do
             <p class="mt-1 truncate text-sm font-semibold text-ink-strong">
               {@current_scope.scope.tenant.name}
             </p>
-            <p class="mt-0.5 text-xs tabular-nums text-ink-subtle">
-              #{@current_scope.scope.tenant.id} · {@current_scope.scope.tenant.status}
-            </p>
+            <div class="mt-1.5 flex items-center gap-2">
+              <span class="text-xs tabular-nums text-ink-subtle">#{@current_scope.scope.tenant.id}</span>
+              <.badge kind={
+                if @current_scope.scope.tenant.status == "active", do: :success, else: :warning
+              }>
+                {@current_scope.scope.tenant.status}
+              </.badge>
+            </div>
           </div>
         </div>
 
@@ -115,7 +120,7 @@ defmodule BilimbiWeb.DashboardLive do
         </section>
 
         <section id="dashboard-recent-users" class="mt-6">
-          <div class="mb-2 flex items-baseline justify-between">
+          <div class="mb-2 flex items-center justify-between">
             <h2 class="text-sm font-semibold text-ink-strong">People in this workspace</h2>
             <.link
               navigate={~p"/users"}
@@ -130,7 +135,7 @@ defmodule BilimbiWeb.DashboardLive do
             </:col>
             <:col :let={user} label="Email">{user.email}</:col>
             <:col :let={user} label="Email verified">
-              <.badge kind={if user.email_verified_at, do: :success, else: :neutral}>
+              <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
                 {if user.email_verified_at, do: "verified", else: "unverified"}
               </.badge>
             </:col>
