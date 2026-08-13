@@ -3,6 +3,7 @@ defmodule Bilimbi.Core.AddressTest do
 
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
+  alias Bilimbi.Core.Address.Page
 
   import Bilimbi.Core.Address.TestFixtures
 
@@ -44,12 +45,134 @@ defmodule Bilimbi.Core.AddressTest do
     assert {:error, :address_not_found} = Address.get_address(context.customer, address.id)
   end
 
+  test "lists a bounded searchable administration page inside the explicit tenant", context do
+    assert {:ok, label_match} =
+             Address.create_address(context.operator, %{
+               label: "Needle label",
+               verification_status: "verified"
+             })
+
+    assert {:ok, line_match} =
+             Address.create_address(context.operator, %{
+               label: "Second",
+               line1: "Needle road",
+               verification_status: "suggested"
+             })
+
+    assert {:ok, locality_match} =
+             Address.create_address(context.operator, %{
+               label: "Third",
+               locality: "Needle city"
+             })
+
+    assert {:ok, postcode_match} =
+             Address.create_address(context.operator, %{
+               label: "Fourth",
+               postcode: "Needle postcode"
+             })
+
+    assert {:ok, country_match} =
+             Address.create_address(context.operator, %{label: "Fifth", country_iso: "MY"})
+
+    assert {:ok, other_tenant} =
+             Address.create_address(context.customer, %{label: "Needle other tenant"})
+
+    assert {:ok, deleted} =
+             Address.create_address(context.operator, %{label: "Needle deleted"})
+
+    assert :ok = Address.delete_address(context.operator, deleted.id)
+
+    assert %Page{
+             entries: first_page,
+             page: 1,
+             page_size: 2,
+             total_entries: 4,
+             total_pages: 2
+           } = Address.list_addresses(context.operator, search: "Needle", page_size: 2)
+
+    assert Enum.map(first_page, & &1.id) == [postcode_match.id, label_match.id]
+
+    assert %Page{entries: second_page, page: 2} =
+             Address.list_addresses(context.operator,
+               search: "Needle",
+               page: 2,
+               page_size: 2
+             )
+
+    assert Enum.map(second_page, & &1.id) == [line_match.id, locality_match.id]
+
+    assert %Page{entries: [same_country], total_entries: 1} =
+             Address.list_addresses(context.operator, search: "MY")
+
+    assert same_country.id == country_match.id
+    refute other_tenant.id in Enum.map(first_page ++ second_page, & &1.id)
+  end
+
+  test "allowlists administration sorting with a newest-first creation tie-break", context do
+    assert {:ok, older} =
+             Address.create_address(context.operator, %{
+               label: "Same",
+               country_iso: "MY",
+               verification_status: "verified"
+             })
+
+    assert {:ok, newer} =
+             Address.create_address(context.operator, %{
+               label: "Same",
+               country_iso: "MY",
+               verification_status: "suggested"
+             })
+
+    Ecto.Adapters.SQL.query!(
+      Bilimbi.Base.Repo,
+      "UPDATE addresses SET created_at = $1 WHERE id = $2",
+      [~N[2026-08-12 12:00:00], older.id]
+    )
+
+    Ecto.Adapters.SQL.query!(
+      Bilimbi.Base.Repo,
+      "UPDATE addresses SET created_at = $1 WHERE id = $2",
+      [~N[2026-08-13 12:00:00], newer.id]
+    )
+
+    assert %Page{entries: [first, second]} =
+             Address.list_addresses(context.operator, sort_by: :label, sort_dir: :asc)
+
+    assert [first.id, second.id] == [newer.id, older.id]
+
+    assert %Page{entries: [verified, suggested]} =
+             Address.list_addresses(context.operator,
+               sort_by: :verification_status,
+               sort_dir: :desc
+             )
+
+    assert [verified.id, suggested.id] == [older.id, newer.id]
+  end
+
+  test "rejects invalid administration page options", context do
+    for options <- [
+          [search: 1],
+          [sort_by: :created_at],
+          [sort_dir: :sideways],
+          [page: 0],
+          [page_size: 0],
+          [page_size: 101]
+        ] do
+      assert_raise ArgumentError, fn -> Address.list_addresses(context.operator, options) end
+    end
+  end
+
   # A raw tenant ID or a bare tenant identity is not a scope. These are also
   # rejected statically by the type checker; the values are made opaque here so
   # the runtime clause itself is what gets asserted.
   test "cannot be called without a scope", context do
     for not_a_scope <- [41, nil, context.operator.tenant] do
       assert_raise FunctionClauseError, fn -> Address.list_addresses(opaque(not_a_scope)) end
+
+      assert_raise FunctionClauseError, fn ->
+        Address.list_addresses(opaque(not_a_scope), page: 1)
+      end
+
       assert_raise FunctionClauseError, fn -> Address.get_address(opaque(not_a_scope), 1) end
 
       assert_raise FunctionClauseError, fn ->
