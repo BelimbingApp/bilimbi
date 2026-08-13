@@ -32,7 +32,7 @@ defmodule BilimbiWeb.RateLimit do
   def attempt_allowed?(key, limit \\ @default_limit, window_ms \\ @default_window_ms) do
     now = System.monotonic_time(:millisecond)
 
-    case lookup(key) do
+    case lookup(key, window_ms) do
       timestamps when length(timestamps) < limit ->
         :allow
 
@@ -70,7 +70,7 @@ defmodule BilimbiWeb.RateLimit do
   @impl true
   def handle_call({:record, key, window_ms}, _from, table) do
     now = System.monotonic_time(:millisecond)
-    timestamps = [now | lookup(key)] |> Enum.filter(&(&1 + window_ms > now))
+    timestamps = [now | lookup(key, window_ms)] |> Enum.filter(&(&1 + window_ms > now))
     :ets.insert(@table, {key, timestamps})
     {:reply, :ok, table}
   end
@@ -102,11 +102,11 @@ defmodule BilimbiWeb.RateLimit do
     {:noreply, table}
   end
 
-  defp lookup(key) do
+  defp lookup(key, window_ms) do
     now = System.monotonic_time(:millisecond)
 
     case :ets.lookup(@table, key) do
-      [{^key, timestamps}] -> Enum.filter(timestamps, &(&1 + @default_window_ms > now))
+      [{^key, timestamps}] -> Enum.filter(timestamps, &(&1 + window_ms > now))
       [] -> []
     end
   end

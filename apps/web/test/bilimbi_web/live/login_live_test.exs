@@ -105,7 +105,34 @@ defmodule BilimbiWeb.LoginLiveTest do
 
     assert html =~ "Too many sign-in attempts"
 
-    BilimbiWeb.RateLimit.reset({:login, "127.0.0.1"})
+    BilimbiWeb.RateLimit.reset({:login, "ada@example.com", "127.0.0.1"})
+  end
+
+  test "the throttle keys on email+IP, so one email's failures do not lock out another",
+       %{conn: conn} do
+    Company.TestFixtures.insert_tenant!(%{id: 41})
+    Company.TestFixtures.insert_company!(%{id: 73, tenant_id: 41})
+
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    for _ <- 1..5 do
+      view
+      |> form("#login-form", login: %{email: "ada@example.com", password: "not-the-password"})
+      |> render_submit()
+    end
+
+    # A different email from the same IP is still allowed -- Belimbing keys
+    # the throttle on email|ip, so one loud neighbor cannot lock out a NAT.
+    html =
+      view
+      |> form("#login-form", login: %{email: "grace@example.com", password: "not-the-password"})
+      |> render_submit()
+
+    refute html =~ "Too many sign-in attempts"
+    assert html =~ "These credentials do not match our records."
+
+    BilimbiWeb.RateLimit.reset({:login, "ada@example.com", "127.0.0.1"})
+    BilimbiWeb.RateLimit.reset({:login, "grace@example.com", "127.0.0.1"})
   end
 
   test "shows the live platform workspace identity below the card", %{conn: conn} do

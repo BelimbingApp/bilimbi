@@ -28,12 +28,10 @@ defmodule BilimbiWeb.LoginLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    throttle_key = throttle_key(socket)
-
     {:ok,
      socket
      |> assign(:page_title, "Sign in")
-     |> assign(:throttle_key, throttle_key)
+     |> assign(:peer_ip, peer_ip(socket))
      |> assign(:phase, :editing)
      |> assign(:trigger_action, false)
      |> assign(:login_token, nil)
@@ -58,29 +56,34 @@ defmodule BilimbiWeb.LoginLive do
   end
 
   defp attempt_login(socket, changeset) do
-    case RateLimit.attempt_allowed?(socket.assigns.throttle_key) do
-      :allow -> verify_credentials(socket, changeset)
+    # Belimbing keys the throttle on strtolower(email)."|".ip(); the key is
+    # built once the changeset has validated, so a malformed submit never
+    # touches the limiter and one loud neighbor cannot lock out a NAT.
+    key = throttle_key(socket, Ecto.Changeset.get_field(changeset, :email))
+
+    case RateLimit.attempt_allowed?(key) do
+      :allow -> verify_credentials(socket, changeset, key)
       {:deny, seconds} -> {:noreply, reject(socket, changeset, throttle_message(seconds))}
     end
   end
 
-  defp verify_credentials(socket, changeset) do
+  defp verify_credentials(socket, changeset, key) do
     %{email: email, password: password} = Ecto.Changeset.apply_action!(changeset, :login)
 
     case UserAuth.authenticate(email, password) do
       {:ok, user} ->
-        complete_login(socket, user)
+        complete_login(socket, user, key)
 
       {:error, :invalid_credentials} ->
-        :ok = RateLimit.record_attempt(socket.assigns.throttle_key)
+        :ok = RateLimit.record_attempt(key)
         {:noreply, reject(socket, changeset, "These credentials do not match our records.")}
     end
   end
 
-  defp complete_login(socket, user) do
+  defp complete_login(socket, user, key) do
     case UserAuth.session_user(user) do
       {:ok, session_user} ->
-        :ok = RateLimit.reset(socket.assigns.throttle_key)
+        :ok = RateLimit.reset(key)
 
         {:noreply,
          socket
@@ -125,14 +128,16 @@ defmodule BilimbiWeb.LoginLive do
     assign(socket, :form, to_form(changeset, as: "login"))
   end
 
-  defp throttle_key(socket) do
-    peer =
-      case Phoenix.LiveView.get_connect_info(socket, :peer_data) do
-        %{address: address} -> :inet.ntoa(address) |> to_string()
-        _ -> "unknown"
-      end
+  defp peer_ip(socket) do
+    case Phoenix.LiveView.get_connect_info(socket, :peer_data) do
+      %{address: address} -> :inet.ntoa(address) |> to_string()
+      _ -> "unknown"
+    end
+  end
 
-    {:login, peer}
+  # Belimbing `Login::throttleKey()`: strtolower(email)."|".ip().
+  defp throttle_key(socket, email) do
+    {:login, String.downcase(email), socket.assigns.peer_ip}
   end
 
   # The workspace strip: platform-level, non-tenant-owned identity, readable

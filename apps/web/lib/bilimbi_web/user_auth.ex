@@ -19,10 +19,11 @@ defmodule BilimbiWeb.UserAuth do
   ## Cross-module seam
 
   `Bilimbi.Core.Company.fetch_tenant_id_for_company/1` — a public
-  company → tenant read for the login edge — is requested on issue #87.
-  Until it exists the seam falls back to the platform-operator company,
-  which covers the development seed. The fallback is honest about its
-  limits (`{:error, :tenant_unavailable}`) rather than guessing.
+  company → tenant read for the login edge — is requested on issue #87
+  and lands with PR #95. Until it is merged the seam resolves only the
+  platform-operator company, which covers the development seed. The
+  fallback is honest about its limits (`{:error, :tenant_unavailable}`)
+  rather than guessing.
   """
 
   import Plug.Conn
@@ -120,18 +121,9 @@ defmodule BilimbiWeb.UserAuth do
   defp tenant_id_for_user(%Summary{company_id: nil}), do: {:error, :tenant_unavailable}
 
   defp tenant_id_for_user(%Summary{company_id: company_id}) do
-    cond do
-      function_exported?(Company, :fetch_tenant_id_for_company, 1) ->
-        case apply(Company, :fetch_tenant_id_for_company, [company_id]) do
-          {:ok, tenant_id} -> {:ok, tenant_id}
-          _ -> {:error, :tenant_unavailable}
-        end
-
-      true ->
-        case Company.platform_operator_company() do
-          {:ok, %{id: id, tenant_id: tenant_id}} when id == company_id -> {:ok, tenant_id}
-          _ -> {:error, :tenant_unavailable}
-        end
+    case Company.platform_operator_company() do
+      {:ok, %{id: id, tenant_id: tenant_id}} when id == company_id -> {:ok, tenant_id}
+      _ -> {:error, :tenant_unavailable}
     end
   end
 
