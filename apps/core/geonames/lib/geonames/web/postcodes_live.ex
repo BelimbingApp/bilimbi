@@ -297,7 +297,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
     |> assign(:postcode_country_summaries, postcode_country_summaries)
     |> assign(
       :filters_form,
-      to_form(%{search: state.search, perPage: state.per_page}, as: :filters)
+      to_form(%{"search" => state.search, "perPage" => state.per_page}, as: :filters)
     )
     |> assign(:index_state, state)
     |> stream(:postcodes, postcodes_page.entries, reset: true)

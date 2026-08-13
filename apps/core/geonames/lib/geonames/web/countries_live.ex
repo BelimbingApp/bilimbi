@@ -198,7 +198,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
     |> assign(:countries_page, countries_page)
     |> assign(
       :filters_form,
-      to_form(%{search: state.search, perPage: state.per_page}, as: :filters)
+      to_form(%{"search" => state.search, "perPage" => state.per_page}, as: :filters)
     )
     |> assign(:index_state, state)
     |> stream(:countries, countries_page.entries, reset: true)

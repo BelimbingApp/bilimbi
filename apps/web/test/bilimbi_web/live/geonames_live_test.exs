@@ -93,4 +93,40 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     assert has_element?(postcodes, "#postcode-2", "San Francisco")
     refute has_element?(postcodes, "#postcode-1", "Kuala Lumpur")
   end
+
+  test "resets filter pagination and renders normal empty index states", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list"])
+
+    {:ok, countries, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/geonames/countries?#{%{page: 9}}")
+
+    countries
+    |> element("#countries-filters")
+    |> render_change(%{"filters" => %{"search" => "missing", "perPage" => "20"}})
+
+    assert_patch(
+      countries,
+      ~p"/geonames/countries?#{%{search: "missing", page: 1, perPage: 20, sortBy: "country", sortDir: "asc"}}"
+    )
+
+    assert has_element?(countries, "#countries-empty")
+
+    {:ok, admin1, _html} = conn |> log_in_as() |> live(~p"/geonames/admin1")
+
+    admin1
+    |> element("#admin1-filters")
+    |> render_change(%{"filters" => %{"search" => "missing", "countryIso" => "", "perPage" => "20"}})
+
+    assert has_element?(admin1, "#admin1-empty")
+
+    {:ok, postcodes, _html} = conn |> log_in_as() |> live(~p"/geonames/postcodes")
+
+    postcodes
+    |> element("#postcodes-filters")
+    |> render_change(%{"filters" => %{"search" => "missing", "perPage" => "20"}})
+
+    assert has_element?(postcodes, "#postcodes-empty")
+  end
 end

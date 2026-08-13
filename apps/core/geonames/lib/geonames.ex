@@ -344,7 +344,7 @@ defmodule Bilimbi.Core.Geonames do
 
       iso ->
         from([admin1, _country] in query,
-          where: fragment("upper(?) like ?", admin1.code, ^"#{iso}.%")
+          where: fragment("upper(split_part(?, '.', 1)) = ?", admin1.code, ^iso)
         )
     end
   end
@@ -546,7 +546,9 @@ defmodule Bilimbi.Core.Geonames do
 
   defp normalize_iso(value) do
     case normalize_required(value) do
-      {:ok, iso} when byte_size(iso) == 2 -> {:ok, String.upcase(iso)}
+      {:ok, iso} when byte_size(iso) == 2 ->
+        if String.match?(iso, ~r/\A[A-Za-z]{2}\z/), do: {:ok, String.upcase(iso)}, else: :error
+
       _other -> :error
     end
   end
