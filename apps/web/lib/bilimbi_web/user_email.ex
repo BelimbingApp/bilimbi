@@ -9,6 +9,7 @@ defmodule BilimbiWeb.UserEmail do
     statics: BilimbiWeb.static_paths()
 
   alias Bilimbi.Core.User.Summary
+  alias BilimbiWeb.Mailer
 
   def password_reset(%Summary{} = user, token) when is_binary(token) do
     reset_url =
@@ -17,7 +18,7 @@ defmodule BilimbiWeb.UserEmail do
 
     new()
     |> to({user.name, user.email})
-    |> from({"Bilimbi", "no-reply@bilimbi.local"})
+    |> from(Mailer.sender())
     |> subject("Reset your Bilimbi password")
     |> text_body("""
     Reset your Bilimbi password by opening this link:

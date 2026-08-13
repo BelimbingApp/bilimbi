@@ -25,6 +25,9 @@ if config_env() == :dev do
 end
 
 if config_env() == :prod do
+  config :web, BilimbiWeb.Mailer, BilimbiWeb.MailerConfig.production_config!()
+  config :web, :mailer_sender, BilimbiWeb.MailerConfig.sender!()
+
   database_url =
     System.get_env("DATABASE_URL") ||
       raise """
