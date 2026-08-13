@@ -24,6 +24,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
         {:ok, scope} = Tenancy.scope(41)
         scope
       end)
+
     %{schema: schema, scope: scope}
   end
 
@@ -32,7 +33,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
       refute Repo.in_transaction?()
       assert {:error, :transaction_required} = Company.lock_live_company(scope, 73)
 
-      assert {:ok, %LiveCompanyProof{id: 73}} =
+      assert {:ok, {:ok, %LiveCompanyProof{id: 73}}} =
                Repo.transaction(fn ->
                  assert Repo.in_transaction?()
                  Company.lock_live_company(scope, 73)
@@ -42,16 +43,14 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
 
   test "returns generic misses and keeps its proof schema-free", %{schema: schema, scope: scope} do
     on_schema!(schema, fn ->
-      assert {:ok, %LiveCompanyProof{id: 73} = proof} =
+      assert {:ok, {:ok, %LiveCompanyProof{id: 73} = proof}} =
                Repo.transaction(fn -> Company.lock_live_company(scope, 73) end)
 
       assert Map.keys(Map.from_struct(proof)) == [:id]
       refute is_struct(proof, Schema)
       refute Map.has_key?(proof, :__meta__)
 
-      assert_raise Protocol.UndefinedError, fn ->
-        Ecto.Queryable.to_query(proof)
-      end
+      assert Ecto.Queryable.impl_for(proof) == nil
 
       for company_id <- [0, -1, nil, "73", 74, 75] do
         assert {:ok, {:error, :not_found}} =
@@ -63,7 +62,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
   test "rejects a malformed scope at the public boundary", %{schema: schema} do
     on_schema!(schema, fn ->
       assert_raise FunctionClauseError, fn ->
-        Repo.transaction(fn -> Company.lock_live_company(41, 73) end)
+        Repo.transaction(fn -> apply(Company, :lock_live_company, [41, 73]) end)
       end
     end)
   end
@@ -79,7 +78,7 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
                  Repo.rollback(:rollback)
                end)
 
-      assert {:ok, %LiveCompanyProof{id: 73}} =
+      assert {:ok, {:ok, %LiveCompanyProof{id: 73}}} =
                Repo.transaction(fn -> Company.lock_live_company(scope, 73) end)
     end)
   end
@@ -195,10 +194,13 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
 
   defp await_backend_lock_wait!(backend_pid, remaining) do
     %{rows: rows} =
-      SQL.query!(Repo, "SELECT wait_event_type FROM pg_stat_activity WHERE pid = $1", [backend_pid])
+      SQL.query!(Repo, "SELECT wait_event_type FROM pg_stat_activity WHERE pid = $1", [
+        backend_pid
+      ])
 
     case rows do
-      [["Lock"]] -> :ok
+      [["Lock"]] ->
+        :ok
 
       _other ->
         receive do
