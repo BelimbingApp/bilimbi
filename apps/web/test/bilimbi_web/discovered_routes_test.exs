@@ -13,4 +13,10 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
              %{path: "/widgets", live: Foo, source: "core/foo"}
            ]
   end
+
+  test "router includes tenant and session admin routes from the test-env manifest" do
+    paths = BilimbiWeb.Router.__routes__() |> Enum.map(& &1.path)
+    assert "/tenancy/tenants" in paths
+    assert "/system/sessions" in paths
+  end
 end

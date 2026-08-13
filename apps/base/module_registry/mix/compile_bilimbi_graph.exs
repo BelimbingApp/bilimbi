@@ -8,16 +8,38 @@ defmodule Mix.Tasks.Compile.BilimbiGraph do
 
   @impl true
   def run(_arguments) do
-    case Mix.Project.config()[:bilimbi_module_root] do
-      nil ->
-        {:noop, []}
+    config = Mix.Project.config()
 
-      module_root ->
+    case {config[:bilimbi_module_root], config[:bilimbi_workspace_root]} do
+      {module_root, _} when is_binary(module_root) ->
         workspace_root =
           Bilimbi.Base.ModuleRegistry.MixDiscovery.workspace_root!(module_root)
 
         Bilimbi.Base.ModuleRegistry.MixDiscovery.write_route_manifest!(workspace_root)
         refresh_marker(module_root)
+
+      {nil, workspace_root} when is_binary(workspace_root) ->
+        write_host_route_manifest(workspace_root)
+
+      _other ->
+        {:noop, []}
+    end
+  end
+
+  defp write_host_route_manifest(workspace_root) do
+    manifest =
+      Bilimbi.Base.ModuleRegistry.MixDiscovery.route_manifest_path(workspace_root)
+
+    previous = if File.regular?(manifest), do: File.read!(manifest)
+
+    Bilimbi.Base.ModuleRegistry.MixDiscovery.write_route_manifest!(workspace_root)
+
+    current = File.read!(manifest)
+
+    if previous == current do
+      {:noop, []}
+    else
+      {:ok, []}
     end
   end
 
