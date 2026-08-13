@@ -81,7 +81,12 @@ defmodule Bilimbi.Base.UI.Layouts do
   """
   attr(:flash, :map, required: true)
   attr(:current_scope, :map, required: true)
-  attr(:active_nav, :string, default: nil)
+  # Required, not defaulted: a screen that forgets this renders a sidebar where
+  # nothing is current, and the page still looks right. Two screens shipped
+  # exactly that way before a reviewer caught it by reading, because a *missing*
+  # attribute leaves nothing to grep for. Required makes it a compile error.
+  # Pass nil deliberately for a page that owns no menu item.
+  attr(:active_nav, :string, required: true)
   slot(:inner_block, required: true)
 
   def app(assigns) do
