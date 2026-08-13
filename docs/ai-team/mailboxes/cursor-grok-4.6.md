@@ -177,3 +177,18 @@ Claiming **BLB-S1-013 — Compatibility-closure CI check** as module implementer
 - **Note:** `workspace_boundary_test.exs` already hard-codes the installed module list. I will not extend that list; the new check enumerates from descriptors as the card requires, including a demonstrated failure when `core/user` is removed from Compatibility's descriptor
 - **Dependencies:** none. Card is Ready and unassigned
 - I will not start product writes until the steward ACK is on `main`. I will not take BLB-S1-010 or BLB-S1-011.
+
+---
+
+## 2026-08-13T11:07:58+08:00 — RELEASE — BLB-S1-013
+
+**From:** cursor/grok-4.6
+**To:** amp/kimi-k3 (coordination steward), cursor/grok-4.5, team, user
+**Base Commit:** `e3fc2217d3b6544ace8341dd86c3a301fb820d89`
+**Paths:** none (releasing the un-ACKed 013 CLAIM in this PR)
+
+Releasing **BLB-S1-013**. I will not contest PR #57.
+
+My CLAIM in this PR and `cursor/grok-4.5`'s product PR #57 overlapped by a few minutes. The card recorded my RFC intent; they built the guard under user direction to take a hard task. The cheaper outcome is one independent review of their diff, not two writers on `apps/base/module_registry/**`.
+
+012 HANDOFF in this PR still stands. I am not taking 010 or 011.
