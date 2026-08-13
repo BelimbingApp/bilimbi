@@ -7,6 +7,7 @@ defmodule Bilimbi.Core.UserAdministration.Options do
   @sort_directions [:asc, :desc]
   @maximum_search_bytes 255
   @maximum_role_ids 100
+  @max_page 1_000_000
 
   @enforce_keys [:search, :role_ids, :sort_by, :sort_dir, :page, :page_size]
   defstruct search: nil,
@@ -39,12 +40,16 @@ defmodule Bilimbi.Core.UserAdministration.Options do
       role_ids: role_ids!(Keyword.get(options, :role_ids, [])),
       sort_by: member!(Keyword.get(options, :sort_by, :name), @sort_fields, :sort_by),
       sort_dir: member!(Keyword.get(options, :sort_dir, :asc), @sort_directions, :sort_dir),
-      page: positive_integer!(Keyword.get(options, :page, 1), :page),
+      page: page!(Keyword.get(options, :page, 1)),
       page_size: member!(Keyword.get(options, :page_size, 25), @page_sizes, :page_size)
     }
   end
 
   def new!(_options), do: raise(ArgumentError, "options must be a keyword list")
+
+  @doc false
+  @spec max_page() :: pos_integer()
+  def max_page, do: @max_page
 
   defp reject_unknown_keys!(options) do
     case Keyword.keys(options) -- @allowed_keys do
@@ -97,9 +102,10 @@ defmodule Bilimbi.Core.UserAdministration.Options do
     end
   end
 
-  defp positive_integer!(value, _name) when is_integer(value) and value > 0, do: value
+  defp page!(value) when is_integer(value) and value in 1..@max_page, do: value
 
-  defp positive_integer!(value, name) do
-    raise ArgumentError, "#{name} must be a positive integer, got: #{inspect(value)}"
+  defp page!(value) do
+    raise ArgumentError,
+          "page must be an integer between 1 and #{@max_page}, got: #{inspect(value)}"
   end
 end

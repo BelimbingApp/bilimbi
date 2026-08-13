@@ -10,6 +10,7 @@ defmodule Bilimbi.Core.UserAdministrationTest do
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias Bilimbi.Core.UserAdministration
   alias Bilimbi.Core.UserAdministration.Entry
+  alias Bilimbi.Core.UserAdministration.Options
   alias Bilimbi.Core.UserAdministration.Page
   alias Bilimbi.Core.UserAdministration.Role
   alias Bilimbi.Core.UserAdministration.TestAuthz
@@ -105,6 +106,8 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     user!(3, 10, "Alpine", "target@EXAMPLE.com", nil)
 
     assert ids(search: "ALPHA") == [1]
+    assert ids(search: "LPH") == [1]
+    assert ids(search: "target@") == [3]
     assert ids(search: "A_pha") == [2]
     assert ids(search: "Al%") == [2, 3]
     assert ids(search: "%@EXAMPLE.com") == [3]
@@ -251,6 +254,10 @@ defmodule Bilimbi.Core.UserAdministrationTest do
   end
 
   test "rejects every malformed or unnormalized option without dynamic atoms" do
+    max_page = Options.max_page()
+    assert max_page == 1_000_000
+    assert (max_page - 1) * 100 < 9_223_372_036_854_775_807
+
     malformed = [
       %{},
       [:name],
@@ -266,6 +273,7 @@ defmodule Bilimbi.Core.UserAdministrationTest do
       [sort_by: :password],
       [sort_dir: "asc"],
       [page: 0],
+      [page: max_page + 1],
       [page_size: 1],
       [page_size: 30],
       [page_size: 9_999]
@@ -276,6 +284,14 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     end)
 
     assert %Page{page: 1, page_size: 25} = UserAdministration.list_users(scope())
+    user!(1, 10, "Ada", "ada@example.com", nil)
+
+    assert %Page{
+             entries: [],
+             page: ^max_page,
+             total_entries: 1,
+             total_pages: 1
+           } = UserAdministration.list_users(scope(), page: max_page)
   end
 
   test "executes one parameterized PostgreSQL statement for a combined page snapshot" do

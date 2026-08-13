@@ -15,12 +15,10 @@ defmodule Bilimbi.Core.UserAdministration.Query do
   def list(%Scope{} = scope, %Options{} = options) do
     platform_operator? = Scope.platform_operator?(scope)
 
-    query =
-      options
-      |> final_query(platform_operator?, scope)
-      |> Repo.all()
+    query = final_query(options, platform_operator?, scope)
+    rows = Repo.all(query)
 
-    to_page(query, options)
+    to_page(rows, options)
   end
 
   defp final_query(options, platform_operator?, scope) do
@@ -150,7 +148,8 @@ defmodule Bilimbi.Core.UserAdministration.Query do
   defp search(query, nil), do: query
 
   defp search(query, search) do
-    where(query, [user, _company], like(user.name, ^search) or like(user.email, ^search))
+    pattern = "%" <> search <> "%"
+    where(query, [user, _company], like(user.name, ^pattern) or like(user.email, ^pattern))
   end
 
   defp role_filter(query, []), do: query

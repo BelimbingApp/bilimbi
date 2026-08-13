@@ -21,13 +21,16 @@ Options accept only a keyword list containing the following normalized values:
 - `role_ids`: at most 100 unique positive integer IDs, with OR semantics;
 - `sort_by`: `:name`, `:email`, `:company_name`, or `:created_at`;
 - `sort_dir`: `:asc` or `:desc`;
-- `page`: a positive integer; and
+- `page`: an integer from 1 through 1,000,000; and
 - `page_size`: exactly `10`, `25`, `50`, or `100`.
 
 Defaults are no search or Role filter, Name ascending, page 1, and 25 entries.
 Search uses PostgreSQL `LIKE`, including its case behavior and `%`/`_` wildcard
-meaning. Every primary ordering ends with User ID descending. Empty and
-out-of-range pages keep truthful totals.
+meaning, around a parameterized contains pattern. The deliberate page cap
+keeps the largest supported page-size offset below 100 million rows, far below
+PostgreSQL's signed-bigint `OFFSET` ceiling, while rejecting impractical URL
+inputs before arithmetic reaches the adapter. Every primary ordering ends with
+User ID descending. Empty and out-of-range pages keep truthful totals.
 
 Role summaries use the integration-only containment rule from ADR 0007. The
 assignment must be visible through a live in-scope Company (or the documented
