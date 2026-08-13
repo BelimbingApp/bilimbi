@@ -9,6 +9,7 @@ defmodule BilimbiWeb.CompanyLive.Show do
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.User
+  alias BilimbiWeb.UserAuth
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -88,7 +89,19 @@ defmodule BilimbiWeb.CompanyLive.Show do
           <h2 class="mb-2 text-sm font-semibold text-ink-strong">Employees</h2>
           <.table id="company-employees-table" rows={@streams.company_employees}>
             <:col :let={{_id, employee}} label="Name">
-              <span class="font-medium">{employee.full_name}</span>
+              <.link
+                :if={UserAuth.allowed?(@current_scope, "admin.employee.view")}
+                navigate={~p"/employees/#{employee.id}"}
+                class="font-medium text-ink-strong hover:underline"
+              >
+                {employee.full_name}
+              </.link>
+              <span
+                :if={not UserAuth.allowed?(@current_scope, "admin.employee.view")}
+                class="font-medium"
+              >
+                {employee.full_name}
+              </span>
               <span :if={employee.designation} class="block text-xs text-ink-subtle">
                 {employee.designation}
               </span>

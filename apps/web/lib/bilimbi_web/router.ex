@@ -73,6 +73,36 @@ defmodule BilimbiWeb.Router do
     plug :require_capability, "admin.user.update"
   end
 
+  pipeline :ensure_employee_list do
+    plug :require_authenticated
+    plug :require_capability, "admin.employee.list"
+  end
+
+  pipeline :ensure_employee_view do
+    plug :require_authenticated
+    plug :require_capability, "admin.employee.view"
+  end
+
+  pipeline :ensure_employee_create do
+    plug :require_authenticated
+    plug :require_capability, "admin.employee.create"
+  end
+
+  pipeline :ensure_employee_update do
+    plug :require_authenticated
+    plug :require_capability, "admin.employee.update"
+  end
+
+  pipeline :ensure_employee_type_list do
+    plug :require_authenticated
+    plug :require_capability, "admin.employee-type.list"
+  end
+
+  pipeline :ensure_employee_type_create do
+    plug :require_authenticated
+    plug :require_capability, "admin.employee-type.create"
+  end
+
   # The homepage is the sign-in screen; authenticated visitors are forwarded
   # to their workspace.
   scope "/", BilimbiWeb do
@@ -171,6 +201,78 @@ defmodule BilimbiWeb.Router do
         {BilimbiWeb.UserAuth, {:require_capability, "admin.user.update"}}
       ] do
       live "/users/:id/edit", UserLive.Form, :edit
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_employee_list]
+
+    live_session :employees_index,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.employee.list"}}
+      ] do
+      live "/employees", EmployeeLive.Index
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_employee_create]
+
+    live_session :employees_new,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.employee.create"}}
+      ] do
+      live "/employees/new", EmployeeLive.Form, :new
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_employee_view]
+
+    live_session :employees_show,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.employee.view"}}
+      ] do
+      live "/employees/:id", EmployeeLive.Show
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_employee_update]
+
+    live_session :employees_edit,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.employee.update"}}
+      ] do
+      live "/employees/:id/edit", EmployeeLive.Form, :edit
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_employee_type_list]
+
+    live_session :employee_types_index,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.employee-type.list"}}
+      ] do
+      live "/employee-types", EmployeeTypeLive.Index
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_employee_type_create]
+
+    live_session :employee_types_new,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.employee-type.create"}}
+      ] do
+      live "/employee-types/new", EmployeeTypeLive.Form, :new
     end
   end
 

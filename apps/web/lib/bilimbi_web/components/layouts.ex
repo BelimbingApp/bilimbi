@@ -139,6 +139,15 @@ defmodule BilimbiWeb.Layouts do
           >
             Users
           </.nav_item>
+          <.nav_item
+            :if={UserAuth.allowed?(@current_scope, "admin.employee.list")}
+            navigate={~p"/employees"}
+            icon="hero-identification"
+            active={@active_nav == :employees}
+            id="nav-employees"
+          >
+            Employees
+          </.nav_item>
         </nav>
 
         <div id="app-user" class="border-t border-line-subtle px-1.5 py-3 lg:px-3">

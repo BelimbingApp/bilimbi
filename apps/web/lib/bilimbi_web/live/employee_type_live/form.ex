@@ -1,0 +1,123 @@
+defmodule BilimbiWeb.EmployeeTypeLive.Form do
+  @moduledoc """
+  Create a custom employee type for the signed-in company.
+
+  Edit and delete are not offered: Core Employee has no public update or
+  delete for types yet.
+  """
+
+  use BilimbiWeb, :live_view
+
+  import Ecto.Changeset
+
+  alias Bilimbi.Core.Employee
+  alias Ecto.Changeset
+
+  @field_types %{code: :string, label: :string}
+
+  @impl true
+  def mount(_params, _session, socket) do
+    {:ok,
+     socket
+     |> assign(:page_title, "New employee type")
+     |> assign(:active_nav, :employees)
+     |> assign_form(form_changeset(%{}))}
+  end
+
+  @impl true
+  def handle_event("validate", %{"employee_type" => params}, socket) do
+    {:noreply, assign_form(socket, form_changeset(params))}
+  end
+
+  def handle_event("save", %{"employee_type" => params}, socket) do
+    scope = socket.assigns.current_scope.scope
+    company_id = socket.assigns.current_scope.user["company_id"]
+    changeset = form_changeset(params)
+
+    if changeset.valid? do
+      attributes = Map.take(params, ["code", "label"])
+
+      case Employee.create_employee_type(scope, company_id, attributes) do
+        {:ok, type} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, "#{type.label} was created.")
+           |> push_navigate(to: ~p"/employee-types")}
+
+        {:error, :company_not_found} ->
+          {:noreply, put_flash(socket, :error, "That company is not in this workspace.")}
+
+        {:error, %Changeset{} = domain_changeset} ->
+          {:noreply, assign_form(socket, copy_domain_errors(changeset, domain_changeset))}
+      end
+    else
+      {:noreply, assign_form(socket, changeset)}
+    end
+  end
+
+  defp form_changeset(params) do
+    {%{}, @field_types}
+    |> cast(params, [:code, :label])
+    |> validate_required([:code, :label])
+    |> Map.put(:action, :validate)
+  end
+
+  defp copy_domain_errors(form_changeset, %Changeset{} = domain_changeset) do
+    domain_changeset.errors
+    |> Enum.reduce(form_changeset, fn {field, {message, opts}}, acc ->
+      if Map.has_key?(@field_types, field) do
+        add_error(acc, field, message, opts)
+      else
+        acc
+      end
+    end)
+    |> Map.put(:action, :insert)
+  end
+
+  defp assign_form(socket, %Changeset{} = changeset) do
+    assign(socket, :form, to_form(changeset, as: :employee_type))
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
+      <div class="mx-auto max-w-xl">
+        <p class="mb-2 text-xs">
+          <.link navigate={~p"/employee-types"} class="font-medium text-ink-muted hover:text-ink">
+            ← Employee types
+          </.link>
+        </p>
+
+        <.header>
+          {@page_title}
+          <:subtitle>Custom types belong to this company. System type codes are reserved.</:subtitle>
+        </.header>
+
+        <.form
+          for={@form}
+          id="employee-type-form"
+          phx-change="validate"
+          phx-submit="save"
+          class="mt-5 flex flex-col gap-4 rounded-xl border border-line bg-surface px-6 py-5"
+        >
+          <.input field={@form[:label]} id="employee-type-label" label="Label" autocomplete="off" />
+          <.input field={@form[:code]} id="employee-type-code" label="Code" autocomplete="off" />
+
+          <div class="mt-2 flex items-center gap-3">
+            <.button id="employee-type-save" variant="primary" type="submit" phx-disable-with="Saving…">
+              Save type
+            </.button>
+            <.link
+              navigate={~p"/employee-types"}
+              class="text-sm font-medium text-ink-muted hover:text-ink"
+            >
+              Cancel
+            </.link>
+          </div>
+        </.form>
+      </div>
+    </Layouts.app>
+    """
+  end
+end
