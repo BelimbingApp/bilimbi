@@ -22,6 +22,8 @@ defmodule Bilimbi.Base.Authz.DecisionLog do
     timestamps(type: :naive_datetime, inserted_at: :created_at)
   end
 
+  @type t :: %__MODULE__{}
+
   @spec changeset(map()) :: Ecto.Changeset.t()
   def changeset(attributes) do
     %__MODULE__{}

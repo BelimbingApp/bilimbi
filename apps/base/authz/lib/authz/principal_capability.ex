@@ -11,4 +11,6 @@ defmodule Bilimbi.Base.Authz.PrincipalCapability do
     field :is_allowed, :boolean, default: true
     timestamps(type: :naive_datetime, inserted_at: :created_at)
   end
+
+  @type t :: %__MODULE__{}
 end
