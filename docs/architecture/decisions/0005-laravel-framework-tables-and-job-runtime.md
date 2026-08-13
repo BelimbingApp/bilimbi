@@ -43,8 +43,10 @@ Bilimbi-only Oban migration: an untouched Belimbing database does not contain
 ### Classify the six framework tables by ownership
 
 `sessions` is ported, not residue. Base Session owns its migration, exact
-schema contract, runtime API, and current-scope integration. Verification and
-adoption remain strict for the canonical table.
+schema contract, and operational runtime API. Verification and adoption remain
+strict for the canonical table. The authenticated current-scope adapter belongs
+to Phoenix Web and composes Session with User and Tenancy; Base Session neither
+owns that adapter nor interprets the opaque compatibility payload.
 
 `cache` and `cache_locks` are intentionally not ported. Bilimbi code must not
 read, write, refresh, or depend on Laravel's serialized cache values or locks.
