@@ -45,9 +45,24 @@ defmodule Bilimbi.Core.MenuRouteIntegrityTest do
 
   defp flatten(nodes), do: Enum.flat_map(nodes, &[&1.item | flatten(&1.children)])
 
+  # Belimbing guards a section on the container and leaves its children bare --
+  # `app/Core/Geonames/Config/menu.php` puts `admin.geonames.list` on
+  # `admin.geonames` and gives Countries/Admin1/Postcodes no permission at all.
+  # Visibility is therefore inherited, so an item's effective capability is its
+  # own or its nearest ancestor's.
+  defp effective_capability(item, by_id) do
+    cond do
+      item.capability -> item.capability
+      is_nil(item.parent) -> nil
+      true -> by_id |> Map.get(item.parent) |> then(&(&1 && effective_capability(&1, by_id)))
+    end
+  end
+
   test "a menu item's capability matches the capability guarding its route" do
     routes = manifest_routes()
     refute routes == [], "route manifest is empty; the seam under test is not present"
+
+    by_id = Map.new(Menu.items(), &{&1.id, &1})
 
     mismatches =
       Menu.items()
@@ -59,12 +74,13 @@ defmodule Bilimbi.Core.MenuRouteIntegrityTest do
 
           route ->
             route_capability = Map.get(route, :capability)
+            menu_capability = effective_capability(item, by_id)
 
-            if item.capability == route_capability do
+            if menu_capability == route_capability do
               []
             else
               [
-                "#{item.id}: menu #{inspect(item.capability)} vs route #{inspect(route_capability)}"
+                "#{item.id}: menu #{inspect(menu_capability)} vs route #{inspect(route_capability)}"
               ]
             end
         end

@@ -48,7 +48,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={:geonames}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.geonames.admin1-division">
       <div id="admin1-index" class="mx-auto max-w-7xl">
         <.header>
           Admin1 Divisions

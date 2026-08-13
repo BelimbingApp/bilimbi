@@ -78,6 +78,26 @@ defmodule Bilimbi.Base.UI.NavTest do
                Nav.tree(scope([]))
     end
 
+    test "strips the link from an item kept only for its children" do
+      # Surviving on its children is not permission to render its own route:
+      # that link is the 404 the pruning exists to prevent.
+      install!([
+        Item.new!(%{id: "top", label: "Top", route: @unserved}),
+        Item.new!(%{id: "top.here", label: "Here", parent: "top", route: @served})
+      ])
+
+      assert [%{item: %Item{id: "top", route: nil, label: "Top"}}] = Nav.tree(scope([]))
+    end
+
+    test "leaves a served parent's own link intact" do
+      install!([
+        Item.new!(%{id: "top", label: "Top", route: @served}),
+        Item.new!(%{id: "top.here", label: "Here", parent: "top", route: @served})
+      ])
+
+      assert [%{item: %Item{id: "top", route: @served}}] = Nav.tree(scope([]))
+    end
+
     test "still hides what the actor lacks the capability for" do
       install!([
         Item.new!(%{id: "open", label: "Open", route: @served}),

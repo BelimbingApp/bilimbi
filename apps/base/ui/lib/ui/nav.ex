@@ -51,6 +51,7 @@ defmodule Bilimbi.Base.UI.Nav do
     nodes
     |> Enum.map(fn node -> %{node | children: reject_unreachable(node.children)} end)
     |> Enum.reject(&unreachable?/1)
+    |> Enum.map(&demote_unserved/1)
   end
 
   # A node survives on either merit: it leads somewhere, or something under it
@@ -59,6 +60,16 @@ defmodule Bilimbi.Base.UI.Nav do
 
   defp unreachable?(%{item: %{route: route}, children: children}),
     do: children == [] and not served?(route)
+
+  # A node kept only for its children keeps its label and loses its link, so it
+  # renders as a section heading. Without this it survives the check above and
+  # then renders as exactly the 404 that check exists to prevent -- the item is
+  # reachable, its own route is not.
+  defp demote_unserved(%{item: %{route: route} = item} = node) when is_binary(route) do
+    if served?(route), do: node, else: %{node | item: %{item | route: nil}}
+  end
+
+  defp demote_unserved(node), do: node
 
   defp allowed?(%{capabilities: caps}, cap) when is_list(caps) and is_binary(cap),
     do: cap in caps
