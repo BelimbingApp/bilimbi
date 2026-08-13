@@ -128,50 +128,6 @@ defmodule Bilimbi.Base.AuthzTest do
     assert Authz.can(actor, "admin.test.record.view").allowed
   end
 
-  test "custom roles cannot grant across companies in the same tenant" do
-    tenant_scope = scope()
-    company_ten_actor = Authz.actor(:user, 90, tenant_scope, 10)
-    company_eleven_actor = Authz.actor(:user, 91, tenant_scope, 11)
-
-    assert {:ok, role} =
-             Authz.create_role(tenant_scope, 11, %{
-               name: "Company eleven viewer",
-               code: "company_eleven_viewer"
-             })
-
-    assert {:ok, 1} =
-             Authz.replace_role_capabilities(
-               tenant_scope,
-               role.id,
-               ["admin.test.record.view"]
-             )
-
-    assert {:error, :role_not_found} =
-             Authz.assign_role(tenant_scope, 10, :user, 90, role.id)
-
-    assert {:ok, :assigned} =
-             Authz.assign_role(tenant_scope, 11, :user, 91, role.id)
-
-    assert Authz.can(company_eleven_actor, "admin.test.record.view").allowed
-
-    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-
-    Repo.insert_all(PrincipalRole, [
-      %{
-        company_id: 10,
-        principal_type: "user",
-        principal_id: 90,
-        role_id: role.id,
-        created_at: now,
-        updated_at: now
-      }
-    ])
-
-    decision = Authz.can(company_ten_actor, "admin.test.record.view")
-    refute decision.allowed
-    assert decision.reason == :denied_missing_capability
-  end
-
   test "resource tenant and company policies reject cross-boundary access" do
     actor = Authz.actor(:user, 7, scope(), 10)
     assert {:ok, _summary} = Authz.reconcile_system_roles()

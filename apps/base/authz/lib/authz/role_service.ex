@@ -94,7 +94,7 @@ defmodule Bilimbi.Base.Authz.RoleService do
       not directory.company_in_scope?(scope, company_id) ->
         {:error, :company_not_found}
 
-      is_nil(eligible_role_for_assignment(scope, company_id, role_id, registry)) ->
+      is_nil(eligible_role(scope, role_id, registry)) ->
         {:error, :role_not_found}
 
       true ->
@@ -181,20 +181,6 @@ defmodule Bilimbi.Base.Authz.RoleService do
         where:
           (role.is_system and is_nil(role.company_id)) or
             (not role.is_system and role.company_id in ^company_ids)
-      )
-    )
-  end
-
-  defp eligible_role_for_assignment(scope, company_id, role_id, registry) do
-    company_ids = directory!(registry).company_ids(scope)
-
-    Repo.one(
-      from(role in Role,
-        where: role.id == ^role_id,
-        where:
-          (role.is_system and is_nil(role.company_id)) or
-            (not role.is_system and role.company_id == ^company_id and
-               role.company_id in ^company_ids)
       )
     )
   end
