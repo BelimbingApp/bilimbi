@@ -182,6 +182,21 @@ exactly as the migration does.
 `tail`'s exit status, so it prints success over failure. This masked a real
 failure twice.
 
+**`missing plug dependency` in Geonames is a stale build artifact, not a bug.**
+`apps/core/geonames` uses Req's plug adapter to stub HTTP, and
+`deps/req/lib/req/plug.ex:1` is `if Code.ensure_loaded?(Plug) do` — evaluated at
+*Req's* compile time. If Req compiled before `plug` (declared `only: :test`)
+was available, a stub that raises is baked in and persists. Three tests fail
+with `** (RuntimeError) missing plug dependency`. Fix:
+
+```bash
+cd apps/core/geonames && MIX_ENV=test mix deps.compile req --force
+```
+
+18/18 after that. Do not "fix" the source — there is nothing wrong with it.
+Suspect this whenever a dependency's optional feature is missing despite being
+in `mix.lock` and `deps/`.
+
 **Root `mix` needs deps first.** `credo`, `sobelow`, `dialyxir` and `mix_audit`
 are pinned but not fetched, so root `mix format` and `mix precommit` fail until
 `mix deps.get`. Module-level `mix test` works without it — run
