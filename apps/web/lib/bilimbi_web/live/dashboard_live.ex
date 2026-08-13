@@ -23,7 +23,7 @@ defmodule BilimbiWeb.DashboardLive do
     {:ok,
      socket
      |> assign(:page_title, "Dashboard")
-     |> assign(:active_nav, :dashboard)
+     |> assign(:active_nav, "dashboard")
      |> assign(:companies, companies)
      |> assign(:users, users)
      |> assign_primary_company(companies)}

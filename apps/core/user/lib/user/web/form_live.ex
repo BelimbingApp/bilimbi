@@ -29,7 +29,7 @@ defmodule Bilimbi.Core.User.Web.FormLive do
 
     {:ok,
      socket
-     |> assign(:active_nav, :users)
+     |> assign(:active_nav, "admin.user")
      |> assign(:companies, companies)}
   end
 

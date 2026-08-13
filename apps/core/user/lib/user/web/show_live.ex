@@ -23,7 +23,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       {:ok,
        socket
        |> assign(:page_title, user.name)
-       |> assign(:active_nav, :users)
+       |> assign(:active_nav, "admin.user")
        |> assign(:user, user)
        |> assign(:company_name, company_name(companies, user.company_id))}
     else
