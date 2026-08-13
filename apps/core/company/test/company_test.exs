@@ -177,6 +177,51 @@ defmodule Bilimbi.Core.CompanyTest do
     end
   end
 
+  describe "list_companies/1 and list_tenant_company_ids/1" do
+    setup do
+      insert_tenant!()
+      insert_tenant!(%{id: 42, name: "Customer", is_platform_operator: false})
+      insert_company!(%{id: 73, code: "live_a"})
+      insert_company!(%{id: 75, code: "live_b"})
+
+      insert_company!(%{
+        id: 76,
+        code: "soft_deleted",
+        deleted_at: ~N[2026-08-11 12:00:00]
+      })
+
+      insert_company!(%{id: 74, tenant_id: 42, code: "other_tenant"})
+
+      {:ok, owner} = Tenancy.scope(41)
+      {:ok, other} = Tenancy.scope(42)
+
+      %{owner: owner, other: other}
+    end
+
+    test "list_companies returns live companies ordered by id", %{owner: owner} do
+      assert {:ok, [%Summary{id: 73}, %Summary{id: 75}]} = Company.list_companies(owner)
+    end
+
+    test "list_companies excludes soft-deleted and other-tenant companies", %{
+      owner: owner,
+      other: other
+    } do
+      assert {:ok, companies} = Company.list_companies(owner)
+      refute Enum.any?(companies, &(&1.id == 76))
+      refute Enum.any?(companies, &(&1.id == 74))
+
+      assert {:ok, [%Summary{id: 74}]} = Company.list_companies(other)
+    end
+
+    test "list_tenant_company_ids includes soft-deleted companies for the tenant", %{
+      owner: owner,
+      other: other
+    } do
+      assert {:ok, [73, 75, 76]} = Company.list_tenant_company_ids(owner)
+      assert {:ok, [74]} = Company.list_tenant_company_ids(other)
+    end
+  end
+
   test "provisions the platform operator and company idempotently" do
     company_attributes = %{name: "Operator company", code: "operator_company"}
 

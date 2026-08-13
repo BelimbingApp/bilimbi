@@ -15,7 +15,8 @@ the stored credential never leave the module; reads return
 
 | Function | Purpose |
 |---|---|
-| `list_company_users(scope, company_id)` | Users affiliated with one proven company |
+| `list_company_users(scope, company_id)` | Users affiliated with one proven live company |
+| `list_users(scope)` | Tenant-wide list; includes users of soft-deleted companies |
 | `get_user(scope, company_id, user_id)` | One user inside that company |
 | `create_user(scope, company_id, attributes)` | Create; requires `:password_hash` |
 | `update_user(scope, company_id, user_id, attributes)` | Update |
@@ -47,9 +48,11 @@ a tenant only through its nullable `company_id`. Belimbing's own list
 (`app/Core/User/Livewire/Users/Index.php:110-111`) left-joins `companies` and
 filters `companies.tenant_id`; because the `WHERE` lands on the right-side
 table, a user with no company is invisible to every tenant-scoped read. This
-module gets the same visibility by resolving the company through
-`Bilimbi.Core.Company.get_company/2` first, so it never touches Company's
-tables.
+module gets the same visibility by resolving companies through Core Company's
+public API (`get_company/2` for single-company reads;
+`list_tenant_company_ids/1` for the tenant-wide list), so it never touches
+Company's tables. Soft-deleted companies stay visible in `list_users/1` to
+match Belimbing (BLB-S1-010 option a).
 
 **This module stores credentials; it never creates them.** `users.password` is
 non-null and holds Laravel bcrypt output — a crypt-format string. Bilimbi has
