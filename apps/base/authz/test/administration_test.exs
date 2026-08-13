@@ -170,6 +170,103 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert {:ok, :removed} = Authz.remove_principal_capability(tenant_scope, stale_grant.id)
   end
 
+  test "principal read models are bounded, ordered, and scoped without resolving principal ownership" do
+    tenant_scope = scope()
+
+    assert {:ok, custom_role} =
+             Authz.create_role(tenant_scope, 10, %{
+               name: "Custom role",
+               code: "custom_role",
+               description: "Tenant role"
+             })
+
+    assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 10, :user, 7, custom_role.id)
+    assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 11, :agent, 7, custom_role.id)
+    assert {:ok, _result} = Authz.reconcile_system_roles()
+    system_role = Repo.one!(from(item in Role, where: item.is_system, limit: 1))
+    assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 10, :user, 7, system_role.id)
+    system_role_id = system_role.id
+    custom_role_id = custom_role.id
+
+    assert %Page{entries: assignments, total_entries: 2, total_pages: 1} =
+             Authz.list_principal_role_assignments(tenant_scope, :user, 7, page_size: 2)
+
+    assert Enum.map(assignments, & &1.role_code) ==
+             Enum.sort(Enum.map(assignments, & &1.role_code))
+
+    assert %{
+             company_id: 10,
+             principal_type: "user",
+             principal_id: 7,
+             role_id: ^system_role_id,
+             role_is_system: true
+           } = Enum.find(assignments, &(&1.role_id == system_role_id))
+
+    assert %{
+             id: custom_assignment_id,
+             role_id: ^custom_role_id,
+             role_name: "Custom role",
+             role_code: "custom_role",
+             role_is_system: false,
+             role_grant_all: false
+           } = Enum.find(assignments, &(&1.role_id == custom_role_id))
+
+    assert %Page{entries: [%{principal_type: "agent", principal_id: 7}], total_entries: 1} =
+             Authz.list_principal_role_assignments(tenant_scope, :agent, 7)
+
+    assert %Page{entries: [], total_entries: 0} =
+             Authz.list_principal_role_assignments(scope(2), :user, 7)
+
+    # Base Authz receives only the opaque principal identity. With no persisted
+    # company-scoped rows, it cannot invent tenant context for this user ID.
+    assert %Page{entries: [], total_entries: 0} =
+             Authz.list_principal_role_assignments(tenant_scope, :user, 88)
+
+    assert {:ok, :stored} =
+             Authz.put_principal_capability(
+               tenant_scope,
+               10,
+               :user,
+               7,
+               "admin.test.record.view",
+               true
+             )
+
+    assert {:ok, :stored} =
+             Authz.put_principal_capability(
+               tenant_scope,
+               11,
+               :agent,
+               7,
+               "admin.test.record.view",
+               false
+             )
+
+    assert %Page{
+             entries: [
+               %PrincipalCapabilitySummary{
+                 principal_type: "user",
+                 principal_id: 7,
+                 allowed: true
+               }
+             ],
+             total_entries: 1
+           } =
+             Authz.list_principal_capabilities(tenant_scope,
+               principal_type: :user,
+               principal_id: 7
+             )
+
+    assert %Page{entries: [], total_entries: 0} =
+             Authz.list_principal_capabilities(scope(2), principal_type: :user, principal_id: 7)
+
+    assert {:ok, :unassigned} =
+             Authz.unassign_role(tenant_scope, custom_role.id, custom_assignment_id)
+
+    assert {:ok, :not_found} =
+             Authz.unassign_role(tenant_scope, custom_role.id, custom_assignment_id)
+  end
+
   test "only platform operators can inspect and remove effective global rows" do
     tenant_scope = scope()
     platform_scope = platform_operator_scope()
@@ -219,11 +316,25 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert %Page{entries: [], total_entries: 0} =
              Authz.list_principal_capabilities(tenant_scope)
 
+    assert %Page{entries: [], total_entries: 0} =
+             Authz.list_principal_capabilities(tenant_scope,
+               principal_type: :user,
+               principal_id: 70
+             )
+
     assert %Page{entries: operator_grants, total_entries: 2} =
              Authz.list_principal_capabilities(platform_scope)
 
     assert Enum.sort(Enum.map(operator_grants, & &1.id)) ==
              Enum.sort([global_deny.id, global_allow.id])
+
+    assert %Page{entries: [%{id: global_deny_id, allowed: false}], total_entries: 1} =
+             Authz.list_principal_capabilities(platform_scope,
+               principal_type: :user,
+               principal_id: 70
+             )
+
+    assert global_deny_id == global_deny.id
 
     assert {:ok, %RoleDetails{role: %RoleSummary{principal_count: 0}, principal_roles: []}} =
              Authz.get_role(tenant_scope, system_role.id)
@@ -330,6 +441,14 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
 
     assert_raise ArgumentError, ~r/unknown keys/, fn ->
       Authz.list_roles(scope(), unsafe_query: true)
+    end
+
+    assert_raise ArgumentError, ~r/principal filter/, fn ->
+      Authz.list_principal_capabilities(scope(), principal_type: :user)
+    end
+
+    assert_raise ArgumentError, ~r/principal filter/, fn ->
+      Authz.list_principal_role_assignments(scope(), :service, 7)
     end
   end
 

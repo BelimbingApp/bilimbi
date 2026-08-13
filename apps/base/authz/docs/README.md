@@ -33,6 +33,19 @@ authority auditable without exposing it to a tenant administrator.
 
 `get_role/2` returns a role with immutable capability keys and only the
 principal assignments visible through the caller's company directory.
+`list_principal_role_assignments/4` returns one principal's visible persisted
+assignments, including stable role facts needed to render them, in a bounded
+and deterministic page. `list_principal_capabilities/2` accepts an optional
+complete `principal_type`/`principal_id` pair for the same single-principal
+read. Both require `:user` or `:agent` plus a positive ID; partial or other
+principal identities fail closed. Their durable assignment and grant IDs feed
+`unassign_role/3` and `remove_principal_capability/2` respectively.
+
+These reads do not resolve a User or Employee and therefore cannot infer a
+user's company or manufacture a tenant context. A company-less user has no
+tenant-visible Authz rows unless a persisted assignment or direct capability
+exists at a company the supplied `%Scope{}` can see; global rows remain visible
+only to a platform-operator scope.
 `update_role/3`, `delete_role/2`, and `replace_role_capabilities/3` reject
 system roles. A custom role cannot move to another live company while any
 principal remains assigned. Deleting a custom role intentionally relies on

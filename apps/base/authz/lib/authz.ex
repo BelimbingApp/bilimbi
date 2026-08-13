@@ -152,6 +152,25 @@ defmodule Bilimbi.Base.Authz do
     RoleService.unassign_role(scope, role_id, assignment_id, registry!())
   end
 
+  @doc "Lists one principal's visible role assignments through a bounded page."
+  @spec list_principal_role_assignments(Scope.t(), :user | :agent, pos_integer(), keyword()) ::
+          Bilimbi.Base.Authz.Page.t(Bilimbi.Base.Authz.PrincipalRoleSummary.t())
+  def list_principal_role_assignments(
+        %Scope{} = scope,
+        principal_type,
+        principal_id,
+        opts \\ []
+      )
+      when is_list(opts) do
+    Administration.list_principal_role_assignments(
+      scope,
+      principal_type,
+      principal_id,
+      opts,
+      registry!()
+    )
+  end
+
   @spec put_principal_capability(
           Scope.t(),
           pos_integer(),
@@ -190,7 +209,7 @@ defmodule Bilimbi.Base.Authz do
     RoleService.remove_principal_capability(scope, grant_id, registry!())
   end
 
-  @doc "Lists scoped direct principal capabilities through a bounded page."
+  @doc "Lists scoped direct principal capabilities through a bounded page, optionally for one principal."
   @spec list_principal_capabilities(Scope.t(), keyword()) ::
           Bilimbi.Base.Authz.Page.t(Bilimbi.Base.Authz.PrincipalCapabilitySummary.t())
   def list_principal_capabilities(%Scope{} = scope, opts \\ []) when is_list(opts) do
