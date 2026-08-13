@@ -37,6 +37,29 @@ defmodule Bilimbi.Core.Company do
   end
 
   @doc """
+  Resolves a live company's tenant for the authenticated Web login edge.
+
+  This is a deliberately narrow pre-scope lookup. Callers must already have
+  authenticated the user associated with `company_id`, then prove the returned
+  tenant through `Bilimbi.Base.Tenancy.scope/1`. Ordinary Company reads remain
+  scope-required through `get_company/2` and `list_companies/1`.
+  """
+  @spec fetch_tenant_id_for_company(term()) :: {:ok, pos_integer()} | {:error, :not_found}
+  def fetch_tenant_id_for_company(company_id) when is_integer(company_id) and company_id > 0 do
+    query =
+      from company in Schema,
+        where: company.id == ^company_id and is_nil(company.deleted_at),
+        select: company.tenant_id
+
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      tenant_id -> {:ok, tenant_id}
+    end
+  end
+
+  def fetch_tenant_id_for_company(_company_id), do: {:error, :not_found}
+
+  @doc """
   Lists live companies in the scope's tenant, ordered by id.
 
   Soft-deleted rows are excluded, matching `get_company/2`.
