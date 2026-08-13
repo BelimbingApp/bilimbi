@@ -92,7 +92,8 @@ defmodule Bilimbi.Base.Authz do
   end
 
   @spec replace_role_capabilities(Scope.t(), pos_integer(), [String.t()]) ::
-          {:ok, non_neg_integer()} | {:error, :role_not_found | :system_role}
+          {:ok, non_neg_integer()}
+          | {:error, :role_not_found | :system_role | {:unknown_capabilities, [String.t()]}}
   def replace_role_capabilities(%Scope{} = scope, role_id, capabilities) do
     RoleService.replace_role_capabilities(scope, role_id, capabilities, registry!())
   end
@@ -117,7 +118,9 @@ defmodule Bilimbi.Base.Authz do
           pos_integer(),
           String.t(),
           boolean()
-        ) :: {:ok, :stored} | {:error, :company_not_found}
+        ) ::
+          {:ok, :stored}
+          | {:error, :company_not_found | {:unknown_capabilities, [String.t()]}}
   def put_principal_capability(
         %Scope{} = scope,
         company_id,

@@ -53,10 +53,11 @@ defmodule Bilimbi.Base.Authz.SystemRoleReconciler do
   end
 
   defp sync_capabilities!(repo, role, %{grant_all: true}) do
-    from(grant in RoleCapability, where: grant.role_id == ^role.id)
-    |> repo.delete_all()
+    {deleted_count, _rows} =
+      from(grant in RoleCapability, where: grant.role_id == ^role.id)
+      |> repo.delete_all()
 
-    0
+    deleted_count
   end
 
   defp sync_capabilities!(repo, role, definition) do
@@ -64,11 +65,12 @@ defmodule Bilimbi.Base.Authz.SystemRoleReconciler do
 
     delete_query = from(grant in RoleCapability, where: grant.role_id == ^role.id)
 
-    if desired == [] do
-      repo.delete_all(delete_query)
-    else
-      delete_query |> where([grant], grant.capability_key not in ^desired) |> repo.delete_all()
-    end
+    {deleted_count, _rows} =
+      if desired == [] do
+        repo.delete_all(delete_query)
+      else
+        delete_query |> where([grant], grant.capability_key not in ^desired) |> repo.delete_all()
+      end
 
     existing =
       from(grant in RoleCapability,
@@ -91,7 +93,7 @@ defmodule Bilimbi.Base.Authz.SystemRoleReconciler do
         }
       end)
 
-    if rows != [], do: repo.insert_all(RoleCapability, rows)
-    length(desired)
+    inserted_count = if rows == [], do: 0, else: elem(repo.insert_all(RoleCapability, rows), 0)
+    deleted_count + inserted_count
   end
 end

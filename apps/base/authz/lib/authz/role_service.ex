@@ -42,39 +42,39 @@ defmodule Bilimbi.Base.Authz.RoleService do
   end
 
   @spec replace_role_capabilities(Scope.t(), pos_integer(), [String.t()], map()) ::
-          {:ok, non_neg_integer()} | {:error, :role_not_found | :system_role}
+          {:ok, non_neg_integer()}
+          | {:error, :role_not_found | :system_role | {:unknown_capabilities, [String.t()]}}
   def replace_role_capabilities(%Scope{} = scope, role_id, capabilities, registry)
       when is_list(capabilities) do
-    capabilities = capabilities |> Enum.uniq() |> Enum.sort()
-    assert_known!(capabilities, registry)
+    with {:ok, capabilities} <- validate_capabilities(capabilities, registry) do
+      case eligible_role(scope, role_id, registry) do
+        nil ->
+          {:error, :role_not_found}
 
-    case eligible_role(scope, role_id, registry) do
-      nil ->
-        {:error, :role_not_found}
+        %Role{is_system: true} ->
+          {:error, :system_role}
 
-      %Role{is_system: true} ->
-        {:error, :system_role}
+        %Role{} ->
+          Repo.transaction(fn ->
+            from(grant in RoleCapability, where: grant.role_id == ^role_id)
+            |> Repo.delete_all()
 
-      %Role{} ->
-        Repo.transaction(fn ->
-          from(grant in RoleCapability, where: grant.role_id == ^role_id)
-          |> Repo.delete_all()
+            now = now()
 
-          now = now()
+            rows =
+              Enum.map(capabilities, fn capability ->
+                %{
+                  role_id: role_id,
+                  capability_key: capability,
+                  created_at: now,
+                  updated_at: now
+                }
+              end)
 
-          rows =
-            Enum.map(capabilities, fn capability ->
-              %{
-                role_id: role_id,
-                capability_key: capability,
-                created_at: now,
-                updated_at: now
-              }
-            end)
-
-          if rows != [], do: Repo.insert_all(RoleCapability, rows)
-          length(rows)
-        end)
+            if rows != [], do: Repo.insert_all(RoleCapability, rows)
+            length(rows)
+          end)
+      end
     end
   end
 
@@ -129,7 +129,9 @@ defmodule Bilimbi.Base.Authz.RoleService do
           String.t(),
           boolean(),
           map()
-        ) :: {:ok, :stored} | {:error, :company_not_found}
+        ) ::
+          {:ok, :stored}
+          | {:error, :company_not_found | {:unknown_capabilities, [String.t()]}}
   def put_principal_capability(
         %Scope{} = scope,
         company_id,
@@ -141,31 +143,32 @@ defmodule Bilimbi.Base.Authz.RoleService do
       )
       when is_binary(capability) and is_boolean(allowed?) do
     validate_principal!(principal_type, principal_id)
-    assert_known!([capability], registry)
 
-    if directory!(registry).company_in_scope?(scope, company_id) do
-      now = now()
+    with {:ok, [capability]} <- validate_capabilities([capability], registry) do
+      if directory!(registry).company_in_scope?(scope, company_id) do
+        now = now()
 
-      Repo.insert_all(
-        PrincipalCapability,
-        [
-          %{
-            company_id: company_id,
-            principal_type: Atom.to_string(principal_type),
-            principal_id: principal_id,
-            capability_key: capability,
-            is_allowed: allowed?,
-            created_at: now,
-            updated_at: now
-          }
-        ],
-        on_conflict: {:replace, [:is_allowed, :updated_at]},
-        conflict_target: [:company_id, :principal_type, :principal_id, :capability_key]
-      )
+        Repo.insert_all(
+          PrincipalCapability,
+          [
+            %{
+              company_id: company_id,
+              principal_type: Atom.to_string(principal_type),
+              principal_id: principal_id,
+              capability_key: capability,
+              is_allowed: allowed?,
+              created_at: now,
+              updated_at: now
+            }
+          ],
+          on_conflict: {:replace, [:is_allowed, :updated_at]},
+          conflict_target: [:company_id, :principal_type, :principal_id, :capability_key]
+        )
 
-      {:ok, :stored}
-    else
-      {:error, :company_not_found}
+        {:ok, :stored}
+      else
+        {:error, :company_not_found}
+      end
     end
   end
 
@@ -182,12 +185,11 @@ defmodule Bilimbi.Base.Authz.RoleService do
     )
   end
 
-  defp assert_known!(capabilities, registry) do
+  defp validate_capabilities(capabilities, registry) do
+    capabilities = capabilities |> Enum.map(&String.downcase/1) |> Enum.uniq() |> Enum.sort()
     unknown = capabilities -- registry.capabilities
 
-    if unknown != [] do
-      raise ArgumentError, "unknown capabilities: #{Enum.join(Enum.sort(unknown), ", ")}"
-    end
+    if unknown == [], do: {:ok, capabilities}, else: {:error, {:unknown_capabilities, unknown}}
   end
 
   defp directory!(%{company_directory: nil}) do

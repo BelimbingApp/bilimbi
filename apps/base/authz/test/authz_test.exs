@@ -99,6 +99,23 @@ defmodule Bilimbi.Base.AuthzTest do
     assert {:ok, role} =
              Authz.create_role(tenant_scope, 10, %{name: "Local viewer", code: "local_viewer"})
 
+    assert {:error, {:unknown_capabilities, ["admin.test.record.unknown"]}} =
+             Authz.replace_role_capabilities(
+               tenant_scope,
+               role.id,
+               ["admin.test.record.unknown"]
+             )
+
+    assert {:error, {:unknown_capabilities, ["admin.test.record.unknown"]}} =
+             Authz.put_principal_capability(
+               tenant_scope,
+               10,
+               :user,
+               9,
+               "admin.test.record.unknown",
+               true
+             )
+
     assert {:ok, 1} =
              Authz.replace_role_capabilities(
                tenant_scope,
@@ -132,6 +149,7 @@ defmodule Bilimbi.Base.AuthzTest do
 
     assert {:ok, %{roles: 2, capabilities: 1}} = Authz.reconcile_system_roles()
     viewer = system_role("viewer")
+    all_access = system_role("all_access")
     assert Repo.aggregate(RoleCapability, :count) == 1
 
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
@@ -140,6 +158,12 @@ defmodule Bilimbi.Base.AuthzTest do
       %{
         role_id: viewer.id,
         capability_key: "admin.removed.record.view",
+        created_at: now,
+        updated_at: now
+      },
+      %{
+        role_id: all_access.id,
+        capability_key: "admin.test.record.view",
         created_at: now,
         updated_at: now
       }
@@ -160,7 +184,8 @@ defmodule Bilimbi.Base.AuthzTest do
                true
              )
 
-    assert {:ok, %{roles: 2, capabilities: 1}} = Authz.reconcile_system_roles()
+    assert {:ok, %{roles: 2, capabilities: 2}} = Authz.reconcile_system_roles()
+    assert {:ok, %{roles: 2, capabilities: 0}} = Authz.reconcile_system_roles()
     assert Repo.aggregate(Role, :count) == 2
     assert Repo.aggregate(RoleCapability, :count) == 1
     assert Repo.aggregate(PrincipalRole, :count) == 1
