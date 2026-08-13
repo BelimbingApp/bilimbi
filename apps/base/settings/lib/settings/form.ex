@@ -114,10 +114,34 @@ defmodule Bilimbi.Base.Settings.Form do
           {:ok, %{written: [String.t()], cleared: [String.t()], unchanged: [String.t()]}}
           | {:error, String.t(), String.t()}
   def save(params, fields, scope) when is_map(params) and is_list(fields) do
-    fields
-    |> Enum.filter(&Map.has_key?(params, &1.key))
-    |> Enum.reduce_while({[], [], []}, fn field, {written, cleared, unchanged} ->
-      case apply_field(field, Map.fetch!(params, field.key), scope) do
+    submitted = Enum.filter(fields, &Map.has_key?(params, &1.key))
+
+    with {:ok, plan} <- plan(submitted, params, scope) do
+      apply_plan(plan)
+    end
+  end
+
+  # Every field is decided before any of them is written. Deciding as we go
+  # would let a later field's bad input abort a loop that has already committed
+  # the earlier ones, leaving a save that reported failure and changed data
+  # anyway. Belimbing validates its whole rule set before entering the mutation
+  # loop (`SettingsForm.php:40-46`); this is that, in the shape Elixir wants.
+  defp plan(submitted, params, scope) do
+    Enum.reduce_while(submitted, {:ok, []}, fn field, {:ok, planned} ->
+      case decide(field, Map.fetch!(params, field.key), scope) do
+        {:error, message} -> {:halt, {:error, field.key, message}}
+        step -> {:cont, {:ok, [{field, step} | planned]}}
+      end
+    end)
+    |> case do
+      {:ok, planned} -> {:ok, Enum.reverse(planned)}
+      {:error, key, message} -> {:error, key, message}
+    end
+  end
+
+  defp apply_plan(plan) do
+    Enum.reduce_while(plan, {[], [], []}, fn {field, step}, {written, cleared, unchanged} ->
+      case run(step, field) do
         :unchanged -> {:cont, {written, cleared, [field.key | unchanged]}}
         :cleared -> {:cont, {written, [field.key | cleared], unchanged}}
         {:ok, _value} -> {:cont, {[field.key | written], cleared, unchanged}}
@@ -138,6 +162,39 @@ defmodule Bilimbi.Base.Settings.Form do
     end
   end
 
+  # Decides one field without touching storage. `:skip` covers both an
+  # untouched secret and a blank on a field that was already inherited --
+  # neither is a change, and reporting "cleared" for the latter would claim
+  # something the user can see did not happen.
+  defp decide(%{definition: definition} = field, submitted, scope) do
+    scope = narrow_to_allowed(scope, definition)
+
+    cond do
+      field.encrypted? and to_string(submitted) == secret_mask() ->
+        :skip
+
+      blank?(submitted) and definition.type != :boolean ->
+        if Settings.overridden?(field.key, scope), do: {:clear, scope}, else: :skip
+
+      true ->
+        with {:ok, value} <- cast(submitted, definition), do: {:write, value, scope}
+    end
+  end
+
+  defp run(:skip, _field), do: :unchanged
+
+  defp run({:clear, scope}, field) do
+    :ok = Settings.delete(field.key, scope)
+    :cleared
+  end
+
+  defp run({:write, value, scope}, field) do
+    case Settings.put(field.key, value, scope) do
+      {:ok, value} -> {:ok, value}
+      {:error, changeset} -> {:error, changeset_message(changeset)}
+    end
+  end
+
   @doc """
   Drops every override these fields hold at `scope`.
 
@@ -150,9 +207,17 @@ defmodule Bilimbi.Base.Settings.Form do
   def restore_defaults(fields, scope) when is_list(fields) do
     cleared =
       fields
-      |> Enum.filter(& &1.overridden?)
+      |> Enum.filter(fn field ->
+        # Asked now, not read off the field. A field carries the override state
+        # it had when the screen rendered, and a save since then would make
+        # that a lie -- restore would skip the very value it was asked to drop.
+        # Belimbing sidesteps this by calling forget unconditionally
+        # (`SettingsForm.php:91-110`); this keeps the honest report of what
+        # actually changed without trusting stale state.
+        Settings.overridden?(field.key, narrow_to_allowed(scope, field.definition))
+      end)
       |> Enum.map(fn field ->
-        :ok = Settings.delete(field.key, scope)
+        :ok = Settings.delete(field.key, narrow_to_allowed(scope, field.definition))
         field.key
       end)
 
@@ -202,30 +267,6 @@ defmodule Bilimbi.Base.Settings.Form do
     |> Enum.filter(&(scope_type(&1) in definition.scopes))
     |> Enum.find(fn candidate -> Settings.overridden?(key, candidate) end)
     |> scope_type()
-  end
-
-  defp apply_field(%{definition: definition} = field, submitted, scope) do
-    scope = narrow_to_allowed(scope, definition)
-
-    cond do
-      field.encrypted? and to_string(submitted) == secret_mask() ->
-        :unchanged
-
-      blank?(submitted) and definition.type != :boolean ->
-        clear(field, scope)
-
-      true ->
-        write(field, submitted, scope)
-    end
-  end
-
-  defp write(field, submitted, scope) do
-    with {:ok, value} <- cast(submitted, field.definition) do
-      case Settings.put(field.key, value, scope) do
-        {:ok, value} -> {:ok, value}
-        {:error, changeset} -> {:error, changeset_message(changeset)}
-      end
-    end
   end
 
   @doc """
@@ -286,18 +327,6 @@ defmodule Bilimbi.Base.Settings.Form do
     changeset
     |> Ecto.Changeset.traverse_errors(fn {message, _opts} -> message end)
     |> Enum.map_join("; ", fn {field, messages} -> "#{field} #{Enum.join(messages, ", ")}" end)
-  end
-
-  # Clearing an override that is not there is not an error, but it is also not
-  # a change worth reporting -- saying "cleared" about a field that was already
-  # inherited would be a lie the user can see through.
-  defp clear(field, scope) do
-    if Settings.overridden?(field.key, scope) do
-      :ok = Settings.delete(field.key, scope)
-      :cleared
-    else
-      :unchanged
-    end
   end
 
   defp blank?(nil), do: true

@@ -169,6 +169,36 @@ defmodule Bilimbi.Base.Settings.FormTest do
       refute Settings.overridden?("tests.retention", nil)
     end
 
+    test "an invalid field leaves every other field in the submission unwritten" do
+      # The defect this replaces: save mutated as it went, so a later bad value
+      # aborted a loop that had already committed the earlier ones -- reporting
+      # failure while changing data. Ordering matters, so the valid field sorts
+      # first and would have been written before the invalid one was reached.
+      fields = Form.fields(["profile", "operator"], @user)
+
+      assert {:error, "tests.retention", "must be a whole number"} =
+               Form.save(
+                 %{"tests.theme" => "dark", "tests.retention" => "invalid"},
+                 fields,
+                 @user
+               )
+
+      refute Settings.overridden?("tests.theme", @user)
+      assert Settings.get("tests.theme", @user) == "system"
+    end
+
+    test "an invalid field does not clear an earlier field either" do
+      # The same hazard on the delete path: a clear is a mutation too.
+      assert {:ok, "mine"} = Settings.put("tests.theme", "mine", @user)
+      fields = Form.fields(["profile", "operator"], @user)
+
+      assert {:error, "tests.retention", _} =
+               Form.save(%{"tests.theme" => "", "tests.retention" => "nope"}, fields, @user)
+
+      assert Settings.overridden?("tests.theme", @user)
+      assert Settings.get("tests.theme", @user) == "mine"
+    end
+
     test "casts a submitted string to the declared type" do
       fields = Form.fields(["operator"], @user)
 
@@ -200,6 +230,28 @@ defmodule Bilimbi.Base.Settings.FormTest do
 
       refute Settings.overridden?("tests.theme", @user)
       assert Settings.get("tests.theme", @user) == "tenant-wide"
+    end
+
+    test "clears an override written after the fields were built" do
+      # A field snapshot carries the override state it had at render time. A
+      # save between render and restore makes that stale, and filtering on it
+      # would skip the very override the user just created and asked to drop.
+      fields = Form.fields(["profile"], @user)
+      assert field(fields, "tests.theme").overridden? == false
+
+      assert {:ok, %{written: ["tests.theme"]}} =
+               Form.save(%{"tests.theme" => "dark"}, fields, @user)
+
+      assert {:ok, ["tests.theme"]} = Form.restore_defaults(fields, @user)
+      refute Settings.overridden?("tests.theme", @user)
+    end
+
+    test "does not report clearing a field that was already inherited" do
+      # The mirror of the above: asking storage must not turn restore into an
+      # unconditional delete that claims to have changed things it did not.
+      fields = Form.fields(["profile"], @user)
+
+      assert {:ok, []} = Form.restore_defaults(fields, @user)
     end
 
     test "does not write the defaults as overrides" do
