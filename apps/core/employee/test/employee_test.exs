@@ -107,6 +107,7 @@ defmodule Bilimbi.Core.EmployeeTest do
     assert page.total_pages == 1
     refute page.has_prev?
     refute page.has_next?
+
     assert Enum.map(page.entries, & &1.full_name) == [
              "Alpha Match",
              "Bravo",
@@ -155,6 +156,7 @@ defmodule Bilimbi.Core.EmployeeTest do
 
     assert Enum.map(type_desc.entries, & &1.employee_type) ==
              ["full_time", "full_time", "full_time", "full_time", "full_time", "agent", "agent"]
+
     assert Enum.map(type_desc.entries, & &1.employee_type_label) ==
              ["Full Time", "Full Time", "Full Time", "Full Time", "Full Time", "Agent", "Agent"]
 
@@ -239,6 +241,7 @@ defmodule Bilimbi.Core.EmployeeTest do
                employee_number: "OTHER-ADMIN",
                full_name: "Other"
              })
+
     assert {:error, :company_not_found} = Employee.list_administration_page(owner, 74)
 
     Ecto.Adapters.SQL.query!(
@@ -290,6 +293,7 @@ defmodule Bilimbi.Core.EmployeeTest do
 
     assert {:ok, past_end} =
              Employee.list_administration_page(owner, 73, page: 3, page_size: 2)
+
     assert past_end.entries == []
     assert past_end.total_entries == 4
     assert past_end.total_pages == 2
@@ -298,6 +302,7 @@ defmodule Bilimbi.Core.EmployeeTest do
 
     assert {:ok, empty} =
              Employee.list_administration_page(owner, 73, search: "missing", page: 3)
+
     assert empty.entries == []
     assert empty.total_entries == 0
     assert empty.total_pages == 0
