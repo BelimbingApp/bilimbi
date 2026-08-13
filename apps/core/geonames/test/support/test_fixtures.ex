@@ -232,6 +232,7 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
           geoname_id: 1_735_161,
           name: "Kuala Lumpur",
           ascii_name: "Kuala Lumpur",
+          alternate_names: nil,
           latitude: Decimal.new("3.1412000"),
           longitude: Decimal.new("101.6865000"),
           country_iso: "MY",
@@ -246,15 +247,16 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
       Repo,
       """
       INSERT INTO geonames_cities (
-        geoname_id, name, ascii_name, latitude, longitude, country_iso,
-        admin1_code, population, timezone
+        geoname_id, name, ascii_name, alternate_names, latitude, longitude,
+        country_iso, admin1_code, population, timezone
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       """,
       [
         attributes.geoname_id,
         attributes.name,
         attributes.ascii_name,
+        attributes.alternate_names,
         attributes.latitude,
         attributes.longitude,
         attributes.country_iso,

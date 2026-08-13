@@ -49,5 +49,19 @@ The page queries return `Bilimbi.Core.Geonames.Page` with schema-free entries,
 20-row defaults, page sizes clamped to 20/50/100/300, allow-listed sorting,
 and deterministic ties. Postcode country totals are a separately sortable,
 unpaginated summary bounded by the imported-country set. Exact
-`lookup_postcode/2` remains the address-workflow lookup; prefix postcode and
-city combobox searches are intentionally outside this module UI slice.
+`lookup_postcode/2` remains the address-workflow locality lookup.
+
+Address forms use two additional bounded, schema-free reference-data reads:
+
+```elixir
+Geonames.search_postcodes(country_iso, prefix)
+Geonames.search_city_names(country_iso, query, admin1_code: full_or_raw_code)
+```
+
+Postcode search returns at most ten distinct ascending values. City search
+returns names from at most 15 population-ordered candidate rows before exact
+deduplication, and accepts either raw GeoNames Admin1 values or the module's
+full `CC.value` identities. Both APIs treat caller text literally, including
+SQL wildcard and escape characters, and return an empty list for an invalid
+country identity. These are global reference-data reads and deliberately take
+no tenancy scope.
