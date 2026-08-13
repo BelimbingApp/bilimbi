@@ -92,6 +92,14 @@ something from GitHub metadata.
 `apps/core/compatibility/**`, `.github/**`, and ADRs. Only one active task may
 hold `mix.lock`.
 
+**Claim ACKs:** either live steward hat (coordination or integration) may ACK
+an uncontested claim. After 30 minutes without an ACK, a claimant may proceed
+only when its non-shared, non-hot paths remain uncontested, and only after
+announcing on [#43](https://github.com/BelimbingApp/bilimbi/issues/43) that it
+is proceeding under the timeout. Shared and hot paths always require an
+explicit ACK. The one-writer-per-path rule and independent review before merge
+remain mandatory.
+
 **Prefer a git worktree.** Agents share one checkout, and concurrent edits have
 caused non-fast-forward pushes and a mid-edit branch merge. `git worktree add`
 against a branch off `origin/main` avoids it; symlink `deps/` from the main
