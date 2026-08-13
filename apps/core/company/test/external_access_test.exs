@@ -18,6 +18,7 @@ defmodule Bilimbi.Core.Company.ExternalAccessTest do
     insert_relationship_type!(11)
     insert_relationship!(21, 73, 75)
     insert_relationship!(22, 74, 74)
+    insert_relationship!(23, 75, 73)
 
     {:ok, owner} = Tenancy.scope(41)
     {:ok, other} = Tenancy.scope(42)
@@ -45,6 +46,12 @@ defmodule Bilimbi.Core.Company.ExternalAccessTest do
     assert {:ok, []} = Company.list_external_accesses(owner, 73, 99)
     assert {:ok, fetched} = Company.get_external_access(owner, 73, access.id)
     assert fetched.permissions == ["view_orders"]
+
+    for bad_id <- [0, -1, "91", nil] do
+      assert_raise FunctionClauseError, fn ->
+        Company.list_external_accesses(owner, 73, bad_id)
+      end
+    end
   end
 
   test "refuses a relationship that does not belong to the granting company", %{
@@ -103,6 +110,58 @@ defmodule Bilimbi.Core.Company.ExternalAccessTest do
     refute ExternalAccessSummary.valid?(expired, ~N[2026-06-01 00:00:00])
   end
 
+  test "lists a user's accesses across live companies in the tenant", %{
+    owner: owner,
+    other: other
+  } do
+    assert {:ok, first} =
+             Company.create_external_access(owner, 73, %{relationship_id: 21, user_id: 91})
+
+    assert {:ok, second} =
+             Company.create_external_access(owner, 75, %{relationship_id: 23, user_id: 91})
+
+    assert {:ok, _foreign} =
+             Company.create_external_access(other, 74, %{relationship_id: 22, user_id: 91})
+
+    assert {:ok, listed} = Company.list_external_accesses_for_user(owner, 91)
+    assert Enum.map(listed, & &1.id) == [first.id, second.id]
+    assert Enum.all?(listed, &(&1.company_id in [73, 75]))
+
+    assert {:ok, [elsewhere]} = Company.list_external_accesses_for_user(other, 91)
+    assert elsewhere.company_id == 74
+    assert {:ok, []} = Company.list_external_accesses_for_user(owner, 99)
+  end
+
+  test "accepts expires-before-granted timestamps that Belimbing persists", %{owner: owner} do
+    assert {:ok, access} =
+             Company.create_external_access(owner, 73, %{
+               relationship_id: 21,
+               access_granted_at: ~N[2026-06-01 00:00:00],
+               access_expires_at: ~N[2026-01-01 00:00:00]
+             })
+
+    assert {:ok, revoked} = Company.revoke_external_access(owner, 73, access.id)
+    refute revoked.is_active
+    assert revoked.access_expires_at == ~N[2026-01-01 00:00:00]
+  end
+
+  test "stale writes against a concurrently deleted row return not_found", %{owner: owner} do
+    assert {:ok, access} =
+             Company.create_external_access(owner, 73, %{relationship_id: 21})
+
+    deleted_at = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+    Ecto.Adapters.SQL.query!(
+      Bilimbi.Base.Repo,
+      "UPDATE company_external_accesses SET deleted_at = $1 WHERE id = $2",
+      [deleted_at, access.id]
+    )
+
+    assert {:error, :not_found} = Company.revoke_external_access(owner, 73, access.id)
+    assert {:error, :not_found} = Company.delete_external_access(owner, 73, access.id)
+    assert {:error, :not_found} = Company.update_external_access(owner, 73, access.id, %{})
+  end
+
   test "soft-deletes an access and treats a second delete as missing", %{owner: owner} do
     assert {:ok, access} =
              Company.create_external_access(owner, 73, %{relationship_id: 21})
@@ -150,6 +209,10 @@ defmodule Bilimbi.Core.Company.ExternalAccessTest do
     for not_a_scope <- [41, nil, owner.tenant] do
       assert_raise FunctionClauseError, fn ->
         Company.list_external_accesses(opaque(not_a_scope), 73)
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        Company.list_external_accesses_for_user(opaque(not_a_scope), 91)
       end
     end
   end

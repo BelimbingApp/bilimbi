@@ -35,7 +35,6 @@ defmodule Bilimbi.Core.Company.ExternalAccess do
     |> cast(attributes, @fields)
     |> put_change(:company_id, company_id)
     |> validate_required([:company_id, :relationship_id, :is_active])
-    |> validate_period()
     |> foreign_key_constraint(:company_id, name: :company_external_accesses_company_id_foreign)
     |> foreign_key_constraint(:relationship_id,
       name: :company_external_accesses_relationship_id_foreign
@@ -48,21 +47,9 @@ defmodule Bilimbi.Core.Company.ExternalAccess do
     access
     |> cast(attributes, @fields)
     |> validate_required([:company_id, :relationship_id, :is_active])
-    |> validate_period()
     |> foreign_key_constraint(:relationship_id,
       name: :company_external_accesses_relationship_id_foreign
     )
     |> foreign_key_constraint(:user_id, name: :company_external_accesses_user_id_foreign)
-  end
-
-  defp validate_period(changeset) do
-    granted = get_field(changeset, :access_granted_at)
-    expires = get_field(changeset, :access_expires_at)
-
-    if granted && expires && NaiveDateTime.compare(expires, granted) == :lt do
-      add_error(changeset, :access_expires_at, "must be on or after access granted at")
-    else
-      changeset
-    end
   end
 end

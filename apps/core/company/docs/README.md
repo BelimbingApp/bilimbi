@@ -26,19 +26,21 @@ queries `companies` directly (BLB-S1-010 option a).
 ## External access
 
 `company_external_accesses` is owned here. `user_id` is an optional opaque
-identity contributed by Core User; this module never queries `users`. Every
-read and write takes a `Bilimbi.Base.Tenancy.Scope` and a live granting
-company. `relationship_id` must belong to that company.
+identity contributed by Core User; this module never queries `users`. The
+caller (Core User / Web) must prove the user belongs in the tenant before
+passing that identity. `relationship_id` must belong to the granting company.
 
 | Function | Notes |
 |---|---|
-| `list_external_accesses/2,3` | Live rows, oldest id first, capped; optional `user_id` filter |
+| `list_external_accesses/2` | Live rows for one granting company, oldest id first, capped |
+| `list_external_accesses/3` | Same, filtered by a positive opaque `user_id` |
+| `list_external_accesses_for_user/2` | Live rows for one user across live companies in the scope |
 | `get_external_access/3` | Live row in the granting company |
 | `create_external_access/3` | Requires a company-owned relationship |
 | `update_external_access/4` | Dates, permissions, activity |
 | `grant_external_access/3` | Sets `is_active` and `access_granted_at` |
 | `revoke_external_access/3` | Sets `is_active` false |
-| `delete_external_access/3` | Soft-delete |
+| `delete_external_access/3` | Soft-delete; fetch-and-mutate locks the live row |
 
 `ExternalAccessSummary.valid?/1,2` matches Belimbing `isValid()`: active, not
 pending, and not expired.
