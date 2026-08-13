@@ -86,6 +86,86 @@ defmodule Bilimbi.Base.SessionTest do
     assert :ok = Session.delete_session("current")
   end
 
+  test "terminates multiple sessions for one user without reading or returning payloads" do
+    put_user_session!("current", 41, "current opaque payload")
+    put_user_session!("other-a", 41, "first opaque payload")
+    put_user_session!("other-b", 41, "second opaque payload")
+    put_user_session!("another-user", 42, "another user's opaque payload")
+    put_session!("anonymous", 100)
+
+    assert {:ok, 2} = Session.terminate_user_sessions(41, "current")
+
+    assert {:ok, %Entry{id: "current"}} = Session.fetch_session("current")
+    assert {:error, :not_found} = Session.fetch_session("other-a")
+    assert {:error, :not_found} = Session.fetch_session("other-b")
+    assert {:ok, %Entry{id: "another-user"}} = Session.fetch_session("another-user")
+    assert {:ok, %Entry{id: "anonymous", user_id: nil}} = Session.fetch_session("anonymous")
+  end
+
+  test "returns the stable count when no other target session exists" do
+    put_user_session!("current", 41, "opaque")
+
+    assert {:ok, 0} = Session.terminate_user_sessions(41, "current")
+    assert {:ok, 0} = Session.terminate_user_sessions(42, "current")
+    assert {:ok, %Entry{id: "current"}} = Session.fetch_session("current")
+  end
+
+  test "preserves a current session belonging to another user while terminating one target session" do
+    put_user_session!("target", 41, "target opaque payload")
+    put_user_session!("current", 42, "current opaque payload")
+
+    assert {:ok, 1} = Session.terminate_user_sessions(41, "current")
+
+    assert {:error, :not_found} = Session.fetch_session("target")
+    assert {:ok, %Entry{id: "current", user_id: 42}} = Session.fetch_session("current")
+  end
+
+  test "rejects malformed identifiers without widening the deletion" do
+    put_user_session!("current", 41, "current opaque payload")
+    put_user_session!("target", 41, "target opaque payload")
+
+    for {user_id, current_session_id} <- [
+          {0, "current"},
+          {-1, "current"},
+          {"41", "current"},
+          {41, ""},
+          {41, nil},
+          {41, 42}
+        ] do
+      assert_raise FunctionClauseError, fn ->
+        Session.terminate_user_sessions(user_id, current_session_id)
+      end
+    end
+
+    assert {:ok, %Entry{id: "current"}} = Session.fetch_session("current")
+    assert {:ok, %Entry{id: "target"}} = Session.fetch_session("target")
+  end
+
+  test "composes with and rolls back through a shared Repo transaction" do
+    put_user_session!("current", 41, "current opaque payload")
+    put_user_session!("target", 41, "target opaque payload")
+
+    assert {:error, :rollback} =
+             Repo.transaction(fn ->
+               assert {:ok, 1} = Session.terminate_user_sessions(41, "current")
+               Repo.rollback(:rollback)
+             end)
+
+    assert {:ok, %Entry{id: "current"}} = Session.fetch_session("current")
+    assert {:ok, %Entry{id: "target"}} = Session.fetch_session("target")
+  end
+
+  test "does not prevent a later session from being established" do
+    put_user_session!("current", 41, "current opaque payload")
+    put_user_session!("existing", 41, "existing opaque payload")
+
+    assert {:ok, 1} = Session.terminate_user_sessions(41, "current")
+    put_user_session!("later", 41, "later opaque payload")
+
+    assert {:error, :not_found} = Session.fetch_session("existing")
+    assert {:ok, %Entry{id: "later", user_id: 41}} = Session.fetch_session("later")
+  end
+
   test "prunes only sessions older than the supplied activity boundary" do
     put_session!("expired", 99)
     put_session!("boundary", 100)
@@ -115,6 +195,16 @@ defmodule Bilimbi.Base.SessionTest do
         ip_address: ip_address,
         user_agent: user_agent,
         last_activity: last_activity
+      })
+
+    entry
+  end
+
+  defp put_user_session!(id, user_id, payload) do
+    {:ok, entry} =
+      Session.put_session(id, payload, %{
+        user_id: user_id,
+        last_activity: 100
       })
 
     entry
