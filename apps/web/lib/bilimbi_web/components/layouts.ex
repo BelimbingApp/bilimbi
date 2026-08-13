@@ -1,48 +1,214 @@
 defmodule BilimbiWeb.Layouts do
   @moduledoc """
-  Shared Bilimbi web shell and feedback surfaces.
+  Shared Bilimbi web shells and feedback surfaces.
+
+  Two shells:
+
+    * `auth/1` — the centered credential layout (login and, later, password
+      reset). Compact card on the warm canvas with the Bilimbi brand bar;
+      the page is otherwise quiet so the form reads first.
+    * `app/1` — the authenticated workspace shell: a compact sidebar with
+      primary navigation and the signed-in user footer, plus a top strip
+      that always names the workspace (tenant) the screen acts on.
+
+  The workspace strip is a deliberate Bilimbi distinction from Belimbing:
+  no authenticated screen is context-free.
   """
 
   use BilimbiWeb, :html
 
   embed_templates "layouts/*"
 
+  @doc """
+  The centered credential layout. Renders its own flash group because the
+  workspace shell is absent here.
+  """
   attr :flash, :map, required: true
-  attr :current_scope, :map, default: nil
   slot :inner_block, required: true
 
-  def app(assigns) do
+  def auth(assigns) do
     ~H"""
-    <div class="min-h-full">
-      <header id="app-header" class="border-b border-line/80 bg-surface/90 backdrop-blur">
-        <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
-          <a href={~p"/"} class="group flex items-center gap-3" aria-label="Bilimbi home">
-            <span class="grid size-9 place-items-center rounded-xl bg-brand text-brand-ink shadow-sm shadow-brand-ink/10 transition-transform group-hover:-rotate-2 group-hover:scale-105">
-              <.icon name="hero-squares-2x2" class="size-5" />
-            </span>
-            <span>
-              <span class="block text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-ink-subtle">
-                Platform baseline
-              </span>
-              <span class="block text-sm font-semibold tracking-tight text-ink">Bilimbi</span>
-            </span>
-          </a>
+    <div class="flex min-h-svh flex-col items-center justify-center gap-6 p-6">
+      <div class="flex w-full max-w-sm flex-col gap-5">
+        <.link navigate={~p"/"} class="flex flex-col items-center gap-2.5" aria-label="Bilimbi home">
+          <span class="grid size-10 place-items-center rounded-xl bg-brand shadow-sm shadow-brand-ink/10">
+            <.icon name="hero-squares-2x2" class="size-5 text-brand-ink" />
+          </span>
+          <span class="text-base font-semibold tracking-tight text-ink-strong">Bilimbi</span>
+        </.link>
 
-          <div class="flex items-center gap-2 text-xs font-medium text-ink-subtle">
-            <span class="size-2 rounded-full bg-success ring-4 ring-success/15"></span>
-            Explicit tenancy read slice
-          </div>
+        <div
+          id="auth-card"
+          class="rounded-xl border border-line bg-surface shadow-sm shadow-ink/[0.04]"
+        >
+          <div class="h-0.5 rounded-t-xl bg-brand" aria-hidden="true"></div>
+          <div class="px-7 py-6 sm:px-8">{render_slot(@inner_block)}</div>
         </div>
-      </header>
 
-      <main id="app-content" class="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-16">
-        {render_slot(@inner_block)}
-      </main>
+        <p class="text-center text-xs text-ink-faint">
+          Business application platform
+        </p>
+      </div>
     </div>
 
     <.flash_group flash={@flash} />
     """
   end
+
+  @doc """
+  The authenticated workspace shell. Requires `@current_scope` — routes must
+  run through the authenticated pipeline rather than tolerating a fallback.
+  """
+  attr :flash, :map, required: true
+  attr :current_scope, :map, required: true
+  attr :active_nav, :atom, default: nil
+  slot :inner_block, required: true
+
+  def app(assigns) do
+    ~H"""
+    <div class="flex h-screen overflow-hidden bg-canvas">
+      <aside
+        id="app-sidebar"
+        class="flex w-60 shrink-0 flex-col border-r border-line bg-surface"
+      >
+        <.link
+          navigate={~p"/dashboard"}
+          id="app-brand"
+          class="flex items-center gap-2.5 border-b border-line-subtle px-4 py-3.5"
+          aria-label="Bilimbi dashboard"
+        >
+          <span class="grid size-8 place-items-center rounded-lg bg-brand">
+            <.icon name="hero-squares-2x2" class="size-4 text-brand-ink" />
+          </span>
+          <span class="text-sm font-semibold tracking-tight text-ink-strong">Bilimbi</span>
+        </.link>
+
+        <nav id="app-nav" aria-label="Main navigation" class="flex-1 overflow-y-auto px-2 py-3">
+          <p class="px-2 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint select-none">
+            Workspace
+          </p>
+          <.nav_item
+            navigate={~p"/dashboard"}
+            icon="hero-home"
+            active={@active_nav == :dashboard}
+            id="nav-dashboard"
+          >
+            Dashboard
+          </.nav_item>
+          <.nav_item
+            navigate={~p"/companies"}
+            icon="hero-building-office-2"
+            active={@active_nav == :companies}
+            id="nav-companies"
+          >
+            Companies
+          </.nav_item>
+          <.nav_item
+            navigate={~p"/users"}
+            icon="hero-users"
+            active={@active_nav == :users}
+            id="nav-users"
+          >
+            Users
+          </.nav_item>
+        </nav>
+
+        <div id="app-user" class="border-t border-line-subtle px-3 py-3">
+          <div class="flex items-center gap-2.5">
+            <span class="grid size-8 shrink-0 place-items-center rounded-full bg-action text-xs font-semibold text-action-ink">
+              {user_initials(@current_scope.user["name"])}
+            </span>
+            <div class="min-w-0 flex-1">
+              <p id="app-user-name" class="truncate text-sm font-medium text-ink">
+                {@current_scope.user["name"]}
+              </p>
+              <p class="truncate text-xs text-ink-subtle">{@current_scope.user["email"]}</p>
+            </div>
+            <.link
+              href={~p"/session"}
+              method="delete"
+              id="app-logout"
+              class="grid size-7 shrink-0 place-items-center rounded-md text-ink-subtle transition hover:bg-surface-sunken hover:text-ink"
+              aria-label="Log out"
+              title="Log out"
+            >
+              <.icon name="hero-arrow-right-on-rectangle" class="size-4" />
+            </.link>
+          </div>
+        </div>
+      </aside>
+
+      <div class="flex min-w-0 flex-1 flex-col">
+        <header
+          id="app-topbar"
+          class="flex h-12 shrink-0 items-center justify-between border-b border-line bg-surface px-5"
+        >
+          <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+            {@current_scope.user["company_name"] || "Workspace"}
+          </p>
+          <p
+            id="app-tenant"
+            class="flex items-center gap-1.5 text-xs text-ink-subtle"
+            title="Every screen in this shell acts on this tenant"
+          >
+            <.icon name="hero-identification" class="size-3.5" /> Tenant
+            <span class="tabular-nums font-medium text-ink-muted">
+              {@current_scope.scope.tenant.id}
+            </span>
+            <span :if={@current_scope.scope.tenant.is_platform_operator} class="text-ink-faint">
+              · platform operator
+            </span>
+          </p>
+        </header>
+
+        <main id="app-content" class="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8">
+          {render_slot(@inner_block)}
+        </main>
+      </div>
+    </div>
+
+    <.flash_group flash={@flash} />
+    """
+  end
+
+  attr :navigate, :string, required: true
+  attr :icon, :string, required: true
+  attr :active, :boolean, default: false
+  attr :id, :string, required: true
+  slot :inner_block, required: true
+
+  defp nav_item(assigns) do
+    ~H"""
+    <.link
+      navigate={@navigate}
+      id={@id}
+      aria-current={@active && "page"}
+      class={[
+        "relative flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition",
+        @active && "bg-surface-sunken font-medium text-ink-strong",
+        !@active && "text-ink-muted hover:bg-surface-sunken hover:text-ink"
+      ]}
+    >
+      <span
+        :if={@active}
+        class="absolute inset-y-1 left-0 w-0.5 rounded-full bg-brand-strong"
+        aria-hidden="true"
+      ></span>
+      <.icon name={@icon} class={["size-4 shrink-0", @active && "text-brand-strong"]} />
+      <span class="truncate">{render_slot(@inner_block)}</span>
+    </.link>
+    """
+  end
+
+  defp user_initials(name) when is_binary(name) do
+    name
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.take(2)
+    |> Enum.map_join(&String.first/1)
+    |> String.upcase()
+  end
+
+  defp user_initials(_), do: "?"
 
   attr :flash, :map, required: true
   attr :id, :string, default: "flash-group"
@@ -78,7 +244,8 @@ defmodule BilimbiWeb.Layouts do
         phx-connected={hide("#server-error") |> JS.set_attribute({"hidden", ""})}
         hidden
       >
-        {gettext("Reconnecting…")}
+        {gettext("Attempting to reconnect")}
+        <.icon name="hero-arrow-path" class="ml-1 size-3 animate-spin" />
       </.flash>
     </div>
     """

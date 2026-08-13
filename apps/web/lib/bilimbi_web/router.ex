@@ -1,6 +1,9 @@
 defmodule BilimbiWeb.Router do
   use BilimbiWeb, :router
 
+  import BilimbiWeb.UserAuth,
+    only: [fetch_current_scope: 2, require_authenticated: 2, redirect_if_authenticated: 2]
+
   @content_security_policy Enum.join(
                              [
                                "default-src 'self'",
@@ -27,16 +30,42 @@ defmodule BilimbiWeb.Router do
     plug :put_secure_browser_headers, %{
       "content-security-policy" => @content_security_policy
     }
+
+    plug :fetch_current_scope
   end
 
   pipeline :api do
     plug :accepts, ["json"]
   end
 
+  # The homepage is the sign-in screen; authenticated visitors are forwarded
+  # to their workspace.
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :redirect_if_authenticated]
+
+    live_session :anonymous,
+      on_mount: [{BilimbiWeb.UserAuth, :redirect_if_authenticated}] do
+      live "/", LoginLive
+    end
+  end
+
   scope "/", BilimbiWeb do
     pipe_through :browser
 
-    live "/", HomeLive
+    post "/session", SessionController, :create
+    delete "/session", SessionController, :delete
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :require_authenticated]
+
+    live_session :authenticated,
+      on_mount: [{BilimbiWeb.UserAuth, :require_authenticated}] do
+      live "/dashboard", DashboardLive
+      live "/companies", CompanyLive.Index
+      live "/companies/:id", CompanyLive.Show
+      live "/users", UserLive.Index
+    end
   end
 
   # Other scopes may use custom stacks.

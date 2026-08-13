@@ -24,6 +24,24 @@ Before designing a page, ask what can be removed, what should be obvious, what
 should not be configurable, and where the page can feel more like a confident
 product than a pile of components.
 
+## Relationship to Belimbing
+
+Belimbing is the behavioral reference: its interaction contracts (neutral
+credential errors, throttled retries, two-phase sign-in handoff, sidebar with
+user footer) are preserved unless this document says otherwise. Bilimbi is
+not a reskin. Two deliberate distinctions define the Bilimbi look:
+
+1. **The workspace strip.** No screen is context-free. The login card names
+   the platform workspace being entered (live provisioning state included);
+   the authenticated shell's top strip always names the company and tenant
+   the screen acts on. Tenancy is visible product truth, not hidden plumbing.
+2. **Ledger geometry.** Compact scale with `rounded-md` controls and
+   `rounded-xl` surfaces, hairline rules, and tabular numerals for IDs and
+   counts. The lime `brand` marks orientation only — the card's top edge,
+   the active navigation item's spine, selection — and never reports status.
+   Where Belimbing is soft, arid, and pill-shaped, Bilimbi is ruled paper
+   with a bookmark.
+
 ## Semantic color roles
 
 Use semantic roles rather than arbitrary colors. The visual language should
@@ -80,6 +98,22 @@ stable DOM IDs for tests and accessibility.
 Function components are the default reuse mechanism. Use a LiveComponent only
 when it needs its own state and event lifecycle; do not introduce one merely to
 split markup into another file.
+
+## Application shell
+
+Two shells exist and each stays minimal:
+
+- **`Layouts.auth`** — the centered credential layout for sign-in and password
+  recovery. One quiet card with the brand bar, the wordmark above it, and the
+  workspace strip below. No navigation, no marketing.
+- **`Layouts.app`** — the authenticated workspace shell. A compact sidebar
+  carries the brand, the primary navigation (Dashboard, Companies, Users) with
+  the active item marked by a brand spine, and the user footer with initials
+  and logout. The top strip always names the workspace: company on the left,
+  tenant on the right.
+
+The shell does not grow navigation items for pages that do not exist. A
+workflow joins the sidebar when its screen ships, not before.
 
 ## Gestalt grouping
 

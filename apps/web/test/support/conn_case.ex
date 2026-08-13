@@ -41,4 +41,27 @@ defmodule BilimbiWeb.ConnCase do
 
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
+
+  @doc """
+  A session map as `BilimbiWeb.UserAuth.session_user/1` produces it: the
+  user summary fields plus the tenant resolved at the login edge.
+  """
+  def session_user(overrides \\ %{}) do
+    Map.merge(
+      %{
+        "user_id" => 91,
+        "name" => "Ada Lovelace",
+        "email" => "ada@example.com",
+        "company_id" => 73,
+        "company_name" => "Bilimbi Development",
+        "tenant_id" => 41
+      },
+      overrides
+    )
+  end
+
+  @doc "Puts a signed-in session on the connection."
+  def log_in_as(conn, session_user \\ session_user()) do
+    Phoenix.ConnTest.init_test_session(conn, %{"current_user" => session_user})
+  end
 end

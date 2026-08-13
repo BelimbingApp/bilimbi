@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Orb setup for Bilimbi: toolchain (mise: Erlang 28.5 / Elixir 1.20.3),
+# PostgreSQL 18 on port 5433, database creation, migrations, dev seed.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+# --- mise toolchain -------------------------------------------------------
+if ! command -v mise >/dev/null 2>&1; then
+  curl -fsSL https://mise.run | sh
+fi
+export PATH="$HOME/.local/bin:$PATH"
+mise trust -q || true
+mise install -y
+eval "$(mise activate bash)"
+
+mix local.hex --force >/dev/null
+mix local.rebar --force >/dev/null
+
+# --- PostgreSQL 18 (PGDG) --------------------------------------------------
+if ! command -v psql >/dev/null 2>&1; then
+  sudo apt-get update -qq
+  sudo apt-get install -y -qq build-essential libssl-dev libncurses-dev \
+    autoconf m4 unixodbc-dev postgresql-common
+  sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y || true
+  sudo apt-get install -y -qq postgresql-18
+fi
+
+if ! pg_lsclusters 2>/dev/null | grep -q online; then
+  sudo pg_ctlcluster 18 main start
+fi
+
+# Bilimbi dev expects PostgreSQL on 5433 with role bilimbi / bilimbi_dev_*.
+sudo -u postgres psql -tc \
+  "SELECT 1 FROM pg_roles WHERE rolname='bilimbi'" | grep -q 1 ||
+  sudo -u postgres psql -c \
+    "CREATE USER bilimbi WITH PASSWORD 'bilimbi_dev_ca658ad7d8b5' CREATEDB SUPERUSER;"
+sudo -u postgres psql -tc "SHOW port" | grep -q 5433 || {
+  sudo -u postgres psql -c "ALTER SYSTEM SET port = 5433;"
+  sudo pg_ctlcluster 18 main restart
+  sleep 2
+}
+
+# --- Application -----------------------------------------------------------
+mix deps.get
+mix ecto.setup
+mix bilimbi.dev.seed
