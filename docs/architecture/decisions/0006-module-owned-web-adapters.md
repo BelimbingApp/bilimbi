@@ -174,7 +174,66 @@ This is an explicit, recorded choice, not an assumption. The alternative —
 keeping LiveViews centralised to avoid the library dependency — was rejected
 by the steward directive.
 
-### 4. What stays in the host
+### 4. Base UI package — the compile seam
+
+Every shipped LiveView renders `<Layouts.app>`, `<.input>`, `<.button>`,
+`<.header>`, and mounts via `UserAuth` `on_mount` hooks. Those are
+**compile-time** dependencies: a LiveView in `bilimbi_core_employee` calling
+`Layouts.app/1` cannot compile unless it can see that module's beam code.
+
+A module cannot depend on the `:web` OTP application — that is the reverse
+dependency §4 forbids. Placing `Layouts`, `CoreComponents`, and `UserAuth` in
+the host creates an impossible compile seam: the migration plan's step 4
+(relocate LiveViews) fails on the first file because `use BilimbiWeb,
+:live_view` and `<Layouts.app>` do not resolve.
+
+The solution is a **Base-layer UI package** (`base/ui`) that owns the shared
+presentation contracts every UI-bearing module needs:
+
+```text
+apps/base/ui/
+├── mix.exs
+├── bilimbi.module.exs
+├── lib/
+│   ├── ui.ex                       # Bilimbi.Base.UI — public facade
+│   └── ui/
+│       ├── components.ex           # CoreComponents (<.input>, <.button>, etc.)
+│       ├── layouts.ex              # Layouts (<Layouts.app>)
+│       ├── live_view.ex            # __using__ macro replacing use BilimbiWeb, :live_view
+│       └── auth_hooks.ex           # on_mount hooks (require_authenticated, require_capability)
+├── test/
+└── docs/
+```
+
+`base/ui` is a Base-layer module. UI-bearing modules (Core, Domain,
+Extension) depend on it through the same descriptor graph as any other Base
+dependency. The dependency direction stays legal: Base → Core → Domain →
+Extension. `base/ui` itself depends on `phoenix_live_view`, `phoenix`, and
+`phoenix_html` as Hex packages, and on `base/tenancy` (for `Scope` used in
+auth hooks) and `base/authz` (for `Authz.can/2` in capability hooks).
+
+`Bilimbi.Base.UI` is a deliberate cross-cutting public name, the same class
+of documented exception as `Bilimbi.Base.Repo` (ADR 0003). Its physical
+ownership stays in `apps/base/ui/`; its public name does not carry `Base.UI`
+in template calls — `Layouts.app` and `<.input>` work because the module
+exports them and consuming LiveViews `import` or `use` the facade.
+
+Module LiveViews use `use Bilimbi.Base.UI, :live_view` instead of
+`use BilimbiWeb, :live_view`. The `__using__` macro brings in the HTML
+helpers, verified routes, and shared components. Module LiveViews that need
+the endpoint (for socket configuration) get it through the standard Phoenix
+compile-time mechanism — the endpoint module is injected at compile time and
+does not require a runtime `:web` dependency.
+
+`UserAuth`'s `on_mount` hooks (`require_authenticated`,
+`require_capability`, `redirect_if_authenticated`) move to
+`Bilimbi.Base.UI.AuthHooks`. The host router's `fetch_current_scope` plug
+stays in `apps/web` (it is request-level, not LiveView-level), but the
+on_mount hooks that LiveViews use are in the Base UI package. The capability
+string and live_session name are data the host macro interprets; the hooks
+themselves are shared Base code.
+
+### 5. What stays in the host
 
 `apps/web` remains a plain umbrella child (not a composition container) and
 owns only the **host shell**:
@@ -182,19 +241,17 @@ owns only the **host shell**:
 - `BilimbiWeb.Endpoint` — Phoenix endpoint, socket, LiveSocket configuration
 - `BilimbiWeb.Router` — router shell with pipelines, login routes, and the
   discovered-route expansion macro
-- `BilimbiWeb.Layouts` — application layout, flash group, auth layout
-- `BilimbiWeb.CoreComponents` — semantic design system components (`<.input>`,
-  `<.button>`, `<.badge>`, `<.list>`, `<.header>`, etc.)
-- `BilimbiWeb.UserAuth` — session handling, scope propagation, Authz plugs
-  and LiveView `on_mount` hooks (used by module routes via the discovery
-  mechanism)
+- `BilimbiWeb.UserAuth` — request-level plugs (`fetch_current_scope`,
+  `require_authenticated`, `redirect_if_authenticated`) and login/logout
+  lifecycle. LiveView `on_mount` hooks move to `Bilimbi.Base.UI.AuthHooks`.
 - `assets/` — Tailwind CSS, JS hooks, esbuild pipeline, vendor code
 - `config/` entries for the endpoint, pubsub, and asset pipeline
 
 `apps/web` does **not** own any module's LiveView, controller, template, or
-route. It is the host, not a dumping ground.
+route. It does **not** own `Layouts` or `CoreComponents` — those move to
+`base/ui`. It is the host, not a dumping ground.
 
-### 5. Base and Core relaxation
+### 6. Base and Core relaxation
 
 The steward's directive allows relaxation for Base and Core "since they are
 always the foundation." This ADR narrows that latitude:
@@ -211,7 +268,7 @@ exempt themselves, Domains inherit ambiguity. The relaxation is for modules
 that genuinely have no UI, not for modules that have UI but prefer the old
 centralised placement.
 
-### 6. `apps/web` identity
+### 7. `apps/web` identity
 
 `apps/web` stays a plain umbrella child with OTP application `:web` and
 namespace `BilimbiWeb`. It does **not** become a composition container with a
@@ -276,24 +333,67 @@ compile-time macro expansion, not a runtime lookup.
   validate `web:` providers and route contributions, keeping one verification
   path.
 
+## Interim placement rule for in-flight UI
+
+Before the `web:` descriptor key and host router macro land, UI-bearing
+modules that are building screens now must:
+
+1. **Put LiveViews in `lib/<module>/web/`** inside the owning module now.
+2. **Do not register routes in the host `router.ex`** — that recreates the
+   central child list the ADR removes.
+3. **Do not invent a per-screen shim** or temporary route-registration hack.
+   Coordinate route wiring through the `web:` descriptor key when it lands.
+
+This rule applies to all in-flight UI issues (#97–#103, #119, #102, #97).
+Screens can be built, tested, and reviewed in the owning module; route
+wiring is the last step, gated on the descriptor infrastructure.
+
+## AGENTS.md amendment
+
+AGENTS.md §4 currently recommends `apps/web/lib/bilimbi_web/core/...` and
+`BilimbiWeb.Core.*Live`. §9 recommends `BilimbiWeb.Core.CompanyLive.Index`.
+These are stale after this ADR is Accepted. The amendment must happen **before
+any LiveView moves** (migration step 4), not after, so agents do not continue
+writing the old path. The amendment:
+
+- §4: replace the recommended placement with
+  `apps/<layer>/<module>/lib/<module>/web/` and namespace
+  `Bilimbi.<Layer>.<Module>.Web`.
+- §6: add the optional `web/` sub-directory and the `web:` descriptor key to
+  the module directory contents list.
+- §9: replace `BilimbiWeb.Core.CompanyLive.Index` with
+  `Bilimbi.Core.Company.Web.IndexLive`.
+- §10: note that `use Bilimbi.Base.UI, :live_view` replaces
+  `use BilimbiWeb, :live_view` for module-owned LiveViews.
+
+The amendment is part of migration step 5 but must be sequenced before step 4.
+
 ## Migration plan
 
 This ADR records the decision. The migration is separate work, sequenced as:
 
 1. **Descriptor schema** — add `web:` key to `bilimbi.module.exs` validation
    in Base ModuleRegistry. All existing descriptors gain `web: nil`.
-2. **Route behavior** — define `Bilimbi.Base.ModuleRegistry.Route` and the
+2. **Base UI package** — create `apps/base/ui/` with `Layouts`,
+   `CoreComponents`, the `__using__` macro, and `AuthHooks` moved from
+   `apps/web`. Add `base/ui` to the Base container and descriptor graph.
+3. **Route behavior** — define `Bilimbi.Base.ModuleRegistry.Route` and the
    `Router` callback in Base ModuleRegistry.
-3. **Host router macro** — implement the discovered-route expansion macro in
+4. **Host router macro** — implement the discovered-route expansion macro in
    `apps/web/lib/bilimbi_web/router.ex`.
-4. **Move existing LiveViews** — relocate each LiveView from
+5. **Amend AGENTS.md** — update §4, §6, §9, and §10 to reflect the new
+   placement, descriptor key, and `use Bilimbi.Base.UI, :live_view`. This
+   must happen before step 6.
+6. **Move existing LiveViews** — relocate each LiveView from
    `apps/web/lib/bilimbi_web/live/` to its owning module's
-   `lib/<module>/web/live/`. Add `phoenix_live_view` to each owning module's
-   `deps/`. Implement each module's `Web.Router` with its route contributions.
-5. **Update AGENTS.md** — amend §4 and §6 to reflect the new placement and
-   descriptor key.
-6. **Update tests** — Web integration tests continue to use public module
-   APIs for setup; LiveView tests move with their owning module.
+   `lib/<module>/web/live/`. Add `phoenix_live_view` and `base/ui` to each
+   owning module's `deps/`. Implement each module's `Web.Router` with its
+   route contributions.
+7. **Update tests** — Web integration tests continue to use public module
+   APIs for setup; LiveView tests move with their owning module. Tests that
+   need the endpoint get it through the standard cross-module test-support
+   rule.
 
-Steps 1–3 are infrastructure that can land before any LiveView moves. Step 4
-can proceed module-by-module. Steps 5 and 6 follow.
+Steps 1–4 are infrastructure that can land before any LiveView moves. Step 5
+amends AGENTS.md. Step 6 can proceed module-by-module. Step 7 follows each
+module move.
