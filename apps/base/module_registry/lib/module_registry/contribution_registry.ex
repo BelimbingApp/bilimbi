@@ -152,9 +152,13 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
     provider.contributions()
   rescue
     error ->
-      raise ArgumentError,
-            "contribution provider #{inspect(provider)} for #{descriptor.id} failed: " <>
-              Exception.message(error)
+      reraise ArgumentError,
+              [
+                message:
+                  "contribution provider #{inspect(provider)} for #{descriptor.id} failed: " <>
+                    Exception.message(error)
+              ],
+              __STACKTRACE__
   end
 
   defp validate_consumer!(_consumer, []), do: []

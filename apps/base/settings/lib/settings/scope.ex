@@ -48,12 +48,12 @@ defmodule Bilimbi.Base.Settings.Scope do
   def chain(%__MODULE__{type: :tenant} = scope), do: [scope, nil]
 
   def chain(%__MODULE__{type: :company, tenant_id: tenant_id} = scope) do
-    [scope, optional_scope(:tenant, tenant_id), nil] |> Enum.reject(&is_nil_gap?/1)
+    [scope, optional_scope(:tenant, tenant_id), nil] |> Enum.reject(&missing_scope?/1)
   end
 
   def chain(%__MODULE__{type: :user, company_id: company_id, tenant_id: tenant_id} = scope) do
     [scope, optional_scope(:company, company_id), optional_scope(:tenant, tenant_id), nil]
-    |> Enum.reject(&is_nil_gap?/1)
+    |> Enum.reject(&missing_scope?/1)
   end
 
   @spec database_identity(t() | nil) :: {String.t() | nil, pos_integer() | nil}
@@ -63,8 +63,8 @@ defmodule Bilimbi.Base.Settings.Scope do
   defp optional_scope(_type, nil), do: :missing
   defp optional_scope(:company, id), do: company(id)
   defp optional_scope(:tenant, id), do: tenant(id)
-  defp is_nil_gap?(:missing), do: true
-  defp is_nil_gap?(_scope), do: false
+  defp missing_scope?(:missing), do: true
+  defp missing_scope?(_scope), do: false
 
   defp positive_id!(value, _field) when is_integer(value) and value > 0, do: value
 

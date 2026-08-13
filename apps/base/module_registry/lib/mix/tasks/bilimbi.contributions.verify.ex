@@ -1,4 +1,6 @@
 defmodule Mix.Tasks.Bilimbi.Contributions.Verify do
+  @moduledoc false
+
   use Mix.Task
 
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry

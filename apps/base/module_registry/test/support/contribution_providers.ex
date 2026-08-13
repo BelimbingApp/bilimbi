@@ -1,4 +1,6 @@
 defmodule Bilimbi.Base.ModuleRegistry.TestProvider do
+  @moduledoc false
+
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionProvider
 
   @impl true
@@ -6,6 +8,8 @@ defmodule Bilimbi.Base.ModuleRegistry.TestProvider do
 end
 
 defmodule Bilimbi.Base.ModuleRegistry.UnknownConsumerTestProvider do
+  @moduledoc false
+
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionProvider
 
   @impl true
@@ -13,6 +17,8 @@ defmodule Bilimbi.Base.ModuleRegistry.UnknownConsumerTestProvider do
 end
 
 defmodule Bilimbi.Base.ModuleRegistry.NonPlainTestProvider do
+  @moduledoc false
+
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionProvider
 
   @impl true
@@ -20,6 +26,8 @@ defmodule Bilimbi.Base.ModuleRegistry.NonPlainTestProvider do
 end
 
 defmodule Bilimbi.Base.ModuleRegistry.ThrowingTestProvider do
+  @moduledoc false
+
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionProvider
 
   @impl true
@@ -27,5 +35,7 @@ defmodule Bilimbi.Base.ModuleRegistry.ThrowingTestProvider do
 end
 
 defmodule Bilimbi.Base.ModuleRegistry.MissingBehaviourTestProvider do
+  @moduledoc false
+
   def contributions, do: %{}
 end
