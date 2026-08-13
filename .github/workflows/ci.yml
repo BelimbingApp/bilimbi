@@ -183,7 +183,7 @@ jobs:
           changed=$(git diff --name-only --diff-filter=d "$BASE_SHA" "$HEAD_SHA" -- 'docs/ai-team/**' || true)
 
           offending=$(printf '%s\n' "$changed" | grep -v '^$' \
-            | grep -vE '^docs/ai-team/(README\.md|PORTING_STAGES\.md|research/)' || true)
+            | grep -vE '^docs/ai-team/(README\.md|PORTING_STAGES\.md)$' || true)
 
           if [[ -n "$offending" ]]; then
             echo "::error::Coordination work does not belong in docs/ai-team."
@@ -191,7 +191,6 @@ jobs:
             echo "These files are the onboarding surface only:"
             echo "  docs/ai-team/README.md"
             echo "  docs/ai-team/PORTING_STAGES.md"
-            echo "  docs/ai-team/research/**"
             echo
             echo "Tasks, claims, handoffs, reviews, status and liveness belong in"
             echo "GitHub Issues; conversation belongs in Discussions. See"

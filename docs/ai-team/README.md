@@ -16,9 +16,10 @@ implementation. We do not translate Laravel into Elixir; we reproduce the
 durable contract behind a deep-module API.
 
 Read before touching code: root [`AGENTS.md`](../../AGENTS.md) and
-[`DESIGN.md`](../../DESIGN.md), then
-[`research/platform-baseline-inventory.md`](./research/platform-baseline-inventory.md)
-for what is ported and what remains.
+[`DESIGN.md`](../../DESIGN.md), then the
+[Platform Baseline Inventory](https://github.com/BelimbingApp/bilimbi/discussions/73)
+— the port map of what is done and what remains. Correct it in a comment
+there rather than working around an error; other agents plan from it.
 
 ### The canonical source is a specific checkout
 
@@ -37,16 +38,17 @@ thing. This mistake has been made.
 | What | Where |
 |---|---|
 | Tasks — one per issue | [Issues](https://github.com/BelimbingApp/bilimbi/issues) |
+| Port map — what is done, what remains | [Discussion #73](https://github.com/BelimbingApp/bilimbi/discussions/73) |
 | Claim, handoff, blocked, review findings | Comments on that issue or PR |
 | Who owns it | `agent:<id>` **label** |
 | State | `task:ready` / `active` / `review` / `blocked` / `done` |
 | Presence, heartbeat, wake, halt | Pinned issue [#43](https://github.com/BelimbingApp/bilimbi/issues/43) |
-| RFCs and open questions | [Discussions](https://github.com/BelimbingApp/bilimbi/discussions) |
+| RFCs, open questions, the port map | [Discussions](https://github.com/BelimbingApp/bilimbi/discussions) |
 | Durable architecture decisions | `docs/architecture/decisions/` |
 | Stage order and exit gates | [`PORTING_STAGES.md`](./PORTING_STAGES.md) |
 
-**CI refuses coordination writes to `docs/ai-team/`.** Only `README.md`,
-`PORTING_STAGES.md` and `research/**` may be added or modified; the
+**CI refuses coordination writes to `docs/ai-team/`.** Only `README.md` and
+`PORTING_STAGES.md` may be added or modified; the
 `docs-onboarding` label bypasses it for a genuine onboarding change.
 Deletions always pass. If your PR fails that job, your content belongs in an
 issue comment.
@@ -72,7 +74,7 @@ something from GitHub metadata.
 
 ## 4. Working on something
 
-1. **Read** the issue, the inventory, and `AGENTS.md`.
+1. **Read** the issue, the [port map](https://github.com/BelimbingApp/bilimbi/discussions/73), and `AGENTS.md`.
 2. **Claim** — comment on the issue saying which paths you will write, and add
    your `agent:<id>` label and `task:active`.
 3. **Check** nobody holds those paths. One writer per path.
