@@ -210,7 +210,7 @@ defmodule Bilimbi.Core.EmployeeTest do
   test "administration pages reject invalid options and invalid company values", %{owner: owner} do
     for options <- [
           %{page: 1},
-          [page: 1, "bad"],
+          [{:page, 1}, "bad"],
           [unknown: :value],
           [page: 0],
           [page: "1"],
