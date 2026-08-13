@@ -123,6 +123,15 @@ modules such as User, Company, Employee, Address, and Geonames.
 Core may depend on Base. Core modules should collaborate through public APIs,
 behaviours, or explicit events—not another module's private queries or tables.
 
+[ADR 0007](docs/architecture/decisions/0007-core-user-administration-integration-read.md)
+records one conditional exception for the future required
+`core/user_administration` integration read. The exception does not apply
+until that package lands with ADR 0007's exact relation-and-column allowlist,
+versioned consumed-relation manifest, source-position guards, and independent
+architecture/security review. Only its private
+`Bilimbi.Core.UserAdministration.Query` may then perform that read; this is not
+precedent for any other sibling-private-table access.
+
 ### Future Domains and Extensions
 
 An optional Domain may depend on Base and Core and may compose explicitly
