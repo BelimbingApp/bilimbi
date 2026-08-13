@@ -4,13 +4,16 @@
 **Layer:** Core · required
 **Canonical source:** Belimbing `app/Core/User`, migration prefix `0200_01_20_*`
 
-Owns user accounts and their affiliation to a company and an employee record.
-Authentication is deliberately **not** here — see [Deferred](#deferred).
+Owns user accounts, credentials, email verification, password-reset state, and
+the four user-scoped preferences moved out of Belimbing's deleted `users.prefs`
+column. It also owns affiliation to a company and an employee record.
 
 ## Public API
 
-Every function takes a `Bilimbi.Base.Tenancy.Scope`. Ecto schemas, queries, and
-the stored credential never leave the module; reads return
+Tenant-owned functions take a `Bilimbi.Base.Tenancy.Scope`. Login and reset
+lookup deliberately use the globally unique email because no tenant scope
+exists before authentication. Ecto schemas, password hashes, remember tokens,
+and reset-token hashes never leave the module; account reads return
 `Bilimbi.Core.User.Summary`.
 
 | Function | Purpose |
@@ -18,9 +21,16 @@ the stored credential never leave the module; reads return
 | `list_company_users(scope, company_id)` | Users affiliated with one proven live company |
 | `list_users(scope)` | Tenant-wide list; includes users of soft-deleted companies |
 | `get_user(scope, company_id, user_id)` | One user inside that company |
-| `create_user(scope, company_id, attributes)` | Create; requires `:password_hash` |
+| `register_user(scope, company_id, attributes)` | Create an unverified account from plaintext `:password` |
+| `create_user(scope, company_id, attributes)` | Compatibility name for `register_user/3` |
 | `update_user(scope, company_id, user_id, attributes)` | Update |
 | `delete_user(scope, company_id, user_id)` | Hard delete — `users` has no soft delete |
+| `authenticate(email, password)` | Verify a login and upgrade legacy bcrypt |
+| `confirm_password(...)` / `change_password(...)` | Current-password confirmation and replacement |
+| `request_password_reset(email, deliver_fun)` | Neutral, throttled request; callback receives the one plaintext token |
+| `reset_password(email, token, password)` | Consume a 60-minute token and rotate `remember_token` |
+| `issue_email_verification_token(...)` / `verify_email(...)` | Signed 60-minute verification bound to the current email |
+| `user_preferences(...)` and preference get/put/delete | Scoped access to the four module-owned settings |
 | `notifiable_identity()` | The durable Laravel polymorphic string |
 
 ## Tables
@@ -54,25 +64,40 @@ public API (`get_company/2` for single-company reads;
 Company's tables. Soft-deleted companies stay visible in `list_users/1` to
 match Belimbing (BLB-S1-010 option a).
 
-**This module stores credentials; it never creates them.** `users.password` is
-non-null and holds Laravel bcrypt output — a crypt-format string. Bilimbi has
-no hashing dependency and S1 deliberately does not add one, so writes take an
-already-hashed `:password_hash` and reject anything that is not crypt-format,
-rather than silently storing a plaintext password. `Summary` has no `password`
-or `remember_token` field by construction, not by filtering.
+**Credential creation belongs to the module.** Callers provide plaintext only
+under `:password`; `:password_hash` is not a public input. New credentials and
+reset tokens use Argon2id. Existing Laravel Argon2 hashes verify directly.
+Laravel's legacy bcrypt prefix `$2y$` is normalized to the equivalent `$2b$`
+only while verifying, then a successful login replaces that hash with
+Argon2id. Missing accounts perform dummy verification, and login/reset failures
+do not reveal whether an email exists. `Summary` has no credential or remember
+token field by construction.
+
+**Account creation is not public registration.** Belimbing deliberately has no
+`/register` route. `register_user/3` is the trusted administrative primitive;
+the future Web adapter must gate it with the normal Authz capability. New
+accounts start unverified. Changing an email clears its verification timestamp.
+
+**Reset and verification delivery remain adapters.** Core User stores the
+hashed reset token, while a caller-provided delivery function receives the
+safe account summary and one plaintext token. Email verification uses
+`Plug.Crypto` signing with a caller-provided secret of at least 32 bytes; Web
+owns the eventual URL and mail templates. Web also owns request/IP rate
+limiting, session cookies, and Phoenix navigation.
 
 **Employee affiliation is checked through Core Employee's API**, never by
 querying `employees`. A foreign key to another module's table does not grant
 read access to its schema.
 
-**`users.prefs` is intentionally absent.** Belimbing dropped it in
-`0200_01_20_000007`, moving four keys into `base_settings` under
-`scope_type: 'user'`. Porting it would resurrect a deleted column.
+**`users.prefs` remains intentionally absent.** Belimbing dropped it in
+`0200_01_20_000007`. Core User contributes and validates `ui.theme`,
+`ui.landing_menu_id`, `ui.dashboard.layout`, and
+`ai.last_used_model_hints`; Base Settings persists their overrides under
+`scope_type: 'user'`.
 
 ## Deferred
 
-Registration, login, sessions, password-reset flow, email verification,
-authorization, and user preferences belong to S2 with Base Authz, Base
-Settings, and Session. `user_pins` and `user_database_queries` have schema but
-no public API: they are UI features owned by Menu and the Base Database query
-surface in S3. `User::getLastUsedModel()` is Core AI's, in S4.
+Phoenix routes, forms, mail delivery, login throttling, and the authenticated
+Session adapter remain a Web slice. `user_pins` and `user_database_queries`
+have schema but no public API: they are UI features owned by Menu and the Base
+Database query surface in S3. `User::getLastUsedModel()` is Core AI's, in S4.
