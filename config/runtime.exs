@@ -4,6 +4,10 @@ if System.get_env("PHX_SERVER") do
   config :web, BilimbiWeb.Endpoint, server: true
 end
 
+if belimbing_app_key = System.get_env("BELIMBING_APP_KEY") do
+  config :bilimbi_base_settings, :belimbing_app_key, belimbing_app_key
+end
+
 config :web, BilimbiWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
 if config_env() == :dev do

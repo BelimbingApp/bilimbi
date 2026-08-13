@@ -15,6 +15,7 @@ config :web, BilimbiWeb.Endpoint,
   server: false
 
 config :swoosh, :api_client, false
+config :bilimbi_base_settings, :belimbing_app_key, "base64:#{Base.encode64(<<0::256>>)}"
 config :logger, level: :warning
 config :phoenix, :plug_init_mode, :runtime
 config :phoenix_live_view, enable_expensive_runtime_checks: true

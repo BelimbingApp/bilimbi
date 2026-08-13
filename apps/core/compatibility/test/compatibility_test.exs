@@ -307,6 +307,7 @@ defmodule Bilimbi.Core.CompatibilityTest do
     # run and its schema contract is never verified. Core User shipped that way.
     assert relation(MigrationTestRepo, schema, "users") != nil
     assert relation(MigrationTestRepo, schema, "notifications") != nil
+    assert relation(MigrationTestRepo, schema, "base_settings") != nil
 
     assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
   end

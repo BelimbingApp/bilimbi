@@ -1,13 +1,16 @@
-Code.require_file(Path.expand("mix/module_discovery.exs", __DIR__))
+[discovery_file] =
+  Path.wildcard(Path.expand("../../../apps/base/*/mix/module_discovery.exs", __DIR__))
 
-defmodule Bilimbi.Base.ModuleRegistry.MixProject do
+Code.require_file(discovery_file)
+
+defmodule Bilimbi.Base.Settings.MixProject do
   use Mix.Project
 
   @workspace_root Path.expand("../../..", __DIR__)
 
   def project do
     [
-      app: :bilimbi_base_module_registry,
+      app: :bilimbi_base_settings,
       version: "0.1.0",
       build_path: Path.join(@workspace_root, "_build"),
       config_path: Path.join(@workspace_root, "config/config.exs"),
@@ -18,17 +21,27 @@ defmodule Bilimbi.Base.ModuleRegistry.MixProject do
       bilimbi_module_root: __DIR__,
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      deps: Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
+      aliases: aliases(),
+      deps: deps()
     ]
   end
 
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:crypto, :logger],
       env: Bilimbi.Base.ModuleRegistry.MixDiscovery.application_env(__DIR__)
     ]
   end
 
+  defp deps do
+    [{:ecto_sql, "~> 3.14"}, {:jason, "~> 1.4"}] ++
+      Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
+  end
+
   defp elixirc_paths(:test), do: ["lib", "test/support"]
-  defp elixirc_paths(_environment), do: ["lib"]
+  defp elixirc_paths(_env), do: ["lib"]
+
+  defp aliases do
+    [test: ["ecto.create --quiet -r Bilimbi.Base.Repo", "test"]]
+  end
 end
