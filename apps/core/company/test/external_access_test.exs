@@ -146,6 +146,8 @@ defmodule Bilimbi.Core.Company.ExternalAccessTest do
   end
 
   test "stale writes against a concurrently deleted row return not_found", %{owner: owner} do
+    # Sequential already-deleted case. Wait/recheck under a held row lock is
+    # `ExternalAccessLockTest`.
     assert {:ok, access} =
              Company.create_external_access(owner, 73, %{relationship_id: 21})
 
