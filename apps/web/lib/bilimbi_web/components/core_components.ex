@@ -178,16 +178,18 @@ defmodule BilimbiWeb.CoreComponents do
       nil => "border border-line-strong bg-surface text-ink hover:bg-surface-sunken"
     }
 
+    # A caller-supplied class extends the button; it must not replace the
+    # variant, or `<.button variant="primary" class="w-full">` silently
+    # renders an unstyled button.
     assigns =
-      assign_new(assigns, :class, fn ->
-        [
-          "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
-          "shadow-sm transition focus-visible:outline-none focus-visible:ring-2",
-          "focus-visible:ring-action/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-          "disabled:cursor-not-allowed disabled:opacity-50",
-          Map.fetch!(variants, assigns[:variant])
-        ]
-      end)
+      assign(assigns, :class, [
+        "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
+        "shadow-sm transition focus-visible:outline-none focus-visible:ring-2",
+        "focus-visible:ring-action/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        Map.fetch!(variants, assigns[:variant]),
+        assigns[:class]
+      ])
 
     if rest[:href] || rest[:navigate] || rest[:patch] do
       ~H"""

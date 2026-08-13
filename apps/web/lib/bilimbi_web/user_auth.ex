@@ -18,12 +18,11 @@ defmodule BilimbiWeb.UserAuth do
 
   ## Cross-module seam
 
-  `Bilimbi.Core.Company.fetch_tenant_id_for_company/1` — a public
-  company → tenant read for the login edge — is requested on issue #87
-  and lands with PR #95. Until it is merged the seam resolves only the
-  platform-operator company, which covers the development seed. The
-  fallback is honest about its limits (`{:error, :tenant_unavailable}`)
-  rather than guessing.
+  `Bilimbi.Core.Company.fetch_tenant_id_for_company/1` is the public
+  company → tenant read for the login edge (issue #87, PR #95) — the same
+  exception class as `User.authenticate/2`'s unscoped email lookup. It
+  fails closed for absent, soft-deleted, or invalid IDs; tenant liveness
+  is re-proven by `Tenancy.scope/1` on every request.
   """
 
   import Plug.Conn
@@ -115,15 +114,15 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   # Belimbing resolves the tenant from the user's current company
-  # (TenantContext). Bilimbi's public company → tenant read for the
-  # unauthenticated edge is pending (issue #87); until then the development
-  # platform-operator company is the only resolvable case.
+  # (TenantContext). The public company → tenant read fails closed for
+  # absent, soft-deleted, or invalid IDs; tenant liveness itself is
+  # re-proven by Tenancy.scope/1 on every request.
   defp tenant_id_for_user(%Summary{company_id: nil}), do: {:error, :tenant_unavailable}
 
   defp tenant_id_for_user(%Summary{company_id: company_id}) do
-    case Company.platform_operator_company() do
-      {:ok, %{id: id, tenant_id: tenant_id}} when id == company_id -> {:ok, tenant_id}
-      _ -> {:error, :tenant_unavailable}
+    case Company.fetch_tenant_id_for_company(company_id) do
+      {:ok, tenant_id} -> {:ok, tenant_id}
+      {:error, :not_found} -> {:error, :tenant_unavailable}
     end
   end
 
