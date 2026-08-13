@@ -7,5 +7,6 @@
   namespace: Bilimbi.Core.Company,
   dependencies: ["base/database", "base/tenancy"],
   migrations: "priv/repo/migrations",
-  schema_contract: Bilimbi.Core.Company.SchemaContract
+  schema_contract: Bilimbi.Core.Company.SchemaContract,
+  contribution_provider: nil
 ]

@@ -16,6 +16,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixProject do
       elixir: "~> 1.20",
       compilers: [:bilimbi_graph] ++ Mix.compilers(),
       bilimbi_module_root: __DIR__,
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
     ]
@@ -27,4 +28,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixProject do
       env: Bilimbi.Base.ModuleRegistry.MixDiscovery.application_env(__DIR__)
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_environment), do: ["lib"]
 end

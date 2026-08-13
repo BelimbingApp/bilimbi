@@ -35,7 +35,13 @@ defmodule Bilimbi.Umbrella.MixProject do
       setup: ["cmd mix setup", "bilimbi.migrate"],
       "ecto.setup": ["ecto.create -r Bilimbi.Base.Repo", "bilimbi.migrate"],
       "ecto.reset": ["ecto.drop -r Bilimbi.Base.Repo", "ecto.setup"],
-      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      precommit: [
+        "compile --warnings-as-errors",
+        "deps.unlock --unused",
+        "format",
+        "test",
+        "bilimbi.contributions.verify"
+      ]
     ]
   end
 end

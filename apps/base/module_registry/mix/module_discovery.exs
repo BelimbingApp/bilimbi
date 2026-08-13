@@ -19,7 +19,8 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     :namespace,
     :dependencies,
     :migrations,
-    :schema_contract
+    :schema_contract,
+    :contribution_provider
   ]
 
   Code.require_file("compile_bilimbi_graph.exs", __DIR__)
@@ -34,6 +35,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
           dependencies: [String.t()],
           migrations: nil | String.t(),
           schema_contract: nil | module(),
+          contribution_provider: nil | module(),
           path: String.t(),
           container_id: String.t()
         }
@@ -353,6 +355,10 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     unless is_nil(descriptor.schema_contract) or is_atom(descriptor.schema_contract) do
       malformed!(path, "schema_contract must be nil or a module atom")
     end
+
+    unless valid_optional_module?(descriptor.contribution_provider) do
+      malformed!(path, "contribution_provider must be nil or a non-nil module atom")
+    end
   end
 
   defp validate_unique!(modules, field, label) do
@@ -507,6 +513,10 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   end
 
   defp valid_relative_path?(_path), do: false
+
+  defp valid_optional_module?(nil), do: true
+  defp valid_optional_module?(module) when is_atom(module), do: true
+  defp valid_optional_module?(_module), do: false
 
   defp malformed!(path, message) do
     raise ArgumentError, "malformed Bilimbi module descriptor #{path}: #{message}"

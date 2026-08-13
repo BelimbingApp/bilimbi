@@ -46,12 +46,14 @@ not one OTP application inside it.
 ## 2. Current scope
 
 The initial Bilimbi implementation contains the Platform Baseline and its web
-host. Base Tenancy, Core Company, Core Geonames, Core Address, Core Employee,
-and Core User are active foundation slices:
+host. Base Settings, Base Tenancy, Base Audit, Core Company, Core Geonames,
+Core Address, Core Employee, and Core User are active foundation slices:
 
 ```text
 apps/base/database/
+apps/base/settings/
 apps/base/tenancy/
+apps/base/audit/
 apps/core/company/
 apps/core/geonames/
 apps/core/address/
@@ -189,7 +191,9 @@ from, write to, rename, or repurpose Laravel's `migrations` table. Migration
 files stay with their owner:
 
 ```text
+apps/base/settings/priv/repo/migrations/
 apps/base/tenancy/priv/repo/migrations/
+apps/base/audit/priv/repo/migrations/
 apps/core/company/priv/repo/migrations/
 apps/core/geonames/priv/repo/migrations/
 apps/core/address/priv/repo/migrations/
@@ -262,9 +266,13 @@ container's source composition.
 
 The module descriptor is the sole declaration of its stable module ID, layer,
 OTP application ID, namespace, module dependencies, required/optional state,
-migration path, and optional compatibility contract. Its `mix.exs` derives
-local module path dependencies and application metadata from that descriptor;
-do not repeat module dependency names manually.
+migration path, optional compatibility contract, and optional contribution
+provider. Every descriptor carries `contribution_provider`; use `nil` when the
+module contributes nothing. A non-nil provider implements the ModuleRegistry
+behavior and returns immutable plain terms below only `:settings`, `:authz`,
+and `:menu`, as decided by ADR 0004. Its `mix.exs` derives local module path
+dependencies and application metadata from that descriptor; do not repeat
+module dependency names manually.
 
 Discovery must fail during dependency resolution for a malformed or missing
 descriptor, duplicate stable ID, duplicate OTP application ID, missing
