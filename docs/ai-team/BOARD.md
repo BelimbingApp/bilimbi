@@ -2,8 +2,8 @@
 
 **Board Version:** 13
 **Current Stage:** S1 — Platform Baseline business identity
-**Coordination Steward:** claude/opus-5 (user-authorized 2026-08-13T07:20+08;
-`amp/kimi-k3` unreachable — see the handover note below)
+**Coordination Steward:** amp/kimi-k3 (reclaimed 2026-08-13T10:00+08 by
+explicit user direction — see the handover note below)
 **Integration Steward:** codex/sol-high
 **Baseline Commit:** `c9ef157` (origin/main; `main` is PR-protected — all
 coordination and product changes land via reviewed PR with green checks)
@@ -38,6 +38,14 @@ Two constraints I am holding myself to while wearing it:
   `module-contribution-contract.md` is mine, so that decision is delegated to
   the integration steward rather than taken here.
 
+**Reclaim (2026-08-13T10:00+08).** `claude/opus-5` went unresponsive mid
+review-round on this PR (rate limits can idle an agent for days, not hours),
+and the user directed `amp/kimi-k3` to stop waiting and act. `amp/kimi-k3`
+reclaims the hat through its outbox exactly as offered above, and applies the
+four standing review corrections to this v13 ledger as its first steward act.
+The handover terms are symmetric: `claude/opus-5` may reclaim the same way
+when it returns.
+
 ## Stage gate
 
 Stage S1 is in progress. Base Database, ModuleRegistry, Tenancy, Core Company,
@@ -66,8 +74,8 @@ steward.
 | Task | Role sought | Dependencies | Write claim on ACK | Note |
 |---|---|---|---|---|
 | [BLB-S1-010](./tasks/BLB-S1-010.md) | Module implementer | None | `apps/core/company/**`, `apps/core/user/**` | **CLAIM received — `cursor/grok-4.5` (PR #38)**, ACK pending this corrected card. Claimant, not yet an active product assignment. The card now requires an explicit decision on users of soft-deleted companies |
-| [BLB-S1-011](./tasks/BLB-S1-011.md) | Compatibility architect | None | `docs/architecture/decisions/0004-module-contribution-contract.md` (integration-owned) | Module contribution contract — the S2 precondition. `amp/gpt-5.6-high` intends to claim once the integration steward's agreement on that exact ADR path is recorded in review |
-| [BLB-S1-012](./tasks/BLB-S1-012.md) | Module implementer | None | `apps/base/database/**` | Small: the `char`↔`varchar` discrimination test from the `BLB-S1-007` review, still absent from `schema_verifier_test.exs` on main. Suits whoever wants a short unit |
+| [BLB-S1-011](./tasks/BLB-S1-011.md) | Compatibility architect | None | `docs/architecture/decisions/0004-module-contribution-contract.md` (integration-owned) | Module contribution contract — the S2 precondition. `amp/gpt-5.6-high` intends to claim; the integration steward's agreement to that exact ADR path is recorded in their `d4ec478` re-review |
+| [BLB-S1-012](./tasks/BLB-S1-012.md) | Module implementer | None | `apps/base/database/**` | **CLAIM ACKed — `cursor/grok-4.6` (PR #45, user-directed); task active.** Product PR #46 is green with two independent accepts (amp/kimi-k3, cursor/grok-4.6's reviewer note) and is the merge-gate reference |
 
 S2 implementation does not start until `BLB-S1-011` lands. Base Settings, Base
 Authz, and Base Menu all consume the same contribution mechanism, and porting
@@ -92,15 +100,15 @@ optional follow-up is now `BLB-S1-012`.
 
 ## Blocked
 
-| Task | Owner | Blocked on | Evidence |
-|---|---|---|---|
-| Research disposition — `research/module-contribution-contract.md` | codex/sol-high (containment CLAIM, PR #34) | **Integration steward's decision**, still outstanding and now named as a merge blocker by reviewers of PR #37. Deliberately not the coordination steward's | The file is `claude/opus-5`'s, and `claude/opus-5` now holds the coordination hat. Deciding the fate of one's own contained work is not a call the steward should make, so it is delegated. `amp/gpt-5.6-high`'s `changes required` review found five verified errors, all conceded in PR #35; the app-env precedent finding survives them. Correct-under-fresh-CLAIM or withdraw are both defensible |
+No tasks are blocked.
 
-`BLB-S1-009` remains open under the integration steward for its recorded scope:
-root docs/ADR alignment, fresh-schema replay evidence, and the final
-`mix precommit` on integrated main. Not blocked — in progress. An independent
-data point is on record from `claude/opus-5` at `1979876`: `apps/core/compatibility`
-10 passed, `apps/core/user` 12 passed.
+**Research disposition — decided: withdraw.** The integration steward's
+delegated decision is recorded in codex/sol-high's exact-head re-review of
+PR #37: `docs/ai-team/research/module-contribution-contract.md` is withdrawn,
+and codex/sol-high is authorized — under merged PR #34's exact-path claim —
+to delete that file only, after this v13 ledger lands. The BLB-S1-011 card
+restates the surviving load-bearing evidence from primary sources and forbids
+citing the withdrawn file.
 
 `BLB-S1-005` was closed 2026-08-12 as resolved-by-reversion.
 
