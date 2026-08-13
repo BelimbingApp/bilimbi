@@ -19,7 +19,11 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
     create_lock_schema!(schema)
     on_exit(fn -> drop_lock_schema!(schema) end)
 
-    scope = on_schema!(schema, fn -> {:ok, scope} = Tenancy.scope(41); scope end)
+    scope =
+      on_schema!(schema, fn ->
+        {:ok, scope} = Tenancy.scope(41)
+        scope
+      end)
     %{schema: schema, scope: scope}
   end
 
@@ -139,7 +143,8 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
 
         on_schema!(schema, fn ->
           Repo.transaction(fn ->
-            %{rows: [[73]]} = SQL.query!(Repo, "SELECT id FROM companies WHERE id = 73 FOR UPDATE", [])
+            %{rows: [[73]]} =
+              SQL.query!(Repo, "SELECT id FROM companies WHERE id = 73 FOR UPDATE", [])
             send(parent, :delete_holder_locked)
             await_message!(:soft_delete_and_commit)
 
@@ -184,7 +189,9 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
 
   defp await_backend_lock_wait!(backend_pid), do: await_backend_lock_wait!(backend_pid, 50)
 
-  defp await_backend_lock_wait!(_backend_pid, 0), do: flunk("contender never waited on a row lock")
+  defp await_backend_lock_wait!(_backend_pid, 0) do
+    flunk("contender never waited on a row lock")
+  end
 
   defp await_backend_lock_wait!(backend_pid, remaining) do
     %{rows: rows} =
@@ -286,5 +293,11 @@ defmodule Bilimbi.Core.Company.LiveLockTest do
     SQL.query!(Repo, "DROP SCHEMA IF EXISTS #{quote_ident(schema)} CASCADE", [])
   end
 
-  defp quote_ident(name) when is_binary(name) and name =~ ~r/^[a-z0-9_]+$/, do: name
+  defp quote_ident(name) when is_binary(name) do
+    if name =~ ~r/^[a-z0-9_]+$/ do
+      name
+    else
+      raise "refusing to interpolate #{inspect(name)} as an identifier"
+    end
+  end
 end
