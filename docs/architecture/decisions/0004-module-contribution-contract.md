@@ -18,8 +18,9 @@ does not fit Bilimbi's physical module graph. At reference commit
 `e70b4d33c0b10790e681f4c2b5095d85a53bc918`, the source inventory contains 22
 `menu.php`, 22 `authz.php`, and 12 `settings.php` files below `app/Base` and
 `app/Core`. Menu discovery needs six topology-specific glob patterns
-(`app/Base/Menu/Services/MenuDiscoveryService.php:26-37`) and executes every
-discovered PHP file (`MenuDiscoveryService.php:86-121`). Authz likewise scans
+(`app/Base/Menu/Services/MenuDiscoveryService.php:26-37`), filters the matched
+paths through `DomainState`, and executes each surviving PHP file
+(`MenuDiscoveryService.php:43-53,86-121`). Authz likewise scans
 topology patterns and requires each file during service registration
 (`app/Base/Authz/ServiceProvider.php:109-170`). Settings discovers and executes
 module manifests eagerly during boot (`app/Base/Settings/ServiceProvider.php:44-102`).
@@ -33,7 +34,7 @@ descriptor graph.
 The files are executable PHP rather than inert manifests. For example, Base
 Database's menu file captures a parent and builds seven items through a local
 function (`app/Base/Database/Config/menu.php:3-70`), while its Settings file
-computes a shared validation rule before returning definitions
+declares and reuses a path validation rule before returning definitions
 (`app/Base/Database/Config/settings.php:3-38`). Bilimbi therefore needs a
 bounded executable seam, not a claim that all source contributions were
 literal data.
@@ -188,9 +189,11 @@ instead of silently rewriting them.
 Bilimbi preserves Belimbing's deliberate absence of a `capabilities` table.
 The in-memory registry is authoritative for known capabilities; persisted role
 and principal grants continue to store string keys directly
-(`docs/architecture/authorization.md:319-382`). Authorization checks for an
-unknown key fail closed, as Belimbing's registry does
-(`app/Base/Authz/Capability/CapabilityRegistry.php:26-50`).
+(`docs/architecture/authorization.md:319-382`). Authorization of an unknown
+capability key fails closed; Belimbing enforces this through
+`KnownCapabilityPolicy` over the registry's known set
+(`app/Base/Authz/Capability/CapabilityRegistry.php:26-50`;
+`docs/architecture/authorization.md:210-215`).
 
 Building the contribution snapshot never writes the database. Reconciliation
 has these exact boundaries:
