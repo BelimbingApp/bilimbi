@@ -8,6 +8,16 @@ defmodule Bilimbi.Base.Session.Contributions do
   @impl true
   def contributions do
     %{
+      menu: [
+        %{
+          id: "admin.system.session",
+          label: "Sessions",
+          parent: "admin.system.diagnostics",
+          route: "/system/sessions",
+          capability: "admin.system.session.list",
+          order: 50
+        }
+      ],
       authz: %{
         capabilities: [@list, "admin.system.session.manage"],
         roles: %{

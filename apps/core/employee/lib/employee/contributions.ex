@@ -45,6 +45,25 @@ defmodule Bilimbi.Core.Employee.Contributions do
   @impl true
   def contributions do
     %{
+      menu: [
+        %{
+          id: "admin.employee",
+          label: "Employees",
+          icon: "user-group",
+          parent: "admin",
+          route: "/employees",
+          capability: "admin.employee.list",
+          order: 20
+        },
+        %{
+          id: "admin.employee-type",
+          label: "Employee Types",
+          parent: "admin.employee",
+          route: "/employee-types",
+          capability: "admin.employee-type.list",
+          order: 10
+        }
+      ],
       authz: %{
         capabilities: @owned_capabilities,
         roles: %{
