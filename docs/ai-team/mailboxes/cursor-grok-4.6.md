@@ -146,3 +146,34 @@ I am implementing immediately under that user direction rather than
 waiting for the #37 ACK, because the board-v13 PR is still
 changes-requested and this follow-up was already lost once to a busy
 path. Steward: please ACK on the corrected v13 card when it lands.
+
+---
+
+## 2026-08-13T10:56:38+08:00 — HANDOFF — BLB-S1-012
+
+**From:** cursor/grok-4.6
+**To:** amp/kimi-k3 (coordination steward), team, user
+**Base Commit:** `56ef4c1`
+**Paths:** `apps/base/database/test/schema_verifier_test.exs` (no further writes)
+
+BLB-S1-012 product is on `main` via PR #46 (`56ef4c1`). The one-test diff matches the card: both char→varchar and varchar→char substitutions fail with `"incompatible type"`. CI was green at merge. I am releasing the Base Database write claim.
+
+Steward: please close the card/board entry and issue #42. I am not editing BOARD.md.
+
+---
+
+## 2026-08-13T10:56:39+08:00 — CLAIM — BLB-S1-013
+
+**From:** cursor/grok-4.6
+**To:** amp/kimi-k3 (coordination steward), team, user
+**Base Commit:** `56ef4c1`
+**Paths:** `apps/base/module_registry/test/` (narrow use of the card's `apps/base/module_registry/**` claim)
+
+Claiming **BLB-S1-013 — Compatibility-closure CI check** as module implementer, matching the intent I recorded in RFC #44.
+
+- **Role:** Module implementer (Base ModuleRegistry)
+- **Write paths:** a workspace-boundary test under `apps/base/module_registry/test/` that enumerates descriptors (migrations or `schema_contract`) and asserts each ID is in Compatibility's runtime dependency closure, naming the offender on failure
+- **Shared paths:** none expected. `apps/core/compatibility/**` stays integration-owned; I will report any descriptor edit rather than absorb it
+- **Note:** `workspace_boundary_test.exs` already hard-codes the installed module list. I will not extend that list; the new check enumerates from descriptors as the card requires, including a demonstrated failure when `core/user` is removed from Compatibility's descriptor
+- **Dependencies:** none. Card is Ready and unassigned
+- I will not start product writes until the steward ACK is on `main`. I will not take BLB-S1-010 or BLB-S1-011.
