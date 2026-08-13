@@ -175,18 +175,19 @@ by the steward directive.
 ### 4. Base UI package — the compile seam
 
 Every shipped LiveView renders `<Layouts.app>`, `<.input>`, `<.button>`,
-`<.header>`, and mounts via `UserAuth` `on_mount` hooks. Those are
-**compile-time** dependencies: a LiveView in `bilimbi_core_employee` calling
-`Layouts.app/1` cannot compile unless it can see that module's beam code.
+`<.header>`. Those are **compile-time** dependencies: a LiveView in
+`bilimbi_core_employee` calling `Layouts.app/1` cannot compile unless it can
+see that module's beam code.
 
 A module cannot depend on the `:web` OTP application — that is the reverse
-dependency §4 forbids. Placing `Layouts`, `CoreComponents`, and `UserAuth` in
-the host creates an impossible compile seam: the migration plan's step 4
-(relocate LiveViews) fails on the first file because `use BilimbiWeb,
-:live_view` and `<Layouts.app>` do not resolve.
+dependency §4 forbids. Placing `Layouts` and `CoreComponents` in the host
+creates an impossible compile seam: the migration plan's step 6 (relocate
+LiveViews) fails on the first file because `use BilimbiWeb, :live_view` and
+`<Layouts.app>` do not resolve.
 
 The solution is a **Base-layer UI package** (`base/ui`) that owns the shared
-presentation contracts every UI-bearing module needs:
+presentation contracts every UI-bearing module needs — **and only those
+contracts**:
 
 ```text
 apps/base/ui/
@@ -198,17 +199,25 @@ apps/base/ui/
 │       ├── components.ex           # CoreComponents (<.input>, <.button>, etc.)
 │       ├── layouts.ex              # Layouts (<Layouts.app>)
 │       ├── live_view.ex            # __using__ macro replacing use BilimbiWeb, :live_view
-│       └── auth_hooks.ex           # on_mount hooks (require_authenticated, require_capability)
+│       └── route_contract.ex       # RouteContract (@behaviour Phoenix.VerifiedRoutes)
 ├── test/
 └── docs/
 ```
 
 `base/ui` is a Base-layer module. UI-bearing modules (Core, Domain,
-Extension) depend on it through the same descriptor graph as any other Base
-dependency. The dependency direction stays legal: Base → Core → Domain →
-Extension. `base/ui` itself depends on `phoenix_live_view`, `phoenix`, and
-`phoenix_html` as Hex packages, and on `base/tenancy` (for `Scope` used in
-auth hooks) and `base/authz` (for `Authz.can/2` in capability hooks).
+Extension, and Base modules with UI) depend on it through the same descriptor
+graph as any other Base dependency. The dependency direction stays legal:
+Base → Core → Domain → Extension.
+
+**`base/ui` is deliberately dependency-light.** It depends only on
+`phoenix_live_view`, `phoenix`, and `phoenix_html` as Hex packages, and on
+`base/module_registry` (for the route manifest path). It does **not** depend
+on `base/tenancy`, `base/authz`, or any other Base business module. This is
+essential: if `base/ui` depended on `base/authz`, then a future Authz
+administration screen — which needs `base/ui` for components — would create
+`base/authz → base/ui → base/authz`, a cycle the descriptor graph rejects.
+The same applies to Settings and Tenancy screens. Keeping `base/ui`
+dependency-light ensures any Base module can have a UI without a cycle.
 
 `Bilimbi.Base.UI` is a deliberate cross-cutting public name, the same class
 of documented exception as `Bilimbi.Base.Repo` (ADR 0003). Its physical
@@ -226,13 +235,29 @@ endpoint (for socket configuration) get it through the standard Phoenix
 compile-time mechanism — the endpoint module is injected at compile time and
 does not require a runtime `:web` dependency.
 
-`UserAuth`'s `on_mount` hooks (`require_authenticated`,
-`require_capability`, `redirect_if_authenticated`) move to
-`Bilimbi.Base.UI.AuthHooks`. The host router's `fetch_current_scope` plug
-stays in `apps/web` (it is request-level, not LiveView-level), but the
-on_mount hooks that LiveViews use are in the Base UI package. The capability
-string and live_session name are data the host macro interprets; the hooks
-themselves are shared Base code.
+#### Authentication and authorization hooks stay in the host
+
+The `on_mount` hooks (`require_authenticated`, `require_capability`,
+`redirect_if_authenticated`) and `fetch_current_scope` plug stay in
+`apps/web` as `BilimbiWeb.UserAuth`. They are **not** moved to `base/ui`
+because:
+
+1. **Dependency cycle.** `UserAuth`'s live scope rehydration calls Base
+   Session, Tenancy, Authz **and Core Company and User**
+   (`user_auth.ex:350-404`). A Base package cannot own that without depending
+   on Core, which is an upward dependency violation. And if `base/ui`
+   depended on `base/authz` or `base/tenancy` for the hooks, any Base module
+   with a UI (Authz settings, Tenancy admin) would cycle back through
+   `base/ui`.
+
+2. **No compile-time coupling.** Module LiveViews do not need to compile
+   against the auth hooks. The host router attaches `on_mount` hooks from
+   route data — each route's capability string and live session name are
+   data the host macro interprets, selecting the appropriate hook from
+   `BilimbiWeb.UserAuth`. The LiveView module itself only needs `base/ui`
+   for components and `~p` verification; the hooks run in the LiveView
+   process but are loaded by the host router's `live_session` declaration,
+   not by the LiveView's `use` macro.
 
 ### 5. What stays in the host
 
@@ -243,8 +268,11 @@ owns only the **host shell**:
 - `BilimbiWeb.Router` — router shell with pipelines, login routes, and the
   discovered-route expansion macro
 - `BilimbiWeb.UserAuth` — request-level plugs (`fetch_current_scope`,
-  `require_authenticated`, `redirect_if_authenticated`) and login/logout
-  lifecycle. LiveView `on_mount` hooks move to `Bilimbi.Base.UI.AuthHooks`.
+  `require_authenticated`, `redirect_if_authenticated`), login/logout
+  lifecycle, **and LiveView `on_mount` hooks**. The hooks stay in the host
+  because their live scope rehydration depends on Core Company and User
+  (see §4). The host router attaches the hooks from route data; module
+  LiveViews do not compile against `UserAuth`.
 - `assets/` — Tailwind CSS, JS hooks, esbuild pipeline, vendor code
 - `config/` entries for the endpoint, pubsub, and asset pipeline
 
@@ -541,8 +569,9 @@ This ADR records the decision. The migration is separate work, sequenced as:
    in Base ModuleRegistry. The value is `nil` or a path to a route data file.
    All existing descriptors gain `web: nil`.
 2. **Base UI package** — create `apps/base/ui/` with `Layouts`,
-   `CoreComponents`, the `__using__` macro, and `AuthHooks` moved from
-   `apps/web`. Add `base/ui` to the Base container and descriptor graph.
+   `CoreComponents`, the `__using__` macro, and `RouteContract` moved from
+   `apps/web`. Auth hooks stay in `BilimbiWeb.UserAuth` (host). Add `base/ui`
+   to the Base container and descriptor graph.
 3. **Route manifest + RouteContract** — extend `:bilimbi_graph` to read route
    data files and write a consolidated route manifest. Implement
    `Bilimbi.Base.UI.RouteContract` (`@behaviour Phoenix.VerifiedRoutes`) in
