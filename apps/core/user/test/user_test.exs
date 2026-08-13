@@ -49,6 +49,47 @@ defmodule Bilimbi.Core.UserTest do
     end
   end
 
+  describe "list_users/1" do
+    test "returns tenant users across companies ordered by id", %{
+      scope_a: scope_a,
+      scope_b: scope_b
+    } do
+      CompanyFixtures.insert_company!(%{id: 75, tenant_id: 41, code: "a2"})
+      insert_user!(%{id: 91, company_id: 73, email: "a1@example.com"})
+      insert_user!(%{id: 94, company_id: 75, email: "a2@example.com"})
+      insert_user!(%{id: 92, company_id: 74, email: "b@example.com"})
+
+      assert {:ok, [%Summary{id: 91}, %Summary{id: 94}]} = User.list_users(scope_a)
+      assert {:ok, [%Summary{id: 92}]} = User.list_users(scope_b)
+    end
+
+    test "includes users whose company is soft-deleted", %{scope_a: scope_a} do
+      CompanyFixtures.insert_company!(%{
+        id: 76,
+        tenant_id: 41,
+        code: "soft_deleted",
+        deleted_at: ~N[2026-08-11 12:00:00]
+      })
+
+      insert_user!(%{id: 95, company_id: 76, email: "soft@example.com"})
+      insert_user!(%{id: 91, company_id: 73, email: "live@example.com"})
+
+      assert {:ok, users} = User.list_users(scope_a)
+      assert Enum.map(users, & &1.id) == [91, 95]
+
+      # Would fail under option (b): soft-deleted companies excluded from listing.
+      assert Enum.any?(users, &(&1.id == 95))
+    end
+
+    test "excludes users with no company and users in another tenant", %{scope_a: scope_a} do
+      insert_user!(%{id: 91, company_id: 73, email: "a@example.com"})
+      insert_user!(%{id: 93, company_id: nil, email: "orphan@example.com"})
+      insert_user!(%{id: 92, company_id: 74, email: "b@example.com"})
+
+      assert {:ok, [%Summary{id: 91}]} = User.list_users(scope_a)
+    end
+  end
+
   describe "credentials" do
     test "stores a supplied bcrypt hash unchanged", %{scope_a: scope_a} do
       assert {:ok, %Summary{id: id}} = User.create_user(scope_a, 73, valid_attributes())

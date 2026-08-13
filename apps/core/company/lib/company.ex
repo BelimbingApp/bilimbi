@@ -36,6 +36,45 @@ defmodule Bilimbi.Core.Company do
     end
   end
 
+  @doc """
+  Lists live companies in the scope's tenant, ordered by id.
+
+  Soft-deleted rows are excluded, matching `get_company/2`.
+  """
+  @spec list_companies(Scope.t()) :: {:ok, [Summary.t()]}
+  def list_companies(%Scope{} = scope) do
+    companies =
+      from(company in Tenancy.scope_query(Schema, scope),
+        where: is_nil(company.deleted_at),
+        order_by: company.id
+      )
+      |> Repo.all()
+      |> Enum.map(&Summary.from_schema/1)
+
+    {:ok, companies}
+  end
+
+  @doc """
+  Returns company ids owned by the scope's tenant, including soft-deleted rows.
+
+  Belimbing's tenant-wide user list joins `companies` with a raw SQL left join,
+  so Company's SoftDeletes scope never applies and users whose company is
+  soft-deleted remain visible. Core User must not query `companies`; this
+  Company-owned id list is the seam that preserves that visibility without
+  leaking a queryable across the module boundary.
+  """
+  @spec list_tenant_company_ids(Scope.t()) :: {:ok, [pos_integer()]}
+  def list_tenant_company_ids(%Scope{} = scope) do
+    ids =
+      from(company in Tenancy.scope_query(Schema, scope),
+        order_by: company.id,
+        select: company.id
+      )
+      |> Repo.all()
+
+    {:ok, ids}
+  end
+
   @spec platform_operator_company() :: {:ok, Summary.t()} | {:error, lookup_error()}
   def platform_operator_company do
     {:ok, PrimaryCompanyManager.platform_operator_company!()}
