@@ -17,6 +17,10 @@ defmodule BilimbiWeb.ConnCase do
 
   use ExUnit.CaseTemplate
 
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Session
+  alias Bilimbi.Base.Tenancy
+
   using do
     quote do
       # The default endpoint for testing
@@ -39,29 +43,77 @@ defmodule BilimbiWeb.ConnCase do
 
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(owner) end)
 
+    create_session_and_authz_tables!()
+
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 
+  # Fixture modules are loaded from test_helper.exs after this file compiles.
+  # Concatenate from strings so `alias Bilimbi.Base.Session` does not nest.
+  defp create_session_and_authz_tables! do
+    apply(Module.concat(["Bilimbi.Base.Session.TestFixtures"]), :create_sessions_table!, [])
+    apply(Module.concat(["Bilimbi.Base.Authz.TestFixtures"]), :create_authz_tables!, [])
+  end
+
   @doc """
-  A session map as `BilimbiWeb.UserAuth.session_user/1` produces it: the
-  user summary fields plus the tenant resolved at the login edge.
+  Stable IDs as `BilimbiWeb.UserAuth.session_user/1` produces them for the
+  login token. Display fields are not part of the cookie.
   """
   def session_user(overrides \\ %{}) do
     Map.merge(
       %{
         "user_id" => 91,
-        "name" => "Ada Lovelace",
-        "email" => "ada@example.com",
-        "company_id" => 73,
-        "company_name" => "Bilimbi Development",
-        "tenant_id" => 41
+        "company_id" => 73
       },
       overrides
     )
   end
 
-  @doc "Puts a signed-in session on the connection."
+  @doc """
+  Puts a signed-in Phoenix cookie backed by a durable Base Session row.
+
+  The cookie carries only `session_id`, `user_id`, and `company_id`. The
+  matching user must already exist so request rehydration can succeed.
+  """
   def log_in_as(conn, session_user \\ session_user()) do
-    Phoenix.ConnTest.init_test_session(conn, %{"current_user" => session_user})
+    user_id = Map.fetch!(session_user, "user_id")
+    company_id = Map.fetch!(session_user, "company_id")
+    session_id = Map.get(session_user, "session_id") || generate_session_id()
+
+    {:ok, _entry} =
+      Session.put_session(session_id, "{}", %{
+        user_id: user_id,
+        last_activity: System.system_time(:second)
+      })
+
+    Phoenix.ConnTest.init_test_session(conn, %{
+      "current_user" => %{
+        "session_id" => session_id,
+        "user_id" => user_id,
+        "company_id" => company_id
+      }
+    })
+  end
+
+  @doc """
+  Grants direct Authz capabilities to the signed-in test user against their
+  live company. Uses the real contribution registry, not the Authz test snapshot.
+  """
+  def grant_capabilities!(capabilities, opts \\ []) do
+    tenant_id = Keyword.get(opts, :tenant_id, 41)
+    company_id = Keyword.get(opts, :company_id, 73)
+    user_id = Keyword.get(opts, :user_id, 91)
+    {:ok, scope} = Tenancy.scope(tenant_id)
+
+    Enum.each(List.wrap(capabilities), fn capability ->
+      {:ok, :stored} =
+        Authz.put_principal_capability(scope, company_id, :user, user_id, capability, true)
+    end)
+
+    :ok
+  end
+
+  defp generate_session_id do
+    :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
   end
 end

@@ -164,6 +164,7 @@ defmodule BilimbiWeb.LoginLiveTest do
   test "redirects a signed-in visitor to the dashboard", %{conn: conn} do
     Company.TestFixtures.insert_tenant!(%{id: 41})
     Company.TestFixtures.insert_company!(%{id: 73, tenant_id: 41})
+    Bilimbi.Core.User.TestFixtures.insert_user!(%{id: 91, company_id: 73})
 
     conn = log_in_as(conn)
 
