@@ -100,7 +100,8 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
       id: "core/geonames",
       app: :bilimbi_core_geonames,
       facade: "lib/geonames.ex",
-      migrations: "priv/repo/migrations"
+      migrations: "priv/repo/migrations",
+      web: "priv/web_routes.exs"
     },
     %{
       root: Path.join(@core_root, "address"),

@@ -3,6 +3,7 @@ Code.require_file(Path.expand("../../base/session/test/support/test_fixtures.ex"
 Code.require_file(Path.expand("../../base/authz/test/support/test_fixtures.ex", __DIR__))
 Code.require_file(Path.expand("../../core/company/test/support/test_fixtures.ex", __DIR__))
 Code.require_file(Path.expand("../../core/employee/test/support/test_fixtures.ex", __DIR__))
+Code.require_file(Path.expand("../../core/geonames/test/support/test_fixtures.ex", __DIR__))
 Code.require_file(Path.expand("../../core/user/test/support/test_fixtures.ex", __DIR__))
 
 ExUnit.start()
