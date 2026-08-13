@@ -16,6 +16,8 @@ config :web, BilimbiWeb.Endpoint,
 
 config :swoosh, :api_client, false
 config :bilimbi_base_settings, :belimbing_app_key, "base64:#{Base.encode64(<<0::256>>)}"
+config :argon2_elixir, t_cost: 1, m_cost: 8, parallelism: 1
+config :bcrypt_elixir, log_rounds: 4
 config :logger, level: :warning
 config :phoenix, :plug_init_mode, :runtime
 config :phoenix_live_view, enable_expensive_runtime_checks: true
