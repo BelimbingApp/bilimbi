@@ -14,9 +14,18 @@ defmodule Bilimbi.Core.Address do
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Address.Addressable
+  alias Bilimbi.Core.Address.Page
   alias Bilimbi.Core.Address.Schema
   alias Bilimbi.Core.Address.Summary
   alias Bilimbi.Core.Company
+
+  @default_page_size 15
+  @maximum_page_size 100
+  @address_sort_fields %{
+    label: :label,
+    country_iso: :country_iso,
+    verification_status: :verification_status
+  }
 
   @type error_reason ::
           :address_in_use | :address_not_found | :attachment_not_found | :company_not_found
@@ -36,6 +45,27 @@ defmodule Bilimbi.Core.Address do
       |> Enum.map(&Summary.from_schema/1)
 
     {:ok, addresses}
+  end
+
+  @doc "Lists live tenant addresses through a bounded administration page."
+  @spec list_addresses(Scope.t(), keyword()) :: Page.t(Summary.t())
+  def list_addresses(%Scope{} = scope, opts) when is_list(opts) do
+    opts =
+      Keyword.validate!(opts,
+        page: 1,
+        page_size: @default_page_size,
+        search: nil,
+        sort_by: :label,
+        sort_dir: :asc
+      )
+
+    query =
+      Schema
+      |> Tenancy.scope_query(scope)
+      |> where([address], is_nil(address.deleted_at))
+      |> maybe_search_addresses(search!(opts[:search]))
+
+    page_query(query, opts)
   end
 
   @spec get_address(Scope.t(), pos_integer()) ::
@@ -246,6 +276,93 @@ defmodule Bilimbi.Core.Address do
   defp attachment_exists?(address_id) do
     Repo.exists?(from(attachment in Addressable, where: attachment.address_id == ^address_id))
   end
+
+  defp page_query(query, opts) do
+    page = page!(opts[:page])
+    page_size = page_size!(opts[:page_size])
+    sort_field = sort_by!(opts[:sort_by])
+    sort_direction = sort_dir!(opts[:sort_dir])
+    total_entries = Repo.aggregate(query, :count, :id)
+
+    entries =
+      query
+      |> order_by(
+        [address],
+        ^[
+          {sort_direction, sort_field},
+          {:desc, :created_at},
+          {:desc, :id}
+        ]
+      )
+      |> offset(^((page - 1) * page_size))
+      |> limit(^page_size)
+      |> Repo.all()
+      |> Enum.map(&Summary.from_schema/1)
+
+    %Page{
+      entries: entries,
+      page: page,
+      page_size: page_size,
+      total_entries: total_entries,
+      total_pages: total_pages(total_entries, page_size)
+    }
+  end
+
+  defp maybe_search_addresses(query, nil), do: query
+
+  defp maybe_search_addresses(query, search) do
+    pattern = "%#{search}%"
+
+    from(address in query,
+      where:
+        like(address.label, ^pattern) or like(address.line1, ^pattern) or
+          like(address.locality, ^pattern) or like(address.postcode, ^pattern) or
+          like(address.country_iso, ^pattern)
+    )
+  end
+
+  defp search!(nil), do: nil
+
+  defp search!(search) when is_binary(search) do
+    case String.trim(search) do
+      "" -> nil
+      value -> value
+    end
+  end
+
+  defp search!(value),
+    do: raise(ArgumentError, "search must be a string or nil, got: #{inspect(value)}")
+
+  defp sort_by!(value) do
+    case Map.fetch(@address_sort_fields, value) do
+      {:ok, field} ->
+        field
+
+      :error ->
+        raise ArgumentError,
+              "sort_by must be one of #{inspect(Map.keys(@address_sort_fields))}, got: #{inspect(value)}"
+    end
+  end
+
+  defp sort_dir!(value) when value in [:asc, :desc], do: value
+
+  defp sort_dir!(value),
+    do: raise(ArgumentError, "sort_dir must be :asc or :desc, got: #{inspect(value)}")
+
+  defp page!(value) when is_integer(value) and value > 0, do: value
+
+  defp page!(value),
+    do: raise(ArgumentError, "page must be a positive integer, got: #{inspect(value)}")
+
+  defp page_size!(value) when is_integer(value) and value in 1..@maximum_page_size, do: value
+
+  defp page_size!(value) do
+    raise ArgumentError,
+          "page_size must be between 1 and #{@maximum_page_size}, got: #{inspect(value)}"
+  end
+
+  defp total_pages(0, _page_size), do: 0
+  defp total_pages(total_entries, page_size), do: div(total_entries + page_size - 1, page_size)
 
   defp normalize_company_result({:ok, company}), do: {:ok, company}
   defp normalize_company_result({:error, :not_found}), do: {:error, :company_not_found}
