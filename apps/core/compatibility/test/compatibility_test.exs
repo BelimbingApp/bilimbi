@@ -62,6 +62,21 @@ defmodule Bilimbi.Core.CompatibilityTest do
                ).rows
     end
 
+    for table <- ~w(
+          base_authz_roles
+          base_authz_role_capabilities
+          base_authz_principal_roles
+          base_authz_principal_capabilities
+          base_authz_decision_logs
+        ) do
+      assert [[0]] =
+               SQL.query!(
+                 MigrationTestRepo,
+                 "SELECT count(*) FROM \"#{schema}\".\"#{table}\"",
+                 []
+               ).rows
+    end
+
     SQL.query!(
       MigrationTestRepo,
       "SELECT setval(to_regclass($1), 40, true)",

@@ -190,6 +190,8 @@ files stay with their owner:
 
 ```text
 apps/base/tenancy/priv/repo/migrations/
+apps/base/settings/priv/repo/migrations/
+apps/base/authz/priv/repo/migrations/
 apps/core/company/priv/repo/migrations/
 apps/core/geonames/priv/repo/migrations/
 apps/core/address/priv/repo/migrations/
@@ -221,9 +223,16 @@ postcode, and city lookup tables. Core Address preserves the canonical
 non-null `addresses.tenant_id`, named index, restricted tenant foreign key, and
 its two Geonames normalization foreign keys. Fresh installation creates empty
 Geonames tables; reference-data import remains separately owned seeding work.
-When Authz is ported, custom roles require a live owning company; system roles
-are company-less. AI provider configuration lookup requires an owning company
-ID and must not resolve credentials from tenant identity alone.
+Base Authz owns capability vocabulary, roles, direct grants, evaluation, and
+decision logs. Capability definitions come from installed module
+contributions; there is no capabilities table, and unknown keys fail closed.
+Custom roles require a live owning company; system roles are company-less.
+Core Company owns the restricted `base_authz_roles.company_id` foreign key and
+the exact `is_system = (company_id IS NULL)` check. Reconcile configured system
+roles only through the explicit production-seed path, never at application
+boot, and never delete principal grants as part of reconciliation. AI provider
+configuration lookup requires an owning company ID and must not resolve
+credentials from tenant identity alone.
 
 ## 6. Deep-module design
 

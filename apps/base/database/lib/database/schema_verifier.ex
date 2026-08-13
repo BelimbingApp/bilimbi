@@ -41,11 +41,24 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
           optional(:on_update) => :cascade | :nilify_all | :nothing | :restrict
         }
 
+  @type check_spec :: %{
+          required(:expression) => String.t(),
+          optional(:validated) => boolean()
+        }
+
   @type table_spec :: %{
           required(:name) => String.t(),
           required(:columns) => %{required(String.t()) => column_spec()},
           required(:indexes) => %{required(String.t()) => index_spec()},
-          required(:foreign_keys) => %{required(String.t()) => foreign_key_spec()}
+          required(:foreign_keys) => %{required(String.t()) => foreign_key_spec()},
+          optional(:checks) => %{required(String.t()) => check_spec()}
+        }
+
+  @type table_contribution_spec :: %{
+          required(:name) => String.t(),
+          optional(:indexes) => %{required(String.t()) => index_spec()},
+          optional(:foreign_keys) => %{required(String.t()) => foreign_key_spec()},
+          optional(:checks) => %{required(String.t()) => check_spec()}
         }
 
   @spec verify(Ecto.Repo.t(), [table_spec()], keyword()) :: :ok | {:error, [String.t()]}
@@ -56,6 +69,21 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
     errors =
       table_specs
       |> Enum.flat_map(&verify_table(repo, schema, &1))
+      |> Enum.sort()
+
+    if errors == [], do: :ok, else: {:error, errors}
+  end
+
+  @doc "Verifies structural objects contributed to tables owned by another module."
+  @spec verify_contributions(Ecto.Repo.t(), [table_contribution_spec()], keyword()) ::
+          :ok | {:error, [String.t()]}
+  def verify_contributions(repo, contributions, opts \\ []) do
+    schema = Keyword.get(opts, :prefix, "public")
+    validate_identifier!(schema)
+
+    errors =
+      contributions
+      |> Enum.flat_map(&verify_contribution(repo, schema, &1))
       |> Enum.sort()
 
     if errors == [], do: :ok, else: {:error, errors}
@@ -76,11 +104,46 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
       actual_columns ->
         actual_indexes = indexes(repo, schema, spec.name)
         actual_foreign_keys = foreign_keys(repo, schema, spec.name)
+        actual_checks = checks(repo, schema, spec.name)
 
         compare_columns(spec, actual_columns) ++
           compare_indexes(spec, actual_indexes) ++
           compare_foreign_keys(spec, actual_foreign_keys) ++
-          compare_optional_groups(spec, actual_columns, actual_indexes, actual_foreign_keys)
+          compare_checks(spec, actual_checks) ++
+          compare_optional_groups(
+            spec,
+            actual_columns,
+            actual_indexes,
+            actual_foreign_keys,
+            actual_checks
+          )
+    end
+  end
+
+  defp verify_contribution(repo, schema, spec) do
+    case columns(repo, schema, spec.name) do
+      actual_columns when map_size(actual_columns) == 0 ->
+        ["missing table #{schema}.#{spec.name} for structural contribution"]
+
+      _actual_columns ->
+        compare_required_named_objects(
+          spec.name,
+          "index",
+          Map.get(spec, :indexes, %{}),
+          indexes(repo, schema, spec.name)
+        ) ++
+          compare_required_named_objects(
+            spec.name,
+            "foreign key",
+            Map.get(spec, :foreign_keys, %{}),
+            foreign_keys(repo, schema, spec.name)
+          ) ++
+          compare_required_named_objects(
+            spec.name,
+            "check",
+            Map.get(spec, :checks, %{}),
+            checks(repo, schema, spec.name)
+          )
     end
   end
 
@@ -200,6 +263,30 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
     end)
   end
 
+  defp checks(repo, schema, table) do
+    result =
+      SQL.query!(
+        repo,
+        """
+        SELECT constraint_info.conname,
+               constraint_info.convalidated,
+               pg_get_constraintdef(constraint_info.oid, true)
+        FROM pg_constraint AS constraint_info
+        JOIN pg_class AS source_table ON source_table.oid = constraint_info.conrelid
+        JOIN pg_namespace AS namespace ON namespace.oid = source_table.relnamespace
+        WHERE namespace.nspname = $1
+          AND source_table.relname = $2
+          AND constraint_info.contype = 'c'
+        ORDER BY constraint_info.conname
+        """,
+        [schema, table]
+      )
+
+    Map.new(result.rows, fn [name, validated, definition] ->
+      {name, %{validated: validated, expression: normalize_check(definition)}}
+    end)
+  end
+
   defp compare_columns(spec, actual) do
     expected_names = spec.columns |> Map.keys() |> MapSet.new()
     optional = Map.get(spec, :optional_columns, %{})
@@ -261,6 +348,16 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
     )
   end
 
+  defp compare_checks(spec, actual) do
+    compare_named_objects(
+      spec.name,
+      "check",
+      Map.get(spec, :checks, %{}),
+      Map.get(spec, :optional_checks, %{}),
+      actual
+    )
+  end
+
   defp compare_named_objects(table, kind, expected, optional, actual) do
     expected_names = expected |> Map.keys() |> MapSet.new()
     optional_names = optional |> Map.keys() |> MapSet.new()
@@ -291,14 +388,29 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
     missing ++ unexpected ++ mismatched
   end
 
-  defp compare_optional_groups(spec, columns, indexes, foreign_keys) do
+  defp compare_required_named_objects(table, kind, expected, actual) do
+    Enum.flat_map(expected, fn {name, expected_object} ->
+      case Map.fetch(actual, name) do
+        :error ->
+          ["#{table}: missing contributed #{kind} #{name}"]
+
+        {:ok, actual_object} ->
+          if normalize_named_object(kind, expected_object) == actual_object,
+            do: [],
+            else: ["#{table}: incompatible contributed #{kind} #{name}"]
+      end
+    end)
+  end
+
+  defp compare_optional_groups(spec, columns, indexes, foreign_keys, checks) do
     spec
     |> Map.get(:optional_groups, [])
     |> Enum.flat_map(fn group ->
       members =
-        Enum.map(group.columns, &Map.has_key?(columns, &1)) ++
-          Enum.map(group.indexes, &Map.has_key?(indexes, &1)) ++
-          Enum.map(group.foreign_keys, &Map.has_key?(foreign_keys, &1))
+        Enum.map(Map.get(group, :columns, []), &Map.has_key?(columns, &1)) ++
+          Enum.map(Map.get(group, :indexes, []), &Map.has_key?(indexes, &1)) ++
+          Enum.map(Map.get(group, :foreign_keys, []), &Map.has_key?(foreign_keys, &1)) ++
+          Enum.map(Map.get(group, :checks, []), &Map.has_key?(checks, &1))
 
       if Enum.any?(members) and not Enum.all?(members) do
         ["#{spec.name}: incomplete optional contribution #{group.name}"]
@@ -369,6 +481,12 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
   defp normalize_named_object("foreign key", object),
     do: Map.put_new(object, :on_update, :nothing)
 
+  defp normalize_named_object("check", object) do
+    object
+    |> Map.put_new(:validated, true)
+    |> Map.update!(:expression, &normalize_check/1)
+  end
+
   defp normalize_named_object(_kind, object), do: object
 
   defp decode_action("c"), do: :cascade
@@ -382,6 +500,13 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
   defp normalize_predicate(predicate) do
     predicate
     |> String.downcase()
+    |> String.replace(~r/[\s()]+/, "")
+  end
+
+  defp normalize_check(definition) do
+    definition
+    |> String.downcase()
+    |> String.replace_prefix("check", "")
     |> String.replace(~r/[\s()]+/, "")
   end
 

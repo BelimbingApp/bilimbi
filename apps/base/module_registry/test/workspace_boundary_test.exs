@@ -30,6 +30,13 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
       migrations: "priv/repo/migrations"
     },
     %{
+      root: Path.join(@base_root, "authz"),
+      id: "base/authz",
+      app: :bilimbi_base_authz,
+      facade: "lib/authz.ex",
+      migrations: "priv/repo/migrations"
+    },
+    %{
       root: Path.join(@base_root, "tenancy"),
       id: "base/tenancy",
       app: :bilimbi_base_tenancy,

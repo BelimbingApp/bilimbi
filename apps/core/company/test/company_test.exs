@@ -4,6 +4,7 @@ defmodule Bilimbi.Core.CompanyTest do
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
+  alias Bilimbi.Core.Company.AuthzCompanyDirectory
   alias Bilimbi.Core.Company.PrimaryCompanyManager
   alias Bilimbi.Core.Company.SchemaContract
   alias Bilimbi.Core.Company.Summary
@@ -219,6 +220,17 @@ defmodule Bilimbi.Core.CompanyTest do
     } do
       assert {:ok, [73, 75, 76]} = Company.list_tenant_company_ids(owner)
       assert {:ok, [74]} = Company.list_tenant_company_ids(other)
+    end
+
+    test "Authz directory exposes only live companies in the tenant", %{
+      owner: owner,
+      other: other
+    } do
+      assert AuthzCompanyDirectory.company_ids(owner) == [73, 75]
+      assert AuthzCompanyDirectory.company_ids(other) == [74]
+      assert AuthzCompanyDirectory.company_in_scope?(owner, 73)
+      refute AuthzCompanyDirectory.company_in_scope?(owner, 76)
+      refute AuthzCompanyDirectory.company_in_scope?(owner, 74)
     end
   end
 

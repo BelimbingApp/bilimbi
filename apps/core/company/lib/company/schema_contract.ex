@@ -25,6 +25,24 @@ defmodule Bilimbi.Core.Company.SchemaContract do
   end
 
   @impl true
+  def contributions do
+    [
+      %{
+        name: "base_authz_roles",
+        foreign_keys: %{
+          "base_authz_roles_company_foreign" => foreign_key("company_id", "companies", :restrict)
+        },
+        checks: %{
+          "base_authz_roles_custom_company_check" => %{
+            expression: "is_system = (company_id IS NULL)",
+            validated: true
+          }
+        }
+      }
+    ]
+  end
+
+  @impl true
   def verify_invariants(repo, opts) do
     schema = Keyword.get(opts, :prefix, "public")
     prefix = SchemaVerifier.quote_identifier!(schema)

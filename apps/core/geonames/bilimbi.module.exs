@@ -5,8 +5,8 @@
   required: true,
   otp_app: :bilimbi_core_geonames,
   namespace: Bilimbi.Core.Geonames,
-  dependencies: ["base/database"],
+  dependencies: ["base/database", "base/module_registry"],
   migrations: "priv/repo/migrations",
   schema_contract: Bilimbi.Core.Geonames.SchemaContract,
-  contribution_provider: nil
+  contribution_provider: Bilimbi.Core.Geonames.Contributions
 ]

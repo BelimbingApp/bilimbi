@@ -14,7 +14,7 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
     %{schema: schema}
   end
 
-  test "accepts an exact column, index, and foreign-key contract", %{schema: schema} do
+  test "accepts an exact column, index, foreign-key, and check contract", %{schema: schema} do
     assert :ok = SchemaVerifier.verify(Repo, [widget_spec()], prefix: schema)
   end
 
@@ -31,11 +31,13 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
       |> put_in([:columns, "name", :nullable], true)
       |> put_in([:indexes, "widgets_name_unique", :unique], false)
       |> put_in([:foreign_keys, "widgets_parent_foreign", :on_delete], :cascade)
+      |> put_in([:checks, "widgets_enabled_check", :expression], "enabled = true")
 
     assert {:error, errors} = SchemaVerifier.verify(Repo, [drifted], prefix: schema)
     assert "widgets.name: expected nullable=true, got false" in errors
     assert "widgets: incompatible index widgets_name_unique" in errors
     assert "widgets: incompatible foreign key widgets_parent_foreign" in errors
+    assert "widgets: incompatible check widgets_enabled_check" in errors
   end
 
   test "rejects partial optional contributions", %{schema: schema} do
@@ -44,17 +46,44 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
       |> Map.put(:optional_indexes, %{
         "widgets_parent_id_index" => index(["parent_id"])
       })
+      |> Map.put(:optional_checks, %{
+        "widgets_optional_check" => check("parent_id IS NOT NULL")
+      })
       |> Map.put(:optional_groups, [
         %{
           name: "parent lookup",
           columns: [],
           indexes: ["widgets_parent_id_index"],
-          foreign_keys: ["widgets_parent_foreign"]
+          foreign_keys: ["widgets_parent_foreign"],
+          checks: ["widgets_optional_check"]
         }
       ])
 
     assert {:error, errors} = SchemaVerifier.verify(Repo, [spec], prefix: schema)
     assert "widgets: incomplete optional contribution parent lookup" in errors
+  end
+
+  test "verifies required cross-module structural contributions", %{schema: schema} do
+    contribution = %{
+      name: "widgets",
+      foreign_keys: %{
+        "widgets_parent_foreign" => %{
+          columns: ["parent_id"],
+          references: {"parents", ["id"]},
+          on_delete: :restrict
+        }
+      },
+      checks: %{"widgets_enabled_check" => check("enabled = false")}
+    }
+
+    assert :ok = SchemaVerifier.verify_contributions(Repo, [contribution], prefix: schema)
+
+    drifted = put_in(contribution, [:checks, "widgets_enabled_check", :expression], "enabled")
+
+    assert {:error, errors} =
+             SchemaVerifier.verify_contributions(Repo, [drifted], prefix: schema)
+
+    assert "widgets: incompatible contributed check widgets_enabled_check" in errors
   end
 
   test "verifies foreign-key update actions", %{schema: schema} do
@@ -123,6 +152,7 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
         parent_id bigint,
         name varchar(20) NOT NULL DEFAULT 'ready',
         enabled boolean NOT NULL DEFAULT false,
+        CONSTRAINT widgets_enabled_check CHECK (enabled = false),
         CONSTRAINT widgets_parent_foreign
           FOREIGN KEY (parent_id)
           REFERENCES "#{schema}".parents (id)
@@ -175,7 +205,8 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
           references: {"parents", ["id"]},
           on_delete: :restrict
         }
-      }
+      },
+      checks: %{"widgets_enabled_check" => check("enabled = false")}
     }
   end
 
@@ -202,4 +233,6 @@ defmodule Bilimbi.Base.Database.SchemaVerifierTest do
   defp index(columns, unique \\ false) do
     %{columns: columns, unique: unique, where: nil}
   end
+
+  defp check(expression), do: %{expression: expression, validated: true}
 end

@@ -34,10 +34,10 @@ Bilimbi is in its foundation phase. The repository uses a Mix umbrella rooted
 at the repository. Base, Core, and Web are its top-level composition
 applications; each declared deep module below Base or Core is a self-contained
 local Mix package discovered from its descriptor. The current foundation owns
-Ecto migrations that can create the compatible Base Tenancy, Core Company,
-Core Geonames, Core Address, Core Employee, and Core User schema, or verify and
-adopt an existing Belimbing database. Optional Domains and deployment-owned
-Extensions are intentionally not implemented yet.
+Ecto migrations that can create the compatible Base Tenancy, Settings, and
+Authz plus Core Company, Geonames, Address, Employee, and User schema, or
+verify and adopt an existing Belimbing database. Optional Domains and
+deployment-owned Extensions are intentionally not implemented yet.
 
 The first major compatibility target is the existing Belimbing PostgreSQL
 schema. Bilimbi should map that schema accurately instead of creating a second,
@@ -120,7 +120,9 @@ apps/
 │   ├── bilimbi.container.exs     # Declares the Base layer
 │   ├── database/                 # base/database module package
 │   ├── module_registry/          # Runtime installed-module registry
-│   └── tenancy/                  # base/tenancy module package
+│   ├── settings/                 # Immutable definitions and scoped values
+│   ├── tenancy/                  # base/tenancy module package
+│   └── authz/                    # Capability, role, grant, and decision engine
 ├── core/                         # Mandatory composition application
 │   ├── bilimbi.container.exs     # Declares the Core layer
 │   ├── company/                  # core/company module package
@@ -135,8 +137,8 @@ apps/
 The complete physical boundary of Base Tenancy is `apps/base/tenancy/`, not a
 directory below its `lib/`. Consequently its source begins at
 `apps/base/tenancy/lib/tenancy.ex` while the Elixir namespace remains
-`Bilimbi.Base.Tenancy`. The same rule applies to Company, Geonames, Address,
-Employee, User, and every future declared module.
+`Bilimbi.Base.Tenancy`. The same rule applies to Settings, Authz, Company,
+Geonames, Address, Employee, User, and every future declared module.
 
 A composition container never lists child packages by name. Every immediate
 child directory containing `bilimbi.module.exs` is an installed module; the
@@ -208,6 +210,8 @@ only historical migration input in Belimbing, never a Bilimbi runtime role.
 
 Bilimbi-owned migrations live inside their owning module, currently
 `apps/base/tenancy/priv/repo/migrations`,
+`apps/base/settings/priv/repo/migrations`,
+`apps/base/authz/priv/repo/migrations`,
 `apps/core/company/priv/repo/migrations`,
 `apps/core/geonames/priv/repo/migrations`,
 `apps/core/address/priv/repo/migrations`,
@@ -236,6 +240,13 @@ Company's external-access user contribution. Both modules own their baselines,
 contracts, and tenant/company-scoped APIs while Compatibility only coordinates
 their descriptor-declared contributions.
 
+Base Authz keeps capability definitions in immutable module contributions and
+assignments in the five compatible `base_authz_*` tables. Unknown capability
+keys fail closed. System-role reconciliation is an explicit production-seed
+operation and never deletes principal grants. Core Company owns the later
+restricted company foreign key and exact system/custom-role ownership check,
+so Base does not depend upward on Core.
+
 ## Documentation
 
 | Topic | Link |
@@ -245,6 +256,7 @@ their descriptor-declared contributions.
 | Original Mix umbrella topology | [ADR 0001](./docs/architecture/decisions/0001-mix-umbrella-topology.md) |
 | Compatible schema baselines | [ADR 0002](./docs/architecture/decisions/0002-compatible-schema-baselines.md) |
 | Physical deep-module packages | [ADR 0003](./docs/architecture/decisions/0003-physical-deep-module-packages.md) |
+| Module contribution contract | [ADR 0004](./docs/architecture/decisions/0004-module-contribution-contract.md) |
 | Source Belimbing project | [BelimbingApp/belimbing](https://github.com/BelimbingApp/belimbing) |
 | Phoenix documentation | [phoenix.hexdocs.pm](https://phoenix.hexdocs.pm/) |
 | Elixir documentation | [hexdocs.pm/elixir](https://hexdocs.pm/elixir/) |
