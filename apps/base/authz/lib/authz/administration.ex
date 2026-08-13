@@ -51,6 +51,7 @@ defmodule Bilimbi.Base.Authz.Administration do
       )
 
     company_ids = company_ids(scope, registry)
+    visibility = company_visibility(scope, company_ids)
 
     query =
       company_ids
@@ -61,7 +62,7 @@ defmodule Bilimbi.Base.Authz.Administration do
       query,
       order_query(query, sort_by!(opts[:sort_by], @role_sort_fields), opts, @role_sort_fields),
       opts,
-      &role_summaries(&1, company_ids)
+      &role_summaries(&1, visibility)
     )
   end
 
@@ -75,10 +76,10 @@ defmodule Bilimbi.Base.Authz.Administration do
         sort_dir: :desc
       )
 
+    visibility = company_visibility(scope, company_ids(scope, registry))
+
     query =
-      from(log in DecisionLog,
-        where: log.company_id in ^company_ids(scope, registry)
-      )
+      from(log in DecisionLog, where: ^visibility)
       |> maybe_search_decision_logs(search!(opts[:search]))
       |> maybe_filter_allowed(allowed!(opts[:allowed]))
 
@@ -106,10 +107,10 @@ defmodule Bilimbi.Base.Authz.Administration do
         sort_dir: :desc
       )
 
+    visibility = company_visibility(scope, company_ids(scope, registry))
+
     query =
-      from(grant in PrincipalCapability,
-        where: grant.company_id in ^company_ids(scope, registry)
-      )
+      from(grant in PrincipalCapability, where: ^visibility)
       |> maybe_search_principal_capabilities(search!(opts[:search]))
       |> maybe_filter_principal_allowed(allowed!(opts[:allowed]))
 
@@ -159,10 +160,10 @@ defmodule Bilimbi.Base.Authz.Administration do
     )
   end
 
-  defp role_summaries(roles, company_ids) do
+  defp role_summaries(roles, visibility) do
     ids = Enum.map(roles, & &1.id)
     capability_counts = counts_by(RoleCapability, :role_id, ids)
-    principal_counts = principal_counts_by_role(ids, company_ids)
+    principal_counts = principal_counts_by_role(ids, visibility)
 
     Enum.map(roles, fn role ->
       RoleSummary.from_schema(
@@ -184,12 +185,12 @@ defmodule Bilimbi.Base.Authz.Administration do
     |> Map.new()
   end
 
-  defp principal_counts_by_role([], _company_ids), do: %{}
+  defp principal_counts_by_role([], _visibility), do: %{}
 
-  defp principal_counts_by_role(role_ids, company_ids) do
+  defp principal_counts_by_role(role_ids, visibility) do
     PrincipalRole
     |> where([assignment], assignment.role_id in ^role_ids)
-    |> where([assignment], assignment.company_id in ^company_ids)
+    |> where(^visibility)
     |> group_by([assignment], assignment.role_id)
     |> select([assignment], {assignment.role_id, count(assignment.id)})
     |> Repo.all()
@@ -298,6 +299,14 @@ defmodule Bilimbi.Base.Authz.Administration do
   defp total_pages(total_entries, page_size), do: div(total_entries + page_size - 1, page_size)
 
   defp company_ids(%Scope{} = scope, registry), do: directory!(registry).company_ids(scope)
+
+  defp company_visibility(%Scope{} = scope, company_ids) do
+    if Scope.platform_operator?(scope) do
+      dynamic([row], row.company_id in ^company_ids or is_nil(row.company_id))
+    else
+      dynamic([row], row.company_id in ^company_ids)
+    end
+  end
 
   defp directory!(%{company_directory: nil}) do
     raise ArgumentError, "no installed module contributes the Authz company directory"

@@ -34,6 +34,8 @@ defmodule Bilimbi.Base.Authz.RoleService do
         {:error, :not_found}
 
       %Role{} = role ->
+        visibility = company_visibility(scope, registry)
+
         capabilities =
           from(grant in RoleCapability,
             where: grant.role_id == ^role.id,
@@ -45,7 +47,7 @@ defmodule Bilimbi.Base.Authz.RoleService do
         principal_roles =
           from(assignment in PrincipalRole,
             where: assignment.role_id == ^role.id,
-            where: assignment.company_id in ^directory!(registry).company_ids(scope),
+            where: ^visibility,
             order_by: [
               asc: assignment.principal_type,
               asc: assignment.principal_id,
@@ -216,14 +218,14 @@ defmodule Bilimbi.Base.Authz.RoleService do
       when is_integer(role_id) and role_id > 0 and is_integer(assignment_id) and
              assignment_id > 0 do
     if eligible_role(scope, role_id, registry) do
-      company_ids = directory!(registry).company_ids(scope)
+      visibility = company_visibility(scope, registry)
 
       {count, _rows} =
         Repo.delete_all(
           from(assignment in PrincipalRole,
             where: assignment.id == ^assignment_id,
             where: assignment.role_id == ^role_id,
-            where: assignment.company_id in ^company_ids
+            where: ^visibility
           )
         )
 
@@ -287,40 +289,21 @@ defmodule Bilimbi.Base.Authz.RoleService do
   @spec remove_principal_capability(
           Scope.t(),
           pos_integer(),
-          :user | :agent,
-          pos_integer(),
-          String.t(),
           map()
-        ) :: {:ok, :removed | :not_found} | {:error, :company_not_found}
-  def remove_principal_capability(
-        %Scope{} = scope,
-        company_id,
-        principal_type,
-        principal_id,
-        capability,
-        registry
-      )
-      when is_binary(capability) do
-    validate_principal!(principal_type, principal_id)
+        ) :: {:ok, :removed | :not_found}
+  def remove_principal_capability(%Scope{} = scope, grant_id, registry)
+      when is_integer(grant_id) and grant_id > 0 do
+    visibility = company_visibility(scope, registry)
 
-    if directory!(registry).company_in_scope?(scope, company_id) do
-      capability = normalize_capability!(capability)
-      principal_type = Atom.to_string(principal_type)
-
-      {count, _rows} =
-        Repo.delete_all(
-          from(grant in PrincipalCapability,
-            where: grant.company_id == ^company_id,
-            where: grant.principal_type == ^principal_type,
-            where: grant.principal_id == ^principal_id,
-            where: grant.capability_key == ^capability
-          )
+    {count, _rows} =
+      Repo.delete_all(
+        from(grant in PrincipalCapability,
+          where: grant.id == ^grant_id,
+          where: ^visibility
         )
+      )
 
-      {:ok, if(count == 1, do: :removed, else: :not_found)}
-    else
-      {:error, :company_not_found}
-    end
+    {:ok, if(count == 1, do: :removed, else: :not_found)}
   end
 
   defp eligible_role(scope, role_id, registry) do
@@ -381,10 +364,13 @@ defmodule Bilimbi.Base.Authz.RoleService do
       else: :ok
   end
 
-  defp normalize_capability!(capability) do
-    case capability |> String.trim() |> String.downcase() do
-      "" -> raise ArgumentError, "capability must not be blank"
-      normalized -> normalized
+  defp company_visibility(%Scope{} = scope, registry) do
+    company_ids = directory!(registry).company_ids(scope)
+
+    if Scope.platform_operator?(scope) do
+      dynamic([row], row.company_id in ^company_ids or is_nil(row.company_id))
+    else
+      dynamic([row], row.company_id in ^company_ids)
     end
   end
 
