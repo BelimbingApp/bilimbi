@@ -4,6 +4,7 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.DecisionLog
   alias Bilimbi.Base.Authz.Page
+  alias Bilimbi.Base.Authz.PrincipalCapability
   alias Bilimbi.Base.Authz.PrincipalCapabilitySummary
   alias Bilimbi.Base.Authz.PrincipalRole
   alias Bilimbi.Base.Authz.Role
@@ -11,6 +12,8 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   alias Bilimbi.Base.Authz.RoleSummary
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy.Identity
+  alias Bilimbi.Base.Tenancy.Scope
 
   import Bilimbi.Base.Authz.TestFixtures
 
@@ -122,7 +125,9 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
              )
 
     assert %Page{
-             entries: [%PrincipalCapabilitySummary{allowed: false, principal_type: "user"}],
+             entries: [
+               denied_grant = %PrincipalCapabilitySummary{allowed: false, principal_type: "user"}
+             ],
              total_entries: 1,
              total_pages: 1
            } =
@@ -136,22 +141,10 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert Authz.can(actor, "admin.test.record.view").reason == :denied_explicitly
 
     assert {:ok, :removed} =
-             Authz.remove_principal_capability(
-               tenant_scope,
-               10,
-               :user,
-               7,
-               "ADMIN.TEST.RECORD.VIEW"
-             )
+             Authz.remove_principal_capability(tenant_scope, denied_grant.id)
 
     assert {:ok, :not_found} =
-             Authz.remove_principal_capability(
-               tenant_scope,
-               10,
-               :user,
-               7,
-               "admin.test.record.view"
-             )
+             Authz.remove_principal_capability(tenant_scope, denied_grant.id)
 
     refute Authz.can(actor, "admin.test.record.view").allowed
     refute Authz.can(actor, "admin.test.record.view").reason == :denied_explicitly
@@ -159,14 +152,112 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert %Page{total_entries: 0, entries: []} =
              Authz.list_principal_capabilities(scope(2))
 
-    assert {:error, :company_not_found} =
-             Authz.remove_principal_capability(
-               tenant_scope,
-               99,
-               :user,
-               7,
-               "admin.test.record.view"
-             )
+    assert %Page{entries: [other_grant]} =
+             Authz.list_principal_capabilities(tenant_scope, allowed: true)
+
+    assert {:ok, :not_found} =
+             Authz.remove_principal_capability(scope(2), other_grant.id)
+
+    stale_grant =
+      Repo.insert!(%PrincipalCapability{
+        company_id: 10,
+        principal_type: "user",
+        principal_id: 9,
+        capability_key: "retired.capability",
+        is_allowed: true
+      })
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(tenant_scope, stale_grant.id)
+  end
+
+  test "only platform operators can inspect and remove effective global rows" do
+    tenant_scope = scope()
+    platform_scope = platform_operator_scope()
+    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+    assert {:ok, _result} = Authz.reconcile_system_roles()
+    system_role = Repo.one!(from(item in Role, where: item.is_system, limit: 1))
+
+    global_deny =
+      Repo.insert!(%PrincipalCapability{
+        company_id: nil,
+        principal_type: "user",
+        principal_id: 70,
+        capability_key: "admin.test.record.view",
+        is_allowed: false,
+        created_at: now,
+        updated_at: now
+      })
+
+    global_allow =
+      Repo.insert!(%PrincipalCapability{
+        company_id: nil,
+        principal_type: "user",
+        principal_id: 71,
+        capability_key: "admin.test.record.view",
+        is_allowed: true,
+        created_at: now,
+        updated_at: now
+      })
+
+    global_assignment =
+      Repo.insert!(%PrincipalRole{
+        company_id: nil,
+        principal_type: "user",
+        principal_id: 72,
+        role_id: system_role.id,
+        created_at: now,
+        updated_at: now
+      })
+
+    assert Authz.can(Authz.actor(:user, 70, tenant_scope, 10), "admin.test.record.view").reason ==
+             :denied_explicitly
+
+    assert Authz.can(Authz.actor(:user, 71, tenant_scope, 10), "admin.test.record.view").allowed
+    assert Authz.can(Authz.actor(:user, 72, tenant_scope, 10), "admin.test.record.view").allowed
+
+    assert %Page{entries: [], total_entries: 0} =
+             Authz.list_principal_capabilities(tenant_scope)
+
+    assert %Page{entries: operator_grants, total_entries: 2} =
+             Authz.list_principal_capabilities(platform_scope)
+
+    assert Enum.sort(Enum.map(operator_grants, & &1.id)) ==
+             Enum.sort([global_deny.id, global_allow.id])
+
+    assert {:ok, %RoleDetails{role: %RoleSummary{principal_count: 0}, principal_roles: []}} =
+             Authz.get_role(tenant_scope, system_role.id)
+
+    assert {:ok,
+            %RoleDetails{
+              role: %RoleSummary{principal_count: 1},
+              principal_roles: [visible_assignment]
+            }} = Authz.get_role(platform_scope, system_role.id)
+
+    assert %Page{entries: [%RoleSummary{principal_count: 0}]} =
+             Authz.list_roles(tenant_scope, search: system_role.code)
+
+    assert %Page{entries: [%RoleSummary{principal_count: 1}]} =
+             Authz.list_roles(platform_scope, search: system_role.code)
+
+    assert visible_assignment.id == global_assignment.id
+    assert {:ok, :not_found} = Authz.remove_principal_capability(tenant_scope, global_deny.id)
+
+    assert {:ok, :not_found} =
+             Authz.unassign_role(tenant_scope, system_role.id, global_assignment.id)
+
+    assert {:ok, :removed} =
+             Authz.remove_principal_capability(platform_scope, global_deny.id)
+
+    assert {:ok, :removed} =
+             Authz.remove_principal_capability(platform_scope, global_allow.id)
+
+    assert {:ok, :unassigned} =
+             Authz.unassign_role(platform_scope, system_role.id, global_assignment.id)
+
+    refute Authz.can(Authz.actor(:user, 70, tenant_scope, 10), "admin.test.record.view").allowed
+    refute Authz.can(Authz.actor(:user, 71, tenant_scope, 10), "admin.test.record.view").allowed
+    refute Authz.can(Authz.actor(:user, 72, tenant_scope, 10), "admin.test.record.view").allowed
   end
 
   test "decision-log pages are tenant-scoped, filterable, and payload-safe" do
@@ -240,5 +331,14 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert_raise ArgumentError, ~r/unknown keys/, fn ->
       Authz.list_roles(scope(), unsafe_query: true)
     end
+  end
+
+  defp platform_operator_scope do
+    Scope.for_tenant(%Identity{
+      id: 1,
+      name: "Platform",
+      status: "active",
+      is_platform_operator: true
+    })
   end
 end

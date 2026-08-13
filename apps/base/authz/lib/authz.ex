@@ -118,7 +118,7 @@ defmodule Bilimbi.Base.Authz do
     RoleService.update_role(scope, role_id, attributes, registry!())
   end
 
-  @doc "Deletes a custom role and its database-cascaded assignments."
+  @doc "Deletes a custom role and intentionally database-cascades its grants and assignments."
   @spec delete_role(Scope.t(), pos_integer()) ::
           {:ok, :deleted} | {:error, :role_not_found | :system_role | Ecto.Changeset.t()}
   def delete_role(%Scope{} = scope, role_id) do
@@ -181,29 +181,13 @@ defmodule Bilimbi.Base.Authz do
     )
   end
 
-  @doc "Removes a persisted direct capability instead of storing an explicit deny."
+  @doc "Removes one visible persisted direct capability by its durable grant ID."
   @spec remove_principal_capability(
           Scope.t(),
-          pos_integer(),
-          :user | :agent,
-          pos_integer(),
-          String.t()
-        ) :: {:ok, :removed | :not_found} | {:error, :company_not_found}
-  def remove_principal_capability(
-        %Scope{} = scope,
-        company_id,
-        principal_type,
-        principal_id,
-        capability
-      ) do
-    RoleService.remove_principal_capability(
-      scope,
-      company_id,
-      principal_type,
-      principal_id,
-      capability,
-      registry!()
-    )
+          pos_integer()
+        ) :: {:ok, :removed | :not_found}
+  def remove_principal_capability(%Scope{} = scope, grant_id) do
+    RoleService.remove_principal_capability(scope, grant_id, registry!())
   end
 
   @doc "Lists scoped direct principal capabilities through a bounded page."
