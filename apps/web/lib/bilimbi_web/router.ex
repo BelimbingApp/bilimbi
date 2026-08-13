@@ -73,6 +73,16 @@ defmodule BilimbiWeb.Router do
     plug :require_capability, "admin.user.update"
   end
 
+  pipeline :ensure_geonames_list do
+    plug :require_authenticated
+    plug :require_capability, "admin.geonames.list"
+  end
+
+  pipeline :ensure_geonames_view do
+    plug :require_authenticated
+    plug :require_capability, "admin.geonames.view"
+  end
+
   # The homepage is the sign-in screen; authenticated visitors are forwarded
   # to their workspace.
   scope "/", BilimbiWeb do
@@ -171,6 +181,42 @@ defmodule BilimbiWeb.Router do
         {BilimbiWeb.UserAuth, {:require_capability, "admin.user.update"}}
       ] do
       live "/users/:id/edit", UserLive.Form, :edit
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_geonames_list]
+
+    live_session :geonames_countries,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.geonames.list"}}
+      ] do
+      live "/geonames/countries", GeonamesLive.Countries
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_geonames_view]
+
+    live_session :geonames_admin1,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.geonames.view"}}
+      ] do
+      live "/geonames/admin1", GeonamesLive.Admin1
+    end
+  end
+
+  scope "/", BilimbiWeb do
+    pipe_through [:browser, :ensure_geonames_view]
+
+    live_session :geonames_postcodes,
+      on_mount: [
+        {BilimbiWeb.UserAuth, :require_authenticated},
+        {BilimbiWeb.UserAuth, {:require_capability, "admin.geonames.view"}}
+      ] do
+      live "/geonames/postcodes", GeonamesLive.Postcodes
     end
   end
 
