@@ -1,13 +1,17 @@
 defmodule BilimbiWeb.DiscoveredRoutes do
   @moduledoc false
 
+  @manifest_path Path.expand(
+                   "../../../../_build/#{Application.compile_env!(:web, :mix_env)}/bilimbi_routes.exs",
+                   __DIR__
+                 )
+
   def module_routes(routes) when is_list(routes) do
     Enum.reject(routes, &(&1[:source] == "web"))
   end
 
   defmacro inject do
-    manifest_path =
-      Path.expand("../../../../_build/#{Mix.env()}/bilimbi_routes.exs", __DIR__)
+    manifest_path = @manifest_path
 
     routes =
       if File.regular?(manifest_path) do

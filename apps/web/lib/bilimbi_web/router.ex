@@ -174,7 +174,10 @@ defmodule BilimbiWeb.Router do
     end
   end
 
-  @manifest_path Path.expand("../../../../_build/#{Mix.env()}/bilimbi_routes.exs", __DIR__)
+  @manifest_path Path.expand(
+                   "../../../../_build/#{Application.compile_env!(:web, :mix_env)}/bilimbi_routes.exs",
+                   __DIR__
+                 )
   @external_resource @manifest_path
   require BilimbiWeb.DiscoveredRoutes
   BilimbiWeb.DiscoveredRoutes.inject()

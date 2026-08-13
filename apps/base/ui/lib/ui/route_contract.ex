@@ -11,7 +11,7 @@ defmodule Bilimbi.Base.UI.RouteContract do
   @manifest_path Path.join([
                    Path.expand("../../../../..", __DIR__),
                    "_build",
-                   "#{Mix.env()}",
+                   "#{Application.compile_env!(:bilimbi_base_ui, :mix_env)}",
                    "bilimbi_routes.exs"
                  ])
   @external_resource @manifest_path

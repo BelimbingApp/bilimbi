@@ -45,4 +45,9 @@ config :logger, :default_formatter,
 
 config :phoenix, :json_library, Jason
 
+# Route manifest lives at `_build/<env>/bilimbi_routes.exs`. Capture the Mix
+# environment here so application modules never call `Mix.env/0` (Dialyzer).
+config :bilimbi_base_ui, :mix_env, config_env()
+config :web, :mix_env, config_env()
+
 import_config "#{config_env()}.exs"
