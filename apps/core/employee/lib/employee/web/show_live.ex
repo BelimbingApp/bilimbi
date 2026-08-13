@@ -36,24 +36,22 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     employee = socket.assigns.employee
     company_id = socket.assigns.current_scope.user["company_id"]
 
-    cond do
-      not allowed?(socket.assigns.current_scope, "admin.employee.delete") ->
-        {:noreply, put_flash(socket, :error, "You do not have access to that action.")}
+    if not allowed?(socket.assigns.current_scope, "admin.employee.delete") do
+      {:noreply, put_flash(socket, :error, "You do not have access to that action.")}
+    else
+      case Employee.delete_employee(scope, company_id, employee.id) do
+        :ok ->
+          {:noreply,
+           socket
+           |> put_flash(:info, "#{employee.full_name} was deleted.")
+           |> push_navigate(to: ~p"/employees")}
 
-      true ->
-        case Employee.delete_employee(scope, company_id, employee.id) do
-          :ok ->
-            {:noreply,
-             socket
-             |> put_flash(:info, "#{employee.full_name} was deleted.")
-             |> push_navigate(to: ~p"/employees")}
+        {:error, :invariant_violation} ->
+          {:noreply, put_flash(socket, :error, "The platform orchestrator cannot be deleted.")}
 
-          {:error, :invariant_violation} ->
-            {:noreply, put_flash(socket, :error, "The platform orchestrator cannot be deleted.")}
-
-          {:error, _reason} ->
-            {:noreply, put_flash(socket, :error, "That employee could not be deleted.")}
-        end
+        {:error, _reason} ->
+          {:noreply, put_flash(socket, :error, "That employee could not be deleted.")}
+      end
     end
   end
 
@@ -73,18 +71,18 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
             ← Employees
           </.link>
         </p>
-
+        
         <.header>
           {@employee.full_name}
           <:subtitle>
             <code class="text-ink-subtle">{@employee.employee_number}</code>
           </:subtitle>
-
+          
           <:actions>
             <.badge kind={if @employee.status == "active", do: :success, else: :neutral}>
               {@employee.status}
             </.badge>
-
+            
             <.link
               :if={allowed?(@current_scope, "admin.employee.update")}
               navigate={~p"/employees/#{@employee.id}/edit"}
@@ -95,33 +93,33 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
             </.link>
           </:actions>
         </.header>
-
+        
         <div class="mt-5">
           <.list>
             <:item title="Short name">
               {display_or_dash(@employee.short_name)}
             </:item>
-
+            
             <:item title="Designation">
               {display_or_dash(@employee.designation)}
             </:item>
-
+            
             <:item title="Type">{@employee.employee_type}</:item>
-
+            
             <:item title="Email">
               {display_or_dash(@employee.email)}
             </:item>
-
+            
             <:item title="Employment start">
               {display_or_dash(@employee.employment_start)}
             </:item>
-
+            
             <:item title="Employment end">
               {display_or_dash(@employee.employment_end)}
             </:item>
           </.list>
         </div>
-
+        
         <div
           :if={allowed?(@current_scope, "admin.employee.delete")}
           id="employee-danger"
@@ -130,12 +128,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
           <div class="flex items-center justify-between gap-4">
             <div>
               <h2 class="text-sm font-semibold text-ink-strong">Delete this employee</h2>
-
+              
               <p class="mt-0.5 text-xs text-ink-subtle">
                 Removes the employment record. The platform orchestrator cannot be deleted.
               </p>
             </div>
-
+            
             <.button
               id="employee-delete"
               phx-click="delete"
