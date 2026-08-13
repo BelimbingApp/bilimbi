@@ -1,6 +1,6 @@
 # Bilimbi AI Team Board
 
-**Board Version:** 14
+**Board Version:** 15
 **Current Stage:** S1 — Platform Baseline business identity
 **Coordination Steward:** amp/kimi-k3 (reclaimed 2026-08-13T10:00+08 by
 explicit user direction — see the handover note below)
@@ -68,12 +68,12 @@ See [`PORTING_STAGES.md`](./PORTING_STAGES.md) for exit criteria.
 | [BLB-S1-012](./tasks/BLB-S1-012.md) | merged — PR #46 | cursor/grok-4.6 | Module implementer | `apps/base/database/**` | CLAIM (PR #45, user-directed) ACKed on v13; product green with independent accept (amp/kimi-k3) |
 | [BLB-S1-010](./tasks/BLB-S1-010.md) | active | cursor/grok-4.5 | Module implementer | `apps/core/company/**`, `apps/core/user/**` | CLAIM (PR #38) ACKed on v14; product PR #53 open. The card's soft-deleted-company decision is the implementer's to make and test |
 | [BLB-S1-011](./tasks/BLB-S1-011.md) | active | codex/sol-high | Compatibility architect | `docs/architecture/decisions/0004-module-contribution-contract.md` | CLAIM (PR #51, user-directed) ACKed on v14; integration steward's agreement to that exact ADR path is on record. `amp/gpt-5.6-high` is the natural independent reviewer |
+| [BLB-S1-013](./tasks/BLB-S1-013.md) | active | cursor/grok-4.6 | Module implementer (Base ModuleRegistry) | `apps/base/module_registry/**` | CLAIM (PR #56) ACKed on v15; product PR #57 open. Acceptance hinges on the demonstrated-failure criterion |
 
 ## Ready
 
 | Task | Role sought | Dependencies | Write claim on ACK | Note |
 |---|---|---|---|---|
-| [BLB-S1-013](./tasks/BLB-S1-013.md) | Module implementer (Base ModuleRegistry) | None | `apps/base/module_registry/**` | Compatibility-closure CI check — the guard for the defect class that shipped Core User inert. `cursor/grok-4.6` stated intent to claim (RFC #44); claim through your outbox |
 | [BLB-S1-014](./tasks/BLB-S1-014.md) | Integration steward | Point 3 gated on BLB-S1-013 | `docs/ai-team/README.md` + the BOARD.md structural change | Land the RFC #44 protocol amendment. Blocked on the integration steward at creation; codex/sol-high is active again, so claim through your outbox |
 
 S2 implementation does not start until `BLB-S1-011` lands. Base Settings, Base
@@ -95,7 +95,7 @@ Audit, and their Web workflows must not be started as one broad parallel port.
 
 | Task | Owner | Reviewer | Note |
 |---|---|---|---|
-| [BLB-S1-006](./tasks/BLB-S1-006.md) | claude/opus-5 | codex/sol-high — **ACKed** | Retrospective review CLAIM (PR #29) acknowledged. `reviews/BLB-S1-006--codex-sol-high.md` is yours to land. Targets named on the card: the per-company read standing in for Belimbing's tenant-wide list, and the crypt-format credential guard |
+| [BLB-S1-006](./tasks/BLB-S1-006.md) | claude/opus-5 | codex/sol-high | Closed — `accept with follow-up`, merged via PR #55; the tenant-wide-read follow-up is BLB-S1-010 |
 | [BLB-S1-008](./tasks/BLB-S1-008.md) | codex/sol-high | cursor/grok-4.5 + claude/opus-5 | Closed. Both reviews cleared at exact head `e48d82c`; formal review merged via PR #28. Optional follow-up carried to `BLB-S1-012` |
 | [BLB-S1-010](./tasks/BLB-S1-010.md) | cursor/grok-4.5 | *open — volunteers via mailbox* | Product PR #53 open. Reviewer checks the soft-deleted-company reasoning and its test, per the card |
 | [BLB-S1-012](./tasks/BLB-S1-012.md) | cursor/grok-4.6 | amp/kimi-k3 | Closed — accept; product merged via PR #46 |
