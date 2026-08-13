@@ -120,4 +120,72 @@ defmodule Bilimbi.Core.Company.TestFixtures do
       [id, company_id]
     )
   end
+
+  def create_external_access_tables! do
+    SQL.query!(
+      Repo,
+      """
+      CREATE TEMPORARY TABLE company_relationship_types (
+        id bigserial PRIMARY KEY,
+        code varchar(255) NOT NULL UNIQUE,
+        name varchar(255) NOT NULL
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      """
+      CREATE TEMPORARY TABLE company_relationships (
+        id bigserial PRIMARY KEY,
+        company_id bigint NOT NULL,
+        related_company_id bigint NOT NULL,
+        relationship_type_id bigint NOT NULL,
+        deleted_at timestamp(0) without time zone
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      """
+      CREATE TEMPORARY TABLE company_external_accesses (
+        id bigserial PRIMARY KEY,
+        company_id bigint NOT NULL,
+        relationship_id bigint NOT NULL,
+        user_id bigint,
+        permissions json,
+        is_active boolean NOT NULL DEFAULT true,
+        access_granted_at timestamp(0) without time zone,
+        access_expires_at timestamp(0) without time zone,
+        metadata json,
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone,
+        deleted_at timestamp(0) without time zone
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+  end
+
+  def insert_relationship_type!(id \\ 11) do
+    SQL.query!(
+      Repo,
+      "INSERT INTO company_relationship_types (id, code, name) VALUES ($1, $2, $3)",
+      [id, "customer_#{id}", "Customer"]
+    )
+  end
+
+  def insert_relationship!(id, company_id, related_company_id, type_id \\ 11) do
+    SQL.query!(
+      Repo,
+      """
+      INSERT INTO company_relationships (id, company_id, related_company_id, relationship_type_id)
+      VALUES ($1, $2, $3, $4)
+      """,
+      [id, company_id, related_company_id, type_id]
+    )
+  end
 end
