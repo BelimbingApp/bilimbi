@@ -76,6 +76,240 @@ defmodule Bilimbi.Core.EmployeeTest do
     assert {:error, :employee_not_found} = Employee.get_employee(owner, 73, employee.id + 1)
   end
 
+  test "returns a bounded administration page with source search, filters, and stable order", %{
+    owner: owner
+  } do
+    for {number, name, type, status, attrs} <- [
+          {"EMP-SEARCH-NAME", "Alpha Match", "full_time", "active", %{}},
+          {"EMP-SEARCH-SHORT", "Bravo", "full_time", "active", %{short_name: "Alpha Alias"}},
+          {"ALPHA-NUMBER", "Charlie", "full_time", "active", %{}},
+          {"EMP-SEARCH-EMAIL", "Delta", "agent", "inactive", %{email: "alpha@example.test"}},
+          {"EMP-SEARCH-DESIGNATION", "Echo", "agent", "pending", %{designation: "Alpha Lead"}},
+          {"EMP-SEARCH-JOB", "Foxtrot", "full_time", "terminated",
+           %{job_description: "alpha specialist"}},
+          {"EMP-OTHER", "Zulu", "full_time", "active", %{}}
+        ] do
+      assert {:ok, _employee} =
+               Employee.create_employee(
+                 owner,
+                 73,
+                 Map.merge(attrs, %{
+                   employee_number: number,
+                   full_name: name,
+                   employee_type: type,
+                   status: status
+                 })
+               )
+    end
+
+    assert {:ok, page} = Employee.list_administration_page(owner, 73, search: "alpha")
+    assert page.total_entries == 6
+    assert page.total_pages == 1
+    refute page.has_prev?
+    refute page.has_next?
+
+    assert Enum.map(page.entries, & &1.full_name) == [
+             "Alpha Match",
+             "Bravo",
+             "Charlie",
+             "Delta",
+             "Echo",
+             "Foxtrot"
+           ]
+
+    assert {:ok, agents} = Employee.list_administration_page(owner, 73, type_filter: :agent)
+    assert Enum.map(agents.entries, & &1.full_name) == ["Delta", "Echo"]
+
+    assert {:ok, humans} = Employee.list_administration_page(owner, 73, type_filter: :human)
+    refute Enum.any?(humans.entries, &(&1.employee_type == "agent"))
+
+    assert {:ok, status_desc} =
+             Employee.list_administration_page(owner, 73, sort_by: :status, sort_dir: :desc)
+
+    assert Enum.map(status_desc.entries, & &1.status) ==
+             ["terminated", "pending", "inactive", "active", "active", "active", "active"]
+
+    assert {:ok, full_name_desc} =
+             Employee.list_administration_page(owner, 73, sort_by: :full_name, sort_dir: :desc)
+
+    assert Enum.map(full_name_desc.entries, & &1.full_name) == [
+             "Zulu",
+             "Foxtrot",
+             "Echo",
+             "Delta",
+             "Charlie",
+             "Bravo",
+             "Alpha Match"
+           ]
+
+    assert {:ok, status_asc} =
+             Employee.list_administration_page(owner, 73, sort_by: :status, sort_dir: :asc)
+
+    assert Enum.map(status_asc.entries, & &1.status) ==
+             ["active", "active", "active", "active", "inactive", "pending", "terminated"]
+
+    assert {:ok, type_desc} =
+             Employee.list_administration_page(owner, 73,
+               sort_by: :employee_type_label,
+               sort_dir: :desc
+             )
+
+    assert Enum.map(type_desc.entries, & &1.employee_type) ==
+             ["full_time", "full_time", "full_time", "full_time", "full_time", "agent", "agent"]
+
+    assert Enum.map(type_desc.entries, & &1.employee_type_label) ==
+             ["Full Time", "Full Time", "Full Time", "Full Time", "Full Time", "Agent", "Agent"]
+
+    assert {:ok, type_asc} =
+             Employee.list_administration_page(owner, 73,
+               sort_by: :employee_type_label,
+               sort_dir: :asc
+             )
+
+    assert Enum.map(type_asc.entries, & &1.employee_type) ==
+             ["agent", "agent", "full_time", "full_time", "full_time", "full_time", "full_time"]
+  end
+
+  test "escapes literal LIKE wildcard input and keeps administration entries narrow", %{
+    owner: owner
+  } do
+    assert {:ok, literal} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-100%_LITERAL",
+               full_name: "Literal",
+               job_description: "contains % and _"
+             })
+
+    assert {:ok, _broad} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-100xxLITERAL",
+               full_name: "Broad Match"
+             })
+
+    assert {:ok, page} = Employee.list_administration_page(owner, 73, search: "100%_LITERAL")
+    assert [entry] = page.entries
+    assert entry.id == literal.id
+    refute Map.has_key?(entry, :metadata)
+    refute Map.has_key?(entry, :company_id)
+
+    assert {:ok, slash_literal} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-SLASH",
+               full_name: "Literal \\ path"
+             })
+
+    assert {:ok, _not_slash_literal} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-NO-SLASH",
+               full_name: "Literal x path"
+             })
+
+    assert {:ok, slash_page} = Employee.list_administration_page(owner, 73, search: "\\")
+    assert [slash_entry] = slash_page.entries
+    assert slash_entry.id == slash_literal.id
+  end
+
+  test "administration pages reject invalid options and invalid company values", %{owner: owner} do
+    for options <- [
+          %{page: 1},
+          [{:page, 1}, "bad"],
+          [unknown: :value],
+          [page: 0],
+          [page: "1"],
+          [page_size: 0],
+          [page_size: 101],
+          [search: :not_a_string],
+          [type_filter: "agent"],
+          [sort_by: "full_name"],
+          [sort_by: :company_name],
+          [sort_dir: "asc"],
+          [page: 1, page: 2]
+        ] do
+      assert {:error, :invalid_options} = Employee.list_administration_page(owner, 73, options)
+    end
+
+    assert {:error, :company_not_found} = Employee.list_administration_page(owner, 0)
+    assert {:error, :company_not_found} = Employee.list_administration_page(owner, 999)
+  end
+
+  test "administration pages prove a live company before querying its employees", %{
+    owner: owner,
+    other: other
+  } do
+    assert {:ok, _} =
+             Employee.create_employee(other, 74, %{
+               employee_number: "OTHER-ADMIN",
+               full_name: "Other"
+             })
+
+    assert {:error, :company_not_found} = Employee.list_administration_page(owner, 74)
+
+    Ecto.Adapters.SQL.query!(
+      Bilimbi.Base.Repo,
+      "UPDATE companies SET deleted_at = '2026-08-12 12:00:00' WHERE id = 73",
+      []
+    )
+
+    assert {:error, :company_not_found} = Employee.list_administration_page(owner, 73)
+  end
+
+  test "administration pages paginate deterministically with id descending ties", %{owner: owner} do
+    for number <- 1..4 do
+      assert {:ok, _} =
+               Employee.create_employee(owner, 73, %{
+                 employee_number: "TIE-#{number}",
+                 full_name: "Same Name"
+               })
+    end
+
+    assert {:ok, first} = Employee.list_administration_page(owner, 73, page: 1, page_size: 2)
+    assert {:ok, second} = Employee.list_administration_page(owner, 73, page: 2, page_size: 2)
+    assert first.total_entries == 4
+    assert first.total_pages == 2
+    assert first.has_next?
+    refute first.has_prev?
+    assert second.has_prev?
+    refute second.has_next?
+    assert Enum.map(first.entries, & &1.id) == [4, 3]
+    assert Enum.map(second.entries, & &1.id) == [2, 1]
+
+    for {sort_by, sort_dir} <- [
+          {:full_name, :asc},
+          {:full_name, :desc},
+          {:employee_type_label, :asc},
+          {:employee_type_label, :desc},
+          {:status, :asc},
+          {:status, :desc}
+        ] do
+      assert {:ok, ordered} =
+               Employee.list_administration_page(owner, 73,
+                 page_size: 4,
+                 sort_by: sort_by,
+                 sort_dir: sort_dir
+               )
+
+      assert Enum.map(ordered.entries, & &1.id) == [4, 3, 2, 1]
+    end
+
+    assert {:ok, past_end} =
+             Employee.list_administration_page(owner, 73, page: 3, page_size: 2)
+
+    assert past_end.entries == []
+    assert past_end.total_entries == 4
+    assert past_end.total_pages == 2
+    assert past_end.has_prev?
+    refute past_end.has_next?
+
+    assert {:ok, empty} =
+             Employee.list_administration_page(owner, 73, search: "missing", page: 3)
+
+    assert empty.entries == []
+    assert empty.total_entries == 0
+    assert empty.total_pages == 0
+    assert empty.has_prev?
+    refute empty.has_next?
+  end
+
   test "scope-wide lookup excludes employees whose owning company is deleted", %{owner: owner} do
     assert {:ok, employee} =
              Employee.create_employee(owner, 73, %{
@@ -293,6 +527,10 @@ defmodule Bilimbi.Core.EmployeeTest do
     for not_a_scope <- [41, nil, owner.tenant] do
       assert_raise FunctionClauseError, fn ->
         Employee.list_employees(opaque(not_a_scope), 73)
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        Employee.list_administration_page(opaque(not_a_scope), 73)
       end
 
       assert_raise FunctionClauseError, fn ->
