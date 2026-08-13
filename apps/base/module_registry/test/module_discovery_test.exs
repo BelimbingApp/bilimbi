@@ -172,6 +172,42 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
                  end
   end
 
+  test "Compatibility-closure check names a contributor missing from the coordinator", %{
+    root: root
+  } do
+    put_container!(root, "base", :base)
+    put_container!(root, "core", :core)
+    put_module!(root, "base", "database")
+
+    put_module!(root, "core", "user",
+      dependencies: ["base/database"],
+      schema_contract: Test.Core.User.SchemaContract
+    )
+
+    put_module!(root, "core", "compatibility", dependencies: ["base/database"])
+
+    modules = MixDiscovery.discover_workspace!(root)
+
+    assert MixDiscovery.missing_compatibility_contributors(modules) == ["core/user"]
+
+    assert MixDiscovery.missing_compatibility_contributors(modules, [
+             "base/database",
+             "core/user"
+           ]) == []
+  end
+
+  test "Compatibility-closure check ignores modules that contribute neither migrations nor a contract",
+       %{root: root} do
+    put_container!(root, "base", :base)
+    put_container!(root, "core", :core)
+    put_module!(root, "base", "database")
+    put_module!(root, "base", "module_registry")
+    put_module!(root, "core", "compatibility", dependencies: ["base/database"])
+
+    modules = MixDiscovery.discover_workspace!(root)
+    assert MixDiscovery.missing_compatibility_contributors(modules) == []
+  end
+
   defp put_container!(root, id, layer) do
     path = Path.join([root, "apps", id])
     File.mkdir_p!(path)
@@ -200,8 +236,8 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
       otp_app: Keyword.get(overrides, :otp_app, String.to_atom("test_#{container}_#{name}")),
       namespace: Module.concat([Test, Macro.camelize(container), Macro.camelize(name)]),
       dependencies: Keyword.get(overrides, :dependencies, []),
-      migrations: nil,
-      schema_contract: nil
+      migrations: Keyword.get(overrides, :migrations, nil),
+      schema_contract: Keyword.get(overrides, :schema_contract, nil)
     ]
 
     File.write!(

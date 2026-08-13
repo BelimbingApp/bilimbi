@@ -132,6 +132,47 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     |> Base.encode16(case: :lower)
   end
 
+  @doc """
+  Contributor IDs Compatibility cannot see at runtime.
+
+  Enumerates from source descriptors, not `Application.loaded_applications/0`.
+  Runtime discovery only sees OTP apps in Compatibility's Mix closure, which
+  Mix builds from `core/compatibility`'s declared `dependencies`. A module
+  with migrations or a `schema_contract` that is missing from that list is
+  inert: its migration never runs and its contract is never verified.
+
+  `compatibility_dependencies` overrides the coordinator's declared list so
+  tests can prove the guard fails without mutating the live descriptor.
+  """
+  @spec missing_compatibility_contributors([descriptor()], [String.t()] | nil) :: [String.t()]
+  def missing_compatibility_contributors(modules, compatibility_dependencies \\ nil)
+      when is_list(modules) do
+    dependencies =
+      compatibility_dependencies || compatibility_dependencies!(modules)
+
+    closure = MapSet.new(dependencies)
+
+    modules
+    |> Enum.filter(&contributor?/1)
+    |> Enum.map(& &1.id)
+    |> Enum.reject(&(&1 == "core/compatibility" or MapSet.member?(closure, &1)))
+    |> Enum.sort()
+  end
+
+  defp compatibility_dependencies!(modules) do
+    case Enum.find(modules, &(&1.id == "core/compatibility")) do
+      nil ->
+        raise ArgumentError, "workspace has no core/compatibility coordinator"
+
+      compatibility ->
+        compatibility.dependencies
+    end
+  end
+
+  defp contributor?(module) do
+    is_binary(module.migrations) or not is_nil(module.schema_contract)
+  end
+
   @doc "Discovers and validates all installed modules in a source workspace."
   @spec discover_workspace!(String.t()) :: [descriptor()]
   def discover_workspace!(workspace_root) do
