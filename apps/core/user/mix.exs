@@ -41,6 +41,9 @@ defmodule Bilimbi.Core.User.MixProject do
       {:argon2_elixir, "~> 4.1"},
       {:bcrypt_elixir, "~> 3.3"},
       {:ecto_sql, "~> 3.14"},
+      {:phoenix, "~> 1.8.9"},
+      {:phoenix_html, "~> 4.3"},
+      {:phoenix_live_view, "~> 1.2.0"},
       {:plug_crypto, "~> 2.2"}
     ] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)

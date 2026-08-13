@@ -12,11 +12,12 @@
     "base/session",
     "base/settings",
     "base/tenancy",
+    "base/ui",
     "core/company",
     "core/employee"
   ],
   migrations: "priv/repo/migrations",
-  web: nil,
+  web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Core.User.SchemaContract,
   contribution_provider: Bilimbi.Core.User.Contributions
 ]
