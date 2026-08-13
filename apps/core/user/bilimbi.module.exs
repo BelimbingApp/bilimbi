@@ -16,6 +16,7 @@
     "core/employee"
   ],
   migrations: "priv/repo/migrations",
+  web: nil,
   schema_contract: Bilimbi.Core.User.SchemaContract,
   contribution_provider: Bilimbi.Core.User.Contributions
 ]

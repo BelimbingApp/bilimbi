@@ -7,6 +7,7 @@
   namespace: Bilimbi.Base.Authz,
   dependencies: ["base/database", "base/module_registry", "base/settings", "base/tenancy"],
   migrations: "priv/repo/migrations",
+  web: nil,
   schema_contract: Bilimbi.Base.Authz.SchemaContract,
   contribution_provider: Bilimbi.Base.Authz.Contributions
 ]

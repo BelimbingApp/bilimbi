@@ -7,6 +7,7 @@
   namespace: Bilimbi.Base.Database,
   dependencies: ["base/module_registry"],
   migrations: nil,
+  web: nil,
   schema_contract: nil,
   contribution_provider: Bilimbi.Base.Database.Contributions
 ]

@@ -13,6 +13,7 @@
     "core/geonames"
   ],
   migrations: "priv/repo/migrations",
+  web: nil,
   schema_contract: Bilimbi.Core.Address.SchemaContract,
   contribution_provider: Bilimbi.Core.Address.Contributions
 ]

@@ -13,6 +13,10 @@ defmodule Mix.Tasks.Compile.BilimbiGraph do
         {:noop, []}
 
       module_root ->
+        workspace_root =
+          Bilimbi.Base.ModuleRegistry.MixDiscovery.workspace_root!(module_root)
+
+        Bilimbi.Base.ModuleRegistry.MixDiscovery.write_route_manifest!(workspace_root)
         refresh_marker(module_root)
     end
   end

@@ -8,6 +8,7 @@
   dependencies: [
     "base/database",
     "base/menu",
+    "base/ui",
     "base/module_registry",
     "base/authz",
     "base/session",
@@ -21,6 +22,7 @@
     "core/user"
   ],
   migrations: nil,
+  web: nil,
   schema_contract: nil,
   contribution_provider: nil
 ]

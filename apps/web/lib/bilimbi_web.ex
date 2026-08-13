@@ -85,10 +85,10 @@ defmodule BilimbiWeb do
       # HTML escaping functionality
       import Phoenix.HTML
       # Core UI components
-      import BilimbiWeb.CoreComponents
+      import Bilimbi.Base.UI.Components
 
       # Common modules used in templates
-      alias BilimbiWeb.Layouts
+      alias Bilimbi.Base.UI.Layouts
       alias Phoenix.LiveView.JS
 
       # Routes generation with the ~p sigil

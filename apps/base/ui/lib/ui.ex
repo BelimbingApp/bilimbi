@@ -1,0 +1,55 @@
+defmodule Bilimbi.Base.UI do
+  @moduledoc """
+  Shared presentation contracts for module-owned web adapters.
+
+  Module LiveViews `use Bilimbi.Base.UI, :live_view` instead of
+  `use BilimbiWeb, :live_view`. This package is dependency-light: Phoenix
+  libraries and `base/module_registry` only. Authentication hooks stay in
+  `BilimbiWeb.UserAuth`.
+  """
+
+  def live_view do
+    quote do
+      use Phoenix.LiveView
+
+      unquote(html_helpers())
+    end
+  end
+
+  def live_component do
+    quote do
+      use Phoenix.LiveComponent
+
+      unquote(html_helpers())
+    end
+  end
+
+  def html do
+    quote do
+      use Phoenix.Component
+
+      unquote(html_helpers())
+    end
+  end
+
+  defp html_helpers do
+    quote do
+      use Gettext, backend: Bilimbi.Base.UI.Gettext
+
+      import Phoenix.HTML
+      import Bilimbi.Base.UI.Components
+
+      alias Bilimbi.Base.UI.Layouts
+      alias Phoenix.LiveView.JS
+
+      use Phoenix.VerifiedRoutes,
+        router: Bilimbi.Base.UI.RouteContract,
+        endpoint: Bilimbi.Base.UI.ScriptPath,
+        statics: ~w(assets fonts images favicon.ico robots.txt)
+    end
+  end
+
+  defmacro __using__(which) when is_atom(which) do
+    apply(__MODULE__, which, [])
+  end
+end
