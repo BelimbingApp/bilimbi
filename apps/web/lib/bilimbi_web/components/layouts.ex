@@ -78,15 +78,15 @@ defmodule BilimbiWeb.Layouts do
     <div class="flex h-screen overflow-hidden bg-canvas">
       <aside
         id="app-sidebar"
-        class="flex w-60 shrink-0 flex-col border-r border-line bg-surface"
+        class="flex w-14 shrink-0 flex-col border-r border-line bg-surface lg:w-60"
       >
         <.link
           navigate={~p"/dashboard"}
           id="app-brand"
-          class="flex items-center gap-2.5 border-b border-line-subtle px-4 py-3.5"
+          class="flex items-center justify-center gap-2.5 border-b border-line-subtle px-2 py-3.5 lg:justify-start lg:px-4"
           aria-label="Bilimbi dashboard"
         >
-          <span class="grid size-8 place-items-center rounded-lg bg-brand">
+          <span class="grid size-8 shrink-0 place-items-center rounded-lg bg-brand">
             <img
               src={~p"/images/logo.svg"}
               alt=""
@@ -98,11 +98,17 @@ defmodule BilimbiWeb.Layouts do
               aria-hidden="true"
             />
           </span>
-          <span class="text-sm font-semibold tracking-tight text-ink-strong">Bilimbi</span>
+          <span class="hidden text-sm font-semibold tracking-tight text-ink-strong lg:inline">
+            Bilimbi
+          </span>
         </.link>
 
-        <nav id="app-nav" aria-label="Main navigation" class="flex-1 overflow-y-auto px-2 py-3">
-          <p class="px-2 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint select-none">
+        <nav
+          id="app-nav"
+          aria-label="Main navigation"
+          class="flex-1 overflow-y-auto px-1.5 py-3 lg:px-2"
+        >
+          <p class="hidden px-2 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint select-none lg:block">
             Workspace
           </p>
           <.nav_item
@@ -131,12 +137,12 @@ defmodule BilimbiWeb.Layouts do
           </.nav_item>
         </nav>
 
-        <div id="app-user" class="border-t border-line-subtle px-3 py-3">
-          <div class="flex items-center gap-2.5">
+        <div id="app-user" class="border-t border-line-subtle px-1.5 py-3 lg:px-3">
+          <div class="flex flex-col items-center gap-1.5 lg:flex-row lg:gap-2.5">
             <span class="grid size-8 shrink-0 place-items-center rounded-full bg-action text-xs font-semibold text-action-ink">
               {user_initials(@current_scope.user["name"])}
             </span>
-            <div class="min-w-0 flex-1">
+            <div class="hidden min-w-0 flex-1 lg:block">
               <p id="app-user-name" class="truncate text-sm font-medium text-ink">
                 {@current_scope.user["name"]}
               </p>
@@ -202,7 +208,7 @@ defmodule BilimbiWeb.Layouts do
       id={@id}
       aria-current={@active && "page"}
       class={[
-        "relative flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition",
+        "relative flex items-center justify-center gap-2.5 rounded-md px-2 py-2 text-sm transition lg:justify-start lg:py-1.5",
         @active && "bg-surface-sunken font-medium text-ink-strong",
         !@active && "text-ink-muted hover:bg-surface-sunken hover:text-ink"
       ]}
@@ -213,7 +219,7 @@ defmodule BilimbiWeb.Layouts do
         aria-hidden="true"
       ></span>
       <.icon name={@icon} class={["size-4 shrink-0", @active && "text-brand-strong"]} />
-      <span class="truncate">{render_slot(@inner_block)}</span>
+      <span class="hidden truncate lg:inline">{render_slot(@inner_block)}</span>
     </.link>
     """
   end
