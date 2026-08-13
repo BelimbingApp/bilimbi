@@ -48,7 +48,8 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
       id: "base/session",
       app: :bilimbi_base_session,
       facade: "lib/session.ex",
-      migrations: "priv/repo/migrations"
+      migrations: "priv/repo/migrations",
+      web: "priv/web_routes.exs"
     },
     %{
       root: Path.join(@base_root, "authz"),
@@ -62,7 +63,8 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
       id: "base/tenancy",
       app: :bilimbi_base_tenancy,
       facade: "lib/tenancy.ex",
-      migrations: "priv/repo/migrations"
+      migrations: "priv/repo/migrations",
+      web: "priv/web_routes.exs"
     },
     %{
       root: Path.join(@base_root, "audit"),
@@ -137,10 +139,14 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
       assert descriptor[:id] == module.id
       assert descriptor[:otp_app] == module.app
       assert descriptor[:migrations] == module.migrations
-      assert descriptor[:web] == nil
+      assert descriptor[:web] == Map.get(module, :web)
 
       if module.migrations do
         assert File.dir?(Path.join(module.root, module.migrations)), module.id
+      end
+
+      if web = Map.get(module, :web) do
+        assert File.regular?(Path.join(module.root, web)), module.id
       end
     end
   end
