@@ -116,6 +116,7 @@ defmodule Bilimbi.Base.Authz.EffectivePermissions do
           (role.is_system and is_nil(role.company_id) and
              (assignment.company_id == ^actor.company_id or is_nil(assignment.company_id))) or
             (not role.is_system and role.company_id in ^company_ids and
+               role.company_id == assignment.company_id and
                assignment.company_id == ^actor.company_id),
         select: {role.id, role.grant_all},
         distinct: true
