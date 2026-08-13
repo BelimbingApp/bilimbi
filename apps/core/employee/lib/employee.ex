@@ -21,6 +21,8 @@ defmodule Bilimbi.Core.Employee do
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee.AdministrationIndex
   alias Bilimbi.Core.Employee.AdministrationPage
+  alias Bilimbi.Core.Employee.AffiliationLock
+  alias Bilimbi.Core.Employee.AffiliationProof
   alias Bilimbi.Core.Employee.EmployeeType
   alias Bilimbi.Core.Employee.Schema
   alias Bilimbi.Core.Employee.Summary
@@ -125,6 +127,26 @@ defmodule Bilimbi.Core.Employee do
       nil -> {:error, :employee_not_found}
       employee -> {:ok, Summary.from_schema(employee)}
     end
+  end
+
+  @doc """
+  Locks and proves one employee's affiliation with a live scoped company.
+
+  The caller must already be inside the shared Repo transaction. The returned
+  proof is valid only for that transaction and contains no Employee schema or
+  queryable. Callers that also lock User state must keep the global lock order:
+  Company, then Employee, then User, with ascending IDs within each module.
+
+  Missing, cross-tenant, and company-mismatched identities all fail as
+  `:not_found`. `:invariant_violation` is reserved for the protected platform
+  orchestrator, which is not available through this generic sibling-workflow
+  seam.
+  """
+  @spec lock_affiliation(Scope.t(), term(), term()) ::
+          {:ok, AffiliationProof.t()}
+          | {:error, :invariant_violation | :not_found | :transaction_required}
+  def lock_affiliation(%Scope{} = scope, company_id, employee_id) do
+    AffiliationLock.lock(scope, company_id, employee_id)
   end
 
   @spec create_employee(Scope.t(), pos_integer(), map()) ::
