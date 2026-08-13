@@ -1,12 +1,12 @@
 defmodule Bilimbi.Base.SessionTest do
   use Bilimbi.Base.Database.DataCase, async: true
 
+  alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Session.Contributions
   alias Bilimbi.Base.Session.Entry
   alias Bilimbi.Base.Session.Schema
   alias Bilimbi.Base.Session.Summary
-  alias Bilimbi.Base.Repo
 
   import Bilimbi.Base.Session.TestFixtures
 
