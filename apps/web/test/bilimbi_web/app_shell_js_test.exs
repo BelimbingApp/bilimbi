@@ -1,0 +1,34 @@
+defmodule BilimbiWeb.AppShellJsTest do
+  @moduledoc """
+  LiveViewTest cannot drive the colocated hook. These pin the modal-drawer
+  contract in the source so a later edit cannot drop inert/aria-modal
+  without a failing test.
+  """
+
+  use ExUnit.Case, async: true
+
+  @hook Path.expand("../../assets/js/app_shell.js", __DIR__)
+
+  setup do
+    {:ok, source: File.read!(@hook)}
+  end
+
+  test "closed mobile drawer is inert", %{source: source} do
+    assert source =~ ~S[this.sidebar.toggleAttribute("inert", hideDrawer)]
+    assert source =~ ~S[this.sidebar.setAttribute("aria-hidden", hideDrawer ? "true" : "false")]
+  end
+
+  test "open mobile drawer is a modal dialog and inerts the rest of the shell", %{source: source} do
+    assert source =~ ~S[this.sidebar.setAttribute("aria-modal", drawerOpen ? "true" : "false")]
+    assert source =~ ~S[this.sidebar.setAttribute("role", drawerOpen ? "dialog" : "navigation")]
+    assert source =~ "this.content, this.statusbar, this.topbarMain"
+    assert source =~ ~S[region.toggleAttribute("inert", drawerOpen)]
+  end
+
+  test "Escape closes the drawer and the toggle stays outside the inert region", %{source: source} do
+    assert source =~ ~S[if (event.key === "Escape")]
+    assert source =~ "this.closeDrawer()"
+    assert source =~ ~S[this.toggle = this.el.querySelector("#app-sidebar-toggle")]
+    refute source =~ "this.topbar.toggleAttribute"
+  end
+end

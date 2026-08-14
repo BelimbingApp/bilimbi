@@ -24,12 +24,9 @@ Before designing a page, ask what can be removed, what should be obvious, what
 should not be configurable, and where the page can feel more like a confident
 product than a pile of components.
 
-## Relationship to Belimbing
+## Product character
 
-Belimbing is the behavioral reference: its interaction contracts (neutral
-credential errors, throttled retries, two-phase sign-in handoff, sidebar with
-user footer) are preserved unless this document says otherwise. Bilimbi is
-not a reskin. Two deliberate distinctions define the Bilimbi look:
+Two choices define the Bilimbi look:
 
 1. **The workspace strip.** No screen is context-free. The login card names
    the platform workspace being entered (live provisioning state included);
@@ -39,8 +36,7 @@ not a reskin. Two deliberate distinctions define the Bilimbi look:
    `rounded-xl` surfaces, hairline rules, and tabular numerals for IDs and
    counts. The lime `brand` marks orientation only — the card's top edge,
    the active navigation item's spine, selection — and never reports status.
-   Where Belimbing is soft, arid, and pill-shaped, Bilimbi is ruled paper
-   with a bookmark.
+   The surface is ruled paper with a bookmark.
 
 ## Semantic color roles
 
@@ -106,14 +102,20 @@ Two shells exist and each stays minimal:
 - **`Layouts.auth`** — the centered credential layout for sign-in and password
   recovery. One quiet card with the brand bar, the wordmark above it, and the
   workspace strip below. No navigation, no marketing.
-- **`Layouts.app`** — the authenticated workspace shell. A compact sidebar
-  carries the brand, the primary navigation (Dashboard, Companies, Users) with
-  the active item marked by a brand spine, and the user footer with initials
-  and logout. The top strip always names the workspace: company on the left,
-  tenant on the right.
+- **`Layouts.app`** — the authenticated workspace shell: a compact full-width
+  top bar (sidebar toggle, transparent `size-6` brand mark, Bilimbi wordmark,
+  tenant on the right), a left menu rail with the active item marked by a
+  brand spine and a user footer with initials and logout, and a persistent
+  status bar (application version). In development only, the status bar
+  shows `dev` plus the listen address. Wide screens keep the rail; the
+  collapsed rail hides labels and logout, leaving the user initials.
+  Below `lg`, the menu is an off-canvas drawer. The logo is the product
+  mark on a transparent background — never a brand tile.
 
 The shell does not grow navigation items for pages that do not exist. A
-workflow joins the sidebar when its screen ships, not before.
+workflow joins the sidebar when its screen ships, not before. Notifications,
+theme, timezone, chat, and diagnostics controls appear only when a real
+route or API backs them.
 
 ## Gestalt grouping
 

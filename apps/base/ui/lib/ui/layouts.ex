@@ -7,12 +7,11 @@ defmodule Bilimbi.Base.UI.Layouts do
     * `auth/1` — the centered credential layout (login and, later, password
       reset). Compact card on the warm canvas with the Bilimbi brand bar;
       the page is otherwise quiet so the form reads first.
-    * `app/1` — the authenticated workspace shell: a compact sidebar with
-      primary navigation and the signed-in user footer, plus a top strip
-      that always names the workspace (tenant) the screen acts on.
+    * `app/1` — the authenticated workspace shell: a full-width top bar,
+      a left menu rail, and a persistent status bar. The top bar names the
+      tenant the screen acts on.
 
-  The workspace strip is a deliberate Bilimbi distinction from Belimbing:
-  no authenticated screen is context-free.
+  No authenticated screen is context-free.
   """
 
   use Phoenix.Component
@@ -26,7 +25,7 @@ defmodule Bilimbi.Base.UI.Layouts do
   use Phoenix.VerifiedRoutes,
     router: Bilimbi.Base.UI.RouteContract,
     endpoint: Bilimbi.Base.UI.ScriptPath,
-    statics: ~w(assets fonts images favicon.ico robots.txt)
+    statics: ~w(assets fonts images favicon.ico favicon.svg robots.txt)
 
   embed_templates("layouts/*")
 
@@ -42,18 +41,7 @@ defmodule Bilimbi.Base.UI.Layouts do
     <div class="flex min-h-svh flex-col items-center justify-center gap-6 p-6">
       <div class="flex w-full max-w-sm flex-col gap-5">
         <.link navigate={~p"/"} class="flex flex-col items-center gap-2.5" aria-label="Bilimbi home">
-          <span class="grid size-10 place-items-center rounded-xl bg-brand shadow-sm shadow-brand-ink/10">
-            <img
-              src={~p"/images/logo.svg"}
-              alt=""
-              class="size-6 object-contain"
-              width="24"
-              height="24"
-              decoding="async"
-              loading="eager"
-              aria-hidden="true"
-            />
-          </span>
+          <.brand_mark size={36} />
           <span class="text-base font-semibold tracking-tight text-ink-strong">Bilimbi</span>
         </.link>
 
@@ -86,107 +74,150 @@ defmodule Bilimbi.Base.UI.Layouts do
   # exactly that way before a reviewer caught it by reading, because a *missing*
   # attribute leaves nothing to grep for. Required makes it a compile error.
   # Pass nil deliberately for a page that owns no menu item.
-  attr(:active_nav, :string, required: true)
+  # `:any`, not `:string`: a page that owns no menu item must pass nil.
+  # Forbidding a missing attribute is the guard; forbidding "none" is not.
+  attr(:active_nav, :any, required: true)
   slot(:inner_block, required: true)
 
   def app(assigns) do
+    assigns = assign(assigns, :shell, shell_meta())
+
     ~H"""
-    <div class="flex h-screen overflow-hidden bg-canvas">
-      <aside
-        id="app-sidebar"
-        class="flex w-14 shrink-0 flex-col border-r border-line bg-surface lg:w-60"
+    <div
+      id="app-shell"
+      phx-hook="AppShell"
+      data-sidebar-mode="desktop"
+      data-sidebar-rail="false"
+      data-sidebar-open="false"
+      class="flex h-screen flex-col overflow-hidden bg-canvas"
+    >
+      <header
+        id="app-topbar"
+        class="flex h-7 shrink-0 items-center justify-between border-b border-line bg-surface px-2"
       >
-        <.link
-          navigate={~p"/dashboard"}
-          id="app-brand"
-          class="flex items-center justify-center gap-2.5 border-b border-line-subtle px-2 py-3.5 lg:justify-start lg:px-4"
-          aria-label="Bilimbi dashboard"
+        <button
+          type="button"
+          id="app-sidebar-toggle"
+          class="inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-action transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          aria-label="Toggle sidebar"
+          title="Toggle sidebar"
+          aria-controls="app-sidebar"
+          aria-expanded="false"
         >
-          <span class="grid size-8 shrink-0 place-items-center rounded-lg bg-brand">
-            <img
-              src={~p"/images/logo.svg"}
-              alt=""
-              class="size-5 object-contain"
-              width="20"
-              height="20"
-              decoding="async"
-              loading="eager"
-              aria-hidden="true"
-            />
-          </span>
-          <span class="hidden text-sm font-semibold tracking-tight text-ink-strong lg:inline">
-            Bilimbi
-          </span>
-        </.link>
+          <.icon name="hero-bars-3" class="size-5" />
+        </button>
 
-        <nav
-          id="app-nav"
-          aria-label="Main navigation"
-          class="flex-1 overflow-y-auto px-1.5 py-3 lg:px-2"
-        >
-          <p class="hidden px-2 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint select-none lg:block">
-            Workspace
-          </p>
-          <.nav_branch
-            :for={node <- Bilimbi.Base.UI.Nav.tree(@current_scope)}
-            node={node}
-            active_nav={@active_nav}
-            depth={0}
-          />
-        </nav>
+        <div id="app-topbar-main" class="flex min-w-0 flex-1 items-center justify-between gap-3">
+          <.link
+            navigate={~p"/dashboard"}
+            id="app-brand"
+            class="flex shrink-0 items-center gap-1.5 text-ink transition hover:opacity-90"
+            aria-label="Bilimbi dashboard"
+          >
+            <.brand_mark size={24} />
+            <span class="text-sm font-semibold tracking-tight text-ink-strong">Bilimbi</span>
+          </.link>
 
-        <div id="app-user" class="border-t border-line-subtle px-1.5 py-3 lg:px-3">
-          <div class="flex flex-col items-center gap-1.5 lg:flex-row lg:gap-2.5">
-            <span class="grid size-8 shrink-0 place-items-center rounded-full bg-action text-xs font-semibold text-action-ink">
-              {user_initials(@current_scope.user["name"])}
-            </span>
-            <div class="hidden min-w-0 flex-1 lg:block">
-              <p id="app-user-name" class="truncate text-sm font-medium text-ink">
-                {@current_scope.user["name"]}
-              </p>
-              <p class="truncate text-xs text-ink-subtle">{@current_scope.user["email"]}</p>
-            </div>
-            <.link
-              href={~p"/session"}
-              method="delete"
-              id="app-logout"
-              class="grid size-7 shrink-0 place-items-center rounded-md text-ink-subtle transition hover:bg-surface-sunken hover:text-ink"
-              aria-label="Log out"
-              title="Log out"
-            >
-              <.icon name="hero-arrow-right-on-rectangle" class="size-4" />
-            </.link>
-          </div>
-        </div>
-      </aside>
-
-      <div class="flex min-w-0 flex-1 flex-col">
-        <header
-          id="app-topbar"
-          class="flex h-12 shrink-0 items-center justify-between border-b border-line bg-surface px-5"
-        >
-          <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-            {@current_scope.user["company_name"] || "Workspace"}
-          </p>
           <p
             id="app-tenant"
-            class="flex items-center gap-1.5 text-xs text-ink-subtle"
-            title="Every screen in this shell acts on this tenant"
+            class="flex min-w-0 max-w-[50%] items-center gap-1.5 text-xs text-ink-subtle"
+            title={"Every screen in this shell acts on tenant #{@current_scope.scope.tenant.name}"}
           >
-            <.icon name="hero-identification" class="size-3.5" /> Tenant
-            <span class="tabular-nums font-medium text-ink-muted">
-              {@current_scope.scope.tenant.id}
+            <.icon name="hero-identification" class="size-3.5 shrink-0" />
+            <span class="hidden sm:inline">Tenant</span>
+            <span class="truncate font-medium text-ink-muted">
+              {@current_scope.scope.tenant.name}
             </span>
-            <span :if={@current_scope.scope.tenant.is_platform_operator} class="text-ink-faint">
+            <span class="tabular-nums">#{@current_scope.scope.tenant.id}</span>
+            <span
+              :if={@current_scope.scope.tenant.is_platform_operator}
+              class="hidden text-ink-faint sm:inline"
+            >
               · platform operator
             </span>
           </p>
-        </header>
+        </div>
+      </header>
 
-        <main id="app-content" class="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8">
+      <div class="relative flex min-h-0 flex-1 overflow-hidden">
+        <div
+          id="app-sidebar-backdrop"
+          class="app-sidebar-backdrop fixed inset-x-0 top-7 bottom-6 z-30 bg-ink/35 opacity-0 lg:hidden"
+          aria-hidden="true"
+        >
+        </div>
+
+        <aside
+          id="app-sidebar"
+          class="app-sidebar fixed top-7 bottom-6 left-0 z-40 flex w-56 shrink-0 flex-col border-r border-line bg-surface lg:static lg:inset-auto lg:top-auto lg:bottom-auto lg:z-auto lg:w-60"
+          tabindex="-1"
+          role="navigation"
+          aria-label="Main navigation"
+        >
+          <nav
+            id="app-nav"
+            aria-label="Main navigation"
+            class="flex-1 overflow-y-auto px-1 py-1"
+          >
+            <.nav_branch
+              :for={node <- Bilimbi.Base.UI.Nav.tree(@current_scope)}
+              node={node}
+              active_nav={@active_nav}
+              depth={0}
+            />
+          </nav>
+
+          <div id="app-user" class="border-t border-line px-1 py-1">
+            <div class="flex items-center gap-2 rounded-none px-1 py-0.5 text-sm text-ink-muted transition hover:bg-surface-sunken">
+              <span class="grid size-7 shrink-0 place-items-center rounded-full bg-action text-xs font-medium text-action-ink">
+                {user_initials(@current_scope.user["name"])}
+              </span>
+              <div class="app-user-expanded min-w-0 flex-1">
+                <p id="app-user-name" class="truncate text-sm font-medium text-ink">
+                  {@current_scope.user["name"]}
+                </p>
+                <p class="truncate text-xs text-ink-subtle">{@current_scope.user["email"]}</p>
+              </div>
+              <.link
+                href={~p"/session"}
+                method="delete"
+                id="app-logout"
+                class="grid size-6 shrink-0 place-items-center rounded-sm text-ink-subtle transition hover:bg-surface-sunken hover:text-ink"
+                aria-label="Log out"
+                title="Log out"
+              >
+                <.icon name="hero-arrow-right-on-rectangle" class="size-4" />
+              </.link>
+            </div>
+          </div>
+        </aside>
+
+        <main
+          id="app-content"
+          class="min-h-0 min-w-0 flex-1 overflow-y-auto px-1 py-2 sm:px-4 sm:py-1"
+        >
           {render_slot(@inner_block)}
         </main>
       </div>
+
+      <footer
+        id="app-statusbar"
+        class="flex h-6 shrink-0 items-center justify-between border-t border-line bg-surface px-4 text-xs text-ink-subtle"
+      >
+        <div class="flex min-w-0 items-center gap-4 overflow-hidden">
+          <span
+            :if={@shell.dev?}
+            id="app-env"
+            class="shrink-0 tabular-nums"
+            title={env_title(@shell)}
+          >
+            dev <span :if={@shell.listen_address} id="app-listen">{@shell.listen_address}</span>
+          </span>
+        </div>
+        <span id="app-version" class="shrink-0 tabular-nums" title={"Bilimbi #{@shell.version}"}>
+          v{@shell.version}
+        </span>
+      </footer>
     </div>
 
     <.flash_group flash={@flash} />
@@ -205,8 +236,9 @@ defmodule Bilimbi.Base.UI.Layouts do
       navigate={@navigate}
       id={@id}
       aria-current={@active && "page"}
+      title={render_slot(@inner_block)}
       class={[
-        "relative flex items-center justify-center gap-2.5 rounded-md px-2 py-2 text-sm transition lg:justify-start lg:py-1.5",
+        "app-nav-item relative flex items-center gap-2.5 rounded-none px-2 py-1.5 text-sm transition",
         @active && "bg-surface-sunken font-medium text-ink-strong",
         !@active && "text-ink-muted hover:bg-surface-sunken hover:text-ink"
       ]}
@@ -217,7 +249,7 @@ defmodule Bilimbi.Base.UI.Layouts do
         aria-hidden="true"
       ></span>
       <.icon name={@icon} class={["size-4 shrink-0", @active && "text-brand-strong"]} />
-      <span class="hidden truncate lg:inline">{render_slot(@inner_block)}</span>
+      <span class="app-nav-label truncate">{render_slot(@inner_block)}</span>
     </.link>
     """
   end
@@ -240,7 +272,7 @@ defmodule Bilimbi.Base.UI.Layouts do
 
     <p
       :if={is_nil(@node.item.route) and @node.children != []}
-      class="hidden px-2 pt-3 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint select-none lg:block"
+      class="app-nav-section px-2 pt-3 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint select-none"
     >
       {@node.item.label}
     </p>
@@ -269,6 +301,42 @@ defmodule Bilimbi.Base.UI.Layouts do
   end
 
   defp user_initials(_), do: "?"
+
+  attr(:size, :integer, required: true)
+
+  defp brand_mark(assigns) do
+    ~H"""
+    <img
+      src={~p"/images/logo.svg"}
+      alt=""
+      class={[
+        "shrink-0 object-contain",
+        @size == 36 && "size-9",
+        @size == 24 && "size-6"
+      ]}
+      width={@size}
+      height={@size}
+      decoding="async"
+      loading="eager"
+      aria-hidden="true"
+    />
+    """
+  end
+
+  # Mix env :dev is the only environment chrome. Test and prod render none
+  # of it. There is no separate debug flag.
+  defp shell_meta do
+    dev? = Application.get_env(:bilimbi_base_ui, :mix_env, :prod) == :dev
+
+    %{
+      dev?: dev?,
+      listen_address: if(dev?, do: Application.get_env(:bilimbi_base_ui, :listen_address)),
+      version: Application.get_env(:bilimbi_base_ui, :app_version, "0.1.0")
+    }
+  end
+
+  defp env_title(%{listen_address: address}) when is_binary(address), do: "dev · #{address}"
+  defp env_title(_shell), do: "dev"
 
   attr(:flash, :map, required: true)
   attr(:id, :string, default: "flash-group")

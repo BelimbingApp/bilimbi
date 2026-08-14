@@ -3,6 +3,7 @@
 @source "../css";
 @source "../js";
 @source "../../lib/bilimbi_web";
+@source "../../../../apps/base/ui/lib/ui";
 @source "../../../../_build/dev/phoenix-colocated/web/*/";
 
 @plugin "../vendor/heroicons";
@@ -84,4 +85,68 @@
 
 body {
   min-width: 20rem;
+}
+
+/* Authenticated shell chrome. Geometry matches Belimbing: full-width top
+ * bar, persistent rail on wide screens, off-canvas drawer below `lg`.
+ * The AppShell hook writes data attributes; reduced-motion skips the
+ * drawer transform. Rail styles apply only at `lg+` — the mobile drawer
+ * always shows labels, the same as Belimbing's honorRail=false copy. */
+@media (min-width: 1024px) {
+  #app-shell[data-sidebar-rail="true"] #app-sidebar {
+    width: 3.5rem;
+  }
+
+  #app-shell[data-sidebar-rail="true"] .app-nav-label,
+  #app-shell[data-sidebar-rail="true"] .app-nav-section,
+  #app-shell[data-sidebar-rail="true"] .app-user-expanded,
+  #app-shell[data-sidebar-rail="true"] #app-logout {
+    display: none;
+  }
+
+  #app-shell[data-sidebar-rail="true"] .app-nav-item {
+    justify-content: center;
+  }
+
+  #app-shell[data-sidebar-rail="true"] #app-user > div {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 1023px) {
+  #app-sidebar {
+    transform: translateX(-100%);
+  }
+
+  #app-shell[data-sidebar-open="false"] #app-sidebar {
+    transform: translateX(-100%);
+    pointer-events: none;
+  }
+
+  #app-shell[data-sidebar-open="true"] #app-sidebar {
+    transform: translateX(0);
+  }
+
+  #app-shell[data-sidebar-open="false"] #app-sidebar-backdrop {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  #app-shell[data-sidebar-open="true"] #app-sidebar-backdrop {
+    opacity: 1;
+  }
+
+  #app-sidebar,
+  #app-sidebar-backdrop {
+    transition-property: transform, opacity;
+    transition-duration: 200ms;
+    transition-timing-function: ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #app-sidebar,
+    #app-sidebar-backdrop {
+      transition: none;
+    }
+  }
 }

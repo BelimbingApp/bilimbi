@@ -23,6 +23,7 @@ defmodule BilimbiWeb.LoginLiveTest do
     {:ok, view, _html} = live(conn, ~p"/")
 
     assert has_element?(view, "#auth-card")
+    assert has_element?(view, "img[src='/images/logo.svg']")
     assert has_element?(view, "#login-form[action='/session'][method='post']")
     assert has_element?(view, "#login-email[autocomplete='email']")
     assert has_element?(view, "#login-password[autocomplete='current-password']")

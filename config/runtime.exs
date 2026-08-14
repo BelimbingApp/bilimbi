@@ -19,7 +19,7 @@ if config_env() == :dev do
         ~r"apps/web/priv/gettext/.*\.po$"E,
         ~r"apps/web/lib/bilimbi_web/router\.ex$"E,
         ~r"apps/web/lib/bilimbi_web/(controllers|live|components)/.*\.(ex|heex)$"E,
-        ~r"apps/[^/]+/[^/]+/lib/.*\.ex$"E
+        ~r"apps/[^/]+/[^/]+/lib/.*\.(ex|heex)$"E
       ]
     ]
 end

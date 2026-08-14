@@ -45,7 +45,7 @@ defmodule Bilimbi.Base.UI do
       use Phoenix.VerifiedRoutes,
         router: Bilimbi.Base.UI.RouteContract,
         endpoint: Bilimbi.Base.UI.ScriptPath,
-        statics: ~w(assets fonts images favicon.ico robots.txt)
+        statics: ~w(assets fonts images favicon.ico favicon.svg robots.txt)
     end
   end
 

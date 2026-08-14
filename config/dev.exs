@@ -1,5 +1,24 @@
 import Config
 
+# Mix-time only: config/*.exs may load the discovery helpers that live
+# beside ModuleRegistry. Runtime modules never call this file.
+discovery_files =
+  Path.wildcard(Path.expand("../apps/base/*/mix/module_discovery.exs", __DIR__))
+
+discovery_file =
+  case discovery_files do
+    [path] ->
+      path
+
+    [] ->
+      raise "expected apps/base/*/mix/module_discovery.exs, found none"
+
+    paths ->
+      raise "expected one module_discovery.exs, found #{inspect(paths)}"
+  end
+
+Code.require_file(discovery_file)
+
 database_options =
   case System.get_env("DATABASE_URL") do
     nil ->
@@ -28,12 +47,18 @@ config :web, BilimbiWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}],
   check_origin: false,
   code_reloader: true,
+  reloadable_apps:
+    Bilimbi.Base.ModuleRegistry.MixDiscovery.reloadable_apps(Path.expand("..", __DIR__)),
   debug_errors: true,
   secret_key_base: "JLKsxHDXUNLBR8WIgU06I8gkdAmnpr1yLlN9mLPa3XNGisoNFgS6GuVuABPfqtwQ",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:bilimbi_web, ~w(--sourcemap=inline --watch)]},
     tailwind: {Tailwind, :install_and_run, [:bilimbi_web, ~w(--watch)]}
   ]
+
+# Same bind the Endpoint uses. The shell reads this key, not :web, so
+# base/ui never reaches across the application boundary for a display string.
+config :bilimbi_base_ui, :listen_address, "127.0.0.1"
 
 config :web, dev_routes: true
 config :web, BilimbiWeb.Mailer, adapter: Swoosh.Adapters.Local

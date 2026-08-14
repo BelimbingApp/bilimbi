@@ -53,6 +53,46 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
            ]
   end
 
+  test "reloadable apps are the discovered module OTP apps plus the web host", %{root: root} do
+    put_container!(root, "base", :base)
+    put_container!(root, "people", :domain)
+    put_container!(root, "acme", :extension)
+    put_module!(root, "base", "ui")
+    put_module!(root, "people", "employee", dependencies: ["base/ui"])
+    put_module!(root, "acme", "payroll_export", dependencies: ["people/employee"])
+
+    assert MixDiscovery.reloadable_apps(root) == [
+             :test_base_ui,
+             :test_people_employee,
+             :test_acme_payroll_export,
+             :web
+           ]
+  end
+
+  test "reloadable apps fail closed on a malformed descriptor", %{root: root} do
+    put_container!(root, "base", :base)
+    put_module!(root, "base", "ui")
+
+    File.write!(
+      Path.join([root, "apps", "base", "ui", "bilimbi.module.exs"]),
+      "[:not_a_keyword]\n"
+    )
+
+    assert_raise ArgumentError, ~r/descriptor must return a keyword list/, fn ->
+      MixDiscovery.reloadable_apps(root)
+    end
+  end
+
+  test "reloadable apps fail closed on a duplicate OTP application ID", %{root: root} do
+    put_container!(root, "base", :base)
+    put_module!(root, "base", "one")
+    put_module!(root, "base", "two", otp_app: :test_base_one)
+
+    assert_raise ArgumentError, ~r/duplicate OTP application ID/, fn ->
+      MixDiscovery.reloadable_apps(root)
+    end
+  end
+
   test "container dependencies and tests are generated from immediate module directories", %{
     root: root
   } do
