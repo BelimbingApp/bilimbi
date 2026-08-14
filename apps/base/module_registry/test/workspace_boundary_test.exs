@@ -41,7 +41,8 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
       id: "base/settings",
       app: :bilimbi_base_settings,
       facade: "lib/settings.ex",
-      migrations: "priv/repo/migrations"
+      migrations: "priv/repo/migrations",
+      web: "priv/web_routes.exs"
     },
     %{
       root: Path.join(@base_root, "session"),

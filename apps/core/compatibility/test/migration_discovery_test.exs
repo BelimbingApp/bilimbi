@@ -8,9 +8,14 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
     migration_modules = ModuleRegistry.migration_modules!()
     migration_paths = Compatibility.migration_paths()
 
+    # base/settings and base/session declare identical dependencies, so they
+    # share a tier and the tiebreak orders them alphabetically. base/settings
+    # led until it took a base/ui dependency for its group screen and joined
+    # base/session's tier. Safe to reorder: neither reads the other's tables,
+    # and the ascending-order assertion below is the real invariant.
     assert Enum.map(migration_modules, & &1.id) == [
-             "base/settings",
              "base/session",
+             "base/settings",
              "base/tenancy",
              "base/audit",
              "base/authz",
