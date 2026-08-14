@@ -4,6 +4,27 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
   @query_module Bilimbi.Core.UserAdministration.Query
   @repo_module [:Bilimbi, :Base, :Repo]
   @ecto_query_module [:Ecto, :Query]
+  @approved_dynamic_dispatches [
+    {[:Enum], :all?},
+    {[:Enum], :any?},
+    {[:Enum], :count},
+    {[:Enum], :filter},
+    {[:Enum], :find},
+    {[:Enum], :map},
+    {[:Enum], :reduce},
+    {[:Enum], :reject},
+    {[:Enum], :sort_by},
+    {[:Keyword], :fetch},
+    {[:Keyword], :get},
+    {[:List], :first},
+    {[:List], :last},
+    {[:Map], :fetch},
+    {[:Map], :get},
+    {[:String], :contains?},
+    {[:String], :ends_with?},
+    {[:String], :starts_with?},
+    {[:String], :trim}
+  ]
   @forbidden_owner_modules [
     [:Bilimbi, :Core, :User, :Schema],
     [:Bilimbi, :Core, :Company, :Schema],
@@ -95,6 +116,8 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
       delegates: Enum.flat_map(modules, & &1.delegates),
       module_references: Enum.flat_map(modules, & &1.module_references),
       repo_calls: Enum.flat_map(modules, & &1.repo_calls),
+      dynamic_dispatches: Enum.flat_map(modules, & &1.dynamic_dispatches),
+      module_constructions: Enum.flat_map(modules, & &1.module_constructions),
       sources: Enum.flat_map(modules, & &1.sources),
       fragments: Enum.flat_map(modules, & &1.fragments),
       function_bodies: Enum.flat_map(modules, & &1.function_bodies)
@@ -117,7 +140,7 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
 
   defp analyze_module(%{module: module, body: body}, file) do
     aliases = aliases(body, module, file)
-    repo_aliases = repo_aliases(aliases)
+    alias_map = alias_map(aliases)
     forms = block_forms(body)
 
     function_bodies =
@@ -142,11 +165,13 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
       module: module,
       aliases: aliases,
       imports: directives(body, [:import, :require, :use], module, file),
-      delegates: delegates(body, module, file, repo_aliases),
+      delegates: delegates(body, module, file, alias_map),
       module_references: module_references(body, module, file),
-      repo_calls: Enum.flat_map(contexts, &repo_calls(&1, file, repo_aliases)),
-      sources: Enum.flat_map(contexts, &source_sites(&1, file)),
-      fragments: Enum.flat_map(contexts, &fragment_sites(&1, file)),
+      repo_calls: Enum.flat_map(contexts, &repo_calls(&1, file, alias_map)),
+      dynamic_dispatches: Enum.flat_map(contexts, &dynamic_dispatches(&1, file, alias_map)),
+      module_constructions: Enum.flat_map(contexts, &module_constructions(&1, file, alias_map)),
+      sources: Enum.flat_map(contexts, &source_sites(&1, file, alias_map)),
+      fragments: Enum.flat_map(contexts, &fragment_sites(&1, file, alias_map)),
       function_bodies: function_bodies
     }
   end
@@ -255,14 +280,93 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
     Enum.reverse(calls)
   end
 
-  defp source_sites(context, file) do
+  defp dynamic_dispatches(context, file, alias_map) do
+    {_ast, dispatches} =
+      Macro.prewalk(context.ast, [], fn
+        {:apply, meta, [target, function, arguments]} = node, dispatches ->
+          {node,
+           [
+             dynamic_dispatch(context, file, :apply, target, function, arguments, meta, alias_map)
+             | dispatches
+           ]}
+
+        {{:., _dot_meta, [receiver, :apply]}, meta, [target, function, arguments]} = node,
+        dispatches ->
+          if resolve_module(receiver, alias_map) in [[:Kernel], [:erlang]] do
+            {node,
+             [
+               dynamic_dispatch(
+                 context,
+                 file,
+                 :remote_apply,
+                 target,
+                 function,
+                 arguments,
+                 meta,
+                 alias_map
+               )
+               | dispatches
+             ]}
+          else
+            {node, dispatches}
+          end
+
+        node, dispatches ->
+          {node, dispatches}
+      end)
+
+    Enum.reverse(dispatches)
+  end
+
+  defp dynamic_dispatch(context, file, kind, target, function, arguments, meta, alias_map) do
+    %{
+      module: context.module,
+      function_context: context.function,
+      kind: kind,
+      target: resolve_module(target, alias_map),
+      target_ast: Macro.to_string(target),
+      dispatched_function: literal_atom(function),
+      arguments_ast: Macro.to_string(arguments),
+      file: file,
+      meta: meta
+    }
+  end
+
+  defp module_constructions(context, file, alias_map) do
+    {_ast, constructions} =
+      Macro.prewalk(context.ast, [], fn
+        {{:., _dot_meta, [receiver, function]}, meta, arguments} = node, constructions
+        when function in [:concat, :safe_concat] ->
+          if resolve_module(receiver, alias_map) == [:Module] do
+            construction = %{
+              module: context.module,
+              function_context: context.function,
+              function: function,
+              arguments: arguments,
+              file: file,
+              meta: meta
+            }
+
+            {node, [construction | constructions]}
+          else
+            {node, constructions}
+          end
+
+        node, constructions ->
+          {node, constructions}
+      end)
+
+    Enum.reverse(constructions)
+  end
+
+  defp source_sites(context, file, alias_map) do
     {_ast, sites} =
       Macro.prewalk(context.ast, [], fn
         {:from, meta, arguments} = node, sites ->
           {node, sources_from(:from, meta, arguments, context, file) ++ sites}
 
         {{:., _dot_meta, [receiver, :from]}, meta, arguments} = node, sites ->
-          if module_parts(receiver) == @ecto_query_module do
+          if query_infrastructure?(resolve_module(receiver, alias_map)) do
             {node, sources_from(:from, meta, arguments, context, file) ++ sites}
           else
             {node, sites}
@@ -272,7 +376,7 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
           {node, sources_from(:join, meta, arguments, context, file) ++ sites}
 
         {{:., _dot_meta, [receiver, :join]}, meta, arguments} = node, sites ->
-          if module_parts(receiver) == @ecto_query_module do
+          if query_infrastructure?(resolve_module(receiver, alias_map)) do
             {node, sources_from(:join, meta, arguments, context, file) ++ sites}
           else
             {node, sites}
@@ -334,14 +438,14 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
     }
   end
 
-  defp fragment_sites(context, file) do
+  defp fragment_sites(context, file, alias_map) do
     {_ast, sites} =
       Macro.prewalk(context.ast, [], fn
         {:fragment, meta, arguments} = node, sites ->
           {node, [fragment_site(arguments, meta, context, file) | sites]}
 
         {{:., _dot_meta, [receiver, :fragment]}, meta, arguments} = node, sites ->
-          if module_parts(receiver) == @ecto_query_module do
+          if query_infrastructure?(resolve_module(receiver, alias_map)) do
             {node, [fragment_site(arguments, meta, context, file) | sites]}
           else
             {node, sites}
@@ -385,8 +489,8 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
                        alias_info.as == :Repo) ->
             [violation(alias_info, "Repo alias is outside the approved Query alias")]
 
-          alias_info.target == @ecto_query_module ->
-            [violation(alias_info, "aliasing Ecto.Query is forbidden")]
+          query_infrastructure?(alias_info.target) ->
+            [violation(alias_info, "aliasing Ecto.Query infrastructure is forbidden")]
 
           true ->
             []
@@ -399,9 +503,12 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
           directive.target == @repo_module ->
             [violation(directive, "Repo import/require/use is forbidden")]
 
-          directive.target == @ecto_query_module and
+          directive.target == [:Module] ->
+            [violation(directive, "importing/requiring Module construction helpers is forbidden")]
+
+          query_infrastructure?(directive.target) and
               not (analysis.file == query_file and directive.module == @query_module and
-                       directive.directive == :import) ->
+                     directive.directive == :import and directive.target == @ecto_query_module) ->
             [violation(directive, "Ecto.Query may only be imported by the private Query")]
 
           true ->
@@ -434,17 +541,37 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
         end
       end)
 
+    dispatch_violations =
+      for dispatch <- analysis.dynamic_dispatches,
+          not approved_dynamic_dispatch?(dispatch),
+          do:
+            violation(
+              dispatch,
+              "dynamic module dispatch is not a statically harmless approved target/function: #{inspect({dispatch.target, dispatch.dispatched_function})}"
+            )
+
+    construction_violations =
+      for construction <- analysis.module_constructions,
+          do:
+            violation(construction, "Module.concat/safe_concat target construction is forbidden")
+
     query_builder_violations =
       for reference <- analysis.module_references,
-          reference.target == @ecto_query_module,
+          query_infrastructure?(reference.target),
           not approved_ecto_query_reference?(reference, query_file),
-          do: violation(reference, "Ecto.Query reference is outside the private Query")
+          do:
+            violation(
+              reference,
+              "Ecto.Query infrastructure reference is outside the private Query"
+            )
 
     alias_violations ++
       directive_violations ++
       delegate_violations ++
       owner_violations ++
-      repo_reference_violations ++ repo_violations ++ query_builder_violations
+      repo_reference_violations ++
+      repo_violations ++
+      dispatch_violations ++ construction_violations ++ query_builder_violations
   end
 
   defp validate_sources(analyses, manifest, query_file, options \\ []) do
@@ -578,6 +705,10 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
       call.meta[:column] > 0 and match?([{:query, _, _}], call.args)
   end
 
+  defp approved_dynamic_dispatch?(dispatch) do
+    {dispatch.target, dispatch.dispatched_function} in @approved_dynamic_dispatches
+  end
+
   defp approved_repo_reference?(reference, query_file) do
     reference.file == query_file and reference.module == @query_module and
       reference.meta[:line] == 6 and reference.meta[:column] > 0
@@ -623,11 +754,7 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
 
   defp normalize_fragment_argument(argument), do: {:other, Macro.to_string(argument)}
 
-  defp repo_aliases(aliases) do
-    aliases
-    |> Enum.filter(&(&1.target == @repo_module))
-    |> Map.new(&{&1.as, @repo_module})
-  end
+  defp alias_map(aliases), do: Map.new(aliases, &{&1.as, &1.target})
 
   defp resolve_module(ast, aliases) do
     case module_parts(ast) do
@@ -640,6 +767,12 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
   defp module_parts(nil), do: []
   defp module_parts(atom) when is_atom(atom), do: [atom]
   defp module_parts(_other), do: []
+
+  defp query_infrastructure?([:Ecto, :Query | _descendants]), do: true
+  defp query_infrastructure?(_module), do: false
+
+  defp literal_atom(atom) when is_atom(atom), do: atom
+  defp literal_atom(_ast), do: :dynamic
 
   defp module_name(ast), do: ast |> module_parts() |> Module.concat()
 

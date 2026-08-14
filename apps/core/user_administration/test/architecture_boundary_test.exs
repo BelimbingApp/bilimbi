@@ -80,6 +80,91 @@ defmodule Bilimbi.Core.UserAdministration.ArchitectureBoundaryTest do
     end)
   end
 
+  test "approved Repo alias cannot escape through Kernel or unqualified apply" do
+    mutations = [
+      ~S|Kernel.apply(Repo, :query!, ["SELECT password FROM users"])|,
+      ~S|apply(Repo, :query!, ["SELECT password FROM users"])|
+    ]
+
+    Enum.each(mutations, fn expression ->
+      assert query_violations(expression)
+             |> Enum.any?(&String.contains?(&1, "dynamic module dispatch"))
+    end)
+
+    full_module = """
+    defmodule Sneaky do
+      def read, do: Kernel.apply(Bilimbi.Base.Repo, :query!, ["SELECT password FROM users"])
+    end
+    """
+
+    alternate_alias = """
+    defmodule Sneaky do
+      alias Bilimbi.Base.Repo, as: Database
+      def read, do: apply(Database, :query!, ["SELECT password FROM users"])
+    end
+    """
+
+    for source <- [full_module, alternate_alias] do
+      assert Enum.any?(violations(source), &String.contains?(&1, "dynamic module dispatch"))
+    end
+  end
+
+  test "computed apply targets and Module.concat construction fail closed" do
+    dynamic_target = """
+    defmodule Sneaky do
+      def read(target, query), do: apply(target, :all, [query])
+    end
+    """
+
+    constructed_target = """
+    defmodule Sneaky do
+      alias Module, as: Builder
+
+      def read do
+        target = Builder.concat([Bilimbi, Base, Repo])
+        apply(target, :query!, ["SELECT password FROM users"])
+      end
+    end
+    """
+
+    assert Enum.any?(violations(dynamic_target), &String.contains?(&1, "dynamic module dispatch"))
+
+    assert Enum.any?(
+             violations(constructed_target),
+             &String.contains?(&1, "target construction")
+           )
+  end
+
+  test "Ecto.Query descendants and their aliases remain query infrastructure" do
+    mutations = [
+      ~S"""
+      defmodule Sneaky do
+        def read(role), do: Ecto.Query.API.fragment("SELECT * FROM users", role.id)
+      end
+      """,
+      ~S"""
+      defmodule Sneaky do
+        alias Ecto.Query.API, as: QueryAPI
+        def read(role), do: QueryAPI.fragment("SELECT * FROM users", role.id)
+      end
+      """
+    ]
+
+    Enum.each(mutations, fn source ->
+      assert Enum.any?(violations(source), &String.contains?(&1, "Ecto.Query infrastructure"))
+    end)
+  end
+
+  test "literal reviewed standard-library dispatch remains harmless" do
+    source = """
+    defmodule Harmless do
+      def count(values), do: Kernel.apply(Enum, :count, [values])
+    end
+    """
+
+    assert violations(source) == []
+  end
+
   test "copied and dynamic Ecto sources outside the exact Query sites fail" do
     mutations = [
       """
@@ -142,6 +227,26 @@ defmodule Bilimbi.Core.UserAdministration.ArchitectureBoundaryTest do
     ArchitecturePolicy.validate_source(
       source,
       Path.join(@module_root, "lib/sneaky.ex"),
+      ConsumedRelations.manifest(),
+      @query_file
+    )
+  end
+
+  defp query_violations(expression) do
+    source = """
+    defmodule Bilimbi.Core.UserAdministration.Query do
+      @moduledoc false
+
+      import Ecto.Query
+
+      alias Bilimbi.Base.Repo
+      def escape, do: #{expression}
+    end
+    """
+
+    ArchitecturePolicy.validate_source(
+      source,
+      @query_file,
       ConsumedRelations.manifest(),
       @query_file
     )
