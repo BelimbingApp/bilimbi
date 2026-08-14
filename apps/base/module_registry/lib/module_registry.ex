@@ -9,6 +9,7 @@ defmodule Bilimbi.Base.ModuleRegistry do
   """
 
   @layers [:base, :core, :domain, :extension]
+  @migration_dispositions [:compatible_baseline, :bilimbi_only]
 
   @spec installed_modules!() :: [map()]
   def installed_modules! do
@@ -28,6 +29,7 @@ defmodule Bilimbi.Base.ModuleRegistry do
     |> validate_unique!(:order, "resolved module order")
     |> Enum.sort_by(& &1.order)
     |> validate_resolved_order!()
+    |> validate_migrations!()
   end
 
   defp validate_unique_graph_fingerprint!(modules) do
@@ -50,6 +52,23 @@ defmodule Bilimbi.Base.ModuleRegistry do
   def migration_paths! do
     Enum.map(migration_modules!(), fn descriptor ->
       Application.app_dir(descriptor.otp_app, descriptor.migrations)
+    end)
+  end
+
+  @spec migration_dispositions!() :: %{pos_integer() => :compatible_baseline | :bilimbi_only}
+  def migration_dispositions! do
+    migration_modules!()
+    |> Enum.reduce(%{}, fn descriptor, dispositions ->
+      Enum.reduce(descriptor.migration_dispositions, dispositions, fn {version, disposition},
+                                                                      acc ->
+        case Map.fetch(acc, version) do
+          :error ->
+            Map.put(acc, version, disposition)
+
+          {:ok, _existing} ->
+            raise ArgumentError, "duplicate migration version: #{version}"
+        end
+      end)
     end)
   end
 
@@ -105,6 +124,95 @@ defmodule Bilimbi.Base.ModuleRegistry do
     end)
 
     modules
+  end
+
+  defp validate_migrations!(modules) do
+    Enum.each(modules, &validate_module_migrations!/1)
+
+    duplicates =
+      modules
+      |> Enum.flat_map(fn descriptor ->
+        descriptor |> Map.get(:migration_dispositions, %{}) |> Map.keys()
+      end)
+      |> Enum.frequencies()
+      |> Enum.filter(fn {_version, count} -> count > 1 end)
+      |> Enum.map(&elem(&1, 0))
+      |> Enum.sort()
+
+    if duplicates != [] do
+      raise ArgumentError, "duplicate migration versions: #{inspect(duplicates)}"
+    end
+
+    modules
+  end
+
+  defp validate_module_migrations!(%{migrations: nil} = descriptor) do
+    if Map.has_key?(descriptor, :migration_dispositions) do
+      raise ArgumentError,
+            "module #{descriptor.id} must omit migration_dispositions when migrations is nil"
+    end
+  end
+
+  defp validate_module_migrations!(%{migrations: migrations} = descriptor)
+       when is_binary(migrations) do
+    unless valid_relative_path?(migrations) do
+      raise ArgumentError, "module #{descriptor.id} has an unsafe migration path"
+    end
+
+    dispositions = Map.get(descriptor, :migration_dispositions)
+
+    unless is_map(dispositions) and map_size(dispositions) > 0 and
+             Enum.all?(dispositions, fn {version, disposition} ->
+               is_integer(version) and version > 0 and disposition in @migration_dispositions
+             end) do
+      raise ArgumentError,
+            "module #{descriptor.id} has invalid migration_dispositions metadata"
+    end
+
+    migration_dir = Application.app_dir(descriptor.otp_app, migrations)
+
+    unless File.dir?(migration_dir) do
+      raise ArgumentError, "module #{descriptor.id} migration directory is missing"
+    end
+
+    file_versions = migration_versions!(descriptor.id, migration_dir)
+    declared_versions = dispositions |> Map.keys() |> Enum.sort()
+
+    unless file_versions == declared_versions do
+      raise ArgumentError,
+            "module #{descriptor.id} migration_dispositions versions #{inspect(declared_versions)} " <>
+              "do not match migration files #{inspect(file_versions)}"
+    end
+  end
+
+  defp validate_module_migrations!(descriptor) do
+    raise ArgumentError, "module #{descriptor.id} has invalid migrations metadata"
+  end
+
+  defp migration_versions!(module_id, migration_dir) do
+    versions =
+      migration_dir
+      |> Path.join("*.exs")
+      |> Path.wildcard()
+      |> Enum.map(fn migration_path ->
+        case Regex.run(~r/^(\d+)_.*\.exs$/, Path.basename(migration_path),
+               capture: :all_but_first
+             ) do
+          [version] -> String.to_integer(version)
+          _other -> raise ArgumentError, "module #{module_id} has an invalid migration filename"
+        end
+      end)
+      |> Enum.sort()
+
+    if length(versions) != length(Enum.uniq(versions)) do
+      raise ArgumentError, "module #{module_id} has duplicate migration versions"
+    end
+
+    versions
+  end
+
+  defp valid_relative_path?(path) do
+    path != "" and Path.type(path) == :relative and ".." not in Path.split(path)
   end
 
   defp layer_rank(layer), do: Enum.find_index(@layers, &(&1 == layer))

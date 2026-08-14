@@ -93,6 +93,94 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
     refute MixDiscovery.workspace_fingerprint(root) == first_fingerprint
   end
 
+  test "migration dispositions are explicit, exact, and fingerprinted", %{root: root} do
+    put_container!(root, "base", :base)
+
+    module_root =
+      put_module!(root, "base", "database",
+        migrations: "priv/repo/migrations",
+        migration_dispositions: %{20_260_814_120_000 => :compatible_baseline}
+      )
+
+    migration_dir = Path.join(module_root, "priv/repo/migrations")
+    File.mkdir_p!(migration_dir)
+    migration_path = Path.join(migration_dir, "20260814120000_create_baseline.exs")
+    File.write!(migration_path, "defmodule TestMigration do\nend\n")
+
+    assert [descriptor] = MixDiscovery.discover_workspace!(root)
+
+    assert descriptor.migration_dispositions == %{
+             20_260_814_120_000 => :compatible_baseline
+           }
+
+    first_fingerprint = MixDiscovery.workspace_fingerprint(root)
+    File.write!(migration_path, "defmodule UpdatedTestMigration do\nend\n")
+    refute MixDiscovery.workspace_fingerprint(root) == first_fingerprint
+  end
+
+  test "rejects missing, unknown, and non-exact migration dispositions", %{root: root} do
+    put_container!(root, "base", :base)
+
+    module_root =
+      put_module!(root, "base", "database",
+        migrations: "priv/repo/migrations",
+        omit_migration_dispositions: true
+      )
+
+    migration_dir = Path.join(module_root, "priv/repo/migrations")
+    File.mkdir_p!(migration_dir)
+    File.write!(Path.join(migration_dir, "20260814120000_create_baseline.exs"), "[]\n")
+
+    assert_raise ArgumentError, ~r/expected keys.*migration_dispositions/, fn ->
+      MixDiscovery.discover_workspace!(root)
+    end
+
+    File.rm_rf!(module_root)
+
+    module_root =
+      put_module!(root, "base", "database",
+        migrations: "priv/repo/migrations",
+        migration_dispositions: %{20_260_814_120_000 => :unknown}
+      )
+
+    migration_dir = Path.join(module_root, "priv/repo/migrations")
+    File.mkdir_p!(migration_dir)
+    File.write!(Path.join(migration_dir, "20260814120000_create_baseline.exs"), "[]\n")
+
+    assert_raise ArgumentError, ~r/migration_dispositions must map positive versions/, fn ->
+      MixDiscovery.discover_workspace!(root)
+    end
+
+    File.rm_rf!(module_root)
+
+    module_root =
+      put_module!(root, "base", "database",
+        migrations: "priv/repo/migrations",
+        migration_dispositions: %{20_260_814_120_001 => :bilimbi_only}
+      )
+
+    migration_dir = Path.join(module_root, "priv/repo/migrations")
+    File.mkdir_p!(migration_dir)
+    File.write!(Path.join(migration_dir, "20260814120000_create_baseline.exs"), "[]\n")
+
+    assert_raise ArgumentError, ~r/do not match migration files/, fn ->
+      MixDiscovery.discover_workspace!(root)
+    end
+  end
+
+  test "rejects an unsafe migration path before reading dispositions", %{root: root} do
+    put_container!(root, "base", :base)
+
+    put_module!(root, "base", "database",
+      migrations: "../outside",
+      migration_dispositions: %{20_260_814_120_000 => :compatible_baseline}
+    )
+
+    assert_raise ArgumentError, ~r/migrations must be nil or a safe relative path/, fn ->
+      MixDiscovery.discover_workspace!(root)
+    end
+  end
+
   test "validates and publishes the descriptor-owned contribution provider", %{root: root} do
     put_container!(root, "base", :base)
 
@@ -159,6 +247,26 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
     end
   end
 
+  test "rejects duplicate migration versions across modules", %{root: root} do
+    put_container!(root, "base", :base)
+
+    for name <- ["one", "two"] do
+      module_root =
+        put_module!(root, "base", name,
+          migrations: "priv/repo/migrations",
+          migration_dispositions: %{20_260_814_120_000 => :compatible_baseline}
+        )
+
+      migration_dir = Path.join(module_root, "priv/repo/migrations")
+      File.mkdir_p!(migration_dir)
+      File.write!(Path.join(migration_dir, "20260814120000_create_#{name}.exs"), "[]\n")
+    end
+
+    assert_raise ArgumentError, ~r/duplicate migration versions.*20260814120000/, fn ->
+      MixDiscovery.discover_workspace!(root)
+    end
+  end
+
   test "rejects missing dependencies and dependency cycles", %{root: root} do
     put_container!(root, "base", :base)
     put_module!(root, "base", "one", dependencies: ["base/missing"])
@@ -203,10 +311,16 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
     put_container!(root, "core", :core)
     put_module!(root, "base", "database")
 
-    put_module!(root, "core", "user",
-      dependencies: ["base/database"],
-      schema_contract: Test.Core.User.SchemaContract
-    )
+    user_root =
+      put_module!(root, "core", "user",
+        dependencies: ["base/database"],
+        migrations: "priv/repo/migrations",
+        migration_dispositions: %{20_260_814_120_000 => :compatible_baseline}
+      )
+
+    migration_dir = Path.join(user_root, "priv/repo/migrations")
+    File.mkdir_p!(migration_dir)
+    File.write!(Path.join(migration_dir, "20260814120000_create_user.exs"), "[]\n")
 
     put_module!(root, "core", "compatibility", dependencies: ["base/database"])
 
@@ -383,6 +497,18 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
       schema_contract: Keyword.get(overrides, :schema_contract, nil),
       contribution_provider: Keyword.get(overrides, :contribution_provider, nil)
     ]
+
+    descriptor =
+      if descriptor[:migrations] &&
+           not Keyword.get(overrides, :omit_migration_dispositions, false) do
+        Keyword.put(
+          descriptor,
+          :migration_dispositions,
+          Keyword.get(overrides, :migration_dispositions, %{})
+        )
+      else
+        descriptor
+      end
 
     File.write!(
       Path.join(path, "bilimbi.module.exs"),

@@ -7,6 +7,10 @@
   namespace: Bilimbi.Core.Company,
   dependencies: ["base/authz", "base/database", "base/module_registry", "base/tenancy"],
   migrations: "priv/repo/migrations",
+  migration_dispositions: %{
+    20_260_811_093_956 => :compatible_baseline,
+    20_260_811_093_957 => :compatible_baseline
+  },
   web: nil,
   schema_contract: Bilimbi.Core.Company.SchemaContract,
   contribution_provider: Bilimbi.Core.Company.Contributions

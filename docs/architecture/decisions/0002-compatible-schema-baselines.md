@@ -73,14 +73,15 @@ apps/core/user/priv/repo/migrations/
 These are the current contributing paths, not a hard-coded coordinator list.
 The Compatibility coordinator discovers every installed module descriptor
 whose `migrations` field is non-null and composes those paths through the shared
-Repo and ledger. It uses globally unique Ecto versions with strict deterministic
-ordering: declared dependencies first, then Base → Core → Domain → Extension
-and stable module ID as tie-breakers. Migration versions remain globally
-monotonic as modules are added. Because Bilimbi has not yet been distributed,
-the current ledger is a clean sequence of six module baselines: Tenancy,
-Company, Geonames, Address, Employee, then User. Address's baseline runs after
-Geonames and creates its normalization foreign keys directly. Employee and
-User follow Company and complete their respective cross-module foreign keys.
+Repo and ledger. Each such descriptor maps every owned migration version to
+either `:compatible_baseline` or `:bilimbi_only`; missing, extra, unknown, or
+duplicate classifications fail at Mix time and runtime. It uses globally
+unique Ecto versions with deterministic ordering. The current graph contains
+eleven compatible-baseline versions contributed by Base Session, Tenancy,
+Settings, Authz, and Audit plus Core Company, Geonames, Address, Employee, and
+User; Company owns two versions. Address's baseline runs after Geonames and
+creates its normalization foreign keys directly. Employee and User follow
+Company and complete their respective cross-module foreign keys.
 Ownership is expressed by the module descriptor and path; version numbers
 provide global execution order rather than permanent numeric ranges for
 layers.
@@ -151,7 +152,8 @@ does not claim every Belimbing seeder has been ported.
 
 ### Fresh installation
 
-`mix bilimbi.migrate` runs all installed descriptor-contributed paths together.
+`mix bilimbi.migrate` runs all installed descriptor-contributed migrations
+through Core Compatibility's disposition and ledger validation.
 `mix setup` includes this command. A fresh migration:
 
 - creates `bilimbi_schema_migrations` and never creates Laravel's ledger;
@@ -171,13 +173,16 @@ An existing database uses an explicit two-step contract:
 1. `mix bilimbi.schema.verify` compares its current PostgreSQL structure and
    identity invariants with the pinned contract.
 2. `mix bilimbi.schema.adopt` repeats verification and, only after success,
-   records the Bilimbi baseline versions without executing their DDL.
+   records only compatible-baseline versions without executing their DDL.
 
-An existing Bilimbi ledger that is an exact prefix of the current baseline may
-be advanced by the same verify-and-adopt command. This handles a previously
-adopted Belimbing database whose newly owned tables and constraints already
-exist. A fresh Bilimbi database missing those structures fails verification and
-runs the later migrations normally; a non-prefix ledger remains a conflict.
+Recorded compatible versions and recorded Bilimbi-only versions must each be a
+prefix of their installed class sequence, and every recorded version must be
+installed. Adoption may advance only the compatible sequence. It never records
+a Bilimbi-only version. A later compatible baseline can therefore be adopted
+while an earlier Bilimbi-only migration remains pending; the operational
+migrate command accepts that validated class gap and executes the pending
+migration normally. A fresh database runs both classes; a foreign or
+class-non-prefix ledger remains a conflict.
 
 Verification checks owned columns, types, nullability, defaults, named indexes
 including the partial predicate, single and composite foreign keys, and

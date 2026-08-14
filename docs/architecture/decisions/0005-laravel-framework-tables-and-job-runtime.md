@@ -97,10 +97,10 @@ Enqueueing must occur transactionally with the business change when loss or a
 phantom job would violate the capability contract. Oban uniqueness is an
 insertion-time aid, not a substitute for idempotent business behavior.
 
-### Extend adoption before adding a Bilimbi-only migration
+### Classify adoption before adding a Bilimbi-only migration
 
-The Base Queue implementation is blocked on an explicit migration-disposition
-contract. Compatibility must distinguish at least:
+Installed migration descriptors explicitly classify every owned version.
+Compatibility distinguishes:
 
 1. **compatible baselines**, whose current structure already exists in a
    pinned Belimbing database and may be ledger-adopted after strict
@@ -108,11 +108,14 @@ contract. Compatibility must distinguish at least:
 2. **Bilimbi-only migrations**, which must execute normally and must never be
    marked complete merely because the Belimbing-compatible slice verified.
 
-That distinction must remain deterministic, inspectable through the installed
-module graph, and covered by fresh-database, untouched-Belimbing adoption, and
-already-adopted-prefix tests. Until it exists, no Oban migration or dependency
-may land. This prevents `bilimbi.schema.adopt` from recording an absent
-`oban_jobs` table as migrated.
+The distinction is deterministic and inspectable through the installed module
+graph. Mix-time and runtime validation require exact version coverage. Fresh
+databases execute both classes; untouched-Belimbing adoption records only the
+verified compatible class; class-prefix validation lets normal migration run
+pending Bilimbi-only work even when a later compatible version is already
+recorded. This prevents `bilimbi.schema.adopt` from recording an absent
+`oban_jobs` table as migrated without requiring compatible baselines to remain
+a permanent global prefix.
 
 ### Cut over without translating queued payloads
 
