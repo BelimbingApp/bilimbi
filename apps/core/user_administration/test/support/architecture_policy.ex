@@ -273,6 +273,50 @@ defmodule Bilimbi.Core.UserAdministration.ArchitecturePolicy do
               {node, calls}
           end
 
+        # Detect apply/3 and Kernel.apply/3 that dispatch to Repo. This closes
+        # the dynamic-dispatch escape: Kernel.apply(Repo, :query!, [...])
+        # produces no dotted Repo call, so the guard above does not see it.
+        {:apply, meta, [target | _rest]} = node, calls ->
+          case resolve_module(target, repo_aliases) do
+            @repo_module ->
+              call = %{
+                module: context.module,
+                function_context: context.function,
+                function: :apply,
+                args: [target],
+                receiver: module_parts(target),
+                file: file,
+                meta: meta
+              }
+
+              {node, [call | calls]}
+
+            _other ->
+              {node, calls}
+          end
+
+        {{:., _dot_meta, [{:__aliases__, _apply_meta, [:Kernel]}, :apply]}, meta,
+         [target | _rest]} =
+            node,
+        calls ->
+          case resolve_module(target, repo_aliases) do
+            @repo_module ->
+              call = %{
+                module: context.module,
+                function_context: context.function,
+                function: :apply,
+                args: [target],
+                receiver: module_parts(target),
+                file: file,
+                meta: meta
+              }
+
+              {node, [call | calls]}
+
+            _other ->
+              {node, calls}
+          end
+
         node, calls ->
           {node, calls}
       end)

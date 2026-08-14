@@ -72,6 +72,28 @@ defmodule Bilimbi.Core.UserAdministration.ArchitectureBoundaryTest do
       defmodule Sneaky do
         defdelegate read(query), to: Bilimbi.Base.Repo, as: :all
       end
+      """,
+      ~S"""
+      defmodule Sneaky do
+        alias Bilimbi.Base.Repo
+        def read(query), do: apply(Repo, :query!, [query])
+      end
+      """,
+      ~S"""
+      defmodule Sneaky do
+        alias Bilimbi.Base.Repo
+        def read(query), do: Kernel.apply(Repo, :query!, [query])
+      end
+      """,
+      ~S"""
+      defmodule Sneaky do
+        def read(query), do: apply(Bilimbi.Base.Repo, :query!, [query])
+      end
+      """,
+      ~S"""
+      defmodule Sneaky do
+        def read(query), do: Kernel.apply(Bilimbi.Base.Repo, :query!, [query])
+      end
       """
     ]
 
