@@ -80,7 +80,12 @@ defmodule Bilimbi.Base.UI.Layouts do
   slot(:inner_block, required: true)
 
   def app(assigns) do
-    assigns = assign(assigns, :shell, shell_meta())
+    nav = Bilimbi.Base.UI.Nav.tree(assigns.current_scope)
+
+    assigns =
+      assigns
+      |> assign(:shell, shell_meta())
+      |> assign(:nav, nav)
 
     ~H"""
     <div
@@ -93,7 +98,7 @@ defmodule Bilimbi.Base.UI.Layouts do
     >
       <header
         id="app-topbar"
-        class="flex h-7 shrink-0 items-center justify-between border-b border-line bg-surface px-2"
+        class="flex h-7 shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-3"
       >
         <button
           type="button"
@@ -111,7 +116,7 @@ defmodule Bilimbi.Base.UI.Layouts do
           <.link
             navigate={~p"/dashboard"}
             id="app-brand"
-            class="flex shrink-0 items-center gap-1.5 text-ink transition hover:opacity-90"
+            class="flex shrink-0 items-center gap-2 text-ink transition hover:opacity-90"
             aria-label="Bilimbi dashboard"
           >
             <.brand_mark size={24} />
@@ -139,7 +144,7 @@ defmodule Bilimbi.Base.UI.Layouts do
         </div>
       </header>
 
-      <div class="relative flex min-h-0 flex-1 overflow-hidden">
+      <div id="app-workspace" class="relative flex min-h-0 flex-1 overflow-hidden">
         <div
           id="app-sidebar-backdrop"
           class="app-sidebar-backdrop fixed inset-x-0 top-7 bottom-6 z-30 bg-ink/35 opacity-0 lg:hidden"
@@ -160,11 +165,22 @@ defmodule Bilimbi.Base.UI.Layouts do
             class="flex-1 overflow-y-auto px-1 py-1"
           >
             <.nav_branch
-              :for={node <- Bilimbi.Base.UI.Nav.tree(@current_scope)}
+              :for={node <- @nav}
               node={node}
               active_nav={@active_nav}
               depth={0}
             />
+            <p
+              :if={@nav == []}
+              id="app-nav-empty"
+              class="app-nav-empty px-2 py-3 text-xs leading-snug text-ink-subtle"
+            >
+              No navigation is available for this account. An operator needs to
+              assign a role — in development, run
+              <code class="font-medium text-ink-muted">mix bilimbi.authz.reconcile</code>
+              then assign <code class="font-medium text-ink-muted">core_admin</code>
+              to this user.
+            </p>
           </nav>
 
           <div id="app-user" class="border-t border-line px-1 py-1">
@@ -191,6 +207,15 @@ defmodule Bilimbi.Base.UI.Layouts do
             </div>
           </div>
         </aside>
+
+        <div
+          id="app-sidebar-drag"
+          class="app-sidebar-drag relative z-20 hidden w-2 shrink-0 cursor-col-resize hover:bg-surface-sunken lg:block"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+        >
+        </div>
 
         <main
           id="app-content"

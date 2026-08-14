@@ -10,8 +10,8 @@ defmodule Bilimbi.Base.UI.NavTest do
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.UI.Nav
 
-  # `/dashboard` is contributed by base/menu and served by base/session, so it
-  # is in this app's manifest. Anything under /nowhere never will be.
+  # `/dashboard` is served by the web host, so it is in this app's manifest.
+  # Anything under /nowhere never will be.
   @served "/dashboard"
   @unserved "/nowhere/at/all"
 

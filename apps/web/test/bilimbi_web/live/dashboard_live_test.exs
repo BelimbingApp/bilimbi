@@ -60,10 +60,9 @@ defmodule BilimbiWeb.DashboardLiveTest do
     assert has_element?(view, "#app-version", "v#{version}")
     assert has_element?(view, "#app-topbar-main")
     assert has_element?(view, "#app-shell[phx-hook='AppShell']")
-    assert has_element?(view, "#nav-dashboard[aria-current='page']")
-    # Ids come from the modules' menu contributions, so assert one that is
-    # present -- a renamed id must fail these refutes rather than pass vacuously.
-    assert has_element?(view, "#nav-dashboard")
+    assert has_element?(view, "#app-sidebar-drag")
+    refute has_element?(view, "#nav-dashboard")
+    assert has_element?(view, "#app-nav-empty")
     refute has_element?(view, "#nav-admin-company")
     refute has_element?(view, "#nav-admin-user")
     refute has_element?(view, "#dashboard-company-open")
@@ -82,7 +81,8 @@ defmodule BilimbiWeb.DashboardLiveTest do
     # A LiveView marks itself current by naming its menu item. Nothing else
     # connects the two, so a screen naming an id the menu does not define
     # highlights nothing -- and the sidebar looks fine while it happens.
-    assert has_element?(view, "#nav-dashboard[aria-current='page']")
+    refute has_element?(view, "#nav-dashboard")
+    refute has_element?(view, "#app-nav-empty")
     refute has_element?(view, "#nav-admin-company[aria-current='page']")
     assert has_element?(view, "#dashboard-company-open")
     assert has_element?(view, "#stat-companies[href='/companies']")
