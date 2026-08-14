@@ -46,6 +46,7 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       |> Keyword.put(:name, PlatformBaselineTestRepo)
       |> Keyword.put(:database, database)
       |> Keyword.put(:pool, DBConnection.ConnectionPool)
+      |> Keyword.put(:pool_size, 1)
 
     Application.put_env(
       :bilimbi_base_database,
@@ -58,6 +59,7 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
     end)
 
     start_supervised!(PlatformBaselineTestRepo)
+    assert PlatformBaselineTestRepo.config()[:pool_size] == 1
 
     %{env: [{"MIX_TEST_PARTITION", "_#{partition}"}]}
   end
