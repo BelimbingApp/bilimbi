@@ -60,6 +60,7 @@ defmodule BilimbiWeb.UserLiveTest do
       conn |> log_in_as() |> live(~p"/users")
 
     assert has_element?(view, "#users-index")
+    assert has_element?(view, "#users-search[placeholder='Search by name or email...']")
     assert has_element?(view, "#nav-admin-user[aria-current='page']")
   end
 
