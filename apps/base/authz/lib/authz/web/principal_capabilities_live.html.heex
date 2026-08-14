@@ -98,7 +98,7 @@
       </table>
 
       <p :if={@page.total_entries == 0} class="px-4 py-8 text-center text-sm text-ink-muted">
-        {if @state.search == "" and @state.result == "" and @state.principal_type == "",
+        {if @state.search == "" and @state.result == "",
           do: "No capabilities have been granted directly in this tenant.",
           else: "No direct capabilities match these filters."}
       </p>

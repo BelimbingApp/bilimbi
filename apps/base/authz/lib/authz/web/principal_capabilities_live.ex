@@ -108,7 +108,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
       search: Map.get(params, "search", ""),
       result: member_or_blank(Map.get(params, "result"), @results),
       sort_by: sort_by_from(Map.get(params, "sort_by")),
-      sort_dir: if(Map.get(params, "sort_dir") == "asc", do: :asc, else: :desc),
+      sort_dir: sort_dir_from(params),
       page: to_int(Map.get(params, "page"), 1)
     }
   end
@@ -133,6 +133,16 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
 
   defp sort_by_from(value) when value in @sortable, do: String.to_existing_atom(value)
   defp sort_by_from(_value), do: :created_at
+
+  # A URL naming a column but no direction must mean what clicking that column
+  # means. Defaulting everything to :desc made ?sort_by=capability render
+  # descending while the header that produces it sorts ascending -- the same
+  # link, two different pages.
+  defp sort_dir_from(%{"sort_dir" => "asc"}), do: :asc
+  defp sort_dir_from(%{"sort_dir" => "desc"}), do: :desc
+
+  defp sort_dir_from(params),
+    do: params |> Map.get("sort_by") |> sort_by_from() |> default_direction()
 
   defp to_int(nil, default), do: default
 

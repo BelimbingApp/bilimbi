@@ -138,10 +138,29 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
     assert has_element?(view, "#grants-result option[value=''][selected]")
   end
 
-  test "lists the very grant that let the viewer in", %{conn: conn} do
-    # Reaching this page requires a direct capability, and that grant is itself
-    # a row here -- so like the decision log, the empty state is unreachable in
-    # practice. I expected an empty page and was wrong; pinning the truth.
+  test "renders the empty state for a viewer whose access comes from a role", %{
+    conn: conn,
+    scope: scope
+  } do
+    # The production path my earlier test missed. `grant_capabilities!/1`
+    # grants the route capability *directly*, which puts a row on this very
+    # page and hides the empty state. Reach the page through a role instead and
+    # there is genuinely nothing to list -- which is where a stale reference to
+    # a filter I had removed crashed with a KeyError.
+    {:ok, role} = Authz.create_role(scope, 73, %{name: "Auditors", code: "auditors"})
+
+    {:ok, _} =
+      Authz.replace_role_capabilities(scope, role.id, ["admin.authz.principal-capability.list"])
+
+    {:ok, :assigned} = Authz.assign_role(scope, 73, :user, 91, role.id)
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/principal-capabilities")
+
+    assert render(view) =~ "No capabilities have been granted directly"
+  end
+
+  test "a direct grant of the route capability lists itself", %{conn: conn} do
+    # The other half: granted directly, the grant is a row here.
     {:ok, view, _html} = open(conn)
 
     assert has_element?(
@@ -149,8 +168,22 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
              "#principal-capabilities",
              "admin.authz.principal-capability.list"
            )
+  end
 
-    refute render(view) =~ "No capabilities have been granted directly"
+  test "a sort URL means what clicking that column means", %{conn: conn, scope: scope} do
+    grant(scope, "admin.company.list", true)
+    grant_capabilities!("admin.authz.principal-capability.list")
+
+    # Same column, two routes to it: the link and the header. They must agree,
+    # or a shared URL shows a different page than the click that produced it.
+    {:ok, from_url, _html} =
+      conn |> log_in_as() |> live(~p"/authz/principal-capabilities?sort_by=capability")
+
+    assert has_element?(from_url, "#grants-sort-capability .hero-chevron-up")
+
+    {:ok, from_click, _html} = open(conn)
+    from_click |> element("#grants-sort-capability") |> render_click()
+    assert %{"sort_dir" => "asc"} = patched_params(from_click)
   end
 
   defp patched_params(view) do
