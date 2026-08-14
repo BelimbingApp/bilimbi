@@ -1,0 +1,120 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.authz.role">
+  <div class="mx-auto max-w-6xl">
+    <.header>
+      Roles
+      <:subtitle>
+        System roles ship with the platform; custom roles belong to a company in this tenant
+      </:subtitle>
+    </.header>
+
+    <form id="roles-filters" phx-change="search" phx-submit="search" class="mt-5">
+      <label for="roles-search" class="sr-only">Search roles</label>
+      <input
+        type="search"
+        id="roles-search"
+        name="search"
+        value={@state.search}
+        placeholder="Search name, code or description"
+        phx-debounce="300"
+        autocomplete="off"
+        class="w-full max-w-sm rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
+      />
+    </form>
+
+    <div class="mt-4 overflow-x-auto rounded-xl border border-line bg-surface">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-line bg-surface-sunken">
+          <tr>
+            <th
+              :for={{column, label} <- [{"name", "Name"}, {"code", "Code"}, {"is_system", "Scope"}]}
+              class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle"
+            >
+              <button
+                type="button"
+                id={"roles-sort-#{column}"}
+                phx-click="sort"
+                phx-value-column={column}
+                class="inline-flex items-center gap-1 hover:text-ink"
+              >
+                {label}
+                <.icon
+                  :if={sort_indicator(@state, String.to_existing_atom(column))}
+                  name={sort_indicator(@state, String.to_existing_atom(column))}
+                  class="size-3"
+                />
+              </button>
+            </th>
+            <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+              Capabilities
+            </th>
+            <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+              Principals
+            </th>
+          </tr>
+        </thead>
+        <tbody id="roles" phx-update="stream" class="divide-y divide-line-subtle">
+          <tr :for={{dom_id, role} <- @streams.roles} id={dom_id} class="hover:bg-surface-sunken">
+            <td class="px-4 py-2.5">
+              <.link
+                navigate={~p"/authz/roles/#{role.id}"}
+                class="font-medium text-ink-strong hover:underline"
+              >
+                {role.name}
+              </.link>
+              <p :if={role.description} class="text-xs text-ink-subtle">{role.description}</p>
+            </td>
+            <td class="px-4 py-2.5 font-mono text-xs text-ink-muted">{role.code}</td>
+            <td class="px-4 py-2.5">
+              <.badge kind={scope_kind(role)}>{scope_label(role)}</.badge>
+              <.badge :if={role.grant_all} kind={:warning} class="ml-1">Grants all</.badge>
+            </td>
+            <td class="px-4 py-2.5 tabular-nums text-ink-muted">
+              <%= if role.grant_all do %>
+                <span title="A grant-all role carries every capability, present and future">
+                  All
+                </span>
+              <% else %>
+                {role.capability_count}
+              <% end %>
+            </td>
+            <td class="px-4 py-2.5 tabular-nums text-ink-muted">{role.principal_count}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p :if={@page.total_entries == 0} class="px-4 py-8 text-center text-sm text-ink-muted">
+        {if @state.search == "",
+          do: "No roles are visible in this tenant.",
+          else: "No roles match #{@state.search}."}
+      </p>
+    </div>
+
+    <div
+      :if={@page.total_pages > 1}
+      id="roles-pagination"
+      class="mt-3 flex items-center justify-between text-sm"
+    >
+      <p class="text-ink-subtle">
+        Page {@page.page} of {@page.total_pages} · {@page.total_entries} roles
+      </p>
+      <div class="flex gap-2">
+        <.button
+          :if={@page.page > 1}
+          id="roles-prev"
+          phx-click="page"
+          phx-value-page={@page.page - 1}
+        >
+          Previous
+        </.button>
+        <.button
+          :if={@page.page < @page.total_pages}
+          id="roles-next"
+          phx-click="page"
+          phx-value-page={@page.page + 1}
+        >
+          Next
+        </.button>
+      </div>
+    </div>
+  </div>
+</Layouts.app>
