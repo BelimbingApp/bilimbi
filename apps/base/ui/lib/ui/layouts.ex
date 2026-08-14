@@ -73,9 +73,12 @@ defmodule Bilimbi.Base.UI.Layouts do
   # nothing is current, and the page still looks right. Two screens shipped
   # exactly that way before a reviewer caught it by reading, because a *missing*
   # attribute leaves nothing to grep for. Required makes it a compile error.
-  # Pass nil deliberately for a page that owns no menu item.
-  # `:any`, not `:string`: a page that owns no menu item must pass nil.
-  # Forbidding a missing attribute is the guard; forbidding "none" is not.
+  #
+  # `:any` rather than `:string` so `nil` is expressible: some pages genuinely
+  # own no menu item -- Belimbing's profile screen is one -- and the guard
+  # exists to forbid *forgetting*, not to forbid saying "none". Typed
+  # `:string`, the honest answer was a compile warning, which would have
+  # pushed the next author into inventing a menu id to satisfy the compiler.
   attr(:active_nav, :any, required: true)
   slot(:inner_block, required: true)
 
