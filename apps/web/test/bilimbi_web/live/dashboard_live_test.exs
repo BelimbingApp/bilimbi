@@ -58,6 +58,8 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
     version = Application.get_env(:bilimbi_base_ui, :app_version, "0.1.0")
     assert has_element?(view, "#app-version", "v#{version}")
+    assert has_element?(view, "#app-topbar-main")
+    assert has_element?(view, "#app-shell[phx-hook='AppShell']")
     assert has_element?(view, "#nav-dashboard[aria-current='page']")
     # Ids come from the modules' menu contributions, so assert one that is
     # present -- a renamed id must fail these refutes rather than pass vacuously.

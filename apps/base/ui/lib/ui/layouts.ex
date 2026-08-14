@@ -74,7 +74,9 @@ defmodule Bilimbi.Base.UI.Layouts do
   # exactly that way before a reviewer caught it by reading, because a *missing*
   # attribute leaves nothing to grep for. Required makes it a compile error.
   # Pass nil deliberately for a page that owns no menu item.
-  attr(:active_nav, :string, required: true)
+  # `:any`, not `:string`: a page that owns no menu item must pass nil.
+  # Forbidding a missing attribute is the guard; forbidding "none" is not.
+  attr(:active_nav, :any, required: true)
   slot(:inner_block, required: true)
 
   def app(assigns) do
@@ -93,19 +95,19 @@ defmodule Bilimbi.Base.UI.Layouts do
         id="app-topbar"
         class="flex h-7 shrink-0 items-center justify-between border-b border-line bg-surface px-2"
       >
-        <div class="flex min-w-0 items-center gap-3">
-          <button
-            type="button"
-            id="app-sidebar-toggle"
-            class="inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-action transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-            aria-label="Toggle sidebar"
-            title="Toggle sidebar"
-            aria-controls="app-sidebar"
-            aria-expanded="false"
-          >
-            <.icon name="hero-bars-3" class="size-5" />
-          </button>
+        <button
+          type="button"
+          id="app-sidebar-toggle"
+          class="inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-action transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          aria-label="Toggle sidebar"
+          title="Toggle sidebar"
+          aria-controls="app-sidebar"
+          aria-expanded="false"
+        >
+          <.icon name="hero-bars-3" class="size-5" />
+        </button>
 
+        <div id="app-topbar-main" class="flex min-w-0 flex-1 items-center justify-between gap-3">
           <.link
             navigate={~p"/dashboard"}
             id="app-brand"
@@ -115,26 +117,26 @@ defmodule Bilimbi.Base.UI.Layouts do
             <.brand_mark size={24} />
             <span class="text-sm font-semibold tracking-tight text-ink-strong">Bilimbi</span>
           </.link>
-        </div>
 
-        <p
-          id="app-tenant"
-          class="flex min-w-0 max-w-[50%] items-center gap-1.5 text-xs text-ink-subtle"
-          title={"Every screen in this shell acts on tenant #{@current_scope.scope.tenant.name}"}
-        >
-          <.icon name="hero-identification" class="size-3.5 shrink-0" />
-          <span class="hidden sm:inline">Tenant</span>
-          <span class="truncate font-medium text-ink-muted">
-            {@current_scope.scope.tenant.name}
-          </span>
-          <span class="tabular-nums">#{@current_scope.scope.tenant.id}</span>
-          <span
-            :if={@current_scope.scope.tenant.is_platform_operator}
-            class="hidden text-ink-faint sm:inline"
+          <p
+            id="app-tenant"
+            class="flex min-w-0 max-w-[50%] items-center gap-1.5 text-xs text-ink-subtle"
+            title={"Every screen in this shell acts on tenant #{@current_scope.scope.tenant.name}"}
           >
-            · platform operator
-          </span>
-        </p>
+            <.icon name="hero-identification" class="size-3.5 shrink-0" />
+            <span class="hidden sm:inline">Tenant</span>
+            <span class="truncate font-medium text-ink-muted">
+              {@current_scope.scope.tenant.name}
+            </span>
+            <span class="tabular-nums">#{@current_scope.scope.tenant.id}</span>
+            <span
+              :if={@current_scope.scope.tenant.is_platform_operator}
+              class="hidden text-ink-faint sm:inline"
+            >
+              · platform operator
+            </span>
+          </p>
+        </div>
       </header>
 
       <div class="relative flex min-h-0 flex-1 overflow-hidden">
@@ -149,6 +151,8 @@ defmodule Bilimbi.Base.UI.Layouts do
           id="app-sidebar"
           class="app-sidebar fixed top-7 bottom-6 left-0 z-40 flex w-56 shrink-0 flex-col border-r border-line bg-surface lg:static lg:inset-auto lg:top-auto lg:bottom-auto lg:z-auto lg:w-60"
           tabindex="-1"
+          role="navigation"
+          aria-label="Main navigation"
         >
           <nav
             id="app-nav"

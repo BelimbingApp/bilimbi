@@ -12,6 +12,9 @@ const AppShell = {
     this.toggle = this.el.querySelector("#app-sidebar-toggle")
     this.sidebar = this.el.querySelector("#app-sidebar")
     this.backdrop = this.el.querySelector("#app-sidebar-backdrop")
+    this.content = this.el.querySelector("#app-content")
+    this.topbarMain = this.el.querySelector("#app-topbar-main")
+    this.statusbar = this.el.querySelector("#app-statusbar")
     this.mq = window.matchMedia(DESKTOP)
     this.rail = window.localStorage.getItem("sidebarRail") === "1"
     this.drawerOpen = false
@@ -135,16 +138,25 @@ const AppShell = {
       this.toggle.setAttribute("aria-expanded", open ? "true" : "false")
     }
 
+    const drawerOpen = !desktop && this.drawerOpen
+    const hideDrawer = !desktop && !this.drawerOpen
+
     if (this.sidebar) {
-      const hideDrawer = !desktop && !this.drawerOpen
       this.sidebar.toggleAttribute("inert", hideDrawer)
       this.sidebar.setAttribute("aria-hidden", hideDrawer ? "true" : "false")
+      this.sidebar.setAttribute("aria-modal", drawerOpen ? "true" : "false")
+      this.sidebar.setAttribute("role", drawerOpen ? "dialog" : "navigation")
+    }
+
+    for (const region of [this.content, this.statusbar, this.topbarMain]) {
+      if (!region) continue
+      region.toggleAttribute("inert", drawerOpen)
+      region.setAttribute("aria-hidden", drawerOpen ? "true" : "false")
     }
 
     if (this.backdrop) {
-      const showBackdrop = open && !desktop
-      this.backdrop.setAttribute("aria-hidden", showBackdrop ? "false" : "true")
-      this.backdrop.style.pointerEvents = showBackdrop ? "auto" : "none"
+      this.backdrop.setAttribute("aria-hidden", drawerOpen ? "false" : "true")
+      this.backdrop.style.pointerEvents = drawerOpen ? "auto" : "none"
     }
   },
 }

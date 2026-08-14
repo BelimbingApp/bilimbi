@@ -56,29 +56,9 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   @spec reloadable_apps(String.t()) :: [atom()]
   def reloadable_apps(workspace_root) do
     workspace_root
-    |> Path.expand()
-    |> Path.join("apps/*/*/#{@module_file}")
-    |> Path.wildcard()
-    |> Enum.sort()
-    |> Enum.map(&otp_app_from_descriptor!/1)
-    |> Enum.concat([:web])
-    |> Enum.uniq()
-  end
-
-  defp otp_app_from_descriptor!(path) do
-    case evaluate_descriptor!(path, "module") do
-      value when is_list(value) ->
-        case Keyword.get(value, :otp_app) do
-          otp_app when is_atom(otp_app) and not is_nil(otp_app) ->
-            otp_app
-
-          other ->
-            malformed!(path, "otp_app must be a non-nil atom, got #{inspect(other)}")
-        end
-
-      _other ->
-        malformed!(path, "descriptor must return a keyword list")
-    end
+    |> discover_workspace!()
+    |> Enum.map(& &1.otp_app)
+    |> Kernel.++([:web])
   end
 
   @doc "Returns local path dependencies for modules installed in a container."
