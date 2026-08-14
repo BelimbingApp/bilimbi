@@ -7,7 +7,7 @@ defmodule Bilimbi.Core.UserAdministration.ArchitectureBoundaryTest do
   @module_root Path.expand("..", __DIR__)
   @query_file Path.join(@module_root, "lib/user_administration/query.ex")
 
-  test "the descriptor has exactly the reviewed graph and no product contribution" do
+  test "the descriptor has the reviewed graph and only the transferred web route contribution" do
     {descriptor, _binding} = Code.eval_file(Path.join(@module_root, "bilimbi.module.exs"))
 
     assert descriptor == [
@@ -22,11 +22,12 @@ defmodule Bilimbi.Core.UserAdministration.ArchitectureBoundaryTest do
                "base/database",
                "base/module_registry",
                "base/tenancy",
+               "base/ui",
                "core/company",
                "core/user"
              ],
              migrations: nil,
-             web: nil,
+             web: "priv/web_routes.exs",
              schema_contract: nil,
              contribution_provider: nil
            ]

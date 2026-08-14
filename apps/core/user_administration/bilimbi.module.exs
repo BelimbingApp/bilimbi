@@ -10,11 +10,12 @@
     "base/database",
     "base/module_registry",
     "base/tenancy",
+    "base/ui",
     "core/company",
     "core/user"
   ],
   migrations: nil,
-  web: nil,
+  web: "priv/web_routes.exs",
   schema_contract: nil,
   contribution_provider: nil
 ]
