@@ -6,6 +6,9 @@ defmodule Bilimbi.Core.Compatibility.PlatformBaselineFailureDiagnosticsTest do
   alias Bilimbi.Core.Compatibility.PlatformBaselineFailureDiagnostics, as: Diagnostics
 
   @safe_nested_output "nested command failed safely"
+  @workspace_root Path.expand("../../../..", __DIR__)
+  @local_diagnostics_root Path.join(@workspace_root, "_build/test/e2e-diagnostics")
+  @selector_env_keys ~w(BELIMBING_APP_KEY BILIMBI_E2E_DIAGNOSTICS_DIR GITHUB_ACTIONS RUNNER_TEMP)
 
   test "captures the original assertion, stack, seed, and nested command status" do
     parent = self()
@@ -121,6 +124,106 @@ defmodule Bilimbi.Core.Compatibility.PlatformBaselineFailureDiagnosticsTest do
     known_value = "UNLABELED_CONFIGURED_CANARY"
 
     refute Diagnostics.redact_for_test("value=#{known_value}", [known_value]) =~ known_value
+  end
+
+  test "configured application key is redacted through the ordinary capture and write path" do
+    preserve_environment(@selector_env_keys)
+    preserve_application_env(:bilimbi_base_settings, :belimbing_app_key)
+
+    output_dir = unique_local_output_dir("configured-key")
+    on_exit(fn -> File.rm_rf!(output_dir) end)
+
+    canary = "base64:" <> Base.encode64("safe-configured-app-key-canary")
+
+    assert Diagnostics.redact_for_test("unlabelled #{canary}", []) =~ canary
+
+    System.delete_env("BELIMBING_APP_KEY")
+    configure_local_output(output_dir)
+    Application.put_env(:bilimbi_base_settings, :belimbing_app_key, canary)
+
+    assert_raise ExUnit.AssertionError, fn ->
+      Diagnostics.capture(
+        diagnostic_context(),
+        :test,
+        fn ->
+          Diagnostics.record_nested_mix(
+            "bilimbi.schema.verify",
+            [],
+            23,
+            "unlabelled configured value #{canary}"
+          )
+
+          raise ExUnit.AssertionError, message: "configured value #{canary}"
+        end,
+        snapshot_fun: &safe_snapshot/0
+      )
+    end
+
+    assert [path] = diagnostic_files(output_dir)
+    bytes = File.read!(path)
+    parsed = :json.decode(bytes)
+
+    refute bytes =~ canary
+    refute contains_binary?(parsed, canary)
+    assert bytes =~ "[REDACTED]"
+  end
+
+  test "local and Actions output selectors remain within their allowed roots" do
+    preserve_environment(@selector_env_keys)
+
+    local_relative = "valid-local-#{System.unique_integer([:positive])}"
+    local_output = Path.join(@local_diagnostics_root, local_relative)
+    on_exit(fn -> File.rm_rf!(local_output) end)
+
+    configure_local_output(local_relative)
+    capture_failure_to_default("safe local selector")
+    assert [_path] = diagnostic_files(local_output)
+
+    runner_temp = temporary_dir("runner-root")
+    actions_output = Path.join(runner_temp, "bilimbi-e2e-diagnostics")
+    on_exit(fn -> File.rm_rf!(runner_temp) end)
+
+    configure_actions_output(runner_temp, actions_output)
+
+    capture_failure_to_default(
+      "selector roots #{runner_temp} and #{actions_output} must not be encoded"
+    )
+
+    assert [path] = diagnostic_files(actions_output)
+    bytes = File.read!(path)
+    parsed = :json.decode(bytes)
+
+    for selector <- [runner_temp, actions_output] do
+      refute bytes =~ selector
+      refute contains_binary?(parsed, selector)
+    end
+  end
+
+  test "absolute, prefix-confused, and traversing output selectors fail closed" do
+    preserve_environment(@selector_env_keys)
+    unique = Integer.to_string(System.unique_integer([:positive]))
+
+    local_outside = temporary_dir("outside-local-#{unique}")
+    local_prefix = @local_diagnostics_root <> "-outside-#{unique}"
+    local_traversal = Path.join(@local_diagnostics_root, "../escape-local-#{unique}")
+
+    for rejected <- [local_outside, local_prefix, local_traversal] do
+      configure_local_output(rejected)
+      assert_output_rejected()
+      refute File.exists?(Path.expand(rejected))
+    end
+
+    runner_temp = temporary_dir("runner-containment-#{unique}")
+    actions_prefix = runner_temp <> "-outside"
+    actions_traversal = Path.join(runner_temp, "../escape-actions-#{unique}")
+
+    on_exit(fn -> File.rm_rf!(runner_temp) end)
+
+    for rejected <- [actions_prefix, actions_traversal] do
+      configure_actions_output(runner_temp, rejected)
+      assert_output_rejected()
+      refute File.exists?(Path.expand(rejected))
+    end
   end
 
   test "strict validation rejects unknown fields and database result columns" do
@@ -402,6 +505,81 @@ defmodule Bilimbi.Core.Compatibility.PlatformBaselineFailureDiagnosticsTest do
       "bilimbi-platform-baseline-diagnostics-#{name}-#{System.unique_integer([:positive])}"
     )
   end
+
+  defp unique_local_output_dir(name) do
+    Path.join(
+      @local_diagnostics_root,
+      "#{name}-#{System.unique_integer([:positive])}"
+    )
+  end
+
+  defp configure_local_output(path) do
+    System.delete_env("GITHUB_ACTIONS")
+    System.delete_env("RUNNER_TEMP")
+    System.put_env("BILIMBI_E2E_DIAGNOSTICS_DIR", path)
+  end
+
+  defp configure_actions_output(runner_temp, path) do
+    System.put_env("GITHUB_ACTIONS", "true")
+    System.put_env("RUNNER_TEMP", runner_temp)
+    System.put_env("BILIMBI_E2E_DIAGNOSTICS_DIR", path)
+  end
+
+  defp capture_failure_to_default(message) do
+    assert_raise ExUnit.AssertionError, fn ->
+      Diagnostics.capture(
+        diagnostic_context(),
+        :test,
+        fn -> raise ExUnit.AssertionError, message: message end,
+        snapshot_fun: &safe_snapshot/0
+      )
+    end
+  end
+
+  defp assert_output_rejected do
+    stderr =
+      capture_io(:stderr, fn ->
+        capture_failure_to_default("safe rejected output selector")
+      end)
+
+    assert stderr =~ "preserving original failure"
+  end
+
+  defp preserve_environment(keys) do
+    original = Map.new(keys, &{&1, System.get_env(&1)})
+
+    on_exit(fn ->
+      Enum.each(original, fn
+        {key, nil} -> System.delete_env(key)
+        {key, value} -> System.put_env(key, value)
+      end)
+    end)
+  end
+
+  defp preserve_application_env(application, key) do
+    original = Application.fetch_env(application, key)
+
+    on_exit(fn ->
+      case original do
+        {:ok, value} -> Application.put_env(application, key, value)
+        :error -> Application.delete_env(application, key)
+      end
+    end)
+  end
+
+  defp contains_binary?(value, needle) when is_binary(value),
+    do: String.contains?(value, needle)
+
+  defp contains_binary?(value, needle) when is_list(value),
+    do: Enum.any?(value, &contains_binary?(&1, needle))
+
+  defp contains_binary?(value, needle) when is_map(value) do
+    Enum.any?(value, fn {key, nested} ->
+      contains_binary?(key, needle) or contains_binary?(nested, needle)
+    end)
+  end
+
+  defp contains_binary?(_value, _needle), do: false
 
   defp diagnostic_files(output_dir) do
     output_dir

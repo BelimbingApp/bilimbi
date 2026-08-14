@@ -39,6 +39,7 @@ defmodule Bilimbi.Core.Compatibility.PlatformBaselineFailureDiagnostics do
     PGPASSWORD
     SECRET_KEY_BASE
   )
+  @selector_env_keys ~w(BILIMBI_E2E_DIAGNOSTICS_DIR RUNNER_TEMP)
 
   @settings_columns [
     "server_version",
@@ -476,20 +477,102 @@ defmodule Bilimbi.Core.Compatibility.PlatformBaselineFailureDiagnostics do
   defp json_term(value), do: value
 
   defp diagnostics_dir do
-    case System.get_env("BILIMBI_E2E_DIAGNOSTICS_DIR") do
-      path when is_binary(path) and path != "" -> path
-      _other -> @default_output_dir
+    override = nonempty_env("BILIMBI_E2E_DIAGNOSTICS_DIR")
+
+    if System.get_env("GITHUB_ACTIONS") == "true" do
+      runner_temp = required_absolute_env!("RUNNER_TEMP")
+      contained_output_dir!(override || runner_temp, runner_temp)
+    else
+      contained_output_dir!(override || @default_output_dir, @default_output_dir)
     end
   end
 
   defp forbidden_values do
     env_values = Enum.map(@secret_env_keys, &System.get_env/1)
+    selector_values = Enum.map(@selector_env_keys, &System.get_env/1)
+    configured_values = [Application.get_env(:bilimbi_base_settings, :belimbing_app_key)]
     repo_values = repo_secret_values()
 
-    [System.get_env("RUNNER_TEMP"), System.user_home() | env_values ++ repo_values]
+    [System.user_home() | env_values ++ selector_values ++ configured_values ++ repo_values]
     |> Enum.filter(&(is_binary(&1) and &1 != ""))
     |> Enum.uniq()
     |> Enum.sort_by(&byte_size/1, :desc)
+  end
+
+  defp nonempty_env(name) do
+    case System.get_env(name) do
+      value when is_binary(value) and value != "" -> value
+      _other -> nil
+    end
+  end
+
+  defp required_absolute_env!(name) do
+    case nonempty_env(name) do
+      nil ->
+        raise ArgumentError, "diagnostic Actions output root is unavailable"
+
+      value ->
+        if Path.type(value) == :absolute do
+          Path.expand(value)
+        else
+          raise ArgumentError, "diagnostic Actions output root is unavailable"
+        end
+    end
+  end
+
+  defp contained_output_dir!(path, root) when is_binary(path) and is_binary(root) do
+    root = Path.expand(root)
+
+    candidate =
+      case Path.type(path) do
+        :absolute -> Path.expand(path)
+        :relative -> Path.expand(path, root)
+        _other -> raise ArgumentError, "diagnostic output path is invalid"
+      end
+
+    relative = Path.relative_to(candidate, root)
+
+    unless relative == "." or contained_relative_path?(relative) do
+      raise ArgumentError, "diagnostic output path escapes its allowed root"
+    end
+
+    reject_existing_symlink_descendants!(root, relative)
+    candidate
+  end
+
+  defp contained_relative_path?(relative) do
+    Path.type(relative) == :relative and
+      case Path.split(relative) do
+        [".." | _rest] -> false
+        parts -> Enum.all?(parts, &(&1 not in [".", ".."]))
+      end
+  end
+
+  defp reject_existing_symlink_descendants!(_root, "."), do: :ok
+
+  defp reject_existing_symlink_descendants!(root, relative) do
+    _last_checked =
+      relative
+      |> Path.split()
+      |> Enum.reduce_while(root, fn part, parent ->
+        current = Path.join(parent, part)
+
+        case File.lstat(current) do
+          {:ok, %File.Stat{type: :symlink}} ->
+            raise ArgumentError, "diagnostic output path crosses a symbolic link"
+
+          {:ok, _stat} ->
+            {:cont, current}
+
+          {:error, :enoent} ->
+            {:halt, current}
+
+          {:error, _reason} ->
+            raise ArgumentError, "diagnostic output path cannot be inspected"
+        end
+      end)
+
+    :ok
   end
 
   defp repo_secret_values do

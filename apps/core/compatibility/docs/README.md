@@ -16,8 +16,9 @@ existing Belimbing structure or accepts a foreign/non-prefix ledger.
 ## Platform baseline failure evidence
 
 The ExUnit console or GitHub Actions job log is the authoritative failure
-record. Read it before rerunning. When `PlatformBaselineE2ETest` fails, its
-test-only diagnostics also write a bounded, redacted JSON supplement under
+record. Read it before rerunning. The repository currently retains Actions job
+logs for 90 days. When `PlatformBaselineE2ETest` fails, its test-only
+diagnostics also write a bounded, redacted JSON supplement below
 `_build/test/e2e-diagnostics/` locally. In GitHub Actions, the failed Tests run
 uploads the same JSON from runner temporary storage as a
 `platform-baseline-failure-<run>-<attempt>` artifact for 14 days.
