@@ -53,6 +53,22 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
            ]
   end
 
+  test "reloadable apps are the discovered module OTP apps plus the web host", %{root: root} do
+    put_container!(root, "base", :base)
+    put_container!(root, "people", :domain)
+    put_container!(root, "acme", :extension)
+    put_module!(root, "base", "ui")
+    put_module!(root, "people", "employee", dependencies: ["base/ui"])
+    put_module!(root, "acme", "payroll_export", dependencies: ["people/employee"])
+
+    assert MixDiscovery.reloadable_apps(root) == [
+             :test_base_ui,
+             :test_people_employee,
+             :test_acme_payroll_export,
+             :web
+           ]
+  end
+
   test "container dependencies and tests are generated from immediate module directories", %{
     root: root
   } do

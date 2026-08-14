@@ -25,8 +25,6 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   ]
   @migration_dispositions [:compatible_baseline, :bilimbi_only]
 
-  Code.require_file("compile_bilimbi_graph.exs", __DIR__)
-
   @type descriptor :: %{
           optional(:migration_dispositions) => %{
             pos_integer() => :compatible_baseline | :bilimbi_only
@@ -45,6 +43,24 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
           path: String.t(),
           container_id: String.t()
         }
+
+  @doc """
+  OTP apps Phoenix should recompile on the next request in development.
+
+  Nested path packages (`apps/base/ui`, a future Domain, an Extension) are
+  not Mix umbrella children, so `reloadable_apps: nil` never sees them.
+  This list is the discovered module graph plus the web host, so a builder
+  who mounts a module directory gets save-and-refresh without editing
+  `config/dev.exs`.
+  """
+  @spec reloadable_apps(String.t()) :: [atom()]
+  def reloadable_apps(workspace_root) do
+    workspace_root
+    |> discover_workspace!()
+    |> Enum.map(& &1.otp_app)
+    |> Enum.concat([:web])
+    |> Enum.uniq()
+  end
 
   @doc "Returns local path dependencies for modules installed in a container."
   @spec container_dependencies(String.t()) :: [Mix.Project.dependency()]
@@ -776,3 +792,8 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     raise ArgumentError, "malformed Bilimbi module descriptor #{path}: #{message}"
   end
 end
+
+# Load after MixDiscovery is defined. The graph compiler calls this module;
+# requiring it at the top of the file made those calls see an undefined module
+# whenever config/dev.exs loaded discovery first.
+Code.require_file("compile_bilimbi_graph.exs", __DIR__)

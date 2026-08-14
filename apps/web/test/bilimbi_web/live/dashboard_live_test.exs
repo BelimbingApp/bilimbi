@@ -48,6 +48,14 @@ defmodule BilimbiWeb.DashboardLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
     assert has_element?(view, "#app-sidebar")
+    assert has_element?(view, "#app-topbar")
+    assert has_element?(view, "#app-sidebar-toggle[aria-controls='app-sidebar']")
+    assert has_element?(view, "#app-brand[href='/dashboard']", "Bilimbi")
+    refute has_element?(view, "#app-dev")
+    refute has_element?(view, "#app-env")
+    refute has_element?(view, "#app-debug")
+    assert has_element?(view, "#app-statusbar")
+    assert has_element?(view, "#app-version", "v0.1.0")
     assert has_element?(view, "#nav-dashboard[aria-current='page']")
     # Ids come from the modules' menu contributions, so assert one that is
     # present -- a renamed id must fail these refutes rather than pass vacuously.
