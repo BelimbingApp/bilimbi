@@ -75,6 +75,9 @@
             <td class="px-4 py-2.5 whitespace-nowrap text-ink-muted">
               <.badge>{actor_label(log)}</.badge>
               <span class="ml-1 tabular-nums">{log.actor_id}</span>
+              <span :if={log.acting_for_user_id} class="ml-1 text-xs text-ink-faint tabular-nums">
+                (as #{log.acting_for_user_id})
+              </span>
             </td>
             <td class="px-4 py-2.5 font-mono text-xs text-ink">{log.capability}</td>
             <td class="px-4 py-2.5">

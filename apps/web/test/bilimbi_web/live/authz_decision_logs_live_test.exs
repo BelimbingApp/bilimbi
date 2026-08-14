@@ -89,6 +89,22 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     {:ok, view, _html} = open(conn)
 
     assert has_element?(view, "#decision-logs", "Employee")
+
+    # Belimbing's blade keeps the delegation context. An audit row that hides
+    # who an employee acted for is the wrong kind of terse, and the read model
+    # already carries it, so nothing had to be plumbed to keep it.
+    assert has_element?(view, "#decision-logs", "(as #91)")
+  end
+
+  test "shows no delegation note when a user acted for themselves", %{
+    conn: conn,
+    scope: scope
+  } do
+    record_decision(scope, "admin.user.list")
+
+    {:ok, view, _html} = open(conn)
+
+    refute render(view) =~ "(as #"
   end
 
   test "search narrows to a capability", %{conn: conn, scope: scope} do

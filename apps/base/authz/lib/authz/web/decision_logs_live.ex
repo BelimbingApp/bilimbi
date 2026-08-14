@@ -7,6 +7,11 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
   things it must make easy are filtering to denials and reading why one
   happened — hence the result filter and `reason` beside every row.
 
+  Delegation context is kept: an employee acts on behalf of a user, and the row
+  shows `(as #<id>)` exactly as Belimbing's blade does. `DecisionLogSummary`
+  already carries `acting_for_user_id`, so no naming seam is involved -- an
+  audit row that hides who an action was really for is the wrong kind of terse.
+
   One deliberate difference from Belimbing: it joins `users` to show and sort
   by an actor's name. `DecisionLogSummary` carries `actor_type` and `actor_id`
   and no name, so this shows those. See #184 — I have not assumed that is an
