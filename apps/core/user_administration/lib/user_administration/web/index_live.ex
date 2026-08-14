@@ -121,17 +121,15 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
   end
 
   defp delete_user(socket, user_id) do
-    cond do
-      not allowed?(socket.assigns.current_scope, "admin.user.delete") ->
-        {:noreply, put_flash(socket, :error, "You do not have permission to delete users.")}
+    if allowed?(socket.assigns.current_scope, "admin.user.delete") do
+      scope = socket.assigns.current_scope.scope
 
-      true ->
-        scope = socket.assigns.current_scope.scope
-
-        case User.get_tenant_user(scope, user_id) do
-          {:ok, user} -> delete_visible_user(socket, user)
-          {:error, :user_not_found} -> deletion_race(socket)
-        end
+      case User.get_tenant_user(scope, user_id) do
+        {:ok, user} -> delete_visible_user(socket, user)
+        {:error, :user_not_found} -> deletion_race(socket)
+      end
+    else
+      {:noreply, put_flash(socket, :error, "You do not have permission to delete users.")}
     end
   end
 
