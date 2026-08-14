@@ -1,6 +1,8 @@
 defmodule Bilimbi.Base.Settings.Definition do
   @moduledoc "Validated module-owned runtime setting definition."
 
+  alias Bilimbi.Base.Settings.Schema
+
   @supported_types [:array, :boolean, :float, :integer, :mixed, :string]
   @supported_scopes [:company, :global, :tenant, :user]
   @enforce_keys [:key, :owner, :type, :scopes, :default, :nullable, :encrypted]
@@ -30,7 +32,7 @@ defmodule Bilimbi.Base.Settings.Definition do
     end
 
     definition = %__MODULE__{
-      key: non_empty!(key, "definition key"),
+      key: key |> non_empty!("definition key") |> within_key_limit!(key),
       owner: non_empty!(owner, "owner"),
       type: type,
       scopes: scopes,
@@ -107,6 +109,18 @@ defmodule Bilimbi.Base.Settings.Definition do
     do: value
 
   defp optional_string!(_value, key, field), do: invalid!(key, "#{field} must be non-empty")
+
+  # The storage limit, enforced where every other malformed definition is
+  # caught. Without this a module can declare an over-long key, have it
+  # accepted, appear on a settings screen, and fail only when a user first
+  # presses Save -- as far from the cause as the failure can land.
+  defp within_key_limit!(value, key) do
+    if String.length(value) > Schema.key_max_length() do
+      invalid!(key, "key must be at most #{Schema.key_max_length()} characters")
+    end
+
+    value
+  end
 
   defp non_empty!(value, _field) when is_binary(value) and value != "", do: value
   defp non_empty!(_value, field), do: raise(ArgumentError, "#{field} must be non-empty")

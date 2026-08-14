@@ -7,6 +7,18 @@ defmodule Bilimbi.Base.Settings.Schema do
 
   @primary_key {:id, :id, autogenerate: true}
 
+  @key_max_length 255
+
+  @doc """
+  The stored key limit, shared so the definition validator can reject an
+  over-long key where every other malformed definition is rejected.
+
+  Written once: a migration widening the column should not depend on anyone
+  remembering a second file.
+  """
+  @spec key_max_length() :: pos_integer()
+  def key_max_length, do: @key_max_length
+
   schema "base_settings" do
     field(:key, :string)
     field(:value, Bilimbi.Base.Settings.JsonValue)
@@ -25,7 +37,7 @@ defmodule Bilimbi.Base.Settings.Schema do
       :value, nil -> [value: "cannot be nil"]
       :value, _value -> []
     end)
-    |> validate_length(:key, max: 255)
+    |> validate_length(:key, max: @key_max_length)
     |> validate_length(:scope_type, max: 50)
     |> validate_inclusion(:scope_type, ["company", "tenant", "user"])
     |> validate_scope_pair()
