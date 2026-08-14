@@ -99,6 +99,7 @@ body {
 
   #app-shell[data-sidebar-rail="true"] .app-nav-label,
   #app-shell[data-sidebar-rail="true"] .app-nav-section,
+  #app-shell[data-sidebar-rail="true"] .app-nav-empty,
   #app-shell[data-sidebar-rail="true"] .app-user-expanded,
   #app-shell[data-sidebar-rail="true"] #app-logout {
     display: none;

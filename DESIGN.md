@@ -157,7 +157,9 @@ labels across modules. Variation needs a user-visible reason.
 
 Users should always know what is happening and what happened. Show work in
 flight, give every action a visible and timely response, and keep outcomes
-honest and transparent. Never fail silently.
+honest and transparent. Never fail silently. An empty navigation is a
+permission-denied state: say that no destinations are available and name
+the recovery (an operator must assign a role), not a blank rail.
 
 ## Reduce anxiety
 
