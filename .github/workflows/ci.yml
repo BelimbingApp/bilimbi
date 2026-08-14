@@ -106,6 +106,7 @@ jobs:
     timeout-minutes: 30
 
     env:
+      BILIMBI_E2E_PARENT_COMMAND: mix precommit
       PGHOST: localhost
       PGPASSWORD: bilimbi_dev_ca658ad7d8b5
       PGPORT: "5432"
@@ -149,7 +150,21 @@ jobs:
         run: mix deps.get
 
       - name: Run the project precommit suite
+        id: precommit
+        env:
+          BILIMBI_E2E_DIAGNOSTICS_DIR: ${{ runner.temp }}/bilimbi-e2e-diagnostics
         run: mix precommit
+
+      - name: Upload PlatformBaseline failure diagnostics
+        if: ${{ failure() && steps.precommit.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: platform-baseline-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/bilimbi-e2e-diagnostics/
+          if-no-files-found: ignore
+          retention-days: 14
+          compression-level: 9
+          include-hidden-files: false
 
       - name: Verify the precommit suite made no changes
         run: git diff --exit-code
