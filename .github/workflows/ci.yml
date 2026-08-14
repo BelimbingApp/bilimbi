@@ -106,7 +106,6 @@ jobs:
     timeout-minutes: 30
 
     env:
-      BILIMBI_E2E_DIAGNOSTICS_DIR: ${{ runner.temp }}/bilimbi-e2e-diagnostics
       BILIMBI_E2E_PARENT_COMMAND: mix precommit
       PGHOST: localhost
       PGPASSWORD: bilimbi_dev_ca658ad7d8b5
@@ -152,6 +151,8 @@ jobs:
 
       - name: Run the project precommit suite
         id: precommit
+        env:
+          BILIMBI_E2E_DIAGNOSTICS_DIR: ${{ runner.temp }}/bilimbi-e2e-diagnostics
         run: mix precommit
 
       - name: Upload PlatformBaseline failure diagnostics
