@@ -29,6 +29,7 @@ defmodule BilimbiWeb.AppShellJsTest do
     assert source =~ "startDrag"
     assert source =~ "sidebarWidth"
     assert source =~ ~S[this.drag = this.el.querySelector("#app-sidebar-drag")]
+    assert source =~ "this.endDrag()"
   end
 
   test "Escape closes the drawer and the toggle stays outside the inert region", %{source: source} do

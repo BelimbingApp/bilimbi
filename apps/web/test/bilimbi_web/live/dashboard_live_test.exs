@@ -63,6 +63,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
     assert has_element?(view, "#app-sidebar-drag")
     refute has_element?(view, "#nav-dashboard")
     assert has_element?(view, "#app-nav-empty")
+    refute has_element?(view, "#app-nav-empty-dev")
     refute has_element?(view, "#nav-admin-company")
     refute has_element?(view, "#nav-admin-user")
     refute has_element?(view, "#dashboard-company-open")

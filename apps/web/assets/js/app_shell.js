@@ -50,12 +50,11 @@ const AppShell = {
   },
 
   destroyed() {
+    this.endDrag()
     this.toggle?.removeEventListener("click", this.onToggle)
     this.backdrop?.removeEventListener("click", this.onBackdrop)
     this.sidebar?.removeEventListener("click", this.onNav)
     this.drag?.removeEventListener("mousedown", this.onDragStart)
-    window.removeEventListener("mousemove", this.onDragMove)
-    window.removeEventListener("mouseup", this.onDragEnd)
     window.removeEventListener("keydown", this.onKey)
     this.mq?.removeEventListener("change", this.onMq)
   },

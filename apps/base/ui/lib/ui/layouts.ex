@@ -176,10 +176,13 @@ defmodule Bilimbi.Base.UI.Layouts do
               class="app-nav-empty px-2 py-3 text-xs leading-snug text-ink-subtle"
             >
               No navigation is available for this account. An operator needs to
-              assign a role — in development, run
-              <code class="font-medium text-ink-muted">mix bilimbi.authz.reconcile</code>
-              then assign <code class="font-medium text-ink-muted">core_admin</code>
-              to this user.
+              assign a role.
+              <span :if={@shell.dev?} id="app-nav-empty-dev">
+                In development, run
+                <code class="font-medium text-ink-muted">mix bilimbi.authz.reconcile</code>
+                then assign <code class="font-medium text-ink-muted">core_admin</code>
+                to this user.
+              </span>
             </p>
           </nav>
 
