@@ -75,6 +75,22 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     refute has_element?(view, "#decision-logs", "admin.authz.role.list")
   end
 
+  test "labels an actor by what it means, not the stored word", %{conn: conn, scope: scope} do
+    # actor_type is a :string column, not an Ecto.Enum, so matching atoms fell
+    # through to the raw value. An :agent is the case that shows it: the badge
+    # is CSS-capitalized, so "user" and "User" are indistinguishable on screen,
+    # but "agent" renders as Agent where Belimbing says Employee. Asserting the
+    # user case proves nothing -- I wrote that test first and it passed against
+    # the bug.
+    # An agent acts on behalf of a user, and Actor.validate!/1 requires saying
+    # which -- an employee decision is always attributable to a person.
+    Authz.can(Authz.actor(:agent, 7, scope, 73, acting_for_user_id: 91), "admin.user.list")
+
+    {:ok, view, _html} = open(conn)
+
+    assert has_element?(view, "#decision-logs", "Employee")
+  end
+
   test "search narrows to a capability", %{conn: conn, scope: scope} do
     record_decision(scope, "admin.user.list")
     record_decision(scope, "admin.company.list")
