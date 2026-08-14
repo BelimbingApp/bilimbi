@@ -4,7 +4,7 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
   alias BilimbiWeb.DiscoveredRoutes
 
   @user_routes [
-    {"/users", "/users", Bilimbi.Core.User.Web.IndexLive},
+    {"/users", "/users", Bilimbi.Core.UserAdministration.Web.IndexLive},
     {"/users/new", "/users/new", Bilimbi.Core.User.Web.FormLive},
     {"/users/:id", "/users/91", Bilimbi.Core.User.Web.ShowLive},
     {"/users/:id/edit", "/users/91/edit", Bilimbi.Core.User.Web.FormLive}
@@ -27,14 +27,22 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
     assert "/system/sessions" in paths
   end
 
-  test "keeps the Core User route contribution for discovered injection" do
+  test "keeps the User Administration index contribution for discovered injection" do
     routes = [
-      %{path: "/users", live: Bilimbi.Core.User.Web.IndexLive, source: "core/user"},
+      %{
+        path: "/users",
+        live: Bilimbi.Core.UserAdministration.Web.IndexLive,
+        source: "core/user_administration"
+      },
       %{path: "/", live: BilimbiWeb.LoginLive, source: "web"}
     ]
 
     assert DiscoveredRoutes.module_routes(routes) == [
-             %{path: "/users", live: Bilimbi.Core.User.Web.IndexLive, source: "core/user"}
+             %{
+               path: "/users",
+               live: Bilimbi.Core.UserAdministration.Web.IndexLive,
+               source: "core/user_administration"
+             }
            ]
   end
 
@@ -44,12 +52,18 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
     {user_routes, _binding} =
       Code.eval_file(Path.expand("../../../core/user/priv/web_routes.exs", __DIR__))
 
-    host_paths = MapSet.new(host_routes, & &1.path)
+    {administration_routes, _binding} =
+      Code.eval_file(
+        Path.expand("../../../core/user_administration/priv/web_routes.exs", __DIR__)
+      )
 
-    assert MapSet.disjoint?(host_paths, MapSet.new(user_routes, & &1.path))
+    host_paths = MapSet.new(host_routes, & &1.path)
+    module_paths = MapSet.new(user_routes ++ administration_routes, & &1.path)
+
+    assert MapSet.disjoint?(host_paths, module_paths)
   end
 
-  test "router reaches each module-owned user route exactly once" do
+  test "router reaches the transferred index and three retained User routes exactly once" do
     registered_routes = BilimbiWeb.Router.__routes__()
 
     Enum.each(@user_routes, fn {route_path, request_path, live_view} ->
@@ -60,5 +74,35 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
                phoenix_live_view: {^live_view, _action, _options, _live_session}
              } = Phoenix.Router.route_info(BilimbiWeb.Router, "GET", request_path, "localhost")
     end)
+  end
+
+  test "route manifest records the exact atomic ownership transfer" do
+    routes = manifest_routes()
+
+    assert Enum.count(routes, fn route ->
+             route.path == "/users" and route.source == "core/user_administration" and
+               route.live == Bilimbi.Core.UserAdministration.Web.IndexLive
+           end) == 1
+
+    assert Enum.count(routes, &(&1.path == "/users")) == 1
+
+    for path <- ["/users/new", "/users/:id", "/users/:id/edit"] do
+      assert Enum.count(routes, &(&1.path == path and &1.source == "core/user")) == 1
+    end
+  end
+
+  test "Core User menu and capability contribution still targets the transferred route" do
+    contributions = Bilimbi.Core.User.Contributions.contributions()
+
+    assert %{route: "/users", capability: "admin.user.list"} =
+             Enum.find(contributions.menu, &(&1.id == "admin.user"))
+
+    assert "admin.user.list" in contributions.authz.capabilities
+  end
+
+  defp manifest_routes do
+    manifest = Path.expand("../../../../_build/test/bilimbi_routes.exs", __DIR__)
+    {routes, _binding} = Code.eval_file(manifest)
+    routes
   end
 end

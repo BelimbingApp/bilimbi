@@ -1,10 +1,12 @@
 # Core User Administration read contract
 
 `Bilimbi.Core.UserAdministration` owns the bounded Users administration index
-read established by ADR 0007. The initial package has no web adapter, route,
-command, migration, schema contract, or contribution provider. Callers pass a
-validated `%Bilimbi.Base.Tenancy.Scope{}` and strict normalized options to
-`list_users/2`; the only result is a schema-free `%Page{}` containing
+read and web adapter established by ADR 0007. It contributes exactly the
+capability-gated `/users` route. Core User continues to own account commands
+and the `/users/new`, `/users/:id`, and `/users/:id/edit` adapters. This package
+owns no command, migration, schema contract, menu, or capability contribution.
+Callers pass a validated `%Bilimbi.Base.Tenancy.Scope{}` and strict normalized
+options to `list_users/2`; the only result is a schema-free `%Page{}` containing
 UI-safe `%Entry{}` and `%Role{}` summaries.
 
 ## Visibility and options
@@ -12,8 +14,15 @@ UI-safe `%Entry{}` and `%Role{}` summaries.
 The read starts from tenant-scoped Companies. Users at archived Companies stay
 visible with the archived Company name and flag. A null Company affiliation or
 an affiliation to another tenant is absent. This is data visibility, not actor
-authorization; the later web adapter must enforce `admin.user.list` before it
-calls the facade.
+authorization; the web adapter enforces `admin.user.list` before it calls the
+facade.
+
+The adapter keeps `active_nav` at `admin.user`, so Core User's existing menu
+contribution remains the navigation owner. Create, view, update, and delete
+controls are gated by their existing Core User capabilities. Deletion calls
+only Core User's public tenant-scoped APIs, protects the signed-in account,
+reports disappearance races, and presents archived-company accounts as
+read-only.
 
 Options accept only a keyword list containing the following normalized values:
 
@@ -31,6 +40,14 @@ keeps the largest supported page-size offset below 100 million rows, far below
 PostgreSQL's signed-bigint `OFFSET` ceiling, while rejecting impractical URL
 inputs before arithmetic reaches the adapter. Every primary ordering ends with
 User ID descending. Empty and out-of-range pages keep truthful totals.
+
+The adapter accepts plain URL and form values and normalizes them into this
+strict contract without creating atoms. Page sizes clamp upward over `10`,
+`25`, `50`, and `100`, so `1` becomes `10`, `30` becomes `50`, and `9999`
+becomes `100`. Empty search and exact `"0"` retain their PHP-falsey meaning.
+Changing search, Roles, page size, or sorting resets to page 1; pagination
+alone preserves the other filters. A first Created sort uses descending order,
+while Name, Email, and Company begin ascending.
 
 Role summaries use the integration-only containment rule from ADR 0007. The
 assignment must be visible through a live in-scope Company (or the documented
