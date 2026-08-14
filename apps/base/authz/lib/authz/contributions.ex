@@ -55,6 +55,64 @@ defmodule Bilimbi.Base.Authz.Contributions do
   @impl true
   def contributions do
     %{
+      # Belimbing's app/Base/Authz/Config/menu.php, ported whole rather than
+      # one item per slice. Items whose routes are not served yet are pruned
+      # by Base.UI.Nav, so each appears by itself as its screen lands and the
+      # declared shape stays the reference rather than a running total.
+      menu: [
+        %{
+          id: "admin.authz",
+          label: "Authorization",
+          icon: "shield-check",
+          parent: "admin",
+          order: 20
+        },
+        %{
+          id: "admin.authz.capability",
+          label: "Capabilities",
+          icon: "puzzle-piece",
+          parent: "admin.authz",
+          route: "/authz/capabilities",
+          capability: "admin.authz.capability.list",
+          order: 10
+        },
+        %{
+          id: "admin.authz.role",
+          label: "Roles",
+          icon: "shield-check",
+          parent: "admin.authz",
+          route: "/authz/roles",
+          capability: "admin.authz.role.list",
+          order: 20
+        },
+        %{
+          id: "admin.authz.principal-role",
+          label: "Principal Roles",
+          icon: "user-circle",
+          parent: "admin.authz",
+          route: "/authz/principal-roles",
+          capability: "admin.authz.principal-role.list",
+          order: 30
+        },
+        %{
+          id: "admin.authz.principal-capability",
+          label: "Principal Capabilities",
+          icon: "key",
+          parent: "admin.authz",
+          route: "/authz/principal-capabilities",
+          capability: "admin.authz.principal-capability.list",
+          order: 40
+        },
+        %{
+          id: "admin.authz.decision-log",
+          label: "Decision Logs",
+          icon: "clipboard-document-list",
+          parent: "admin.authz",
+          route: "/authz/decision-logs",
+          capability: "admin.authz.decision-log.list",
+          order: 50
+        }
+      ],
       settings: %{
         definitions: %{
           "authz.decision_log_retention_days" => %{

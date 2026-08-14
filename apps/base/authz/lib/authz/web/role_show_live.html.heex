@@ -1,0 +1,94 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.authz.role">
+  <div class="mx-auto max-w-4xl">
+    <.header>
+      {@role.name}
+      <:subtitle>
+        <span class="font-mono text-xs">{@role.code}</span>
+      </:subtitle>
+      <:actions>
+        <.link navigate={~p"/authz/roles"} class="text-sm text-ink-muted hover:text-ink">
+          Back to roles
+        </.link>
+      </:actions>
+    </.header>
+
+    <div id="role-summary" class="mt-5 rounded-xl border border-line bg-surface p-4">
+      <.list>
+        <:item title="Scope">
+          <.badge kind={scope_kind(@role)}>{scope_label(@role)}</.badge>
+        </:item>
+        <:item title="Description">{@role.description || "—"}</:item>
+        <:item title="Owning company">{@role.company_id || "—"}</:item>
+        <:item title="Grants all capabilities">
+          {if @role.grant_all, do: "Yes", else: "No"}
+        </:item>
+      </.list>
+    </div>
+
+    <section class="mt-5">
+      <h2 class="text-sm font-semibold text-ink-strong">Capabilities</h2>
+
+      <p :if={@role.grant_all} id="role-grant-all" class="mt-1 text-xs text-ink-subtle">
+        This role grants every capability, including ones added by modules installed later.
+        Individual grants below are therefore not the whole story.
+      </p>
+
+      <ul
+        :if={@capabilities != []}
+        id="role-capabilities"
+        class="mt-2 flex flex-wrap gap-1.5"
+      >
+        <li
+          :for={capability <- @capabilities}
+          class="rounded-md bg-surface-sunken px-2 py-1 font-mono text-xs text-ink-muted"
+        >
+          {capability}
+        </li>
+      </ul>
+
+      <p
+        :if={@capabilities == [] and not @role.grant_all}
+        class="mt-2 rounded-xl border border-line bg-surface px-4 py-6 text-center text-sm text-ink-muted"
+      >
+        This role grants no capabilities.
+      </p>
+    </section>
+
+    <section class="mt-5">
+      <h2 class="text-sm font-semibold text-ink-strong">Principals</h2>
+
+      <div class="mt-2 overflow-x-auto rounded-xl border border-line bg-surface">
+        <table class="w-full text-left text-sm">
+          <thead class="border-b border-line bg-surface-sunken">
+            <tr>
+              <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+                Type
+              </th>
+              <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+                Principal
+              </th>
+              <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+                Company
+              </th>
+            </tr>
+          </thead>
+          <tbody id="role-principals" class="divide-y divide-line-subtle">
+            <tr :for={assignment <- @principal_roles} id={"principal-role-#{assignment.id}"}>
+              <td class="px-4 py-2.5">
+                <.badge>{principal_label(assignment)}</.badge>
+              </td>
+              <td class="px-4 py-2.5 tabular-nums text-ink-muted">{assignment.principal_id}</td>
+              <td class="px-4 py-2.5 tabular-nums text-ink-muted">
+                {assignment.company_id || "—"}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p :if={@principal_roles == []} class="px-4 py-6 text-center text-sm text-ink-muted">
+          Nobody in this tenant holds this role.
+        </p>
+      </div>
+    </section>
+  </div>
+</Layouts.app>
