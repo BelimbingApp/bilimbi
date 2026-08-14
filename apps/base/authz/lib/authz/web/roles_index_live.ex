@@ -70,11 +70,21 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
         page_size: state.page_size
       )
 
-    socket
-    |> assign(:state, state)
-    |> assign(:page, page)
-    |> stream(:roles, page.entries, reset: true)
+    # `Page.page` echoes the request, so an out-of-range page returns empty with
+    # a real `total_pages` -- rendered as-is that is a dead end with no rows, no
+    # empty-state text and no pager. Land on the last real page instead.
+    if beyond_last_page?(page) do
+      load(socket, %{state | page: page.total_pages})
+    else
+      socket
+      |> assign(:state, state)
+      |> assign(:page, page)
+      |> stream(:roles, page.entries, reset: true)
+    end
   end
+
+  defp beyond_last_page?(page),
+    do: page.total_pages > 0 and page.page > page.total_pages
 
   defp state_from_params(params) do
     %{
