@@ -142,6 +142,19 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     assert %{"sort_by" => "occurred_at", "sort_dir" => "desc"} = patched_params(view)
   end
 
+  test "a sort URL means what clicking that column means", %{conn: conn, scope: scope} do
+    record_decision(scope, "admin.user.list")
+    grant_capabilities!("admin.authz.decision-log.list")
+
+    # Same defect I fixed on the principal-capabilities screen and left here:
+    # ?sort_by=capability rendered descending while the header that produces
+    # that link sorts ascending.
+    {:ok, from_url, _html} =
+      conn |> log_in_as() |> live(~p"/authz/decision-logs?sort_by=capability")
+
+    assert has_element?(from_url, "#logs-sort-capability .hero-chevron-up")
+  end
+
   test "an unrecognised sort or result in the URL falls back", %{conn: conn} do
     grant_capabilities!("admin.authz.decision-log.list")
 

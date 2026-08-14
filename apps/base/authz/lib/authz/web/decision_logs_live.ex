@@ -24,7 +24,11 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
 
   # Belimbing also sorts by actor name, which needs a join this read model does
   # not offer. The rest map one to one.
-  @sortable ~w(occurred_at capability allowed reason resource actor_type actor_id)
+  # Every entry here is reachable from a header button. `actor_id` was listed
+  # and had no header, so it was accepted from a URL and offered nowhere --
+  # configuration that looks like a feature. Belimbing sorts by actor *name*,
+  # which needs a join this read model does not have (#185).
+  @sortable ~w(occurred_at capability allowed reason resource actor_type)
   @results ~w(allowed denied)
 
   @impl true
@@ -106,7 +110,7 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
       search: Map.get(params, "search", ""),
       result: result_from(Map.get(params, "result")),
       sort_by: sort_by_from(Map.get(params, "sort_by")),
-      sort_dir: if(Map.get(params, "sort_dir") == "asc", do: :asc, else: :desc),
+      sort_dir: sort_dir_from(params),
       page: to_int(Map.get(params, "page"), 1),
       page_size: 25
     }
@@ -129,6 +133,15 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
   # falls back rather than raising.
   defp sort_by_from(value) when value in @sortable, do: String.to_existing_atom(value)
   defp sort_by_from(_value), do: :occurred_at
+
+  # A URL naming a column but no direction must mean what clicking that column
+  # means, or a shared link shows a different page than the click that made it.
+  # Same defect as the one fixed in #186; I fixed it there and left it here.
+  defp sort_dir_from(%{"sort_dir" => "asc"}), do: :asc
+  defp sort_dir_from(%{"sort_dir" => "desc"}), do: :desc
+
+  defp sort_dir_from(params),
+    do: params |> Map.get("sort_by") |> sort_by_from() |> default_direction()
 
   defp to_int(nil, default), do: default
 
