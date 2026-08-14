@@ -31,6 +31,37 @@ defmodule Bilimbi.Base.SettingsTest do
     assert Settings.get("tests.inherited", Scope.tenant(31)) == "global"
   end
 
+  test "rejects a definition key the settings column cannot store" do
+    # The gap this closes: an over-long key was accepted here, appeared in the
+    # registry, rendered on a settings screen, and failed only when a user
+    # first pressed Save -- as far from the module that declared it as the
+    # failure could land. Caught at contribution validation now, naming the
+    # owner like every other malformed definition.
+    overlong = String.duplicate("k", Bilimbi.Base.Settings.Schema.key_max_length() + 1)
+
+    limit = Bilimbi.Base.Settings.Schema.key_max_length()
+
+    assert_raise ArgumentError,
+                 ~r/at most #{limit} characters.*declared by tests\/settings/,
+                 fn ->
+                   Definition.new!(overlong, "tests/settings", %{
+                     type: :string,
+                     scopes: [:global],
+                     default: ""
+                   })
+                 end
+
+    # The boundary itself is storable and must stay accepted.
+    at_limit = String.duplicate("k", Bilimbi.Base.Settings.Schema.key_max_length())
+
+    assert %Definition{} =
+             Definition.new!(at_limit, "tests/settings", %{
+               type: :string,
+               scopes: [:global],
+               default: ""
+             })
+  end
+
   test "distinguishes an absent declared row from an undeclared key" do
     assert Settings.get("tests.personal", Scope.user(10)) == "system"
     assert Settings.definition!("tests.personal").owner == "tests/settings"

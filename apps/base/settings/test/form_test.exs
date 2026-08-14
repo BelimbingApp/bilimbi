@@ -17,11 +17,6 @@ defmodule Bilimbi.Base.Settings.FormTest do
 
   @user Scope.user(10, 20, 30)
 
-  # Sorts after "tests.a-then-overlong" so the valid field is written first and
-  # has something to roll back. 256 chars: accepted by the definition
-  # validator, rejected by the settings schema's varchar(255).
-  @overlong "tests.z" <> String.duplicate("x", 249)
-
   setup do
     create_settings_table!()
     install_test_registry!()
@@ -50,7 +45,7 @@ defmodule Bilimbi.Base.Settings.FormTest do
     end
 
     test "groups/0 lists what screens may ask for" do
-      assert Form.groups() == ["appearance", "operator", "overlong", "profile"]
+      assert Form.groups() == ["appearance", "operator", "profile"]
     end
 
     test "reports a value as inherited until it is set at this scope" do
@@ -205,23 +200,36 @@ defmodule Bilimbi.Base.Settings.FormTest do
     end
 
     test "a persistence failure rolls back every earlier write in the same save" do
-      # Planning catches cast failures before any write. It cannot catch a
-      # failure only the database knows about, so the plan runs in one
-      # transaction. Reproduction is real, not mocked: the definition
-      # validator accepts a key the settings schema's varchar(255) rejects.
-      fields = Form.fields(["overlong"], @user)
-      assert Enum.map(fields, & &1.key) == ["tests.a-then-overlong", @overlong]
+      # Planning catches cast failures before any write. It cannot catch one
+      # only the database knows about, so the plan runs in one transaction.
+      #
+      # Provoking a real persistence error without mocking got harder once
+      # #178 closed the over-long-key gap this test used to exploit -- which
+      # is a good sign about the guards. A scope naming a type with no id is
+      # the remaining honest route: `allows_scope?/2` inspects only the type
+      # so it passes, and the schema's scope-pair rule then rejects the row.
+      broken = %Scope{type: :user, id: nil, company_id: 20, tenant_id: 30}
 
-      assert {:error, @overlong, message} =
+      fields = Form.fields(["profile"], @user)
+      assert {:ok, "start"} = Settings.put("tests.theme", "start", @user)
+
+      assert {:error, key, message} =
                Form.save(
-                 %{"tests.a-then-overlong" => "written", @overlong => "boom"},
+                 %{"tests.landing" => "/written", "tests.theme" => "dark"},
                  fields,
-                 @user
+                 broken
                )
 
-      # Interpolated, not the raw Ecto template: a user must not read "%{count}".
-      assert message == "key should be at most 255 character(s)"
-      refute Settings.overridden?("tests.a-then-overlong", @user)
+      assert key in ["tests.landing", "tests.theme"]
+
+      # The whole message, not a substring: "scope" would also match an
+      # unrelated failure, and this test is worthless if the failure mode
+      # changes underneath it without anyone noticing.
+      assert message == "scope_id must be present exactly when scope_type is present"
+
+      # Neither field survived, including the one ordered before the failure.
+      refute Settings.overridden?("tests.landing", @user)
+      assert Settings.get("tests.theme", @user) == "start"
     end
 
     test "casts a submitted string to the declared type" do
@@ -345,22 +353,6 @@ defmodule Bilimbi.Base.Settings.FormTest do
                 type: :string,
                 scopes: [:global],
                 default: "x"
-              },
-              "tests.a-then-overlong" => %{
-                type: :string,
-                scopes: [:user],
-                default: "",
-                label: "Writes first",
-                help: "Sorts before the overlong key so it commits first.",
-                editable: "overlong"
-              },
-              @overlong => %{
-                type: :string,
-                scopes: [:user],
-                default: "",
-                label: "Rejected by the schema",
-                help: "The definition validator accepts this key; the schema does not.",
-                editable: "overlong"
               }
             },
             runtime_claims: []

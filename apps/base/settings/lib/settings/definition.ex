@@ -1,6 +1,8 @@
 defmodule Bilimbi.Base.Settings.Definition do
   @moduledoc "Validated module-owned runtime setting definition."
 
+  alias Bilimbi.Base.Settings.Schema
+
   @supported_types [:array, :boolean, :float, :integer, :mixed, :string]
   @supported_scopes [:company, :global, :tenant, :user]
   @enforce_keys [:key, :owner, :type, :scopes, :default, :nullable, :encrypted]
@@ -22,6 +24,20 @@ defmodule Bilimbi.Base.Settings.Definition do
 
   @spec new!(String.t(), String.t(), map()) :: t()
   def new!(key, owner, attributes) when is_map(attributes) do
+    build!(key, owner, attributes)
+  rescue
+    error in ArgumentError ->
+      # Every rejection here names the module that declared the setting. The
+      # reader is whoever has to fix it, and a key alone does not tell them
+      # which descriptor to open -- keys are namespaced by convention, not by
+      # rule. Wrapping once beats threading `owner` through every helper.
+      reraise ArgumentError, [message: "#{error.message} (declared by #{owner})"], __STACKTRACE__
+  end
+
+  def new!(key, owner, _attributes),
+    do: invalid!(key, "must be a map (declared by #{owner})")
+
+  defp build!(key, owner, attributes) do
     type = fetch_atom!(attributes, :type, @supported_types, key)
     scopes = fetch_scopes!(attributes, key)
 
@@ -30,7 +46,7 @@ defmodule Bilimbi.Base.Settings.Definition do
     end
 
     definition = %__MODULE__{
-      key: non_empty!(key, "definition key"),
+      key: key |> non_empty!("definition key") |> within_key_limit!(key),
       owner: non_empty!(owner, "owner"),
       type: type,
       scopes: scopes,
@@ -53,8 +69,6 @@ defmodule Bilimbi.Base.Settings.Definition do
 
     definition
   end
-
-  def new!(key, _owner, _attributes), do: invalid!(key, "must be a map")
 
   @spec allows_scope?(t(), Bilimbi.Base.Settings.Scope.t() | nil) :: boolean()
   def allows_scope?(%__MODULE__{scopes: scopes}, nil), do: :global in scopes
@@ -107,6 +121,18 @@ defmodule Bilimbi.Base.Settings.Definition do
     do: value
 
   defp optional_string!(_value, key, field), do: invalid!(key, "#{field} must be non-empty")
+
+  # The storage limit, enforced where every other malformed definition is
+  # caught. Without this a module can declare an over-long key, have it
+  # accepted, appear on a settings screen, and fail only when a user first
+  # presses Save -- as far from the cause as the failure can land.
+  defp within_key_limit!(value, key) do
+    if String.length(value) > Schema.key_max_length() do
+      invalid!(key, "key must be at most #{Schema.key_max_length()} characters")
+    end
+
+    value
+  end
 
   defp non_empty!(value, _field) when is_binary(value) and value != "", do: value
   defp non_empty!(_value, field), do: raise(ArgumentError, "#{field} must be non-empty")
