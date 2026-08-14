@@ -1,37 +1,39 @@
-defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
+defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
   @moduledoc """
-  Capabilities granted or denied to a principal directly, bypassing roles.
+  Authorization decisions, newest first.
 
-  Ports Belimbing's `app/Base/Authz/Livewire/PrincipalCapabilities/Index.php`.
-  These rows are the exceptions to the role model, so the question the screen
-  has to answer quickly is "who has been given this outside their role, and was
-  it a grant or a block".
+  Ports Belimbing's `app/Base/Authz/Livewire/DecisionLogs/Index.php`. This is
+  the screen people reach for when someone says "it says I can't", so the two
+  things it must make easy are filtering to denials and reading why one
+  happened — hence the result filter and `reason` beside every row.
 
-  A direct **deny** outranks anything a role grants, which is why `allowed` is
-  a filter and not just a column: the denials are the rows that explain
-  otherwise baffling behaviour.
+  Delegation context is kept: an employee acts on behalf of a user, and the row
+  shows `(as #<id>)` exactly as Belimbing's blade does. `DecisionLogSummary`
+  already carries `acting_for_user_id`, so no naming seam is involved -- an
+  audit row that hides who an action was really for is the wrong kind of terse.
 
-  Belimbing offers no principal-type filter and neither does this: the
-  administration query accepts a principal filter only as a type *and* id
-  together, so a type-only filter would raise. Sorting by principal type is
-  supported and covers the same need.
-
-  Belimbing joins users and companies to show names. Bilimbi's read model
-  carries ids, because Base may not name a Core entity — see #183 and #185,
-  where that seam is being decided across all three Authz screens at once. This
-  is built id-based deliberately, and stays correct whichever way those land.
+  One deliberate difference from Belimbing: it joins `users` to show and sort
+  by an actor's name. `DecisionLogSummary` carries `actor_type` and `actor_id`
+  and no name, so this shows those. See #184 — I have not assumed that is an
+  oversight, since the read model calls itself payload-safe.
   """
 
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
 
-  @sortable ~w(created_at principal_type principal_id capability allowed company_id)
+  # Belimbing also sorts by actor name, which needs a join this read model does
+  # not offer. The rest map one to one.
+  # Every entry here is reachable from a header button. `actor_id` was listed
+  # and had no header, so it was accepted from a URL and offered nowhere --
+  # configuration that looks like a feature. Belimbing sorts by actor *name*,
+  # which needs a join this read model does not have (#185).
+  @sortable ~w(occurred_at capability allowed reason resource actor_type)
   @results ~w(allowed denied)
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, page_title: "Principal Capabilities")}
+    {:ok, assign(socket, page_title: "Decision Logs")}
   end
 
   @impl true
@@ -44,7 +46,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
     state = %{
       socket.assigns.state
       | search: Map.get(params, "search", ""),
-        result: member_or_blank(Map.get(params, "result"), @results),
+        result: result_from(Map.get(params, "result")),
         page: 1
     }
 
@@ -73,24 +75,24 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
     {:noreply, push_state(socket, %{socket.assigns.state | page: to_int(page, 1)})}
   end
 
-  # Newest first, as Belimbing does: a direct capability is usually being read
-  # because somebody just granted or revoked one.
-  defp default_direction(:created_at), do: :desc
+  # Belimbing defaults occurred_at to descending: a log read ascending starts
+  # at the oldest decision, which is never what the reader wanted.
+  defp default_direction(:occurred_at), do: :desc
   defp default_direction(_column), do: :asc
 
   defp push_state(socket, state) do
-    push_patch(socket, to: ~p"/authz/principal-capabilities?#{state_to_params(state)}")
+    push_patch(socket, to: ~p"/authz/decision-logs?#{state_to_params(state)}")
   end
 
   defp load(socket, state) do
     page =
-      Authz.list_principal_capabilities(socket.assigns.current_scope.scope,
+      Authz.list_decision_logs(socket.assigns.current_scope.scope,
         search: nilify(state.search),
         allowed: allowed_filter(state.result),
         sort_by: state.sort_by,
         sort_dir: state.sort_dir,
         page: state.page,
-        page_size: 25
+        page_size: state.page_size
       )
 
     # `Page.page` echoes what was asked for, so an out-of-range page comes back
@@ -104,7 +106,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
-      |> stream(:grants, page.entries, reset: true)
+      |> stream(:logs, page.entries, reset: true)
     end
   end
 
@@ -118,10 +120,11 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
   defp state_from_params(params) do
     %{
       search: Map.get(params, "search", ""),
-      result: member_or_blank(Map.get(params, "result"), @results),
+      result: result_from(Map.get(params, "result")),
       sort_by: sort_by_from(Map.get(params, "sort_by")),
       sort_dir: sort_dir_from(params),
-      page: to_int(Map.get(params, "page"), 1)
+      page: to_int(Map.get(params, "page"), 1),
+      page_size: 25
     }
   end
 
@@ -135,21 +138,17 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
     }
   end
 
-  # Anything unrecognised becomes "no filter" rather than reaching
-  # String.to_existing_atom, which a hand-edited URL would otherwise crash on.
-  defp member_or_blank(value, allowed) when is_binary(value) do
-    if value in allowed, do: value, else: ""
-  end
+  defp result_from(value) when value in @results, do: value
+  defp result_from(_value), do: ""
 
-  defp member_or_blank(_value, _allowed), do: ""
-
+  # A hand-edited URL reaches String.to_existing_atom, so anything unrecognised
+  # falls back rather than raising.
   defp sort_by_from(value) when value in @sortable, do: String.to_existing_atom(value)
-  defp sort_by_from(_value), do: :created_at
+  defp sort_by_from(_value), do: :occurred_at
 
   # A URL naming a column but no direction must mean what clicking that column
-  # means. Defaulting everything to :desc made ?sort_by=capability render
-  # descending while the header that produces it sorts ascending -- the same
-  # link, two different pages.
+  # means, or a shared link shows a different page than the click that made it.
+  # Same defect as the one fixed in #186; I fixed it there and left it here.
   defp sort_dir_from(%{"sort_dir" => "asc"}), do: :asc
   defp sort_dir_from(%{"sort_dir" => "desc"}), do: :desc
 
@@ -179,22 +178,14 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
     end
   end
 
-  # principal_type is a :string column, not an Ecto.Enum -- matching atoms here
-  # silently fell through to the raw value, so every row read "agent" instead
-  # of "Employee". "agent" is the stored word; "Employee" is what it means.
-  defp principal_label(%{principal_type: "agent"}), do: "Employee"
-  defp principal_label(%{principal_type: "user"}), do: "User"
-  defp principal_label(%{principal_type: other}), do: to_string(other)
+  defp actor_label(%{actor_type: "agent"}), do: "Employee"
+  defp actor_label(%{actor_type: "user"}), do: "User"
+  defp actor_label(%{actor_type: other}), do: to_string(other)
 
-  defp created_at(%{created_at: nil}), do: "—"
-  defp created_at(%{created_at: at}), do: Calendar.strftime(at, "%Y-%m-%d %H:%M")
+  defp resource_label(%{resource_type: nil}), do: "—"
+  defp resource_label(%{resource_type: type, resource_id: nil}), do: type
+  defp resource_label(%{resource_type: type, resource_id: id}), do: "#{type} ##{id}"
 
-  # `put_principal_capability/6` rejects an unknown key, so this cannot be
-  # created through the API. It becomes reachable when a module that declared
-  # a capability is uninstalled: its rows survive, the registry forgets the
-  # key, and the grant silently stops matching. Nothing raises -- authorization
-  # fails closed by design -- so this badge is the only place an operator can
-  # see that a grant has quietly become inert.
-  defp unknown_capability?(%{capability: capability}),
-    do: not Authz.capability_known?(capability)
+  defp occurred_at(%{occurred_at: nil}), do: "—"
+  defp occurred_at(%{occurred_at: at}), do: Calendar.strftime(at, "%Y-%m-%d %H:%M:%S")
 end

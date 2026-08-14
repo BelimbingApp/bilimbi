@@ -16,5 +16,11 @@
     live: Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive,
     session: :auth,
     capability: "admin.authz.principal-capability.list"
+  },
+  %{
+    path: "/authz/decision-logs",
+    live: Bilimbi.Base.Authz.Web.DecisionLogsLive,
+    session: :auth,
+    capability: "admin.authz.decision-log.list"
   }
 ]
