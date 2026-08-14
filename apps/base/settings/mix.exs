@@ -34,7 +34,12 @@ defmodule Bilimbi.Base.Settings.MixProject do
   end
 
   defp deps do
-    [{:ecto_sql, "~> 3.14"}, {:jason, "~> 1.4"}] ++
+    [
+      {:ecto_sql, "~> 3.14"},
+      {:jason, "~> 1.4"},
+      {:phoenix, "~> 1.8.9"},
+      {:phoenix_live_view, "~> 1.2.0"}
+    ] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 

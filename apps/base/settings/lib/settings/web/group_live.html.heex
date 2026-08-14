@@ -1,0 +1,95 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@page.nav}>
+  <div class="mx-auto max-w-3xl">
+    <.header>
+      {@page.title}
+      <:subtitle>{@page.subtitle}</:subtitle>
+    </.header>
+
+    <nav
+      :if={length(@page.groups) > 1}
+      id="settings-tabs"
+      class="mt-5 flex gap-1 border-b border-line"
+      aria-label="Settings groups"
+    >
+      <button
+        :for={group <- @page.groups}
+        id={"settings-tab-#{group}"}
+        type="button"
+        phx-click="switch_tab"
+        phx-value-group={group}
+        aria-current={group == @active_tab && "page"}
+        class={[
+          "-mb-px border-b-2 px-3 py-2 text-sm transition",
+          group == @active_tab && "border-brand-strong font-medium text-ink-strong",
+          group != @active_tab && "border-transparent text-ink-muted hover:text-ink"
+        ]}
+      >
+        {group}
+      </button>
+    </nav>
+
+    <form id="settings-form" phx-submit="save" class="mt-5 space-y-5">
+      <div
+        :for={group <- @page.groups}
+        :if={group == @active_tab}
+        id={"settings-group-#{group}"}
+        class="space-y-5"
+      >
+        <div
+          :for={field <- fields_in(@fields, group)}
+          id={"setting-#{String.replace(field.key, ".", "-")}"}
+          class="rounded-xl border border-line bg-surface p-4"
+        >
+          <label
+            for={"input-#{String.replace(field.key, ".", "-")}"}
+            class="block text-sm font-medium text-ink-strong"
+          >
+            {field.definition.label}
+          </label>
+          <p class="mt-0.5 text-xs text-ink-subtle">{field.definition.help}</p>
+
+          <input
+            type={input_type(field)}
+            id={"input-#{String.replace(field.key, ".", "-")}"}
+            name={"settings[#{field.key}]"}
+            value={input_value(field)}
+            autocomplete="off"
+            class="mt-2.5 w-full rounded-md border border-line bg-surface-sunken px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
+          />
+
+          <div class="mt-1.5 flex items-center gap-2 text-xs">
+            <.badge :if={field.overridden?}>Set here</.badge>
+            <span :if={source_note(field)} class="text-ink-faint">{source_note(field)}</span>
+            <span :if={field.encrypted?} class="text-ink-faint">
+              Stored encrypted; leave the mask to keep the current value
+            </span>
+          </div>
+        </div>
+
+        <p
+          :if={fields_in(@fields, group) == []}
+          class="rounded-xl border border-line bg-surface px-4 py-8 text-center text-sm text-ink-muted"
+        >
+          No installed module contributes settings to this group.
+        </p>
+      </div>
+
+      <div class="flex items-center justify-between gap-4">
+        <p class="text-xs text-ink-faint">
+          Clearing a field removes this override, so the value returns to what it inherits.
+        </p>
+        <div class="flex gap-2">
+          <.button
+            id="settings-restore"
+            type="button"
+            phx-click="restore_defaults"
+            data-confirm="Remove every override on this page and fall back to inherited values?"
+          >
+            Restore Defaults
+          </.button>
+          <.button id="settings-save" type="submit" variant="primary">Save</.button>
+        </div>
+      </div>
+    </form>
+  </div>
+</Layouts.app>
