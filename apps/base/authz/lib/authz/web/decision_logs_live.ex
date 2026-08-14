@@ -95,11 +95,23 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
         page_size: state.page_size
       )
 
-    socket
-    |> assign(:state, state)
-    |> assign(:page, page)
-    |> stream(:logs, page.entries, reset: true)
+    # `Page.page` echoes what was asked for, so an out-of-range page comes back
+    # empty with a real `total_pages`. Rendered as-is that is a dead end: no
+    # rows, no empty-state text (the filters are not why it is empty), and no
+    # pager, because the pager only appears when there is more than one page.
+    # Land the reader on the last real page instead.
+    if beyond_last_page?(page) do
+      load(socket, %{state | page: page.total_pages})
+    else
+      socket
+      |> assign(:state, state)
+      |> assign(:page, page)
+      |> stream(:logs, page.entries, reset: true)
+    end
   end
+
+  defp beyond_last_page?(page),
+    do: page.total_pages > 0 and page.page > page.total_pages
 
   defp allowed_filter("allowed"), do: true
   defp allowed_filter("denied"), do: false

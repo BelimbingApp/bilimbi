@@ -155,6 +155,23 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     assert has_element?(from_url, "#logs-sort-capability .hero-chevron-up")
   end
 
+  test "a page past the end lands on the last real page, not a dead end", %{
+    conn: conn,
+    scope: scope
+  } do
+    record_decision(scope, "admin.user.list")
+
+    # Page.page echoes the request, so ?page=2 with one page of results came
+    # back empty with total_pages: 1 -- no rows, no empty-state text (the
+    # filters are not why it is empty) and no pager, because the pager needs
+    # more than one page. A URL somebody kept after the data shrank became a
+    # dead end with no way out.
+    grant_capabilities!("admin.authz.decision-log.list")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/decision-logs?page=2")
+
+    assert has_element?(view, "#decision-logs", "admin.authz.decision-log.list")
+  end
+
   test "an unrecognised sort or result in the URL falls back", %{conn: conn} do
     grant_capabilities!("admin.authz.decision-log.list")
 
