@@ -139,6 +139,20 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       assert has_element?(view, "#role-principals")
     end
 
+    test "labels a principal by what it means, not the stored word", %{conn: conn, ours: ours} do
+      {:ok, role} = Authz.create_role(ours, 73, %{name: "Auditor", code: "auditor"})
+      {:ok, :assigned} = Authz.assign_role(ours, 73, :agent, 7, role.id)
+      grant_capabilities!(["admin.authz.role.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/roles/#{role.id}")
+
+      # principal_type is a :string column. Matching atoms fell through
+      # silently and rendered the raw "agent"; nothing but an assertion on the
+      # label itself would notice.
+      assert has_element?(view, "#role-principals", "Employee")
+      refute has_element?(view, "#role-principals", "agent")
+    end
+
     test "another tenant's role is not found rather than forbidden", %{
       conn: conn,
       theirs: theirs

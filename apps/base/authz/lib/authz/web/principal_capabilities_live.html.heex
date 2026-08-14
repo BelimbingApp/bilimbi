@@ -1,0 +1,135 @@
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  active_nav="admin.authz.principal-capability"
+>
+  <div class="mx-auto max-w-6xl">
+    <.header>
+      Principal Capabilities
+      <:subtitle>
+        Capabilities granted or denied directly, outside any role. A direct denial outranks a role's grant.
+      </:subtitle>
+    </.header>
+
+    <form id="grants-filters" phx-change="filter" phx-submit="filter" class="mt-5 flex gap-3">
+      <div class="flex-1">
+        <label for="grants-search" class="sr-only">Search capabilities</label>
+        <input
+          type="search"
+          id="grants-search"
+          name="search"
+          value={@state.search}
+          placeholder="Search capability key"
+          phx-debounce="300"
+          autocomplete="off"
+          class="w-full max-w-sm rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
+        />
+      </div>
+      <div>
+        <label for="grants-result" class="sr-only">Filter by grant or denial</label>
+        <select
+          id="grants-result"
+          name="result"
+          class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
+        >
+          <option value="" selected={@state.result == ""}>Granted and denied</option>
+          <option value="allowed" selected={@state.result == "allowed"}>Granted</option>
+          <option value="denied" selected={@state.result == "denied"}>Denied</option>
+        </select>
+      </div>
+    </form>
+
+    <div class="mt-4 overflow-x-auto rounded-xl border border-line bg-surface">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-line bg-surface-sunken">
+          <tr>
+            <th
+              :for={
+                {column, label} <- [
+                  {"principal_type", "Principal"},
+                  {"capability", "Capability"},
+                  {"allowed", "Effect"},
+                  {"company_id", "Company"},
+                  {"created_at", "Granted"}
+                ]
+              }
+              class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle"
+            >
+              <button
+                type="button"
+                id={"grants-sort-#{column}"}
+                phx-click="sort"
+                phx-value-column={column}
+                class="inline-flex items-center gap-1 hover:text-ink"
+              >
+                {label}
+                <.icon
+                  :if={sort_indicator(@state, String.to_existing_atom(column))}
+                  name={sort_indicator(@state, String.to_existing_atom(column))}
+                  class="size-3"
+                />
+              </button>
+            </th>
+          </tr>
+        </thead>
+        <tbody id="principal-capabilities" phx-update="stream" class="divide-y divide-line-subtle">
+          <tr :for={{dom_id, grant} <- @streams.grants} id={dom_id} class="hover:bg-surface-sunken">
+            <td class="px-4 py-2.5 whitespace-nowrap text-ink-muted">
+              <.badge>{principal_label(grant)}</.badge>
+              <span class="ml-1 tabular-nums">{grant.principal_id}</span>
+            </td>
+            <td class="px-4 py-2.5">
+              <span class="font-mono text-xs text-ink">{grant.capability}</span>
+              <.badge :if={unknown_capability?(grant)} kind={:warning} class="ml-1">
+                Unknown
+              </.badge>
+            </td>
+            <td class="px-4 py-2.5">
+              <.badge kind={if grant.allowed, do: :success, else: :danger}>
+                {if grant.allowed, do: "Granted", else: "Denied"}
+              </.badge>
+            </td>
+            <td class="px-4 py-2.5 tabular-nums text-ink-muted">{grant.company_id || "—"}</td>
+            <td class="px-4 py-2.5 whitespace-nowrap tabular-nums text-ink-muted">
+              {created_at(grant)}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p :if={@page.total_entries == 0} class="px-4 py-8 text-center text-sm text-ink-muted">
+        {if @state.search == "" and @state.result == "",
+          do: "No capabilities have been granted directly in this tenant.",
+          else: "No direct capabilities match these filters."}
+      </p>
+    </div>
+
+    <div
+      :if={@page.total_pages > 1}
+      id="grants-pagination"
+      class="mt-3 flex items-center justify-between text-sm"
+    >
+      <p class="text-ink-subtle">
+        Page {@page.page} of {@page.total_pages} · {@page.total_entries} direct capabilities
+      </p>
+      <div class="flex gap-2">
+        <.button
+          :if={@page.page > 1}
+          id="grants-prev"
+          phx-click="page"
+          phx-value-page={@page.page - 1}
+        >
+          Previous
+        </.button>
+        <.button
+          :if={@page.page < @page.total_pages}
+          id="grants-next"
+          phx-click="page"
+          phx-value-page={@page.page + 1}
+        >
+          Next
+        </.button>
+      </div>
+    </div>
+  </div>
+</Layouts.app>
