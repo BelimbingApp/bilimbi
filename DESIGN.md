@@ -108,9 +108,9 @@ Two shells exist and each stays minimal:
   brand spine and a user footer with initials and logout, and a persistent
   status bar (application version). In development only, the status bar
   shows `dev` plus the listen address. Wide screens keep the rail; the
-  rail hides labels and logout, leaving the user initials.
-  below `lg` the menu is an off-canvas drawer. The logo is the product mark
-  on a transparent background — never a brand tile.
+  collapsed rail hides labels and logout, leaving the user initials.
+  Below `lg`, the menu is an off-canvas drawer. The logo is the product
+  mark on a transparent background — never a brand tile.
 
 The shell does not grow navigation items for pages that do not exist. A
 workflow joins the sidebar when its screen ships, not before. Notifications,

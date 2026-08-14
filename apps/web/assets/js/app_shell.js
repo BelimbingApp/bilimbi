@@ -135,6 +135,12 @@ const AppShell = {
       this.toggle.setAttribute("aria-expanded", open ? "true" : "false")
     }
 
+    if (this.sidebar) {
+      const hideDrawer = !desktop && !this.drawerOpen
+      this.sidebar.toggleAttribute("inert", hideDrawer)
+      this.sidebar.setAttribute("aria-hidden", hideDrawer ? "true" : "false")
+    }
+
     if (this.backdrop) {
       const showBackdrop = open && !desktop
       this.backdrop.setAttribute("aria-hidden", showBackdrop ? "false" : "true")

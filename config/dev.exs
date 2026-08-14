@@ -2,8 +2,20 @@ import Config
 
 # Mix-time only: config/*.exs may load the discovery helpers that live
 # beside ModuleRegistry. Runtime modules never call this file.
-[discovery_file] =
+discovery_files =
   Path.wildcard(Path.expand("../apps/base/*/mix/module_discovery.exs", __DIR__))
+
+discovery_file =
+  case discovery_files do
+    [path] ->
+      path
+
+    [] ->
+      raise "expected apps/base/*/mix/module_discovery.exs, found none"
+
+    paths ->
+      raise "expected one module_discovery.exs, found #{inspect(paths)}"
+  end
 
 Code.require_file(discovery_file)
 

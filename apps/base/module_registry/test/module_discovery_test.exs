@@ -58,13 +58,13 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
     put_container!(root, "people", :domain)
     put_container!(root, "acme", :extension)
     put_module!(root, "base", "ui")
-    put_module!(root, "people", "employee", dependencies: ["base/ui"])
-    put_module!(root, "acme", "payroll_export", dependencies: ["people/employee"])
+    put_module!(root, "people", "employee")
+    put_module!(root, "acme", "payroll_export")
 
     assert MixDiscovery.reloadable_apps(root) == [
+             :test_acme_payroll_export,
              :test_base_ui,
              :test_people_employee,
-             :test_acme_payroll_export,
              :web
            ]
   end

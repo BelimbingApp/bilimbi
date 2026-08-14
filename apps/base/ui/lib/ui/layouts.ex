@@ -7,10 +7,9 @@ defmodule Bilimbi.Base.UI.Layouts do
     * `auth/1` — the centered credential layout (login and, later, password
       reset). Compact card on the warm canvas with the Bilimbi brand bar;
       the page is otherwise quiet so the form reads first.
-    * `app/1` — the authenticated workspace shell. Geometry follows
-      Belimbing: a full-width top bar, a left menu rail, and a persistent
-      status bar. The top bar still names the company and tenant the
-      screen acts on — that workspace strip is the Bilimbi distinction.
+    * `app/1` — the authenticated workspace shell: a full-width top bar,
+      a left menu rail, and a persistent status bar. The top bar names the
+      tenant the screen acts on.
 
   No authenticated screen is context-free.
   """
@@ -208,8 +207,7 @@ defmodule Bilimbi.Base.UI.Layouts do
             class="shrink-0 tabular-nums"
             title={env_title(@shell)}
           >
-            dev
-            <span :if={@shell.listen_address} id="app-listen">{@shell.listen_address}</span>
+            dev <span :if={@shell.listen_address} id="app-listen">{@shell.listen_address}</span>
           </span>
         </div>
         <span id="app-version" class="shrink-0 tabular-nums" title={"Bilimbi #{@shell.version}"}>
