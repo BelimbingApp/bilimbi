@@ -62,6 +62,7 @@ config :bilimbi_base_ui, :listen_address, "127.0.0.1"
 
 config :web, dev_routes: true
 config :web, BilimbiWeb.Mailer, adapter: Swoosh.Adapters.Local
+config :web, :mailer_sender, {"Bilimbi Development", "no-reply@bilimbi.local"}
 
 config :logger, :default_formatter, format: "[$level] $message\n"
 

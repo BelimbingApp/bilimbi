@@ -57,6 +57,7 @@ defmodule Bilimbi.Web.MixProject do
       {:dns_cluster, "~> 0.2"},
       {:bandit, "~> 1.12"},
       {:swoosh, "~> 1.27"},
+      {:gen_smtp, "~> 1.3"},
       {:req, "~> 0.7"},
       {:base, in_umbrella: true},
       {:core, in_umbrella: true}

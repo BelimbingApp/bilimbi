@@ -253,6 +253,24 @@ verification, and the four canonical user-scoped settings. This is a Core API,
 not a public signup surface; Phoenix Web still owns routes, rate limiting,
 delivery, cookies, and the authenticated session adapter.
 
+### Production mail delivery
+
+Production uses SMTP with mandatory authentication and certificate verification.
+Set these environment variables before the release starts:
+
+| Variable | Purpose |
+|---|---|
+| `MAIL_HOST` | SMTP relay hostname. |
+| `MAIL_PORT` | Relay port (`587` for STARTTLS or commonly `465` for implicit TLS). |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | SMTP credentials. |
+| `MAIL_TLS_MODE` | `starttls` or `implicit_tls`; unencrypted delivery is not supported. |
+| `MAIL_FROM_NAME` / `MAIL_FROM_ADDRESS` | Sender identity used for product email. |
+
+An absent or invalid value stops a production release during configuration, so a
+password-reset request cannot be the first time a mail misconfiguration is
+discovered. Development uses Swoosh's local mailbox and test uses its test
+adapter instead.
+
 Base Session preserves Belimbing's root `sessions` table as an opaque durable
 store with no dependency on Core User or Web. Its operational listing omits
 payloads, termination protects the caller's current session, and unreadable
