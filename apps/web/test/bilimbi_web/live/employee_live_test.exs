@@ -59,6 +59,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
 
+    assert has_element?(view, "#nav-admin-employee[aria-current='page']")
     assert has_element?(view, "#employees td", "John")
     assert has_element?(view, "#employees td", "EMP-001")
     refute has_element?(view, "#employees td", "Grace Hopper")

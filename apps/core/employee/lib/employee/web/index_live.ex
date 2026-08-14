@@ -21,7 +21,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
         {:ok,
          socket
          |> assign(:page_title, "Employees")
-         |> assign(:active_nav, :employees)
+         |> assign(:active_nav, "admin.employee")
          |> assign(:company_id, company_id)
          |> stream(:employees, employees)}
 

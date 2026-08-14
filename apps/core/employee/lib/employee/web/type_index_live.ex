@@ -21,7 +21,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
         {:ok,
          socket
          |> assign(:page_title, "Employee types")
-         |> assign(:active_nav, :employees)
+         |> assign(:active_nav, "admin.employee-type")
          |> stream(:employee_types, types)}
 
       {:error, :company_not_found} ->

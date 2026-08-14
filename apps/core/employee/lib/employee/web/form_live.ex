@@ -44,7 +44,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
       {:ok, types} ->
         {:ok,
          socket
-         |> assign(:active_nav, :employees)
+         |> assign(:active_nav, "admin.employee")
          |> assign(:company_id, company_id)
          |> assign(:types, types)
          |> assign(:statuses, @statuses)}

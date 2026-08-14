@@ -27,10 +27,11 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
   end
 
   test "lists system types", %{conn: conn} do
-    grant_capabilities!("admin.employee-type.list")
+    grant_capabilities!(["admin.employee.list", "admin.employee-type.list"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
 
+    assert has_element?(view, "#nav-admin-employee-type[aria-current='page']")
     assert has_element?(view, "#employee-types td", "Full Time")
     assert has_element?(view, "#employee-types td", "Agent")
     refute has_element?(view, "#employee-type-new")

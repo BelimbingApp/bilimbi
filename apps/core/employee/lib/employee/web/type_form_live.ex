@@ -20,7 +20,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
     {:ok,
      socket
      |> assign(:page_title, "New employee type")
-     |> assign(:active_nav, :employees)
+     |> assign(:active_nav, "admin.employee-type")
      |> assign_form(form_changeset(%{}))}
   end
 
