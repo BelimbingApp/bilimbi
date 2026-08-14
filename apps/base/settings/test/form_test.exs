@@ -221,7 +221,11 @@ defmodule Bilimbi.Base.Settings.FormTest do
                )
 
       assert key in ["tests.landing", "tests.theme"]
-      assert message =~ "scope"
+
+      # The whole message, not a substring: "scope" would also match an
+      # unrelated failure, and this test is worthless if the failure mode
+      # changes underneath it without anyone noticing.
+      assert message == "scope_id must be present exactly when scope_type is present"
 
       # Neither field survived, including the one ordered before the failure.
       refute Settings.overridden?("tests.landing", @user)

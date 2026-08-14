@@ -39,13 +39,17 @@ defmodule Bilimbi.Base.SettingsTest do
     # owner like every other malformed definition.
     overlong = String.duplicate("k", Bilimbi.Base.Settings.Schema.key_max_length() + 1)
 
-    assert_raise ArgumentError, ~r/at most 255 characters/, fn ->
-      Definition.new!(overlong, "tests/settings", %{
-        type: :string,
-        scopes: [:global],
-        default: ""
-      })
-    end
+    limit = Bilimbi.Base.Settings.Schema.key_max_length()
+
+    assert_raise ArgumentError,
+                 ~r/at most #{limit} characters.*declared by tests\/settings/,
+                 fn ->
+                   Definition.new!(overlong, "tests/settings", %{
+                     type: :string,
+                     scopes: [:global],
+                     default: ""
+                   })
+                 end
 
     # The boundary itself is storable and must stay accepted.
     at_limit = String.duplicate("k", Bilimbi.Base.Settings.Schema.key_max_length())
