@@ -36,9 +36,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     employee = socket.assigns.employee
     company_id = socket.assigns.current_scope.user["company_id"]
 
-    if not allowed?(socket.assigns.current_scope, "admin.employee.delete") do
-      {:noreply, put_flash(socket, :error, "You do not have access to that action.")}
-    else
+    if allowed?(socket.assigns.current_scope, "admin.employee.delete") do
       case Employee.delete_employee(scope, company_id, employee.id) do
         :ok ->
           {:noreply,
@@ -52,6 +50,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
         {:error, _reason} ->
           {:noreply, put_flash(socket, :error, "That employee could not be deleted.")}
       end
+    else
+      {:noreply, put_flash(socket, :error, "You do not have access to that action.")}
     end
   end
 
