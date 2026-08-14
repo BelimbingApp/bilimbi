@@ -52,7 +52,7 @@ defmodule Bilimbi.Base.Authz.Web.RoleShowLive do
   defp scope_kind(%{company_id: nil}), do: :warning
   defp scope_kind(_role), do: :success
 
-  defp principal_label(%{principal_type: :agent}), do: "Employee"
-  defp principal_label(%{principal_type: :user}), do: "User"
+  defp principal_label(%{principal_type: "agent"}), do: "Employee"
+  defp principal_label(%{principal_type: "user"}), do: "User"
   defp principal_label(%{principal_type: other}), do: to_string(other)
 end

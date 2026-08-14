@@ -1,0 +1,178 @@
+defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
+  @moduledoc """
+  Capabilities granted or denied to a principal directly, bypassing roles.
+
+  Ports Belimbing's `app/Base/Authz/Livewire/PrincipalCapabilities/Index.php`.
+  These rows are the exceptions to the role model, so the question the screen
+  has to answer quickly is "who has been given this outside their role, and was
+  it a grant or a block".
+
+  A direct **deny** outranks anything a role grants, which is why `allowed` is
+  a filter and not just a column: the denials are the rows that explain
+  otherwise baffling behaviour.
+
+  Belimbing offers no principal-type filter and neither does this: the
+  administration query accepts a principal filter only as a type *and* id
+  together, so a type-only filter would raise. Sorting by principal type is
+  supported and covers the same need.
+
+  Belimbing joins users and companies to show names. Bilimbi's read model
+  carries ids, because Base may not name a Core entity — see #183 and #185,
+  where that seam is being decided across all three Authz screens at once. This
+  is built id-based deliberately, and stays correct whichever way those land.
+  """
+
+  use Bilimbi.Base.UI, :live_view
+
+  alias Bilimbi.Base.Authz
+
+  @sortable ~w(created_at principal_type principal_id capability allowed company_id)
+  @results ~w(allowed denied)
+
+  @impl true
+  def mount(_params, _session, socket) do
+    {:ok, assign(socket, page_title: "Principal Capabilities")}
+  end
+
+  @impl true
+  def handle_params(params, _uri, socket) do
+    {:noreply, load(socket, state_from_params(params))}
+  end
+
+  @impl true
+  def handle_event("filter", params, socket) do
+    state = %{
+      socket.assigns.state
+      | search: Map.get(params, "search", ""),
+        result: member_or_blank(Map.get(params, "result"), @results),
+        page: 1
+    }
+
+    {:noreply, push_state(socket, state)}
+  end
+
+  @impl true
+  def handle_event("sort", %{"column" => column}, socket) when column in @sortable do
+    state = socket.assigns.state
+    column = String.to_existing_atom(column)
+
+    direction =
+      cond do
+        state.sort_by != column -> default_direction(column)
+        state.sort_dir == :asc -> :desc
+        true -> :asc
+      end
+
+    {:noreply, push_state(socket, %{state | sort_by: column, sort_dir: direction, page: 1})}
+  end
+
+  def handle_event("sort", _params, socket), do: {:noreply, socket}
+
+  @impl true
+  def handle_event("page", %{"page" => page}, socket) do
+    {:noreply, push_state(socket, %{socket.assigns.state | page: to_int(page, 1)})}
+  end
+
+  # Newest first, as Belimbing does: a direct capability is usually being read
+  # because somebody just granted or revoked one.
+  defp default_direction(:created_at), do: :desc
+  defp default_direction(_column), do: :asc
+
+  defp push_state(socket, state) do
+    push_patch(socket, to: ~p"/authz/principal-capabilities?#{state_to_params(state)}")
+  end
+
+  defp load(socket, state) do
+    page =
+      Authz.list_principal_capabilities(socket.assigns.current_scope.scope,
+        search: nilify(state.search),
+        allowed: allowed_filter(state.result),
+        sort_by: state.sort_by,
+        sort_dir: state.sort_dir,
+        page: state.page,
+        page_size: 25
+      )
+
+    socket
+    |> assign(:state, state)
+    |> assign(:page, page)
+    |> stream(:grants, page.entries, reset: true)
+  end
+
+  defp allowed_filter("allowed"), do: true
+  defp allowed_filter("denied"), do: false
+  defp allowed_filter(_result), do: nil
+
+  defp state_from_params(params) do
+    %{
+      search: Map.get(params, "search", ""),
+      result: member_or_blank(Map.get(params, "result"), @results),
+      sort_by: sort_by_from(Map.get(params, "sort_by")),
+      sort_dir: if(Map.get(params, "sort_dir") == "asc", do: :asc, else: :desc),
+      page: to_int(Map.get(params, "page"), 1)
+    }
+  end
+
+  defp state_to_params(state) do
+    %{
+      "search" => state.search,
+      "result" => state.result,
+      "sort_by" => state.sort_by,
+      "sort_dir" => state.sort_dir,
+      "page" => state.page
+    }
+  end
+
+  # Anything unrecognised becomes "no filter" rather than reaching
+  # String.to_existing_atom, which a hand-edited URL would otherwise crash on.
+  defp member_or_blank(value, allowed) when is_binary(value) do
+    if value in allowed, do: value, else: ""
+  end
+
+  defp member_or_blank(_value, _allowed), do: ""
+
+  defp sort_by_from(value) when value in @sortable, do: String.to_existing_atom(value)
+  defp sort_by_from(_value), do: :created_at
+
+  defp to_int(nil, default), do: default
+
+  defp to_int(value, default) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, ""} when int > 0 -> int
+      _ -> default
+    end
+  end
+
+  defp to_int(value, _default) when is_integer(value) and value > 0, do: value
+  defp to_int(_value, default), do: default
+
+  defp nilify(""), do: nil
+  defp nilify(value), do: value
+
+  defp sort_indicator(state, column) do
+    cond do
+      state.sort_by != column -> nil
+      state.sort_dir == :asc -> "hero-chevron-up"
+      true -> "hero-chevron-down"
+    end
+  end
+
+  # principal_type is a :string column, not an Ecto.Enum -- matching atoms here
+  # silently fell through to the raw value, so every row read "agent" instead
+  # of "Employee". "agent" is the stored word; "Employee" is what it means.
+  defp principal_label(%{principal_type: "agent"}), do: "Employee"
+  defp principal_label(%{principal_type: "user"}), do: "User"
+  defp principal_label(%{principal_type: other}), do: to_string(other)
+
+  defp created_at(%{created_at: nil}), do: "—"
+  defp created_at(%{created_at: at}), do: Calendar.strftime(at, "%Y-%m-%d %H:%M")
+
+  # `put_principal_capability/6` rejects an unknown key, so this cannot be
+  # created through the API. It becomes reachable when a module that declared
+  # a capability is uninstalled: its rows survive, the registry forgets the
+  # key, and the grant silently stops matching. Nothing raises -- authorization
+  # fails closed by design -- so this badge is the only place an operator can
+  # see that a grant has quietly become inert.
+  defp unknown_capability?(%{capability: capability}),
+    do: not Authz.capability_known?(capability)
+end
