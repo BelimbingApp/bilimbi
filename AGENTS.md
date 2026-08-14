@@ -313,6 +313,14 @@ and `:menu`, as decided by ADR 0004. Its `mix.exs` derives local module path
 dependencies and application metadata from that descriptor; do not repeat
 module dependency names manually.
 
+A descriptor with a non-null `migrations` path must also declare
+`migration_dispositions`, mapping every owned migration filename version
+exactly once to `:compatible_baseline` or `:bilimbi_only`. A descriptor with
+`migrations: nil` omits that field. Compatible baselines may be ledger-adopted
+only after verification; Bilimbi-only migrations always execute. There is no
+default disposition. Adding, removing, or reclassifying a migration changes
+the workspace graph and must fail discovery until the descriptor is exact.
+
 Discovery must fail during dependency resolution for a malformed or missing
 descriptor, duplicate stable ID, duplicate OTP application ID, missing
 dependency, dependency cycle, layer/container mismatch, or forbidden upward
@@ -324,7 +332,7 @@ directory. That directory must remain in the package formatter. Mix records the
 validated resolved position and workspace-graph fingerprint in each OTP
 application's descriptor metadata. Every module project includes the shared
 `:bilimbi_graph` compiler before Mix's standard compilers; when composition
-changes, it refreshes each package's application metadata. Runtime consumers
+or an owned migration file changes, it refreshes each package's application metadata. Runtime consumers
 verify one graph fingerprint, use the approved positions, and must not
 implement a second dependency graph algorithm.
 

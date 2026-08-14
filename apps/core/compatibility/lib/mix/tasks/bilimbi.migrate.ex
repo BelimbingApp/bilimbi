@@ -8,15 +8,27 @@ defmodule Mix.Tasks.Bilimbi.Migrate do
 
   @impl Mix.Task
   def run(args) do
-    Mix.Task.run(
-      "ecto.migrate",
-      ["-r", "Bilimbi.Base.Repo", "--strict-version-order"] ++ migration_args() ++ args
-    )
+    run(args, Bilimbi.Base.Repo)
   end
 
-  defp migration_args do
-    Enum.flat_map(Bilimbi.Core.Compatibility.migration_paths(), fn path ->
-      ["--migrations-path", path]
-    end)
+  @doc false
+  def run(args, repo) do
+    {parsed, remaining} =
+      OptionParser.parse!(args,
+        strict: [prefix: :string, quiet: :boolean]
+      )
+
+    if remaining != [] do
+      Mix.raise("unexpected arguments: #{Enum.join(remaining, " ")}")
+    end
+
+    opts =
+      parsed
+      |> Keyword.delete(:quiet)
+      |> then(fn opts ->
+        if parsed[:quiet], do: Keyword.put(opts, :log, false), else: opts
+      end)
+
+    Bilimbi.Core.Compatibility.migrate(repo, opts)
   end
 end

@@ -9,9 +9,15 @@ tables or migrations: each module ships its own migration path, while
 Compatibility orders those paths through `Bilimbi.Base.Repo` and the shared
 `bilimbi_schema_migrations` ledger.
 
-Adoption may create an empty Bilimbi ledger or advance an exact earlier prefix
-only after the complete installed schema verifies. It never replays DDL over an
-existing Belimbing structure or accepts a foreign/non-prefix ledger.
+Every owned migration version is explicitly classified by its descriptor.
+Adoption records only verified compatible baselines and leaves Bilimbi-only
+migrations pending. Recorded versions must be installed, and the recorded
+versions in each class must be a prefix of that class's deterministic sequence.
+The operational `mix bilimbi.migrate` command validates that state through this
+module before choosing strict timestamp ordering. A class-valid gap may occur
+when a later compatible baseline was adopted while an earlier Bilimbi-only
+migration remains pending; arbitrary, foreign, or class-non-prefix ledgers fail
+closed.
 
 ## Platform baseline failure evidence
 

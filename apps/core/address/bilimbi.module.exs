@@ -14,6 +14,7 @@
     "core/geonames"
   ],
   migrations: "priv/repo/migrations",
+  migration_dispositions: %{20_260_812_103_809 => :compatible_baseline},
   web: nil,
   schema_contract: Bilimbi.Core.Address.SchemaContract,
   contribution_provider: Bilimbi.Core.Address.Contributions

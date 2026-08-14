@@ -17,6 +17,7 @@
     "core/employee"
   ],
   migrations: "priv/repo/migrations",
+  migration_dispositions: %{20_260_813_094_500 => :compatible_baseline},
   web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Core.User.SchemaContract,
   contribution_provider: Bilimbi.Core.User.Contributions

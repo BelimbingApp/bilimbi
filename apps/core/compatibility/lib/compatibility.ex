@@ -20,16 +20,21 @@ defmodule Bilimbi.Core.Compatibility do
   def migration_paths, do: ModuleRegistry.migration_paths!()
 
   def baseline_versions do
-    Enum.map(migration_entries(), &elem(&1, 0))
+    migration_entries()
+    |> Enum.filter(&(elem(&1, 2) == :compatible_baseline))
+    |> Enum.map(&elem(&1, 0))
   end
 
   def migration_entries do
+    dispositions = ModuleRegistry.migration_dispositions!()
+
     entries =
       migration_paths()
       |> Enum.flat_map(&Path.wildcard(Path.join(&1, "*.exs")))
       |> Enum.map(fn path ->
         Code.require_file(path)
-        {migration_version!(path), migration_module!(path)}
+        version = migration_version!(path)
+        {version, migration_module!(path), Map.fetch!(dispositions, version)}
       end)
       |> Enum.sort_by(&elem(&1, 0))
 
@@ -43,8 +48,19 @@ defmodule Bilimbi.Core.Compatibility do
 
   @spec migrate(Ecto.Repo.t(), keyword()) :: [integer()]
   def migrate(repo \\ Repo, opts \\ []) do
-    opts = opts |> Keyword.put(:all, true) |> Keyword.put(:strict_version_order, true)
-    Ecto.Migrator.run(repo, migration_entries(), :up, opts)
+    entries = migration_entries()
+    schema = Keyword.get(opts, :prefix, "public")
+    _ = SchemaVerifier.quote_identifier!(schema)
+
+    strict_version_order = strict_version_order?(repo, schema, entries)
+
+    opts =
+      opts
+      |> Keyword.put(:all, true)
+      |> Keyword.put(:strict_version_order, strict_version_order)
+
+    migrations = Enum.map(entries, fn {version, module, _disposition} -> {version, module} end)
+    Ecto.Migrator.run(repo, migrations, :up, opts)
   end
 
   @spec verify(Ecto.Repo.t(), keyword()) :: :ok | {:error, [String.t()]}
@@ -109,24 +125,77 @@ defmodule Bilimbi.Core.Compatibility do
         {:ok, :adopted}
 
       versions ->
-        adopt_existing_ledger(repo, schema, versions)
+        adopt_existing_ledger(repo, schema, versions, migration_entries())
     end
   end
 
-  defp adopt_existing_ledger(repo, schema, versions) do
-    baselines = baseline_versions()
+  defp adopt_existing_ledger(repo, schema, versions, entries) do
+    case validate_ledger(entries, versions) do
+      :ok ->
+        missing_baselines = baseline_versions() -- versions
 
-    cond do
-      versions == baselines ->
-        {:ok, :already_adopted}
+        if missing_baselines == [] do
+          {:ok, :already_adopted}
+        else
+          record_versions!(repo, schema, missing_baselines)
+          {:ok, :advanced}
+        end
 
-      Enum.take(baselines, length(versions)) == versions ->
-        record_versions!(repo, schema, Enum.drop(baselines, length(versions)))
-        {:ok, :advanced}
-
-      true ->
+      :error ->
         repo.rollback({:ledger_conflict, versions})
     end
+  end
+
+  defp strict_version_order?(repo, schema, entries) do
+    case ledger_versions(repo, schema) do
+      :missing ->
+        true
+
+      versions ->
+        case validate_ledger(entries, versions) do
+          :ok -> not class_valid_gap?(entries, versions)
+          :error -> raise ArgumentError, "Bilimbi migration ledger is not class-valid"
+        end
+    end
+  end
+
+  defp validate_ledger(entries, versions) do
+    known_versions = Enum.map(entries, &elem(&1, 0))
+
+    compatible_versions =
+      entries
+      |> Enum.filter(&(elem(&1, 2) == :compatible_baseline))
+      |> Enum.map(&elem(&1, 0))
+
+    bilimbi_only_versions =
+      entries
+      |> Enum.filter(&(elem(&1, 2) == :bilimbi_only))
+      |> Enum.map(&elem(&1, 0))
+
+    recorded_compatible = Enum.filter(compatible_versions, &(&1 in versions))
+    recorded_bilimbi_only = Enum.filter(bilimbi_only_versions, &(&1 in versions))
+
+    if versions -- known_versions == [] and
+         prefix?(compatible_versions, recorded_compatible) and
+         prefix?(bilimbi_only_versions, recorded_bilimbi_only) do
+      :ok
+    else
+      :error
+    end
+  end
+
+  defp prefix?(versions, recorded) do
+    Enum.take(versions, length(recorded)) == recorded
+  end
+
+  defp class_valid_gap?(_entries, []), do: false
+
+  defp class_valid_gap?(entries, versions) do
+    latest_recorded = Enum.max(versions)
+
+    Enum.any?(entries, fn {version, _module, _disposition} ->
+      version < latest_recorded and version not in versions
+    end)
   end
 
   defp ledger_versions(repo, schema) do

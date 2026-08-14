@@ -16,6 +16,13 @@ that every package was compiled from the same graph and that the generated
 positions are complete and dependency-safe before exposing module and
 migration contributions.
 
+A non-null migration path has a mandatory `migration_dispositions` map whose
+positive version keys exactly equal the migration filenames and whose values
+are only `:compatible_baseline` or `:bilimbi_only`. Nil paths omit the field.
+Mix-time and runtime validation both fail closed on missing, extra, malformed,
+or duplicate versions. Descriptor and migration-file contents participate in
+the workspace fingerprint.
+
 Source composition and runtime visibility stay separate. A coordinator such as
 Core Compatibility can enumerate only OTP applications in its Mix dependency
 closure. Workspace-boundary tests therefore fail when a source-discovered

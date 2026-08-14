@@ -7,6 +7,7 @@
   namespace: Bilimbi.Base.Audit,
   dependencies: ["base/database", "base/module_registry", "base/tenancy"],
   migrations: "priv/repo/migrations",
+  migration_dispositions: %{20_260_813_114_300 => :compatible_baseline},
   web: nil,
   schema_contract: Bilimbi.Base.Audit.SchemaContract,
   contribution_provider: Bilimbi.Base.Audit.Contributions

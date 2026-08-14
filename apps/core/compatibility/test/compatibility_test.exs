@@ -248,6 +248,19 @@ defmodule Bilimbi.Core.CompatibilityTest do
              Compatibility.baseline_versions()
   end
 
+  test "fresh migration executes compatible and Bilimbi-only contributions", %{schema: schema} do
+    synthetic_version = install_synthetic_migration!()
+
+    expected_versions = Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
+
+    assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) ==
+             expected_versions
+
+    assert relation(MigrationTestRepo, schema, "bilimbi_only_probe") != nil
+    assert recorded_versions(MigrationTestRepo, schema) == expected_versions
+    refute synthetic_version in Compatibility.baseline_versions()
+  end
+
   test "adoption verifies a compatible Belimbing schema before recording baselines", %{
     schema: schema
   } do
@@ -281,6 +294,62 @@ defmodule Bilimbi.Core.CompatibilityTest do
 
     assert recorded_versions(MigrationTestRepo, schema) ==
              Compatibility.baseline_versions()
+  end
+
+  test "adoption leaves an interleaved Bilimbi-only migration pending for normal migration", %{
+    schema: schema
+  } do
+    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+    drop_bilimbi_ledger!(MigrationTestRepo, schema)
+    synthetic_version = install_synthetic_migration!()
+
+    assert relation(MigrationTestRepo, schema, "bilimbi_only_probe") == nil
+
+    assert {:ok, :adopted} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
+
+    assert recorded_versions(MigrationTestRepo, schema) == Compatibility.baseline_versions()
+    refute synthetic_version in recorded_versions(MigrationTestRepo, schema)
+
+    assert [^synthetic_version] =
+             Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+
+    assert relation(MigrationTestRepo, schema, "bilimbi_only_probe") != nil
+
+    assert recorded_versions(MigrationTestRepo, schema) ==
+             Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
+
+    assert {:ok, :already_adopted} =
+             Compatibility.adopt(MigrationTestRepo, prefix: schema)
+  end
+
+  test "adoption rejects non-prefix and unknown ledger versions", %{schema: schema} do
+    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+    [first_version | _rest] = Compatibility.baseline_versions()
+
+    SQL.query!(
+      MigrationTestRepo,
+      ~s(DELETE FROM "#{schema}".bilimbi_schema_migrations WHERE version = $1),
+      [first_version]
+    )
+
+    non_prefix = recorded_versions(MigrationTestRepo, schema)
+
+    assert {:error, {:ledger_conflict, ^non_prefix}} =
+             Compatibility.adopt(MigrationTestRepo, prefix: schema)
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".bilimbi_schema_migrations (version, inserted_at)
+      VALUES ($1, now())
+      """,
+      [99_999_999_999_999]
+    )
+
+    with_unknown = recorded_versions(MigrationTestRepo, schema)
+
+    assert {:error, {:ledger_conflict, ^with_unknown}} =
+             Compatibility.adopt(MigrationTestRepo, prefix: schema)
   end
 
   test "adoption refuses schema drift and leaves no Bilimbi ledger", %{schema: schema} do
@@ -384,6 +453,45 @@ defmodule Bilimbi.Core.CompatibilityTest do
 
   defp drop_bilimbi_ledger!(repo, schema) do
     SQL.query!(repo, ~s(DROP TABLE "#{schema}".bilimbi_schema_migrations), [])
+  end
+
+  defp install_synthetic_migration! do
+    app = :bilimbi_core_compatibility
+    version = 20_260_812_000_000
+    descriptor = Application.fetch_env!(app, :bilimbi_module)
+    suffix = System.unique_integer([:positive, :monotonic])
+    relative_path = "test_migrations_#{suffix}"
+    path = Application.app_dir(app, relative_path)
+    File.mkdir_p!(path)
+
+    File.write!(
+      Path.join(path, "20260812000000_create_bilimbi_only_probe.exs"),
+      """
+      defmodule Bilimbi.Core.Compatibility.TestMigrations.CreateBilimbiOnlyProbe#{suffix} do
+        use Ecto.Migration
+
+        def change do
+          create table(:bilimbi_only_probe, primary_key: false) do
+            add :id, :bigserial, primary_key: true
+          end
+        end
+      end
+      """
+    )
+
+    test_descriptor =
+      descriptor
+      |> Map.put(:migrations, relative_path)
+      |> Map.put(:migration_dispositions, %{version => :bilimbi_only})
+
+    Application.put_env(app, :bilimbi_module, test_descriptor)
+
+    on_exit(fn ->
+      Application.put_env(app, :bilimbi_module, descriptor)
+      File.rm_rf!(path)
+    end)
+
+    version
   end
 
   defp relation(repo, schema, table) do

@@ -7,6 +7,7 @@
   namespace: Bilimbi.Core.Geonames,
   dependencies: ["base/database", "base/module_registry", "base/ui"],
   migrations: "priv/repo/migrations",
+  migration_dispositions: %{20_260_812_103_801 => :compatible_baseline},
   web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Core.Geonames.SchemaContract,
   contribution_provider: Bilimbi.Core.Geonames.Contributions

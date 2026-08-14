@@ -23,10 +23,14 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     :schema_contract,
     :contribution_provider
   ]
+  @migration_dispositions [:compatible_baseline, :bilimbi_only]
 
   Code.require_file("compile_bilimbi_graph.exs", __DIR__)
 
   @type descriptor :: %{
+          optional(:migration_dispositions) => %{
+            pos_integer() => :compatible_baseline | :bilimbi_only
+          },
           id: String.t(),
           kind: :module,
           layer: :base | :core | :domain | :extension,
@@ -119,7 +123,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   def workspace_fingerprint(path) do
     workspace_root = workspace_root!(path)
 
-    files =
+    descriptor_files =
       [
         Path.join(workspace_root, "apps/*/#{@container_file}"),
         Path.join(workspace_root, "apps/*/*/#{@module_file}"),
@@ -129,6 +133,21 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
       |> Enum.flat_map(&Path.wildcard/1)
       |> Enum.uniq()
       |> Enum.sort()
+
+    migration_files =
+      workspace_root
+      |> discover_workspace!()
+      |> Enum.flat_map(fn descriptor ->
+        case descriptor.migrations do
+          path when is_binary(path) ->
+            Path.wildcard(Path.join([descriptor.path, path, "*.exs"]))
+
+          nil ->
+            []
+        end
+      end)
+
+    files = Enum.sort(Enum.uniq(descriptor_files ++ migration_files))
 
     source =
       Enum.map_join(files, "\0", fn file_path ->
@@ -259,6 +278,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     modules
     |> validate_unique!(:id, "stable module ID")
     |> validate_unique!(:otp_app, "OTP application ID")
+    |> validate_unique_migration_versions!()
     |> validate_container_membership!()
     |> validate_dependencies!()
     |> topological_sort!()
@@ -349,7 +369,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     end
 
     value = evaluate_descriptor!(descriptor_path, "module")
-    validate_keyword_keys!(value, @module_keys, descriptor_path)
+    validate_module_keyword_keys!(value, descriptor_path)
 
     descriptor = Map.new(value)
     validate_module_fields!(descriptor, descriptor_path)
@@ -389,6 +409,32 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     end
   end
 
+  defp validate_module_keyword_keys!(value, path) do
+    unless Keyword.keyword?(value) do
+      malformed!(path, "descriptor must return a keyword list")
+    end
+
+    keys = Keyword.keys(value)
+
+    if length(keys) != length(Enum.uniq(keys)) do
+      malformed!(path, "descriptor contains duplicate keys")
+    end
+
+    expected_keys =
+      if Keyword.get(value, :migrations) do
+        [:migration_dispositions | @module_keys]
+      else
+        @module_keys
+      end
+
+    unless Enum.sort(keys) == Enum.sort(expected_keys) do
+      malformed!(
+        path,
+        "expected keys #{inspect(Enum.sort(expected_keys))}, got #{inspect(Enum.sort(keys))}"
+      )
+    end
+  end
+
   defp validate_module_fields!(descriptor, path) do
     unless valid_module_id?(descriptor.id), do: malformed!(path, "id is invalid")
     unless descriptor.kind == :module, do: malformed!(path, "kind must be :module")
@@ -418,6 +464,8 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
       malformed!(path, "declared migration directory does not exist")
     end
 
+    validate_migration_dispositions!(descriptor, path)
+
     unless valid_relative_path?(descriptor.web) do
       malformed!(path, "web must be nil or a safe relative path")
     end
@@ -436,6 +484,61 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     end
   end
 
+  defp validate_migration_dispositions!(%{migrations: nil}, _path), do: :ok
+
+  defp validate_migration_dispositions!(descriptor, descriptor_path) do
+    dispositions = Map.fetch!(descriptor, :migration_dispositions)
+
+    unless is_map(dispositions) and map_size(dispositions) > 0 and
+             Enum.all?(dispositions, fn {version, disposition} ->
+               is_integer(version) and version > 0 and disposition in @migration_dispositions
+             end) do
+      malformed!(
+        descriptor_path,
+        "migration_dispositions must map positive versions to :compatible_baseline or :bilimbi_only"
+      )
+    end
+
+    migration_dir = Path.join(Path.dirname(descriptor_path), descriptor.migrations)
+    file_versions = migration_versions!(migration_dir, descriptor_path)
+    declared_versions = dispositions |> Map.keys() |> Enum.sort()
+
+    unless file_versions == declared_versions do
+      malformed!(
+        descriptor_path,
+        "migration_dispositions versions #{inspect(declared_versions)} do not match migration files #{inspect(file_versions)}"
+      )
+    end
+  end
+
+  defp migration_versions!(migration_dir, descriptor_path) do
+    versions =
+      migration_dir
+      |> Path.join("*.exs")
+      |> Path.wildcard()
+      |> Enum.map(fn migration_path ->
+        case Regex.run(~r/^(\d+)_.*\.exs$/, Path.basename(migration_path),
+               capture: :all_but_first
+             ) do
+          [version] ->
+            String.to_integer(version)
+
+          _other ->
+            malformed!(
+              descriptor_path,
+              "invalid migration filename #{Path.basename(migration_path)}"
+            )
+        end
+      end)
+      |> Enum.sort()
+
+    if length(versions) != length(Enum.uniq(versions)) do
+      malformed!(descriptor_path, "migration directory contains duplicate versions")
+    end
+
+    versions
+  end
+
   defp validate_unique!(modules, field, label) do
     duplicates =
       modules
@@ -446,6 +549,24 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
 
     if duplicates != [] do
       raise ArgumentError, "duplicate #{label}: #{Enum.map_join(duplicates, ", ", &inspect/1)}"
+    end
+
+    modules
+  end
+
+  defp validate_unique_migration_versions!(modules) do
+    duplicates =
+      modules
+      |> Enum.flat_map(fn descriptor ->
+        descriptor |> Map.get(:migration_dispositions, %{}) |> Map.keys()
+      end)
+      |> Enum.frequencies()
+      |> Enum.filter(fn {_version, count} -> count > 1 end)
+      |> Enum.map(&elem(&1, 0))
+      |> Enum.sort()
+
+    if duplicates != [] do
+      raise ArgumentError, "duplicate migration versions: #{inspect(duplicates)}"
     end
 
     modules
