@@ -63,6 +63,13 @@ defmodule BilimbiWeb.UserProfileLiveTest do
     assert {:ok, user} = User.get_tenant_user(scope, 91)
     assert user.name == "Ada King"
     assert user.email == "ada.king@example.com"
+
+    # And the form shows what was saved. Asserting only the database missed a
+    # real defect: `current_scope.user` is built at mount and no write
+    # refreshes it, so reloading the form from the session redisplayed the old
+    # values -- a save that looked to the user like it had silently failed.
+    assert has_element?(view, "input[name='profile[name]'][value='Ada King']")
+    assert has_element?(view, "input[name='profile[email]'][value='ada.king@example.com']")
   end
 
   test "ignores a user id smuggled through the form", %{conn: conn} do

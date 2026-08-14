@@ -43,6 +43,7 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
      socket
      |> assign(:page_title, "Profile")
      |> assign(:landing_options, landing_options(socket))
+     |> assign(:account, session_account(socket))
      |> load_form()}
   end
 
@@ -64,16 +65,25 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
 
   defp save(socket, changeset) do
     scope = socket.assigns.current_scope.scope
-    %{id: user_id, company_id: company_id} = account(socket)
+    %{id: user_id, company_id: company_id} = socket.assigns.account
 
     attributes = %{
       name: get_field(changeset, :name),
       email: get_field(changeset, :email)
     }
 
+    previous_email = socket.assigns.account.email
+
     case User.update_user(scope, company_id, user_id, attributes) do
       {:ok, _summary} ->
-        {:noreply, save_landing(socket, changeset, attributes)}
+        # Re-read from the domain, not the session. `current_scope.user` is
+        # built at mount and no write refreshes it, so reloading the form from
+        # it would show the values the user just replaced -- a save that looks
+        # like it silently failed.
+        {:noreply,
+         socket
+         |> refresh_account()
+         |> save_landing(changeset, Map.put(attributes, :previous_email, previous_email))}
 
       {:error, %Changeset{} = domain} ->
         {:noreply, assign_form(socket, copy_domain_errors(changeset, domain))}
@@ -89,6 +99,23 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
   # The landing page is a setting, so it goes through the settings engine
   # rather than beside the user columns -- which is what makes an empty
   # selection *clear* the override instead of pinning an empty string.
+  defp refresh_account(socket) do
+    %{id: user_id, company_id: company_id} = socket.assigns.account
+
+    case User.get_tenant_user(socket.assigns.current_scope.scope, user_id) do
+      {:ok, user} ->
+        assign(socket, :account, %{
+          id: user_id,
+          company_id: company_id,
+          name: user.name,
+          email: user.email
+        })
+
+      _ ->
+        socket
+    end
+  end
+
   defp save_landing(socket, changeset, attributes) do
     scope = settings_scope(socket)
     fields = Settings.Form.fields(["profile.profile"], scope)
@@ -97,7 +124,7 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
     case Settings.Form.save(submitted, fields, scope) do
       {:ok, _outcome} ->
         socket
-        |> put_flash(:info, saved_message(socket, attributes))
+        |> put_flash(:info, saved_message(attributes))
         |> load_form()
 
       {:error, _key, message} ->
@@ -110,8 +137,8 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
   # Belimbing tells the user when an email change costs them their verified
   # status. Saying "Profile saved" and silently unverifying them is the kind of
   # quiet consequence that turns into a support ticket.
-  defp saved_message(socket, %{email: email}) do
-    if email != account(socket).email do
+  defp saved_message(%{email: email, previous_email: previous_email}) do
+    if email != previous_email do
       "Profile saved. Your new address is unverified until you confirm it."
     else
       "Profile saved."
@@ -119,10 +146,9 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
   end
 
   defp load_form(socket) do
-    account = account(socket)
+    account = socket.assigns.account
 
     socket
-    |> assign(:account, account)
     |> assign_form(
       form_changeset(
         %{
@@ -141,13 +167,13 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
 
   # The user's own scope: this screen edits nobody else's preferences.
   defp settings_scope(socket) do
-    %{id: user_id, company_id: company_id} = account(socket)
+    %{id: user_id, company_id: company_id} = socket.assigns.account
     tenant_id = socket.assigns.current_scope.scope.tenant.id
     Settings.Scope.user(user_id, company_id, tenant_id)
   end
 
-  # From the session, never from params. See the moduledoc.
-  defp account(socket) do
+  # The session seed, used once at mount. From the session, never from params.
+  defp session_account(socket) do
     user = socket.assigns.current_scope.user
 
     %{
