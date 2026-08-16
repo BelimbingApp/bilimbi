@@ -2,7 +2,12 @@
 
 **Status:** Proposed
 **Last Updated:** 2026-08-16
-**Sources:** Client meeting notes, LDPE foam plant (2026-08-15); `docs/architecture/0010_composition-model.md`; `docs/plans/domain-extension-layer-rollout.md`; `docs/ai-team/PORTING_STAGES.md` (S5); `AGENTS.md` §"Future Domains and Extensions", §5 schema compatibility; Belimbing `app/Domains/Commerce/Inventory` (item master, 3 models)
+**Sources:** Client meeting notes, LDPE foam plant (2026-08-15);
+`docs/architecture/0010_composition-model.md`;
+`docs/plans/domain-extension-layer-rollout.md`;
+`docs/ai-team/PORTING_STAGES.md` (S5); `AGENTS.md` §"Future Domains and
+Extensions", §5 schema compatibility; Belimbing
+`app/Domains/Commerce/Inventory` (item master, 3 models)
 **Agents:** claude/claude-opus-5, amp/medium-sol
 
 ## Problem Essence
@@ -11,7 +16,7 @@ An LDPE foam plant runs its entire material flow on manual records, so no step r
 
 ## Desired Outcome
 
-Every material step records its input and output quantities against one canonical unit, so any discrepancy surfaces as a number rather than as a suspicion. Concretely, when this is done the plant can answer: what weight arrived on that lorry and from which supplier; what went into extruder run X and what rolls came out; how much of each roll became product and how much became trim; and what is physically in the warehouse right now. Records are append-only and attributable, so they stand as ISO evidence.
+Every material step records observed input and output in its native unit with provenance, plus a normalised mass equivalent for reconciliation, so discrepancies surface as attributable numbers rather than suspicions. The plant can answer what arrived from each supplier, what entered and left each production step, how much became product or trim, and what is physically in stock. Append-only, attributable records support audit evidence without claiming that this plan alone satisfies any certification.
 
 ## Context that shapes the design
 
@@ -28,22 +33,22 @@ Three facts constrain the design more than any feature request:
 - **Stock ledger** — append-only movements over identified material units, with locations and quantities. Generic; no manufacturing knowledge. Owned by the stock module.
 - **Lot and unit identity** — durable identity for a bag, a roll, or a pack, with parent/child links across transforms so a finished pack traces back to an extruder run and to a recycle receipt.
 - **Receiving and weigh tickets** — supplier, vehicle, gross/tare/net, tied to the movement that creates the lot.
-- **Production steps** — extrusion runs with blend composition and measured roll output; cure ageing with a minimum-age gate; lamination; cutting against a plan. Owned by the process module and written to serve manufacturers generally.
-- **Cut planning and trim accounting** — matching measured roll widths to ordered widths, with offcut recorded as an explicit output.
+- **Production steps** — extrusion runs with blend composition and measured roll output; cure ageing with a minimum-age gate; lamination; cutting against a plan. Owned by the process module and scoped honestly to sheet-goods manufacturing.
+- **Cut planning and trim accounting** — matching measured roll widths to widths from the confirmed demand source, with offcut recorded as an explicit output.
 - **Capture surface** — printed labels and scanning, plus the small number of manual measurements that cannot be automated.
 - **Reconciliation reporting** — expected against actual per step, per supplier, per run.
 
 ## Design Decisions
 
-### Canonical ledger unit
+### Quantity model
 
-**Option A — mass canonical.** Every movement is recorded in kilograms; geometry (width, thickness, length) is an attribute of the unit, and area or piece counts derive from a recorded density per formulation. Reconciliation is arithmetic on a single unit end to end, and the extruder's own input is already mass. Costs a density figure per formulation, which the plant must be willing to measure and maintain.
+**Option A — mass only.** Every movement is recorded in kilograms; geometry (width, thickness, length) is an attribute of the unit, and area or piece counts derive from a recorded density per formulation. Reconciliation is arithmetic on a single unit end to end, but inferred mass becomes indistinguishable from observed mass.
 
-**Option B — geometry canonical.** Movements are recorded in area or linear metres, with mass as an attribute. Matches how the shop floor talks about rolls and cuts, and makes cutting yield directly legible, but the upstream half of the process is weight-based, so every receipt needs conversion in the opposite direction and blending becomes awkward.
+**Option B — geometry only.** Movements are recorded in area or linear metres, with mass as an attribute. This matches rolls and cuts but makes weight-based receiving and blending depend on reverse conversions.
 
-**Option C — dual unit, no canonical.** Record whatever unit is natural at each step and reconcile through conversion tables. Most convenient for data entry, worst for truth: with no canonical unit, discrepancies hide inside conversion assumptions, which is the exact failure the plan exists to end.
+**Option C — native observations plus normalised mass.** Record the observed quantity in its native unit, how it was obtained, the versioned conversion basis, and a normalised mass equivalent. This preserves measurement truth while providing one reconciliation basis.
 
-**Recommended: mass as the reconciliation basis, but never as a recorded fact that was not observed.** An earlier draft of this decision said "every movement is recorded in kilograms", which quietly converts derived numbers into apparent measurements: rolls are captured as width, thickness, and length, so their mass is inferred from an assumed density. A variance computed against inferred mass then blends real material loss with density variation, dimensional measurement error, and rounding, and the resulting number cannot be acted on.
+**Recommended: C.** Mass remains the reconciliation basis but never appears as an observed fact when it was derived. A roll captured as width, thickness, and length has an inferred mass; its variance therefore reflects density assumptions and measurement error as well as possible material loss.
 
 Every quantity therefore records four things: the **native observed quantity and unit**, how it was obtained — **measured, declared, counted, or derived** — the **conversion basis and its version** where one was applied, and a **normalised mass equivalent** for reconciliation. Mass stays the basis on which the plant's books balance; provenance is what makes a variance report worth reading, because a discrepancy traceable to derived quantities is a measurement problem and a discrepancy between two measured quantities is a material problem.
 
@@ -89,6 +94,7 @@ Label each roll individually rather than labelling the run. Per-roll identity is
 - The stock module exposes no manufacturing concepts. It knows units, quantities, locations, and transforms; it does not know what an extruder or a cure is. The process module reaches it only through its public API, under a dependency declared in its descriptor.
 - The process module is named for the industry it actually serves — sheet goods — rather than presented as a general manufacturing engine. Cure duration, tolerance, and cut rules are configuration rather than hardcoded foam values, but generalisation beyond sheet goods waits for a second real variation. A configurable engine designed from one example is a guess with extra surface area.
 - The stock Domain installs and runs with the sheet-goods Domain absent. A company that only warehouses and sells never acquires a cure step.
+- Cure gating refuses under-aged consumption by default. An override requires an explicit Base Authz capability and a mandatory reason, and records the actor, time, reason, and affected unit as an immutable nonconformance.
 
 ## Phases
 
@@ -98,6 +104,9 @@ Phase 1 is a vertical slice deliberately narrower than the substrate beneath it.
 
 Goal: a receiving clerk records an arriving lorry in one screen, and a supplier's history of declared against measured weight is visible without further work.
 
+- [ ] Port Belimbing's canonical item master into the stock module, preserving
+  its schema under `AGENTS.md` §5.
+- [ ] Establish durable receiving and warehouse locations used by receipts and stock positions.
 - [ ] Record weigh tickets with supplier, vehicle, gross, tare, and net.
 - [ ] Capture declared weight alongside measured weight so the difference is a stored fact, each carrying its provenance.
 - [ ] Post receipts as balanced immutable transactions, in the shape Phase 2 generalises rather than a shape it will replace.
@@ -113,9 +122,8 @@ Deferred from this phase: landed recycle cost against virgin resin. It needs pur
 
 Goal: any step's input and output can be recorded as one balanced transaction, and a stock position or lot ancestry can be read back, with no manufacturing concept present in the module.
 
-- [ ] Port Belimbing's item master into the stock module, preserving its canonical schema per `AGENTS.md` §5.
 - [ ] Add material unit identity with parent/child ancestry across transforms.
-- [ ] Add locations covering receiving, WIP, cure, and finished goods.
+- [ ] Extend locations from receiving and warehouse into WIP, cure, and finished goods.
 - [ ] Generalise Phase 1's receipts into transactions of balanced entries carrying native quantity, unit, and provenance.
 - [ ] Add the transform operation consuming inputs and producing outputs in one transaction, recording variance.
 - [ ] Implement the contract's idempotency, concurrent-consumption, backdating, and reversal behaviour.
@@ -176,4 +184,4 @@ Work proceeds on these unless corrected; each is recorded because being wrong ab
 - **No adaptation is identified**, so no Extension is named here. Domain classification follows standalone business meaning, not whether a capability is public, private, reusable, bespoke, or client-owned. If later work adapts stock or sheet-goods behavior, that adaptation may live in its own public or private Extension repository mounted under `apps/`.
 - **Domain and module names are unsettled.** `commerce` currently echoes Belimbing's arrangement for the stock capability, but a ledger serving manufacturers may deserve a name closer to what it owns; the sheet-goods Domain and its principal process module also need durable names. Repository selection does not remove the cost of renaming stable module and OTP application identities later.
 - **AutoCard is assumed to be replaced, not integrated.** No import or synchronisation work is planned. If it must survive, an integration phase is added and Phase 2 changes shape.
-- **Interim manual process.** The plant has no system until Base and Core complete. A paper or spreadsheet weigh-ticket and cut-yield discipline started now would both deliver value immediately and produce a data shape to validate Phases 2 and 4 against. This is a client-side decision recorded here so it is not lost.
+- **Interim manual process.** The plant has no system until the composition proof passes and the stock Domain's receiving slice is available. A paper or spreadsheet weigh-ticket and cut-yield discipline started now would both deliver value immediately and produce a data shape to validate Phases 2 and 4 against. This is a client-side decision recorded here so it is not lost.

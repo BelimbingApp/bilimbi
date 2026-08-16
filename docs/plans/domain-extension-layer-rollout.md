@@ -2,10 +2,11 @@
 
 **Status:** Proposed — Phase 1 must prove the composition model
 **Last Updated:** 2026-08-16
-**Sources:** `docs/architecture/0010_composition-model.md`; review by sol (2026-08-16); ADR 0003 physical deep-module packages; ADR 0004 module
-contribution contract; `docs/ai-team/PORTING_STAGES.md` (S5, S6, stage-change
-rule); `AGENTS.md` §4; `apps/base/module_registry/`; sibling plan
-`docs/plans/commerce-material-flow-ledger.md`
+**Sources:** `docs/architecture/0010_composition-model.md`; review by sol
+(2026-08-16); ADR 0003 physical deep-module packages; ADR 0004 module
+contribution contract; `docs/ai-team/PORTING_STAGES.md` (S5, S6,
+stage-change rule); `AGENTS.md` §4; `apps/base/module_registry/`; sibling
+plan `docs/plans/commerce-material-flow-ledger.md`
 **Agents:** claude/claude-opus-5, amp/medium-sol
 
 ## Problem Essence
@@ -34,6 +35,10 @@ The following facts have already been verified:
   existing source scan without central registration.
 - The graph validator already rejects missing dependencies, duplicate
   identities, and cycles within the graph it sees.
+- The current dependency validator permits Domain-to-Domain dependencies only
+  inside one container and rejects every Extension-to-Extension dependency.
+  Both rules must change to implement 0010's declared, acyclic same-layer
+  contract across mounted repositories.
 - Runtime migration discovery sees only applications in
   `core/compatibility`'s dependency closure. An optional Domain cannot enter
   that closure through an upward Core dependency, so its migrations currently
@@ -94,12 +99,12 @@ runtime scan, or release-loading design.
 
 ### Phase 1 — Disposable composition proof
 
-Goal: prove or reject the complete model before changing normative rules.
+Goal: prove or reject the complete model before production implementation.
 
-- [ ] Mount a throwaway Domain repository and an Extension repository beneath
-  `apps/`, each with a valid container and at least one module.
-- [ ] Add a second throwaway Extension only to prove a declared
-  Extension-to-Extension dependency and cycle rejection.
+- [ ] Mount two throwaway Domain repositories and two Extension repositories
+  beneath `apps/`, each with a valid container and at least one module.
+- [ ] Prove a declared cross-repository Domain dependency and a declared
+  Extension-to-Extension dependency, with cycle rejection for both.
 - [ ] Confirm the parent Bilimbi repository neither owns nor records the nested
   repositories.
 - [ ] Prove discovery includes every mounted module without a central list and
@@ -112,8 +117,9 @@ Goal: prove or reject the complete model before changing normative rules.
 - [ ] Prove settings, authorization, menu, and schema contributions derive from
   the same mounted graph.
 - [ ] Build a release and boot it without source, Mix, or a compiler.
-- [ ] Remove one mounted repository, rebuild, and prove its code and
-  contributions disappear while its durable data remains.
+- [ ] Remove one mounted repository, force a clean rebuild of every remaining
+  graph application, and prove one fresh fingerprint, no removed code or
+  contribution, and unchanged durable data.
 - [ ] Delete the throwaway repositories and experimental code after recording
   the result.
 
@@ -130,6 +136,9 @@ Goal: turn the successful proof into the smallest maintained implementation.
 
 - [ ] Implement generic mounted-container discovery and build-time graph
   validation using the mechanism proven in Phase 1.
+- [ ] Permit declared cross-container Domain dependencies and declared
+  Extension-to-Extension dependencies while retaining cycle and upward-edge
+  rejection.
 - [ ] Include every graph application and its resources in the release.
 - [ ] Make migrations and runtime contributions consume the approved graph
   without reconstructing it or creating upward dependencies.
@@ -166,14 +175,13 @@ exists.
 - [ ] Prove the application remains complete with the Extension absent and
   that removing it leaves durable data intact.
 
-### Phase 5 — Normative alignment
+### Phase 5 — Documentation alignment
 
-Goal: documentation and enforced rules describe only the mechanism that passed.
+Goal: architecture, implementation evidence, and roadmap describe the mechanism
+that passed.
 
-- [ ] Update 0010 from Proposed to Current with the mechanism and evidence the
-  proof established.
-- [ ] Amend `AGENTS.md` dependency, discovery, migration, Web, and nested-source
-  rules to match the proven model.
+- [ ] Record the proof outcome and chosen runtime mechanism in 0010 without
+  duplicating its normative composition rules.
 - [ ] Update ADR 0003 and ADR 0004 only where the implementation changes their
   accepted contracts.
 - [ ] Revise `PORTING_STAGES.md` S5 and S6 and record the approved scope change

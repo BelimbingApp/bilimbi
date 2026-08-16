@@ -37,6 +37,12 @@ composition applications; their declared deep modules are nested local Mix
 path packages discovered from `bilimbi.module.exs`. Future Domain and Extension
 composition applications use the same discovery contract.
 
+`docs/architecture/0010_composition-model.md` is the normative source of truth
+for Platform, Domain, Extension, composition membership, dependency direction,
+and nested-repository ownership. The summaries in this file must agree with
+that standard; when they do not, fix this file rather than creating a second
+composition model.
+
 `Base` and `Core` remain ownership boundaries rather than superclass
 hierarchies. OTP application boundaries support their dependency, supervision,
 and lifecycle contracts; they do not replace deep Module APIs or become
@@ -66,9 +72,11 @@ apps/core/compatibility/
 apps/web/
 ```
 
-Do not add optional Domains or Extensions yet. Their future existence may be
-described in architecture documentation, but their implementation is deferred
-until Base and Core are stable and a real second business Domain requires it.
+The current production scope contains no optional Domain or Extension. Add
+production capabilities only through the composition rollout and a real
+business requirement. Disposable repositories used by the approved composition
+proof are allowed, must remain outside the Platform Git history, and must be
+removed when the proof ends.
 
 The initial goal is compatibility with Belimbing's existing PostgreSQL schema.
 Bilimbi maps that schema accurately and owns Ecto migrations that can create a
@@ -137,17 +145,23 @@ precedent for any other sibling-private-table access.
 
 ### Future Domains and Extensions
 
-An optional Domain may depend on Base and Core and may compose explicitly
-declared sibling modules from the same Domain. An Extension may depend on Base,
-Core, or Domain contracts. Base cannot depend on a higher layer, Core cannot
-depend on a Domain or Extension, a Domain cannot depend on an Extension, and
-Extensions cannot form a hidden Extension layer among themselves.
+An optional Domain may depend on Base, Core, and explicitly declared Domain
+contracts, including a contract in another Domain repository. An Extension may
+depend on Base, Core, Domain, or explicitly declared Extension contracts.
+Same-layer dependencies must be public, declared, and acyclic; repository
+placement never makes a private implementation callable. Base cannot depend on
+a higher layer, Core cannot depend on a Domain or Extension, and a Domain
+cannot depend on an Extension.
 
 ### Web
 
 `BilimbiWeb` contains Phoenix adapters: routers, controllers, LiveViews,
-function components, layouts, and web-specific presentation. A web module may
-call a Base or Core API. Base and Core modules must not depend on `BilimbiWeb`.
+function components, layouts, and web-specific presentation. Platform-owned
+adapters may call Base or Core APIs. A mounted Domain or Extension owns its
+presentation adapters and may call only its declared public dependencies. Web
+hosts mounted routes through the generic composition contract rather than a
+hard-coded capability list. Base, Core, Domains, and Extensions must not depend
+on the `BilimbiWeb` application.
 
 Recommended placement:
 
@@ -300,8 +314,9 @@ Every Base, Core, Domain, or Extension composition container has a
 `bilimbi.container.exs` descriptor. Its `mix.exs` must call the shared generic
 discovery mechanism and must not name any installed child module. Every
 immediate child directory is treated as an installed module and must contain a
-valid `bilimbi.module.exs`; mounting or removing that one directory changes the
-container's source composition.
+valid `bilimbi.module.exs` and descriptor-derived `mix.exs`. For a mounted
+Domain or Extension repository, every valid immediate child module
+participates; do not add a second sparse module-selection list.
 
 The module descriptor is the sole declaration of its stable module ID, layer,
 OTP application ID, namespace, module dependencies, required/optional state,
@@ -336,18 +351,16 @@ or an owned migration file changes, it refreshes each package's application meta
 verify one graph fingerprint, use the approved positions, and must not
 implement a second dependency graph algorithm.
 
-Source composition and runtime visibility are separate obligations. Mounting a
-valid module makes it a discovered path package, but a runtime coordinator can
-enumerate only OTP applications in its dependency closure. A coordinator's
-descriptor must therefore declare stable module dependencies on every current
-contributor it must discover at runtime. Core Compatibility depends on each
-installed migration or schema-contract contributor while still discovering
-paths and contracts generically; neither its code nor its descriptor carries a
-module-specific path list. Workspace-boundary tests must fail when a declared
-contributor is absent from that runtime closure.
+Source composition and runtime visibility are separate obligations. The build
+must include every application in the validated mounted graph, and runtime
+consumers must obtain contributors from that same approved graph without
+requiring Base or Core to declare upward dependencies. Runtime consumers must
+not reconstruct a second graph or depend on incidental application load order.
+The composition rollout must prove the smallest mechanism before optional
+contributors ship.
 
 The shared database module owns one Repo. Compatibility discovers migration
-paths from installed runtime descriptor metadata and executes them through the
+paths from the approved composition metadata and executes them through the
 single `bilimbi_schema_migrations` ledger; it must not hard-code Tenancy,
 Company, Address, or any future contributor.
 

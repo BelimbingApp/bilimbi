@@ -47,7 +47,8 @@ npm-debug.log
 # Base, Core, and Web belong to the Platform repository. Domains and Extensions
 # mount as independent nested repositories directly below `apps/`, so ignore
 # unknown containers by default and re-include the Platform-owned ones. This
-# prevents accidental tracking; ignore rules are not a security boundary.
+# prevents accidental tracking; ignore rules are not a security boundary. Add
+# any future Platform-owned container to the allowlist below before committing it.
 /apps/*
 !/apps/base/
 !/apps/core/

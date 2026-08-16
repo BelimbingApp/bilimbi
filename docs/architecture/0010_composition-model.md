@@ -1,19 +1,20 @@
 # Bilimbi Composition Model
 
-**Document Type:** Proposed architecture reference
-**Status:** Proposed for review
+**Document Type:** Normative architecture standard
+**Status:** Current — implementation pending realization proof
+**Architecture ID:** 0010 (reserved; do not reuse for an ADR)
 **Agents:** claude/claude-opus-5, amp/medium-sol
-**Scope:** The product meaning of Platform, Domains, and Extensions, and a
-tentative nested-Git realization
+**Scope:** Platform, Domain, Extension, composition, and nested-Git rules
 **Last Updated:** 2026-08-16
 
 ## Purpose
 
-The three principles define the product model. The constraints protect its
-boundaries. The nested-Git realization is a hypothesis to prove, not an
-authorized implementation or amendment to `AGENTS.md`.
+This document is Bilimbi's normative source of truth for composition. The three
+principles define the product model, the constraints protect its boundaries,
+and the nested-Git section defines the target mechanism.
 
-If the realization fails, change the mechanism rather than the principles.
+The realization proof must validate the mechanism before optional capabilities
+ship. If it fails, revise this standard rather than silently weakening it.
 
 ## Vocabulary
 
@@ -69,29 +70,41 @@ outside that boundary, not an accidental private API.
 
 ### Keep dependencies explicit and downward
 
-    Extension
-      ▼
-    Domain
-      ▼
-    Core
-      ▼
-    Base
+```diagram
+Extension
+    │ depends on
+    ▼
+Domain
+    │ depends on
+    ▼
+Core
+    │ depends on
+    ▼
+Base
+```
 
-Dependencies may point to the same or a lower layer (toward Base). Every dependency is
-declared and the graph is acyclic. Base and Core never depend on optional
-capabilities, and a Domain never depends on an Extension.
+Dependencies may point to the same or a lower layer toward Base. Every
+dependency is declared and the graph is acyclic. Base and Core never depend on
+optional capabilities, and a Domain never depends on an Extension.
+
+A same-layer dependency is legitimate when it names a public contract, is
+declared in the graph, and does not create a cycle. This includes Domain-to-
+Domain and Extension-to-Extension dependencies; repository proximity never
+grants access to private internals or creates another architectural layer.
 
 ### The company owns its build
 
-The company selects trusted source and compiles it into its own binary. Bilimbi
-supplies source and composition tooling but neither owns the binary nor
-prescribes how the company operates it. Selected capabilities are trusted
-application code, not sandboxed plugins.
+The company selects trusted source and compiles it into its own binary. It is
+responsible for reviewing the owner, source, and revision it selects; mounting
+code does not establish provenance or safety. Bilimbi supplies source and
+composition tooling but neither owns the binary nor prescribes how the company
+operates it. Selected capabilities are trusted application code, not sandboxed
+plugins.
 
 Removing source removes its code from the next build; it does not delete
 durable data.
 
-## Tentative nested-Git realization
+## Nested-Git composition
 
 A company starts with the main Bilimbi checkout and mounts selected Domain and
 Extension repositories below `apps/`:
@@ -110,6 +123,19 @@ business-application/
 └── mix.lock
 ```
 
+Each mounted container and each immediate child module is a Mix project as well
+as a Bilimbi descriptor boundary:
+
+```text
+commerce/
+├── .git/
+├── bilimbi.container.exs
+├── mix.exs
+└── stock/
+    ├── bilimbi.module.exs
+    └── mix.exs
+```
+
 These are ordinary independent repositories, not Git submodules. Each owns its
 Git history and access. The enclosing Bilimbi repository ignores and does not
 record them. The company decides how to record, reproduce, mirror, or back up
@@ -119,9 +145,10 @@ security boundary.
 ### Composition flow
 
 1. A mounted repository presents one Domain or Extension container through
-   `bilimbi.container.exs`.
+   `bilimbi.container.exs` and a container `mix.exs` using generic discovery.
 2. Its immediate child modules declare identities, dependencies, migrations,
-   and contributions through `bilimbi.module.exs`.
+   and contributions through `bilimbi.module.exs`; each module's `mix.exs`
+   derives its application metadata and path dependencies from that descriptor.
 3. Bilimbi discovers every mounted container and rejects malformed descriptors,
    missing or forbidden dependencies, cycles, and duplicate identities.
 4. The company compiles the validated graph and its contributions into one
@@ -129,9 +156,9 @@ security boundary.
 5. The binary runs without source, Mix, a compiler, or runtime installation of
    unmounted code.
 
-Repository presence is the tentative selection boundary: every valid module in
-a mounted repository participates. Finer module-level selection is deferred
-until a real capability requires it.
+Repository presence is the selection boundary: every valid module in a mounted
+repository participates. Finer module-level selection is deferred until a real
+capability requires it.
 
 Git obtains source; discovery does not search GitHub or download dependencies.
 A dependency from another repository must already be mounted.
@@ -166,12 +193,13 @@ that Bilimbi can:
 
 1. discover one mounted Domain and one mounted Extension;
 2. validate their identities and dependency graph before building;
-3. support the necessary same-layer dependencies without hidden layers;
+3. accept declared, public, acyclic same-layer dependencies and reject cycles
+   and forbidden directions;
 4. compile and serve their Web contributions;
 5. consume their migrations and metadata without upward Platform dependencies;
 6. remove their code and contributions without deleting durable data; and
 7. produce a binary that boots without source, Mix, or a compiler.
 
-Only then should an implementation plan choose router integration, migration
-coordination, generated metadata, or other concrete mechanisms and amend the
-normative architecture rules.
+The implementation plan must use the proof to choose router integration,
+migration coordination, generated metadata, or other concrete mechanisms. Any
+result that changes these rules must revise this standard explicitly.
