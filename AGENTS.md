@@ -636,3 +636,27 @@ Do not rely on an unwritten convention.
 - Do not use destructive commands such as `git reset --hard` or
   `git checkout --` without explicit authorization.
 - Keep the working tree clean when handing off work.
+
+## 17. GitHub credentials in Orbs
+
+Orbs receive two GitHub credentials with different capabilities:
+
+- `GH_TOKEN` (the default `gh` authentication): a GitHub App user token. It
+  reads Discussions and writes issues, comments, and PRs, but **cannot write
+  GitHub Discussions** — `createDiscussion` and `addDiscussionComment` fail
+  with `FORBIDDEN: Resource not accessible by integration`.
+- `GH_DISCUSSION_TOKEN` (workspace secret, authenticates as `faith-tohmm`):
+  has Discussions write permission. Use it for any Discussion creation or
+  comment by overriding `GH_TOKEN` for that call only:
+
+  ```bash
+  GH_TOKEN="$GH_DISCUSSION_TOKEN" gh api graphql \
+    -f query='mutation($id: ID!, $body: String!) {
+      addDiscussionComment(input: {discussionId: $id, body: $body}) {
+        comment { id url }
+      }
+    }' -f id='D_...' -f body='...'
+  ```
+
+Never print, log, or commit either token value. Do not reconfigure `gh` auth
+globally to the discussion token; keep the override scoped per command.
