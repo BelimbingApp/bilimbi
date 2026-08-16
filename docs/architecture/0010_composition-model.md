@@ -69,17 +69,15 @@ outside that boundary, not an accidental private API.
 
 ### Keep dependencies explicit and downward
 
-```text
-Base
-  ▲
-Core
-  ▲
-Domain
-  ▲
-Extension
-```
+    Extension
+      ▼
+    Domain
+      ▼
+    Core
+      ▼
+    Base
 
-Dependencies may point to the same or a lower layer. Every dependency is
+Dependencies may point to the same or a lower layer (toward Base). Every dependency is
 declared and the graph is acyclic. Base and Core never depend on optional
 capabilities, and a Domain never depends on an Extension.
 
