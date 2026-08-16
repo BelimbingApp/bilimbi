@@ -2,8 +2,7 @@
 
 **Status:** Proposed — Phase 1 must prove the composition model
 **Last Updated:** 2026-08-16
-**Sources:** `docs/architecture/0010_composition-model.md`; review by sol,
-2026-08-16; ADR 0003 physical deep-module packages; ADR 0004 module
+**Sources:** `docs/architecture/0010_composition-model.md`; review by sol (2026-08-16); ADR 0003 physical deep-module packages; ADR 0004 module
 contribution contract; `docs/ai-team/PORTING_STAGES.md` (S5, S6, stage-change
 rule); `AGENTS.md` §4; `apps/base/module_registry/`; sibling plan
 `docs/plans/commerce-material-flow-ledger.md`
