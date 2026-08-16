@@ -38,16 +38,12 @@ path packages discovered from `bilimbi.module.exs`. Future Domain and Extension
 composition applications use the same discovery contract.
 
 `docs/architecture/0010_composition-model.md` is the normative source of truth
-for Platform, Domain, Extension, composition membership, dependency direction,
-and nested-repository ownership. The summaries in this file must agree with
-that standard; when they do not, fix this file rather than creating a second
-composition model.
+for composition. Read it before changing Platform, Domain, Extension,
+dependency, or nested-repository rules; do not restate those rules here.
 
 `Base` and `Core` remain ownership boundaries rather than superclass
 hierarchies. OTP application boundaries support their dependency, supervision,
-and lifecycle contracts; they do not replace deep Module APIs or become
-product vocabulary. A business application is the complete Bilimbi deployment,
-not one OTP application inside it.
+and lifecycle contracts; they do not replace deep Module APIs.
 
 ## 2. Current scope
 
@@ -145,23 +141,14 @@ precedent for any other sibling-private-table access.
 
 ### Future Domains and Extensions
 
-An optional Domain may depend on Base, Core, and explicitly declared Domain
-contracts, including a contract in another Domain repository. An Extension may
-depend on Base, Core, Domain, or explicitly declared Extension contracts.
-Same-layer dependencies must be public, declared, and acyclic; repository
-placement never makes a private implementation callable. Base cannot depend on
-a higher layer, Core cannot depend on a Domain or Extension, and a Domain
-cannot depend on an Extension.
+Follow the normative roles, dependency rules, and placement tests in
+`docs/architecture/0010_composition-model.md`.
 
 ### Web
 
 `BilimbiWeb` contains Phoenix adapters: routers, controllers, LiveViews,
-function components, layouts, and web-specific presentation. Platform-owned
-adapters may call Base or Core APIs. A mounted Domain or Extension owns its
-presentation adapters and may call only its declared public dependencies. Web
-hosts mounted routes through the generic composition contract rather than a
-hard-coded capability list. Base, Core, Domains, and Extensions must not depend
-on the `BilimbiWeb` application.
+function components, layouts, and web-specific presentation. Ownership of
+mounted presentation follows 0010.
 
 Recommended placement:
 
@@ -310,13 +297,9 @@ does not shorten or weaken the globally qualified Elixir namespace. The public
 facade, private implementation, migrations, tests, docs, descriptor, and
 optional assets must not be split across the parent composition application.
 
-Every Base, Core, Domain, or Extension composition container has a
-`bilimbi.container.exs` descriptor. Its `mix.exs` must call the shared generic
-discovery mechanism and must not name any installed child module. Every
-immediate child directory is treated as an installed module and must contain a
-valid `bilimbi.module.exs` and descriptor-derived `mix.exs`. For a mounted
-Domain or Extension repository, every valid immediate child module
-participates; do not add a second sparse module-selection list.
+Composition layout and selection follow 0010. Each container `mix.exs` calls
+generic discovery and names no child module; each immediate child has a valid
+`bilimbi.module.exs` and descriptor-derived `mix.exs`.
 
 The module descriptor is the sole declaration of its stable module ID, layer,
 OTP application ID, namespace, module dependencies, required/optional state,
@@ -350,14 +333,6 @@ application's descriptor metadata. Every module project includes the shared
 or an owned migration file changes, it refreshes each package's application metadata. Runtime consumers
 verify one graph fingerprint, use the approved positions, and must not
 implement a second dependency graph algorithm.
-
-Source composition and runtime visibility are separate obligations. The build
-must include every application in the validated mounted graph, and runtime
-consumers must obtain contributors from that same approved graph without
-requiring Base or Core to declare upward dependencies. Runtime consumers must
-not reconstruct a second graph or depend on incidental application load order.
-The composition rollout must prove the smallest mechanism before optional
-contributors ship.
 
 The shared database module owns one Repo. Compatibility discovers migration
 paths from the approved composition metadata and executes them through the

@@ -87,10 +87,14 @@ Dependencies may point to the same or a lower layer toward Base. Every
 dependency is declared and the graph is acyclic. Base and Core never depend on
 optional capabilities, and a Domain never depends on an Extension.
 
-A same-layer dependency is legitimate when it names a public contract, is
-declared in the graph, and does not create a cycle. This includes Domain-to-
-Domain and Extension-to-Extension dependencies; repository proximity never
-grants access to private internals or creates another architectural layer.
+A same-layer dependency is legitimate only when a concrete business invariant
+requires the other capability's public contract and lower-layer contracts
+cannot satisfy it. Before adding the edge, consider whether the capabilities
+should merge or whether a genuinely shared contract belongs lower in the
+architecture. Code reuse, repository proximity, and implementation convenience
+are insufficient reasons. The dependency must be declared and acyclic and
+grants no access to private internals. This rule applies equally to Domain-to-
+Domain and Extension-to-Extension dependencies.
 
 ### The company owns its build
 

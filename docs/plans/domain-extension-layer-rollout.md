@@ -105,6 +105,8 @@ Goal: prove or reject the complete model before production implementation.
   beneath `apps/`, each with a valid container and at least one module.
 - [ ] Prove a declared cross-repository Domain dependency and a declared
   Extension-to-Extension dependency, with cycle rejection for both.
+- [ ] Treat those synthetic edges only as mechanism fixtures; every production
+  same-layer dependency must separately pass 0010's business-necessity test.
 - [ ] Confirm the parent Bilimbi repository neither owns nor records the nested
   repositories.
 - [ ] Prove discovery includes every mounted module without a central list and
