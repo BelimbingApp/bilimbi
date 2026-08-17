@@ -510,15 +510,21 @@ defmodule Bilimbi.Base.UI.Components do
   @doc """
   Renders a table with generic styling.
 
+  Pass `sort` on a column to render a header button that pushes `"sort"`
+  with `phx-value-sort`. The active column gets `aria-sort`. Density is
+  `px-4 py-2.5` — that is the in-repo contract until a denser primitive lands.
+
   ## Examples
 
-      <.table id="users" rows={@users}>
-        <:col :let={user} label="id">{user.id}</:col>
-        <:col :let={user} label="username">{user.username}</:col>
+      <.table id="users" rows={@users} sort_by={@sort_by} sort_dir={@sort_dir}>
+        <:col :let={user} label="Name" sort="name" sort_id="users-sort-name">
+          {user.name}
+        </:col>
+        <:col :let={user} label="Email">{user.email}</:col>
       </.table>
   """
   attr :id, :string, required: true
-  attr :rows, :list, required: true
+  attr :rows, :any, required: true
   attr :row_id, :any, default: nil, doc: "the function for generating the row id"
   attr :row_click, :any, default: nil, doc: "the function for handling phx-click on each row"
 
@@ -526,11 +532,21 @@ defmodule Bilimbi.Base.UI.Components do
     default: &Function.identity/1,
     doc: "the function for mapping each row before calling the :col and :action slots"
 
+  attr :sort_by, :any, default: nil, doc: "active sort key; compared to each column's `sort`"
+  attr :sort_dir, :any, default: nil, doc: "`\"asc\"`/`\"desc\"` or `:asc`/`:desc`"
+
+  attr :framed, :boolean,
+    default: true,
+    doc: "when false, omit the outer card chrome so the table can sit in an existing panel"
+
   slot :col, required: true do
     attr :label, :string
+    attr :sort, :string, doc: "sort key pushed as phx-value-sort"
+    attr :sort_id, :string, doc: "DOM id for the sort button"
   end
 
   slot :action, doc: "the slot for showing user actions in the last table column"
+  slot :empty, doc: "row shown in a sibling tbody when the caller decides the table is empty"
 
   def table(assigns) do
     assigns =
@@ -539,17 +555,25 @@ defmodule Bilimbi.Base.UI.Components do
       end
 
     ~H"""
-    <div class="overflow-x-auto rounded-xl border border-line bg-surface">
+    <div class={["overflow-x-auto", @framed && "rounded-xl border border-line bg-surface"]}>
       <table class="w-full text-left text-sm">
         <thead class="border-b border-line bg-surface-sunken">
           <tr>
             <th
               :for={col <- @col}
+              scope="col"
+              aria-sort={table_aria_sort(col[:sort], @sort_by, @sort_dir)}
               class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle"
             >
-              {col[:label]}
+              <.table_sort_heading
+                :if={col[:sort]}
+                col={col}
+                sort_by={@sort_by}
+                sort_dir={@sort_dir}
+              />
+              <span :if={!col[:sort]}>{col[:label]}</span>
             </th>
-            <th :if={@action != []} class="px-4 py-2.5">
+            <th :if={@action != []} scope="col" class="px-4 py-2.5">
               <span class="sr-only">{gettext("Actions")}</span>
             </th>
           </tr>
@@ -576,10 +600,71 @@ defmodule Bilimbi.Base.UI.Components do
             </td>
           </tr>
         </tbody>
+        <tbody :if={@empty != []}>
+          <tr id={"#{@id}-empty"}>
+            <td
+              colspan={table_empty_colspan(@col, @action)}
+              class="px-4 py-8 text-center text-ink-muted"
+            >
+              {render_slot(@empty)}
+            </td>
+          </tr>
+        </tbody>
       </table>
     </div>
     """
   end
+
+  attr :col, :map, required: true
+  attr :sort_by, :any, required: true
+  attr :sort_dir, :any, required: true
+
+  defp table_sort_heading(assigns) do
+    ~H"""
+    <button
+      id={@col[:sort_id]}
+      type="button"
+      phx-click="sort"
+      phx-value-sort={@col[:sort]}
+      class="inline-flex items-center gap-1 rounded text-left transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25"
+    >
+      {@col[:label]}
+      <.icon
+        name={table_sort_icon(@col[:sort], @sort_by, @sort_dir)}
+        class={["size-3.5", table_sort_active?(@col[:sort], @sort_by) && "text-action"]}
+      />
+    </button>
+    """
+  end
+
+  defp table_aria_sort(nil, _sort_by, _sort_dir), do: nil
+
+  defp table_aria_sort(sort, sort_by, sort_dir) do
+    cond do
+      not table_sort_active?(sort, sort_by) -> "none"
+      table_sort_dir(sort_dir) == :asc -> "ascending"
+      table_sort_dir(sort_dir) == :desc -> "descending"
+      true -> "none"
+    end
+  end
+
+  defp table_sort_icon(sort, sort_by, sort_dir) do
+    cond do
+      not table_sort_active?(sort, sort_by) -> "hero-chevron-up-down"
+      table_sort_dir(sort_dir) == :asc -> "hero-chevron-up"
+      table_sort_dir(sort_dir) == :desc -> "hero-chevron-down"
+      true -> "hero-chevron-up-down"
+    end
+  end
+
+  defp table_sort_active?(sort, sort_by), do: to_string(sort) == to_string(sort_by)
+
+  defp table_sort_dir(dir) when dir in ["asc", :asc], do: :asc
+  defp table_sort_dir(dir) when dir in ["desc", :desc], do: :desc
+  defp table_sort_dir(_dir), do: nil
+
+  defp table_empty_colspan(cols, action) when action == [], do: length(cols)
+  defp table_empty_colspan(cols, _action), do: length(cols) + 1
 
   @doc """
   Renders a data list.

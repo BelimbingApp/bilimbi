@@ -87,88 +87,66 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
             />
           </.form>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
-              <thead class="border-y border-line bg-surface-sunken">
-                <tr>
-                  <.sort_heading
-                    id="addresses-sort-label"
-                    label="Label"
-                    sort="label"
-                    state={@index_state}
-                  />
-                  <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                    Address
-                  </th>
-                  <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                    Locality
-                  </th>
-                  <.sort_heading
-                    id="addresses-sort-country"
-                    label="Country"
-                    sort="country_iso"
-                    state={@index_state}
-                  />
-                  <.sort_heading
-                    id="addresses-sort-status"
-                    label="Status"
-                    sort="verification_status"
-                    state={@index_state}
-                  />
-                  <th class="px-4 py-2.5"><span class="sr-only">Actions</span></th>
-                </tr>
-              </thead>
-              <tbody id="addresses-table" phx-update="stream" class="divide-y divide-line-subtle">
-                <tr
-                  :for={{id, address} <- @streams.addresses}
-                  id={id}
-                  class="hover:bg-surface-sunken"
-                >
-                  <td class="whitespace-nowrap px-4 py-2.5">
-                    <span class="font-medium text-ink">{address.label || "Unlabeled"}</span>
-                  </td>
-                  <td class="min-w-56 px-4 py-2.5 text-ink-muted">
-                    <span>{address.line1 || "—"}</span>
-                    <span :if={address.line2} class="block text-xs text-ink-subtle">
-                      {address.line2}
-                    </span>
-                  </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">
-                    <span>{address.locality || "—"}</span>
-                    <span :if={address.postcode} class="block text-xs tabular-nums text-ink-subtle">
-                      {address.postcode}
-                    </span>
-                  </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-ink-muted">
-                    {address.country_iso || "—"}
-                  </td>
-                  <td class="whitespace-nowrap px-4 py-2.5">
-                    <.badge kind={status_kind(address.verification_status)}>
-                      {address.verification_status}
-                    </.badge>
-                  </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-right">
-                    <button
-                      :if={allowed?(@current_scope, "admin.address.delete")}
-                      id={"address-delete-#{address.id}"}
-                      type="button"
-                      phx-click="delete"
-                      phx-value-id={address.id}
-                      data-confirm={"Delete #{address.label || "this address"}?"}
-                      class="text-xs font-medium text-danger hover:underline"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-                <tr :if={@addresses_page.entries == []} id="addresses-empty">
-                  <td colspan="6" class="px-4 py-8 text-center text-ink-muted">
-                    No addresses found.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <.table
+            id="addresses-table"
+            rows={@streams.addresses}
+            row_id={fn {dom_id, _address} -> dom_id end}
+            row_item={fn {_dom_id, address} -> address end}
+            sort_by={@index_state.sort_by}
+            sort_dir={@index_state.sort_dir}
+            framed={false}
+          >
+            <:col :let={address} label="Label" sort="label" sort_id="addresses-sort-label">
+              <span class="whitespace-nowrap font-medium text-ink">{address.label || "Unlabeled"}</span>
+            </:col>
+            <:col :let={address} label="Address">
+              <div class="min-w-56 text-ink-muted">
+                <span>{address.line1 || "—"}</span>
+                <span :if={address.line2} class="block text-xs text-ink-subtle">
+                  {address.line2}
+                </span>
+              </div>
+            </:col>
+            <:col :let={address} label="Locality">
+              <div class="whitespace-nowrap text-ink-muted">
+                <span>{address.locality || "—"}</span>
+                <span :if={address.postcode} class="block text-xs tabular-nums text-ink-subtle">
+                  {address.postcode}
+                </span>
+              </div>
+            </:col>
+            <:col :let={address} label="Country" sort="country_iso" sort_id="addresses-sort-country">
+              <span class="whitespace-nowrap font-mono text-xs text-ink-muted">
+                {address.country_iso || "—"}
+              </span>
+            </:col>
+            <:col
+              :let={address}
+              label="Status"
+              sort="verification_status"
+              sort_id="addresses-sort-status"
+            >
+              <.badge kind={status_kind(address.verification_status)}>
+                {address.verification_status}
+              </.badge>
+            </:col>
+            <:action :let={address}>
+              <button
+                :if={allowed?(@current_scope, "admin.address.delete")}
+                id={"address-delete-#{address.id}"}
+                type="button"
+                phx-click="delete"
+                phx-value-id={address.id}
+                data-confirm={"Delete #{address.label || "this address"}?"}
+                class="text-xs font-medium text-danger hover:underline"
+              >
+                Delete
+              </button>
+            </:action>
+            <:empty :if={@addresses_page.entries == []}>
+              No addresses found.
+            </:empty>
+          </.table>
 
           <nav
             id="addresses-pagination"
@@ -210,31 +188,6 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
         </section>
       </div>
     </Layouts.app>
-    """
-  end
-
-  attr(:id, :string, required: true)
-  attr(:label, :string, required: true)
-  attr(:sort, :string, required: true)
-  attr(:state, :map, required: true)
-
-  defp sort_heading(assigns) do
-    ~H"""
-    <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-      <button
-        id={@id}
-        type="button"
-        phx-click="sort"
-        phx-value-sort={@sort}
-        class="inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25"
-      >
-        {@label}
-        <.icon
-          name={sort_icon(@sort, @state.sort_by, @state.sort_dir)}
-          class={["size-3.5", @sort == @state.sort_by && "text-action"]}
-        />
-      </button>
-    </th>
     """
   end
 
@@ -338,10 +291,6 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
   defp status_kind("verified"), do: :success
   defp status_kind("suggested"), do: :warning
   defp status_kind(_status), do: :neutral
-
-  defp sort_icon(sort, sort, "asc"), do: "hero-chevron-up"
-  defp sort_icon(sort, sort, "desc"), do: "hero-chevron-down"
-  defp sort_icon(_sort, _sort_by, _sort_dir), do: "hero-chevron-up-down"
 
   defp page_summary(%{total_entries: 0}), do: "No results"
 
