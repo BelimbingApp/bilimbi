@@ -74,7 +74,17 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           {@user.name}
           <:subtitle>User details</:subtitle>
           <:actions>
-            <.link navigate={~p"/users"} class="text-sm font-medium text-ink-muted hover:text-ink">Back</.link>
+            <.button id="user-back" navigate={~p"/users"}>
+              Back
+            </.button>
+            <.button
+              :if={allowed?(@current_scope, "admin.user.update")}
+              id="user-edit"
+              navigate={~p"/users/#{@user.id}/edit"}
+              variant="primary"
+            >
+              Edit user
+            </.button>
           </:actions>
         </.header>
 
@@ -98,12 +108,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               </.badge>
             </:item>
           </.list>
-        </section>
-
-        <section :if={allowed?(@current_scope, "admin.user.update")} class="mt-5">
-          <.link id="user-edit" navigate={~p"/users/#{@user.id}/edit"} class="text-sm font-medium text-action hover:underline">
-            Edit user
-          </.link>
         </section>
 
         <section :if={allowed?(@current_scope, "admin.user.delete")} id="user-danger" class="mt-8 rounded-xl border border-danger-line bg-danger-surface px-5 py-4">

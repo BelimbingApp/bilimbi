@@ -48,6 +48,7 @@ defmodule BilimbiWeb.UserShowTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
 
     assert has_element?(view, "h1", "Grace Hopper")
+    assert has_element?(view, "#user-back[href='/users']", "Back")
     assert has_element?(view, "a[href='/companies/73']", "Bilimbi Industries")
     assert has_element?(view, "#app-content", "unverified")
     refute has_element?(view, "#user-edit")
