@@ -151,6 +151,9 @@ head.** `gh api repos/:owner/:repo/git/refs/heads/<branch> --jq .object.sha`
 against the PR's `headRefOid`. GitHub's PR head lags a push by minutes, so a
 merge on green reviews can silently drop the commit the author just pushed.
 That is how a known defect reached `main` while its fix sat on the branch.
+A **404 from that endpoint on a PR whose state is already `MERGED`** means the
+branch was deleted on merge, not that anything diverged — check the state
+before reading a missing ref as a problem.
 
 **`hold:author` stops the merge; the author sets it and the author clears
 it.** Add the label the moment you find something you intend to fix on the PR,
