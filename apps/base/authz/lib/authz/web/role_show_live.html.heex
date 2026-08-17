@@ -57,37 +57,25 @@
     <section class="mt-5">
       <h2 class="text-sm font-semibold text-ink-strong">Principals</h2>
 
-      <div class="mt-2 overflow-x-auto rounded-xl border border-line bg-surface">
-        <table class="w-full text-left text-sm">
-          <thead class="border-b border-line bg-surface-sunken">
-            <tr>
-              <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Type
-              </th>
-              <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Principal
-              </th>
-              <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Company
-              </th>
-            </tr>
-          </thead>
-          <tbody id="role-principals" class="divide-y divide-line-subtle">
-            <tr :for={assignment <- @principal_roles} id={"principal-role-#{assignment.id}"}>
-              <td class="px-4 py-2.5">
-                <.badge>{principal_label(assignment)}</.badge>
-              </td>
-              <td class="px-4 py-2.5 tabular-nums text-ink-muted">{assignment.principal_id}</td>
-              <td class="px-4 py-2.5 tabular-nums text-ink-muted">
-                {assignment.company_id || "—"}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <p :if={@principal_roles == []} class="px-4 py-6 text-center text-sm text-ink-muted">
-          Nobody in this tenant holds this role.
-        </p>
+      <div class="mt-2">
+        <.table
+          id="role-principals"
+          rows={@principal_roles}
+          row_id={&"principal-role-#{&1.id}"}
+        >
+          <:col :let={assignment} label="Type">
+            <.badge>{principal_label(assignment)}</.badge>
+          </:col>
+          <:col :let={assignment} label="Principal">
+            <span class="tabular-nums text-ink-muted">{assignment.principal_id}</span>
+          </:col>
+          <:col :let={assignment} label="Company">
+            <span class="tabular-nums text-ink-muted">{assignment.company_id || "—"}</span>
+          </:col>
+          <:empty :if={@principal_roles == []}>
+            Nobody in this tenant holds this role.
+          </:empty>
+        </.table>
       </div>
     </section>
   </div>

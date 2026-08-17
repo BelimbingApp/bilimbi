@@ -188,6 +188,7 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       assert has_element?(view, "h1", "Auditor")
       assert has_element?(view, "#role-summary", "Custom")
       assert has_element?(view, "#role-principals")
+      assert has_element?(view, "#role-principals-empty", "Nobody in this tenant holds this role")
     end
 
     test "labels a principal by what it means, not the stored word", %{conn: conn, ours: ours} do
