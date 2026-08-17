@@ -45,7 +45,7 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
   end
 
   @impl true
-  def handle_event("sort", %{"column" => column}, socket) when column in @sortable do
+  def handle_event("sort", %{"sort" => column}, socket) when column in @sortable do
     state = socket.assigns.state
     column = String.to_existing_atom(column)
 
@@ -53,6 +53,10 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
       if state.sort_by == column and state.sort_dir == :asc, do: :desc, else: :asc
 
     {:noreply, push_state(socket, %{state | sort_by: column, sort_dir: direction, page: 1})}
+  end
+
+  def handle_event("sort", %{"column" => column}, socket) when column in @sortable do
+    handle_event("sort", %{"sort" => column}, socket)
   end
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
@@ -140,14 +144,6 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
 
   defp nilify(""), do: nil
   defp nilify(value), do: value
-
-  defp sort_indicator(state, column) do
-    cond do
-      state.sort_by != column -> nil
-      state.sort_dir == :asc -> "hero-chevron-up"
-      true -> "hero-chevron-down"
-    end
-  end
 
   defp scope_label(%{is_system: true}), do: "System"
   defp scope_label(%{company_id: nil}), do: "Unowned"

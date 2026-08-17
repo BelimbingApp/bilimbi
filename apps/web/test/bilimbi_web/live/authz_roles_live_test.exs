@@ -120,13 +120,18 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
 
       {:ok, view, _html} = open_index(conn)
 
+      assert has_element?(view, "th[aria-sort='ascending'] #roles-sort-name")
+
       # Assert the params, not their serialisation order -- the encoder is free
       # to reorder a map and this test should not fail when it does.
       view |> element("#roles-sort-code") |> render_click()
       assert %{"sort_by" => "code", "sort_dir" => "asc"} = patched_params(view)
+      assert has_element?(view, "th[aria-sort='ascending'] #roles-sort-code")
+      refute has_element?(view, "th[aria-sort='ascending'] #roles-sort-name")
 
       view |> element("#roles-sort-code") |> render_click()
       assert %{"sort_by" => "code", "sort_dir" => "desc"} = patched_params(view)
+      assert has_element?(view, "th[aria-sort='descending'] #roles-sort-code")
     end
 
     test "a hand-edited sort column falls back instead of crashing", %{conn: conn} do
