@@ -220,28 +220,38 @@ defmodule BilimbiWeb.UserLiveTest do
       conn |> log_in_as() |> live(users_path(search: "Sort", sortBy: "name", sortDir: "asc"))
 
     assert_row_order(view, [3, 2, 1])
+    assert has_element?(view, "th:has(#users-sort-name)[aria-sort='ascending']")
+    assert has_element?(view, "th:has(#users-sort-email)[aria-sort='none']")
 
     view |> element("#users-sort-name") |> render_click()
     assert_row_order(view, [2, 1, 3])
+    assert has_element?(view, "th:has(#users-sort-name)[aria-sort='descending']")
 
     view |> element("#users-sort-email") |> render_click()
     assert_row_order(view, [2, 3, 1])
+    assert has_element?(view, "th:has(#users-sort-email)[aria-sort='ascending']")
+    assert has_element?(view, "th:has(#users-sort-name)[aria-sort='none']")
 
     view |> element("#users-sort-email") |> render_click()
     assert_row_order(view, [1, 3, 2])
+    assert has_element?(view, "th:has(#users-sort-email)[aria-sort='descending']")
 
     view |> element("#users-sort-company") |> render_click()
     assert_row_order(view, [2, 1, 3])
+    assert has_element?(view, "th:has(#users-sort-company)[aria-sort='ascending']")
 
     view |> element("#users-sort-company") |> render_click()
     assert_row_order(view, [3, 2, 1])
+    assert has_element?(view, "th:has(#users-sort-company)[aria-sort='descending']")
 
     view |> element("#users-sort-created") |> render_click()
     assert has_element?(view, "#users-sort-created .hero-chevron-down.text-action")
+    assert has_element?(view, "th:has(#users-sort-created)[aria-sort='descending']")
     assert_row_order(view, [3, 2, 1])
 
     view |> element("#users-sort-created") |> render_click()
     assert has_element?(view, "#users-sort-created .hero-chevron-up.text-action")
+    assert has_element?(view, "th:has(#users-sort-created)[aria-sort='ascending']")
     assert_row_order(view, [3, 2, 1])
   end
 
