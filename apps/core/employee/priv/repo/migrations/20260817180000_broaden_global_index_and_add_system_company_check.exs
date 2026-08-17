@@ -1,4 +1,4 @@
-defmodule Bilimbi.Core.Employee.Migrations.AddEmployeeTypesCustomCompanyCheck do
+defmodule Bilimbi.Core.Employee.Migrations.BroadenGlobalIndexAndAddSystemCompanyCheck do
   use Ecto.Migration
 
   def up do

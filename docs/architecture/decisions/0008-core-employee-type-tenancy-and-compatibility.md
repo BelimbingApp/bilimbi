@@ -52,7 +52,7 @@ To resolve the multi-tenant code uniqueness constraint without breaking compatib
    - Drops global unique index `employee_types_code_unique` on `(code)`.
    - Creates partial unique index `employee_types_global_code_unique` on `(code)` where `company_id IS NULL AND is_system = true`.
    - Creates composite partial unique index `employee_types_company_code_unique` on `(company_id, code)` where `company_id IS NOT NULL`.
-3. Migration `20260817180000_add_employee_types_custom_company_check.exs` is introduced with disposition `:bilimbi_only`:
+3. Migration `20260817180000_broaden_global_index_and_add_system_company_check.exs` is introduced with disposition `:bilimbi_only`:
    - Broadens partial unique index `employee_types_global_code_unique` on `(code)` to `WHERE company_id IS NULL`, eliminating the uncovered uniqueness quadrant and safely covering all global rows (system and legacy Belimbing global custom types).
    - Adds database check constraint `employee_types_system_company_check CHECK (NOT is_system OR (company_id IS NULL))`.
 4. In `apps/core/employee/bilimbi.module.exs`, `migration_dispositions` explicitly registers:

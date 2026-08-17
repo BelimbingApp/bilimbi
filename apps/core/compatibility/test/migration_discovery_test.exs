@@ -58,7 +58,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Core.User.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Base.Audit.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Core.Employee.Migrations.AdaptEmployeeTypesTenancyIndexes,
-             Bilimbi.Core.Employee.Migrations.AddEmployeeTypesCustomCompanyCheck
+             Bilimbi.Core.Employee.Migrations.BroadenGlobalIndexAndAddSystemCompanyCheck
            ]
 
     assert Enum.map(entries, &elem(&1, 2)) == [
