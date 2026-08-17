@@ -33,8 +33,11 @@ defmodule Bilimbi.Base.Authz.CompanyDirectory do
   - **The id set matches `company_ids/1` exactly.** A picker that offered a
     company `company_in_scope?/2` then rejected would be a form that fails on
     submit for a value it supplied itself.
-  - **Ordered by the name being displayed.** Belimbing orders its options by
-    `name`; sorting by anything the user cannot see reads as unsorted.
+  - **Ordered by the name being displayed, case-insensitively.** Belimbing
+    orders its options by `name` and gets case-insensitivity from the database
+    collation. Sorting raw binaries in Elixir is codepoint order, which files
+    every lowercase initial after every uppercase one — "eMart" below "Zulu" —
+    and sorting by anything the user cannot see reads as unsorted.
   """
   @callback companies_in_scope(Scope.t()) :: [named_company()]
 end

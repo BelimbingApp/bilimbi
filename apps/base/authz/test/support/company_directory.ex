@@ -26,6 +26,6 @@ defmodule Bilimbi.Base.Authz.TestCompanyDirectory do
     scope
     |> company_ids()
     |> Enum.map(&%{id: &1, name: "Company #{100 - &1}"})
-    |> Enum.sort_by(& &1.name)
+    |> Enum.sort_by(&String.downcase(&1.name))
   end
 end
