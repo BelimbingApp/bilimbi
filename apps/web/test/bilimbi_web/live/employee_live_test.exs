@@ -25,7 +25,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     :ok = Employee.ensure_system_types()
     {:ok, scope} = Tenancy.scope(41)
 
-    {:ok, _employee} =
+    {:ok, employee} =
       Employee.create_employee(scope, 73, %{
         employee_number: "EMP-001",
         full_name: "John Doe",
@@ -34,7 +34,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
         email: "john@example.test"
       })
 
-    :ok
+    %{employee: employee}
   end
 
   test "requires authentication", %{conn: conn} do
@@ -67,10 +67,49 @@ defmodule BilimbiWeb.EmployeeLiveTest do
   end
 
   test "shows a create action when the actor may create employees", %{conn: conn} do
-    grant_capabilities!(["admin.employee.list", "admin.employee.create"])
+    grant_capabilities!([
+      "admin.employee.list",
+      "admin.employee.create",
+      "admin.employee-type.list"
+    ])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
 
     assert has_element?(view, "#employee-new")
+    assert has_element?(view, "#employee-types")
+  end
+
+  test "shows empty state when company has no employees", %{conn: conn} do
+    CompanyFixtures.insert_company!(%{
+      id: 75,
+      tenant_id: 41,
+      name: "Empty Co",
+      code: "empty-co"
+    })
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 75,
+      name: "Empty User",
+      email: "empty@example.test"
+    })
+
+    grant_capabilities!("admin.employee.list", company_id: 75, user_id: 92)
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_as(%{"user_id" => 92, "company_id" => 75})
+      |> live(~p"/employees")
+
+    assert has_element?(view, "#employees-empty", "No employees found.")
+  end
+
+  test "renders show page with standard edit button", %{conn: conn, employee: employee} do
+    grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+    assert has_element?(view, "h1", "John Doe")
+    assert has_element?(view, "#employee-edit")
   end
 end
