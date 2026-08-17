@@ -22,9 +22,12 @@ READY_LABEL = "task:ready"
 BLOCKED_BY_RE = re.compile(
     r"(?i)^[ \t]*Blocked-By:[ \t]*(#[0-9]+(?:[ \t]*,[ \t]*#[0-9]+)*)[ \t]*$"
 )
-OPENING_FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})")
-CLOSING_FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})[ \t]*$")
-INDENTED_CODE_RE = re.compile(r"^(?: {4}|\t)")
+# Deliberately identical to scripts/review_gate.sh's safe_logical_lines: same
+# expressions, same order. Two different treatments of "which lines are prose"
+# would drift, and the weaker one becomes the exploitable one.
+OPENING_FENCE_RE = re.compile(r"^(`{3,}|~{3,})")
+CLOSING_FENCE_RE = re.compile(r"^(`{3,}|~{3,})[ \t]*$")
+INDENTED_CODE_RE = re.compile(r"^( {4}|[ ]*\t)")
 
 
 @dataclass(frozen=True)
@@ -45,24 +48,31 @@ def safe_lines(body: str) -> list[str]:
     lines: list[str] = []
     fence: str | None = None
 
-    for raw_line in body.split("\n"):
-        line = raw_line.replace("\r", "")
+    for line in body.split("\n"):
+        raw_line = line.replace("\r", "")
+        trimmed = raw_line.strip()
 
         if fence is not None:
-            closing = CLOSING_FENCE_RE.match(line)
+            # Checked before the closer, and against the raw line: Markdown
+            # reads an indented ``` as code, not as the end of the block, so a
+            # parser that closes here treats the rest of the body as prose.
+            if INDENTED_CODE_RE.match(raw_line):
+                continue
+
+            closing = CLOSING_FENCE_RE.match(trimmed)
             if closing and _closes_fence(closing.group(1), fence):
                 fence = None
             continue
 
-        if INDENTED_CODE_RE.match(line) or line.lstrip().startswith(">"):
+        if INDENTED_CODE_RE.match(raw_line) or trimmed.startswith(">"):
             continue
 
-        opening = OPENING_FENCE_RE.match(line)
+        opening = OPENING_FENCE_RE.match(trimmed)
         if opening:
             fence = opening.group(1)
             continue
 
-        lines.append(line)
+        lines.append(trimmed)
 
     return lines
 

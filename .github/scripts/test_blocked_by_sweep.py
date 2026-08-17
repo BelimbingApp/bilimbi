@@ -126,6 +126,21 @@ class BlockedByParsingTest(unittest.TestCase):
     def test_header_inside_an_indented_block_is_not_a_declaration(self):
         self.assertEqual(parse_blockers("Example:\n\n    Blocked-By: #1\n"), ())
 
+    def test_spaces_then_a_tab_are_still_indented_code(self):
+        # Found by cursor/auto on #225. `^(?: {4}|\t)` missed one to three
+        # spaces followed by a tab, which Markdown reads as code.
+        self.assertEqual(parse_blockers("Example:\n\n \tBlocked-By: #7\n"), ())
+        self.assertEqual(parse_blockers("   \tBlocked-By: #7\n"), ())
+
+    def test_an_indented_fence_does_not_close_a_block(self):
+        # Also cursor/auto on #225. Markdown reads an indented ``` as code, not
+        # as a closer -- closing there treats the rest of the body as prose.
+        self.assertEqual(parse_blockers("```\n    ```\nBlocked-By: #9\n"), ())
+
+    def test_a_real_closer_after_an_indented_one_still_closes(self):
+        # The guard must not swallow the body forever.
+        self.assertEqual(parse_blockers("```\n    ```\n```\nBlocked-By: #1\n"), (1,))
+
     def test_a_longer_fence_is_not_closed_by_a_shorter_one(self):
         # ```` opens; ``` does not close it, so the header stays fenced.
         self.assertEqual(parse_blockers("````\nBlocked-By: #1\n```\n"), ())
