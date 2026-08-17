@@ -56,4 +56,121 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     assert {:ok, types} = Employee.list_employee_types(scope, 73)
     assert Enum.any?(types, &(&1.code == "seasonal" and not &1.is_system))
   end
+
+  test "updates a custom type", %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, type} =
+      Employee.create_employee_type(scope, 73, %{
+        code: "temp_contractor",
+        label: "Temporary Contractor"
+      })
+
+    grant_capabilities!(["admin.employee-type.list", "admin.employee-type.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types/#{type.id}/edit")
+
+    view
+    |> form("#employee-type-form", employee_type: %{label: "Independent Contractor"})
+    |> render_submit()
+
+    {path, _flash} = assert_redirect(view)
+    assert path == "/employee-types"
+
+    {:ok, index, _html} = conn |> log_in_as() |> live(path)
+    assert has_element?(index, "#employee-types td", "Independent Contractor")
+
+    assert {:ok, updated} = Employee.get_employee_type(scope, 73, type.id)
+    assert updated.label == "Independent Contractor"
+    assert updated.code == "temp_contractor"
+  end
+
+  test "forbids editing a system type", %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+    {:ok, types} = Employee.list_employee_types(scope, 73)
+    system_type = Enum.find(types, & &1.is_system)
+
+    grant_capabilities!(["admin.employee-type.list", "admin.employee-type.update"])
+
+    assert {:error,
+            {:live_redirect,
+             %{
+               to: "/employee-types",
+               flash: %{"error" => "System employee types cannot be edited."}
+             }}} =
+             conn |> log_in_as() |> live(~p"/employee-types/#{system_type.id}/edit")
+  end
+
+  test "deletes a custom type", %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, type} =
+      Employee.create_employee_type(scope, 73, %{
+        code: "temp",
+        label: "Temporary"
+      })
+
+    grant_capabilities!(["admin.employee-type.list", "admin.employee-type.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+    assert has_element?(view, "#employee-type-delete-#{type.id}")
+
+    view
+    |> element("#employee-type-delete-#{type.id}")
+    |> render_click()
+
+    refute has_element?(view, "#employee-types td", "Temporary")
+    assert render(view) =~ "Employee type deleted."
+
+    assert {:error, :type_not_found} = Employee.get_employee_type(scope, 73, type.id)
+  end
+
+  test "rejects deleting an in-use custom type", %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, type} =
+      Employee.create_employee_type(scope, 73, %{
+        code: "consultant",
+        label: "Consultant"
+      })
+
+    {:ok, _employee} =
+      Employee.create_employee(scope, 73, %{
+        employee_number: "EMP-0099",
+        full_name: "Grace Hopper",
+        short_name: "Grace",
+        designation: "Lead Consultant",
+        employee_type: "consultant",
+        email: "grace@navy.mil",
+        status: "active"
+      })
+
+    grant_capabilities!(["admin.employee-type.list", "admin.employee-type.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+
+    view
+    |> element("#employee-type-delete-#{type.id}")
+    |> render_click()
+
+    assert render(view) =~ "Cannot delete: employees are using this type."
+    assert {:ok, _} = Employee.get_employee_type(scope, 73, type.id)
+  end
+
+  test "system types do not show edit or delete action links", %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+    {:ok, types} = Employee.list_employee_types(scope, 73)
+    system_type = Enum.find(types, & &1.is_system)
+
+    grant_capabilities!([
+      "admin.employee-type.list",
+      "admin.employee-type.update",
+      "admin.employee-type.delete"
+    ])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+
+    refute has_element?(view, "#employee-type-edit-#{system_type.id}")
+    refute has_element?(view, "#employee-type-delete-#{system_type.id}")
+  end
 end

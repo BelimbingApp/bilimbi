@@ -31,6 +31,46 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
   end
 
   @impl true
+  def handle_event("delete", %{"id" => id_str}, socket) do
+    scope = socket.assigns.current_scope.scope
+    company_id = socket.assigns.current_scope.user["company_id"]
+
+    if allowed?(socket.assigns.current_scope, "admin.employee-type.delete") do
+      with {type_id, ""} <- Integer.parse(id_str),
+           :ok <- Employee.delete_employee_type(scope, company_id, type_id) do
+        {:ok, types} = Employee.list_employee_types(scope, company_id)
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "Employee type deleted.")
+         |> stream(:employee_types, types, reset: true)}
+      else
+        {:error, :in_use} ->
+          {:noreply, put_flash(socket, :error, "Cannot delete: employees are using this type.")}
+
+        {:error, :is_system} ->
+          {:noreply, put_flash(socket, :error, "System employee types cannot be deleted.")}
+
+        {:error, :type_not_found} ->
+          {:noreply,
+           put_flash(socket, :error, "That employee type does not exist in this company.")}
+
+        {:error, :company_not_found} ->
+          {:noreply,
+           socket
+           |> put_flash(:error, "That company is not in this workspace.")
+           |> push_navigate(to: ~p"/dashboard")}
+
+        _ ->
+          {:noreply, put_flash(socket, :error, "Could not delete employee type.")}
+      end
+    else
+      {:noreply,
+       put_flash(socket, :error, "You do not have permission to delete employee types.")}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
@@ -69,6 +109,30 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
               <.badge kind={if type.is_system, do: :neutral, else: :success}>
                 {if type.is_system, do: "system", else: "custom"}
               </.badge>
+            </:col>
+
+            <:col :let={{_id, type}} label="Actions">
+              <div :if={not type.is_system} class="flex items-center gap-2">
+                <.link
+                  :if={allowed?(@current_scope, "admin.employee-type.update")}
+                  id={"employee-type-edit-#{type.id}"}
+                  navigate={~p"/employee-types/#{type.id}/edit"}
+                  class="text-xs font-medium text-action hover:underline"
+                >
+                  Edit
+                </.link>
+                <button
+                  :if={allowed?(@current_scope, "admin.employee-type.delete")}
+                  id={"employee-type-delete-#{type.id}"}
+                  type="button"
+                  phx-click="delete"
+                  phx-value-id={type.id}
+                  data-confirm={"Are you sure you want to delete #{type.label}?"}
+                  class="cursor-pointer text-xs font-medium text-danger hover:underline"
+                >
+                  Delete
+                </button>
+              </div>
             </:col>
           </.table>
         </div>
