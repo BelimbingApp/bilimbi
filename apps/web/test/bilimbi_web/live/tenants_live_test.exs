@@ -33,7 +33,30 @@ defmodule BilimbiWeb.TenantsLiveTest do
     assert has_element?(view, "#nav-admin-tenancy-tenant[aria-current='page']")
     assert has_element?(view, "#tenants")
     assert has_element?(view, "#tenants td", "Platform operator")
+    assert has_element?(view, "th[aria-sort='ascending']")
+    assert has_element?(view, "th[scope='col'][aria-sort='none']")
     refute has_element?(view, "#tenants-add")
+  end
+
+  test "sorts columns on click", %{conn: conn} do
+    grant_capabilities!("admin.tenancy.tenant.list")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/tenancy/tenants")
+
+    # Initial sort is by id ascending
+    assert has_element?(view, "#tenants-sort-id .hero-chevron-up")
+    assert has_element?(view, "th:has(#tenants-sort-id)[aria-sort='ascending']")
+
+    # Toggle id to descending
+    view |> element("#tenants-sort-id") |> render_click()
+    assert has_element?(view, "#tenants-sort-id .hero-chevron-down")
+    assert has_element?(view, "th:has(#tenants-sort-id)[aria-sort='descending']")
+
+    # Switch sort to name ascending
+    view |> element("#tenants-sort-name") |> render_click()
+    assert has_element?(view, "#tenants-sort-name .hero-chevron-up")
+    assert has_element?(view, "th:has(#tenants-sort-name)[aria-sort='ascending']")
+    assert has_element?(view, "th:has(#tenants-sort-id)[aria-sort='none']")
   end
 
   test "refuses create without admin.tenancy.tenant.create and does not insert", %{conn: conn} do
@@ -57,6 +80,15 @@ defmodule BilimbiWeb.TenantsLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/tenancy/tenants")
 
     assert has_element?(view, "#tenants-add")
+    view |> element("#tenants-add") |> render_click()
+
+    assert has_element?(view, "#tenant-create-modal")
+
+    # Cancel closing modal
+    view |> element("#tenant-create-modal button", "Cancel") |> render_click()
+    refute has_element?(view, "#tenant-create-modal")
+
+    # Re-open and submit
     view |> element("#tenants-add") |> render_click()
 
     view
