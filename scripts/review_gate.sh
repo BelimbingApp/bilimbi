@@ -53,16 +53,35 @@ verdict=$(jq -r '
   def trimmed_line:
     gsub("\\r"; "")
     | gsub("^[[:space:]]+|[[:space:]]+$"; "");
+  def indented_code_line($raw):
+    $raw | test("^( {4}|[ ]*\\t)");
+  def opening_fence:
+    (try capture("^(?<fence>(?:\\x60{3,}|~{3,})).*$").fence catch null) // null;
+  def closing_fence:
+    (try capture("^(?<fence>(?:\\x60{3,}|~{3,}))[ \\t]*$").fence catch null) // null;
+  def closes_fence($line; $open):
+    ($line | closing_fence) as $close
+    | $close != null
+      and ($close[0:1] == $open[0:1])
+      and (($close | length) >= ($open | length));
   def safe_logical_lines($body):
     reduce ($body | split("\n")[]) as $raw
-      ({fenced: false, lines: []};
-       ($raw | trimmed_line) as $line
-       | if ($line | test("^(```|~~~)")) then
-           .fenced |= not
-         elif .fenced or ($line | test("^>")) then
+      ({fence: null, lines: []};
+       ($raw | gsub("\\r"; "")) as $raw_line
+       | ($raw_line | trimmed_line) as $line
+       | if .fence != null then
+           if indented_code_line($raw_line) then
+             .
+           elif closes_fence($line; .fence) then
+             .fence = null
+           else
+             .
+           end
+         elif indented_code_line($raw_line) or ($line | test("^>")) then
            .
          else
-           .lines += [$line]
+           ($line | opening_fence) as $open
+           | if $open == null then .lines += [$line] else .fence = $open end
          end)
     | .lines;
   def canonical_agent_id:
