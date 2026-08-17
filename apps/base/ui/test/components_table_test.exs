@@ -18,6 +18,7 @@ defmodule Bilimbi.Base.UI.ComponentsTableTest do
       |> Map.put_new(:framed, true)
       |> Map.put_new(:caption, nil)
       |> Map.put_new(:sort_event, "sort")
+      |> Map.put_new(:sort_id, "people-sort-name")
 
     ~H"""
     <.table
@@ -29,7 +30,7 @@ defmodule Bilimbi.Base.UI.ComponentsTableTest do
       caption={@caption}
       sort_event={@sort_event}
     >
-      <:col :let={row} label="Name" sort="name" sort_id="people-sort-name">{row.name}</:col>
+      <:col :let={row} label="Name" sort="name" sort_id={@sort_id}>{row.name}</:col>
       <:col :let={row} label="Count" sort="count" sort_id="people-sort-count" align={:right}>
         {row.count}
       </:col>
@@ -48,6 +49,16 @@ defmodule Bilimbi.Base.UI.ComponentsTableTest do
     assert html =~ ~s(phx-value-sort="name")
     assert html =~ "Ada"
     refute html =~ "Nobody here."
+  end
+
+  test "derives a stable sort button ID when the caller omits one" do
+    html =
+      render_component(&preview/1, %{
+        rows: [%{name: "Ada", note: "ok", count: 3}],
+        sort_id: nil
+      })
+
+    assert html =~ ~s(id="people-sort-name")
   end
 
   test "keeps empty copy out of the stream tbody" do
