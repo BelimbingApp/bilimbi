@@ -27,12 +27,10 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
     # that helper already exist (`user_auth.ex`, `employee/web/capabilities.ex`,
     # `ui/nav.ex`) and a fourth would be one more place for the capability rule
     # to drift. Tracked on #223.
-    capabilities = Map.get(socket.assigns.current_scope, :capabilities) || []
-
     {:ok,
      assign(socket,
        page_title: "Roles",
-       can_create?: "admin.authz.role.create" in capabilities
+       can_create?: "admin.authz.role.create" in socket.assigns.current_scope.capabilities
      )}
   end
 

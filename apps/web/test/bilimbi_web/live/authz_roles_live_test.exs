@@ -62,7 +62,12 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       grant_capabilities!(["admin.authz.role.list", "admin.authz.role.create"])
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/roles")
 
-      assert has_element?(view, "#roles-create")
+      # Asserted as an anchor, not just by id. `<.button>` renders a `<button>`
+      # unless it is given navigate/href/patch, so wrapping it in a `<.link>`
+      # produces `<a><button>` -- invalid, and the element that takes the click
+      # is not the one that navigates. An id-only assertion passes either way.
+      assert has_element?(view, "a#roles-create[href='/authz/roles/create']")
+      refute has_element?(view, "#roles-create button")
     end
 
     test "hides Create Role from an actor who cannot create", %{conn: conn} do
