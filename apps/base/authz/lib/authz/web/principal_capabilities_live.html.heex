@@ -39,69 +39,51 @@
       </div>
     </form>
 
-    <div class="mt-4 overflow-x-auto rounded-xl border border-line bg-surface">
-      <table class="w-full text-left text-sm">
-        <thead class="border-b border-line bg-surface-sunken">
-          <tr>
-            <th
-              :for={
-                {column, label} <- [
-                  {"principal_type", "Principal"},
-                  {"capability", "Capability"},
-                  {"allowed", "Effect"},
-                  {"company_id", "Company"},
-                  {"created_at", "Granted"}
-                ]
-              }
-              class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle"
-            >
-              <button
-                type="button"
-                id={"grants-sort-#{column}"}
-                phx-click="sort"
-                phx-value-column={column}
-                class="inline-flex items-center gap-1 hover:text-ink"
-              >
-                {label}
-                <.icon
-                  :if={sort_indicator(@state, String.to_existing_atom(column))}
-                  name={sort_indicator(@state, String.to_existing_atom(column))}
-                  class="size-3"
-                />
-              </button>
-            </th>
-          </tr>
-        </thead>
-        <tbody id="principal-capabilities" phx-update="stream" class="divide-y divide-line-subtle">
-          <tr :for={{dom_id, grant} <- @streams.grants} id={dom_id} class="hover:bg-surface-sunken">
-            <td class="px-4 py-2.5 whitespace-nowrap text-ink-muted">
-              <.badge>{principal_label(grant)}</.badge>
-              <span class="ml-1 tabular-nums">{grant.principal_id}</span>
-            </td>
-            <td class="px-4 py-2.5">
-              <span class="font-mono text-xs text-ink">{grant.capability}</span>
-              <.badge :if={unknown_capability?(grant)} kind={:warning} class="ml-1">
-                Unknown
-              </.badge>
-            </td>
-            <td class="px-4 py-2.5">
-              <.badge kind={if grant.allowed, do: :success, else: :danger}>
-                {if grant.allowed, do: "Granted", else: "Denied"}
-              </.badge>
-            </td>
-            <td class="px-4 py-2.5 tabular-nums text-ink-muted">{grant.company_id || "—"}</td>
-            <td class="px-4 py-2.5 whitespace-nowrap tabular-nums text-ink-muted">
-              {created_at(grant)}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="mt-4">
+      <.table
+        id="principal-capabilities"
+        rows={@streams.grants}
+        row_id={fn {dom_id, _grant} -> dom_id end}
+        row_item={fn {_dom_id, grant} -> grant end}
+        sort_by={@state.sort_by}
+        sort_dir={@state.sort_dir}
+      >
+        <:col :let={grant} label="Principal" sort="principal_type" sort_id="grants-sort-principal_type">
+          <span class="whitespace-nowrap text-ink-muted">
+            <.badge>{principal_label(grant)}</.badge>
+            <span class="ml-1 tabular-nums">{grant.principal_id}</span>
+          </span>
+        </:col>
 
-      <p :if={@page.total_entries == 0} class="px-4 py-8 text-center text-sm text-ink-muted">
-        {if @state.search == "" and @state.result == "",
-          do: "No capabilities have been granted directly in this tenant.",
-          else: "No direct capabilities match these filters."}
-      </p>
+        <:col :let={grant} label="Capability" sort="capability" sort_id="grants-sort-capability">
+          <span class="font-mono text-xs text-ink">{grant.capability}</span>
+          <.badge :if={unknown_capability?(grant)} kind={:warning} class="ml-1">
+            Unknown
+          </.badge>
+        </:col>
+
+        <:col :let={grant} label="Effect" sort="allowed" sort_id="grants-sort-allowed">
+          <.badge kind={if grant.allowed, do: :success, else: :danger}>
+            {if grant.allowed, do: "Granted", else: "Denied"}
+          </.badge>
+        </:col>
+
+        <:col :let={grant} label="Company" sort="company_id" sort_id="grants-sort-company_id">
+          <span class="tabular-nums text-ink-muted">{grant.company_id || "—"}</span>
+        </:col>
+
+        <:col :let={grant} label="Granted" sort="created_at" sort_id="grants-sort-created_at">
+          <span class="whitespace-nowrap tabular-nums text-ink-muted">
+            {created_at(grant)}
+          </span>
+        </:col>
+
+        <:empty :if={@page.total_entries == 0}>
+          {if @state.search == "" and @state.result == "",
+            do: "No capabilities have been granted directly in this tenant.",
+            else: "No direct capabilities match these filters."}
+        </:empty>
+      </.table>
     </div>
 
     <div
