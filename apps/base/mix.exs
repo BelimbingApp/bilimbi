@@ -28,7 +28,9 @@ defmodule Bilimbi.Base.MixProject do
       setup: ["deps.get", "ecto.create"],
       "ecto.setup": ["ecto.create"],
       "ecto.reset": ["ecto.drop", "ecto.create"],
-      test: Bilimbi.Base.ModuleRegistry.MixDiscovery.container_test_commands(__DIR__)
+      test: Bilimbi.Base.ModuleRegistry.MixDiscovery.container_test_commands(__DIR__),
+      "compile.strict":
+        Bilimbi.Base.ModuleRegistry.MixDiscovery.container_compile_commands(__DIR__)
     ]
   end
 end

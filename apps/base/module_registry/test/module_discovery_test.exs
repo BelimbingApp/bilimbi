@@ -109,6 +109,14 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
              ~s(cmd --cd "alpha" mix test),
              ~s(cmd --cd "zeta" mix test)
            ]
+
+    # Root `mix compile --warnings-as-errors` does not fail on a path
+    # dependency's warnings, so `attr required: true` was unenforced (#176).
+    # Each module must compile in its own project context for them to be fatal.
+    assert MixDiscovery.container_compile_commands(base) == [
+             ~s(cmd --cd "alpha" mix compile --warnings-as-errors),
+             ~s(cmd --cd "zeta" mix compile --warnings-as-errors)
+           ]
   end
 
   test "application metadata carries the Mix-approved resolved order", %{root: root} do
