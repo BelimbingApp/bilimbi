@@ -85,7 +85,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
             <:col :let={summary} label="ISO" sort="country_iso" sort_id="postcodes-summary-sort-iso">
               <span class="whitespace-nowrap font-mono text-xs text-ink-muted">{summary.country_iso}</span>
             </:col>
-            <:col :let={summary} label="Records" sort="record_count" sort_id="postcodes-summary-sort-count">
+            <:col :let={summary} label="Records" sort="record_count" sort_id="postcodes-summary-sort-count" align={:right}>
               <span class="whitespace-nowrap tabular-nums text-ink">{format_integer(summary.record_count)}</span>
             </:col>
           </.table>
@@ -125,6 +125,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
             sort_by={@index_state.sort_by}
             sort_dir={@index_state.sort_dir}
             framed={false}
+            caption="Geonames postcodes"
           >
             <:col :let={postcode} label="Country" sort="country_name" sort_id="postcodes-sort-country">
               <div class="whitespace-nowrap text-ink-muted">

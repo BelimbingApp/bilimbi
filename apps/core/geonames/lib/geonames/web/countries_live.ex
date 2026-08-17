@@ -156,6 +156,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
             sort_by={@index_state.sort_by}
             sort_dir={@index_state.sort_dir}
             framed={false}
+            caption="Countries"
           >
             <:col :let={country} label="ISO" sort="iso" sort_id="countries-sort-iso">
               <span class="whitespace-nowrap font-medium tabular-nums text-ink">{country.iso}</span>
@@ -172,7 +173,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
             <:col :let={country} label="Currency" sort="currency_code" sort_id="countries-sort-currency">
               <span class="whitespace-nowrap text-ink-muted">{country.currency_code || "—"}</span>
             </:col>
-            <:col :let={country} label="Population" sort="population" sort_id="countries-sort-population">
+            <:col :let={country} label="Population" sort="population" sort_id="countries-sort-population" align={:right}>
               <span class="whitespace-nowrap tabular-nums text-ink-muted">{format_integer(country.population)}</span>
             </:col>
             <:col :let={country} label="Updated" sort="updated_at" sort_id="countries-sort-updated">

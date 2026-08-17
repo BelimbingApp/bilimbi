@@ -66,6 +66,8 @@ defmodule BilimbiWeb.GeonamesLiveTest do
            )
 
     assert has_element?(countries, "#countries-sort-population")
+    assert has_element?(countries, "caption.sr-only", "Countries")
+    assert has_element?(countries, "th.text-right #countries-sort-population")
     assert has_element?(countries, "#countries-pagination-page-size option[value='25'][selected]")
     assert has_element?(countries, "#countries-pin[data-nav-pin='nav-admin-geonames-country']")
     assert has_element?(countries, "#countries-update[phx-click='update-countries']", "Update")
@@ -86,6 +88,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     {:ok, admin1, _html} = conn |> log_in_as() |> live(~p"/geonames/admin1")
 
     assert has_element?(admin1, "#admin1-table")
+    assert has_element?(admin1, "caption.sr-only", "Admin1 divisions")
     assert has_element?(admin1, "#admin1-country-filter")
     assert has_element?(admin1, "label[for='admin1-country-filter'].sr-only", "Country")
     assert has_element?(admin1, "#admin1-2", "California")
@@ -100,6 +103,8 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     {:ok, postcodes, _html} = conn |> log_in_as() |> live(~p"/geonames/postcodes")
 
     assert has_element?(postcodes, "#postcodes-country-summary")
+    assert has_element?(postcodes, "caption.sr-only", "Geonames postcodes")
+    assert has_element?(postcodes, "th.text-right #postcodes-summary-sort-count")
     assert has_element?(postcodes, "#postcode-country-US", "United States")
     assert has_element?(postcodes, "#postcodes-sort-postcode")
 
