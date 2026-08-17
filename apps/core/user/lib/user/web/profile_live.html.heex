@@ -1,0 +1,42 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} active_nav={nil}>
+  <div class="mx-auto max-w-2xl">
+    <.header>
+      Profile
+      <:subtitle>Your account details and where signing in takes you</:subtitle>
+    </.header>
+
+    <.form
+      for={@form}
+      id="profile-form"
+      phx-change="validate"
+      phx-submit="save"
+      class="mt-5 space-y-4 rounded-xl border border-line bg-surface p-4"
+    >
+      <.input field={@form[:name]} type="text" label="Name" autocomplete="name" />
+
+      <div>
+        <.input field={@form[:email]} type="email" label="Email" autocomplete="email" />
+        <p class="mt-1 text-xs text-ink-subtle">
+          Changing this address means it needs verifying again before it is trusted.
+        </p>
+      </div>
+
+      <div>
+        <.input
+          field={@form[:landing_menu_id]}
+          type="select"
+          label="Landing page"
+          prompt="Default (first page you can open)"
+          options={@landing_options}
+        />
+        <p class="mt-1 text-xs text-ink-subtle">
+          Only pages you can open are listed. Leave it unset to keep the default.
+        </p>
+      </div>
+
+      <div class="flex justify-end">
+        <.button id="profile-save" type="submit" variant="primary">Save</.button>
+      </div>
+    </.form>
+  </div>
+</Layouts.app>
