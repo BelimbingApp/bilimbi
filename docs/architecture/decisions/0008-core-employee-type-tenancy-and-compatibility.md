@@ -47,26 +47,29 @@ Issue #149 researched this conflict and established that:
 To resolve the multi-tenant code uniqueness constraint without breaking compatible schema baselines or adoption verification:
 
 1. The initial baseline migration `20260812112641_create_core_employee_compatibility_baseline.exs` remains classified as `:compatible_baseline`.
-2. A new Bilimbi-only migration `20260817173000_adapt_employee_types_tenancy_indexes.exs` is introduced with disposition `:bilimbi_only`:
+2. Migration `20260817173000_adapt_employee_types_tenancy_indexes.exs` is introduced with disposition `:bilimbi_only`:
    - Drops global unique index `employee_types_code_unique` on `(code)`.
    - Creates partial unique index `employee_types_global_code_unique` on `(code)` where `company_id IS NULL AND is_system = true`.
    - Creates composite partial unique index `employee_types_company_code_unique` on `(company_id, code)` where `company_id IS NOT NULL`.
+3. Migration `20260817180000_add_employee_types_custom_company_check.exs` is introduced with disposition `:bilimbi_only`:
    - Adds database check constraint `employee_types_custom_company_check CHECK (is_system = (company_id IS NULL))`.
-3. In `apps/core/employee/bilimbi.module.exs`, `migration_dispositions` explicitly registers:
+4. In `apps/core/employee/bilimbi.module.exs`, `migration_dispositions` explicitly registers:
    ```elixir
    migration_dispositions: %{
      20_260_812_112_641 => :compatible_baseline,
-     20_260_817_173_000 => :bilimbi_only
+     20_260_817_173_000 => :bilimbi_only,
+     20_260_817_180_000 => :bilimbi_only
    }
    ```
-4. **Down-Migration Reversibility:** Reversing `20260817173000` via `down` restores the single global unique index on `(code)` and drops the check constraint. Note that executing `down` against a live multi-tenant database requires reconciling duplicate codes across companies if multiple companies have created custom types sharing a code.
+5. `SchemaContract` registers the indexes and check under `optional_groups` (`name: "core/employee type tenancy adaptation"`), ensuring schema verification enforces all-or-nothing presence of the adapted indexes and check constraint.
+6. **Down-Migration Reversibility:** Reversing `20260817180000` drops the check constraint; reversing `20260817173000` via `down` restores the single global unique index on `(code)`. Note that executing `down` on `20260817173000` against a live multi-tenant database requires reconciling duplicate codes across companies if multiple companies have created custom types sharing a code.
 
 ### 3. Adoption Behavior for Existing Databases
 
 When adopting an existing Belimbing database (`mix bilimbi.schema.adopt`):
-- Schema verification checks against `SchemaContract` (which reflects the baseline schema).
+- Schema verification checks against `SchemaContract` (which reflects the baseline schema or the complete adapted group).
 - The baseline migration `20260812112641` is recorded as adopted in `bilimbi_schema_migrations`.
-- `mix bilimbi.migrate` executes the pending `:bilimbi_only` migration `20260817173000`, replacing the global index with the partial indexes and adding the system/company check constraint.
+- `mix bilimbi.migrate` executes the pending `:bilimbi_only` migrations `20260817173000` and `20260817180000`, replacing the global index with the partial indexes and adding the system/company check constraint.
 - If an existing database has custom rows where `company_id IS NULL` and `is_system = false`, they must be assigned to their target company or deleted prior to migration if their codes conflict with system types.
 
 ### 4. Public Administration APIs

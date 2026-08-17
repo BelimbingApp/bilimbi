@@ -79,6 +79,18 @@ defmodule Bilimbi.Core.Employee.SchemaContract do
       optional_checks: %{
         "employee_types_custom_company_check" => check("is_system = (company_id IS NULL)")
       },
+      optional_groups: [
+        %{
+          name: "core/employee type tenancy adaptation",
+          indexes: [
+            "employee_types_global_code_unique",
+            "employee_types_company_code_unique"
+          ],
+          checks: [
+            "employee_types_custom_company_check"
+          ]
+        }
+      ],
       foreign_keys: %{}
     }
   end
