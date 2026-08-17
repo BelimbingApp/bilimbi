@@ -7,7 +7,7 @@
   namespace: Bilimbi.Base.UI,
   dependencies: ["base/menu", "base/module_registry"],
   migrations: nil,
-  web: nil,
+  web: "priv/web_routes.exs",
   schema_contract: nil,
-  contribution_provider: nil
+  contribution_provider: Bilimbi.Base.UI.Contributions
 ]
