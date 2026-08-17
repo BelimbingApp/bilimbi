@@ -31,6 +31,8 @@ defmodule BilimbiWeb.CompanyLive.Show do
          |> assign(:page_title, Company.Summary.display_name(company))
          |> assign(:active_nav, "admin.company")
          |> assign(:company, company)
+         |> assign(:company_users_count, length(users))
+         |> assign(:company_employees_count, length(employees))
          |> stream(:company_users, users)
          |> stream(:company_employees, employees)}
 
@@ -50,15 +52,6 @@ defmodule BilimbiWeb.CompanyLive.Show do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
       <div class="mx-auto max-w-4xl">
-        <p class="mb-2 text-xs">
-          <.link
-            navigate={~p"/companies"}
-            class="font-medium text-ink-muted hover:text-ink"
-          >
-            ← Companies
-          </.link>
-        </p>
-
         <.header>
           {Company.Summary.display_name(@company)}
           <:subtitle>
@@ -68,40 +61,61 @@ defmodule BilimbiWeb.CompanyLive.Show do
             <.badge kind={if @company.status == "active", do: :success, else: :warning}>
               {@company.status}
             </.badge>
+            <.button id="company-back" navigate={~p"/companies"}>
+              Back to companies
+            </.button>
           </:actions>
         </.header>
 
         <section id="company-users" class="mt-6">
           <h2 class="mb-2 text-sm font-semibold text-ink-strong">Users</h2>
-          <.table id="company-users-table" rows={@streams.company_users}>
-            <:col :let={{_id, user}} label="Name"><span class="font-medium">{user.name}</span></:col>
-            <:col :let={{_id, user}} label="Email">{user.email}</:col>
-            <:col :let={{_id, user}} label="Email verified">
+          <.table
+            id="company-users-table"
+            rows={@streams.company_users}
+            row_id={fn {id, _} -> id end}
+            row_item={fn {_, user} -> user end}
+            caption="Users"
+          >
+            <:col :let={user} label="Name"><span class="font-medium">{user.name}</span></:col>
+            <:col :let={user} label="Email">{user.email}</:col>
+            <:col :let={user} label="Email verified">
               <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
                 {if user.email_verified_at, do: "verified", else: "unverified"}
               </.badge>
             </:col>
+            <:empty :if={@company_users_count == 0}>
+              No users found for this company.
+            </:empty>
           </.table>
         </section>
 
         <section id="company-employees" class="mt-6">
           <h2 class="mb-2 text-sm font-semibold text-ink-strong">Employees</h2>
-          <.table id="company-employees-table" rows={@streams.company_employees}>
-            <:col :let={{_id, employee}} label="Name">
+          <.table
+            id="company-employees-table"
+            rows={@streams.company_employees}
+            row_id={fn {id, _} -> id end}
+            row_item={fn {_, employee} -> employee end}
+            caption="Employees"
+          >
+            <:col :let={employee} label="Name">
               <span class="font-medium">{employee.full_name}</span>
               <span :if={employee.designation} class="block text-xs text-ink-subtle">
                 {employee.designation}
               </span>
             </:col>
-            <:col :let={{_id, employee}} label="No.">
+            <:col :let={employee} label="No.">
               <code class="text-xs font-medium">{employee.employee_number}</code>
             </:col>
-            <:col :let={{_id, employee}} label="Type">{employee.employee_type}</:col>
-            <:col :let={{_id, employee}} label="Status">
+            <:col :let={employee} label="Type">{employee.employee_type}</:col>
+            <:col :let={employee} label="Status">
               <.badge kind={if employee.status == "active", do: :success, else: :neutral}>
                 {employee.status}
               </.badge>
             </:col>
+            <:empty :if={@company_employees_count == 0}>
+              No employees found for this company.
+            </:empty>
           </.table>
         </section>
       </div>

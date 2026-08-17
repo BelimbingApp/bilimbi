@@ -14,6 +14,7 @@ defmodule BilimbiWeb.CompanyLive.Index do
      socket
      |> assign(:page_title, "Companies")
      |> assign(:active_nav, "admin.company")
+     |> assign(:companies_count, length(companies))
      |> stream(:companies, companies)}
   end
 
@@ -28,8 +29,14 @@ defmodule BilimbiWeb.CompanyLive.Index do
         </.header>
 
         <div class="mt-5">
-          <.table id="companies" rows={@streams.companies}>
-            <:col :let={{_id, company}} label="Name">
+          <.table
+            id="companies"
+            rows={@streams.companies}
+            row_id={fn {id, _} -> id end}
+            row_item={fn {_, company} -> company end}
+            caption="Companies"
+          >
+            <:col :let={company} label="Name">
               <.link
                 navigate={~p"/companies/#{company.id}"}
                 class="font-medium text-ink-strong hover:underline"
@@ -43,19 +50,22 @@ defmodule BilimbiWeb.CompanyLive.Index do
                 {company.name}
               </span>
             </:col>
-            <:col :let={{_id, company}} label="Code">
+            <:col :let={company} label="Code">
               <code class="text-xs font-medium">{company.code}</code>
             </:col>
-            <:col :let={{_id, company}} label="Status">
+            <:col :let={company} label="Status">
               <.badge kind={if company.status == "active", do: :success, else: :warning}>
                 {company.status}
               </.badge>
             </:col>
-            <:action :let={{_id, company}}>
+            <:action :let={company}>
               <.link navigate={~p"/companies/#{company.id}"} class="text-xs font-medium">
                 Open
               </.link>
             </:action>
+            <:empty :if={@companies_count == 0}>
+              No companies found in this workspace.
+            </:empty>
           </.table>
         </div>
       </div>

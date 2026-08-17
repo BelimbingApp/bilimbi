@@ -53,14 +53,42 @@ defmodule BilimbiWeb.CompanyLiveTest do
                conn |> log_in_as() |> live(~p"/companies/73")
     end
 
-    test "renders the company with its users", %{conn: conn} do
+    test "renders the company with its users and back button", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
       assert has_element?(view, "h1", "Bilimbi Industries")
+      assert has_element?(view, "#company-back[href='/companies']", "Back to companies")
       assert has_element?(view, "#company-users-table td", "Ada Lovelace")
-      assert has_element?(view, "#company-employees-table")
+
+      assert has_element?(
+               view,
+               "#company-employees-table-empty",
+               "No employees found for this company."
+             )
+    end
+
+    test "renders empty users table when company has no users", %{conn: conn} do
+      CompanyFixtures.insert_company!(%{
+        id: 75,
+        tenant_id: 41,
+        name: "Empty Co",
+        code: "empty_co"
+      })
+
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/75")
+
+      assert has_element?(view, "h1", "Empty Co")
+      assert has_element?(view, "#company-users-table-empty", "No users found for this company.")
+
+      assert has_element?(
+               view,
+               "#company-employees-table-empty",
+               "No employees found for this company."
+             )
     end
 
     test "redirects away for another tenant's company", %{conn: conn} do
