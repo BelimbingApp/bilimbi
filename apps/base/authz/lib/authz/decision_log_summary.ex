@@ -1,5 +1,11 @@
 defmodule Bilimbi.Base.Authz.DecisionLogSummary do
-  @moduledoc "Stable payload-safe read model for one authorization decision log."
+  @moduledoc """
+  Stable payload-safe read model for one authorization decision log.
+
+  Deliberately carries actor identity as `actor_type` + `actor_id` and does not
+  include mutable display names. This keeps the audit read model stable and
+  payload-safe while avoiding a Base-to-Core naming join at read time.
+  """
 
   alias Bilimbi.Base.Authz.DecisionLog
 
