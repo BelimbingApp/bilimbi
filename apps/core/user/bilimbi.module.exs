@@ -6,6 +6,7 @@
   otp_app: :bilimbi_core_user,
   namespace: Bilimbi.Core.User,
   dependencies: [
+    "base/audit",
     "base/authz",
     "base/database",
     "base/module_registry",

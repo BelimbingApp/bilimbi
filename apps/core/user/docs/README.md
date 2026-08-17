@@ -25,6 +25,13 @@ and reset-token hashes never leave the module; account reads return
 | `create_user(scope, company_id, attributes)` | Compatibility name for `register_user/3` |
 | `update_user(scope, company_id, user_id, attributes)` | Update |
 | `delete_user(scope, company_id, user_id)` | Hard delete — `users` has no soft delete |
+| `list_unaffiliated_users(actor, scope)` | Operator-only list of users without company affiliation (`admin.user.unaffiliated.manage`) |
+| `get_unaffiliated_user(actor, scope, user_id)` | Operator-only read of one unaffiliated user |
+| `create_unaffiliated_user(actor, scope, attributes)` | Operator-only creation of an unaffiliated user account |
+| `assign_unaffiliated_user(actor, scope, user_id, target_company_id, opts)` | Assign an unaffiliated user to a live company and optional employee |
+| `reassign_user_company(actor, scope, current_company_id, user_id, target_company_id, opts)` | Reassign a user to a target live company with ascending lock ordering |
+| `clear_user_company(actor, scope, current_company_id, user_id, opts)` | Move an affiliated user back to unaffiliated state |
+| `admin_change_password(actor, scope, company_id, user_id, new_password, opts)` | Admin password reset with token rotation and session invalidation |
 | `authenticate(email, password)` | Verify a login and upgrade legacy bcrypt |
 | `confirm_password(...)` / `change_password(...)` | Current-password confirmation and replacement |
 | `request_password_reset(email, deliver_fun)` | Neutral, throttled request; callback receives the one plaintext token |
