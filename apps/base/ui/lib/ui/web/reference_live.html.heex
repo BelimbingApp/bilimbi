@@ -180,6 +180,37 @@
       </div>
     </section>
 
+    <%!-- Section: Flash Component --%>
+    <section id="component-flash" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">
+          {gettext("Flash Messages (<.flash>)")}
+        </h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance:
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/alert.blade.php</code>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-line bg-surface p-5 space-y-3">
+        <.flash
+          kind={:info}
+          title={gettext("Saved")}
+          flash={%{"info" => gettext("Profile saved.")}}
+        />
+        <.flash
+          kind={:error}
+          title={gettext("Not saved")}
+          flash={%{"error" => gettext("Profile was not saved.")}}
+        />
+        <p class="text-xs text-ink-muted">
+          {gettext(
+            "Rendered by the layout from the socket's flash map, not called directly by screens -- put_flash/3 is the interface. Only :info and :error exist; for other states use <.alert>, which takes :warning and :success too."
+          )}
+        </p>
+      </div>
+    </section>
+
     <%!-- Section: Badge Component --%>
     <section id="component-badge" class="space-y-4">
       <div class="border-b border-line pb-2">
