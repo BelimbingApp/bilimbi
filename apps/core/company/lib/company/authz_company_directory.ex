@@ -22,13 +22,18 @@ defmodule Bilimbi.Core.Company.AuthzCompanyDirectory do
   # one company two things. Sorting happens on the resulting string, not on
   # `name`, so the order matches what is actually rendered -- `list_companies/1`
   # orders by id and is left alone, since its other callers do not want this.
+  #
+  # Sorted case-insensitively. Raw binary comparison is codepoint order, which
+  # puts every lowercase initial after every uppercase one: "eMart Retail" would
+  # land below "Zulu Holdings" in the dropdown. Belimbing got this free from the
+  # database collation on `orderBy('name')`.
   @impl true
   def companies_in_scope(%Scope{} = scope) do
     {:ok, companies} = Company.list_companies(scope)
 
     companies
     |> Enum.map(&%{id: &1.id, name: Summary.display_name(&1)})
-    |> Enum.sort_by(& &1.name)
+    |> Enum.sort_by(&String.downcase(&1.name))
   end
 
   @impl true

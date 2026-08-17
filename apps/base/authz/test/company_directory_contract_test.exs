@@ -32,7 +32,7 @@ defmodule Bilimbi.Base.Authz.CompanyDirectoryContractTest do
   test "orders by the name that gets displayed, not by id", %{populated: scope} do
     named = Directory.companies_in_scope(scope)
 
-    assert named == Enum.sort_by(named, & &1.name)
+    assert named == Enum.sort_by(named, &String.downcase(&1.name))
 
     # The double names companies in descending id order precisely so this
     # assertion fails if someone "fixes" the sort to use id.
