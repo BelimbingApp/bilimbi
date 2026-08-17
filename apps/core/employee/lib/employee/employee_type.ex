@@ -21,12 +21,22 @@ defmodule Bilimbi.Core.Employee.EmployeeType do
     |> cast(attributes, [:code, :label])
     |> put_change(:company_id, company_id)
     |> put_change(:is_system, false)
-    |> update_change(:code, &(&1 |> String.trim() |> String.downcase()))
-    |> update_change(:label, &String.trim/1)
+    |> update_change(:code, &(&1 && &1 |> String.trim() |> String.downcase()))
+    |> update_change(:label, &(&1 && String.trim(&1)))
     |> validate_required([:code, :label, :company_id])
     |> validate_format(:code, ~r/^[a-z][a-z0-9_]*$/)
     |> validate_length(:code, max: 255)
     |> validate_length(:label, min: 1, max: 255)
+    |> unique_constraint(:code, name: :employee_types_company_code_unique)
     |> unique_constraint(:code, name: :employee_types_code_unique)
+  end
+
+  @spec update_changeset(%__MODULE__{}, map()) :: Ecto.Changeset.t()
+  def update_changeset(%__MODULE__{} = type, attributes) do
+    type
+    |> cast(attributes, [:label])
+    |> update_change(:label, &(&1 && String.trim(&1)))
+    |> validate_required([:label])
+    |> validate_length(:label, min: 1, max: 255)
   end
 end

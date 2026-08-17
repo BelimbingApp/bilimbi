@@ -56,11 +56,29 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Core.Address.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Core.Employee.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Core.User.Migrations.CreateCompatibilityBaseline,
-             Bilimbi.Base.Audit.Migrations.CreateCompatibilityBaseline
+             Bilimbi.Base.Audit.Migrations.CreateCompatibilityBaseline,
+             Bilimbi.Core.Employee.Migrations.AdaptEmployeeTypesTenancyIndexes
            ]
 
-    assert Enum.all?(entries, &(elem(&1, 2) == :compatible_baseline))
-    assert Compatibility.baseline_versions() == Enum.map(entries, &elem(&1, 0))
+    assert Enum.map(entries, &elem(&1, 2)) == [
+             :compatible_baseline,
+             :compatible_baseline,
+             :compatible_baseline,
+             :compatible_baseline,
+             :compatible_baseline,
+             :compatible_baseline,
+             :compatible_baseline,
+             :compatible_baseline,
+             :compatible_baseline,
+             :compatible_baseline,
+             :compatible_baseline,
+             :bilimbi_only
+           ]
+
+    assert Compatibility.baseline_versions() ==
+             entries
+             |> Enum.filter(&(elem(&1, 2) == :compatible_baseline))
+             |> Enum.map(&elem(&1, 0))
   end
 
   test "runtime rejects missing, unknown, and non-exact migration dispositions" do

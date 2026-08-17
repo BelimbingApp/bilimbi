@@ -66,9 +66,15 @@ defmodule Bilimbi.Core.Employee.SchemaContract do
       },
       indexes: %{
         "employee_types_pkey" => index(["id"], true),
-        "employee_types_code_unique" => index(["code"], true),
         "employee_types_company_id_index" => index(["company_id"]),
         "employee_types_company_id_code_index" => index(["company_id", "code"])
+      },
+      optional_indexes: %{
+        "employee_types_code_unique" => index(["code"], true),
+        "employee_types_global_code_unique" =>
+          index(["code"], true, "company_id IS NULL AND is_system = true"),
+        "employee_types_company_code_unique" =>
+          index(["company_id", "code"], true, "company_id IS NOT NULL")
       },
       foreign_keys: %{}
     }
@@ -78,7 +84,8 @@ defmodule Bilimbi.Core.Employee.SchemaContract do
     %{type: type, nullable: nullable, default: default}
   end
 
-  defp index(columns, unique \\ false), do: %{columns: columns, unique: unique, where: nil}
+  defp index(columns, unique \\ false, where \\ nil),
+    do: %{columns: columns, unique: unique, where: where}
 
   defp foreign_key(column, table, on_delete) do
     %{

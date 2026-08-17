@@ -63,6 +63,24 @@ defmodule Bilimbi.Core.Compatibility do
     Ecto.Migrator.run(repo, migrations, :up, opts)
   end
 
+  @spec migrate_baseline(Ecto.Repo.t(), keyword()) :: [integer()]
+  def migrate_baseline(repo \\ Repo, opts \\ []) do
+    entries =
+      migration_entries()
+      |> Enum.filter(&(elem(&1, 2) == :compatible_baseline))
+
+    schema = Keyword.get(opts, :prefix, "public")
+    _ = SchemaVerifier.quote_identifier!(schema)
+
+    opts =
+      opts
+      |> Keyword.put(:all, true)
+      |> Keyword.put(:strict_version_order, false)
+
+    migrations = Enum.map(entries, fn {version, module, _disposition} -> {version, module} end)
+    Ecto.Migrator.run(repo, migrations, :up, opts)
+  end
+
   @spec verify(Ecto.Repo.t(), keyword()) :: :ok | {:error, [String.t()]}
   def verify(repo \\ Repo, opts \\ []) do
     contracts =

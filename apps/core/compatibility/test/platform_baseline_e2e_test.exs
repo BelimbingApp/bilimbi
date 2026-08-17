@@ -81,7 +81,7 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       assert run_mix!("bilimbi.schema.verify", [], env) =~
                "Bilimbi compatibility schema verified."
 
-      assert recorded_versions() == Compatibility.baseline_versions()
+      assert recorded_versions() == Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
 
       assert run_mix!(
                "run",

@@ -43,7 +43,7 @@ defmodule Mix.Tasks.Bilimbi.MigrateTest do
   test "operational task runs a pending Bilimbi-only migration across a class-valid gap", %{
     schema: schema
   } do
-    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
 
     SQL.query!(
       MigrationTestRepo,
@@ -56,11 +56,15 @@ defmodule Mix.Tasks.Bilimbi.MigrateTest do
     assert {:ok, :adopted} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
     assert relation(MigrationTestRepo, schema, "bilimbi_only_task_probe") == nil
 
-    assert [^synthetic_version] =
-             Mix.Tasks.Bilimbi.Migrate.run(
-               ["--prefix", schema, "--quiet"],
-               MigrationTestRepo
-             )
+    pending =
+      Compatibility.migration_entries()
+      |> Enum.filter(&(elem(&1, 2) == :bilimbi_only))
+      |> Enum.map(&elem(&1, 0))
+
+    assert Mix.Tasks.Bilimbi.Migrate.run(
+             ["--prefix", schema, "--quiet"],
+             MigrationTestRepo
+           ) == pending
 
     assert relation(MigrationTestRepo, schema, "bilimbi_only_task_probe") != nil
     assert synthetic_version in recorded_versions(MigrationTestRepo, schema)

@@ -482,6 +482,12 @@ defmodule Bilimbi.Base.Database.SchemaVerifier do
   defp maybe_error(errors, true, _message), do: errors
   defp maybe_error(errors, false, message), do: [message | errors]
 
+  defp normalize_named_object("index", object) do
+    object
+    |> Map.put_new(:where, nil)
+    |> Map.update!(:where, &normalize_predicate/1)
+  end
+
   defp normalize_named_object("foreign key", object),
     do: Map.put_new(object, :on_update, :nothing)
 

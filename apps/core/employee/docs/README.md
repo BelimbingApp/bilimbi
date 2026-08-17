@@ -63,7 +63,19 @@ Web adapters live under `lib/employee/web/` as `Bilimbi.Core.Employee.Web.*`
 and are discovered from `priv/web_routes.exs`. Screens are company-scoped
 through the signed-in `company_id`: there is no tenant-wide employee list.
 This is an initial module-owned adapter slice, not the complete pinned
-Belimbing workflow. Employee index controls, Employee Type edit/delete, and
-relationship-heavy form/show behavior remain deferred behind their public
-Core contracts. Deleting the platform orchestrator is refused as
-`:invariant_violation`, and the show screen reports that honestly.
+Belimbing workflow. Employee index controls and relationship-heavy form/show
+behavior remain deferred behind their public Core contracts. Deleting the
+platform orchestrator is refused as `:invariant_violation`, and the show screen
+reports that honestly.
+
+## Employee Types administration
+
+`list_employee_types/2`, `create_employee_type/3`, `update_employee_type/4`, and
+`delete_employee_type/3` provide the public administration contract for employee
+types. System types (`is_system = true, company_id = nil`) are immutable,
+platform-wide, and cannot be modified or deleted. Custom employee types
+(`is_system = false, company_id = company_id`) belong to one explicit company.
+`update_employee_type/4` permits label updates only; codes are immutable.
+`delete_employee_type/3` verifies under row lock that the custom type is not
+referenced by any employee in the company (`:in_use`).
+
