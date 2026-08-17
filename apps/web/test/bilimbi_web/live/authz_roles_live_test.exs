@@ -55,6 +55,27 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
                conn |> log_in_as() |> live(~p"/authz/roles")
     end
 
+    test "offers Create Role only to an actor holding the capability", %{conn: conn} do
+      # Belimbing gates this action the same way (`index.blade.php:6-12`,
+      # `@if ($canCreate)`). Without it the create screen is reachable only by
+      # typing the URL, which is how it shipped in #221.
+      grant_capabilities!(["admin.authz.role.list", "admin.authz.role.create"])
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/roles")
+
+      # Asserted as an anchor, not just by id. `<.button>` renders a `<button>`
+      # unless it is given navigate/href/patch, so wrapping it in a `<.link>`
+      # produces `<a><button>` -- invalid, and the element that takes the click
+      # is not the one that navigates. An id-only assertion passes either way.
+      assert has_element?(view, "a#roles-create[href='/authz/roles/create']")
+      refute has_element?(view, "#roles-create button")
+    end
+
+    test "hides Create Role from an actor who cannot create", %{conn: conn} do
+      {:ok, view, _html} = open_index(conn)
+
+      refute has_element?(view, "#roles-create")
+    end
+
     test "lists roles and marks its own nav row current", %{conn: conn, ours: ours} do
       {:ok, _} = Authz.create_role(ours, 73, %{name: "Auditor", code: "auditor"})
 

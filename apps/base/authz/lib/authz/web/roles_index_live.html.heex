@@ -5,6 +5,16 @@
       <:subtitle>
         System roles ship with the platform; custom roles belong to a company in this tenant
       </:subtitle>
+      <:actions>
+        <.button
+          :if={@can_create?}
+          id="roles-create"
+          navigate={~p"/authz/roles/create"}
+          variant="primary"
+        >
+          Create Role
+        </.button>
+      </:actions>
     </.header>
 
     <form id="roles-filters" phx-change="search" phx-submit="search" class="mt-5">
