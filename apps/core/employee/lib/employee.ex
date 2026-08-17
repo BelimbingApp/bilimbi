@@ -268,6 +268,28 @@ defmodule Bilimbi.Core.Employee do
     end
   end
 
+  @doc "Resolves one employee type visible to the company."
+  @spec get_employee_type(Scope.t(), pos_integer(), pos_integer()) ::
+          {:ok, TypeSummary.t()} | {:error, :company_not_found | :type_not_found}
+  def get_employee_type(%Scope{} = scope, company_id, type_id)
+      when is_integer(company_id) and is_integer(type_id) do
+    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+      case Repo.get(EmployeeType, type_id) do
+        nil ->
+          {:error, :type_not_found}
+
+        %EmployeeType{is_system: true, company_id: nil} = type ->
+          {:ok, TypeSummary.from_schema(type)}
+
+        %EmployeeType{company_id: ^company_id} = type ->
+          {:ok, TypeSummary.from_schema(type)}
+
+        %EmployeeType{} ->
+          {:error, :type_not_found}
+      end
+    end
+  end
+
   @spec create_employee_type(Scope.t(), pos_integer(), map()) ::
           {:ok, TypeSummary.t()} | {:error, :company_not_found | Changeset.t()}
   def create_employee_type(%Scope{} = scope, company_id, attributes) do

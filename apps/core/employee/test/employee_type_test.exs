@@ -278,6 +278,52 @@ defmodule Bilimbi.Core.Employee.EmployeeTypeTest do
     end
   end
 
+  describe "get_employee_type/3" do
+    test "gets a system employee type", %{scope_1: scope_1} do
+      {:ok, types} = Employee.list_employee_types(scope_1, 81)
+      system_type = Enum.find(types, & &1.is_system)
+
+      assert {:ok, type} = Employee.get_employee_type(scope_1, 81, system_type.id)
+      assert type.id == system_type.id
+      assert type.is_system == true
+    end
+
+    test "gets a custom employee type belonging to the company", %{scope_1: scope_1} do
+      assert {:ok, created} =
+               Employee.create_employee_type(scope_1, 81, %{
+                 code: "temp_staff",
+                 label: "Temporary Staff"
+               })
+
+      assert {:ok, type} = Employee.get_employee_type(scope_1, 81, created.id)
+      assert type.id == created.id
+      assert type.code == "temp_staff"
+      assert type.label == "Temporary Staff"
+      assert type.company_id == 81
+    end
+
+    test "refuses getting custom type belonging to another company", %{
+      scope_1: scope_1,
+      scope_2: scope_2
+    } do
+      assert {:ok, created} =
+               Employee.create_employee_type(scope_1, 81, %{
+                 code: "c1_type",
+                 label: "C1 Type"
+               })
+
+      assert {:error, :type_not_found} = Employee.get_employee_type(scope_2, 82, created.id)
+    end
+
+    test "returns :type_not_found for non-existent type id", %{scope_1: scope_1} do
+      assert {:error, :type_not_found} = Employee.get_employee_type(scope_1, 81, 999_999)
+    end
+
+    test "returns :company_not_found for unknown company in scope", %{scope_1: scope_1} do
+      assert {:error, :company_not_found} = Employee.get_employee_type(scope_1, 999, 1)
+    end
+  end
+
   describe "database integrity and check constraint" do
     test "rejects company-owned system type (company_id IS NOT NULL and is_system = true)" do
       assert_raise Postgrex.Error, ~r/employee_types_system_company_check/, fn ->
@@ -351,6 +397,10 @@ defmodule Bilimbi.Core.Employee.EmployeeTypeTest do
       for not_a_scope <- [51, nil, "51", scope_1.tenant] do
         assert_raise FunctionClauseError, fn ->
           Employee.list_employee_types(opaque(not_a_scope), 81)
+        end
+
+        assert_raise FunctionClauseError, fn ->
+          Employee.get_employee_type(opaque(not_a_scope), 81, 1)
         end
 
         assert_raise FunctionClauseError, fn ->

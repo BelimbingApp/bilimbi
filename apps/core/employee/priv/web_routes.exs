@@ -34,5 +34,11 @@
     live: Bilimbi.Core.Employee.Web.TypeFormLive,
     session: :auth,
     capability: "admin.employee-type.create"
+  },
+  %{
+    path: "/employee-types/:id/edit",
+    live: Bilimbi.Core.Employee.Web.TypeFormLive,
+    session: :auth,
+    capability: "admin.employee-type.update"
   }
 ]
