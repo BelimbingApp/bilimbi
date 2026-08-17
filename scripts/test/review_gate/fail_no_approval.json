@@ -1,0 +1,7 @@
+{"_expect": "fail",
+ "_case": "activity but no approval verdict at all",
+ "author": {"login": "kiatng"},
+ "labels": [{"name": "agent:claude-opus-5"}],
+ "reviews": [{"author": {"login": "faith-tohmm"}, "state": "COMMENTED",
+              "body": "**From:** amp/kimi-k3\none question inline", "submittedAt": "2026-08-17T01:00:00Z"}],
+ "comments": []}

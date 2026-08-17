@@ -1,0 +1,7 @@
+{"_expect": "pass",
+ "_case": "extra non-agent labels (ui, stage:S2) must not confuse the lane check",
+ "author": {"login": "kiatng"},
+ "labels": [{"name": "agent:claude-opus-5"}, {"name": "ui"}, {"name": "stage:S2"}],
+ "reviews": [{"author": {"login": "faith-tohmm"}, "state": "APPROVED",
+              "body": "**From:** amp/kimi-k3\naccept", "submittedAt": "2026-08-17T01:00:00Z"}],
+ "comments": []}

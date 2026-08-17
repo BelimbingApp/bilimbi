@@ -1,0 +1,7 @@
+{"_expect": "fail",
+ "_case": "approving review was dismissed (stands in for deleted review — the API no longer shows it as APPROVED)",
+ "author": {"login": "kiatng"},
+ "labels": [{"name": "agent:claude-opus-5"}],
+ "reviews": [{"author": {"login": "faith-tohmm"}, "state": "DISMISSED",
+              "body": "**From:** amp/kimi-k3\nverdict: accept", "submittedAt": "2026-08-17T01:00:00Z"}],
+ "comments": []}

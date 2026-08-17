@@ -1,0 +1,7 @@
+{"_expect": "fail",
+ "_case": "cross-account approval but marker matches the PR's own lane (agent approving its own work)",
+ "author": {"login": "kiatng"},
+ "labels": [{"name": "agent:claude-opus-5"}],
+ "reviews": [{"author": {"login": "faith-tohmm"}, "state": "APPROVED",
+              "body": "**From:** claude/opus-5\nverdict: accept", "submittedAt": "2026-08-17T01:00:00Z"}],
+ "comments": []}
