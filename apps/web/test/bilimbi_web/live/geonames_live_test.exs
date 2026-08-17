@@ -65,7 +65,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
              "#countries-search[placeholder='Search by country name or ISO code...']"
            )
 
-    assert has_element?(countries, "#countries-sort-population[title='Sort by Population']")
+    assert has_element?(countries, "#countries-sort-population")
     assert has_element?(countries, "#countries-pagination-page-size option[value='25'][selected]")
     assert has_element?(countries, "#countries-pin[data-nav-pin='nav-admin-geonames-country']")
     assert has_element?(countries, "#countries-update[phx-click='update-countries']", "Update")
@@ -85,6 +85,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     {:ok, admin1, _html} = conn |> log_in_as() |> live(~p"/geonames/admin1")
 
+    assert has_element?(admin1, "#admin1-table")
     assert has_element?(admin1, "#admin1-country-filter")
     assert has_element?(admin1, "label[for='admin1-country-filter'].sr-only", "Country")
     assert has_element?(admin1, "#admin1-2", "California")
@@ -127,7 +128,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
       ~p"/geonames/countries?#{%{search: "missing", page: 1, perPage: 25, sortBy: "country", sortDir: "asc"}}"
     )
 
-    assert has_element?(countries, "#countries-empty")
+    assert has_element?(countries, "#countries-table-empty", "No countries found.")
 
     {:ok, admin1, _html} = conn |> log_in_as() |> live(~p"/geonames/admin1")
 
@@ -137,7 +138,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
       "filters" => %{"search" => "missing", "countryIso" => ""}
     })
 
-    assert has_element?(admin1, "#admin1-empty")
+    assert has_element?(admin1, "#admin1-table-empty", "No Admin1 divisions found.")
 
     {:ok, postcodes, _html} = conn |> log_in_as() |> live(~p"/geonames/postcodes")
 
@@ -145,13 +146,16 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     |> element("#postcodes-filters")
     |> render_change(%{"filters" => %{"search" => "missing"}})
 
-    assert has_element?(postcodes, "#postcodes-empty")
+    assert has_element?(postcodes, "#postcodes-table-empty", "No postcodes found.")
   end
 
   test "uses compact pagination controls for country page size and sorting", %{conn: conn} do
     grant_capabilities!(["admin.geonames.list"])
 
     {:ok, countries, _html} = conn |> log_in_as() |> live(~p"/geonames/countries")
+
+    assert has_element?(countries, "th[aria-sort='ascending'] #countries-sort-country")
+    assert has_element?(countries, "th[aria-sort='none'] #countries-sort-population")
 
     countries
     |> element("#countries-pagination-page-size-form")
@@ -172,5 +176,43 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     )
 
     assert has_element?(countries, "th[aria-sort='descending'] #countries-sort-population")
+    assert has_element?(countries, "th[aria-sort='none'] #countries-sort-country")
+  end
+
+  test "sorts admin1 divisions and postcodes tables with aria-sort", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list"])
+
+    {:ok, admin1, _html} = conn |> log_in_as() |> live(~p"/geonames/admin1")
+
+    assert has_element?(admin1, "th[aria-sort='ascending'] #admin1-sort-country")
+    assert has_element?(admin1, "th[aria-sort='none'] #admin1-sort-name")
+
+    admin1
+    |> element("#admin1-sort-name")
+    |> render_click()
+
+    assert_patch(
+      admin1,
+      ~p"/geonames/admin1?#{%{search: "", filterCountryIso: "", page: 1, perPage: 25, sortBy: "name", sortDir: "asc"}}"
+    )
+
+    assert has_element?(admin1, "th[aria-sort='ascending'] #admin1-sort-name")
+    assert has_element?(admin1, "th[aria-sort='none'] #admin1-sort-country")
+
+    {:ok, postcodes, _html} = conn |> log_in_as() |> live(~p"/geonames/postcodes")
+
+    assert has_element?(postcodes, "th[aria-sort='ascending'] #postcodes-summary-sort-country")
+    assert has_element?(postcodes, "th[aria-sort='ascending'] #postcodes-sort-country")
+
+    postcodes
+    |> element("#postcodes-summary-sort-iso")
+    |> render_click()
+
+    assert_patch(
+      postcodes,
+      ~p"/geonames/postcodes?#{%{search: "", page: 1, perPage: 25, sortBy: "country_name", sortDir: "asc", summarySortBy: "country_iso", summarySortDir: "asc"}}"
+    )
+
+    assert has_element?(postcodes, "th[aria-sort='ascending'] #postcodes-summary-sort-iso")
   end
 end

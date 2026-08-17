@@ -535,6 +535,10 @@ defmodule Bilimbi.Base.UI.Components do
   attr :sort_by, :any, default: nil, doc: "active sort key; compared to each column's `sort`"
   attr :sort_dir, :any, default: nil, doc: "`\"asc\"`/`\"desc\"` or `:asc`/`:desc`"
 
+  attr :sort_event, :string,
+    default: "sort",
+    doc: "the event name pushed when a column sort button is clicked"
+
   attr :framed, :boolean,
     default: true,
     doc: "when false, omit the outer card chrome so the table can sit in an existing panel"
@@ -570,6 +574,7 @@ defmodule Bilimbi.Base.UI.Components do
                 col={col}
                 sort_by={@sort_by}
                 sort_dir={@sort_dir}
+                sort_event={@sort_event}
               />
               <span :if={!col[:sort]}>{col[:label]}</span>
             </th>
@@ -618,13 +623,14 @@ defmodule Bilimbi.Base.UI.Components do
   attr :col, :map, required: true
   attr :sort_by, :any, required: true
   attr :sort_dir, :any, required: true
+  attr :sort_event, :string, default: "sort"
 
   defp table_sort_heading(assigns) do
     ~H"""
     <button
       id={@col[:sort_id]}
       type="button"
-      phx-click="sort"
+      phx-click={@sort_event}
       phx-value-sort={@col[:sort]}
       class="inline-flex items-center gap-1 rounded text-left transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25"
     >
