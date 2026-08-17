@@ -26,7 +26,7 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
     # Computed here rather than through a local `allowed?/2`: three copies of
     # that helper already exist (`user_auth.ex`, `employee/web/capabilities.ex`,
     # `ui/nav.ex`) and a fourth would be one more place for the capability rule
-    # to drift. Tracked on #222.
+    # to drift. Tracked on #223.
     capabilities = Map.get(socket.assigns.current_scope, :capabilities) || []
 
     {:ok,
