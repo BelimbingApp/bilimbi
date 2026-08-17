@@ -116,12 +116,26 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
     |> Map.put(:action, :validate)
   end
 
+  # Membership rather than a positivity check: Belimbing validates
+  # `Rule::exists(Company::class, 'id')->where('tenant_id', $tenantId)`, which
+  # is membership in the tenant's companies -- the same list the picker was
+  # built from. It also rejects another tenant's id and a plausible id that
+  # does not exist, which `greater_than: 0` would pass to the domain call.
+  #
+  # The wording differs from the domain error on purpose. "No longer available"
+  # describes a company that was offered and then left scope; a company that
+  # was never offered has not become unavailable, and saying so was the
+  # misleading message this validation was added to remove.
+  #
+  # This does not replace the check in `create_role/3`: options are read at
+  # mount, so a company can leave scope before submit, and that window is the
+  # domain's to close.
   defp form_changeset(params, valid_company_ids) do
     {%{}, @field_types}
     |> cast(params, Map.keys(@field_types))
     |> validate_required([:name, :code, :company_id])
     |> validate_inclusion(:company_id, valid_company_ids,
-      message: "is no longer available; choose another company"
+      message: "is not a company you can create roles for"
     )
     |> validate_length(:name, max: 255)
     |> validate_length(:code, max: 255)

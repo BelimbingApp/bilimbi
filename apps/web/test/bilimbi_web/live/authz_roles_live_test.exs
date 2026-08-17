@@ -375,26 +375,59 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       refute created.is_system
     end
 
-    test "refuses a company outside the tenant even when submitted directly", %{
+    test "refuses a company the picker never offered, however it was submitted", %{
       conn: conn,
       ours: ours,
       theirs: theirs
     } do
       {:ok, view, _html} = open_create(conn)
 
-      # Sent as a raw event, not through `form/3`: LiveViewTest refuses to
-      # submit a select value the page never offered, which is exactly the
-      # client-side assumption this test exists to go around. The server must
-      # refuse on the domain boundary, land the error on the field, and not
-      # crash.
-      html =
-        render_submit(view, :save, %{
-          "role" => %{"company_id" => "74", "name" => "Trespass", "code" => "trespass"}
-        })
+      # Sent as raw events, not through `form/3`: LiveViewTest refuses to submit
+      # a select value the page never offered, which is the client-side
+      # assumption these payloads exist to go around. 74 belongs to another
+      # tenant, 0 and 999 are tampering. All must land on the field.
+      for tampered <- ["74", "0", "999"] do
+        html =
+          render_submit(view, :save, %{
+            "role" => %{"company_id" => tampered, "name" => "Trespass", "code" => "trespass"}
+          })
 
-      assert html =~ "no longer available"
+        assert html =~ "is not a company you can create roles for",
+               "company_id=#{tampered} was not rejected on the form"
+      end
+
       assert ours |> Authz.list_roles() |> Enum.all?(&(&1.code != "trespass"))
       assert theirs |> Authz.list_roles() |> Enum.all?(&(&1.code != "trespass"))
+    end
+
+    test "fails closed when the chosen company leaves scope after the page loads", %{
+      conn: conn,
+      ours: ours
+    } do
+      CompanyFixtures.insert_company!(%{
+        id: 75,
+        tenant_id: 41,
+        name: "Anvil Works",
+        code: "anvil"
+      })
+
+      {:ok, view, _html} = open_create(conn)
+
+      # The options were read at mount. Form-level inclusion cannot see this,
+      # which is precisely why the domain check in create_role/3 stays: the
+      # window between rendering a picker and acting on it belongs to the
+      # domain, not the form.
+      Bilimbi.Base.Repo.query!("UPDATE companies SET deleted_at = NOW() WHERE id = 75")
+
+      html =
+        view
+        |> form("#role-form", %{
+          "role" => %{"company_id" => "75", "name" => "Foreman", "code" => "foreman"}
+        })
+        |> render_submit()
+
+      assert html =~ "no longer available"
+      assert ours |> Authz.list_roles() |> Enum.all?(&(&1.code != "foreman"))
     end
   end
 end
