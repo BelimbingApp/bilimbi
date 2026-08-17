@@ -5,6 +5,7 @@ defmodule Bilimbi.Core.User.Contributions do
 
   @read_capabilities ["admin.user.list", "admin.user.view"]
   @write_capabilities ["admin.user.create", "admin.user.update", "admin.user.delete"]
+  @unaffiliated_capabilities ["admin.user.unaffiliated.manage"]
 
   @settings %{
     "ai.last_used_model_hints" => %{
@@ -61,7 +62,7 @@ defmodule Bilimbi.Core.User.Contributions do
       ],
       settings: %{definitions: @settings, runtime_claims: []},
       authz: %{
-        capabilities: @read_capabilities ++ @write_capabilities,
+        capabilities: @read_capabilities ++ @write_capabilities ++ @unaffiliated_capabilities,
         roles: %{
           "user_viewer" => %{
             name: "User Viewer",

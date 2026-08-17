@@ -34,7 +34,11 @@ defmodule Bilimbi.Core.User do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.Actor, as: AuthzActor
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Session
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy.Scope
@@ -47,7 +51,12 @@ defmodule Bilimbi.Core.User do
   alias Bilimbi.Core.User.Summary
   alias Ecto.Changeset
 
-  @type lookup_error :: :company_not_found | :user_not_found
+  @type lookup_error ::
+          :company_not_found
+          | :user_not_found
+          | :employee_not_found
+          | :not_platform_operator
+          | :unauthorized
   @type credential_error :: :invalid_credentials | :credential_upgrade_failed
 
   @preference_keys [
@@ -401,6 +410,370 @@ defmodule Bilimbi.Core.User do
   end
 
   @doc """
+  Lists unaffiliated users (both `company_id` and `employee_id` are nil).
+
+  Accessible only to platform operators with the `admin.user.unaffiliated.manage`
+  capability. Unaffiliated users belong to no tenant and are invisible to
+  ordinary tenant-scoped queries.
+  """
+  @spec list_unaffiliated_users(AuthzActor.t(), Scope.t()) ::
+          {:ok, [Summary.t()]} | {:error, :not_platform_operator | :unauthorized}
+  def list_unaffiliated_users(%AuthzActor{} = actor, %Scope{} = scope) do
+    with :ok <- verify_platform_operator(scope),
+         :ok <- authorize_unaffiliated(actor, scope) do
+      users =
+        from(user in Schema,
+          where: is_nil(user.company_id) and is_nil(user.employee_id),
+          order_by: user.id
+        )
+        |> Repo.all()
+        |> Enum.map(&Summary.from_schema/1)
+
+      {:ok, users}
+    end
+  end
+
+  @doc """
+  Reads one unaffiliated user.
+
+  Fails closed as `{:error, :user_not_found}` if the user is missing, not
+  unaffiliated, or if the caller is not an authorized platform operator.
+  """
+  @spec get_unaffiliated_user(AuthzActor.t(), Scope.t(), pos_integer()) ::
+          {:ok, Summary.t()} | {:error, :user_not_found}
+  def get_unaffiliated_user(%AuthzActor{} = actor, %Scope{} = scope, user_id)
+      when is_integer(user_id) and user_id > 0 do
+    with :ok <- verify_platform_operator(scope),
+         :ok <- authorize_unaffiliated(actor, scope, user_id),
+         %Schema{} = user <-
+           Repo.one(
+             from(u in Schema,
+               where: u.id == ^user_id and is_nil(u.company_id) and is_nil(u.employee_id)
+             )
+           ) do
+      {:ok, Summary.from_schema(user)}
+    else
+      _error -> {:error, :user_not_found}
+    end
+  end
+
+  def get_unaffiliated_user(%AuthzActor{}, %Scope{}, _user_id), do: {:error, :user_not_found}
+
+  @doc """
+  Creates an unaffiliated user account with no company or employee affiliation.
+
+  Hashes the plaintext `:password` with Argon2id. Accessible only to platform
+  operators. Records an audit mutation atomically.
+  """
+  @spec create_unaffiliated_user(AuthzActor.t(), Scope.t(), map()) ::
+          {:ok, Summary.t()} | {:error, :not_platform_operator | :unauthorized | Changeset.t()}
+  def create_unaffiliated_user(%AuthzActor{} = actor, %Scope{} = scope, attributes)
+      when is_map(attributes) do
+    with :ok <- verify_platform_operator(scope),
+         :ok <- authorize_unaffiliated(actor, scope) do
+      changeset =
+        nil
+        |> Schema.creation_changeset(attributes)
+        |> Changeset.put_change(:employee_id, nil)
+
+      Repo.transaction(fn ->
+        with {:ok, %Schema{} = user} <- Repo.insert(changeset),
+             {:ok, _mutation} <-
+               record_audit_mutation(
+                 scope,
+                 actor,
+                 user.id,
+                 "created_unaffiliated",
+                 nil,
+                 %{},
+                 %{"name" => user.name, "email" => user.email}
+               ) do
+          Summary.from_schema(user)
+        else
+          {:error, %Changeset{} = err_changeset} -> Repo.rollback(err_changeset)
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+    end
+  end
+
+  @doc """
+  Assigns an unaffiliated user to a live company in the target tenant scope.
+
+  If an optional `employee_id` is supplied, validates and locks that employee's
+  affiliation to the target company. Requires platform operator authority.
+  Terminates existing sessions for this user and records an atomic audit mutation.
+  """
+  @spec assign_unaffiliated_user(
+          AuthzActor.t(),
+          Scope.t(),
+          pos_integer(),
+          pos_integer(),
+          keyword()
+        ) ::
+          {:ok, Summary.t()}
+          | {:error, lookup_error() | :employee_not_found | :unauthorized | Changeset.t()}
+  def assign_unaffiliated_user(
+        %AuthzActor{} = actor,
+        %Scope{} = scope,
+        user_id,
+        target_company_id,
+        opts \\ []
+      )
+      when is_integer(user_id) and user_id > 0 and is_integer(target_company_id) and
+             target_company_id > 0 and is_list(opts) do
+    employee_id = Keyword.get(opts, :employee_id)
+    current_session_id = Keyword.get(opts, :current_session_id, "revoke-unaffiliated-assign")
+
+    with :ok <- verify_platform_operator(scope),
+         :ok <- authorize_unaffiliated(actor, scope, user_id) do
+      Repo.transaction(fn ->
+        with {:ok, _company_proof} <- lock_target_company(scope, target_company_id),
+             {:ok, _emp_proof} <- maybe_lock_employee(scope, target_company_id, employee_id),
+             {:ok, user} <- lock_unaffiliated_user(user_id),
+             {:ok, updated_user} <-
+               user
+               |> Changeset.change(company_id: target_company_id, employee_id: employee_id)
+               |> Repo.update(),
+             {:ok, _terminated_count} <-
+               Session.terminate_user_sessions(user.id, current_session_id),
+             {:ok, _mutation} <-
+               record_audit_mutation(
+                 scope,
+                 actor,
+                 user.id,
+                 "assigned_company",
+                 target_company_id,
+                 %{"company_id" => nil, "employee_id" => nil},
+                 %{"company_id" => target_company_id, "employee_id" => employee_id}
+               ) do
+          Summary.from_schema(updated_user)
+        else
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+    end
+  end
+
+  @doc """
+  Reassigns a user from one live company to another within the proven tenant scope.
+
+  Locks both companies in ascending ID order before taking the User row lock.
+  If an `employee_id` is passed, validates and locks it against the target company;
+  otherwise clears the employee link so no cross-company employee association remains.
+  Terminates existing sessions and records an atomic audit mutation.
+  """
+  @spec reassign_user_company(
+          AuthzActor.t(),
+          Scope.t(),
+          pos_integer(),
+          pos_integer(),
+          pos_integer(),
+          keyword()
+        ) ::
+          {:ok, Summary.t()}
+          | {:error, lookup_error() | :employee_not_found | :unauthorized | Changeset.t()}
+  def reassign_user_company(
+        %AuthzActor{} = actor,
+        %Scope{} = scope,
+        current_company_id,
+        user_id,
+        target_company_id,
+        opts \\ []
+      )
+      when is_integer(current_company_id) and current_company_id > 0 and
+             is_integer(user_id) and user_id > 0 and
+             is_integer(target_company_id) and target_company_id > 0 and
+             is_list(opts) do
+    employee_id = Keyword.get(opts, :employee_id)
+    current_session_id = Keyword.get(opts, :current_session_id, "revoke-reassigned-user")
+
+    with :ok <-
+           authorize_company_user(
+             actor,
+             scope,
+             current_company_id,
+             user_id,
+             "admin.user.update"
+           ) do
+      Repo.transaction(fn ->
+        with :ok <- lock_companies_ascending(scope, [current_company_id, target_company_id]),
+             {:ok, _emp_proof} <- maybe_lock_employee(scope, target_company_id, employee_id),
+             {:ok, user} <- lock_company_user(current_company_id, user_id),
+             new_employee_id =
+               if(current_company_id == target_company_id,
+                 do: employee_id || user.employee_id,
+                 else: employee_id
+               ),
+             {:ok, updated_user} <-
+               user
+               |> Changeset.change(company_id: target_company_id, employee_id: new_employee_id)
+               |> Repo.update(),
+             {:ok, _terminated_count} <-
+               Session.terminate_user_sessions(user.id, current_session_id),
+             {:ok, _mutation} <-
+               record_audit_mutation(
+                 scope,
+                 actor,
+                 user.id,
+                 "reassigned_company",
+                 target_company_id,
+                 %{
+                   "company_id" => current_company_id,
+                   "employee_id" => user.employee_id
+                 },
+                 %{
+                   "company_id" => target_company_id,
+                   "employee_id" => new_employee_id
+                 }
+               ) do
+          Summary.from_schema(updated_user)
+        else
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+    end
+  end
+
+  @doc """
+  Clears a user's company and employee affiliation, returning them to unaffiliated status.
+
+  Locks the current company and user row, clears `company_id` and `employee_id`,
+  terminates existing sessions, and records an atomic audit mutation.
+  """
+  @spec clear_user_company(
+          AuthzActor.t(),
+          Scope.t(),
+          pos_integer(),
+          pos_integer(),
+          keyword()
+        ) ::
+          {:ok, Summary.t()}
+          | {:error, lookup_error() | :unauthorized | Changeset.t()}
+  def clear_user_company(
+        %AuthzActor{} = actor,
+        %Scope{} = scope,
+        current_company_id,
+        user_id,
+        opts \\ []
+      )
+      when is_integer(current_company_id) and current_company_id > 0 and
+             is_integer(user_id) and user_id > 0 and
+             is_list(opts) do
+    current_session_id = Keyword.get(opts, :current_session_id, "revoke-cleared-company")
+
+    with :ok <-
+           authorize_company_user(
+             actor,
+             scope,
+             current_company_id,
+             user_id,
+             "admin.user.update"
+           ) do
+      Repo.transaction(fn ->
+        with {:ok, _proof} <- lock_target_company(scope, current_company_id),
+             {:ok, user} <- lock_company_user(current_company_id, user_id),
+             {:ok, updated_user} <-
+               user
+               |> Changeset.change(company_id: nil, employee_id: nil)
+               |> Repo.update(),
+             {:ok, _terminated_count} <-
+               Session.terminate_user_sessions(user.id, current_session_id),
+             {:ok, _mutation} <-
+               record_audit_mutation(
+                 scope,
+                 actor,
+                 user.id,
+                 "cleared_company",
+                 current_company_id,
+                 %{
+                   "company_id" => current_company_id,
+                   "employee_id" => user.employee_id
+                 },
+                 %{
+                   "company_id" => nil,
+                   "employee_id" => nil
+                 }
+               ) do
+          Summary.from_schema(updated_user)
+        else
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+    end
+  end
+
+  @doc """
+  Replaces a user's password in a trusted administrative workflow without requiring
+  the user's existing password.
+
+  Accepts plaintext `:password` only, hashes with Argon2id, rotates `remember_token`,
+  terminates active sessions, and writes an atomic audit record without leaking
+  credentials.
+  """
+  @spec admin_change_password(
+          AuthzActor.t(),
+          Scope.t(),
+          pos_integer() | nil,
+          pos_integer(),
+          String.t(),
+          keyword()
+        ) ::
+          {:ok, Summary.t()}
+          | {:error, lookup_error() | :unauthorized | :not_platform_operator | Changeset.t()}
+  def admin_change_password(
+        %AuthzActor{} = actor,
+        %Scope{} = scope,
+        company_id,
+        user_id,
+        new_password,
+        opts \\ []
+      )
+      when is_binary(new_password) and is_integer(user_id) and user_id > 0 and is_list(opts) do
+    current_session_id = Keyword.get(opts, :current_session_id, "revoke-admin-password-reset")
+
+    with :ok <- authorize_password_change(actor, scope, company_id, user_id) do
+      Repo.transaction(fn ->
+        with :ok <- maybe_lock_company(scope, company_id),
+             {:ok, user} <- lock_user_for_password_change(company_id, user_id),
+             changeset = Schema.password_changeset(user, %{password: new_password}),
+             {:ok, updated_user} <- apply_password_reset(user, changeset),
+             {:ok, _count} <-
+               Session.terminate_user_sessions(user.id, current_session_id),
+             {:ok, _mutation} <-
+               record_audit_mutation(
+                 scope,
+                 actor,
+                 user.id,
+                 "password_reset",
+                 company_id,
+                 %{},
+                 %{"password_changed" => true}
+               ) do
+          Summary.from_schema(updated_user)
+        else
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+    end
+  end
+
+  defp record_audit_mutation(scope, actor, user_id, event, company_id, old_values, new_values) do
+    Audit.record_mutation(scope, %{
+      event: event,
+      source: "system",
+      occurred_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second),
+      auditable_type: notifiable_identity(),
+      auditable_id: to_string(user_id),
+      actor_type: to_string(actor.type),
+      actor_id: actor.id,
+      company_id: company_id,
+      old_values: old_values,
+      new_values: new_values
+    })
+  end
+
+  @doc """
   The durable polymorphic identity Laravel persists for a user.
 
   Stored in `notifications.notifiable_type` and, once Authz lands,
@@ -573,6 +946,132 @@ defmodule Bilimbi.Core.User do
       {:error, changeset} -> {:error, changeset}
     end
   end
+
+  defp verify_platform_operator(scope) do
+    if Scope.platform_operator?(scope) do
+      :ok
+    else
+      {:error, :not_platform_operator}
+    end
+  end
+
+  defp authorize_unaffiliated(actor, scope, user_id \\ nil) do
+    if Scope.tenant_id(actor.scope) == Scope.tenant_id(scope) do
+      resource_id = if user_id, do: to_string(user_id), else: nil
+      resource = Authz.resource("user", resource_id, scope: scope, company_id: nil)
+
+      case Authz.can(actor, "admin.user.unaffiliated.manage", resource) do
+        %{allowed: true} -> :ok
+        _denied -> {:error, :unauthorized}
+      end
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  defp authorize_company_user(actor, scope, company_id, user_id, capability) do
+    if Scope.tenant_id(actor.scope) == Scope.tenant_id(scope) do
+      resource = Authz.resource("user", to_string(user_id), scope: scope, company_id: company_id)
+
+      case Authz.can(actor, capability, resource) do
+        %{allowed: true} -> :ok
+        _denied -> {:error, :unauthorized}
+      end
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  defp authorize_password_change(actor, scope, nil, user_id) do
+    with :ok <- verify_platform_operator(scope) do
+      authorize_unaffiliated(actor, scope, user_id)
+    end
+  end
+
+  defp authorize_password_change(actor, scope, company_id, user_id) do
+    authorize_company_user(actor, scope, company_id, user_id, "admin.user.update")
+  end
+
+  defp lock_target_company(scope, company_id) do
+    case Company.lock_live_company(scope, company_id) do
+      {:ok, proof} -> {:ok, proof}
+      {:error, _reason} -> {:error, :company_not_found}
+    end
+  end
+
+  defp maybe_lock_company(_scope, nil), do: :ok
+
+  defp maybe_lock_company(scope, company_id) do
+    case lock_target_company(scope, company_id) do
+      {:ok, _proof} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp lock_companies_ascending(scope, company_ids) do
+    company_ids
+    |> Enum.uniq()
+    |> Enum.sort()
+    |> Enum.reduce_while(:ok, fn cid, :ok ->
+      case lock_target_company(scope, cid) do
+        {:ok, _proof} -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp maybe_lock_employee(_scope, _company_id, nil), do: {:ok, nil}
+
+  defp maybe_lock_employee(scope, company_id, employee_id)
+       when is_integer(employee_id) and employee_id > 0 do
+    case Employee.lock_affiliation(scope, company_id, employee_id) do
+      {:ok, proof} -> {:ok, proof}
+      {:error, _reason} -> {:error, :employee_not_found}
+    end
+  end
+
+  defp maybe_lock_employee(_scope, _company_id, _invalid), do: {:error, :employee_not_found}
+
+  defp lock_unaffiliated_user(user_id) do
+    user =
+      from(u in Schema,
+        where: u.id == ^user_id and is_nil(u.company_id) and is_nil(u.employee_id),
+        lock: "FOR UPDATE"
+      )
+      |> Repo.one()
+
+    if user, do: {:ok, user}, else: {:error, :user_not_found}
+  end
+
+  defp lock_company_user(company_id, user_id) do
+    user =
+      from(u in Schema,
+        where: u.id == ^user_id and u.company_id == ^company_id,
+        lock: "FOR UPDATE"
+      )
+      |> Repo.one()
+
+    if user, do: {:ok, user}, else: {:error, :user_not_found}
+  end
+
+  defp lock_user_for_password_change(nil, user_id) do
+    lock_unaffiliated_user(user_id)
+  end
+
+  defp lock_user_for_password_change(company_id, user_id) do
+    lock_company_user(company_id, user_id)
+  end
+
+  defp apply_password_reset(user, %Changeset{valid?: true} = changeset) do
+    password_hash = Changeset.get_change(changeset, :password_hash)
+    remember_token = random_remember_token()
+
+    user
+    |> Schema.password_reset_changeset(password_hash, remember_token)
+    |> Repo.update()
+  end
+
+  defp apply_password_reset(_user, %Changeset{} = changeset), do: {:error, changeset}
 
   defp normalize_company({:ok, company}), do: {:ok, company}
   defp normalize_company({:error, :not_found}), do: {:error, :company_not_found}

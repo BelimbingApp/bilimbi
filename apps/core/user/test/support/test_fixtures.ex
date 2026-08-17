@@ -29,6 +29,11 @@ defmodule Bilimbi.Core.User.TestFixtures do
       "OTk4dW1zRzBTUFkyQlE5ZA$5feI+G5D3AYm7qIywmS4kZKR4T8gyfzWTIG5JWALvtk"
   end
 
+  alias Bilimbi.Base.Authz.ContributionValidator
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
+  alias Bilimbi.Base.Tenancy.Identity
+  alias Bilimbi.Base.Tenancy.Scope
+
   def create_user_tables! do
     apply(EmployeeFixtures, :create_employee_tables!, [])
 
@@ -67,6 +72,135 @@ defmodule Bilimbi.Core.User.TestFixtures do
       ) ON COMMIT PRESERVE ROWS
       """,
       []
+    )
+  end
+
+  def create_sessions_table! do
+    SQL.query!(
+      Repo,
+      """
+      CREATE TEMPORARY TABLE sessions (
+        id varchar(255) PRIMARY KEY,
+        user_id bigint,
+        ip_address varchar(45),
+        user_agent text,
+        payload text NOT NULL,
+        last_activity integer NOT NULL
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+
+    SQL.query!(Repo, "CREATE INDEX sessions_user_id_index ON sessions (user_id)", [])
+
+    SQL.query!(
+      Repo,
+      "CREATE INDEX sessions_last_activity_index ON sessions (last_activity)",
+      []
+    )
+  end
+
+  def install_user_authz_registry! do
+    authz =
+      ContributionValidator.validate_contributions!([
+        %{
+          descriptor: %{
+            id: "base/authz",
+            otp_app: :bilimbi_base_authz
+          },
+          payload: Bilimbi.Base.Authz.Contributions.contributions()[:authz]
+        },
+        %{
+          descriptor: %{
+            id: "core/company",
+            otp_app: :bilimbi_core_company
+          },
+          payload: %{
+            domains: %{"core" => "Core platform modules"},
+            capabilities: [
+              "admin.company.view",
+              "admin.company.list",
+              "admin.company.manage"
+            ],
+            roles: %{},
+            company_directory: Bilimbi.Core.Company.AuthzCompanyDirectory
+          }
+        },
+        %{
+          descriptor: %{
+            id: "core/user",
+            otp_app: :bilimbi_core_user
+          },
+          payload: Bilimbi.Core.User.Contributions.contributions()[:authz]
+        }
+      ])
+
+    ContributionRegistry.put_snapshot_for_test!(%{
+      graph_fingerprint: "user-test",
+      consumers: %{settings: [], authz: authz, menu: []}
+    })
+  end
+
+  def operator_scope(tenant_id \\ 1) do
+    Scope.for_tenant(%Identity{
+      id: tenant_id,
+      name: "Operator Tenant",
+      status: "active",
+      is_platform_operator: true
+    })
+  end
+
+  def tenant_scope(tenant_id \\ 2) do
+    Scope.for_tenant(%Identity{
+      id: tenant_id,
+      name: "Tenant #{tenant_id}",
+      status: "active",
+      is_platform_operator: false
+    })
+  end
+
+  def grant_role!(company_id, user_id, role_code, grant_all \\ false) do
+    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+    %{rows: [[role_id]]} =
+      SQL.query!(
+        Repo,
+        """
+        INSERT INTO base_authz_roles (company_id, name, code, is_system, grant_all, created_at, updated_at)
+        VALUES ($1, $2, $3, false, $4, $5, $6)
+        ON CONFLICT (company_id, code) DO UPDATE SET grant_all = EXCLUDED.grant_all
+        RETURNING id
+        """,
+        [company_id, role_code, role_code, grant_all, now, now]
+      )
+
+    SQL.query!(
+      Repo,
+      """
+      INSERT INTO base_authz_principal_roles (company_id, principal_type, principal_id, role_id, created_at, updated_at)
+      VALUES ($1, 'user', $2, $3, $4, $5)
+      ON CONFLICT (company_id, principal_type, principal_id, role_id) DO NOTHING
+      """,
+      [company_id, user_id, role_id, now, now]
+    )
+
+    role_id
+  end
+
+  def grant_capability!(company_id, user_id, capability_key, is_allowed \\ true) do
+    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+    SQL.query!(
+      Repo,
+      """
+      INSERT INTO base_authz_principal_capabilities (
+        company_id, principal_type, principal_id, capability_key, is_allowed, created_at, updated_at
+      )
+      VALUES ($1, 'user', $2, $3, $4, $5, $6)
+      ON CONFLICT (company_id, principal_type, principal_id, capability_key)
+      DO UPDATE SET is_allowed = EXCLUDED.is_allowed
+      """,
+      [company_id, user_id, capability_key, is_allowed, now, now]
     )
   end
 

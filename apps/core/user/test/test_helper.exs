@@ -1,6 +1,9 @@
 Code.require_file(Path.expand("../../../base/database/test/support/data_case.ex", __DIR__))
 Code.require_file(Path.expand("../../../base/settings/test/support/test_fixtures.ex", __DIR__))
 Code.require_file(Path.expand("../../../base/tenancy/test/support/test_fixtures.ex", __DIR__))
+Code.require_file(Path.expand("../../../base/audit/test/support/test_fixtures.ex", __DIR__))
+Code.require_file(Path.expand("../../../base/session/test/support/test_fixtures.ex", __DIR__))
+Code.require_file(Path.expand("../../../base/authz/test/support/test_fixtures.ex", __DIR__))
 Code.require_file(Path.expand("../../company/test/support/test_fixtures.ex", __DIR__))
 Code.require_file(Path.expand("../../employee/test/support/test_fixtures.ex", __DIR__))
 
