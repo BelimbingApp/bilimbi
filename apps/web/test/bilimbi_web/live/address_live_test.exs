@@ -65,7 +65,7 @@ defmodule BilimbiWeb.AddressLiveTest do
       })
 
     {:ok, branch} = Address.create_address(scope, %{label: "Branch"})
-    {:ok, _foreign} = Address.create_address(other_scope, %{label: "Other tenant"})
+    {:ok, foreign} = Address.create_address(other_scope, %{label: "Other tenant"})
     {:ok, :attached} = Address.attach_to_company(scope, hq.id, 73)
 
     grant_capabilities!(["admin.address.list", "admin.address.create", "admin.address.delete"])
@@ -74,7 +74,8 @@ defmodule BilimbiWeb.AddressLiveTest do
 
     assert has_element?(view, "#address-#{hq.id}", "Head Office")
     assert has_element?(view, "#address-#{branch.id}", "Branch")
-    refute has_element?(view, "#addresses-table", "Other tenant")
+    refute has_element?(view, "#address-#{foreign.id}")
+    assert has_element?(view, "th[aria-sort='ascending'] #addresses-sort-label")
     assert has_element?(view, "#address-create[href='/addresses/create']")
     assert has_element?(view, "#nav-admin-address[aria-current='page']")
 
@@ -96,6 +97,9 @@ defmodule BilimbiWeb.AddressLiveTest do
       view,
       ~p"/addresses?#{%{search: "Head", page: 1, sortBy: "verification_status", sortDir: "asc"}}"
     )
+
+    assert has_element?(view, "th[aria-sort='ascending'] #addresses-sort-status")
+    refute has_element?(view, "th[aria-sort='ascending'] #addresses-sort-label")
 
     view |> element("#address-delete-#{hq.id}") |> render_click()
     assert render(view) =~ "This address is linked. Unlink it before deleting it."
