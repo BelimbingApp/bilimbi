@@ -81,14 +81,13 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
               {@employee.status}
             </.badge>
 
-            <.link
+            <.button
               :if={allowed?(@current_scope, "admin.employee.update")}
               navigate={~p"/employees/#{@employee.id}/edit"}
               id="employee-edit"
-              class="rounded-md px-2.5 py-1.5 text-xs font-medium text-ink-muted ring-1 ring-line transition hover:bg-surface-sunken hover:text-ink"
             >
               Edit
-            </.link>
+            </.button>
           </:actions>
         </.header>
 

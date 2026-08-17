@@ -21,6 +21,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
          |> assign(:page_title, "Employees")
          |> assign(:active_nav, "admin.employee")
          |> assign(:company_id, company_id)
+         |> assign(:employees_count, length(employees))
          |> stream(:employees, employees)}
 
       {:error, :company_not_found} ->
@@ -41,14 +42,13 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
           <:subtitle>People employed by {@current_scope.user["company_name"]}</:subtitle>
 
           <:actions>
-            <.link
+            <.button
               :if={allowed?(@current_scope, "admin.employee-type.list")}
               navigate={~p"/employee-types"}
               id="employee-types"
-              class="rounded-md px-2.5 py-1.5 text-xs font-medium text-ink-muted ring-1 ring-line transition hover:bg-surface-sunken hover:text-ink"
             >
               Employee types
-            </.link>
+            </.button>
 
             <.button
               :if={allowed?(@current_scope, "admin.employee.create")}
@@ -62,8 +62,13 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
         </.header>
 
         <div class="mt-5">
-          <.table id="employees" rows={@streams.employees}>
-            <:col :let={{_id, employee}} label="Name">
+          <.table
+            id="employees"
+            rows={@streams.employees}
+            row_id={fn {id, _employee} -> id end}
+            row_item={fn {_id, employee} -> employee end}
+          >
+            <:col :let={employee} label="Name">
               <.link
                 navigate={~p"/employees/#{employee.id}"}
                 class="font-medium text-ink-strong hover:underline"
@@ -76,17 +81,21 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
               </span>
             </:col>
 
-            <:col :let={{_id, employee}} label="No.">
+            <:col :let={employee} label="No.">
               <code class="text-xs font-medium">{employee.employee_number}</code>
             </:col>
 
-            <:col :let={{_id, employee}} label="Type">{employee.employee_type}</:col>
+            <:col :let={employee} label="Type">{employee.employee_type}</:col>
 
-            <:col :let={{_id, employee}} label="Status">
+            <:col :let={employee} label="Status">
               <.badge kind={if employee.status == "active", do: :success, else: :neutral}>
                 {employee.status}
               </.badge>
             </:col>
+
+            <:empty :if={@employees_count == 0}>
+              No employees found.
+            </:empty>
           </.table>
         </div>
       </div>
