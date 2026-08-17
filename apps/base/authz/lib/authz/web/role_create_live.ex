@@ -102,12 +102,9 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
           Create Role
           <:subtitle>A custom role owned by your company</:subtitle>
           <:actions>
-            <.link
-              navigate={~p"/authz/roles"}
-              class="text-sm font-medium text-ink-muted hover:text-ink"
-            >
-              Back to Roles
-            </.link>
+            <.button id="role-back" navigate={~p"/authz/roles"}>
+              Back to roles
+            </.button>
           </:actions>
         </.header>
 
@@ -127,10 +124,10 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
           </section>
 
           <div class="flex items-center justify-end gap-3">
-            <.link navigate={~p"/authz/roles"} class="text-sm font-medium text-ink-muted hover:text-ink">
+            <.link id="role-cancel" navigate={~p"/authz/roles"} class="text-sm font-medium text-ink-muted hover:text-ink">
               Cancel
             </.link>
-            <.button id="role-save" variant="primary" phx-disable-with="Creating...">
+            <.button id="role-save" type="submit" variant="primary" phx-disable-with="Creating...">
               Create Role
             </.button>
           </div>

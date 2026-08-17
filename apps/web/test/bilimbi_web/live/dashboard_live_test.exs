@@ -39,7 +39,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
     assert has_element?(view, "#dashboard-users")
-    assert has_element?(view, "#dashboard-users td", "Ada Lovelace")
+    assert has_element?(view, "#dashboard-user-91 td", "Ada Lovelace")
   end
 
   test "renders the sidebar without gated destinations when capabilities are absent", %{

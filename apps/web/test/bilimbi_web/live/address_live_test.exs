@@ -120,6 +120,8 @@ defmodule BilimbiWeb.AddressLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/create")
 
     assert has_element?(view, "#address-form")
+    assert has_element?(view, "#address-back[href='/addresses']", "Back to addresses")
+    assert has_element?(view, "#address-cancel[href='/addresses']", "Cancel")
     assert has_element?(view, "#nav-admin-address[aria-current='page']")
     assert has_element?(view, "#address-country option[value='MY']", "Malaysia")
 

@@ -137,7 +137,12 @@ defmodule BilimbiWeb.DashboardLive do
               All users
             </.link>
           </div>
-          <.table id="dashboard-users" rows={Enum.take(@users, 5)}>
+          <.table
+            id="dashboard-users"
+            rows={Enum.take(@users, 5)}
+            row_id={&"dashboard-user-#{&1.id}"}
+            caption="People in this workspace"
+          >
             <:col :let={user} label="Name">
               <span class="font-medium">{user.name}</span>
             </:col>
@@ -147,13 +152,10 @@ defmodule BilimbiWeb.DashboardLive do
                 {if user.email_verified_at, do: "verified", else: "unverified"}
               </.badge>
             </:col>
+            <:empty :if={@users == []}>
+              No users are affiliated with a company in this tenant yet.
+            </:empty>
           </.table>
-          <p
-            :if={@users == []}
-            class="rounded-xl border border-dashed border-line px-4 py-6 text-center text-sm text-ink-subtle"
-          >
-            No users are affiliated with a company in this tenant yet.
-          </p>
         </section>
       </div>
     </Layouts.app>

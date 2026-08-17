@@ -26,17 +26,18 @@ defmodule BilimbiWeb.ForgotPasswordLive do
 
     if changeset.valid? do
       %{email: email} = Ecto.Changeset.apply_action!(changeset, :request_reset)
-
-      User.request_password_reset(email, fn user, token ->
-        case user |> UserEmail.password_reset(token) |> Mailer.deliver() do
-          {:ok, _metadata} -> :ok
-          {:error, reason} -> {:error, reason}
-        end
-      end)
+      User.request_password_reset(email, &deliver_reset/2)
 
       {:noreply, assign(socket, :confirmation, @confirmation)}
     else
       {:noreply, assign_form(socket, changeset)}
+    end
+  end
+
+  defp deliver_reset(user, token) do
+    case user |> UserEmail.password_reset(token) |> Mailer.deliver() do
+      {:ok, _metadata} -> :ok
+      {:error, reason} -> {:error, reason}
     end
   end
 

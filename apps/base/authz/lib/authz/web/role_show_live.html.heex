@@ -6,9 +6,9 @@
         <span class="font-mono text-xs">{@role.code}</span>
       </:subtitle>
       <:actions>
-        <.link navigate={~p"/authz/roles"} class="text-sm text-ink-muted hover:text-ink">
+        <.button id="role-back" navigate={~p"/authz/roles"}>
           Back to roles
-        </.link>
+        </.button>
       </:actions>
     </.header>
 
@@ -62,6 +62,7 @@
           id="role-principals"
           rows={@principal_roles}
           row_id={&"principal-role-#{&1.id}"}
+          caption="Principals"
         >
           <:col :let={assignment} label="Type">
             <.badge>{principal_label(assignment)}</.badge>
