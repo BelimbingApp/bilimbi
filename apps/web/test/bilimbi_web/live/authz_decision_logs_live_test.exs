@@ -142,6 +142,29 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     assert %{"sort_by" => "occurred_at", "sort_dir" => "desc"} = patched_params(view)
   end
 
+  test "sortable headers carry aria-sort, and the empty state is inside the table", %{
+    conn: conn,
+    scope: scope
+  } do
+    # The hand-rolled markup had no aria-sort at all, and rendered the empty
+    # message as a sibling <p> outside the <table> -- so a screen reader got no
+    # association between the message and the grid it describes.
+    record_decision(scope, "admin.user.list")
+
+    {:ok, view, _html} = open(conn)
+
+    assert has_element?(view, "th[aria-sort='descending']")
+    assert has_element?(view, "th[scope='col'][aria-sort='none']")
+    refute has_element?(view, "#decision-logs-empty")
+
+    # The unfiltered table is never empty here: opening the screen authorizes
+    # it, and that authorization writes a decision log of its own. The filtered
+    # case is the only reachable empty state, so it is the one worth asserting.
+    view |> form("#logs-filters", %{"search" => "zzz-no-such-capability"}) |> render_change()
+
+    assert has_element?(view, "#decision-logs-empty", "No decisions match these filters")
+  end
+
   test "a sort URL means what clicking that column means", %{conn: conn, scope: scope} do
     record_decision(scope, "admin.user.list")
     grant_capabilities!("admin.authz.decision-log.list")
