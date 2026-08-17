@@ -92,6 +92,31 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     end)
   end
 
+  @doc """
+  Returns deterministic module-local strict-compile commands for a container.
+
+  `mix compile --warnings-as-errors` at the umbrella root does **not** fail on a
+  path dependency's warnings: the flag applies to the current project, and path
+  deps compile as dependencies. A missing required `attr` therefore printed a
+  warning and exited 0, so `required: true` was documentation rather than a gate
+  (#176). Compiling each module in its own project context is what makes those
+  warnings fatal.
+  """
+  @spec container_compile_commands(String.t()) :: [String.t()]
+  def container_compile_commands(container_root) do
+    container_root = Path.expand(container_root)
+    validate_container_root!(container_root)
+
+    container_root
+    |> workspace_root!()
+    |> discover_workspace!()
+    |> Enum.filter(&(&1.container_path == container_root))
+    |> Enum.map(fn descriptor ->
+      relative_path = Path.relative_to(descriptor.path, container_root)
+      ~s(cmd --cd "#{relative_path}" mix compile --warnings-as-errors)
+    end)
+  end
+
   @doc "Resolves a module's declared dependencies to local Mix path dependencies."
   @spec module_dependencies(String.t()) :: [Mix.Project.dependency()]
   def module_dependencies(module_root) do

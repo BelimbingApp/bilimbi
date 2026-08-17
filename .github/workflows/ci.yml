@@ -52,6 +52,18 @@ jobs:
       - name: Compile without warnings
         run: mix compile --warnings-as-errors
 
+      # The step above does NOT gate path-dependency modules: --warnings-as-errors
+      # applies to the current project, and every module compiles as a dependency
+      # of the root. A missing required attr warned and exited 0 (#176). Compiling
+      # each module in its own project context is what makes those warnings fatal.
+      - name: Compile each module strictly
+        # Plain `cd`, not `mix cmd --cd`: the root project recurses into its
+        # children, so `--cd apps/base` resolves relative to each child and
+        # fails with "Could not cd to apps/base".
+        run: |
+          (cd apps/base && mix compile.strict)
+          (cd apps/core && mix compile.strict)
+
       - name: Run Credo
         run: >-
           mix credo --strict "apps/**/*.{ex,exs}"
