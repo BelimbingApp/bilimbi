@@ -5,7 +5,7 @@
       <:subtitle>Each tenant is an isolated customer of this instance</:subtitle>
       <:actions>
         <.button
-          :if={"admin.tenancy.tenant.create" in @current_scope.capabilities}
+          :if={allowed?(@current_scope, "admin.tenancy.tenant.create")}
           id="tenants-add"
           variant="primary"
           phx-click="show_create"
