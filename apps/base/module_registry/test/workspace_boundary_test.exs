@@ -30,10 +30,9 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
     assert discovered == on_disk
   end
 
-  # Descriptor shape, and the existence of declared migration and web paths, are
-  # enforced by discovery itself and covered by module_discovery_test.exs.
-  # discover_workspace!/1 raises before this loop runs, so asserting them here
-  # would be unreachable.
+  # Descriptor shape and declared path safety are enforced by discovery. The
+  # missing migration directory regression below proves that path existence
+  # fails closed before this loop can inspect installed modules.
   test "installed modules own their package, facade, tests, and documentation" do
     for module <- MixDiscovery.discover_workspace!(@workspace_root) do
       facade = Path.join("lib", Path.basename(module.path) <> ".ex")
@@ -43,6 +42,15 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
       assert File.dir?(Path.join(module.path, "test")), module.id
       assert File.dir?(Path.join(module.path, "docs")), module.id
       refute File.dir?(Path.join(module.path, "lib/bilimbi")), module.id
+    end
+  end
+
+  test "discovery rejects a safe missing migration directory" do
+    root = missing_migration_workspace!()
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    assert_raise ArgumentError, ~r/declared migration directory does not exist/, fn ->
+      MixDiscovery.discover_workspace!(root)
     end
   end
 
@@ -100,6 +108,46 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
     |> Enum.flat_map(&Path.wildcard(Path.join(&1, "*/bilimbi.module.exs")))
     |> Enum.map(&Path.dirname/1)
     |> Enum.sort()
+  end
+
+  defp missing_migration_workspace! do
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "bilimbi-workspace-boundary-#{System.unique_integer([:positive, :monotonic])}"
+      )
+
+    container = Path.join([root, "apps", "base"])
+    module = Path.join([container, "database"])
+
+    File.mkdir_p!(module)
+
+    File.write!(
+      Path.join(container, "bilimbi.container.exs"),
+      inspect([id: "base", kind: :container, layer: :base], pretty: true) <> "\n"
+    )
+
+    descriptor = [
+      id: "base/database",
+      kind: :module,
+      layer: :base,
+      required: true,
+      otp_app: :test_boundary_database,
+      namespace: Test.Boundary.Database,
+      dependencies: [],
+      migrations: "priv/repo/migrations",
+      migration_dispositions: %{20_260_817_000_001 => :compatible_baseline},
+      web: nil,
+      schema_contract: nil,
+      contribution_provider: nil
+    ]
+
+    File.write!(
+      Path.join(module, "bilimbi.module.exs"),
+      inspect(descriptor, pretty: true, limit: :infinity) <> "\n"
+    )
+
+    root
   end
 
   defp contributor_fixture?(nil), do: false
