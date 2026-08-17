@@ -15,42 +15,35 @@
       </:actions>
     </.header>
 
-    <div class="mt-5 overflow-x-auto rounded-xl border border-line bg-surface">
-      <table class="w-full text-left text-sm">
-        <thead class="border-b border-line bg-surface-sunken">
-          <tr>
-            <.sort_th column="id" label="ID" sort_by={@sort_by} sort_dir={@sort_dir} />
-            <.sort_th column="name" label="Name" sort_by={@sort_by} sort_dir={@sort_dir} />
-            <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-              Parent
-            </th>
-            <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-              Sub-tenants
-            </th>
-            <.sort_th column="status" label="Status" sort_by={@sort_by} sort_dir={@sort_dir} />
-          </tr>
-        </thead>
-        <tbody id="tenants" phx-update="stream" class="divide-y divide-line-subtle">
-          <tr :for={{id, tenant} <- @streams.tenants} id={id} class="hover:bg-surface-sunken">
-            <td class="px-4 py-2.5 tabular-nums text-ink-muted">{tenant.id}</td>
-            <td class="px-4 py-2.5 text-ink">
-              <span class="font-medium text-ink-strong">{tenant.name}</span>
-              <.badge :if={tenant.is_platform_operator} class="ml-2">Platform operator</.badge>
-            </td>
-            <td class="px-4 py-2.5 text-ink-muted">{tenant.parent_name || "—"}</td>
-            <td class="px-4 py-2.5 tabular-nums text-ink-muted">{tenant.children_count}</td>
-            <td class="px-4 py-2.5">
-              <.badge kind={status_kind(tenant.status)}>{status_label(tenant.status)}</.badge>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <p
-        :if={@tenants_count == 0}
-        class="px-4 py-8 text-center text-sm text-ink-muted"
+    <div class="mt-5">
+      <.table
+        id="tenants"
+        rows={@streams.tenants}
+        row_id={fn {id, _} -> id end}
+        row_item={fn {_, tenant} -> tenant end}
+        sort_by={@sort_by}
+        sort_dir={@sort_dir}
       >
-        No tenants found.
-      </p>
+        <:col :let={tenant} label="ID" sort="id" sort_id="tenants-sort-id">
+          <span class="tabular-nums text-ink-muted">{tenant.id}</span>
+        </:col>
+        <:col :let={tenant} label="Name" sort="name" sort_id="tenants-sort-name">
+          <span class="font-medium text-ink-strong">{tenant.name}</span>
+          <.badge :if={tenant.is_platform_operator} class="ml-2">Platform operator</.badge>
+        </:col>
+        <:col :let={tenant} label="Parent">
+          <span class="text-ink-muted">{tenant.parent_name || "—"}</span>
+        </:col>
+        <:col :let={tenant} label="Sub-tenants">
+          <span class="tabular-nums text-ink-muted">{tenant.children_count}</span>
+        </:col>
+        <:col :let={tenant} label="Status" sort="status" sort_id="tenants-sort-status">
+          <.badge kind={status_kind(tenant.status)}>{status_label(tenant.status)}</.badge>
+        </:col>
+        <:empty :if={@tenants_count == 0}>
+          No tenants found.
+        </:empty>
+      </.table>
     </div>
   </div>
 

@@ -27,7 +27,7 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
   end
 
   @impl true
-  def handle_event("sort", %{"column" => column}, socket) when column in @sortable do
+  def handle_event("sort", %{"sort" => column}, socket) when column in @sortable do
     {sort_by, sort_dir} = toggle_sort(socket.assigns.sort_by, socket.assigns.sort_dir, column)
 
     {:noreply,
@@ -163,31 +163,6 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
       Changeset.add_error(acc, field, message, opts)
     end)
     |> Map.put(:action, :insert)
-  end
-
-  attr :column, :string, required: true
-  attr :label, :string, required: true
-  attr :sort_by, :string, required: true
-  attr :sort_dir, :atom, required: true
-
-  defp sort_th(assigns) do
-    ~H"""
-    <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-      <button
-        type="button"
-        phx-click="sort"
-        phx-value-column={@column}
-        class="inline-flex items-center gap-1 hover:text-ink"
-      >
-        {@label}
-        <.icon
-          :if={@sort_by == @column}
-          name={if @sort_dir == :asc, do: "hero-chevron-up", else: "hero-chevron-down"}
-          class="size-3"
-        />
-      </button>
-    </th>
-    """
   end
 
   defp status_kind("active"), do: :success
