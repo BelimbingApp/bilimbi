@@ -172,4 +172,82 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
                conn |> log_in_as() |> live(~p"/authz/roles/not-an-id")
     end
   end
+
+  describe "create" do
+    defp open_create(conn) do
+      grant_capabilities!("admin.authz.role.create")
+      conn |> log_in_as() |> live(~p"/authz/roles/create")
+    end
+
+    test "requires authentication", %{conn: conn} do
+      assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/authz/roles/create")
+    end
+
+    test "redirects away without admin.authz.role.create", %{conn: conn} do
+      grant_capabilities!("admin.authz.role.list")
+
+      assert {:error, {:redirect, %{to: "/dashboard"}}} =
+               conn |> log_in_as() |> live(~p"/authz/roles/create")
+    end
+
+    test "the literal path wins over /authz/roles/:id", %{conn: conn} do
+      # Declared before the parameterised route. If that order is ever lost,
+      # RoleShowLive matches "create" as an id and redirects instead, so this
+      # asserts the form renders rather than merely that the request succeeds.
+      {:ok, view, _html} = open_create(conn)
+
+      assert has_element?(view, "#role-form")
+    end
+
+    test "creates a company-owned role and returns to the index", %{conn: conn, ours: ours} do
+      {:ok, view, _html} = open_create(conn)
+
+      assert {:error, {:live_redirect, %{to: "/authz/roles"}}} =
+               view
+               |> form("#role-form", %{
+                 "role" => %{
+                   "name" => "Billing Manager",
+                   "code" => "billing_manager",
+                   "description" => "Handles invoices"
+                 }
+               })
+               |> render_submit()
+
+      created = ours |> Authz.list_roles() |> Enum.find(&(&1.code == "billing_manager"))
+
+      assert created.name == "Billing Manager"
+      # create_role/3 forces both, so a system role can never be built here.
+      refute created.is_system
+      assert created.company_id == 73
+    end
+
+    test "rejects a code the database format constraint would refuse", %{conn: conn} do
+      {:ok, view, _html} = open_create(conn)
+
+      html =
+        view
+        |> form("#role-form", %{"role" => %{"name" => "Bad", "code" => "Billing Manager"}})
+        |> render_submit()
+
+      assert html =~ "lowercase letters, digits and underscores"
+      assert has_element?(view, "#role-form")
+    end
+
+    test "surfaces a duplicate code on the field the user can edit", %{conn: conn, ours: ours} do
+      {:ok, _} = Authz.create_role(ours, 73, %{name: "Auditor", code: "auditor"})
+
+      {:ok, view, _html} = open_create(conn)
+
+      # Uniqueness is the database's to enforce -- the form cannot know it
+      # without racing -- so the domain changeset error has to land back on
+      # :code rather than surfacing as a crash or a bare flash.
+      html =
+        view
+        |> form("#role-form", %{"role" => %{"name" => "Auditor Again", "code" => "auditor"}})
+        |> render_submit()
+
+      assert html =~ "has already been taken"
+      assert has_element?(view, "#role-form")
+    end
+  end
 end
