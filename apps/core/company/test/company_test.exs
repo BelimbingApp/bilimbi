@@ -286,6 +286,10 @@ defmodule Bilimbi.Core.CompanyTest do
         deleted_at: ~N[2026-08-11 12:00:00]
       })
 
+      # A lowercase initial. Raw binary comparison is codepoint order, so this
+      # sorts *below* "Zulu Holdings" unless the directory folds case.
+      insert_company!(%{id: 78, code: "emart", name: "eMart Retail"})
+
       insert_company!(%{id: 74, tenant_id: 42, code: "other", name: "Other Tenant Co"})
 
       {:ok, owner} = Tenancy.scope(41)
@@ -297,6 +301,7 @@ defmodule Bilimbi.Core.CompanyTest do
     test "names companies the way every other screen names them", %{owner: owner} do
       assert AuthzCompanyDirectory.companies_in_scope(owner) == [
                %{id: 75, name: "Alpha Trading"},
+               %{id: 78, name: "eMart Retail"},
                %{id: 77, name: "Mango Supplies Sdn. Bhd."},
                %{id: 73, name: "Zulu Holdings"}
              ]
