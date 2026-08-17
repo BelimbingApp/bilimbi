@@ -10,7 +10,7 @@ defmodule Bilimbi.Core.Employee.AdministrationIndex do
   alias Bilimbi.Core.Employee.Schema
 
   @default_page 1
-  @default_page_size 15
+  @default_page_size 25
   @max_page_size 100
   @allowed_option_keys [:page, :page_size, :search, :type_filter, :sort_by, :sort_dir]
 

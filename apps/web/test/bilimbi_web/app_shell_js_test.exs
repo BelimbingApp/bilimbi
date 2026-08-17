@@ -31,6 +31,12 @@ defmodule BilimbiWeb.AppShellJsTest do
     assert source =~ ~S[this.drag = this.el.querySelector("#app-sidebar-drag")]
   end
 
+  test "page-header pin controls use the same saved items as sidebar pins", %{source: source} do
+    assert source =~ ~S[this.root?.addEventListener("click", this.onNav)]
+    assert source =~ ~S[if (pin && this.root?.contains(pin))]
+    assert source =~ ~S{this.root.querySelectorAll("[data-nav-pin]")}
+  end
+
   test "Escape closes the drawer and the toggle stays outside the inert region", %{source: source} do
     assert source =~ ~S[if (event.key === "Escape")]
     assert source =~ "this.closeDrawer()"

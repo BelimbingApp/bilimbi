@@ -30,6 +30,7 @@ defmodule Bilimbi.Base.UI.Components do
   use Phoenix.Component
   use Gettext, backend: Bilimbi.Base.UI.Gettext
 
+  alias Bilimbi.Base.UI.IconRegistry
   alias Phoenix.LiveView.JS
 
   @doc """
@@ -169,12 +170,13 @@ defmodule Bilimbi.Base.UI.Components do
   attr :rest, :global, include: ~w(href navigate patch method download name value disabled type)
 
   attr :class, :any
-  attr :variant, :string, values: ~w(primary)
+  attr :variant, :string, values: ~w(primary brand)
   slot :inner_block, required: true
 
   def button(%{rest: rest} = assigns) do
     variants = %{
       "primary" => "bg-action text-action-ink hover:bg-action-hover",
+      "brand" => "bg-brand-hover text-brand-action-ink hover:bg-brand-strong",
       nil => "border border-line-strong bg-surface text-ink hover:bg-surface-sunken"
     }
 
@@ -266,6 +268,8 @@ defmodule Bilimbi.Base.UI.Components do
   attr :multiple, :boolean, default: false, doc: "the multiple flag for select inputs"
   attr :class, :any, default: nil, doc: "the input class to use over defaults"
   attr :error_class, :any, default: nil, doc: "the input error class to use over defaults"
+  attr :wrapper_class, :any, default: nil, doc: "the class for the control wrapper"
+  attr :label_class, :any, default: nil, doc: "the class for the control label"
 
   attr :rest, :global,
     include: ~w(accept autocomplete capture cols disabled form list max maxlength min minlength
@@ -301,8 +305,8 @@ defmodule Bilimbi.Base.UI.Components do
       end)
 
     ~H"""
-    <div class="mb-4">
-      <label for={@id} class="flex items-center gap-2.5 text-sm text-ink">
+    <div class={@wrapper_class || "mb-4"}>
+      <label for={@id} class={["flex items-center gap-2.5 text-sm text-ink", @label_class]}>
         <input
           type="hidden"
           name={@name}
@@ -330,8 +334,12 @@ defmodule Bilimbi.Base.UI.Components do
 
   def input(%{type: "select"} = assigns) do
     ~H"""
-    <div class="mb-4">
-      <label :if={@label} for={@id} class="mb-1.5 block text-sm font-medium text-ink">
+    <div class={@wrapper_class || "mb-4"}>
+      <label
+        :if={@label}
+        for={@id}
+        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
+      >
         {@label}
       </label>
       <select
@@ -351,8 +359,12 @@ defmodule Bilimbi.Base.UI.Components do
 
   def input(%{type: "textarea"} = assigns) do
     ~H"""
-    <div class="mb-4">
-      <label :if={@label} for={@id} class="mb-1.5 block text-sm font-medium text-ink">
+    <div class={@wrapper_class || "mb-4"}>
+      <label
+        :if={@label}
+        for={@id}
+        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
+      >
         {@label}
       </label>
       <textarea
@@ -369,8 +381,12 @@ defmodule Bilimbi.Base.UI.Components do
   # All other inputs text, datetime-local, url, password, etc. are handled here...
   def input(assigns) do
     ~H"""
-    <div class="mb-4">
-      <label :if={@label} for={@id} class="mb-1.5 block text-sm font-medium text-ink">
+    <div class={@wrapper_class || "mb-4"}>
+      <label
+        :if={@label}
+        for={@id}
+        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
+      >
         {@label}
       </label>
       <input
@@ -407,6 +423,45 @@ defmodule Bilimbi.Base.UI.Components do
       "disabled:bg-surface-sunken disabled:text-ink-subtle"
   end
 
+  @doc """
+  Renders a timestamp with a readable UTC fallback and browser-local rendering.
+
+  Compatible source timestamps are stored as UTC `NaiveDateTime` values. The
+  server-rendered text makes that assumption explicit so the value remains
+  truthful before LiveView's JavaScript hook localizes it for the operator.
+  """
+  attr :id, :string, required: true
+  attr :value, :any, default: nil
+  attr :format, :atom, values: [:date, :time, :datetime], default: :datetime
+  attr :class, :any, default: nil
+
+  def datetime(assigns) do
+    assigns = assign(assigns, :date_time, datetime_value(assigns.value))
+
+    ~H"""
+    <time
+      :if={@date_time}
+      id={@id}
+      datetime={DateTime.to_iso8601(@date_time)}
+      data-format={@format}
+      phx-hook="DateTime"
+      phx-update="ignore"
+      class={["tabular-nums", @class]}
+    >
+      {server_datetime(@date_time, @format)}
+    </time>
+    <span :if={is_nil(@date_time)} id={@id} class={@class}>—</span>
+    """
+  end
+
+  defp datetime_value(%DateTime{} = value), do: value
+  defp datetime_value(%NaiveDateTime{} = value), do: DateTime.from_naive!(value, "Etc/UTC")
+  defp datetime_value(_value), do: nil
+
+  defp server_datetime(value, :date), do: Calendar.strftime(value, "%d/%m/%Y UTC")
+  defp server_datetime(value, :time), do: Calendar.strftime(value, "%H:%M UTC")
+  defp server_datetime(value, :datetime), do: Calendar.strftime(value, "%d/%m/%Y, %H:%M UTC")
+
   # Helper used by inputs to generate form errors
   slot :inner_block, required: true
 
@@ -424,13 +479,23 @@ defmodule Bilimbi.Base.UI.Components do
   """
   slot :inner_block, required: true
   slot :subtitle
+  slot :title_actions
   slot :actions
 
   def header(assigns) do
     ~H"""
     <header class={[@actions != [] && "flex items-start justify-between gap-6", "pb-4"]}>
       <div>
-        <h1 class="text-lg font-semibold leading-8 tracking-tight text-ink-strong">
+        <div :if={@title_actions != []} class="flex items-center gap-1.5">
+          <h1 class="text-lg font-semibold leading-8 tracking-tight text-ink-strong">
+            {render_slot(@inner_block)}
+          </h1>
+          {render_slot(@title_actions)}
+        </div>
+        <h1
+          :if={@title_actions == []}
+          class="text-lg font-semibold leading-8 tracking-tight text-ink-strong"
+        >
           {render_slot(@inner_block)}
         </h1>
         <p :if={@subtitle != []} class="text-sm text-ink-muted">
@@ -562,11 +627,41 @@ defmodule Bilimbi.Base.UI.Components do
   attr :name, :string, required: true
   attr :class, :any, default: "size-4"
 
-  def icon(%{name: "hero-" <> _} = assigns) do
+  def icon(assigns) do
+    case IconRegistry.fetch(assigns.name) do
+      {:ok, icon} -> registered_icon(assign(assigns, :icon, icon))
+      :error -> hero_icon(assigns)
+    end
+  end
+
+  defp registered_icon(assigns) do
+    ~H"""
+    <svg
+      class={@class}
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox={@icon.view_box}
+      fill={@icon.fill}
+      stroke={@icon.fill == "none" && "currentColor"}
+      stroke-width={@icon.fill == "none" && "1.5"}
+      aria-hidden="true"
+    >
+      <path
+        :for={path <- @icon.paths}
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        d={path}
+      />
+    </svg>
+    """
+  end
+
+  defp hero_icon(%{name: "hero-" <> _} = assigns) do
     ~H"""
     <span class={[@name, @class]} />
     """
   end
+
+  defp hero_icon(assigns), do: hero_icon(assign(assigns, :name, "hero-square-3-stack-3d"))
 
   ## JS Commands
 

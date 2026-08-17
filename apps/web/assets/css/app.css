@@ -3,7 +3,9 @@
 @source "../css";
 @source "../js";
 @source "../../lib/bilimbi_web";
+@source "../../../../apps/base";
 @source "../../../../apps/base/ui/lib/ui";
+@source "../../../../apps/core";
 @source "../../../../_build/dev/phoenix-colocated/web/*/";
 /* Menu contributions provide bare icon names at runtime. Keep the generated
  * Heroicon utilities available for their rail-only rendering. */
@@ -54,7 +56,9 @@
   --color-brand-surface: var(--color-lime-100);
   --color-brand-line: var(--color-lime-300);
   --color-brand-strong: var(--color-lime-600);
+  --color-brand-hover: var(--color-lime-700);
   --color-brand-ink: var(--color-lime-950);
+  --color-brand-action-ink: var(--color-yellow-100);
 
   /* Status — honest feedback only. */
   --color-success: var(--color-emerald-600);

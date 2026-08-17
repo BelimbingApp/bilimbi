@@ -35,7 +35,7 @@ defmodule Bilimbi.Core.Geonames do
 
   @type index_query :: map() | keyword()
 
-  @page_sizes [20, 50, 100, 300]
+  @page_sizes [25, 50, 100, 300]
   @country_sort_fields %{
     iso: :iso,
     country: :country,
@@ -71,7 +71,7 @@ defmodule Bilimbi.Core.Geonames do
   Downloads and imports the selected canonical GeoNames datasets.
 
   Supported options: `:datasets`, `:postcodes`, `:cache_dir`, `:force`,
-  `:ttl_days`, and `:receive_timeout`. Every dataset import is atomic and a
+  `:ttl_days`, `:connect_timeout`, and `:receive_timeout`. Every dataset import is atomic and a
   payload that yields no valid rows is rejected with
   `{:error, {:import, dataset, :no_valid_rows}}`; a failed import restores
   the previously known-good download cache.
@@ -79,7 +79,15 @@ defmodule Bilimbi.Core.Geonames do
   @spec import_reference_data(keyword()) :: {:ok, map()} | {:error, import_error()}
   def import_reference_data(opts \\ []) do
     ReferenceData.run(
-      Keyword.take(opts, [:datasets, :postcodes, :cache_dir, :force, :ttl_days, :receive_timeout])
+      Keyword.take(opts, [
+        :datasets,
+        :postcodes,
+        :cache_dir,
+        :force,
+        :ttl_days,
+        :connect_timeout,
+        :receive_timeout
+      ])
     )
   end
 

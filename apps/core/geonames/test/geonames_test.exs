@@ -40,6 +40,8 @@ defmodule Bilimbi.Core.GeonamesTest do
   end
 
   test "returns a source-faithful bounded Countries index page" do
+    assert %{page_size: 25} = Geonames.page_countries()
+
     insert_country!(%{
       iso: "AA",
       iso3: "AAA",
@@ -84,7 +86,7 @@ defmodule Bilimbi.Core.GeonamesTest do
     page = Geonames.page_countries(%{"search" => "jp", "page_size" => "21"})
 
     assert page.page == 1
-    assert page.page_size == 50
+    assert page.page_size == 25
     assert page.total_entries == 1
     assert page.total_pages == 1
     assert [%{iso: "JP", country: "Japan", capital: "Tokyo"}] = page.entries
@@ -124,6 +126,8 @@ defmodule Bilimbi.Core.GeonamesTest do
   end
 
   test "returns global Admin1 pages with country-name search and a bounded country filter" do
+    assert %{page_size: 25} = Geonames.page_admin1()
+
     assert [%{code: "US.CA", country_name: "United States"}] =
              Geonames.page_admin1(%{"search" => "united"}).entries
 
@@ -199,6 +203,8 @@ defmodule Bilimbi.Core.GeonamesTest do
   end
 
   test "returns searchable postcode pages and independent country summaries" do
+    assert %{page_size: 25} = Geonames.page_postcodes()
+
     insert_postcode!(%{
       country_iso: "US",
       postcode: "94105",

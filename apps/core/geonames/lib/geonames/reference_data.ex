@@ -47,7 +47,7 @@ defmodule Bilimbi.Core.Geonames.ReferenceData do
     downloader = Keyword.get(opts, :downloader, &Downloader.download/3)
 
     download_opts =
-      Keyword.take(opts, [:force, :receive_timeout, :req_options, :ttl_days])
+      Keyword.take(opts, [:connect_timeout, :force, :receive_timeout, :req_options, :ttl_days])
 
     with_cache_protection(destination, entry && Path.join(cache_dir, entry), fn ->
       with {:ok, download} <- downloader.(url, destination, download_opts),
