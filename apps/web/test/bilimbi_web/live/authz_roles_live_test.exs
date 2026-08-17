@@ -306,29 +306,32 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
     } do
       {:ok, view, _html} = open_create(conn)
 
+      # form/3 refuses values outside the rendered options, so a tampered
+      # selection has to be sent as a raw event -- which is exactly what a
+      # tampered client would do.
       html =
-        view
-        |> form("#role-form", %{
+        render_submit(view, "save", %{
           "role" => %{"company_id" => "74", "name" => "Spy", "code" => "spy"}
         })
-        |> render_submit()
 
       assert html =~ "is not a company in this tenant"
       refute ours |> Authz.list_roles() |> Enum.find(&(&1.code == "spy"))
     end
 
     test "requires an owning company, so a tampered submit cannot default to system", %{
-      conn: conn
+      conn: conn,
+      ours: ours
     } do
       {:ok, view, _html} = open_create(conn)
 
       # form/3 merges the picker's preselected value, so a genuinely absent
       # company_id has to be sent as a raw event -- which is exactly what a
-      # tampered client would do.
-      html = render_submit(view, "save", %{"role" => %{"name" => "Orphan", "code" => "orphan"}})
+      # tampered client would do. A field the submit never carried counts as
+      # unused input, so the failure is observable as an outcome, not text.
+      render_submit(view, "save", %{"role" => %{"name" => "Orphan", "code" => "orphan"}})
 
-      assert html =~ "blank"
       assert has_element?(view, "#role-form")
+      refute ours |> Authz.list_roles() |> Enum.find(&(&1.code == "orphan"))
     end
 
     test "creates a company-owned role and returns to the index", %{conn: conn, ours: ours} do

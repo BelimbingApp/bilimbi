@@ -11,8 +11,8 @@ defmodule Bilimbi.Base.Authz do
 
   alias Bilimbi.Base.Authz.Actor
   alias Bilimbi.Base.Authz.Administration
-  alias Bilimbi.Base.Authz.CompanyDirectory
   alias Bilimbi.Base.Authz.AuthorizationDeniedError
+  alias Bilimbi.Base.Authz.CompanyDirectory
   alias Bilimbi.Base.Authz.DatabaseDecisionLogger
   alias Bilimbi.Base.Authz.Decision
   alias Bilimbi.Base.Authz.DecisionLog

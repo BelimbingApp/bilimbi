@@ -122,6 +122,7 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
           <section class="rounded-xl border border-line bg-surface px-6 py-5">
             <.input
               field={@form[:company_id]}
+              id="role-company-scope"
               type="select"
               label="Company Scope"
               options={for company <- @companies, do: {company.name, company.id}}
