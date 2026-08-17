@@ -109,7 +109,12 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
     refute has_element?(view, "#principal-capabilities", "admin.user.list")
 
     view |> form("#grants-filters", %{"search" => "zzz"}) |> render_change()
-    assert render(view) =~ "No direct capabilities match these filters."
+
+    assert has_element?(
+             view,
+             "#principal-capabilities-empty",
+             "No direct capabilities match these filters"
+           )
   end
 
   test "defaults to newest first and returns there when re-sorted", %{conn: conn, scope: scope} do
@@ -117,6 +122,8 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
 
     {:ok, view, _html} = open(conn)
 
+    assert has_element?(view, "th[aria-sort='descending']")
+    assert has_element?(view, "th[scope='col'][aria-sort='none']")
     assert has_element?(view, "#grants-sort-created_at .hero-chevron-down")
 
     view |> element("#grants-sort-capability") |> render_click()
@@ -156,7 +163,11 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/principal-capabilities")
 
-    assert render(view) =~ "No capabilities have been granted directly"
+    assert has_element?(
+             view,
+             "#principal-capabilities-empty",
+             "No capabilities have been granted directly"
+           )
   end
 
   test "a direct grant of the route capability lists itself", %{conn: conn} do
