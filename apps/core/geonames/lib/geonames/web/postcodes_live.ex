@@ -70,110 +70,25 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
           <div class="border-b border-line px-4 py-3">
             <h2 class="text-sm font-semibold text-ink">Postcodes by country</h2>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
-              <thead class="border-b border-line bg-surface-sunken">
-                <tr>
-                  <th
-                    scope="col"
-                    class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle"
-                  >
-                    <button
-                      id="postcodes-summary-sort-country"
-                      type="button"
-                      phx-click="sort-summary"
-                      phx-value-sort="country_name"
-                      class="inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25"
-                    >
-                      Country
-                      <.icon
-                        name={
-                          summary_sort_icon(
-                            "country_name",
-                            @index_state.summary_sort_by,
-                            @index_state.summary_sort_dir
-                          )
-                        }
-                        class={[
-                          "size-3.5",
-                          @index_state.summary_sort_by == "country_name" && "text-action"
-                        ]}
-                      />
-                    </button>
-                  </th>
-                  <th
-                    scope="col"
-                    class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle"
-                  >
-                    <button
-                      id="postcodes-summary-sort-iso"
-                      type="button"
-                      phx-click="sort-summary"
-                      phx-value-sort="country_iso"
-                      class="inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25"
-                    >
-                      ISO
-                      <.icon
-                        name={
-                          summary_sort_icon(
-                            "country_iso",
-                            @index_state.summary_sort_by,
-                            @index_state.summary_sort_dir
-                          )
-                        }
-                        class={[
-                          "size-3.5",
-                          @index_state.summary_sort_by == "country_iso" && "text-action"
-                        ]}
-                      />
-                    </button>
-                  </th>
-                  <th
-                    scope="col"
-                    class="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-ink-subtle"
-                  >
-                    <button
-                      id="postcodes-summary-sort-count"
-                      type="button"
-                      phx-click="sort-summary"
-                      phx-value-sort="record_count"
-                      class="ml-auto inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25"
-                    >
-                      Records
-                      <.icon
-                        name={
-                          summary_sort_icon(
-                            "record_count",
-                            @index_state.summary_sort_by,
-                            @index_state.summary_sort_dir
-                          )
-                        }
-                        class={[
-                          "size-3.5",
-                          @index_state.summary_sort_by == "record_count" && "text-action"
-                        ]}
-                      />
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody id="postcodes-country-summary-rows" class="divide-y divide-line-subtle">
-                <tr
-                  :for={summary <- @postcode_country_summaries}
-                  id={"postcode-country-#{summary.country_iso}"}
-                  class="hover:bg-surface-sunken"
-                >
-                  <td class="whitespace-nowrap px-4 py-2.5 text-ink">{summary.country_name}</td>
-                  <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-ink-muted">
-                    {summary.country_iso}
-                  </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-ink">
-                    {format_integer(summary.record_count)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <.table
+            id="postcodes-country-summary-rows"
+            rows={@postcode_country_summaries}
+            row_id={fn summary -> "postcode-country-#{summary.country_iso}" end}
+            sort_by={@index_state.summary_sort_by}
+            sort_dir={@index_state.summary_sort_dir}
+            sort_event="sort-summary"
+            framed={false}
+          >
+            <:col :let={summary} label="Country" sort="country_name" sort_id="postcodes-summary-sort-country">
+              <span class="whitespace-nowrap text-ink">{summary.country_name}</span>
+            </:col>
+            <:col :let={summary} label="ISO" sort="country_iso" sort_id="postcodes-summary-sort-iso">
+              <span class="whitespace-nowrap font-mono text-xs text-ink-muted">{summary.country_iso}</span>
+            </:col>
+            <:col :let={summary} label="Records" sort="record_count" sort_id="postcodes-summary-sort-count">
+              <span class="whitespace-nowrap tabular-nums text-ink">{format_integer(summary.record_count)}</span>
+            </:col>
+          </.table>
         </section>
 
         <section class="rounded-xl border border-line bg-surface">
@@ -202,79 +117,39 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
             </div>
           </.form>
 
-          <div class="overflow-x-auto px-2 pt-2">
-            <table class="w-full text-left text-sm">
-              <caption class="sr-only">Geonames postcodes</caption>
-              <thead class="border-y border-line bg-surface-sunken">
-                <tr>
-                  <.sortable_heading
-                    id="postcodes-sort-country"
-                    label="Country"
-                    sort="country_name"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                  <.sortable_heading
-                    id="postcodes-sort-postcode"
-                    label="Postcode"
-                    sort="postcode"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                  <.sortable_heading
-                    id="postcodes-sort-place"
-                    label="Place Name"
-                    sort="place_name"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                  <.sortable_heading
-                    id="postcodes-sort-admin1"
-                    label="Admin1 Code"
-                    sort="admin1_code"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                  <.sortable_heading
-                    id="postcodes-sort-updated"
-                    label="Updated"
-                    sort="updated_at"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                </tr>
-              </thead>
-              <tbody id="postcodes-table" phx-update="stream" class="divide-y divide-line-subtle">
-                <tr
-                  :for={{id, postcode} <- @streams.postcodes}
-                  id={id}
-                  class="hover:bg-surface-sunken"
-                >
-                  <td class="whitespace-nowrap px-2 py-1.5 text-ink-muted">
-                    <span class="font-mono text-xs">{postcode.country_iso}</span>
-                    <span class="ml-1">{postcode.country_name || postcode.country_iso}</span>
-                  </td>
-                  <td class="whitespace-nowrap px-2 py-1.5 font-medium tabular-nums text-ink">
-                    {postcode.postcode}
-                  </td>
-                  <td class="whitespace-nowrap px-2 py-1.5 text-ink-muted">
-                    {postcode.place_name}
-                  </td>
-                  <td class="whitespace-nowrap px-2 py-1.5 tabular-nums text-ink-muted">
-                    {postcode.admin1_code || "—"}
-                  </td>
-                  <td class="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums text-ink-muted">
-                    <.datetime id={"#{id}-updated"} value={postcode.updated_at} format={:date} />
-                  </td>
-                </tr>
-                <tr :if={@postcodes_page.entries == []} id="postcodes-empty">
-                  <td colspan="5" class="px-2 py-8 text-center text-ink-muted">
-                    No postcodes found.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <.table
+            id="postcodes-table"
+            rows={@streams.postcodes}
+            row_id={fn {id, _postcode} -> id end}
+            row_item={fn {_id, postcode} -> postcode end}
+            sort_by={@index_state.sort_by}
+            sort_dir={@index_state.sort_dir}
+            framed={false}
+          >
+            <:col :let={postcode} label="Country" sort="country_name" sort_id="postcodes-sort-country">
+              <div class="whitespace-nowrap text-ink-muted">
+                <span class="font-mono text-xs">{postcode.country_iso}</span>
+                <span class="ml-1">{postcode.country_name || postcode.country_iso}</span>
+              </div>
+            </:col>
+            <:col :let={postcode} label="Postcode" sort="postcode" sort_id="postcodes-sort-postcode">
+              <span class="whitespace-nowrap font-medium tabular-nums text-ink">{postcode.postcode}</span>
+            </:col>
+            <:col :let={postcode} label="Place Name" sort="place_name" sort_id="postcodes-sort-place">
+              <span class="whitespace-nowrap text-ink-muted">{postcode.place_name}</span>
+            </:col>
+            <:col :let={postcode} label="Admin1 Code" sort="admin1_code" sort_id="postcodes-sort-admin1">
+              <span class="whitespace-nowrap tabular-nums text-ink-muted">{postcode.admin1_code || "—"}</span>
+            </:col>
+            <:col :let={postcode} label="Updated" sort="updated_at" sort_id="postcodes-sort-updated">
+              <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">
+                <.datetime id={"postcode-#{postcode.id}-updated"} value={postcode.updated_at} format={:date} />
+              </span>
+            </:col>
+            <:empty :if={@postcodes_page.entries == []}>
+              No postcodes found.
+            </:empty>
+          </.table>
 
           <.pagination
             id="postcodes-pagination"
@@ -411,8 +286,4 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
     page_number = parse_page(value)
     max(page.total_pages, 1) |> min(page_number) |> max(1)
   end
-
-  defp summary_sort_icon(sort, sort, "asc"), do: "hero-chevron-up"
-  defp summary_sort_icon(sort, sort, "desc"), do: "hero-chevron-down"
-  defp summary_sort_icon(_sort, _sort_by, _sort_dir), do: "hero-chevron-up-down"
 end

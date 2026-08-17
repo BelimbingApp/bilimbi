@@ -101,75 +101,39 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
             </div>
           </.form>
 
-          <div class="overflow-x-auto px-2 pt-2">
-            <table class="w-full text-left text-sm">
-              <caption class="sr-only">Admin1 divisions</caption>
-              <thead class="border-y border-line bg-surface-sunken">
-                <tr>
-                  <.sortable_heading
-                    id="admin1-sort-country"
-                    label="Country"
-                    sort="country_name"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                  <.sortable_heading
-                    id="admin1-sort-code"
-                    label="Code"
-                    sort="code"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                  <.sortable_heading
-                    id="admin1-sort-name"
-                    label="Name"
-                    sort="name"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                  <.sortable_heading
-                    id="admin1-sort-alt-name"
-                    label="Alt Name"
-                    sort="alt_name"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                  <.sortable_heading
-                    id="admin1-sort-updated"
-                    label="Updated"
-                    sort="updated_at"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                </tr>
-              </thead>
-              <tbody id="admin1-table" phx-update="stream" class="divide-y divide-line-subtle">
-                <tr
-                  :for={{id, admin1} <- @streams.admin1}
-                  id={id}
-                  class="hover:bg-surface-sunken"
-                >
-                  <td class="whitespace-nowrap px-2 py-1.5 text-ink-muted">
-                    <span class="font-mono text-xs">{admin1.country_iso}</span>
-                    <span class="ml-1">{admin1.country_name || admin1.country_iso}</span>
-                  </td>
-                  <td class="whitespace-nowrap px-2 py-1.5 font-mono text-ink">{admin1.code}</td>
-                  <td class="whitespace-nowrap px-2 py-1.5 text-ink">{admin1.name}</td>
-                  <td class="whitespace-nowrap px-2 py-1.5 text-ink-muted">
-                    {admin1.alt_name || "—"}
-                  </td>
-                  <td class="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums text-ink-muted">
-                    <.datetime id={"#{id}-updated"} value={admin1.updated_at} format={:date} />
-                  </td>
-                </tr>
-                <tr :if={@admin1_page.entries == []} id="admin1-empty">
-                  <td colspan="5" class="px-2 py-8 text-center text-ink-muted">
-                    No Admin1 divisions found.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <.table
+            id="admin1-table"
+            rows={@streams.admin1}
+            row_id={fn {id, _admin1} -> id end}
+            row_item={fn {_id, admin1} -> admin1 end}
+            sort_by={@index_state.sort_by}
+            sort_dir={@index_state.sort_dir}
+            framed={false}
+          >
+            <:col :let={admin1} label="Country" sort="country_name" sort_id="admin1-sort-country">
+              <div class="whitespace-nowrap text-ink-muted">
+                <span class="font-mono text-xs">{admin1.country_iso}</span>
+                <span class="ml-1">{admin1.country_name || admin1.country_iso}</span>
+              </div>
+            </:col>
+            <:col :let={admin1} label="Code" sort="code" sort_id="admin1-sort-code">
+              <span class="whitespace-nowrap font-mono text-ink">{admin1.code}</span>
+            </:col>
+            <:col :let={admin1} label="Name" sort="name" sort_id="admin1-sort-name">
+              <span class="whitespace-nowrap text-ink">{admin1.name}</span>
+            </:col>
+            <:col :let={admin1} label="Alt Name" sort="alt_name" sort_id="admin1-sort-alt-name">
+              <span class="whitespace-nowrap text-ink-muted">{admin1.alt_name || "—"}</span>
+            </:col>
+            <:col :let={admin1} label="Updated" sort="updated_at" sort_id="admin1-sort-updated">
+              <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">
+                <.datetime id={"admin1-#{admin1.id}-updated"} value={admin1.updated_at} format={:date} />
+              </span>
+            </:col>
+            <:empty :if={@admin1_page.entries == []}>
+              No Admin1 divisions found.
+            </:empty>
+          </.table>
 
           <.pagination
             id="admin1-pagination"

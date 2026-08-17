@@ -4,47 +4,6 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
   use Bilimbi.Base.UI, :html
 
   attr(:id, :string, required: true)
-  attr(:label, :string, required: true)
-  attr(:sort, :string, required: true)
-  attr(:sort_by, :string, required: true)
-  attr(:sort_dir, :string, required: true)
-  attr(:align, :atom, values: [:left, :right], default: :left)
-
-  def sortable_heading(assigns) do
-    ~H"""
-    <th
-      scope="col"
-      aria-sort={sort_aria(@sort, @sort_by, @sort_dir)}
-      class={[
-        "px-2 py-1.5 text-[0.6875rem] font-medium tracking-wide text-ink-subtle",
-        @align == :right && "text-right"
-      ]}
-    >
-      <button
-        id={@id}
-        type="button"
-        phx-click="sort"
-        phx-value-sort={@sort}
-        title={"Sort by #{@label}"}
-        class={[
-          "inline-flex items-center gap-1 rounded text-left transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25",
-          @align == :right && "ml-auto"
-        ]}
-      >
-        {@label}
-        <.icon
-          name={sort_icon(@sort, @sort_by, @sort_dir)}
-          class={[
-            "size-3 shrink-0",
-            @sort == @sort_by && "text-brand-strong"
-          ]}
-        />
-      </button>
-    </th>
-    """
-  end
-
-  attr(:id, :string, required: true)
   attr(:page, :any, required: true)
   attr(:page_sizes, :list, required: true)
   attr(:filters_form, :any, required: true)
@@ -139,14 +98,6 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
   end
 
   def format_integer(_value), do: "—"
-
-  defp sort_icon(sort, sort, "asc"), do: "hero-chevron-up"
-  defp sort_icon(sort, sort, "desc"), do: "hero-chevron-down"
-  defp sort_icon(_sort, _sort_by, _sort_dir), do: "hero-chevron-up-down"
-
-  defp sort_aria(sort, sort, "asc"), do: "ascending"
-  defp sort_aria(sort, sort, "desc"), do: "descending"
-  defp sort_aria(_sort, _sort_by, _sort_dir), do: "none"
 
   defp page_summary(%{total_entries: 0}), do: "No results"
 

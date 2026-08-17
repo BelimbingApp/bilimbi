@@ -148,101 +148,46 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
             </div>
           </.form>
 
-          <div class="overflow-x-auto px-2 pt-2">
-            <table class="min-w-[46rem] w-full text-left text-sm">
-              <caption class="sr-only">Countries</caption>
-              <thead class="border-y border-line bg-surface-sunken">
-                <tr>
-                  <.sortable_heading
-                    id="countries-sort-iso"
-                    label="ISO"
-                    sort="iso"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                  <.sortable_heading
-                    id="countries-sort-country"
-                    label="Country"
-                    sort="country"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                  <.sortable_heading
-                    id="countries-sort-capital"
-                    label="Capital"
-                    sort="capital"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                  <.sortable_heading
-                    id="countries-sort-phone"
-                    label="Phone"
-                    sort="phone"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                  <.sortable_heading
-                    id="countries-sort-currency"
-                    label="Currency"
-                    sort="currency_code"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                  <.sortable_heading
-                    id="countries-sort-population"
-                    label="Population"
-                    sort="population"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                    align={:right}
-                  />
-                  <.sortable_heading
-                    id="countries-sort-updated"
-                    label="Updated"
-                    sort="updated_at"
-                    sort_by={@index_state.sort_by}
-                    sort_dir={@index_state.sort_dir}
-                  />
-                </tr>
-              </thead>
-              <tbody id="countries-table" phx-update="stream" class="divide-y divide-line-subtle">
-                <tr
-                  :for={{id, country} <- @streams.countries}
-                  id={id}
-                  class="hover:bg-surface-sunken"
-                >
-                  <td class="whitespace-nowrap px-2 py-1.5 font-medium tabular-nums text-ink">
-                    {country.iso}
-                  </td>
-                  <td class="whitespace-nowrap px-2 py-1.5 text-ink">{country.country}</td>
-                  <td class="whitespace-nowrap px-2 py-1.5 text-ink-muted">
-                    {country.capital || "—"}
-                  </td>
-                  <td class="whitespace-nowrap px-2 py-1.5 tabular-nums text-ink-muted">
-                    {country.phone || "—"}
-                  </td>
-                  <td class="whitespace-nowrap px-2 py-1.5 text-ink-muted">
-                    {country.currency_code || "—"}
-                  </td>
-                  <td class="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-ink-muted">
-                    {format_integer(country.population)}
-                  </td>
-                  <td class="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums text-ink-muted">
-                    <.datetime
-                      id={"#{id}-updated"}
-                      value={country.updated_at}
-                      format={:date}
-                    />
-                  </td>
-                </tr>
-                <tr :if={@countries_page.entries == []} id="countries-empty">
-                  <td colspan="7" class="px-2 py-8 text-center text-ink-muted">
-                    No countries found.
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <.table
+            id="countries-table"
+            rows={@streams.countries}
+            row_id={fn {id, _country} -> id end}
+            row_item={fn {_id, country} -> country end}
+            sort_by={@index_state.sort_by}
+            sort_dir={@index_state.sort_dir}
+            framed={false}
+          >
+            <:col :let={country} label="ISO" sort="iso" sort_id="countries-sort-iso">
+              <span class="whitespace-nowrap font-medium tabular-nums text-ink">{country.iso}</span>
+            </:col>
+            <:col :let={country} label="Country" sort="country" sort_id="countries-sort-country">
+              <span class="whitespace-nowrap text-ink">{country.country}</span>
+            </:col>
+            <:col :let={country} label="Capital" sort="capital" sort_id="countries-sort-capital">
+              <span class="whitespace-nowrap text-ink-muted">{country.capital || "—"}</span>
+            </:col>
+            <:col :let={country} label="Phone" sort="phone" sort_id="countries-sort-phone">
+              <span class="whitespace-nowrap tabular-nums text-ink-muted">{country.phone || "—"}</span>
+            </:col>
+            <:col :let={country} label="Currency" sort="currency_code" sort_id="countries-sort-currency">
+              <span class="whitespace-nowrap text-ink-muted">{country.currency_code || "—"}</span>
+            </:col>
+            <:col :let={country} label="Population" sort="population" sort_id="countries-sort-population">
+              <span class="whitespace-nowrap tabular-nums text-ink-muted">{format_integer(country.population)}</span>
+            </:col>
+            <:col :let={country} label="Updated" sort="updated_at" sort_id="countries-sort-updated">
+              <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">
+                <.datetime
+                  id={"country-#{country.id}-updated"}
+                  value={country.updated_at}
+                  format={:date}
+                />
+              </span>
+            </:col>
+            <:empty :if={@countries_page.entries == []}>
+              No countries found.
+            </:empty>
+          </.table>
 
           <.pagination
             id="countries-pagination"
