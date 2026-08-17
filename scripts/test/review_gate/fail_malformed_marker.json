@@ -1,0 +1,7 @@
+{"_expect": "fail",
+ "_case": "trailing punctuation after the marker id — not a whole-line marker, no identity",
+ "author": {"login": "kiatng"},
+ "labels": [{"name": "agent:claude-opus-5"}],
+ "reviews": [],
+ "comments": [{"author": {"login": "faith-tohmm"}, "createdAt": "2026-08-17T01:00:00Z",
+               "body": "**From:** amp/kimi-k3???\nverdict: accept"}]}

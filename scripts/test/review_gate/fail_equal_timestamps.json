@@ -1,0 +1,10 @@
+{"_expect": "fail",
+ "_case": "approval and CHANGES_REQUESTED share a timestamp (second resolution) — order indeterminate, fail closed",
+ "author": {"login": "kiatng"},
+ "labels": [{"name": "agent:claude-opus-5"}],
+ "reviews": [
+   {"author": {"login": "faith-tohmm"}, "state": "APPROVED",
+    "body": "**From:** amp/kimi-k3\nverdict: accept", "submittedAt": "2026-08-17T01:00:00Z"},
+   {"author": {"login": "faith-tohmm"}, "state": "CHANGES_REQUESTED",
+    "body": "**From:** amp/kimi-k3\nverdict: changes required", "submittedAt": "2026-08-17T01:00:00Z"}],
+ "comments": []}
