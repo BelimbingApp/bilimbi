@@ -13,6 +13,7 @@ defmodule BilimbiWeb.MenuIconSafelistTest do
   use ExUnit.Case, async: true
 
   alias Bilimbi.Base.Menu
+  alias Bilimbi.Base.UI.IconRegistry
 
   @app_css Path.expand("../../assets/css/app.css", __DIR__)
 
@@ -20,10 +21,7 @@ defmodule BilimbiWeb.MenuIconSafelistTest do
     safelisted = safelisted_icons()
 
     missing =
-      Menu.items()
-      |> Enum.map(& &1.icon)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.uniq()
+      contributed_heroicons()
       |> Enum.reject(&(&1 in safelisted))
       |> Enum.sort()
 
@@ -41,11 +39,7 @@ defmodule BilimbiWeb.MenuIconSafelistTest do
   end
 
   test "app.css does not safelist icons no module contributes" do
-    contributed =
-      Menu.items()
-      |> Enum.map(& &1.icon)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.uniq()
+    contributed = contributed_heroicons()
 
     stale = safelisted_icons() |> Enum.reject(&(&1 in contributed)) |> Enum.sort()
 
@@ -59,6 +53,18 @@ defmodule BilimbiWeb.MenuIconSafelistTest do
            Remove them from the `@source inline("hero-{...}")` list in
            apps/web/assets/css/app.css.
            """
+  end
+
+  # Registry icons are inline SVG rendered by `IconRegistry`, not Tailwind
+  # utilities, so they need no `hero-` safelist entry -- and demanding one would
+  # fail a contribution that is entirely correct. Only Heroicon names are the
+  # safelist's business.
+  defp contributed_heroicons do
+    Menu.items()
+    |> Enum.map(& &1.icon)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.reject(&match?({:ok, _icon}, IconRegistry.fetch(&1)))
+    |> Enum.uniq()
   end
 
   # Parsed rather than hand-listed: a fixture copy of the safelist would be a
