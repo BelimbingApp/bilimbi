@@ -28,39 +28,45 @@ defmodule BilimbiWeb.ResetPasswordLive do
       %{email: email, password: password} =
         Ecto.Changeset.apply_action!(changeset, :reset_password)
 
-      case User.reset_password(email, socket.assigns.token, password) do
-        {:ok, _user} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Your password has been reset.")
-           |> push_navigate(to: ~p"/")}
-
-        {:error, :invalid_or_expired_token} ->
-          {:noreply,
-           assign_form(
-             socket,
-             Ecto.Changeset.add_error(
-               changeset,
-               :email,
-               "The password reset link is invalid or has expired."
-             )
-           )}
-
-        {:error, %Ecto.Changeset{} = password_changeset} ->
-          changeset =
-            Enum.reduce(password_changeset.errors, changeset, fn
-              {:password, {message, metadata}}, acc ->
-                Ecto.Changeset.add_error(acc, :password, message, metadata)
-
-              _, acc ->
-                acc
-            end)
-
-          {:noreply, assign_form(socket, changeset)}
-      end
+      perform_reset(socket, changeset, email, password)
     else
       {:noreply, assign_form(socket, changeset)}
     end
+  end
+
+  defp perform_reset(socket, changeset, email, password) do
+    case User.reset_password(email, socket.assigns.token, password) do
+      {:ok, _user} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Your password has been reset.")
+         |> push_navigate(to: ~p"/")}
+
+      {:error, :invalid_or_expired_token} ->
+        {:noreply,
+         assign_form(
+           socket,
+           Ecto.Changeset.add_error(
+             changeset,
+             :email,
+             "The password reset link is invalid or has expired."
+           )
+         )}
+
+      {:error, %Ecto.Changeset{} = password_changeset} ->
+        changeset = copy_password_errors(changeset, password_changeset)
+        {:noreply, assign_form(socket, changeset)}
+    end
+  end
+
+  defp copy_password_errors(changeset, password_changeset) do
+    Enum.reduce(password_changeset.errors, changeset, fn
+      {:password, {message, metadata}}, acc ->
+        Ecto.Changeset.add_error(acc, :password, message, metadata)
+
+      _, acc ->
+        acc
+    end)
   end
 
   defp changeset(attrs) do

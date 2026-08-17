@@ -186,6 +186,7 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/roles/#{role.id}")
 
       assert has_element?(view, "h1", "Auditor")
+      assert has_element?(view, "#role-back[href='/authz/roles']", "Back to roles")
       assert has_element?(view, "#role-summary", "Custom")
       assert has_element?(view, "#role-principals")
       assert has_element?(view, "#role-principals-empty", "Nobody in this tenant holds this role")
@@ -249,6 +250,8 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       {:ok, view, _html} = open_create(conn)
 
       assert has_element?(view, "#role-form")
+      assert has_element?(view, "#role-back[href='/authz/roles']", "Back to roles")
+      assert has_element?(view, "#role-cancel[href='/authz/roles']", "Cancel")
     end
 
     test "creates a company-owned role and returns to the index", %{conn: conn, ours: ours} do

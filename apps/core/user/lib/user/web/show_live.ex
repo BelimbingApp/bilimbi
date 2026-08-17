@@ -75,7 +75,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           <:subtitle>User details</:subtitle>
           <:actions>
             <.button id="user-back" navigate={~p"/users"}>
-              Back
+              Back to users
             </.button>
             <.button
               :if={allowed?(@current_scope, "admin.user.update")}

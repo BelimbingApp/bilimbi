@@ -94,9 +94,9 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
           Create Address
           <:subtitle>Add a tenant-owned address</:subtitle>
           <:actions>
-            <.link navigate={~p"/addresses"} class="text-sm font-medium text-ink-muted hover:text-ink">
-              Back to Addresses
-            </.link>
+            <.button id="address-back" navigate={~p"/addresses"}>
+              Back to addresses
+            </.button>
           </:actions>
         </.header>
 
@@ -212,7 +212,7 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
             <.button id="address-save" type="submit" variant="primary" phx-disable-with="Creating…">
               Create Address
             </.button>
-            <.link navigate={~p"/addresses"} class="text-sm font-medium text-ink-muted hover:text-ink">
+            <.link id="address-cancel" navigate={~p"/addresses"} class="text-sm font-medium text-ink-muted hover:text-ink">
               Cancel
             </.link>
           </div>
