@@ -260,6 +260,73 @@ defmodule Bilimbi.Core.CompanyTest do
     end
   end
 
+  describe "AuthzCompanyDirectory.companies_in_scope/1" do
+    setup do
+      insert_tenant!()
+      insert_tenant!(%{id: 42, name: "Customer", is_platform_operator: false})
+
+      # Names run opposite to ids, so a directory that forgot to sort -- or
+      # sorted by id -- fails rather than passing by coincidence.
+      insert_company!(%{id: 73, code: "zulu", name: "Zulu Holdings"})
+      insert_company!(%{id: 75, code: "alpha", name: "Alpha Trading"})
+
+      # `display_name/1` prefers legal_name, so this row sorts under "M" though
+      # its `name` starts with "B". Sorting on the wrong field puts it last.
+      insert_company!(%{
+        id: 77,
+        code: "mid",
+        name: "Bravo Supplies",
+        legal_name: "Mango Supplies Sdn. Bhd."
+      })
+
+      insert_company!(%{
+        id: 76,
+        code: "gone",
+        name: "Aardvark Ltd",
+        deleted_at: ~N[2026-08-11 12:00:00]
+      })
+
+      insert_company!(%{id: 74, tenant_id: 42, code: "other", name: "Other Tenant Co"})
+
+      {:ok, owner} = Tenancy.scope(41)
+      {:ok, other} = Tenancy.scope(42)
+
+      %{owner: owner, other: other}
+    end
+
+    test "names companies the way every other screen names them", %{owner: owner} do
+      assert AuthzCompanyDirectory.companies_in_scope(owner) == [
+               %{id: 75, name: "Alpha Trading"},
+               %{id: 77, name: "Mango Supplies Sdn. Bhd."},
+               %{id: 73, name: "Zulu Holdings"}
+             ]
+    end
+
+    test "reports exactly the companies company_ids/1 reports", %{owner: owner, other: other} do
+      for scope <- [owner, other] do
+        named = AuthzCompanyDirectory.companies_in_scope(scope)
+
+        assert named |> Enum.map(& &1.id) |> Enum.sort() ==
+                 Enum.sort(AuthzCompanyDirectory.company_ids(scope))
+
+        # A picker offering an option that fails validation on submit is the
+        # bug this pairing exists to prevent.
+        assert Enum.all?(named, &AuthzCompanyDirectory.company_in_scope?(scope, &1.id))
+      end
+    end
+
+    test "excludes soft-deleted and other-tenant companies", %{owner: owner, other: other} do
+      owner_ids = owner |> AuthzCompanyDirectory.companies_in_scope() |> Enum.map(& &1.id)
+
+      refute 76 in owner_ids
+      refute 74 in owner_ids
+
+      assert AuthzCompanyDirectory.companies_in_scope(other) == [
+               %{id: 74, name: "Other Tenant Co"}
+             ]
+    end
+  end
+
   test "provisions the platform operator and company idempotently" do
     company_attributes = %{name: "Operator company", code: "operator_company"}
 
