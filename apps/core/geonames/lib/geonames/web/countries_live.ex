@@ -7,13 +7,16 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
 
   import Bilimbi.Core.Geonames.Web.Components
 
-  @page_sizes [20, 50, 100, 300]
+  @page_sizes [25, 50, 100, 300]
   @sorts ~w(iso country capital phone currency_code population updated_at)
   @initial_directions %{"population" => "desc", "updated_at" => "desc"}
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, stream_configure(socket, :countries, dom_id: &"country-#{&1.id}")}
+    {:ok,
+     socket
+     |> assign(:updating_countries?, false)
+     |> stream_configure(:countries, dom_id: &"country-#{&1.id}")}
   end
 
   @impl true
@@ -25,7 +28,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   def handle_event("filters", %{"filters" => filters}, socket) do
     state =
       socket.assigns.index_state
-      |> Map.put(:search, Map.get(filters, "search", ""))
+      |> Map.put(:search, Map.get(filters, "search", socket.assigns.index_state.search))
       |> Map.put(:per_page, Map.get(filters, "perPage", socket.assigns.index_state.per_page))
       |> Map.put(:page, 1)
 
@@ -48,6 +51,39 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
     {:noreply, push_patch(socket, to: countries_path(state))}
   end
 
+  def handle_event("update-countries", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:updating_countries?, true)
+     |> start_async(:update_countries, fn ->
+       Geonames.import_reference_data(datasets: [:countries])
+     end)}
+  end
+
+  @impl true
+  def handle_async(:update_countries, {:ok, {:ok, result}}, socket) do
+    socket =
+      socket
+      |> assign(:updating_countries?, false)
+      |> put_flash(:info, update_success_message(result))
+
+    {:noreply, load_page(socket, socket.assigns.index_state)}
+  end
+
+  def handle_async(:update_countries, {:ok, {:error, reason}}, socket) do
+    {:noreply,
+     socket
+     |> assign(:updating_countries?, false)
+     |> put_flash(:error, update_error_message(reason))}
+  end
+
+  def handle_async(:update_countries, {:exit, _reason}, socket) do
+    {:noreply,
+     socket
+     |> assign(:updating_countries?, false)
+     |> put_flash(:error, update_error_message(:task_exit))}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -55,6 +91,35 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
       <div id="countries-index" class="mx-auto max-w-7xl">
         <.header>
           Countries
+          <:title_actions>
+            <button
+              type="button"
+              id="countries-pin"
+              data-nav-pin="nav-admin-geonames-country"
+              title="Pin Countries to sidebar"
+              aria-label="Pin Countries to sidebar"
+              aria-pressed="false"
+              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            >
+              <.icon name="bilimbi-pin" class="size-3.5" />
+            </button>
+          </:title_actions>
+          <:actions>
+            <.button
+              id="countries-update"
+              type="button"
+              variant="brand"
+              phx-click="update-countries"
+              disabled={@updating_countries?}
+              class="px-3 py-1.5"
+            >
+              <.icon
+                name="hero-arrow-path"
+                class={["size-4", @updating_countries? && "animate-spin"]}
+              />
+              <span>{if @updating_countries?, do: "Updating…", else: "Update"}</span>
+            </.button>
+          </:actions>
         </.header>
 
         <div class="rounded-xl border border-line bg-surface">
@@ -62,29 +127,30 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
             for={@filters_form}
             id="countries-filters"
             phx-change="filters"
-            class="px-4 pt-4"
+            class="px-2 pt-2"
           >
-            <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+            <div class="relative">
+              <.icon
+                name="hero-magnifying-glass"
+                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              />
               <.input
                 field={@filters_form[:search]}
                 id="countries-search"
                 type="search"
                 phx-debounce="300"
                 label="Search countries"
+                label_class="sr-only"
+                wrapper_class="mb-0"
                 placeholder="Search by country name or ISO code..."
-              />
-              <.input
-                field={@filters_form[:perPage]}
-                id="countries-page-size"
-                type="select"
-                label="Rows per page"
-                options={page_size_options()}
+                class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
               />
             </div>
           </.form>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
+          <div class="overflow-x-auto px-2 pt-2">
+            <table class="min-w-[46rem] w-full text-left text-sm">
+              <caption class="sr-only">Countries</caption>
               <thead class="border-y border-line bg-surface-sunken">
                 <tr>
                   <.sortable_heading
@@ -145,28 +211,32 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
                   id={id}
                   class="hover:bg-surface-sunken"
                 >
-                  <td class="whitespace-nowrap px-4 py-2.5 font-medium tabular-nums text-ink">
+                  <td class="whitespace-nowrap px-2 py-1.5 font-medium tabular-nums text-ink">
                     {country.iso}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-ink">{country.country}</td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">
+                  <td class="whitespace-nowrap px-2 py-1.5 text-ink">{country.country}</td>
+                  <td class="whitespace-nowrap px-2 py-1.5 text-ink-muted">
                     {country.capital || "—"}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-ink-muted">
+                  <td class="whitespace-nowrap px-2 py-1.5 tabular-nums text-ink-muted">
                     {country.phone || "—"}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">
+                  <td class="whitespace-nowrap px-2 py-1.5 text-ink-muted">
                     {country.currency_code || "—"}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-ink-muted">
+                  <td class="whitespace-nowrap px-2 py-1.5 text-right tabular-nums text-ink-muted">
                     {format_integer(country.population)}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-ink-muted">
-                    {format_date(country.updated_at)}
+                  <td class="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums text-ink-muted">
+                    <.datetime
+                      id={"#{id}-updated"}
+                      value={country.updated_at}
+                      format={:date}
+                    />
                   </td>
                 </tr>
                 <tr :if={@countries_page.entries == []} id="countries-empty">
-                  <td colspan="7" class="px-4 py-8 text-center text-ink-muted">
+                  <td colspan="7" class="px-2 py-8 text-center text-ink-muted">
                     No countries found.
                   </td>
                 </tr>
@@ -174,7 +244,12 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
             </table>
           </div>
 
-          <.pagination id="countries-pagination" page={@countries_page} />
+          <.pagination
+            id="countries-pagination"
+            page={@countries_page}
+            page_sizes={@page_sizes}
+            filters_form={@filters_form}
+          />
         </div>
       </div>
     </Layouts.app>
@@ -195,6 +270,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
 
     socket
     |> assign(:page_title, "Countries")
+    |> assign(:page_sizes, @page_sizes)
     |> assign(:countries_page, countries_page)
     |> assign(
       :filters_form,
@@ -235,8 +311,6 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
     ~p"/geonames/countries?#{%{search: state.search, page: state.page, perPage: state.per_page, sortBy: state.sort_by, sortDir: state.sort_dir}}"
   end
 
-  defp page_size_options, do: Enum.map(@page_sizes, &{"#{&1} rows", &1})
-
   defp normalize_sort(sort_by) when sort_by in @sorts, do: sort_by
   defp normalize_sort(_sort_by), do: "country"
 
@@ -266,5 +340,32 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   defp bounded_page(value, page) do
     page_number = parse_page(value)
     max(page.total_pages, 1) |> min(page_number) |> max(1)
+  end
+
+  defp update_success_message(%{
+         countries: %{cached: cached, imported: imported, skipped: skipped}
+       }) do
+    source =
+      if cached, do: "the current local GeoNames download", else: "a fresh GeoNames download"
+
+    "Countries updated from #{source}: #{imported} imported, #{skipped} skipped."
+  end
+
+  defp update_success_message(_result), do: "Countries updated from GeoNames."
+
+  defp update_error_message({:download, :countries, {:request, %{reason: :timeout}}}) do
+    "Countries were not changed. Bilimbi could not connect to download.geonames.org within 10 seconds. Check internet, proxy, or firewall access, then try Update again. If it persists, contact your administrator."
+  end
+
+  defp update_error_message({:download, :countries, {:http_status, status}}) do
+    "Countries were not changed. GeoNames responded with HTTP #{status}. Try Update again later; if it persists, contact your administrator."
+  end
+
+  defp update_error_message({:import, :countries, _reason}) do
+    "Countries were not changed. GeoNames data was downloaded but could not be imported, and the existing data was kept. Try Update again; if it persists, contact your administrator."
+  end
+
+  defp update_error_message(_reason) do
+    "Countries were not changed because the GeoNames update did not finish. Try Update again; if it persists, contact your administrator."
   end
 end

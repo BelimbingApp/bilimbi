@@ -50,7 +50,7 @@ const AppShell = {
 
     this.toggle?.addEventListener("click", this.onToggle)
     this.backdrop?.addEventListener("click", this.onBackdrop)
-    this.sidebar?.addEventListener("click", this.onNav)
+    this.root?.addEventListener("click", this.onNav)
     this.drag?.addEventListener("mousedown", this.onDragStart)
     this.pinnedItems?.addEventListener("dragstart", this.onPinnedDragStart)
     this.pinnedItems?.addEventListener("dragover", this.onPinnedDragOver)
@@ -68,7 +68,7 @@ const AppShell = {
   destroyed() {
     this.toggle?.removeEventListener("click", this.onToggle)
     this.backdrop?.removeEventListener("click", this.onBackdrop)
-    this.sidebar?.removeEventListener("click", this.onNav)
+    this.root?.removeEventListener("click", this.onNav)
     this.drag?.removeEventListener("mousedown", this.onDragStart)
     this.pinnedItems?.removeEventListener("dragstart", this.onPinnedDragStart)
     this.pinnedItems?.removeEventListener("dragover", this.onPinnedDragOver)
@@ -217,11 +217,13 @@ const AppShell = {
   onSidebarClick(event) {
     const pin = event.target.closest("[data-nav-pin]")
 
-    if (pin && this.sidebar?.contains(pin)) {
+    if (pin && this.root?.contains(pin)) {
       event.preventDefault()
       this.togglePinnedItem(pin.dataset.navPin)
       return
     }
+
+    if (!this.sidebar?.contains(event.target)) return
 
     const toggle = event.target.closest("[data-nav-toggle]")
 
@@ -423,9 +425,10 @@ const AppShell = {
       this.pinnedItems.append(row)
     }
 
-    for (const pin of this.sidebar.querySelectorAll("[data-nav-pin]")) {
+    for (const pin of this.root.querySelectorAll("[data-nav-pin]")) {
       const pinned = this.pinnedItemIds.includes(pin.dataset.navPin)
       pin.dataset.pinned = String(pinned)
+      pin.setAttribute("aria-pressed", String(pinned))
       pin.title = `${pinned ? "Unpin" : "Pin"} ${pin.getAttribute("aria-label")
         ?.replace(/^(Pin|Unpin) /, "")}`
     }

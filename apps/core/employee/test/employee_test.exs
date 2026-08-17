@@ -188,6 +188,7 @@ defmodule Bilimbi.Core.EmployeeTest do
 
     assert {:ok, page} = Employee.list_administration_page(owner, 73, search: "100%_LITERAL")
     assert [entry] = page.entries
+    assert page.page_size == 25
     assert entry.id == literal.id
     refute Map.has_key?(entry, :metadata)
     refute Map.has_key?(entry, :company_id)

@@ -134,7 +134,4 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     |> put_flash(:error, "That user does not exist in this workspace.")
     |> push_navigate(to: ~p"/users")
   end
-
-  defp allowed?(%{capabilities: capabilities}, capability), do: capability in capabilities
-  defp allowed?(_scope, _capability), do: false
 end

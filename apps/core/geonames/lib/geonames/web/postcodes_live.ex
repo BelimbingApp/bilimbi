@@ -7,7 +7,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
   import Bilimbi.Core.Geonames.Web.Components
 
-  @page_sizes [20, 50, 100, 300]
+  @page_sizes [25, 50, 100, 300]
   @sorts ~w(country_name postcode place_name admin1_code updated_at)
   @summary_sorts ~w(country_name country_iso record_count)
   @initial_directions %{"updated_at" => "desc"}
@@ -27,7 +27,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
   def handle_event("filters", %{"filters" => filters}, socket) do
     state =
       socket.assigns.index_state
-      |> Map.put(:search, Map.get(filters, "search", ""))
+      |> Map.put(:search, Map.get(filters, "search", socket.assigns.index_state.search))
       |> Map.put(:per_page, Map.get(filters, "perPage", socket.assigns.index_state.per_page))
       |> Map.put(:page, 1)
 
@@ -94,7 +94,10 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
                             @index_state.summary_sort_dir
                           )
                         }
-                        class={["size-3.5", @index_state.summary_sort_by == "country_name" && "text-action"]}
+                        class={[
+                          "size-3.5",
+                          @index_state.summary_sort_by == "country_name" && "text-action"
+                        ]}
                       />
                     </button>
                   </th>
@@ -118,7 +121,10 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
                             @index_state.summary_sort_dir
                           )
                         }
-                        class={["size-3.5", @index_state.summary_sort_by == "country_iso" && "text-action"]}
+                        class={[
+                          "size-3.5",
+                          @index_state.summary_sort_by == "country_iso" && "text-action"
+                        ]}
                       />
                     </button>
                   </th>
@@ -142,7 +148,10 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
                             @index_state.summary_sort_dir
                           )
                         }
-                        class={["size-3.5", @index_state.summary_sort_by == "record_count" && "text-action"]}
+                        class={[
+                          "size-3.5",
+                          @index_state.summary_sort_by == "record_count" && "text-action"
+                        ]}
                       />
                     </button>
                   </th>
@@ -172,29 +181,30 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
             for={@filters_form}
             id="postcodes-filters"
             phx-change="filters"
-            class="px-4 pt-4"
+            class="px-2 pt-2"
           >
-            <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+            <div class="relative">
+              <.icon
+                name="hero-magnifying-glass"
+                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              />
               <.input
                 field={@filters_form[:search]}
                 id="postcodes-search"
                 type="search"
                 phx-debounce="300"
                 label="Search postcodes"
+                label_class="sr-only"
+                wrapper_class="mb-0"
                 placeholder="Search by postcode, place name, or country..."
-              />
-              <.input
-                field={@filters_form[:perPage]}
-                id="postcodes-page-size"
-                type="select"
-                label="Rows per page"
-                options={page_size_options()}
+                class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
               />
             </div>
           </.form>
 
-          <div class="overflow-x-auto">
+          <div class="overflow-x-auto px-2 pt-2">
             <table class="w-full text-left text-sm">
+              <caption class="sr-only">Geonames postcodes</caption>
               <thead class="border-y border-line bg-surface-sunken">
                 <tr>
                   <.sortable_heading
@@ -240,25 +250,25 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
                   id={id}
                   class="hover:bg-surface-sunken"
                 >
-                  <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">
+                  <td class="whitespace-nowrap px-2 py-1.5 text-ink-muted">
                     <span class="font-mono text-xs">{postcode.country_iso}</span>
                     <span class="ml-1">{postcode.country_name || postcode.country_iso}</span>
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 font-medium tabular-nums text-ink">
+                  <td class="whitespace-nowrap px-2 py-1.5 font-medium tabular-nums text-ink">
                     {postcode.postcode}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">
+                  <td class="whitespace-nowrap px-2 py-1.5 text-ink-muted">
                     {postcode.place_name}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-ink-muted">
+                  <td class="whitespace-nowrap px-2 py-1.5 tabular-nums text-ink-muted">
                     {postcode.admin1_code || "—"}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-ink-muted">
-                    {format_date(postcode.updated_at)}
+                  <td class="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums text-ink-muted">
+                    <.datetime id={"#{id}-updated"} value={postcode.updated_at} format={:date} />
                   </td>
                 </tr>
                 <tr :if={@postcodes_page.entries == []} id="postcodes-empty">
-                  <td colspan="5" class="px-4 py-8 text-center text-ink-muted">
+                  <td colspan="5" class="px-2 py-8 text-center text-ink-muted">
                     No postcodes found.
                   </td>
                 </tr>
@@ -266,7 +276,12 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
             </table>
           </div>
 
-          <.pagination id="postcodes-pagination" page={@postcodes_page} />
+          <.pagination
+            id="postcodes-pagination"
+            page={@postcodes_page}
+            page_sizes={@page_sizes}
+            filters_form={@filters_form}
+          />
         </section>
       </div>
     </Layouts.app>
@@ -293,6 +308,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
     socket
     |> assign(:page_title, "Geonames Postcodes")
+    |> assign(:page_sizes, @page_sizes)
     |> assign(:postcodes_page, postcodes_page)
     |> assign(:postcode_country_summaries, postcode_country_summaries)
     |> assign(
@@ -352,8 +368,6 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
   defp postcodes_path(state) do
     ~p"/geonames/postcodes?#{%{search: state.search, page: state.page, perPage: state.per_page, sortBy: state.sort_by, sortDir: state.sort_dir, summarySortBy: state.summary_sort_by, summarySortDir: state.summary_sort_dir}}"
   end
-
-  defp page_size_options, do: Enum.map(@page_sizes, &{"#{&1} rows", &1})
 
   defp normalize_sort(sort_by) when sort_by in @sorts, do: sort_by
   defp normalize_sort(_sort_by), do: "country_name"

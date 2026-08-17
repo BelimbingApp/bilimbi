@@ -15,7 +15,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
 
-    GeonamesFixtures.insert_country!()
+    GeonamesFixtures.insert_country!(%{updated_at: ~N[2026-07-24 12:34:56]})
 
     GeonamesFixtures.insert_country!(%{
       iso: "US",
@@ -59,11 +59,26 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     assert has_element?(countries, "#countries-table")
     assert has_element?(countries, "#country-1", "Malaysia")
-    assert has_element?(countries, "#countries-sort-population")
+
+    assert has_element?(
+             countries,
+             "#countries-search[placeholder='Search by country name or ISO code...']"
+           )
+
+    assert has_element?(countries, "#countries-sort-population[title='Sort by Population']")
+    assert has_element?(countries, "#countries-pagination-page-size option[value='25'][selected]")
+    assert has_element?(countries, "#countries-pin[data-nav-pin='nav-admin-geonames-country']")
+    assert has_element?(countries, "#countries-update[phx-click='update-countries']", "Update")
+
+    assert has_element?(
+             countries,
+             "#country-1-updated[phx-hook='DateTime'][datetime='2026-07-24T12:34:56Z']",
+             "24/07/2026 UTC"
+           )
 
     countries
     |> element("#countries-filters")
-    |> render_change(%{"filters" => %{"search" => "United", "perPage" => "20"}})
+    |> render_change(%{"filters" => %{"search" => "United"}})
 
     assert has_element?(countries, "#country-2", "United States")
     refute has_element?(countries, "#country-1", "Malaysia")
@@ -71,11 +86,12 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     {:ok, admin1, _html} = conn |> log_in_as() |> live(~p"/geonames/admin1")
 
     assert has_element?(admin1, "#admin1-country-filter")
+    assert has_element?(admin1, "label[for='admin1-country-filter'].sr-only", "Country")
     assert has_element?(admin1, "#admin1-2", "California")
 
     admin1
     |> element("#admin1-filters")
-    |> render_change(%{"filters" => %{"search" => "", "countryIso" => "MY", "perPage" => "20"}})
+    |> render_change(%{"filters" => %{"search" => "", "countryIso" => "MY"}})
 
     assert has_element?(admin1, "#admin1-1", "Kuala Lumpur")
     refute has_element?(admin1, "#admin1-2", "California")
@@ -88,7 +104,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     postcodes
     |> element("#postcodes-filters")
-    |> render_change(%{"filters" => %{"search" => "San Francisco", "perPage" => "20"}})
+    |> render_change(%{"filters" => %{"search" => "San Francisco"}})
 
     assert has_element?(postcodes, "#postcode-2", "San Francisco")
     refute has_element?(postcodes, "#postcode-1", "Kuala Lumpur")
@@ -104,11 +120,11 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     countries
     |> element("#countries-filters")
-    |> render_change(%{"filters" => %{"search" => "missing", "perPage" => "20"}})
+    |> render_change(%{"filters" => %{"search" => "missing"}})
 
     assert_patch(
       countries,
-      ~p"/geonames/countries?#{%{search: "missing", page: 1, perPage: 20, sortBy: "country", sortDir: "asc"}}"
+      ~p"/geonames/countries?#{%{search: "missing", page: 1, perPage: 25, sortBy: "country", sortDir: "asc"}}"
     )
 
     assert has_element?(countries, "#countries-empty")
@@ -118,7 +134,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     admin1
     |> element("#admin1-filters")
     |> render_change(%{
-      "filters" => %{"search" => "missing", "countryIso" => "", "perPage" => "20"}
+      "filters" => %{"search" => "missing", "countryIso" => ""}
     })
 
     assert has_element?(admin1, "#admin1-empty")
@@ -127,8 +143,34 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     postcodes
     |> element("#postcodes-filters")
-    |> render_change(%{"filters" => %{"search" => "missing", "perPage" => "20"}})
+    |> render_change(%{"filters" => %{"search" => "missing"}})
 
     assert has_element?(postcodes, "#postcodes-empty")
+  end
+
+  test "uses compact pagination controls for country page size and sorting", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list"])
+
+    {:ok, countries, _html} = conn |> log_in_as() |> live(~p"/geonames/countries")
+
+    countries
+    |> element("#countries-pagination-page-size-form")
+    |> render_change(%{"filters" => %{"perPage" => "50"}})
+
+    assert_patch(
+      countries,
+      ~p"/geonames/countries?#{%{search: "", page: 1, perPage: 50, sortBy: "country", sortDir: "asc"}}"
+    )
+
+    countries
+    |> element("#countries-sort-population")
+    |> render_click()
+
+    assert_patch(
+      countries,
+      ~p"/geonames/countries?#{%{search: "", page: 1, perPage: 50, sortBy: "population", sortDir: "desc"}}"
+    )
+
+    assert has_element?(countries, "th[aria-sort='descending'] #countries-sort-population")
   end
 end

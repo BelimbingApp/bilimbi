@@ -293,6 +293,7 @@ defmodule Bilimbi.Core.AddressTest do
              Address.list_addresses(context.operator, search: "MY")
 
     assert same_country.id == country_match.id
+    assert %Page{page_size: 25} = Address.list_addresses(context.operator, [])
     refute other_tenant.id in Enum.map(first_page ++ second_page, & &1.id)
   end
 
