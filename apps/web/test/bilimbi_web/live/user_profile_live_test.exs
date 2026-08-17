@@ -23,7 +23,14 @@ defmodule BilimbiWeb.UserProfileLiveTest do
     SettingsFixtures.create_settings_table!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
-    UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
+    # Verified on purpose: the flash tests below are about *losing* that
+    # status, and they assert nothing against a user who never had it.
+    UserFixtures.insert_user!(%{
+      id: 91,
+      company_id: 73,
+      name: "Ada Lovelace",
+      email_verified_at: ~N[2026-01-01 00:00:00]
+    })
 
     UserFixtures.insert_user!(%{
       id: 92,
@@ -128,13 +135,49 @@ defmodule BilimbiWeb.UserProfileLiveTest do
     assert has_element?(view, "#flash-info", "Profile saved.")
   end
 
-  test "offers only landing pages this actor can open", %{conn: conn} do
+  test "a case-only email difference is not an email change", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
-    # Dashboard is reachable by anyone signed in; Companies needs a capability
-    # this account does not hold, so it must not be offerable as a landing
-    # page — pinning one would redirect the user out on every sign-in.
-    assert has_element?(view, "select[name='profile[landing_menu_id]'] option[value='dashboard']")
+    view
+    |> form("#profile-form", %{
+      "profile" => %{"name" => "Ada K", "email" => "ADA@EXAMPLE.COM"}
+    })
+    |> render_submit()
+
+    # Core downcases before writing, so this submission is equal to the stored
+    # address: Ecto drops the change and verification is never cleared.
+    # Deriving the message from the submitted string instead of the persisted
+    # one announced an unverification that did not happen.
+    #
+    # Case only, not whitespace: `form_changeset/2` rejects whitespace with
+    # `~r/^[^\s@]+@[^\s@]+$/` before the domain ever sees it, so a padded
+    # address cannot reach this path from the UI.
+    refute has_element?(view, "#flash-info", "unverified until you confirm it")
+    assert has_element?(view, "#flash-info", "Profile saved.")
+
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+    assert {:ok, user} = User.get_tenant_user(scope, 91)
+    assert user.email == "ada@example.com"
+    refute is_nil(user.email_verified_at)
+  end
+
+  test "offers only landing pages this actor can open", %{conn: conn} do
+    # Both halves have to be earned now. Dashboard used to be the always-there
+    # option, but c5c16a5 removed it as a sidebar item ("the brand mark remains
+    # the home link"), and every remaining contribution is capability-gated —
+    # so a capability-less account has an empty select, and the negative
+    # assertion below would pass for the wrong reason.
+    grant_capabilities!("admin.user.list")
+
+    {:ok, view, _html} = open(conn)
+
+    # Users is now reachable for this account; Companies needs a capability it
+    # does not hold, so it must not be offerable as a landing page — pinning
+    # one would redirect the user out on every sign-in.
+    assert has_element?(
+             view,
+             "select[name='profile[landing_menu_id]'] option[value='admin.user']"
+           )
 
     refute has_element?(
              view,

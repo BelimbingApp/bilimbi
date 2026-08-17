@@ -75,15 +75,26 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
     previous_email = socket.assigns.account.email
 
     case User.update_user(scope, company_id, user_id, attributes) do
-      {:ok, _summary} ->
+      {:ok, summary} ->
         # Re-read from the domain, not the session. `current_scope.user` is
         # built at mount and no write refreshes it, so reloading the form from
         # it would show the values the user just replaced -- a save that looks
         # like it silently failed.
+        #
+        # The message compares the *persisted* address, not the submitted one.
+        # Core normalizes with trim/downcase, so " ADA@EXAMPLE.COM " over a
+        # verified "ada@example.com" is not a change at all: Ecto drops the
+        # equal value and verification survives. Comparing raw input would
+        # announce an unverification that never happened.
         {:noreply,
          socket
          |> refresh_account()
-         |> save_landing(changeset, Map.put(attributes, :previous_email, previous_email))}
+         |> save_landing(
+           changeset,
+           attributes
+           |> Map.put(:email, summary.email)
+           |> Map.put(:previous_email, previous_email)
+         )}
 
       {:error, %Changeset{} = domain} ->
         {:noreply, assign_form(socket, copy_domain_errors(changeset, domain))}
