@@ -306,9 +306,6 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
 
   defp positive_integer(_value), do: nil
 
-  defp allowed?(%{capabilities: capabilities}, capability), do: capability in capabilities
-  defp allowed?(_current_scope, _capability), do: false
-
   defp initials(name) when is_binary(name) do
     name
     |> String.split(~r/\s+/, trim: true)

@@ -30,7 +30,7 @@ defmodule Bilimbi.Base.UI.Nav do
   """
   @spec tree(map() | nil) :: [node_t()]
   def tree(scope) do
-    Menu.visible_tree(fn capability -> allowed?(scope, capability) end)
+    Menu.visible_tree(fn capability -> Bilimbi.Base.UI.allowed?(scope, capability) end)
     |> reject_unreachable()
   rescue
     ArgumentError -> []
@@ -70,9 +70,4 @@ defmodule Bilimbi.Base.UI.Nav do
   end
 
   defp demote_unserved(node), do: node
-
-  defp allowed?(%{capabilities: caps}, cap) when is_list(caps) and is_binary(cap),
-    do: cap in caps
-
-  defp allowed?(_scope, _cap), do: false
 end

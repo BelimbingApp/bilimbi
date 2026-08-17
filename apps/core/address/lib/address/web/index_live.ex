@@ -355,7 +355,4 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
 
   defp page_position(%{page: page, total_pages: total_pages}),
     do: "Page #{page} of #{total_pages}"
-
-  defp allowed?(%{capabilities: capabilities}, capability), do: capability in capabilities
-  defp allowed?(_scope, _capability), do: false
 end

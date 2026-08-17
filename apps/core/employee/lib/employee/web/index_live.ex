@@ -7,8 +7,6 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
 
   use Bilimbi.Base.UI, :live_view
 
-  import Bilimbi.Core.Employee.Web.Capabilities, only: [allowed?: 2]
-
   alias Bilimbi.Core.Employee
 
   @impl true

@@ -8,6 +8,17 @@ defmodule Bilimbi.Base.UI do
   `BilimbiWeb.UserAuth`.
   """
 
+  @doc """
+  Whether the scope (or assign map) lists `capability` among its effective allows.
+  """
+  @spec allowed?(map() | nil, String.t()) :: boolean()
+  def allowed?(%{capabilities: capabilities}, capability)
+      when is_list(capabilities) and is_binary(capability) do
+    capability in capabilities
+  end
+
+  def allowed?(_current_scope, _capability), do: false
+
   def live_view do
     quote do
       use Phoenix.LiveView
@@ -37,6 +48,7 @@ defmodule Bilimbi.Base.UI do
       use Gettext, backend: Bilimbi.Base.UI.Gettext
 
       import Phoenix.HTML
+      import Bilimbi.Base.UI, only: [allowed?: 2]
       import Bilimbi.Base.UI.Components
 
       alias Bilimbi.Base.UI.Layouts

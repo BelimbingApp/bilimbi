@@ -321,13 +321,7 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   @doc "Whether the rehydrated scope lists `capability` among its effective allows."
-  @spec allowed?(map() | nil, String.t()) :: boolean()
-  def allowed?(%{capabilities: capabilities}, capability)
-      when is_list(capabilities) and is_binary(capability) do
-    capability in capabilities
-  end
-
-  def allowed?(_current_scope, _capability), do: false
+  defdelegate allowed?(current_scope, capability), to: Bilimbi.Base.UI
 
   # ------------------------------------------------------------------
   # LiveView on_mount
