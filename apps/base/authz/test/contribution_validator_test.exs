@@ -1,7 +1,10 @@
 defmodule Bilimbi.Base.Authz.ContributionValidatorTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureIO
+
   alias Bilimbi.Base.Authz.ContributionValidator
+  alias Bilimbi.Base.Authz.TestCompanyDirectory
 
   test "merges role capabilities after validating the complete provider graph" do
     snapshot =
@@ -78,6 +81,51 @@ defmodule Bilimbi.Base.Authz.ContributionValidatorTest do
           }
         })
       ])
+    end
+  end
+
+  describe "company directory contract" do
+    test "accepts a directory that answers every question the contract asks" do
+      snapshot =
+        ContributionValidator.validate_contributions!([
+          %{
+            descriptor: %{id: "base/authz", otp_app: :bilimbi_base_authz},
+            payload: %{company_directory: TestCompanyDirectory}
+          }
+        ])
+
+      assert snapshot.company_directory == TestCompanyDirectory
+    end
+
+    test "rejects a directory that cannot name the companies it lists" do
+      # Defined at run time on purpose. A module carrying `@behaviour` without
+      # `companies_in_scope/1` is a compile *warning*, and this package builds
+      # with `--warnings-as-errors`, so the incomplete directory cannot live in
+      # `test/support` -- it would fail the build rather than this assertion.
+      # Evaluating it here keeps the warning at run time, where `capture_io`
+      # swallows it and the validator still gets a real module to inspect.
+      capture_io(:stderr, fn ->
+        Code.eval_string(~S"""
+        defmodule IdsOnlyCompanyDirectory do
+          @behaviour Bilimbi.Base.Authz.CompanyDirectory
+
+          @impl true
+          def company_ids(_scope), do: [10]
+
+          @impl true
+          def company_in_scope?(_scope, company_id), do: company_id == 10
+        end
+        """)
+      end)
+
+      assert_raise ArgumentError, ~r/company directory .* has the wrong contract/, fn ->
+        ContributionValidator.validate_contributions!([
+          %{
+            descriptor: %{id: "base/authz", otp_app: :bilimbi_base_authz},
+            payload: %{company_directory: IdsOnlyCompanyDirectory}
+          }
+        ])
+      end
     end
   end
 
