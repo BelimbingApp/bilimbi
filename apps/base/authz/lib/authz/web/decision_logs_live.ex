@@ -53,8 +53,11 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
     {:noreply, push_state(socket, state)}
   end
 
+  # The shared `<.table>` pushes the column as `phx-value-sort`, so the param is
+  # "sort" rather than the "column" this screen used while it hand-rolled its
+  # own header buttons.
   @impl true
-  def handle_event("sort", %{"column" => column}, socket) when column in @sortable do
+  def handle_event("sort", %{"sort" => column}, socket) when column in @sortable do
     state = socket.assigns.state
     column = String.to_existing_atom(column)
 
@@ -169,14 +172,6 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
 
   defp nilify(""), do: nil
   defp nilify(value), do: value
-
-  defp sort_indicator(state, column) do
-    cond do
-      state.sort_by != column -> nil
-      state.sort_dir == :asc -> "hero-chevron-up"
-      true -> "hero-chevron-down"
-    end
-  end
 
   defp actor_label(%{actor_type: "agent"}), do: "Employee"
   defp actor_label(%{actor_type: "user"}), do: "User"

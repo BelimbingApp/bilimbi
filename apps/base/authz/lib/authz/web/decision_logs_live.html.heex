@@ -33,69 +33,55 @@
       </div>
     </form>
 
-    <div class="mt-4 overflow-x-auto rounded-xl border border-line bg-surface">
-      <table class="w-full text-left text-sm">
-        <thead class="border-b border-line bg-surface-sunken">
-          <tr>
-            <th
-              :for={
-                {column, label} <- [
-                  {"occurred_at", "When"},
-                  {"actor_type", "Actor"},
-                  {"capability", "Capability"},
-                  {"allowed", "Result"},
-                  {"reason", "Reason"},
-                  {"resource", "Resource"}
-                ]
-              }
-              class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle"
-            >
-              <button
-                type="button"
-                id={"logs-sort-#{column}"}
-                phx-click="sort"
-                phx-value-column={column}
-                class="inline-flex items-center gap-1 hover:text-ink"
-              >
-                {label}
-                <.icon
-                  :if={sort_indicator(@state, String.to_existing_atom(column))}
-                  name={sort_indicator(@state, String.to_existing_atom(column))}
-                  class="size-3"
-                />
-              </button>
-            </th>
-          </tr>
-        </thead>
-        <tbody id="decision-logs" phx-update="stream" class="divide-y divide-line-subtle">
-          <tr :for={{dom_id, log} <- @streams.logs} id={dom_id} class="hover:bg-surface-sunken">
-            <td class="px-4 py-2.5 whitespace-nowrap tabular-nums text-ink-muted">
-              {occurred_at(log)}
-            </td>
-            <td class="px-4 py-2.5 whitespace-nowrap text-ink-muted">
-              <.badge>{actor_label(log)}</.badge>
-              <span class="ml-1 tabular-nums">{log.actor_id}</span>
-              <span :if={log.acting_for_user_id} class="ml-1 text-xs text-ink-faint tabular-nums">
-                (as #{log.acting_for_user_id})
-              </span>
-            </td>
-            <td class="px-4 py-2.5 font-mono text-xs text-ink">{log.capability}</td>
-            <td class="px-4 py-2.5">
-              <.badge kind={if log.allowed, do: :success, else: :danger}>
-                {if log.allowed, do: "Allowed", else: "Denied"}
-              </.badge>
-            </td>
-            <td class="px-4 py-2.5 font-mono text-xs text-ink-muted">{log.reason || "—"}</td>
-            <td class="px-4 py-2.5 text-ink-muted">{resource_label(log)}</td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="mt-4">
+      <.table
+        id="decision-logs"
+        rows={@streams.logs}
+        row_id={fn {dom_id, _log} -> dom_id end}
+        row_item={fn {_dom_id, log} -> log end}
+        sort_by={@state.sort_by}
+        sort_dir={@state.sort_dir}
+      >
+        <:col :let={log} label="When" sort="occurred_at" sort_id="logs-sort-occurred_at">
+          <span class="whitespace-nowrap tabular-nums text-ink-muted">
+            {occurred_at(log)}
+          </span>
+        </:col>
 
-      <p :if={@page.total_entries == 0} class="px-4 py-8 text-center text-sm text-ink-muted">
-        {if @state.search == "" and @state.result == "",
-          do: "No authorization decisions have been recorded in this tenant.",
-          else: "No decisions match these filters."}
-      </p>
+        <:col :let={log} label="Actor" sort="actor_type" sort_id="logs-sort-actor_type">
+          <span class="whitespace-nowrap text-ink-muted">
+            <.badge>{actor_label(log)}</.badge>
+            <span class="ml-1 tabular-nums">{log.actor_id}</span>
+            <span :if={log.acting_for_user_id} class="ml-1 text-xs text-ink-faint tabular-nums">
+              (as #{log.acting_for_user_id})
+            </span>
+          </span>
+        </:col>
+
+        <:col :let={log} label="Capability" sort="capability" sort_id="logs-sort-capability">
+          <span class="font-mono text-xs text-ink">{log.capability}</span>
+        </:col>
+
+        <:col :let={log} label="Result" sort="allowed" sort_id="logs-sort-allowed">
+          <.badge kind={if log.allowed, do: :success, else: :danger}>
+            {if log.allowed, do: "Allowed", else: "Denied"}
+          </.badge>
+        </:col>
+
+        <:col :let={log} label="Reason" sort="reason" sort_id="logs-sort-reason">
+          <span class="font-mono text-xs text-ink-muted">{log.reason || "—"}</span>
+        </:col>
+
+        <:col :let={log} label="Resource" sort="resource" sort_id="logs-sort-resource">
+          <span class="text-ink-muted">{resource_label(log)}</span>
+        </:col>
+
+        <:empty :if={@page.total_entries == 0}>
+          {if @state.search == "" and @state.result == "",
+            do: "No authorization decisions have been recorded in this tenant.",
+            else: "No decisions match these filters."}
+        </:empty>
+      </.table>
     </div>
 
     <div

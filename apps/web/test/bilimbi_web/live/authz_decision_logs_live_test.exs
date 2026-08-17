@@ -119,7 +119,12 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     refute has_element?(view, "#decision-logs", "admin.user.list")
 
     view |> form("#logs-filters", %{"search" => "zzz"}) |> render_change()
-    assert render(view) =~ "No decisions match these filters."
+
+    assert has_element?(
+             view,
+             "#decision-logs-empty",
+             "No decisions match these filters"
+           )
   end
 
   test "defaults to newest first and keeps that when re-sorting time", %{
@@ -129,6 +134,9 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     record_decision(scope, "admin.user.list")
 
     {:ok, view, _html} = open(conn)
+
+    assert has_element?(view, "th[aria-sort='descending']")
+    assert has_element?(view, "th[scope='col'][aria-sort='none']")
 
     # A log read oldest-first is never what the reader wanted, so occurred_at
     # starts descending. Asserted through the rendered indicator, which is real
