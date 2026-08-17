@@ -2,7 +2,8 @@ defmodule Bilimbi.Core.Geonames.Downloader do
   @moduledoc false
 
   @default_ttl_days 7
-  @default_timeout 300_000
+  @default_connect_timeout 10_000
+  @default_receive_timeout 300_000
 
   @type result :: %{
           path: String.t(),
@@ -32,6 +33,7 @@ defmodule Bilimbi.Core.Geonames.Downloader do
 
     temporary_path = destination <> ".download-#{System.unique_integer([:positive])}"
     headers = if stored_etag, do: [{"if-none-match", stored_etag}], else: []
+    connect_options = [timeout: Keyword.get(opts, :connect_timeout, @default_connect_timeout)]
 
     request_options =
       opts
@@ -40,7 +42,8 @@ defmodule Bilimbi.Core.Geonames.Downloader do
         url: url,
         headers: headers,
         into: File.stream!(temporary_path, [:write]),
-        receive_timeout: Keyword.get(opts, :receive_timeout, @default_timeout),
+        connect_options: connect_options,
+        receive_timeout: Keyword.get(opts, :receive_timeout, @default_receive_timeout),
         retry: false
       )
 

@@ -7,7 +7,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
 
   import Bilimbi.Core.Geonames.Web.Components
 
-  @page_sizes [20, 50, 100, 300]
+  @page_sizes [25, 50, 100, 300]
   @sorts ~w(country_name code name alt_name updated_at)
   @initial_directions %{"updated_at" => "desc"}
 
@@ -25,8 +25,11 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
   def handle_event("filters", %{"filters" => filters}, socket) do
     state =
       socket.assigns.index_state
-      |> Map.put(:search, Map.get(filters, "search", ""))
-      |> Map.put(:country_iso, Map.get(filters, "countryIso", ""))
+      |> Map.put(:search, Map.get(filters, "search", socket.assigns.index_state.search))
+      |> Map.put(
+        :country_iso,
+        Map.get(filters, "countryIso", socket.assigns.index_state.country_iso)
+      )
       |> Map.put(:per_page, Map.get(filters, "perPage", socket.assigns.index_state.per_page))
       |> Map.put(:page, 1)
 
@@ -48,7 +51,11 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
   @impl true
   def render(assigns) do
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.geonames.admin1-division">
+    <Layouts.app
+      flash={@flash}
+      current_scope={@current_scope}
+      active_nav="admin.geonames.admin1-division"
+    >
       <div id="admin1-index" class="mx-auto max-w-7xl">
         <.header>
           Admin1 Divisions
@@ -60,37 +67,43 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
             for={@filters_form}
             id="admin1-filters"
             phx-change="filters"
-            class="px-4 pt-4"
+            class="px-2 pt-2"
           >
-            <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_16rem_12rem]">
-              <.input
-                field={@filters_form[:search]}
-                id="admin1-search"
-                type="search"
-                phx-debounce="300"
-                label="Search Admin1 divisions"
-                placeholder="Search by name, code, or country..."
-              />
+            <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_16rem]">
+              <div class="relative">
+                <.icon
+                  name="hero-magnifying-glass"
+                  class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+                />
+                <.input
+                  field={@filters_form[:search]}
+                  id="admin1-search"
+                  type="search"
+                  phx-debounce="300"
+                  label="Search Admin1 divisions"
+                  label_class="sr-only"
+                  wrapper_class="mb-0"
+                  placeholder="Search by name, code, or country..."
+                  class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+                />
+              </div>
               <.input
                 field={@filters_form[:countryIso]}
                 id="admin1-country-filter"
                 type="select"
                 label="Country"
+                label_class="sr-only"
+                wrapper_class="mb-0"
                 prompt="All Countries"
                 options={country_options(@filter_countries)}
-              />
-              <.input
-                field={@filters_form[:perPage]}
-                id="admin1-page-size"
-                type="select"
-                label="Rows per page"
-                options={page_size_options()}
+                class="h-[2.125rem] w-full rounded-lg border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
               />
             </div>
           </.form>
 
-          <div class="overflow-x-auto">
+          <div class="overflow-x-auto px-2 pt-2">
             <table class="w-full text-left text-sm">
+              <caption class="sr-only">Admin1 divisions</caption>
               <thead class="border-y border-line bg-surface-sunken">
                 <tr>
                   <.sortable_heading
@@ -136,21 +149,21 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
                   id={id}
                   class="hover:bg-surface-sunken"
                 >
-                  <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">
+                  <td class="whitespace-nowrap px-2 py-1.5 text-ink-muted">
                     <span class="font-mono text-xs">{admin1.country_iso}</span>
                     <span class="ml-1">{admin1.country_name || admin1.country_iso}</span>
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 font-mono text-ink">{admin1.code}</td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-ink">{admin1.name}</td>
-                  <td class="whitespace-nowrap px-4 py-2.5 text-ink-muted">
+                  <td class="whitespace-nowrap px-2 py-1.5 font-mono text-ink">{admin1.code}</td>
+                  <td class="whitespace-nowrap px-2 py-1.5 text-ink">{admin1.name}</td>
+                  <td class="whitespace-nowrap px-2 py-1.5 text-ink-muted">
                     {admin1.alt_name || "—"}
                   </td>
-                  <td class="whitespace-nowrap px-4 py-2.5 tabular-nums text-ink-muted">
-                    {format_date(admin1.updated_at)}
+                  <td class="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums text-ink-muted">
+                    <.datetime id={"#{id}-updated"} value={admin1.updated_at} format={:date} />
                   </td>
                 </tr>
                 <tr :if={@admin1_page.entries == []} id="admin1-empty">
-                  <td colspan="5" class="px-4 py-8 text-center text-ink-muted">
+                  <td colspan="5" class="px-2 py-8 text-center text-ink-muted">
                     No Admin1 divisions found.
                   </td>
                 </tr>
@@ -158,7 +171,12 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
             </table>
           </div>
 
-          <.pagination id="admin1-pagination" page={@admin1_page} />
+          <.pagination
+            id="admin1-pagination"
+            page={@admin1_page}
+            page_sizes={@page_sizes}
+            filters_form={@filters_form}
+          />
         </div>
       </div>
     </Layouts.app>
@@ -180,6 +198,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
 
     socket
     |> assign(:page_title, "Admin1 Divisions")
+    |> assign(:page_sizes, @page_sizes)
     |> assign(:admin1_page, admin1_page)
     |> assign(:filter_countries, Geonames.admin1_filter_countries())
     |> assign(
@@ -230,8 +249,6 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
   end
 
   defp country_options(countries), do: Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
-  defp page_size_options, do: Enum.map(@page_sizes, &{"#{&1} rows", &1})
-
   defp normalize_sort(sort_by) when sort_by in @sorts, do: sort_by
   defp normalize_sort(_sort_by), do: "country_name"
 

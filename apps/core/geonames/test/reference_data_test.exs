@@ -58,6 +58,26 @@ defmodule Bilimbi.Core.Geonames.ReferenceDataTest do
              )
   end
 
+  test "passes an explicit connection timeout to the downloader", context do
+    caller = self()
+
+    downloader = fn _url, destination, opts ->
+      send(caller, {:download_options, opts})
+      File.cp!(Path.join(context.source_dir, Path.basename(destination)), destination)
+      {:ok, %{path: destination, cached: false, status: 200, etag: nil}}
+    end
+
+    assert {:ok, _results} =
+             ReferenceData.run(
+               datasets: [:countries],
+               cache_dir: context.cache_dir,
+               connect_timeout: 10_000,
+               downloader: downloader
+             )
+
+    assert_received {:download_options, [connect_timeout: 10_000]}
+  end
+
   test "a failed import restores the known-good download cache", context do
     assert {:ok, _results} =
              ReferenceData.run(

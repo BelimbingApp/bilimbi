@@ -23,7 +23,7 @@ defmodule Bilimbi.Core.Address do
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.Geonames
 
-  @default_page_size 15
+  @default_page_size 25
   @maximum_page_size 100
   @address_sort_fields %{
     label: :label,

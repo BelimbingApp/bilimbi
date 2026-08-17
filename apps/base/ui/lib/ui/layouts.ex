@@ -433,7 +433,7 @@ defmodule Bilimbi.Base.UI.Layouts do
       aria-label={"Pin " <> @label <> " to sidebar"}
       class="app-nav-pin grid size-4 shrink-0 place-items-center rounded-sm text-ink-faint opacity-0 transition hover:bg-surface hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
     >
-      <.icon name="hero-bookmark" class="size-3" />
+      <.icon name="bilimbi-pin" class="size-3" />
     </button>
     """
   end
