@@ -4,8 +4,9 @@
 # Agreed spec (Discussion #196, issue #198, docs/ai-team/README.md §3/§8).
 # The team shares two GitHub accounts, so GitHub authorship cannot identify an
 # agent and self-approval is blocked natively. This gate reads the team's only
-# machine-readable identity — the `agent:*` label and the `**From:** <id>`
-# marker — and passes only when BOTH hold:
+# machine-readable identity — one canonical `agent:*` label and one canonical
+# non-quoted/non-fenced `**From:** <id>` marker — and passes only when BOTH
+# hold:
 #
 #   1. the approving marker's agent id differs from the PR's `agent:*` label
 #      (an agent must not approve its own lane), and
@@ -17,7 +18,11 @@
 # explicit logical line: `accept`, `accept with follow-up`, or `changes
 # required`, optionally prefixed by `Verdict:` and decorated with a Markdown
 # heading or bold. Free prose and quoted/example lines never create or revoke
-# an approval. A line may add one bounded `at <token>` or `for <token>` context.
+# an approval or identity. A verdict line may add one bounded `at <token>` or
+# `for <token>` context. Marker IDs use lower-case stable-agent segments
+# separated by single `.`, `_`, or `-` characters with at most one `/`; case
+# and punctuation variants are invalid rather than normalized. A missing,
+# repeated, or invalid marker fails closed.
 # Several explicit lines are ambiguous and fail closed, except that any explicit
 # `changes required` line wins as a rejection. An approval is also revoked by a
 # newer formal CHANGES_REQUESTED review, an explicit rejection comment, or a
@@ -35,7 +40,7 @@ set -euo pipefail
 
 if [[ -n "${REVIEW_GATE_INPUT:-}" ]]; then
   input="$REVIEW_GATE_INPUT"
-elif [[ $# -eq 1 ]]; then
+elif [[ $# -eq 1 && "$1" =~ ^[0-9]+$ ]]; then
   input=$(mktemp)
   trap 'rm -f "$input"' EXIT
   gh pr view "$1" --json author,labels,reviews,comments >"$input"
@@ -45,8 +50,38 @@ else
 fi
 
 verdict=$(jq -r '
+  def trimmed_line:
+    gsub("\\r"; "")
+    | gsub("^[[:space:]]+|[[:space:]]+$"; "");
+  def safe_logical_lines($body):
+    reduce ($body | split("\n")[]) as $raw
+      ({fenced: false, lines: []};
+       ($raw | trimmed_line) as $line
+       | if ($line | test("^(```|~~~)")) then
+           .fenced |= not
+         elif .fenced or ($line | test("^>")) then
+           .
+         else
+           .lines += [$line]
+         end)
+    | .lines;
+  def canonical_agent_id:
+    if type == "string" and
+         test("^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)?$") then
+      .
+    else
+      null
+    end;
+  def marker_token:
+    sub("^#{1,6}[[:space:]]+"; "")
+    | try capture("^\\*\\*From:\\*\\*[[:space:]]+(?<id>[^[:space:]]+)(?:[[:space:]].*)?$").id catch null;
   def marker_id($body):
-    ($body | capture("\\*\\*From:\\*\\*\\s*(?<id>[A-Za-z0-9._/-]+)"; "m").id) // null;
+    ([safe_logical_lines($body)[] | marker_token | select(. != null)]) as $markers
+    | if ($markers | length) == 1 then
+        ($markers[0] | canonical_agent_id)
+      else
+        null
+      end;
   def normalized_verdict_line:
     gsub("\\r"; "")
     | gsub("^[[:space:]]+|[[:space:]]+$"; "")
@@ -63,18 +98,7 @@ verdict=$(jq -r '
       null
     end;
   def explicit_verdict($body):
-    (reduce ($body | split("\n")[]) as $raw
-      ({fenced: false, verdicts: []};
-       ($raw | gsub("\\r"; "") | gsub("^[[:space:]]+|[[:space:]]+$"; "")) as $line
-       | if ($line | test("^(```|~~~)")) then
-           .fenced |= not
-         elif .fenced then
-           .
-         else
-           ($line | normalized_verdict_line | line_verdict) as $verdict
-           | if $verdict == null then . else .verdicts += [$verdict] end
-         end)
-      | .verdicts) as $verdicts
+    ([safe_logical_lines($body)[] | normalized_verdict_line | line_verdict | select(. != null)]) as $verdicts
     | if ($verdicts | length) == 1 then
         $verdicts[0]
       elif ($verdicts | any(. == "changes required")) then
@@ -82,35 +106,47 @@ verdict=$(jq -r '
       else
         null
       end;
+  def timestamp($value):
+    if ($value | type) == "string" then
+      try ($value | fromdateiso8601) catch null
+    else
+      null
+    end;
 
   . as $pr
   | ([$pr.labels[].name | select(startswith("agent:"))]) as $agent_labels
   | ([$pr.reviews[]  | (explicit_verdict(.body)) as $verdict
-                        | {account: .author.login, at: .submittedAt,
+                        | {account: .author.login, at: timestamp(.submittedAt),
                            state: .state, id: marker_id(.body), verdict: $verdict,
                            changes: (.state == "CHANGES_REQUESTED" or
                                      (.state == "COMMENTED" and $verdict == "changes required")),
                            accept: (.state == "APPROVED" or
                                     (.state == "COMMENTED" and $verdict == "accept"))}]
      + [$pr.comments[] | (explicit_verdict(.body)) as $verdict
-                         | {account: .author.login, at: .createdAt,
+                         | {account: .author.login, at: timestamp(.createdAt),
                             state: "COMMENTED", id: marker_id(.body), verdict: $verdict,
                             changes: ($verdict == "changes required"),
                             accept: ($verdict == "accept")}]
     ) as $events
   | if ($agent_labels | length) != 1 then
       "FAIL: PR must carry exactly one agent:* label (found \($agent_labels | length))"
+    elif ($agent_labels[0] | test("^agent:[a-z0-9]+(?:[._-][a-z0-9]+)*$") | not) then
+      "FAIL: PR agent:* label is not canonical"
+    elif (($pr.author.login | type) != "string" or $pr.author.login == "") then
+      "FAIL: malformed PR author"
     else
       ($agent_labels[0]) as $lane
       | ([$events[] | select(.state != "DISMISSED" and .state != "CHANGES_REQUESTED")
-                    | select(.id != null and .accept and (.changes | not))]
-         # an approval counts only while no revocation is newer than it
+                    | select(.id != null and .accept and (.changes | not) and .at != null)
+                    | select((.account | type) == "string" and .account != "")]
+         # Ties and malformed relevant timestamps revoke: only a strictly
+         # later reapproval can survive every relevant revocation.
          | map(. as $a
              | $a + {revoked: (([$events[]
-                       | select(.at > $a.at)
                        | select(.state == "CHANGES_REQUESTED"
-                                or .changes
-                                or (.state == "DISMISSED" and .account == $a.account))]
+                                or (.changes and .id != null)
+                                or (.state == "DISMISSED" and .account == $a.account))
+                       | select((.at == null) or (.at >= $a.at))]
                        | length) > 0)})
          | map(select(.revoked | not))) as $approvals
       | ([$approvals[]

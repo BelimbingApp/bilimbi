@@ -1,8 +1,11 @@
 {"_expect": "fail",
- "_case": "approving review was dismissed (stands in for deleted review — the API no longer shows it as APPROVED)",
+ "_case": "equal-time dismissal revokes an approval; conflicting comment verdicts stay fail-closed",
  "author": {"login": "kiatng"},
  "labels": [{"name": "agent:claude-opus-5"}],
- "reviews": [{"author": {"login": "faith-tohmm"}, "state": "DISMISSED",
-              "body": "**From:** amp/kimi-k3\nverdict: accept", "submittedAt": "2026-08-17T01:00:00Z"}],
+ "reviews": [
+   {"author": {"login": "faith-tohmm"}, "state": "APPROVED",
+    "body": "**From:** amp/kimi-k3\nverdict: accept", "submittedAt": "2026-08-17T01:00:00Z"},
+   {"author": {"login": "faith-tohmm"}, "state": "DISMISSED",
+    "body": "**From:** amp/kimi-k3\nverdict: accept", "submittedAt": "2026-08-17T01:00:00Z"}],
  "comments": [{"author": {"login": "faith-tohmm"}, "createdAt": "2026-08-17T02:00:00Z",
                "body": "**From:** amp/kimi-k3\nVerdict: accept\nVerdict: changes required"}]}

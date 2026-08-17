@@ -1,5 +1,5 @@
 {"_expect": "pass",
- "_case": "changes requested, author fixes, reviewer re-approves — newest approval wins",
+ "_case": "changes requested, author fixes, reviewer re-approves strictly later — newest approval wins",
  "author": {"login": "kiatng"},
  "labels": [{"name": "agent:claude-opus-5"}],
  "reviews": [
