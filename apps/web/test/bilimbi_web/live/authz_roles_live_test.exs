@@ -129,6 +129,36 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       assert %{"sort_by" => "code", "sort_dir" => "desc"} = patched_params(view)
     end
 
+    test "sortable headers carry aria-sort, and only the active one is set", %{
+      conn: conn,
+      ours: ours
+    } do
+      # The hand-rolled markup this screen used had no aria-sort at all; the
+      # shared primitive supplies it, and losing it again would be invisible
+      # without this assertion.
+      {:ok, _} = Authz.create_role(ours, 73, %{name: "Auditor", code: "auditor"})
+
+      {:ok, view, _html} = open_index(conn)
+
+      assert has_element?(view, "th[aria-sort='ascending']")
+      assert has_element?(view, "th[scope='col'][aria-sort='none']")
+
+      view |> element("#roles-sort-code") |> render_click()
+
+      assert %{"sort_by" => "code", "sort_dir" => "asc"} = patched_params(view)
+    end
+
+    test "renders the empty state through the shared table", %{conn: conn} do
+      {:ok, view, _html} = open_index(conn)
+
+      # The `:empty` slot is caller-guarded, so a wrong guard renders it over a
+      # populated table or never at all.
+      assert has_element?(view, "#roles-empty", "No roles are visible in this tenant")
+
+      view |> form("#roles-filters", %{"search" => "zzz"}) |> render_change()
+      assert has_element?(view, "#roles-empty", "No roles match zzz")
+    end
+
     test "a hand-edited sort column falls back instead of crashing", %{conn: conn} do
       grant_capabilities!("admin.authz.role.list")
 
