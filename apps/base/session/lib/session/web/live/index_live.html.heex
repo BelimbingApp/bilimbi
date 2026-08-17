@@ -17,27 +17,32 @@
     </form>
 
     <div class="mt-2">
-      <.table id="sessions" rows={@streams.sessions}>
-        <:col :let={{_id, session}} label="User">{user_label(session)}</:col>
-        <:col :let={{_id, session}} label="IP Address">
+      <.table
+        id="sessions"
+        rows={@streams.sessions}
+        row_id={fn {id, _session} -> id end}
+        row_item={fn {_id, session} -> session end}
+      >
+        <:col :let={session} label="User">{user_label(session)}</:col>
+        <:col :let={session} label="IP Address">
           <span class="tabular-nums text-ink-muted">{session.ip_address || "—"}</span>
         </:col>
-        <:col :let={{_id, session}} label="User Agent">
+        <:col :let={session} label="User Agent">
           <span class="max-w-xs truncate text-ink-muted" title={session.user_agent}>
             {truncate_ua(session.user_agent)}
           </span>
         </:col>
-        <:col :let={{_id, session}} label="Last Activity">
+        <:col :let={session} label="Last Activity">
           <span class="text-ink-muted">{relative_activity(session.last_activity)}</span>
         </:col>
-        <:col :let={{_id, session}} label="Status">
+        <:col :let={session} label="Status">
           <.badge :if={session.id == @current_session_id} kind={:success}>Current</.badge>
         </:col>
-        <:action :let={{_id, session}}>
+        <:action :let={session}>
           <.button
             :if={
               session.id != @current_session_id and
-                "admin.system.session.manage" in @current_scope.capabilities
+                allowed?(@current_scope, "admin.system.session.manage")
             }
             id={"sessions-terminate-#{session.id}"}
             phx-click="terminate"
@@ -50,13 +55,10 @@
             <span class="sr-only">Terminate</span>
           </.button>
         </:action>
+        <:empty :if={@sessions_count == 0}>
+          No sessions found.
+        </:empty>
       </.table>
-      <p
-        :if={@sessions_count == 0}
-        class="mt-2 px-4 py-8 text-center text-sm text-ink-muted"
-      >
-        No sessions found.
-      </p>
     </div>
   </div>
 </Layouts.app>

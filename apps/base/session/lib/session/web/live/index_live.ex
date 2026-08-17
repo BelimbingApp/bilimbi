@@ -60,7 +60,7 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
   end
 
   defp can_manage?(socket) do
-    @manage_cap in socket.assigns.current_scope.capabilities
+    allowed?(socket.assigns.current_scope, @manage_cap)
   end
 
   defp refresh_sessions(socket) do
