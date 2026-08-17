@@ -62,8 +62,7 @@ defmodule BilimbiWeb.MenuIconSafelistTest do
   defp contributed_heroicons do
     Menu.items()
     |> Enum.map(& &1.icon)
-    |> Enum.reject(&is_nil/1)
-    |> Enum.reject(&match?({:ok, _icon}, IconRegistry.fetch(&1)))
+    |> Enum.reject(&(is_nil(&1) or match?({:ok, _icon}, IconRegistry.fetch(&1))))
     |> Enum.uniq()
   end
 
