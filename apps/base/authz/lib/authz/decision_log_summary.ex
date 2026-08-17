@@ -1,5 +1,22 @@
 defmodule Bilimbi.Base.Authz.DecisionLogSummary do
-  @moduledoc "Stable payload-safe read model for one authorization decision log."
+  @moduledoc """
+  Stable payload-safe read model for one authorization decision log.
+
+  Actor identity is `actor_type` + `actor_id` only. Display names are omitted
+  on purpose:
+
+  * Base must not join Core User or Employee schemas.
+  * The durable row records ids (`Bilimbi.Base.Authz.DatabaseDecisionLogger`),
+    not a denormalised name that would drift after rename.
+  * Belimbing's admin index left-joins `users` for **user** principals only
+    (`app/Base/Authz/Livewire/DecisionLogs/Index.php`, `where actor_type =
+    PrincipalType::USER`). Employee/agent rows stay unnamed there too, so
+    copying that join would still be incomplete and would couple Base to Core.
+
+  A later naming seam would be a directory callback spanning User and Employee
+  (the same shape as `Bilimbi.Base.Authz.CompanyDirectory` / #183), not a field
+  on this struct. See #185.
+  """
 
   alias Bilimbi.Base.Authz.DecisionLog
 

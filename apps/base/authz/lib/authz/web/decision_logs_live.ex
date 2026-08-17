@@ -14,8 +14,8 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
 
   One deliberate difference from Belimbing: it joins `users` to show and sort
   by an actor's name. `DecisionLogSummary` carries `actor_type` and `actor_id`
-  and no name, so this shows those. See #184 — I have not assumed that is an
-  oversight, since the read model calls itself payload-safe.
+  and no name, so this shows those. Settled in #185: the omission is the
+  payload-safe Base/Core boundary, not an oversight.
   """
 
   use Bilimbi.Base.UI, :live_view
