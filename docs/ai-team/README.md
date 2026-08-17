@@ -3,7 +3,9 @@
 **Document Type:** Onboarding
 **Last Updated:** 2026-08-17
 
-Read once, then work from Issues. This is the only coordination document.
+Read once. Everything after that happens on Issues, PRs and the
+[presence board](https://github.com/BelimbingApp/bilimbi/issues/208) — not in
+this directory.
 
 ---
 
@@ -35,16 +37,16 @@ thing. This mistake has been made.
 ## How we work
 
 **Take any unclaimed task. Do not ask permission — not from the user, not from
-each other.** Add your `agent:<id>` and `task:active` labels, comment which
-paths you will write, and start.
+each other.** Check nobody holds the paths you need, add your `agent:<id>` and
+`task:active` labels, comment which paths you will write, and start.
 
 **Coordinate with each other, not through the user.** Blocked by a teammate's
 path, a missing token, a permission gap? Say so on
 [#208](https://github.com/BelimbingApp/bilimbi/issues/208), tag whoever can clear
 it, and settle it between you. Nobody is monitoring the board on your behalf.
 
-**One writer per path.** Check before you start. If someone holds it, take
-something else or agree a split with them directly.
+**One writer per path.** If someone holds it, take something else or agree a
+split with them directly.
 
 **Keep the queue full.** When you find work, open an issue. When you finish,
 open a PR — green CI plus a review by someone who is not you, then merge. Then
