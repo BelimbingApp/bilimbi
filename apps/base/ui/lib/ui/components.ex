@@ -514,13 +514,17 @@ defmodule Bilimbi.Base.UI.Components do
   with `phx-value-sort`. The active column gets `aria-sort`. Density is
   `px-4 py-2.5` — that is the in-repo contract until a denser primitive lands.
 
+  `align={:right}` on a column right-aligns the header and cells (numeric
+  columns). `caption` renders an `sr-only` `<caption>` so the grid has an
+  accessible name.
+
   ## Examples
 
-      <.table id="users" rows={@users} sort_by={@sort_by} sort_dir={@sort_dir}>
+      <.table id="users" rows={@users} sort_by={@sort_by} sort_dir={@sort_dir} caption="Users">
         <:col :let={user} label="Name" sort="name" sort_id="users-sort-name">
           {user.name}
         </:col>
-        <:col :let={user} label="Email">{user.email}</:col>
+        <:col :let={user} label="Count" sort="count" align={:right}>{user.count}</:col>
       </.table>
   """
   attr :id, :string, required: true
@@ -543,10 +547,15 @@ defmodule Bilimbi.Base.UI.Components do
     default: true,
     doc: "when false, omit the outer card chrome so the table can sit in an existing panel"
 
+  attr :caption, :string,
+    default: nil,
+    doc: "sr-only caption that names the table for assistive tech"
+
   slot :col, required: true do
     attr :label, :string
     attr :sort, :string, doc: "sort key pushed as phx-value-sort"
     attr :sort_id, :string, doc: "DOM id for the sort button"
+    attr :align, :atom, values: [:right], doc: "right-align header and cells (numeric columns)"
   end
 
   slot :action, doc: "the slot for showing user actions in the last table column"
@@ -561,13 +570,17 @@ defmodule Bilimbi.Base.UI.Components do
     ~H"""
     <div class={["overflow-x-auto", @framed && "rounded-xl border border-line bg-surface"]}>
       <table class="w-full text-left text-sm">
+        <caption :if={@caption} class="sr-only">{@caption}</caption>
         <thead class="border-b border-line bg-surface-sunken">
           <tr>
             <th
               :for={col <- @col}
               scope="col"
               aria-sort={table_aria_sort(col[:sort], @sort_by, @sort_dir)}
-              class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle"
+              class={[
+                "px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle",
+                col[:align] == :right && "text-right"
+              ]}
             >
               <.table_sort_heading
                 :if={col[:sort]}
@@ -592,7 +605,11 @@ defmodule Bilimbi.Base.UI.Components do
             <td
               :for={col <- @col}
               phx-click={@row_click && @row_click.(row)}
-              class={["px-4 py-2.5 text-ink", @row_click && "hover:cursor-pointer"]}
+              class={[
+                "px-4 py-2.5 text-ink",
+                col[:align] == :right && "text-right",
+                @row_click && "hover:cursor-pointer"
+              ]}
             >
               {render_slot(col, @row_item.(row))}
             </td>
@@ -632,7 +649,11 @@ defmodule Bilimbi.Base.UI.Components do
       type="button"
       phx-click={@sort_event}
       phx-value-sort={@col[:sort]}
-      class="inline-flex items-center gap-1 rounded text-left transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25"
+      class={[
+        "inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25",
+        @col[:align] == :right && "ml-auto",
+        @col[:align] != :right && "text-left"
+      ]}
     >
       {@col[:label]}
       <.icon

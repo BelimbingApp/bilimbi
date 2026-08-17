@@ -109,6 +109,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
             sort_by={@index_state.sort_by}
             sort_dir={@index_state.sort_dir}
             framed={false}
+            caption="Admin1 divisions"
           >
             <:col :let={admin1} label="Country" sort="country_name" sort_id="admin1-sort-country">
               <div class="whitespace-nowrap text-ink-muted">
