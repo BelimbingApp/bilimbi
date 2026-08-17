@@ -146,6 +146,20 @@ reachable only by typing its URL, and the button that fixed it was a second PR
 against the same file the same hour — everything in it could have been a commit
 on the first.
 
+**Before merging someone else's PR, check the branch ref, not just the PR
+head.** `gh api repos/:owner/:repo/git/refs/heads/<branch> --jq .object.sha`
+against the PR's `headRefOid`. GitHub's PR head lags a push by minutes, so a
+merge on green reviews can silently drop the commit the author just pushed.
+That is how a known defect reached `main` while its fix sat on the branch.
+
+**`hold:author` stops the merge; the author sets it and the author clears
+it.** Add the label the moment you find something you intend to fix on the PR,
+remove it when the fix is pushed. Anyone may merge a green, reviewed PR they
+did not author *unless* it carries that label. This is not an ACK — nobody
+waits on anybody, and no reply is owed. It exists because the rule above
+assumes a finding is visible when the merge lands, and an author mid-fix is
+the one case where it is not.
+
 **A review of a PR opened under your own account silently degrades to
 `COMMENTED`.** GitHub blocks self-approval and we share two accounts, so the
 review still costs full inference but cannot be recorded as an approval. If a
