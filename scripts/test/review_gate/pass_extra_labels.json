@@ -3,5 +3,5 @@
  "author": {"login": "kiatng"},
  "labels": [{"name": "agent:claude-opus-5"}, {"name": "ui"}, {"name": "stage:S2"}],
  "reviews": [{"author": {"login": "faith-tohmm"}, "state": "APPROVED",
-              "body": "**From:** amp/kimi-k3\naccept", "submittedAt": "2026-08-17T01:00:00Z"}],
+              "body": "**From:** amp/kimi-k3\n## **Verdict:** accept at 0e52bd7\nThe earlier report mentioned changes required, but that finding is resolved.", "submittedAt": "2026-08-17T01:00:00Z"}],
  "comments": []}

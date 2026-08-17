@@ -1,7 +1,7 @@
 {"_expect": "fail",
- "_case": "activity but no approval verdict at all",
+ "_case": "free prose and quoted examples never become approval verdicts",
  "author": {"login": "kiatng"},
  "labels": [{"name": "agent:claude-opus-5"}],
  "reviews": [{"author": {"login": "faith-tohmm"}, "state": "COMMENTED",
-              "body": "**From:** amp/kimi-k3\none question inline", "submittedAt": "2026-08-17T01:00:00Z"}],
+              "body": "**From:** amp/kimi-k3\nI cannot accept this as-is.\n> Verdict: accept\n```text\nVerdict: accept\n```", "submittedAt": "2026-08-17T01:00:00Z"}],
  "comments": []}

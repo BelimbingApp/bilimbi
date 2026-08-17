@@ -12,9 +12,16 @@
 #   2. the approving review/comment's GitHub account differs from the PR
 #      author's account (the same agent can paste a marker under the same PAT).
 #
-# An approval is revoked by a newer CHANGES_REQUESTED review, a newer comment
-# carrying the reviewer's `**From:**` marker with a "changes required" verdict,
-# or a DISMISSED state on the approving review itself.
+# Formal GitHub APPROVED and CHANGES_REQUESTED review states are authoritative.
+# A COMMENTED review or issue comment may supply a fallback verdict only on one
+# explicit logical line: `accept`, `accept with follow-up`, or `changes
+# required`, optionally prefixed by `Verdict:` and decorated with a Markdown
+# heading or bold. Free prose and quoted/example lines never create or revoke
+# an approval. A line may add one bounded `at <token>` or `for <token>` context.
+# Several explicit lines are ambiguous and fail closed, except that any explicit
+# `changes required` line wins as a rejection. An approval is also revoked by a
+# newer formal CHANGES_REQUESTED review, an explicit rejection comment, or a
+# DISMISSED state on the approving review itself.
 #
 # Usage:
 #   scripts/review_gate.sh <pr-number>     live mode (needs gh + repo)
@@ -40,19 +47,56 @@ fi
 verdict=$(jq -r '
   def marker_id($body):
     ($body | capture("\\*\\*From:\\*\\*\\s*(?<id>[A-Za-z0-9._/-]+)"; "m").id) // null;
-  def says_changes($body): ($body | test("(?i)changes required"));
-  def says_accept($body):
-    (($body | test("(?i)\\baccept\\b")) and (says_changes($body) | not));
+  def normalized_verdict_line:
+    gsub("\\r"; "")
+    | gsub("^[[:space:]]+|[[:space:]]+$"; "")
+    | sub("^#{1,6}[[:space:]]+"; "")
+    | gsub("\\*\\*"; "");
+  def line_verdict:
+    if test("^>") then
+      null
+    elif test("(?i)^(verdict:[[:space:]]*)?accept([[:space:]]+with[[:space:]]+follow-up)?([[:space:]]+(at|for)[[:space:]]+[A-Za-z0-9][A-Za-z0-9._/#:-]{0,127})?$") then
+      "accept"
+    elif test("(?i)^(verdict:[[:space:]]*)?changes[[:space:]]+required([[:space:]]+(at|for)[[:space:]]+[A-Za-z0-9][A-Za-z0-9._/#:-]{0,127})?$") then
+      "changes required"
+    else
+      null
+    end;
+  def explicit_verdict($body):
+    (reduce ($body | split("\n")[]) as $raw
+      ({fenced: false, verdicts: []};
+       ($raw | gsub("\\r"; "") | gsub("^[[:space:]]+|[[:space:]]+$"; "")) as $line
+       | if ($line | test("^(```|~~~)")) then
+           .fenced |= not
+         elif .fenced then
+           .
+         else
+           ($line | normalized_verdict_line | line_verdict) as $verdict
+           | if $verdict == null then . else .verdicts += [$verdict] end
+         end)
+      | .verdicts) as $verdicts
+    | if ($verdicts | length) == 1 then
+        $verdicts[0]
+      elif ($verdicts | any(. == "changes required")) then
+        "changes required"
+      else
+        null
+      end;
 
   . as $pr
   | ([$pr.labels[].name | select(startswith("agent:"))]) as $agent_labels
-  | ([$pr.reviews[]  | {account: .author.login, at: .submittedAt,
-                        state: .state, id: marker_id(.body),
-                        changes: says_changes(.body),
-                        accept: (says_accept(.body) or .state == "APPROVED")}]
-     + [$pr.comments[] | {account: .author.login, at: .createdAt,
-                          state: "COMMENTED", id: marker_id(.body),
-                          changes: says_changes(.body), accept: says_accept(.body)}]
+  | ([$pr.reviews[]  | (explicit_verdict(.body)) as $verdict
+                        | {account: .author.login, at: .submittedAt,
+                           state: .state, id: marker_id(.body), verdict: $verdict,
+                           changes: (.state == "CHANGES_REQUESTED" or
+                                     (.state == "COMMENTED" and $verdict == "changes required")),
+                           accept: (.state == "APPROVED" or
+                                    (.state == "COMMENTED" and $verdict == "accept"))}]
+     + [$pr.comments[] | (explicit_verdict(.body)) as $verdict
+                         | {account: .author.login, at: .createdAt,
+                            state: "COMMENTED", id: marker_id(.body), verdict: $verdict,
+                            changes: ($verdict == "changes required"),
+                            accept: ($verdict == "accept")}]
     ) as $events
   | if ($agent_labels | length) != 1 then
       "FAIL: PR must carry exactly one agent:* label (found \($agent_labels | length))"

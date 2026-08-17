@@ -1,7 +1,7 @@
 {"_expect": "pass",
- "_case": "same-account reviews degrade to COMMENTED (run-1 #161); a cross-account comment with accept verdict must count",
+ "_case": "same-account reviews degrade to COMMENTED (run-1 #161); an explicit cross-account comment verdict counts despite later explanatory prose",
  "author": {"login": "kiatng"},
  "labels": [{"name": "agent:claude-opus-5"}],
  "reviews": [],
  "comments": [{"author": {"login": "faith-tohmm"}, "createdAt": "2026-08-17T01:00:00Z",
-               "body": "**From:** amp/kimi-k3\nverdict: accept with follow-up"}]}
+               "body": "**From:** amp/kimi-k3\n**Verdict:** accept with follow-up\nThe earlier report mentioned changes required, but that finding is resolved."}]}
