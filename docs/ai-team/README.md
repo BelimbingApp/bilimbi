@@ -253,10 +253,11 @@ spending tokens.
 | Board quiet, nothing assigned | 45–60 min |
 | Steward hat | shorter — ACK latency is the job |
 
-- **Cap model invocations with no material state change at four**, then post
-  `halt` with a resumable handoff. This applies to every role, stewards
-  included — a gated wake is nearly free, so a steward stays responsive at zero
-  model cost and needs no exemption.
+- **Cap model invocations with no material state change at four**, then **park
+  at the backoff ceiling — do not stop.** This applies to every role, stewards
+  included. Parking is not halting: you keep waking, keep running the gate, and
+  keep ticking; you simply stop spending model tokens until the gate says
+  something changed.
 - **Do not cap wake-ups.** Cheap deterministic observation is what keeps ACK
   latency low.
 - **One sleeper, never two.** Either an event watcher or a long fallback
@@ -264,8 +265,14 @@ spending tokens.
   idle cycle, because killing the watcher raised its own notification.
 - **Back off:** after two consecutive unchanged ticks, double the interval, cap
   4h, reset on any state change.
-- Prefer a harness-enforced tick count (`COUNT=N`, self-terminating) over
-  remembering to stop.
+- **A self-terminating tick count (`COUNT=N`) is a halt, not a cap.** Use it
+  only when you mean to exit, and then §Halt applies — including `wake-on:`.
+
+**Round 2 stopped because this section only knew how to stop.** Every agent
+declared a terminal cap — `COUNT=3`, "≤4", "no further check-back",
+`stop: true` — and none had a documented way back. Heartbeats went quiet at
+`2026-08-17T04:09Z` while work continued until `06:27Z`: #43 was silent through
+three open PRs. A cap that ends the agent is not a budget, it is an exit.
 
 Post **one** comment on [#43](https://github.com/BelimbingApp/bilimbi/issues/43)
 and **edit it in place** each tick. Its edit time is your liveness signal — a
@@ -279,6 +286,14 @@ tick <agent-id> · <ISO-8601 with offset> · <working on … | idle | blocked: r
 **A tick is one line, ≤140 characters, no prose.** If it needs a paragraph it is
 not a tick — it is a comment on the issue it concerns.
 
+**Tick at least once every 4h even when parked, and emit it from the gate
+script rather than a model.** An edit-in-place is one API call and zero model
+tokens, so an idle tick costs nothing worth saving. This is the floor that makes
+silence *mean* something: if a lane has not ticked in 4h it is dead, not quiet,
+and someone should say so. Without the floor, an idle agent and a stopped agent
+are indistinguishable — which is how round 2 lost two hours before anyone
+noticed.
+
 **Read the clock every time: `date -Iseconds`.** Do not carry a remembered
 offset. One agent's timestamps ran eleven hours ahead for a whole session
 before anyone noticed, and message ordering is the tiebreaker for interleaved
@@ -286,11 +301,30 @@ claims.
 
 ### Halt
 
-Rate-limited or otherwise stopping? Comment
-`halt <agent-id> · <reason>` and say what state you are leaving your work in.
+Halt means you are **leaving**, not resting. If you are merely out of useful
+work, park (§Cadence) — do not halt.
+
+```
+halt <agent-id> · <reason> · wake-on: <observable condition>
+```
+
+**No halt without a `wake-on:`.** Name a condition someone else can observe and
+act on — `wake-on: PR #202 reviewed`, `wake-on: quota reset ~14:00Z`,
+`wake-on: operator`. A halt with no wake condition is an unannounced exit, and
+four of them in one round is how the team went dark. Say what state you are
+leaving your work in, as before.
+
 A steward may post `halt all · <reason>`; while that stands with no matching
 `resume all`, start no new product work. This is not hypothetical — an agent
 hit provider usage limits mid-task and the Integration Steward role stalled.
+
+**Restarting is not an agent's job.** Every lane can halt itself, so nothing
+inside the team is guaranteed to be awake to restart it. The wake owner must sit
+outside the cap: a scheduled workflow that finds lanes whose last tick is older
+than the 4h floor, or claims older than their `wake-on:`, and says so on
+[#43](https://github.com/BelimbingApp/bilimbi/issues/43). `blocked-by-sweep.yml`
+already runs on a 30-minute cron with `issues: write` — extend it rather than
+adding a second scheduler.
 
 On a usage-limit signal, stop the watchers too. Background pollers that outlive
 the agent keep spending.
