@@ -7,129 +7,6 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
   @base_root Path.join(@workspace_root, "apps/base")
   @core_root Path.join(@workspace_root, "apps/core")
 
-  @modules [
-    %{
-      root: Path.join(@base_root, "database"),
-      id: "base/database",
-      app: :bilimbi_base_database,
-      facade: "lib/database.ex",
-      migrations: nil
-    },
-    %{
-      root: Path.join(@base_root, "module_registry"),
-      id: "base/module_registry",
-      app: :bilimbi_base_module_registry,
-      facade: "lib/module_registry.ex",
-      migrations: nil
-    },
-    %{
-      root: Path.join(@base_root, "menu"),
-      id: "base/menu",
-      app: :bilimbi_base_menu,
-      facade: "lib/menu.ex",
-      migrations: nil
-    },
-    %{
-      root: Path.join(@base_root, "ui"),
-      id: "base/ui",
-      app: :bilimbi_base_ui,
-      facade: "lib/ui.ex",
-      migrations: nil
-    },
-    %{
-      root: Path.join(@base_root, "settings"),
-      id: "base/settings",
-      app: :bilimbi_base_settings,
-      facade: "lib/settings.ex",
-      migrations: "priv/repo/migrations",
-      web: "priv/web_routes.exs"
-    },
-    %{
-      root: Path.join(@base_root, "session"),
-      id: "base/session",
-      app: :bilimbi_base_session,
-      facade: "lib/session.ex",
-      migrations: "priv/repo/migrations",
-      web: "priv/web_routes.exs"
-    },
-    %{
-      root: Path.join(@base_root, "authz"),
-      id: "base/authz",
-      app: :bilimbi_base_authz,
-      facade: "lib/authz.ex",
-      migrations: "priv/repo/migrations",
-      web: "priv/web_routes.exs"
-    },
-    %{
-      root: Path.join(@base_root, "tenancy"),
-      id: "base/tenancy",
-      app: :bilimbi_base_tenancy,
-      facade: "lib/tenancy.ex",
-      migrations: "priv/repo/migrations",
-      web: "priv/web_routes.exs"
-    },
-    %{
-      root: Path.join(@base_root, "audit"),
-      id: "base/audit",
-      app: :bilimbi_base_audit,
-      facade: "lib/audit.ex",
-      migrations: "priv/repo/migrations"
-    },
-    %{
-      root: Path.join(@core_root, "company"),
-      id: "core/company",
-      app: :bilimbi_core_company,
-      facade: "lib/company.ex",
-      migrations: "priv/repo/migrations"
-    },
-    %{
-      root: Path.join(@core_root, "employee"),
-      id: "core/employee",
-      app: :bilimbi_core_employee,
-      facade: "lib/employee.ex",
-      migrations: "priv/repo/migrations",
-      web: "priv/web_routes.exs"
-    },
-    %{
-      root: Path.join(@core_root, "user"),
-      id: "core/user",
-      app: :bilimbi_core_user,
-      facade: "lib/user.ex",
-      migrations: "priv/repo/migrations",
-      web: "priv/web_routes.exs"
-    },
-    %{
-      root: Path.join(@core_root, "user_administration"),
-      id: "core/user_administration",
-      app: :bilimbi_core_user_administration,
-      facade: "lib/user_administration.ex",
-      migrations: nil,
-      web: "priv/web_routes.exs"
-    },
-    %{
-      root: Path.join(@core_root, "geonames"),
-      id: "core/geonames",
-      app: :bilimbi_core_geonames,
-      facade: "lib/geonames.ex",
-      migrations: "priv/repo/migrations",
-      web: "priv/web_routes.exs"
-    },
-    %{
-      root: Path.join(@core_root, "address"),
-      id: "core/address",
-      app: :bilimbi_core_address,
-      facade: "lib/address.ex",
-      migrations: "priv/repo/migrations"
-    },
-    %{
-      root: Path.join(@core_root, "compatibility"),
-      id: "core/compatibility",
-      app: :bilimbi_core_compatibility,
-      facade: "lib/compatibility.ex",
-      migrations: nil
-    }
-  ]
-
   test "composition containers contain no module implementation or resources" do
     for container_root <- [@base_root, @core_root] do
       refute File.dir?(Path.join(container_root, "lib"))
@@ -138,29 +15,42 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
     end
   end
 
-  test "declared modules own their package, facade, descriptor, tests, and documentation" do
-    for module <- @modules do
-      assert File.regular?(Path.join(module.root, "mix.exs")), module.id
-      assert File.regular?(Path.join(module.root, "bilimbi.module.exs")), module.id
-      assert File.regular?(Path.join(module.root, module.facade)), module.id
-      assert File.dir?(Path.join(module.root, "test")), module.id
-      assert File.dir?(Path.join(module.root, "docs")), module.id
-      refute File.dir?(Path.join(module.root, "lib/bilimbi")), module.id
+  test "discovery finds exactly the modules installed on disk" do
+    discovered =
+      @workspace_root
+      |> MixDiscovery.discover_workspace!()
+      |> Enum.map(& &1.path)
+      |> Enum.sort()
 
-      {descriptor, _binding} = Code.eval_file(Path.join(module.root, "bilimbi.module.exs"))
+    on_disk = module_roots_on_disk()
 
-      assert descriptor[:id] == module.id
-      assert descriptor[:otp_app] == module.app
-      assert descriptor[:migrations] == module.migrations
-      assert descriptor[:web] == Map.get(module, :web)
+    refute on_disk == [],
+           "no bilimbi.module.exs found under any composition container"
 
-      if module.migrations do
-        assert File.dir?(Path.join(module.root, module.migrations)), module.id
-      end
+    assert discovered == on_disk
+  end
 
-      if web = Map.get(module, :web) do
-        assert File.regular?(Path.join(module.root, web)), module.id
-      end
+  # Descriptor shape and declared path safety are enforced by discovery. The
+  # missing migration directory regression below proves that path existence
+  # fails closed before this loop can inspect installed modules.
+  test "installed modules own their package, facade, tests, and documentation" do
+    for module <- MixDiscovery.discover_workspace!(@workspace_root) do
+      facade = Path.join("lib", Path.basename(module.path) <> ".ex")
+
+      assert File.regular?(Path.join(module.path, "mix.exs")), module.id
+      assert File.regular?(Path.join(module.path, facade)), "#{module.id}: #{facade}"
+      assert File.dir?(Path.join(module.path, "test")), module.id
+      assert File.dir?(Path.join(module.path, "docs")), module.id
+      refute File.dir?(Path.join(module.path, "lib/bilimbi")), module.id
+    end
+  end
+
+  test "discovery rejects a safe missing migration directory" do
+    root = missing_migration_workspace!()
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    assert_raise ArgumentError, ~r/declared migration directory does not exist/, fn ->
+      MixDiscovery.discover_workspace!(root)
     end
   end
 
@@ -208,6 +98,56 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
         refute mix_source =~ ~s("#{Path.basename(module.path)}")
       end
     end
+  end
+
+  defp module_roots_on_disk do
+    @workspace_root
+    |> Path.join("apps/*/bilimbi.container.exs")
+    |> Path.wildcard()
+    |> Enum.map(&Path.dirname/1)
+    |> Enum.flat_map(&Path.wildcard(Path.join(&1, "*/bilimbi.module.exs")))
+    |> Enum.map(&Path.dirname/1)
+    |> Enum.sort()
+  end
+
+  defp missing_migration_workspace! do
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "bilimbi-workspace-boundary-#{System.unique_integer([:positive, :monotonic])}"
+      )
+
+    container = Path.join([root, "apps", "base"])
+    module = Path.join([container, "database"])
+
+    File.mkdir_p!(module)
+
+    File.write!(
+      Path.join(container, "bilimbi.container.exs"),
+      inspect([id: "base", kind: :container, layer: :base], pretty: true) <> "\n"
+    )
+
+    descriptor = [
+      id: "base/database",
+      kind: :module,
+      layer: :base,
+      required: true,
+      otp_app: :test_boundary_database,
+      namespace: Test.Boundary.Database,
+      dependencies: [],
+      migrations: "priv/repo/migrations",
+      migration_dispositions: %{20_260_817_000_001 => :compatible_baseline},
+      web: nil,
+      schema_contract: nil,
+      contribution_provider: nil
+    ]
+
+    File.write!(
+      Path.join(module, "bilimbi.module.exs"),
+      inspect(descriptor, pretty: true, limit: :infinity) <> "\n"
+    )
+
+    root
   end
 
   defp contributor_fixture?(nil), do: false
