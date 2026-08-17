@@ -76,6 +76,9 @@ defmodule Bilimbi.Core.Employee.SchemaContract do
         "employee_types_company_code_unique" =>
           index(["company_id", "code"], true, "company_id IS NOT NULL")
       },
+      optional_checks: %{
+        "employee_types_custom_company_check" => check("is_system = (company_id IS NULL)")
+      },
       foreign_keys: %{}
     }
   end
@@ -94,4 +97,6 @@ defmodule Bilimbi.Core.Employee.SchemaContract do
       on_delete: on_delete
     }
   end
+
+  defp check(expression), do: %{expression: expression, validated: true}
 end

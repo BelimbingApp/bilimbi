@@ -278,6 +278,34 @@ defmodule Bilimbi.Core.Employee.EmployeeTypeTest do
     end
   end
 
+  describe "database integrity and check constraint" do
+    test "rejects company-less custom type (company_id IS NULL and is_system = false)" do
+      assert_raise Postgrex.Error, ~r/employee_types_custom_company_check/, fn ->
+        Ecto.Adapters.SQL.query!(
+          Bilimbi.Base.Repo,
+          """
+          INSERT INTO employee_types (code, label, is_system, company_id)
+          VALUES ('orphan_custom', 'Orphan Custom', false, NULL)
+          """,
+          []
+        )
+      end
+    end
+
+    test "rejects company-owned system type (company_id IS NOT NULL and is_system = true)" do
+      assert_raise Postgrex.Error, ~r/employee_types_custom_company_check/, fn ->
+        Ecto.Adapters.SQL.query!(
+          Bilimbi.Base.Repo,
+          """
+          INSERT INTO employee_types (code, label, is_system, company_id)
+          VALUES ('company_system', 'Company System', true, 81)
+          """,
+          []
+        )
+      end
+    end
+  end
+
   describe "scope enforcement" do
     test "requires valid %Scope{} on all employee type endpoints", %{scope_1: scope_1} do
       for not_a_scope <- [51, nil, "51", scope_1.tenant] do

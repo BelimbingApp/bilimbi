@@ -92,7 +92,8 @@ defmodule Bilimbi.Core.Employee.TestFixtures do
         is_system boolean NOT NULL DEFAULT false,
         company_id bigint,
         created_at timestamp(0) without time zone,
-        updated_at timestamp(0) without time zone
+        updated_at timestamp(0) without time zone,
+        CONSTRAINT employee_types_custom_company_check CHECK (is_system = (company_id IS NULL))
       ) ON COMMIT PRESERVE ROWS
       """,
       []

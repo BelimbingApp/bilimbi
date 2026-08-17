@@ -29,6 +29,7 @@ defmodule Bilimbi.Core.Employee.EmployeeType do
     |> validate_length(:label, min: 1, max: 255)
     |> unique_constraint(:code, name: :employee_types_company_code_unique)
     |> unique_constraint(:code, name: :employee_types_code_unique)
+    |> check_constraint(:company_id, name: :employee_types_custom_company_check)
   end
 
   @spec update_changeset(%__MODULE__{}, map()) :: Ecto.Changeset.t()

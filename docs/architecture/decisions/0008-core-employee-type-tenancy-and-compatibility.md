@@ -40,6 +40,7 @@ Issue #149 researched this conflict and established that:
 - Custom types have `is_system = false` and non-null `company_id`. They belong strictly to their owning company and are isolated by `%Scope{}`.
 - Codes are durable and immutable after creation.
 - Custom type creation must continue to reject reserved system codes (`reject_reserved_system_type_code`).
+- Database check constraint `employee_types_custom_company_check` enforces `is_system = (company_id IS NULL)`, ensuring at the PostgreSQL level that system types cannot be company-owned and custom types cannot be company-less.
 
 ### 2. Bilimbi-Only Compatibility Migration
 
@@ -50,6 +51,7 @@ To resolve the multi-tenant code uniqueness constraint without breaking compatib
    - Drops global unique index `employee_types_code_unique` on `(code)`.
    - Creates partial unique index `employee_types_global_code_unique` on `(code)` where `company_id IS NULL AND is_system = true`.
    - Creates composite partial unique index `employee_types_company_code_unique` on `(company_id, code)` where `company_id IS NOT NULL`.
+   - Adds database check constraint `employee_types_custom_company_check CHECK (is_system = (company_id IS NULL))`.
 3. In `apps/core/employee/bilimbi.module.exs`, `migration_dispositions` explicitly registers:
    ```elixir
    migration_dispositions: %{
@@ -57,13 +59,14 @@ To resolve the multi-tenant code uniqueness constraint without breaking compatib
      20_260_817_173_000 => :bilimbi_only
    }
    ```
+4. **Down-Migration Reversibility:** Reversing `20260817173000` via `down` restores the single global unique index on `(code)` and drops the check constraint. Note that executing `down` against a live multi-tenant database requires reconciling duplicate codes across companies if multiple companies have created custom types sharing a code.
 
 ### 3. Adoption Behavior for Existing Databases
 
 When adopting an existing Belimbing database (`mix bilimbi.schema.adopt`):
 - Schema verification checks against `SchemaContract` (which reflects the baseline schema).
 - The baseline migration `20260812112641` is recorded as adopted in `bilimbi_schema_migrations`.
-- `mix bilimbi.migrate` executes the pending `:bilimbi_only` migration `20260817173000`, replacing the global index with the partial indexes.
+- `mix bilimbi.migrate` executes the pending `:bilimbi_only` migration `20260817173000`, replacing the global index with the partial indexes and adding the system/company check constraint.
 - If an existing database has custom rows where `company_id IS NULL` and `is_system = false`, they must be assigned to their target company or deleted prior to migration if their codes conflict with system types.
 
 ### 4. Public Administration APIs
@@ -82,6 +85,7 @@ Core Employee exposes the following public functions without leaking schemas or 
 - **Pros:**
   - Distinct companies can define custom employee types with identical codes without collision.
   - System types remain globally protected and immutable.
+  - Invariant `is_system = (company_id IS NULL)` is guaranteed at database level.
   - Edit and delete parity is achieved for Employee Types, unblocking UI task #97.
   - Follows established Bilimbi migration disposition architecture (ADR 0002, ADR 0005).
 - **Cons:**
