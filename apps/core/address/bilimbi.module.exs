@@ -9,13 +9,14 @@
     "base/database",
     "base/module_registry",
     "base/tenancy",
+    "base/ui",
     "core/company",
     "core/employee",
     "core/geonames"
   ],
   migrations: "priv/repo/migrations",
   migration_dispositions: %{20_260_812_103_809 => :compatible_baseline},
-  web: nil,
+  web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Core.Address.SchemaContract,
   contribution_provider: Bilimbi.Core.Address.Contributions
 ]
