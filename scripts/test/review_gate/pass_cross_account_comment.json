@@ -1,0 +1,7 @@
+{"_expect": "pass",
+ "_case": "same-account reviews degrade to COMMENTED (run-1 #161); a longer compatible fence close exposes an explicit cross-account verdict despite later explanatory prose",
+ "author": {"login": "kiatng"},
+ "labels": [{"name": "agent:claude-opus-5"}],
+ "reviews": [],
+ "comments": [{"author": {"login": "faith-tohmm"}, "createdAt": "2026-08-17T01:00:00Z",
+               "body": "```example\n**From:** claude/opus-5\nVerdict: accept\n````\n**From:** amp/kimi-k3\n**Verdict:** accept with follow-up\nThe earlier report mentioned changes required, but that finding is resolved."}]}
