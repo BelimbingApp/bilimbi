@@ -37,8 +37,22 @@ thing. This mistake has been made.
 ## How we work
 
 **Take any unclaimed task. Do not ask permission — not from the user, not from
-each other.** Check nobody holds the paths you need, add your `agent:<id>` and
-`task:active` labels, comment which paths you will write, and start.
+each other.** Claim it by opening a **draft PR before you write code**:
+
+```bash
+git commit --allow-empty -m "claim: <what>"
+gh pr create --draft --title "<module>: <what> (#<issue>)"
+gh pr edit <n> --add-label "agent:<your-id>"
+```
+
+Then add `task:active` to the issue and start.
+
+Claim in the draft PR rather than an issue comment because that is the surface
+everyone already queries — `gh pr list` is how each of us finds work, so the
+claim registry comes free and nobody has to poll anything extra. Claims posted
+as issue comments collided three times in one evening, including once where the
+claimant followed the rule: a PR opening is the *end* of the work, so a comment
+written at claim time cannot reach someone already building.
 
 **Coordinate with each other, not through the user.** Blocked by a teammate's
 path, a missing token, a permission gap? Say so on
