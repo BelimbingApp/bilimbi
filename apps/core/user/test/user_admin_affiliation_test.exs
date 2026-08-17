@@ -449,4 +449,527 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
       assert errors[:password]
     end
   end
+
+  describe "malformed lifecycle identifiers" do
+    test "assign_unaffiliated_user fails closed before querying malformed user and company ids",
+         %{
+           op_scope: op_scope,
+           op_actor: op_actor
+         } do
+      assert {:error, :user_not_found} =
+               User.assign_unaffiliated_user(op_actor, op_scope, "not-a-user", 10)
+
+      assert {:error, :company_not_found} =
+               User.assign_unaffiliated_user(op_actor, op_scope, 601, "not-a-company")
+    end
+
+    test "reassign_user_company fails closed for malformed current, user, and target ids", %{
+      tenant_scope: tenant_scope,
+      tenant_actor: tenant_actor
+    } do
+      assert {:error, :company_not_found} =
+               User.reassign_user_company(tenant_actor, tenant_scope, "not-a-company", 701, 21)
+
+      assert {:error, :user_not_found} =
+               User.reassign_user_company(tenant_actor, tenant_scope, 20, "not-a-user", 21)
+
+      assert {:error, :company_not_found} =
+               User.reassign_user_company(tenant_actor, tenant_scope, 20, 701, "not-a-company")
+    end
+
+    test "clear_user_company fails closed before querying malformed company and user ids", %{
+      tenant_scope: tenant_scope,
+      tenant_actor: tenant_actor
+    } do
+      assert {:error, :company_not_found} =
+               User.clear_user_company(tenant_actor, tenant_scope, "not-a-company", 801)
+
+      assert {:error, :user_not_found} =
+               User.clear_user_company(tenant_actor, tenant_scope, 20, "not-a-user")
+    end
+
+    test "admin_change_password fails closed before querying malformed company and user ids", %{
+      tenant_scope: tenant_scope,
+      tenant_actor: tenant_actor
+    } do
+      assert {:error, :company_not_found} =
+               User.admin_change_password(
+                 tenant_actor,
+                 tenant_scope,
+                 "not-a-company",
+                 901,
+                 "brandnewsecurepassword123"
+               )
+
+      assert {:error, :user_not_found} =
+               User.admin_change_password(
+                 tenant_actor,
+                 tenant_scope,
+                 20,
+                 "not-a-user",
+                 "brandnewsecurepassword123"
+               )
+    end
+  end
+
+  describe "lifecycle rejection and atomicity" do
+    test "assign_unaffiliated_user rejects a cross-tenant target company", %{
+      op_scope: op_scope,
+      op_actor: op_actor
+    } do
+      UserFixtures.insert_user!(%{
+        id: 910,
+        company_id: nil,
+        employee_id: nil,
+        email: "cross-tenant-target@example.com"
+      })
+
+      assert {:error, :company_not_found} =
+               User.assign_unaffiliated_user(op_actor, op_scope, 910, 20)
+
+      assert {:ok, %Summary{id: 910, company_id: nil, employee_id: nil}} =
+               User.get_unaffiliated_user(op_actor, op_scope, 910)
+
+      refute Repo.get_by(MutationSchema, auditable_id: "910", event: "assigned_company")
+    end
+
+    test "assign_unaffiliated_user rejects a soft-deleted target company", %{
+      op_scope: op_scope,
+      op_actor: op_actor
+    } do
+      UserFixtures.insert_user!(%{
+        id: 911,
+        company_id: nil,
+        employee_id: nil,
+        email: "deleted-target@example.com"
+      })
+
+      SQL.query!(Repo, "UPDATE companies SET deleted_at = $1 WHERE id = $2", [
+        ~N[2026-08-17 00:00:00],
+        11
+      ])
+
+      assert {:error, :company_not_found} =
+               User.assign_unaffiliated_user(op_actor, op_scope, 911, 11)
+
+      assert {:ok, %Summary{id: 911, company_id: nil, employee_id: nil}} =
+               User.get_unaffiliated_user(op_actor, op_scope, 911)
+
+      refute Repo.get_by(MutationSchema, auditable_id: "911", event: "assigned_company")
+    end
+
+    test "a post-update session failure rolls back password, sessions, and audit", %{
+      tenant_scope: tenant_scope,
+      tenant_actor: tenant_actor
+    } do
+      old_hash = UserFixtures.legacy_password_hash("oldpassword")
+
+      UserFixtures.insert_user!(%{
+        id: 912,
+        company_id: 20,
+        email: "rollback-tail@example.com",
+        password_hash: old_hash,
+        remember_token: "unchanged-token"
+      })
+
+      SQL.query!(
+        Repo,
+        "INSERT INTO sessions (id, user_id, payload, last_activity) VALUES ($1, $2, $3, $4)",
+        ["rollback-tail-session", 912, "opaque", 1]
+      )
+
+      # The public Session guard is called after `apply_password_reset/2` inside
+      # Core User's transaction, so this failure exercises the transaction tail.
+      assert_raise FunctionClauseError, fn ->
+        User.admin_change_password(
+          tenant_actor,
+          tenant_scope,
+          20,
+          912,
+          "brandnewsecurepassword123",
+          current_session_id: ""
+        )
+      end
+
+      assert {:ok, %Summary{company_id: 20}} = User.get_user(tenant_scope, 20, 912)
+      assert UserFixtures.stored_password(912) == old_hash
+      assert UserFixtures.stored_remember_token(912) == "unchanged-token"
+
+      assert Repo.all(from(s in "sessions", where: s.user_id == 912, select: s.id)) == [
+               "rollback-tail-session"
+             ]
+
+      refute Repo.get_by(MutationSchema, auditable_id: "912", event: "password_reset")
+    end
+  end
+end
+
+defmodule Bilimbi.Core.User.AdminAffiliationConcurrencyTest do
+  @moduledoc false
+
+  use ExUnit.Case, async: false
+
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
+  alias Bilimbi.Base.Repo
+  alias Bilimbi.Core.User
+  alias Bilimbi.Core.User.Summary
+  alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
+  alias Ecto.Adapters.SQL
+  alias Ecto.Adapters.SQL.Sandbox
+
+  setup do
+    :ok = Sandbox.checkout(Repo, sandbox: false)
+    schema = unique_schema!()
+    create_concurrency_schema!(schema)
+    UserFixtures.install_user_authz_registry!()
+
+    on_exit(fn ->
+      ContributionRegistry.clear_for_test!()
+      drop_concurrency_schema!(schema)
+    end)
+
+    on_schema!(schema, fn ->
+      seed_concurrency_data!()
+    end)
+
+    scope = UserFixtures.tenant_scope(2)
+    actor = Authz.actor(:user, 2, scope, 20)
+
+    %{schema: schema, scope: scope, actor: actor}
+  end
+
+  test "a waiting lifecycle mutation rereads the user after a concurrent reassign", %{
+    schema: schema,
+    scope: scope,
+    actor: actor
+  } do
+    parent = self()
+
+    blocker =
+      Task.async(fn ->
+        checkout_and_on_schema!(schema, fn ->
+          Repo.transaction(fn ->
+            %{rows: [[950]]} =
+              SQL.query!(Repo, "SELECT id FROM users WHERE id = 950 FOR UPDATE", [])
+
+            send(parent, :user_row_locked)
+            await_message!(:release_user_row)
+          end)
+        end)
+      end)
+
+    assert_receive :user_row_locked, 5_000
+
+    winner =
+      Task.async(fn ->
+        checkout_and_on_schema!(schema, fn ->
+          send(parent, {:winner_backend, backend_pid!()})
+
+          User.reassign_user_company(actor, scope, 20, 950, 21,
+            current_session_id: "keep-race-session"
+          )
+        end)
+      end)
+
+    assert_receive {:winner_backend, winner_backend}, 5_000
+    await_backend_lock_wait!(winner_backend)
+
+    loser =
+      Task.async(fn ->
+        checkout_and_on_schema!(schema, fn ->
+          send(parent, {:loser_backend, backend_pid!()})
+
+          User.clear_user_company(actor, scope, 20, 950,
+            current_session_id: "loser-current-session"
+          )
+        end)
+      end)
+
+    assert_receive {:loser_backend, loser_backend}, 5_000
+    await_backend_lock_wait!(loser_backend)
+
+    try do
+      send(blocker.pid, :release_user_row)
+
+      assert {:ok, :ok} = Task.await(blocker, 5_000)
+
+      assert {:ok, %Summary{id: 950, company_id: 21, employee_id: nil}} =
+               Task.await(winner, 5_000)
+
+      assert {:error, :user_not_found} = Task.await(loser, 5_000)
+
+      on_schema!(schema, fn ->
+        assert %{rows: [[21, nil]]} =
+                 SQL.query!(Repo, "SELECT company_id, employee_id FROM users WHERE id = 950", [])
+
+        assert %{rows: [["keep-race-session"]]} =
+                 SQL.query!(Repo, "SELECT id FROM sessions WHERE user_id = 950", [])
+
+        assert %{rows: [[1]]} =
+                 SQL.query!(
+                   Repo,
+                   "SELECT count(*) FROM base_audit_mutations WHERE auditable_id = '950' AND event = 'reassigned_company'",
+                   []
+                 )
+
+        assert %{rows: [[0]]} =
+                 SQL.query!(
+                   Repo,
+                   "SELECT count(*) FROM base_audit_mutations WHERE auditable_id = '950' AND event = 'cleared_company'",
+                   []
+                 )
+      end)
+    after
+      send(blocker.pid, :release_user_row)
+      Enum.each([blocker, winner, loser], &Task.shutdown(&1, :brutal_kill))
+    end
+  end
+
+  defp unique_schema! do
+    random_suffix = :crypto.strong_rand_bytes(12) |> Base.encode16(case: :lower)
+    "user_affiliation_race_#{random_suffix}"
+  end
+
+  defp create_concurrency_schema!(schema) do
+    quoted_schema = quote_ident!(schema)
+    SQL.query!(Repo, "CREATE SCHEMA #{quoted_schema}", [])
+
+    statements = [
+      """
+      CREATE TABLE #{quoted_schema}.companies (
+        id bigserial PRIMARY KEY,
+        parent_id bigint,
+        tenant_id bigint NOT NULL,
+        name varchar(255) NOT NULL,
+        code varchar(255) NOT NULL UNIQUE,
+        status varchar(255) NOT NULL DEFAULT 'active',
+        legal_name varchar(255),
+        registration_number varchar(255),
+        tax_id varchar(255),
+        legal_entity_type_id bigint,
+        jurisdiction varchar(255),
+        email varchar(255),
+        website varchar(255),
+        scope_activities json,
+        metadata json,
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone,
+        deleted_at timestamp(0) without time zone
+      )
+      """,
+      """
+      CREATE TABLE #{quoted_schema}.users (
+        id bigserial PRIMARY KEY,
+        company_id bigint,
+        employee_id bigint,
+        name varchar(255) NOT NULL,
+        email varchar(255) NOT NULL,
+        email_verified_at timestamp(0) without time zone,
+        password varchar(255) NOT NULL,
+        remember_token varchar(100),
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone
+      )
+      """,
+      """
+      CREATE TABLE #{quoted_schema}.sessions (
+        id varchar(255) PRIMARY KEY,
+        user_id bigint,
+        ip_address varchar(45),
+        user_agent text,
+        payload text NOT NULL,
+        last_activity integer NOT NULL
+      )
+      """,
+      """
+      CREATE TABLE #{quoted_schema}.base_audit_mutations (
+        id bigserial PRIMARY KEY,
+        company_id bigint,
+        tenant_id bigint,
+        actor_type varchar(40) NOT NULL,
+        actor_id bigint NOT NULL,
+        actor_role varchar(100),
+        ip_address inet,
+        url text,
+        user_agent varchar(80),
+        auditable_type varchar(255) NOT NULL,
+        auditable_id varchar(128) NOT NULL,
+        subject_name varchar(255),
+        subject_id varchar(128),
+        subject_identifier varchar(255),
+        source varchar(20) NOT NULL DEFAULT 'listener',
+        event varchar(20) NOT NULL,
+        old_values jsonb,
+        new_values jsonb,
+        trace_id varchar(12),
+        occurred_at timestamp(0) without time zone NOT NULL
+      )
+      """,
+      """
+      CREATE TABLE #{quoted_schema}.base_authz_roles (
+        id bigserial PRIMARY KEY,
+        company_id bigint,
+        is_system boolean NOT NULL DEFAULT false,
+        grant_all boolean NOT NULL DEFAULT false
+      )
+      """,
+      """
+      CREATE TABLE #{quoted_schema}.base_authz_principal_roles (
+        id bigserial PRIMARY KEY,
+        company_id bigint,
+        principal_type varchar(40) NOT NULL,
+        principal_id bigint NOT NULL,
+        role_id bigint NOT NULL
+      )
+      """,
+      """
+      CREATE TABLE #{quoted_schema}.base_authz_principal_capabilities (
+        id bigserial PRIMARY KEY,
+        company_id bigint,
+        principal_type varchar(40) NOT NULL,
+        principal_id bigint NOT NULL,
+        capability_key varchar(255) NOT NULL,
+        is_allowed boolean NOT NULL DEFAULT true
+      )
+      """,
+      """
+      CREATE TABLE #{quoted_schema}.base_authz_decision_logs (
+        id bigserial PRIMARY KEY,
+        company_id bigint,
+        actor_type varchar(40) NOT NULL,
+        actor_id bigint NOT NULL,
+        acting_for_user_id bigint,
+        capability varchar(255) NOT NULL,
+        resource_type varchar(255),
+        resource_id varchar(255),
+        allowed boolean NOT NULL,
+        reason_code varchar(255) NOT NULL,
+        applied_policies json,
+        context json,
+        trace_id varchar(12),
+        occurred_at timestamp(0) without time zone NOT NULL,
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone
+      )
+      """
+    ]
+
+    Enum.each(statements, &SQL.query!(Repo, &1, []))
+  end
+
+  defp seed_concurrency_data! do
+    SQL.query!(
+      Repo,
+      """
+      INSERT INTO companies (id, tenant_id, name, code, status, deleted_at)
+      VALUES (20, 2, 'Current', 'current', 'active', NULL),
+             (21, 2, 'Target', 'target', 'active', NULL)
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      """
+      INSERT INTO users (id, company_id, employee_id, name, email, password)
+      VALUES (950, 20, NULL, 'Race Target', 'race-target@example.com', $1)
+      """,
+      [UserFixtures.password_hash("race-password")]
+    )
+
+    SQL.query!(
+      Repo,
+      """
+      INSERT INTO sessions (id, user_id, payload, last_activity)
+      VALUES ('keep-race-session', 950, 'opaque', 1)
+      """,
+      []
+    )
+
+    %{rows: [[role_id]]} =
+      SQL.query!(
+        Repo,
+        """
+        INSERT INTO base_authz_roles (company_id, is_system, grant_all)
+        VALUES (20, false, true)
+        RETURNING id
+        """,
+        []
+      )
+
+    SQL.query!(
+      Repo,
+      """
+      INSERT INTO base_authz_principal_roles (company_id, principal_type, principal_id, role_id)
+      VALUES (20, 'user', 2, $1)
+      """,
+      [role_id]
+    )
+  end
+
+  defp backend_pid! do
+    %{rows: [[backend_pid]]} = SQL.query!(Repo, "SELECT pg_backend_pid()", [])
+    backend_pid
+  end
+
+  defp await_message!(message) do
+    receive do
+      ^message -> :ok
+    after
+      5_000 -> Repo.rollback({:timeout, message})
+    end
+  end
+
+  defp await_backend_lock_wait!(backend_pid), do: await_backend_lock_wait!(backend_pid, 50)
+
+  defp await_backend_lock_wait!(_backend_pid, 0) do
+    flunk("contender never waited on a PostgreSQL row lock")
+  end
+
+  defp await_backend_lock_wait!(backend_pid, remaining) do
+    %{rows: rows} =
+      SQL.query!(Repo, "SELECT wait_event_type FROM pg_stat_activity WHERE pid = $1", [
+        backend_pid
+      ])
+
+    case rows do
+      [["Lock"]] ->
+        :ok
+
+      _other ->
+        receive do
+        after
+          20 -> await_backend_lock_wait!(backend_pid, remaining - 1)
+        end
+    end
+  end
+
+  defp checkout_and_on_schema!(schema, fun) do
+    :ok = Sandbox.checkout(Repo, sandbox: false)
+    on_schema!(schema, fun)
+  end
+
+  defp on_schema!(schema, fun) do
+    SQL.query!(Repo, "SET search_path TO #{quote_ident!(schema)}", [])
+
+    try do
+      fun.()
+    after
+      SQL.query!(Repo, "SET search_path TO public", [])
+    end
+  end
+
+  defp drop_concurrency_schema!(schema) do
+    :ok = Sandbox.checkout(Repo, sandbox: false)
+    SQL.query!(Repo, "DROP SCHEMA IF EXISTS #{quote_ident!(schema)} CASCADE", [])
+  end
+
+  defp quote_ident!(identifier) when is_binary(identifier) do
+    if identifier =~ ~r/^[a-z][a-z0-9_]*$/ do
+      ~s("#{identifier}")
+    else
+      raise ArgumentError, "refusing unsafe schema identifier #{inspect(identifier)}"
+    end
+  end
 end

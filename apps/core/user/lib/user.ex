@@ -513,12 +513,14 @@ defmodule Bilimbi.Core.User do
         ) ::
           {:ok, Summary.t()}
           | {:error, lookup_error() | :employee_not_found | :unauthorized | Changeset.t()}
+  def assign_unaffiliated_user(actor, scope, user_id, target_company_id, opts \\ [])
+
   def assign_unaffiliated_user(
         %AuthzActor{} = actor,
         %Scope{} = scope,
         user_id,
         target_company_id,
-        opts \\ []
+        opts
       )
       when is_integer(user_id) and user_id > 0 and is_integer(target_company_id) and
              target_company_id > 0 and is_list(opts) do
@@ -555,6 +557,14 @@ defmodule Bilimbi.Core.User do
     end
   end
 
+  def assign_unaffiliated_user(%AuthzActor{}, %Scope{}, user_id, _target_company_id, opts)
+      when not (is_integer(user_id) and user_id > 0) and is_list(opts),
+      do: {:error, :user_not_found}
+
+  def assign_unaffiliated_user(%AuthzActor{}, %Scope{}, _user_id, target_company_id, opts)
+      when not (is_integer(target_company_id) and target_company_id > 0) and is_list(opts),
+      do: {:error, :company_not_found}
+
   @doc """
   Reassigns a user from one live company to another within the proven tenant scope.
 
@@ -574,12 +584,21 @@ defmodule Bilimbi.Core.User do
           {:ok, Summary.t()}
           | {:error, lookup_error() | :employee_not_found | :unauthorized | Changeset.t()}
   def reassign_user_company(
+        actor,
+        scope,
+        current_company_id,
+        user_id,
+        target_company_id,
+        opts \\ []
+      )
+
+  def reassign_user_company(
         %AuthzActor{} = actor,
         %Scope{} = scope,
         current_company_id,
         user_id,
         target_company_id,
-        opts \\ []
+        opts
       )
       when is_integer(current_company_id) and current_company_id > 0 and
              is_integer(user_id) and user_id > 0 and
@@ -635,6 +654,39 @@ defmodule Bilimbi.Core.User do
     end
   end
 
+  def reassign_user_company(
+        %AuthzActor{},
+        %Scope{},
+        current_company_id,
+        _user_id,
+        _target_company_id,
+        opts
+      )
+      when not (is_integer(current_company_id) and current_company_id > 0) and is_list(opts),
+      do: {:error, :company_not_found}
+
+  def reassign_user_company(
+        %AuthzActor{},
+        %Scope{},
+        _current_company_id,
+        user_id,
+        _target_company_id,
+        opts
+      )
+      when not (is_integer(user_id) and user_id > 0) and is_list(opts),
+      do: {:error, :user_not_found}
+
+  def reassign_user_company(
+        %AuthzActor{},
+        %Scope{},
+        _current_company_id,
+        _user_id,
+        target_company_id,
+        opts
+      )
+      when not (is_integer(target_company_id) and target_company_id > 0) and is_list(opts),
+      do: {:error, :company_not_found}
+
   @doc """
   Clears a user's company and employee affiliation, returning them to unaffiliated status.
 
@@ -650,12 +702,14 @@ defmodule Bilimbi.Core.User do
         ) ::
           {:ok, Summary.t()}
           | {:error, lookup_error() | :unauthorized | Changeset.t()}
+  def clear_user_company(actor, scope, current_company_id, user_id, opts \\ [])
+
   def clear_user_company(
         %AuthzActor{} = actor,
         %Scope{} = scope,
         current_company_id,
         user_id,
-        opts \\ []
+        opts
       )
       when is_integer(current_company_id) and current_company_id > 0 and
              is_integer(user_id) and user_id > 0 and
@@ -703,6 +757,14 @@ defmodule Bilimbi.Core.User do
     end
   end
 
+  def clear_user_company(%AuthzActor{}, %Scope{}, current_company_id, _user_id, opts)
+      when not (is_integer(current_company_id) and current_company_id > 0) and is_list(opts),
+      do: {:error, :company_not_found}
+
+  def clear_user_company(%AuthzActor{}, %Scope{}, _current_company_id, user_id, opts)
+      when not (is_integer(user_id) and user_id > 0) and is_list(opts),
+      do: {:error, :user_not_found}
+
   @doc """
   Replaces a user's password in a trusted administrative workflow without requiring
   the user's existing password.
@@ -721,15 +783,18 @@ defmodule Bilimbi.Core.User do
         ) ::
           {:ok, Summary.t()}
           | {:error, lookup_error() | :unauthorized | :not_platform_operator | Changeset.t()}
+  def admin_change_password(actor, scope, company_id, user_id, new_password, opts \\ [])
+
   def admin_change_password(
         %AuthzActor{} = actor,
         %Scope{} = scope,
         company_id,
         user_id,
         new_password,
-        opts \\ []
+        opts
       )
-      when is_binary(new_password) and is_integer(user_id) and user_id > 0 and is_list(opts) do
+      when (is_nil(company_id) or (is_integer(company_id) and company_id > 0)) and
+             is_binary(new_password) and is_integer(user_id) and user_id > 0 and is_list(opts) do
     current_session_id = Keyword.get(opts, :current_session_id, "revoke-admin-password-reset")
 
     with :ok <- authorize_password_change(actor, scope, company_id, user_id) do
@@ -757,6 +822,17 @@ defmodule Bilimbi.Core.User do
       end)
     end
   end
+
+  def admin_change_password(%AuthzActor{}, %Scope{}, company_id, _user_id, new_password, opts)
+      when not is_nil(company_id) and not (is_integer(company_id) and company_id > 0) and
+             is_binary(new_password) and is_list(opts),
+      do: {:error, :company_not_found}
+
+  def admin_change_password(%AuthzActor{}, %Scope{}, company_id, user_id, new_password, opts)
+      when (is_nil(company_id) or (is_integer(company_id) and company_id > 0)) and
+             not (is_integer(user_id) and user_id > 0) and is_binary(new_password) and
+             is_list(opts),
+      do: {:error, :user_not_found}
 
   defp record_audit_mutation(scope, actor, user_id, event, company_id, old_values, new_values) do
     Audit.record_mutation(scope, %{
