@@ -455,6 +455,66 @@ defmodule Bilimbi.Core.CompatibilityTest do
     assert Enum.any?(errors, &String.contains?(&1, "platform-operator tenant"))
   end
 
+  test "adoption and migration preserves global custom employee types from Belimbing", %{
+    schema: schema
+  } do
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
+    drop_bilimbi_ledger!(MigrationTestRepo, schema)
+
+    # Insert a canonical Belimbing custom employee type into the baseline schema
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".employee_types (code, label, is_system, company_id)
+      VALUES ('contractor_global', 'Contractor Global', false, NULL)
+      """,
+      []
+    )
+
+    # Adopt baseline
+    assert {:ok, :adopted} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
+
+    # Run pending Bilimbi-only migrations
+    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+
+    # Verify structural integrity against contracts
+    assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
+
+    # Assert global custom type exists and is protected by global unique index
+    assert_raise Postgrex.Error, ~r/employee_types_global_code_unique/, fn ->
+      SQL.query!(
+        MigrationTestRepo,
+        """
+        INSERT INTO "#{schema}".employee_types (code, label, is_system, company_id)
+        VALUES ('contractor_global', 'Duplicate Global', false, NULL)
+        """,
+        []
+      )
+    end
+
+    # Assert system type cannot belong to a company
+    assert_raise Postgrex.Error, ~r/employee_types_system_company_check/, fn ->
+      SQL.query!(
+        MigrationTestRepo,
+        """
+        INSERT INTO "#{schema}".employee_types (code, label, is_system, company_id)
+        VALUES ('invalid_sys', 'Invalid System', true, 81)
+        """,
+        []
+      )
+    end
+
+    # Assert company custom types can be created with distinct or matching codes
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".employee_types (code, label, is_system, company_id)
+      VALUES ('contractor_global', 'Company 81 Custom', false, 81)
+      """,
+      []
+    )
+  end
+
   defp drop_bilimbi_ledger!(repo, schema) do
     SQL.query!(repo, ~s(DROP TABLE "#{schema}".bilimbi_schema_migrations), [])
   end

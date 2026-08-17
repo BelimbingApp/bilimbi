@@ -71,13 +71,12 @@ defmodule Bilimbi.Core.Employee.SchemaContract do
       },
       optional_indexes: %{
         "employee_types_code_unique" => index(["code"], true),
-        "employee_types_global_code_unique" =>
-          index(["code"], true, "company_id IS NULL AND is_system = true"),
+        "employee_types_global_code_unique" => index(["code"], true, "company_id IS NULL"),
         "employee_types_company_code_unique" =>
           index(["company_id", "code"], true, "company_id IS NOT NULL")
       },
       optional_checks: %{
-        "employee_types_custom_company_check" => check("is_system = (company_id IS NULL)")
+        "employee_types_system_company_check" => check("NOT is_system OR (company_id IS NULL)")
       },
       optional_groups: [
         %{
@@ -87,7 +86,7 @@ defmodule Bilimbi.Core.Employee.SchemaContract do
             "employee_types_company_code_unique"
           ],
           checks: [
-            "employee_types_custom_company_check"
+            "employee_types_system_company_check"
           ]
         }
       ],

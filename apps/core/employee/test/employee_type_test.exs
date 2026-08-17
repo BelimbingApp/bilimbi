@@ -279,26 +279,66 @@ defmodule Bilimbi.Core.Employee.EmployeeTypeTest do
   end
 
   describe "database integrity and check constraint" do
-    test "rejects company-less custom type (company_id IS NULL and is_system = false)" do
-      assert_raise Postgrex.Error, ~r/employee_types_custom_company_check/, fn ->
+    test "rejects company-owned system type (company_id IS NOT NULL and is_system = true)" do
+      assert_raise Postgrex.Error, ~r/employee_types_system_company_check/, fn ->
         Ecto.Adapters.SQL.query!(
           Bilimbi.Base.Repo,
           """
           INSERT INTO employee_types (code, label, is_system, company_id)
-          VALUES ('orphan_custom', 'Orphan Custom', false, NULL)
+          VALUES ('company_system', 'Company System', true, 81)
           """,
           []
         )
       end
     end
 
-    test "rejects company-owned system type (company_id IS NOT NULL and is_system = true)" do
-      assert_raise Postgrex.Error, ~r/employee_types_custom_company_check/, fn ->
+    test "allows company-less global custom type and enforces global code uniqueness" do
+      Ecto.Adapters.SQL.query!(
+        Bilimbi.Base.Repo,
+        """
+        INSERT INTO employee_types (code, label, is_system, company_id)
+        VALUES ('legacy_global_custom', 'Legacy Global Custom', false, NULL)
+        """,
+        []
+      )
+
+      assert_raise Postgrex.Error, ~r/employee_types_global_code_unique/, fn ->
         Ecto.Adapters.SQL.query!(
           Bilimbi.Base.Repo,
           """
           INSERT INTO employee_types (code, label, is_system, company_id)
-          VALUES ('company_system', 'Company System', true, 81)
+          VALUES ('legacy_global_custom', 'Duplicate Global Custom', false, NULL)
+          """,
+          []
+        )
+      end
+    end
+
+    test "allows identical codes between different companies under company-scoped unique index" do
+      Ecto.Adapters.SQL.query!(
+        Bilimbi.Base.Repo,
+        """
+        INSERT INTO employee_types (code, label, is_system, company_id)
+        VALUES ('shared_code', 'Company 81 Custom', false, 81)
+        """,
+        []
+      )
+
+      Ecto.Adapters.SQL.query!(
+        Bilimbi.Base.Repo,
+        """
+        INSERT INTO employee_types (code, label, is_system, company_id)
+        VALUES ('shared_code', 'Company 82 Custom', false, 82)
+        """,
+        []
+      )
+
+      assert_raise Postgrex.Error, ~r/employee_types_company_code_unique/, fn ->
+        Ecto.Adapters.SQL.query!(
+          Bilimbi.Base.Repo,
+          """
+          INSERT INTO employee_types (code, label, is_system, company_id)
+          VALUES ('shared_code', 'Company 81 Duplicate', false, 81)
           """,
           []
         )
