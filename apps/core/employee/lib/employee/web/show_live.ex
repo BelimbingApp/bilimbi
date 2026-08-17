@@ -9,8 +9,6 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   use Bilimbi.Base.UI, :live_view
 
-  import Bilimbi.Core.Employee.Web.Capabilities, only: [allowed?: 2]
-
   alias Bilimbi.Core.Employee
 
   @impl true

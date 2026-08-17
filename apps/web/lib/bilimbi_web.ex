@@ -84,7 +84,8 @@ defmodule BilimbiWeb do
 
       # HTML escaping functionality
       import Phoenix.HTML
-      # Core UI components
+      # Core UI helpers and components
+      import Bilimbi.Base.UI, only: [allowed?: 2]
       import Bilimbi.Base.UI.Components
 
       # Common modules used in templates
