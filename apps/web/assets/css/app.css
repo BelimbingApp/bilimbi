@@ -99,6 +99,22 @@ body {
   transform: rotate(90deg);
 }
 
+#app-sidebar .app-pinned-row[draggable="true"] {
+  cursor: grab;
+}
+
+#app-sidebar .app-pinned-row[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+#app-sidebar .app-pinned-row[data-pinned-dragging="true"] {
+  opacity: 0.4;
+}
+
+#app-sidebar .app-pinned-row[data-pinned-drop-target="true"] {
+  border-top: 2px solid var(--color-brand-strong);
+}
+
 /* Authenticated shell chrome. Geometry matches Belimbing: full-width top
  * bar, persistent rail on wide screens, off-canvas drawer below `lg`.
  * The AppShell hook writes data attributes; reduced-motion skips the
@@ -117,6 +133,7 @@ body {
   #app-shell[data-sidebar-rail="true"] .app-nav-caret,
   #app-shell[data-sidebar-rail="true"] .app-nav-toggle,
   #app-shell[data-sidebar-rail="true"] .app-nav-pin,
+  #app-shell[data-sidebar-rail="true"] .app-pinned-grip,
   #app-shell[data-sidebar-rail="true"] .app-pinned-unpin,
   #app-shell[data-sidebar-rail="true"] .app-pinned-heading,
   #app-shell[data-sidebar-rail="true"] .app-pinned-divider {

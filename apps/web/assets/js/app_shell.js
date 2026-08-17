@@ -32,6 +32,8 @@ const AppShell = {
     this.drawerOpen = false
     this.lastFocus = null
     this.dragging = false
+    this.draggedPinnedId = null
+    this.dropPinnedId = null
 
     this.onToggle = () => this.toggleSidebar()
     this.onBackdrop = () => this.closeDrawer()
@@ -41,11 +43,19 @@ const AppShell = {
     this.onDragStart = (event) => this.startDrag(event)
     this.onDragMove = (event) => this.moveDrag(event)
     this.onDragEnd = () => this.endDrag()
+    this.onPinnedDragStart = (event) => this.startPinnedDrag(event)
+    this.onPinnedDragOver = (event) => this.overPinnedDrag(event)
+    this.onPinnedDrop = (event) => this.dropPinnedDrag(event)
+    this.onPinnedDragEnd = () => this.endPinnedDrag()
 
     this.toggle?.addEventListener("click", this.onToggle)
     this.backdrop?.addEventListener("click", this.onBackdrop)
     this.sidebar?.addEventListener("click", this.onNav)
     this.drag?.addEventListener("mousedown", this.onDragStart)
+    this.pinnedItems?.addEventListener("dragstart", this.onPinnedDragStart)
+    this.pinnedItems?.addEventListener("dragover", this.onPinnedDragOver)
+    this.pinnedItems?.addEventListener("drop", this.onPinnedDrop)
+    this.pinnedItems?.addEventListener("dragend", this.onPinnedDragEnd)
     window.addEventListener("keydown", this.onKey)
     this.mq.addEventListener("change", this.onMq)
     this.apply()
@@ -60,6 +70,10 @@ const AppShell = {
     this.backdrop?.removeEventListener("click", this.onBackdrop)
     this.sidebar?.removeEventListener("click", this.onNav)
     this.drag?.removeEventListener("mousedown", this.onDragStart)
+    this.pinnedItems?.removeEventListener("dragstart", this.onPinnedDragStart)
+    this.pinnedItems?.removeEventListener("dragover", this.onPinnedDragOver)
+    this.pinnedItems?.removeEventListener("drop", this.onPinnedDrop)
+    this.pinnedItems?.removeEventListener("dragend", this.onPinnedDragEnd)
     window.removeEventListener("mousemove", this.onDragMove)
     window.removeEventListener("mouseup", this.onDragEnd)
     window.removeEventListener("keydown", this.onKey)
@@ -267,6 +281,89 @@ const AppShell = {
     return this.sidebar?.contains(item) ? item : null
   },
 
+  pinnedRow(event) {
+    if (!(event.target instanceof Element)) return null
+
+    const row = event.target.closest("[data-pinned-item]")
+    return this.pinnedItems?.contains(row) ? row : null
+  },
+
+  startPinnedDrag(event) {
+    const row = this.pinnedRow(event)
+
+    if (!row || this.rail || !event.dataTransfer) {
+      event.preventDefault()
+      return
+    }
+
+    this.draggedPinnedId = row.dataset.pinnedItem
+    event.dataTransfer.effectAllowed = "move"
+    event.dataTransfer.setData("text/plain", this.draggedPinnedId)
+    row.dataset.pinnedDragging = "true"
+  },
+
+  overPinnedDrag(event) {
+    const row = this.pinnedRow(event)
+
+    if (!row || !this.draggedPinnedId || !event.dataTransfer) return
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "move"
+
+    if (row.dataset.pinnedItem === this.draggedPinnedId) return
+
+    this.setPinnedDropTarget(row.dataset.pinnedItem)
+  },
+
+  dropPinnedDrag(event) {
+    const row = this.pinnedRow(event)
+
+    if (!row || !this.draggedPinnedId) return
+
+    event.preventDefault()
+
+    const targetId = row.dataset.pinnedItem
+    const draggedId = this.draggedPinnedId
+
+    if (targetId !== draggedId) {
+      const reordered = this.pinnedItemIds.filter((id) => id !== draggedId)
+      const targetIndex = reordered.indexOf(targetId)
+
+      if (targetIndex >= 0) {
+        reordered.splice(targetIndex, 0, draggedId)
+        this.pinnedItemIds = reordered
+        this.savePinnedItemIds()
+      }
+    }
+
+    this.endPinnedDrag()
+    this.renderPinnedItems()
+  },
+
+  endPinnedDrag() {
+    this.draggedPinnedId = null
+    this.dropPinnedId = null
+
+    for (const row of this.pinnedItems?.querySelectorAll("[data-pinned-item]") ?? []) {
+      delete row.dataset.pinnedDragging
+      delete row.dataset.pinnedDropTarget
+    }
+  },
+
+  setPinnedDropTarget(id) {
+    if (this.dropPinnedId === id) return
+
+    this.dropPinnedId = id
+
+    for (const row of this.pinnedItems?.querySelectorAll("[data-pinned-item]") ?? []) {
+      if (row.dataset.pinnedItem === id) {
+        row.dataset.pinnedDropTarget = "true"
+      } else {
+        delete row.dataset.pinnedDropTarget
+      }
+    }
+  },
+
   renderPinnedItems() {
     if (!this.pinned || !this.pinnedItems) return
 
@@ -284,6 +381,15 @@ const AppShell = {
     for (const {id, item} of items) {
       const row = document.createElement("div")
       row.className = "app-pinned-row group flex min-w-0 items-center"
+      row.dataset.pinnedItem = id
+      row.draggable = !this.rail
+
+      const grip = document.createElement("span")
+      grip.className =
+        "app-pinned-grip mr-0.5 w-3 shrink-0 select-none text-center text-[0.625rem] text-ink-faint opacity-0 transition-opacity group-hover:opacity-60"
+      grip.textContent = "⠁⠁"
+      grip.setAttribute("aria-hidden", "true")
+      grip.title = "Drag to reorder"
 
       const link = document.createElement("a")
       link.href = item.href
@@ -313,7 +419,7 @@ const AppShell = {
       const pinIcon = item.parentElement?.querySelector("[data-nav-pin] svg")?.cloneNode(true)
       if (pinIcon) unpin.append(pinIcon)
 
-      row.append(link, unpin)
+      row.append(grip, link, unpin)
       this.pinnedItems.append(row)
     }
 
