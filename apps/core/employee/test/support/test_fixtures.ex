@@ -92,7 +92,8 @@ defmodule Bilimbi.Core.Employee.TestFixtures do
         is_system boolean NOT NULL DEFAULT false,
         company_id bigint,
         created_at timestamp(0) without time zone,
-        updated_at timestamp(0) without time zone
+        updated_at timestamp(0) without time zone,
+        CONSTRAINT employee_types_system_company_check CHECK (NOT is_system OR (company_id IS NULL))
       ) ON COMMIT PRESERVE ROWS
       """,
       []
@@ -103,7 +104,7 @@ defmodule Bilimbi.Core.Employee.TestFixtures do
       """
       CREATE UNIQUE INDEX employee_types_global_code_unique
       ON employee_types (code)
-      WHERE company_id IS NULL AND is_system = true
+      WHERE company_id IS NULL
       """,
       []
     )
