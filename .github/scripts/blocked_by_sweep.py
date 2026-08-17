@@ -20,8 +20,11 @@ from urllib.request import Request, urlopen
 BLOCKED_LABEL = "task:blocked"
 READY_LABEL = "task:ready"
 BLOCKED_BY_RE = re.compile(
-    r"(?im)^[ \t]*Blocked-By:[ \t]*(#[0-9]+(?:[ \t]*,[ \t]*#[0-9]+)*)[ \t]*$"
+    r"(?i)^[ \t]*Blocked-By:[ \t]*(#[0-9]+(?:[ \t]*,[ \t]*#[0-9]+)*)[ \t]*$"
 )
+OPENING_FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})")
+CLOSING_FENCE_RE = re.compile(r"^[ \t]*(`{3,}|~{3,})[ \t]*$")
+INDENTED_CODE_RE = re.compile(r"^(?: {4}|\t)")
 
 
 @dataclass(frozen=True)
@@ -30,20 +33,65 @@ class Transition:
     comment: str | None
 
 
-def parse_blockers(body: str | None) -> tuple[int, ...]:
-    """Return the issue numbers from one valid Blocked-By header.
+def safe_lines(body: str) -> list[str]:
+    """Body lines that Markdown renders as prose.
 
-    A malformed or missing header returns no blockers. Duplicate references are
+    Fenced blocks, indented code and blockquotes are dropped, so documenting the
+    convention inside an issue cannot arm the sweep against that issue. A fence
+    closes only on a run of the same character at least as long as the one that
+    opened it, so a ```` block is not ended by a ``` line.
+    """
+
+    lines: list[str] = []
+    fence: str | None = None
+
+    for raw_line in body.split("\n"):
+        line = raw_line.replace("\r", "")
+
+        if fence is not None:
+            closing = CLOSING_FENCE_RE.match(line)
+            if closing and _closes_fence(closing.group(1), fence):
+                fence = None
+            continue
+
+        if INDENTED_CODE_RE.match(line) or line.lstrip().startswith(">"):
+            continue
+
+        opening = OPENING_FENCE_RE.match(line)
+        if opening:
+            fence = opening.group(1)
+            continue
+
+        lines.append(line)
+
+    return lines
+
+
+def _closes_fence(closing: str, opening: str) -> bool:
+    return closing[0] == opening[0] and len(closing) >= len(opening)
+
+
+def parse_blockers(body: str | None) -> tuple[int, ...]:
+    """Return the issue numbers from every valid Blocked-By header.
+
+    All headers are unioned rather than only the first. Recording a new blocker
+    by adding a line is the natural edit, and reading only the first silently
+    dropped the rest -- which marked an issue ready while a blocker was open.
+
+    A malformed or missing header contributes nothing. Duplicate references are
     collapsed while preserving their first-seen order.
     """
 
-    match = BLOCKED_BY_RE.search(body or "")
-    if match is None:
-        return ()
+    numbers: list[int] = []
 
-    numbers = (
-        int(reference.strip()[1:]) for reference in match.group(1).split(",")
-    )
+    for line in safe_lines(body or ""):
+        match = BLOCKED_BY_RE.match(line)
+        if match is None:
+            continue
+        numbers.extend(
+            int(reference.strip()[1:]) for reference in match.group(1).split(",")
+        )
+
     return tuple(dict.fromkeys(numbers))
 
 

@@ -90,5 +90,56 @@ class BlockedBySweepTest(unittest.TestCase):
         self.assertIn("#131, #132", api.comments_seen[0])
 
 
+class BlockedByParsingTest(unittest.TestCase):
+    """Fail-open cases found while reviewing #204, fixed in #224.
+
+    Each of these previously unblocked an issue it should not have.
+    """
+
+    def blocked(self, body: str) -> dict:
+        return {"body": body, "labels": [{"name": BLOCKED_LABEL}]}
+
+    def test_every_header_counts_not_only_the_first(self):
+        # Recording a new blocker by adding a line is the natural edit. Reading
+        # only the first header dropped the rest and marked the issue ready
+        # while #2 was still open.
+        body = "Blocked-By: #1\n\nlater:\nBlocked-By: #2\n"
+
+        self.assertEqual(parse_blockers(body), (1, 2))
+        self.assertIsNone(transition_for(self.blocked(body), {1: "closed", 2: "open"}, []))
+
+    def test_all_headers_closed_still_unblocks(self):
+        body = "Blocked-By: #1\nBlocked-By: #2\n"
+
+        transition = transition_for(self.blocked(body), {1: "closed", 2: "closed"}, [])
+
+        self.assertIsNotNone(transition)
+        self.assertIn(READY_LABEL, transition.labels)
+
+    def test_header_inside_a_fenced_block_is_not_a_declaration(self):
+        # Documenting the convention in an issue body must not arm the sweep
+        # against that issue.
+        body = "Syntax:\n```\nBlocked-By: #1\n```\n"
+
+        self.assertEqual(parse_blockers(body), ())
+
+    def test_header_inside_an_indented_block_is_not_a_declaration(self):
+        self.assertEqual(parse_blockers("Example:\n\n    Blocked-By: #1\n"), ())
+
+    def test_a_longer_fence_is_not_closed_by_a_shorter_one(self):
+        # ```` opens; ``` does not close it, so the header stays fenced.
+        self.assertEqual(parse_blockers("````\nBlocked-By: #1\n```\n"), ())
+
+    def test_tildes_and_backticks_do_not_close_each_other(self):
+        self.assertEqual(parse_blockers("~~~\nBlocked-By: #1\n```\n"), ())
+
+    def test_a_quoted_header_is_not_a_declaration(self):
+        self.assertEqual(parse_blockers("> Blocked-By: #1\n"), ())
+
+    def test_a_header_after_a_closed_fence_still_counts(self):
+        # The guard must not swallow the rest of the body.
+        self.assertEqual(parse_blockers("```\nnoise\n```\nBlocked-By: #1\n"), (1,))
+
+
 if __name__ == "__main__":
     unittest.main()
