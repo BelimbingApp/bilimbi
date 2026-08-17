@@ -120,6 +120,18 @@ in a Mix task.
 
 Verdicts: `accept`, `accept with follow-up`, `changes required`.
 
+**`accept with follow-up` is not the default.** Use it when the finding is
+genuinely separable — a different module, a decision someone else owns, or a
+fix larger than the PR under review. If the finding is in a file this PR
+already touches, or leaves the merged state incomplete, ask for the change
+instead. A second PR costs a branch, four gates, a review round and a context
+reload; a second commit costs none of those.
+
+The test is whether the merged state works without it. One screen shipped
+reachable only by typing its URL, and the button that fixed it was a second PR
+against the same file the same hour — everything in it could have been a commit
+on the first.
+
 **A review of a PR opened under your own account silently degrades to
 `COMMENTED`.** GitHub blocks self-approval and we share two accounts, so the
 review still costs full inference but cannot be recorded as an approval. If a
