@@ -31,72 +31,54 @@
       />
     </form>
 
-    <div class="mt-4 overflow-x-auto rounded-xl border border-line bg-surface">
-      <table class="w-full text-left text-sm">
-        <thead class="border-b border-line bg-surface-sunken">
-          <tr>
-            <th
-              :for={{column, label} <- [{"name", "Name"}, {"code", "Code"}, {"is_system", "Scope"}]}
-              class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle"
-            >
-              <button
-                type="button"
-                id={"roles-sort-#{column}"}
-                phx-click="sort"
-                phx-value-column={column}
-                class="inline-flex items-center gap-1 hover:text-ink"
-              >
-                {label}
-                <.icon
-                  :if={sort_indicator(@state, String.to_existing_atom(column))}
-                  name={sort_indicator(@state, String.to_existing_atom(column))}
-                  class="size-3"
-                />
-              </button>
-            </th>
-            <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-              Capabilities
-            </th>
-            <th class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-              Principals
-            </th>
-          </tr>
-        </thead>
-        <tbody id="roles" phx-update="stream" class="divide-y divide-line-subtle">
-          <tr :for={{dom_id, role} <- @streams.roles} id={dom_id} class="hover:bg-surface-sunken">
-            <td class="px-4 py-2.5">
-              <.link
-                navigate={~p"/authz/roles/#{role.id}"}
-                class="font-medium text-ink-strong hover:underline"
-              >
-                {role.name}
-              </.link>
-              <p :if={role.description} class="text-xs text-ink-subtle">{role.description}</p>
-            </td>
-            <td class="px-4 py-2.5 font-mono text-xs text-ink-muted">{role.code}</td>
-            <td class="px-4 py-2.5">
-              <.badge kind={scope_kind(role)}>{scope_label(role)}</.badge>
-              <.badge :if={role.grant_all} kind={:warning} class="ml-1">Grants all</.badge>
-            </td>
-            <td class="px-4 py-2.5 tabular-nums text-ink-muted">
-              <%= if role.grant_all do %>
-                <span title="A grant-all role carries every capability, present and future">
-                  All
-                </span>
-              <% else %>
-                {role.capability_count}
-              <% end %>
-            </td>
-            <td class="px-4 py-2.5 tabular-nums text-ink-muted">{role.principal_count}</td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="mt-4">
+      <.table
+          id="roles"
+        rows={@streams.roles}
+        row_id={fn {dom_id, _role} -> dom_id end}
+        row_item={fn {_dom_id, role} -> role end}
+        sort_by={@state.sort_by}
+        sort_dir={@state.sort_dir}
+      >
+        <:col :let={role} label="Name" sort="name" sort_id="roles-sort-name">
+          <.link
+            navigate={~p"/authz/roles/#{role.id}"}
+            class="font-medium text-ink-strong hover:underline"
+          >
+            {role.name}
+          </.link>
+          <p :if={role.description} class="text-xs text-ink-subtle">{role.description}</p>
+        </:col>
 
-      <p :if={@page.total_entries == 0} class="px-4 py-8 text-center text-sm text-ink-muted">
-        {if @state.search == "",
-          do: "No roles are visible in this tenant.",
-          else: "No roles match #{@state.search}."}
-      </p>
+        <:col :let={role} label="Code" sort="code" sort_id="roles-sort-code">
+          <span class="font-mono text-xs text-ink-muted">{role.code}</span>
+        </:col>
+
+        <:col :let={role} label="Scope" sort="is_system" sort_id="roles-sort-is_system">
+          <.badge kind={scope_kind(role)}>{scope_label(role)}</.badge>
+          <.badge :if={role.grant_all} kind={:warning} class="ml-1">Grants all</.badge>
+        </:col>
+
+        <:col :let={role} label="Capabilities">
+          <span class="tabular-nums text-ink-muted">
+            <%= if role.grant_all do %>
+              <span title="A grant-all role carries every capability, present and future">All</span>
+            <% else %>
+              {role.capability_count}
+            <% end %>
+          </span>
+        </:col>
+
+        <:col :let={role} label="Principals">
+          <span class="tabular-nums text-ink-muted">{role.principal_count}</span>
+        </:col>
+
+        <:empty :if={@page.total_entries == 0}>
+          {if @state.search == "",
+            do: "No roles are visible in this tenant.",
+            else: "No roles match #{@state.search}."}
+        </:empty>
+      </.table>
     </div>
 
     <div
