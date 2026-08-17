@@ -261,6 +261,7 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
                view
                |> form("#role-form", %{
                  "role" => %{
+                   "company_id" => "73",
                    "name" => "Billing Manager",
                    "code" => "billing_manager",
                    "description" => "Handles invoices"
@@ -281,7 +282,9 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
 
       html =
         view
-        |> form("#role-form", %{"role" => %{"name" => "Bad", "code" => "Billing Manager"}})
+        |> form("#role-form", %{
+          "role" => %{"company_id" => "73", "name" => "Bad", "code" => "Billing Manager"}
+        })
         |> render_submit()
 
       assert html =~ "lowercase letters, digits and underscores"
@@ -298,11 +301,100 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       # :code rather than surfacing as a crash or a bare flash.
       html =
         view
-        |> form("#role-form", %{"role" => %{"name" => "Auditor Again", "code" => "auditor"}})
+        |> form("#role-form", %{
+          "role" => %{"company_id" => "73", "name" => "Auditor Again", "code" => "auditor"}
+        })
         |> render_submit()
 
       assert html =~ "has already been taken"
       assert has_element?(view, "#role-form")
+    end
+
+    test "offers every company in the tenant and nobody else's", %{conn: conn} do
+      CompanyFixtures.insert_company!(%{
+        id: 75,
+        tenant_id: 41,
+        name: "Anvil Works",
+        code: "anvil"
+      })
+
+      {:ok, view, _html} = open_create(conn)
+
+      assert has_element?(view, "select#role-company-scope")
+      assert has_element?(view, "#role-company-scope option[value='73']")
+      assert has_element?(view, "#role-company-scope option[value='75']")
+
+      # Company 74 belongs to tenant 42. A picker that offered it would be a
+      # tenancy leak the user could see, and then act on.
+      refute has_element?(view, "#role-company-scope option[value='74']")
+    end
+
+    test "preselects the session company when it is one of the options", %{conn: conn} do
+      {:ok, view, _html} = open_create(conn)
+
+      assert has_element?(view, "#role-company-scope option[value='73'][selected]")
+    end
+
+    test "will not create a role with no company chosen", %{conn: conn, ours: ours} do
+      {:ok, view, _html} = open_create(conn)
+
+      html =
+        view
+        |> form("#role-form", %{
+          "role" => %{"company_id" => "", "name" => "Nobody", "code" => "nobody"}
+        })
+        |> render_submit()
+
+      assert html =~ "can&#39;t be blank"
+      assert has_element?(view, "#role-form")
+      assert ours |> Authz.list_roles() |> Enum.all?(&(&1.code != "nobody"))
+    end
+
+    test "creates a role owned by a different company in the tenant", %{conn: conn, ours: ours} do
+      # The case the session binding could not express: a tenant administrator
+      # creating a role for a subsidiary without switching session context.
+      CompanyFixtures.insert_company!(%{
+        id: 75,
+        tenant_id: 41,
+        name: "Anvil Works",
+        code: "anvil"
+      })
+
+      {:ok, view, _html} = open_create(conn)
+
+      assert {:error, {:live_redirect, %{to: "/authz/roles"}}} =
+               view
+               |> form("#role-form", %{
+                 "role" => %{"company_id" => "75", "name" => "Foreman", "code" => "foreman"}
+               })
+               |> render_submit()
+
+      created = ours |> Authz.list_roles() |> Enum.find(&(&1.code == "foreman"))
+
+      assert created.company_id == 75
+      refute created.is_system
+    end
+
+    test "refuses a company outside the tenant even when submitted directly", %{
+      conn: conn,
+      ours: ours,
+      theirs: theirs
+    } do
+      {:ok, view, _html} = open_create(conn)
+
+      # Sent as a raw event, not through `form/3`: LiveViewTest refuses to
+      # submit a select value the page never offered, which is exactly the
+      # client-side assumption this test exists to go around. The server must
+      # refuse on the domain boundary, land the error on the field, and not
+      # crash.
+      html =
+        render_submit(view, :save, %{
+          "role" => %{"company_id" => "74", "name" => "Trespass", "code" => "trespass"}
+        })
+
+      assert html =~ "no longer available"
+      assert ours |> Authz.list_roles() |> Enum.all?(&(&1.code != "trespass"))
+      assert theirs |> Authz.list_roles() |> Enum.all?(&(&1.code != "trespass"))
     end
   end
 end
