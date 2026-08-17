@@ -157,11 +157,19 @@ defmodule Bilimbi.Base.UI.Layouts do
 
         <aside
           id="app-sidebar"
-          class="app-sidebar fixed top-7 bottom-6 left-0 z-40 flex w-56 shrink-0 flex-col border-r border-line bg-surface lg:static lg:inset-auto lg:top-auto lg:bottom-auto lg:z-auto lg:w-60"
+          class="app-sidebar fixed top-7 bottom-6 left-0 z-40 flex w-56 shrink-0 flex-col border-r border-line bg-surface-sidebar lg:static lg:inset-auto lg:top-auto lg:bottom-auto lg:z-auto lg:w-60"
           tabindex="-1"
           role="navigation"
           aria-label="Main navigation"
         >
+          <div id="app-pinned" class="app-pinned bg-surface-muted px-0.5 py-0.5" hidden>
+            <p class="app-pinned-heading px-1 pt-0.5 pb-px text-[0.65rem] font-medium uppercase tracking-[0.14em] text-ink-faint select-none">
+              Pinned
+            </p>
+            <div id="app-pinned-items"></div>
+            <div class="app-pinned-divider mx-1 my-0.5 h-px bg-line/60" aria-hidden="true"></div>
+          </div>
+
           <nav
             id="app-nav"
             aria-label="Main navigation"
@@ -256,29 +264,38 @@ defmodule Bilimbi.Base.UI.Layouts do
   attr(:icon, :string, required: true)
   attr(:active, :boolean, default: false)
   attr(:id, :string, required: true)
-  slot(:inner_block, required: true)
+  attr(:label, :string, required: true)
 
   defp nav_item(assigns) do
     ~H"""
-    <.link
-      navigate={@navigate}
-      id={@id}
-      aria-current={@active && "page"}
-      title={render_slot(@inner_block)}
-      class={[
-        "app-nav-item relative flex items-center gap-2.5 rounded-none px-2 py-1.5 text-sm transition",
-        @active && "bg-surface-sunken font-medium text-ink-strong",
-        !@active && "text-ink-muted hover:bg-surface-sunken hover:text-ink"
-      ]}
-    >
-      <span
-        :if={@active}
-        class="absolute inset-y-1 left-0 w-0.5 rounded-full bg-brand-strong"
-        aria-hidden="true"
-      ></span>
-      <.icon name={@icon} class={["size-4 shrink-0", @active && "text-brand-strong"]} />
-      <span class="app-nav-label truncate">{render_slot(@inner_block)}</span>
-    </.link>
+    <div class="app-nav-item-row group flex min-w-0 items-center">
+      <.link
+        navigate={@navigate}
+        id={@id}
+        data-nav-item={@id}
+        data-nav-label={@label}
+        aria-current={@active && "page"}
+        title={@label}
+        class={[
+          "app-nav-item relative flex min-w-0 flex-1 items-center gap-1 rounded-none px-1 py-px text-sm font-normal transition",
+          @active && "bg-surface font-medium text-ink-strong",
+          !@active && "text-ink-muted hover:bg-surface-sunken hover:text-ink"
+        ]}
+      >
+        <span
+          :if={@active}
+          class="app-nav-active-spine absolute inset-y-1 left-0 w-0.5 rounded-full bg-brand-strong"
+          aria-hidden="true"
+        ></span>
+        <span class="app-nav-indent w-3 shrink-0 text-center" aria-hidden="true">&#8199;</span>
+        <.icon
+          name={@icon}
+          class={["app-nav-icon size-[1.125rem] shrink-0", @active && "text-brand-strong"]}
+        />
+        <span class="app-nav-label min-w-0 truncate">{@label}</span>
+      </.link>
+      <.nav_pin item_id={@id} label={@label} />
+    </div>
     """
   end
 
@@ -287,30 +304,137 @@ defmodule Bilimbi.Base.UI.Layouts do
   attr(:depth, :integer, default: 0)
 
   defp nav_branch(assigns) do
+    item = assigns.node.item
+    dom_id = nav_dom_id(item.id)
+    branch? = assigns.node.children != []
+    expanded? = nav_branch_open?(assigns.node, assigns.active_nav)
+
+    assigns =
+      assigns
+      |> assign(:branch?, branch?)
+      |> assign(:dom_id, dom_id)
+      |> assign(:expanded?, expanded?)
+      |> assign(:active?, item.id == assigns.active_nav)
+
     ~H"""
     <.nav_item
-      :if={@node.item.route}
+      :if={not @branch? and @node.item.route}
       navigate={@node.item.route}
       icon={nav_icon(@node.item.icon)}
-      active={@active_nav == @node.item.id}
-      id={"nav-" <> String.replace(@node.item.id, ".", "-")}
-    >
-      {@node.item.label}
-    </.nav_item>
-
-    <p
-      :if={is_nil(@node.item.route) and @node.children != []}
-      class="app-nav-section px-2 pt-3 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint select-none"
-    >
-      {@node.item.label}
-    </p>
-
-    <.nav_branch
-      :for={child <- @node.children}
-      node={child}
-      active_nav={@active_nav}
-      depth={@depth + 1}
+      active={@active?}
+      id={"nav-" <> @dom_id}
+      label={@node.item.label}
     />
+
+    <section
+      :if={@branch?}
+      id={"nav-branch-" <> @dom_id}
+      data-nav-branch={@node.item.id}
+      data-nav-default-expanded={to_string(@expanded?)}
+      data-nav-expanded={to_string(@expanded?)}
+      class="app-nav-branch"
+    >
+      <div class="app-nav-parent flex min-w-0 items-center px-1 py-px text-sm font-normal text-ink-muted transition hover:bg-surface-sunken hover:text-ink">
+        <button
+          :if={is_nil(@node.item.route)}
+          id={"nav-toggle-" <> @dom_id}
+          type="button"
+          data-nav-toggle
+          aria-controls={"nav-children-" <> @dom_id}
+          aria-expanded={to_string(@expanded?)}
+          aria-label={"Toggle " <> @node.item.label}
+          title={@node.item.label}
+          class="app-nav-container flex min-w-0 flex-1 items-center gap-1 text-left"
+        >
+          <.icon name="hero-chevron-right" class="app-nav-caret size-3 shrink-0 transition-transform" />
+          <.icon name={nav_icon(@node.item.icon)} class="app-nav-icon size-[1.125rem] shrink-0" />
+          <span class="app-nav-label min-w-0 truncate">{@node.item.label}</span>
+        </button>
+
+        <button
+          :if={@node.item.route}
+          id={"nav-toggle-" <> @dom_id}
+          type="button"
+          data-nav-toggle
+          aria-controls={"nav-children-" <> @dom_id}
+          aria-expanded={to_string(@expanded?)}
+          aria-label={"Toggle " <> @node.item.label}
+          title={@node.item.label}
+          class="app-nav-toggle grid size-4 shrink-0 place-items-center rounded-sm text-ink-muted transition hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        >
+          <.icon name="hero-chevron-right" class="app-nav-caret size-3 transition-transform" />
+          <span class="sr-only">Toggle {@node.item.label}</span>
+        </button>
+
+        <.link
+          :if={@node.item.route}
+          navigate={@node.item.route}
+          id={"nav-" <> @dom_id}
+          data-nav-item={"nav-" <> @dom_id}
+          data-nav-label={@node.item.label}
+          aria-current={@active? && "page"}
+          title={@node.item.label}
+          class={[
+            "app-nav-parent-link relative flex min-w-0 flex-1 items-center gap-1 rounded-none px-1 py-px transition",
+            @active? && "font-medium text-ink-strong",
+            !@active? && "text-ink-muted hover:text-ink"
+          ]}
+        >
+          <span
+            :if={@active?}
+            class="app-nav-active-spine absolute inset-y-0 left-0 w-0.5 rounded-full bg-brand-strong"
+            aria-hidden="true"
+          ></span>
+          <.icon
+            name={nav_icon(@node.item.icon)}
+            class={["app-nav-icon size-[1.125rem] shrink-0", @active? && "text-brand-strong"]}
+          />
+          <span class="app-nav-label min-w-0 truncate">{@node.item.label}</span>
+        </.link>
+        <.nav_pin
+          :if={@node.item.route}
+          item_id={"nav-" <> @dom_id}
+          label={@node.item.label}
+        />
+      </div>
+
+      <div
+        id={"nav-children-" <> @dom_id}
+        class="app-nav-children ml-3"
+        hidden={!@expanded?}
+      >
+        <.nav_branch
+          :for={child <- @node.children}
+          node={child}
+          active_nav={@active_nav}
+          depth={@depth + 1}
+        />
+      </div>
+    </section>
+    """
+  end
+
+  defp nav_branch_open?(node, active_nav) do
+    node.item.id == active_nav or Enum.any?(node.children, &nav_branch_open?(&1, active_nav))
+  end
+
+  defp nav_dom_id(id), do: String.replace(id, ".", "-")
+
+  attr(:item_id, :string, required: true)
+  attr(:label, :string, required: true)
+
+  defp nav_pin(assigns) do
+    ~H"""
+    <button
+      type="button"
+      id={"nav-pin-" <> String.trim_leading(@item_id, "nav-")}
+      data-nav-pin={@item_id}
+      title={"Pin " <> @label <> " to sidebar"}
+      aria-label={"Pin " <> @label <> " to sidebar"}
+      class="app-nav-pin grid size-4 shrink-0 place-items-center rounded-sm text-ink-faint opacity-0 transition hover:bg-surface hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+    >
+      <.icon name="hero-bookmark" class="size-3" />
+    </button>
     """
   end
 

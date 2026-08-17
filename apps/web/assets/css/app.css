@@ -5,6 +5,9 @@
 @source "../../lib/bilimbi_web";
 @source "../../../../apps/base/ui/lib/ui";
 @source "../../../../_build/dev/phoenix-colocated/web/*/";
+/* Menu contributions provide bare icon names at runtime. Keep the generated
+ * Heroicon utilities available for their rail-only rendering. */
+@source inline("hero-{building-library,building-office-2,clipboard-document-list,cog-6-tooth,flag,globe-alt,key,map,map-pin,puzzle-piece,shield-check,user-circle,user-group,users}");
 
 @plugin "../vendor/heroicons";
 
@@ -25,6 +28,7 @@
   --color-surface: var(--color-white);
   --color-surface-sunken: var(--color-stone-50);
   --color-surface-muted: var(--color-stone-100);
+  --color-surface-sidebar: var(--color-stone-100);
 
   /* Structure. */
   --color-line: var(--color-stone-200);
@@ -87,6 +91,30 @@ body {
   min-width: 20rem;
 }
 
+#app-sidebar .app-nav-icon {
+  display: none;
+}
+
+#app-sidebar [data-nav-expanded="true"] .app-nav-caret {
+  transform: rotate(90deg);
+}
+
+#app-sidebar .app-pinned-row[draggable="true"] {
+  cursor: grab;
+}
+
+#app-sidebar .app-pinned-row[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+#app-sidebar .app-pinned-row[data-pinned-dragging="true"] {
+  opacity: 0.4;
+}
+
+#app-sidebar .app-pinned-row[data-pinned-drop-target="true"] {
+  border-top: 2px solid var(--color-brand-strong);
+}
+
 /* Authenticated shell chrome. Geometry matches Belimbing: full-width top
  * bar, persistent rail on wide screens, off-canvas drawer below `lg`.
  * The AppShell hook writes data attributes; reduced-motion skips the
@@ -98,15 +126,56 @@ body {
   }
 
   #app-shell[data-sidebar-rail="true"] .app-nav-label,
-  #app-shell[data-sidebar-rail="true"] .app-nav-section,
   #app-shell[data-sidebar-rail="true"] .app-nav-empty,
   #app-shell[data-sidebar-rail="true"] .app-user-expanded,
-  #app-shell[data-sidebar-rail="true"] #app-logout {
+  #app-shell[data-sidebar-rail="true"] #app-logout,
+  #app-shell[data-sidebar-rail="true"] .app-nav-indent,
+  #app-shell[data-sidebar-rail="true"] .app-nav-caret,
+  #app-shell[data-sidebar-rail="true"] .app-nav-toggle,
+  #app-shell[data-sidebar-rail="true"] .app-nav-pin,
+  #app-shell[data-sidebar-rail="true"] .app-pinned-grip,
+  #app-shell[data-sidebar-rail="true"] .app-pinned-unpin,
+  #app-shell[data-sidebar-rail="true"] .app-pinned-heading,
+  #app-shell[data-sidebar-rail="true"] .app-pinned-divider {
     display: none;
   }
 
-  #app-shell[data-sidebar-rail="true"] .app-nav-item {
+  #app-shell[data-sidebar-rail="true"] .app-nav-item,
+  #app-shell[data-sidebar-rail="true"] .app-nav-parent,
+  #app-shell[data-sidebar-rail="true"] .app-nav-container,
+  #app-shell[data-sidebar-rail="true"] .app-nav-parent-link,
+  #app-shell[data-sidebar-rail="true"] .app-pinned-link {
     justify-content: center;
+  }
+
+  #app-shell[data-sidebar-rail="true"] .app-nav-item,
+  #app-shell[data-sidebar-rail="true"] .app-nav-parent {
+    min-height: 2rem;
+    padding-inline: 0;
+  }
+
+  #app-shell[data-sidebar-rail="true"] .app-nav-container,
+  #app-shell[data-sidebar-rail="true"] .app-nav-parent-link,
+  #app-shell[data-sidebar-rail="true"] .app-pinned-link {
+    flex: none;
+    width: 100%;
+    padding-inline: 0;
+  }
+
+  #app-shell[data-sidebar-rail="true"] .app-nav-children {
+    margin-left: 0;
+  }
+
+  #app-shell[data-sidebar-rail="true"] .app-nav-icon {
+    display: block;
+  }
+
+  #app-shell[data-sidebar-rail="true"] .app-nav-active-spine {
+    inset-block: 0.25rem;
+  }
+
+  #app-shell[data-sidebar-rail="true"] .app-pinned-row {
+    min-height: 2rem;
   }
 
   #app-shell[data-sidebar-rail="true"] #app-user > div {

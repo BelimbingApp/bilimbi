@@ -41,6 +41,9 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#companies td", "Bilimbi Industries")
       refute has_element?(view, "#companies td", "Elsewhere")
       assert has_element?(view, "#nav-admin-company[aria-current='page']")
+      assert has_element?(view, "#nav-branch-admin[data-nav-default-expanded='true']")
+      assert has_element?(view, "#nav-toggle-admin[aria-expanded='true']")
+      assert has_element?(view, "#nav-children-admin:not([hidden])")
     end
   end
 

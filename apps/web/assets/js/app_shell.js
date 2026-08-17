@@ -7,6 +7,8 @@ const RAIL_WIDTH = 56
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
 const DEFAULT_WIDTH = 240
+const NAV_EXPANSION_STORAGE = "sidebarExpandedBranches"
+const PINNED_STORAGE = "sidebarPinnedItems"
 const FOCUSABLE =
   'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -20,12 +22,18 @@ const AppShell = {
     this.topbarMain = this.el.querySelector("#app-topbar-main")
     this.statusbar = this.el.querySelector("#app-statusbar")
     this.drag = this.el.querySelector("#app-sidebar-drag")
+    this.pinned = this.el.querySelector("#app-pinned")
+    this.pinnedItems = this.el.querySelector("#app-pinned-items")
     this.mq = window.matchMedia(DESKTOP)
     this.rail = window.localStorage.getItem("sidebarRail") === "1"
     this.width = this.readWidth()
+    this.expandedBranches = this.readExpandedBranches()
+    this.pinnedItemIds = this.readPinnedItemIds()
     this.drawerOpen = false
     this.lastFocus = null
     this.dragging = false
+    this.draggedPinnedId = null
+    this.dropPinnedId = null
 
     this.onToggle = () => this.toggleSidebar()
     this.onBackdrop = () => this.closeDrawer()
@@ -35,11 +43,19 @@ const AppShell = {
     this.onDragStart = (event) => this.startDrag(event)
     this.onDragMove = (event) => this.moveDrag(event)
     this.onDragEnd = () => this.endDrag()
+    this.onPinnedDragStart = (event) => this.startPinnedDrag(event)
+    this.onPinnedDragOver = (event) => this.overPinnedDrag(event)
+    this.onPinnedDrop = (event) => this.dropPinnedDrag(event)
+    this.onPinnedDragEnd = () => this.endPinnedDrag()
 
     this.toggle?.addEventListener("click", this.onToggle)
     this.backdrop?.addEventListener("click", this.onBackdrop)
     this.sidebar?.addEventListener("click", this.onNav)
     this.drag?.addEventListener("mousedown", this.onDragStart)
+    this.pinnedItems?.addEventListener("dragstart", this.onPinnedDragStart)
+    this.pinnedItems?.addEventListener("dragover", this.onPinnedDragOver)
+    this.pinnedItems?.addEventListener("drop", this.onPinnedDrop)
+    this.pinnedItems?.addEventListener("dragend", this.onPinnedDragEnd)
     window.addEventListener("keydown", this.onKey)
     this.mq.addEventListener("change", this.onMq)
     this.apply()
@@ -54,6 +70,10 @@ const AppShell = {
     this.backdrop?.removeEventListener("click", this.onBackdrop)
     this.sidebar?.removeEventListener("click", this.onNav)
     this.drag?.removeEventListener("mousedown", this.onDragStart)
+    this.pinnedItems?.removeEventListener("dragstart", this.onPinnedDragStart)
+    this.pinnedItems?.removeEventListener("dragover", this.onPinnedDragOver)
+    this.pinnedItems?.removeEventListener("drop", this.onPinnedDrop)
+    this.pinnedItems?.removeEventListener("dragend", this.onPinnedDragEnd)
     window.removeEventListener("mousemove", this.onDragMove)
     window.removeEventListener("mouseup", this.onDragEnd)
     window.removeEventListener("keydown", this.onKey)
@@ -68,6 +88,35 @@ const AppShell = {
     const stored = Number.parseInt(window.localStorage.getItem("sidebarWidth"), 10)
     if (Number.isFinite(stored) && stored >= MIN_WIDTH && stored <= MAX_WIDTH) return stored
     return DEFAULT_WIDTH
+  },
+
+  readExpandedBranches() {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(NAV_EXPANSION_STORAGE) ?? "{}")
+      return stored && typeof stored === "object" && !Array.isArray(stored) ? stored : {}
+    } catch {
+      return {}
+    }
+  },
+
+  saveExpandedBranches() {
+    window.localStorage.setItem(NAV_EXPANSION_STORAGE, JSON.stringify(this.expandedBranches))
+  },
+
+  readPinnedItemIds() {
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(PINNED_STORAGE) ?? "[]")
+
+      return Array.isArray(stored)
+        ? [...new Set(stored.filter((id) => typeof id === "string"))]
+        : []
+    } catch {
+      return []
+    }
+  },
+
+  savePinnedItemIds() {
+    window.localStorage.setItem(PINNED_STORAGE, JSON.stringify(this.pinnedItemIds))
   },
 
   startDrag(event) {
@@ -166,8 +215,222 @@ const AppShell = {
   },
 
   onSidebarClick(event) {
+    const pin = event.target.closest("[data-nav-pin]")
+
+    if (pin && this.sidebar?.contains(pin)) {
+      event.preventDefault()
+      this.togglePinnedItem(pin.dataset.navPin)
+      return
+    }
+
+    const toggle = event.target.closest("[data-nav-toggle]")
+
+    if (toggle && this.sidebar?.contains(toggle)) {
+      event.preventDefault()
+      this.toggleNavBranch(toggle.closest("[data-nav-branch]"))
+      return
+    }
+
     if (this.desktop() || !event.target.closest("a[href]")) return
     this.closeDrawer()
+  },
+
+  toggleNavBranch(branch) {
+    if (!branch) return
+
+    const expanded = branch.dataset.navExpanded !== "true"
+    this.expandedBranches[branch.dataset.navBranch] = expanded
+    this.saveExpandedBranches()
+    this.setNavBranch(branch, expanded)
+  },
+
+  applyNavBranches() {
+    for (const branch of this.sidebar?.querySelectorAll("[data-nav-branch]") ?? []) {
+      const id = branch.dataset.navBranch
+      const expanded = Object.hasOwn(this.expandedBranches, id)
+        ? this.expandedBranches[id]
+        : branch.dataset.navDefaultExpanded === "true"
+
+      this.setNavBranch(branch, expanded)
+    }
+  },
+
+  setNavBranch(branch, expanded) {
+    if (!branch) return
+
+    branch.dataset.navExpanded = expanded ? "true" : "false"
+    branch.querySelector("[data-nav-toggle]")?.setAttribute("aria-expanded", String(expanded))
+    branch.querySelector(".app-nav-children")?.toggleAttribute("hidden", !expanded)
+  },
+
+  togglePinnedItem(id) {
+    if (!id) return
+
+    if (this.pinnedItemIds.includes(id)) {
+      this.pinnedItemIds = this.pinnedItemIds.filter((itemId) => itemId !== id)
+    } else {
+      this.pinnedItemIds.push(id)
+    }
+
+    this.savePinnedItemIds()
+    this.renderPinnedItems()
+  },
+
+  navItem(id) {
+    const item = document.getElementById(id)
+    return this.sidebar?.contains(item) ? item : null
+  },
+
+  pinnedRow(event) {
+    if (!(event.target instanceof Element)) return null
+
+    const row = event.target.closest("[data-pinned-item]")
+    return this.pinnedItems?.contains(row) ? row : null
+  },
+
+  startPinnedDrag(event) {
+    const row = this.pinnedRow(event)
+
+    if (!row || this.rail || !event.dataTransfer) {
+      event.preventDefault()
+      return
+    }
+
+    this.draggedPinnedId = row.dataset.pinnedItem
+    event.dataTransfer.effectAllowed = "move"
+    event.dataTransfer.setData("text/plain", this.draggedPinnedId)
+    row.dataset.pinnedDragging = "true"
+  },
+
+  overPinnedDrag(event) {
+    const row = this.pinnedRow(event)
+
+    if (!row || !this.draggedPinnedId || !event.dataTransfer) return
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "move"
+
+    if (row.dataset.pinnedItem === this.draggedPinnedId) return
+
+    this.setPinnedDropTarget(row.dataset.pinnedItem)
+  },
+
+  dropPinnedDrag(event) {
+    const row = this.pinnedRow(event)
+
+    if (!row || !this.draggedPinnedId) return
+
+    event.preventDefault()
+
+    const targetId = row.dataset.pinnedItem
+    const draggedId = this.draggedPinnedId
+
+    if (targetId !== draggedId) {
+      const reordered = this.pinnedItemIds.filter((id) => id !== draggedId)
+      const targetIndex = reordered.indexOf(targetId)
+
+      if (targetIndex >= 0) {
+        reordered.splice(targetIndex, 0, draggedId)
+        this.pinnedItemIds = reordered
+        this.savePinnedItemIds()
+      }
+    }
+
+    this.endPinnedDrag()
+    this.renderPinnedItems()
+  },
+
+  endPinnedDrag() {
+    this.draggedPinnedId = null
+    this.dropPinnedId = null
+
+    for (const row of this.pinnedItems?.querySelectorAll("[data-pinned-item]") ?? []) {
+      delete row.dataset.pinnedDragging
+      delete row.dataset.pinnedDropTarget
+    }
+  },
+
+  setPinnedDropTarget(id) {
+    if (this.dropPinnedId === id) return
+
+    this.dropPinnedId = id
+
+    for (const row of this.pinnedItems?.querySelectorAll("[data-pinned-item]") ?? []) {
+      if (row.dataset.pinnedItem === id) {
+        row.dataset.pinnedDropTarget = "true"
+      } else {
+        delete row.dataset.pinnedDropTarget
+      }
+    }
+  },
+
+  renderPinnedItems() {
+    if (!this.pinned || !this.pinnedItems) return
+
+    const items = this.pinnedItemIds
+      .map((id) => ({id, item: this.navItem(id)}))
+      .filter(({item}) => item)
+
+    if (items.length !== this.pinnedItemIds.length) {
+      this.pinnedItemIds = items.map(({id}) => id)
+      this.savePinnedItemIds()
+    }
+
+    this.pinnedItems.replaceChildren()
+
+    for (const {id, item} of items) {
+      const row = document.createElement("div")
+      row.className = "app-pinned-row group flex min-w-0 items-center"
+      row.dataset.pinnedItem = id
+      row.draggable = !this.rail
+
+      const grip = document.createElement("span")
+      grip.className =
+        "app-pinned-grip mr-0.5 w-3 shrink-0 select-none text-center text-[0.625rem] text-ink-faint opacity-0 transition-opacity group-hover:opacity-60"
+      grip.textContent = "⠁⠁"
+      grip.setAttribute("aria-hidden", "true")
+      grip.title = "Drag to reorder"
+
+      const link = document.createElement("a")
+      link.href = item.href
+      link.className =
+        "app-pinned-link flex min-w-0 flex-1 items-center gap-1 rounded-none px-1 py-px text-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink"
+
+      for (const attribute of ["data-phx-link", "data-phx-link-state"]) {
+        if (item.hasAttribute(attribute)) link.setAttribute(attribute, item.getAttribute(attribute))
+      }
+
+      const icon = item.querySelector(".app-nav-icon")?.cloneNode(true)
+      if (icon) link.append(icon)
+
+      const label = document.createElement("span")
+      label.className = "app-nav-label app-pinned-label ml-3 min-w-0 truncate"
+      label.textContent = item.dataset.navLabel
+      link.append(label)
+
+      const unpin = document.createElement("button")
+      unpin.type = "button"
+      unpin.dataset.navPin = id
+      unpin.title = `Unpin ${item.dataset.navLabel}`
+      unpin.setAttribute("aria-label", `Unpin ${item.dataset.navLabel}`)
+      unpin.className =
+        "app-pinned-unpin grid size-4 shrink-0 place-items-center rounded-sm text-ink-faint opacity-0 transition hover:bg-surface hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+
+      const pinIcon = item.parentElement?.querySelector("[data-nav-pin] svg")?.cloneNode(true)
+      if (pinIcon) unpin.append(pinIcon)
+
+      row.append(grip, link, unpin)
+      this.pinnedItems.append(row)
+    }
+
+    for (const pin of this.sidebar.querySelectorAll("[data-nav-pin]")) {
+      const pinned = this.pinnedItemIds.includes(pin.dataset.navPin)
+      pin.dataset.pinned = String(pinned)
+      pin.title = `${pinned ? "Unpin" : "Pin"} ${pin.getAttribute("aria-label")
+        ?.replace(/^(Pin|Unpin) /, "")}`
+    }
+
+    this.pinned.hidden = items.length === 0
   },
 
   focusable() {
@@ -213,6 +476,9 @@ const AppShell = {
       this.backdrop.setAttribute("aria-hidden", drawerOpen ? "false" : "true")
       this.backdrop.style.pointerEvents = drawerOpen ? "auto" : "none"
     }
+
+    this.applyNavBranches()
+    this.renderPinnedItems()
 
     if (this.sidebar && desktop) {
       this.sidebar.style.width = `${this.rail ? RAIL_WIDTH : this.width}px`
