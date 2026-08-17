@@ -90,7 +90,7 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
   end
 
   defp can_create?(socket) do
-    @create_cap in socket.assigns.current_scope.capabilities
+    allowed?(socket.assigns.current_scope, @create_cap)
   end
 
   defp refresh_tenants(socket) do

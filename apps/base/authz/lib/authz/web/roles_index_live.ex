@@ -23,14 +23,10 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    # Computed here rather than through a local `allowed?/2`: three copies of
-    # that helper already exist (`user_auth.ex`, `employee/web/capabilities.ex`,
-    # `ui/nav.ex`) and a fourth would be one more place for the capability rule
-    # to drift. Tracked on #223.
     {:ok,
      assign(socket,
        page_title: "Roles",
-       can_create?: "admin.authz.role.create" in socket.assigns.current_scope.capabilities
+       can_create?: allowed?(socket.assigns.current_scope, "admin.authz.role.create")
      )}
   end
 
