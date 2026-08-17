@@ -11,6 +11,7 @@ defmodule Bilimbi.Base.Authz do
 
   alias Bilimbi.Base.Authz.Actor
   alias Bilimbi.Base.Authz.Administration
+  alias Bilimbi.Base.Authz.CompanyDirectory
   alias Bilimbi.Base.Authz.AuthorizationDeniedError
   alias Bilimbi.Base.Authz.DatabaseDecisionLogger
   alias Bilimbi.Base.Authz.Decision
@@ -96,6 +97,20 @@ defmodule Bilimbi.Base.Authz do
   @spec get_role(Scope.t(), pos_integer()) ::
           {:ok, Bilimbi.Base.Authz.RoleDetails.t()} | {:error, :not_found}
   def get_role(%Scope{} = scope, role_id), do: RoleService.get_role(scope, role_id, registry!())
+
+  @doc """
+  Companies the scope may assign ownership to, named for display.
+
+  Backs the role-create company picker: Belimbing's
+  `app/Base/Authz/Livewire/Roles/Create.php` requires an owning company chosen
+  from the current tenant, so the screen needs names, not just the ids
+  `create_role/3` validates. Answers through the contributed company directory,
+  so Base never names Core.
+  """
+  @spec companies_in_scope(Scope.t()) :: [CompanyDirectory.named_company()]
+  def companies_in_scope(%Scope{} = scope) do
+    directory!(registry!()).companies_in_scope(scope)
+  end
 
   @spec create_role(Scope.t(), pos_integer(), map()) ::
           {:ok, Bilimbi.Base.Authz.RoleSummary.t()}

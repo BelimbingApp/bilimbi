@@ -254,6 +254,83 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       assert has_element?(view, "#role-cancel[href='/authz/roles']", "Cancel")
     end
 
+    test "the picker offers this tenant's companies by name and defaults to the session company",
+         %{conn: conn} do
+      CompanyFixtures.insert_company!(%{
+        id: 75,
+        tenant_id: 41,
+        name: "Alpha Trading",
+        code: "alpha_trading"
+      })
+
+      {:ok, view, _html} = open_create(conn)
+
+      assert has_element?(view, "#role-company-scope")
+      # Belimbing requires the choice; the session company is only the default.
+      assert has_element?(view, "#role-company-scope option[value='73'][selected]")
+      assert has_element?(view, "#role-company-scope option[value='75']", "Alpha Trading")
+      # The other tenant's company is never an option.
+      refute has_element?(view, "#role-company-scope option[value='74']")
+    end
+
+    test "creates a role for another company in the tenant", %{conn: conn, ours: ours} do
+      CompanyFixtures.insert_company!(%{
+        id: 75,
+        tenant_id: 41,
+        name: "Alpha Trading",
+        code: "alpha_trading"
+      })
+
+      {:ok, view, _html} = open_create(conn)
+
+      assert {:error, {:live_redirect, %{to: "/authz/roles"}}} =
+               view
+               |> form("#role-form", %{
+                 "role" => %{
+                   "company_id" => "75",
+                   "name" => "Cashier",
+                   "code" => "cashier"
+                 }
+               })
+               |> render_submit()
+
+      created = ours |> Authz.list_roles() |> Enum.find(&(&1.code == "cashier"))
+
+      assert created.company_id == 75
+      refute created.is_system
+    end
+
+    test "refuses a company outside the tenant on the field, not as a crash", %{
+      conn: conn,
+      ours: ours
+    } do
+      {:ok, view, _html} = open_create(conn)
+
+      html =
+        view
+        |> form("#role-form", %{
+          "role" => %{"company_id" => "74", "name" => "Spy", "code" => "spy"}
+        })
+        |> render_submit()
+
+      assert html =~ "is not a company in this tenant"
+      refute ours |> Authz.list_roles() |> Enum.find(&(&1.code == "spy"))
+    end
+
+    test "requires an owning company, so a tampered submit cannot default to system", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = open_create(conn)
+
+      # form/3 merges the picker's preselected value, so a genuinely absent
+      # company_id has to be sent as a raw event -- which is exactly what a
+      # tampered client would do.
+      html = render_submit(view, "save", %{"role" => %{"name" => "Orphan", "code" => "orphan"}})
+
+      assert html =~ "blank"
+      assert has_element?(view, "#role-form")
+    end
+
     test "creates a company-owned role and returns to the index", %{conn: conn, ours: ours} do
       {:ok, view, _html} = open_create(conn)
 

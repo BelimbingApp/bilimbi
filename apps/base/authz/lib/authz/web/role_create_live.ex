@@ -8,24 +8,29 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
   alias Bilimbi.Base.Authz
   alias Ecto.Changeset
 
-  @field_types %{name: :string, code: :string, description: :string}
+  @field_types %{name: :string, code: :string, description: :string, company_id: :integer}
 
   @impl true
   def mount(_params, _session, socket) do
+    scope = socket.assigns.current_scope.scope
+    companies = Authz.companies_in_scope(scope)
+    session_company_id = socket.assigns.current_scope.user["company_id"]
+
     {:ok,
      socket
      |> assign(:page_title, "Create Role")
      |> assign(:active_nav, "admin.authz.role")
-     |> assign_form(form_changeset(%{}))}
+     |> assign(:companies, companies)
+     |> assign_form(form_changeset(%{"company_id" => session_company_id}, companies))}
   end
 
   @impl true
   def handle_event("validate", %{"role" => params}, socket) do
-    {:noreply, assign_form(socket, form_changeset(params))}
+    {:noreply, assign_form(socket, form_changeset(params, socket.assigns.companies))}
   end
 
   def handle_event("save", %{"role" => params}, socket) do
-    changeset = form_changeset(params)
+    changeset = form_changeset(params, socket.assigns.companies)
 
     if changeset.valid? do
       save(socket, changeset)
@@ -36,7 +41,7 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
 
   defp save(socket, changeset) do
     scope = socket.assigns.current_scope.scope
-    company_id = socket.assigns.current_scope.user["company_id"]
+    company_id = get_field(changeset, :company_id)
 
     attributes = %{
       name: get_field(changeset, :name),
@@ -51,12 +56,12 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
          |> put_flash(:info, "Role created.")
          |> push_navigate(to: ~p"/authz/roles")}
 
-      # The company comes from the session, so this is a signed-in account whose
-      # company left scope mid-session -- not something the form can correct.
+      # The picker is validated against `companies_in_scope/1`, so reaching this
+      # means the company left the tenant between mount and submit.
       {:error, :company_not_found} ->
         {:noreply,
          socket
-         |> put_flash(:error, "Your company is no longer in scope; sign in again.")
+         |> put_flash(:error, "The selected company is no longer in this tenant.")
          |> assign_form(changeset)}
 
       {:error, %Changeset{} = domain} ->
@@ -78,10 +83,15 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
     |> Map.put(:action, :validate)
   end
 
-  defp form_changeset(params) do
+  defp form_changeset(params, companies) do
     {%{}, @field_types}
     |> cast(params, Map.keys(@field_types))
-    |> validate_required([:name, :code])
+    |> validate_required([:name, :code, :company_id])
+    # The domain guard in create_role/3 still fails closed; this only decides
+    # whether a bad selection is a field error or a flash.
+    |> validate_inclusion(:company_id, Enum.map(companies, & &1.id),
+      message: "is not a company in this tenant"
+    )
     |> validate_length(:name, max: 255)
     |> validate_length(:code, max: 255)
     |> validate_length(:description, max: 1_000)
@@ -100,7 +110,7 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
       <div id="role-create-page" class="mx-auto max-w-2xl">
         <.header>
           Create Role
-          <:subtitle>A custom role owned by your company</:subtitle>
+          <:subtitle>A custom role owned by a company in this tenant</:subtitle>
           <:actions>
             <.button id="role-back" navigate={~p"/authz/roles"}>
               Back to roles
@@ -110,6 +120,16 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
 
         <.form for={@form} id="role-form" phx-change="validate" phx-submit="save" class="space-y-5">
           <section class="rounded-xl border border-line bg-surface px-6 py-5">
+            <.input
+              field={@form[:company_id]}
+              type="select"
+              label="Company Scope"
+              options={for company <- @companies, do: {company.name, company.id}}
+              prompt={if @companies == [], do: "No companies in this tenant", else: nil}
+            />
+            <p class="mt-1 text-xs text-ink-subtle">
+              The owning company keeps this custom role inside the current tenant.
+            </p>
             <.input field={@form[:name]} type="text" label="Name" />
             <.input
               field={@form[:code]}
@@ -118,7 +138,7 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
               placeholder="billing_manager"
             />
             <p class="mt-1 text-xs text-ink-subtle">
-              Lowercase letters, digits and underscores. Unique within your company.
+              Lowercase letters, digits and underscores. Unique within the owning company.
             </p>
             <.input field={@form[:description]} type="textarea" label="Description" />
           </section>
