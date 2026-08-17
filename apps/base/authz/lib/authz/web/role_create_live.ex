@@ -27,14 +27,16 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
   @impl true
   def mount(_params, _session, socket) do
     companies = Authz.companies_in_scope(socket.assigns.current_scope.scope)
+    company_ids = Enum.map(companies, & &1.id)
 
     {:ok,
      socket
      |> assign(:page_title, "Create Role")
      |> assign(:active_nav, "admin.authz.role")
      |> assign(:companies, companies)
+     |> assign(:company_ids, company_ids)
      |> assign(:company_options, Enum.map(companies, &{&1.name, &1.id}))
-     |> assign_form(form_changeset(default_params(socket, companies)))}
+     |> assign_form(form_changeset(default_params(socket, companies), company_ids))}
   end
 
   # Belimbing preselects nothing, but an operator whose session company is one
@@ -53,11 +55,11 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
 
   @impl true
   def handle_event("validate", %{"role" => params}, socket) do
-    {:noreply, assign_form(socket, form_changeset(params))}
+    {:noreply, assign_form(socket, form_changeset(params, socket.assigns.company_ids))}
   end
 
   def handle_event("save", %{"role" => params}, socket) do
-    changeset = form_changeset(params)
+    changeset = form_changeset(params, socket.assigns.company_ids)
 
     if changeset.valid? do
       save(socket, changeset)
@@ -114,10 +116,13 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
     |> Map.put(:action, :validate)
   end
 
-  defp form_changeset(params) do
+  defp form_changeset(params, valid_company_ids) do
     {%{}, @field_types}
     |> cast(params, Map.keys(@field_types))
     |> validate_required([:name, :code, :company_id])
+    |> validate_inclusion(:company_id, valid_company_ids,
+      message: "is no longer available; choose another company"
+    )
     |> validate_length(:name, max: 255)
     |> validate_length(:code, max: 255)
     |> validate_length(:description, max: 1_000)
