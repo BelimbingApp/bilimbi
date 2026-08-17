@@ -20,6 +20,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
          socket
          |> assign(:page_title, "Employee types")
          |> assign(:active_nav, "admin.employee-type")
+         |> assign(:employee_types_count, length(types))
          |> stream(:employee_types, types)}
 
       {:error, :company_not_found} ->
@@ -43,6 +44,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
         {:noreply,
          socket
          |> put_flash(:info, "Employee type deleted.")
+         |> assign(:employee_types_count, length(types))
          |> stream(:employee_types, types, reset: true)}
       else
         {:error, :in_use} ->
@@ -98,20 +100,25 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
         </.header>
 
         <div class="mt-5">
-          <.table id="employee-types" rows={@streams.employee_types}>
-            <:col :let={{_id, type}} label="Label">{type.label}</:col>
+          <.table
+            id="employee-types"
+            rows={@streams.employee_types}
+            row_id={fn {id, _type} -> id end}
+            row_item={fn {_id, type} -> type end}
+          >
+            <:col :let={type} label="Label">{type.label}</:col>
 
-            <:col :let={{_id, type}} label="Code">
+            <:col :let={type} label="Code">
               <code class="text-xs font-medium">{type.code}</code>
             </:col>
 
-            <:col :let={{_id, type}} label="Kind">
+            <:col :let={type} label="Kind">
               <.badge kind={if type.is_system, do: :neutral, else: :success}>
                 {if type.is_system, do: "system", else: "custom"}
               </.badge>
             </:col>
 
-            <:col :let={{_id, type}} label="Actions">
+            <:action :let={type}>
               <div :if={not type.is_system} class="flex items-center gap-2">
                 <.link
                   :if={allowed?(@current_scope, "admin.employee-type.update")}
@@ -133,7 +140,11 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
                   Delete
                 </button>
               </div>
-            </:col>
+            </:action>
+
+            <:empty :if={@employee_types_count == 0}>
+              No employee types found.
+            </:empty>
           </.table>
         </div>
       </div>

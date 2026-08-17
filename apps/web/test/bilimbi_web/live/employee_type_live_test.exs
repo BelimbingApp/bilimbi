@@ -173,4 +173,12 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     refute has_element?(view, "#employee-type-edit-#{system_type.id}")
     refute has_element?(view, "#employee-type-delete-#{system_type.id}")
   end
+
+  test "renders empty state when no employee types exist", %{conn: conn} do
+    Bilimbi.Base.Repo.delete_all(Bilimbi.Core.Employee.EmployeeType)
+    grant_capabilities!(["admin.employee-type.list"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+    assert has_element?(view, "#employee-types-empty", "No employee types found.")
+  end
 end
