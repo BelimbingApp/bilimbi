@@ -168,7 +168,9 @@ defmodule Bilimbi.Core.User.Web.FormLive do
         <.header>
           {@page_title}
           <:subtitle>{if @mode == :new, do: "Add a new user to the system", else: "Update user information"}</:subtitle>
-          <:actions><.link navigate={~p"/users"} class="text-sm font-medium text-ink-muted hover:text-ink">Back</.link></:actions>
+          <:actions>
+            <.button id="user-back" navigate={~p"/users"}>Back</.button>
+          </:actions>
         </.header>
 
         <.form for={@form} id="user-form" phx-change="validate" phx-submit="save" class="rounded-xl border border-line bg-surface px-6 py-5">
@@ -182,7 +184,7 @@ defmodule Bilimbi.Core.User.Web.FormLive do
 
           <div class="mt-2 flex items-center gap-4">
             <.button id="user-save" variant="primary" type="submit" phx-disable-with="Saving…">{if @mode == :new, do: "Create User", else: "Update User"}</.button>
-            <.link navigate={~p"/users"} class="text-sm font-medium text-ink-muted hover:text-ink">Cancel</.link>
+            <.link id="user-cancel" navigate={~p"/users"} class="text-sm font-medium text-ink-muted hover:text-ink">Cancel</.link>
           </div>
         </.form>
       </div>

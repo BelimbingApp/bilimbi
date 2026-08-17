@@ -40,6 +40,9 @@ defmodule BilimbiWeb.UserFormTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/new")
 
+      assert has_element?(view, "#user-back[href='/users']", "Back")
+      assert has_element?(view, "#user-cancel[href='/users']", "Cancel")
+
       view |> form("#user-form", user: %{name: "", email: ""}) |> render_submit()
 
       assert has_element?(view, "#user-form", "can't be blank")
