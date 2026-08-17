@@ -585,6 +585,7 @@ defmodule Bilimbi.Base.UI.Components do
               <.table_sort_heading
                 :if={col[:sort]}
                 col={col}
+                table_id={@id}
                 sort_by={@sort_by}
                 sort_dir={@sort_dir}
                 sort_event={@sort_event}
@@ -638,6 +639,7 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   attr :col, :map, required: true
+  attr :table_id, :string, required: true
   attr :sort_by, :any, required: true
   attr :sort_dir, :any, required: true
   attr :sort_event, :string, default: "sort"
@@ -645,7 +647,7 @@ defmodule Bilimbi.Base.UI.Components do
   defp table_sort_heading(assigns) do
     ~H"""
     <button
-      id={@col[:sort_id]}
+      id={@col[:sort_id] || "#{@table_id}-sort-#{@col[:sort]}"}
       type="button"
       phx-click={@sort_event}
       phx-value-sort={@col[:sort]}
