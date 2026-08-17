@@ -50,7 +50,7 @@ defmodule BilimbiWeb.SessionsLiveTest do
     refute has_element?(view, "#sessions-terminate-guest-row")
 
     view |> form("#sessions-search", %{q: "no-such-agent-xyz"}) |> render_change()
-    assert has_element?(view, "#app-content", "No sessions found.")
+    assert has_element?(view, "#sessions-empty", "No sessions found.")
   end
 
   test "terminates a non-current session when the actor can manage sessions", %{conn: conn} do
