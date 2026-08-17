@@ -94,32 +94,6 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
     end
   end
 
-  attr(:id, :string, required: true)
-  attr(:label, :string, required: true)
-  attr(:sort, :string, required: true)
-  attr(:sort_by, :string, required: true)
-  attr(:sort_dir, :string, required: true)
-
-  def sortable_heading(assigns) do
-    ~H"""
-    <th scope="col" class="px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-      <button
-        id={@id}
-        type="button"
-        phx-click="sort"
-        phx-value-sort={@sort}
-        class="inline-flex items-center gap-1 rounded text-left transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25"
-      >
-        {@label}
-        <.icon
-          name={sort_icon(@sort, @sort_by, @sort_dir)}
-          class={["size-3.5", @sort == @sort_by && "text-action"]}
-        />
-      </button>
-    </th>
-    """
-  end
-
   defp delete_user(socket, user_id) do
     if allowed?(socket.assigns.current_scope, "admin.user.delete") do
       scope = socket.assigns.current_scope.scope
@@ -318,10 +292,6 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
 
   defp format_created(%NaiveDateTime{} = value), do: Calendar.strftime(value, "%Y-%m-%d")
   defp format_created(_value), do: "—"
-
-  defp sort_icon(sort, sort, "asc"), do: "hero-chevron-up"
-  defp sort_icon(sort, sort, "desc"), do: "hero-chevron-down"
-  defp sort_icon(_sort, _sort_by, _sort_dir), do: "hero-chevron-up-down"
 
   defp page_summary(%{total_entries: 0}), do: "No results"
 
