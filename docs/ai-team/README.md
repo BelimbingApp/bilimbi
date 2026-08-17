@@ -209,13 +209,23 @@ ACTIONABLE=$(gh pr list --state open \
     | select((.labels | map(.name)) as $l
              | ($l | any(startswith("agent:")))
                and ($l | any(. == env.MY_AGENT_LABEL) | not))
+    | select((.statusCheckRollup // []) as $c
+             | ($c | length) > 0
+               and ($c | map(.conclusion // .state // "")
+                       | all(. == "SUCCESS" or . == "NEUTRAL" or . == "SKIPPED")))
     | .number] | length')
 ```
 
 `gh --jq` takes no `--arg`; read the label from `env` as above, or pipe raw
 `gh` output to system `jq --arg`. Both are verified. This exact form was run
-against the live repo: it correctly excludes a `CHANGES_REQUESTED` PR and a
-draft.
+against the live repo: it correctly excludes a `CHANGES_REQUESTED` PR, a draft,
+and a PR whose checks contain a `FAILURE`, while passing PRs whose four checks
+all succeeded.
+
+A PR with **no checks yet** is deliberately not actionable — treating an empty
+rollup as green would wake you on work CI has not judged. `statusCheckRollup` is
+the costly field here; it is fetched because the gate uses it, and if you drop
+the CI condition, drop the field with it.
 
 **This gate is blind until PRs carry `agent:` labels** (§3). Verify the
 precondition before trusting a zero — an empty result and a broken predicate
