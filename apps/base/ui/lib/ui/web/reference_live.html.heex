@@ -1,0 +1,488 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.system.ui-reference">
+  <div class="space-y-10 pb-16">
+    <%!-- Page Title & Overview --%>
+    <div>
+      <.header>
+        {gettext("UI Component Reference")}
+        <:subtitle>
+          {gettext(
+            "Canonical live catalog and Belimbing provenance for shared presentation components and design tokens in Bilimbi.Base.UI.Components."
+          )}
+        </:subtitle>
+        <:actions>
+          <.badge kind={:success}>{gettext("Live Reference")}</.badge>
+        </:actions>
+      </.header>
+
+      <.alert kind={:info} class="mt-4">
+        <strong>{gettext("Architectural Purpose:")}</strong>
+        {gettext(
+          "This page renders every shared component in its real runtime state. It serves as the single source of truth for component APIs, sizing, density, interactive states, and Belimbing source mappings, preventing UI drift across modules."
+        )}
+      </.alert>
+    </div>
+
+    <%!-- Section: Design Tokens & Semantic Color Roles --%>
+    <section id="tokens" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">
+          {gettext("Design Tokens & Semantic Roles")}
+        </h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance:
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/css/tokens.css</code>
+          &rarr;
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">apps/web/assets/css/app.css</code>
+          (<code class="text-xs">@theme</code>)
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-line bg-surface p-4 space-y-4">
+        <div class="text-xs text-ink-muted">
+          <p>
+            <strong>{gettext("Contract Rule:")}</strong>
+            {gettext(
+              "Components and templates must use semantic roles (surface, ink, line, action, brand, status) rather than raw Tailwind palette classes (such as stone-*, emerald-*, red-*). Raw palette classes in templates are defects."
+            )}
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6">
+          <div class="rounded-lg border border-line p-2 text-center bg-surface">
+            <div class="h-6 rounded bg-surface border border-line mb-1"></div>
+            <span class="text-xs font-mono font-medium text-ink">surface</span>
+          </div>
+          <div class="rounded-lg border border-line p-2 text-center bg-surface-sunken">
+            <div class="h-6 rounded bg-surface-sunken border border-line mb-1"></div>
+            <span class="text-xs font-mono font-medium text-ink">surface-sunken</span>
+          </div>
+          <div class="rounded-lg border border-line p-2 text-center bg-surface-muted">
+            <div class="h-6 rounded bg-surface-muted border border-line mb-1"></div>
+            <span class="text-xs font-mono font-medium text-ink">surface-muted</span>
+          </div>
+          <div class="rounded-lg border border-line p-2 text-center bg-action text-action-ink">
+            <div class="h-6 rounded bg-action border border-line mb-1"></div>
+            <span class="text-xs font-mono font-medium text-action-ink">action</span>
+          </div>
+          <div class="rounded-lg border border-line p-2 text-center bg-brand-surface">
+            <div class="h-6 rounded bg-brand-hover mb-1"></div>
+            <span class="text-xs font-mono font-medium text-brand-ink">brand</span>
+          </div>
+          <div class="rounded-lg border border-line p-2 text-center bg-success-surface">
+            <div class="h-6 rounded bg-success-surface border border-success-line mb-1"></div>
+            <span class="text-xs font-mono font-medium text-success-ink">success</span>
+          </div>
+          <div class="rounded-lg border border-line p-2 text-center bg-warning-surface">
+            <div class="h-6 rounded bg-warning-surface border border-warning-line mb-1"></div>
+            <span class="text-xs font-mono font-medium text-warning-ink">warning</span>
+          </div>
+          <div class="rounded-lg border border-line p-2 text-center bg-danger-surface">
+            <div class="h-6 rounded bg-danger-surface border border-danger-line mb-1"></div>
+            <span class="text-xs font-mono font-medium text-danger-ink">danger</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <%!-- Section: Header Component --%>
+    <section id="component-header" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">
+          {gettext("Page & Section Headers (<.header>)")}
+        </h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance:
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/page-header.blade.php</code>
+          and
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/widget-header.blade.php</code>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-line bg-surface p-5 space-y-6">
+        <div>
+          <span class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+            {gettext("Header with Subtitle and Actions Slot")}
+          </span>
+          <div class="mt-2 rounded-lg border border-line-subtle bg-surface-sunken p-4">
+            <.header>
+              {gettext("Company Settings")}
+              <:subtitle>
+                {gettext("Manage corporate identity and localized defaults.")}
+              </:subtitle>
+              <:actions>
+                <.button variant="primary">
+                  <.icon name="hero-plus" class="size-4" />
+                  {gettext("Add Company")}
+                </.button>
+              </:actions>
+            </.header>
+          </div>
+        </div>
+
+        <div>
+          <span class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+            {gettext("Header with Title Actions")}
+          </span>
+          <div class="mt-2 rounded-lg border border-line-subtle bg-surface-sunken p-4">
+            <.header>
+              {gettext("Live Diagnostics")}
+              <:title_actions>
+                <.badge kind={:success}>{gettext("Online")}</.badge>
+              </:title_actions>
+              <:subtitle>{gettext("Runtime cluster health and memory telemetry.")}</:subtitle>
+            </.header>
+          </div>
+        </div>
+
+        <div class="rounded-lg bg-warning-surface/50 border border-warning-line p-3 text-xs text-warning-ink">
+          <strong>{gettext("Known Trap:")}</strong>
+          {gettext(
+            "Do NOT nest <.button> inside <.link>. To render a button that navigates, use <.button navigate={~p\"/path\"}> or <.button href={~p\"/path\"}> directly. Nesting creates invalid HTML <a><button> tags."
+          )}
+        </div>
+      </div>
+    </section>
+
+    <%!-- Section: Button Component --%>
+    <section id="component-button" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">{gettext("Buttons (<.button>)")}</h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance:
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/button.blade.php</code>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-line bg-surface p-5 space-y-4">
+        <div class="flex flex-wrap items-center gap-3">
+          <.button>{gettext("Default Button")}</.button>
+          <.button variant="primary">{gettext("Primary Button")}</.button>
+          <.button variant="brand">{gettext("Brand Button")}</.button>
+          <.button disabled>{gettext("Disabled Button")}</.button>
+          <.button variant="primary" disabled>{gettext("Disabled Primary")}</.button>
+          <.button phx-click="test_click" variant="primary">
+            <.icon name="hero-cursor-arrow-rays" class="size-4" />
+            {gettext("Clicked: %{count}", count: @click_count)}
+          </.button>
+          <.button navigate={~p"/system/ui-reference"}>
+            <.icon name="hero-arrow-path" class="size-4" />
+            {gettext("Navigate Link Button")}
+          </.button>
+        </div>
+
+        <div class="text-xs text-ink-muted">
+          <p>
+            {gettext(
+              "Supports variant=\"primary\", variant=\"brand\", and default (nil, border-line-strong). Accepts navigate, patch, href attributes for verified routing."
+            )}
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <%!-- Section: Badge Component --%>
+    <section id="component-badge" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">
+          {gettext("Status Badges (<.badge>)")}
+        </h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance:
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/badge.blade.php</code>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-line bg-surface p-5 space-y-3">
+        <div class="flex flex-wrap items-center gap-4">
+          <.badge kind={:neutral}>{gettext("Neutral / Archived")}</.badge>
+          <.badge kind={:success}>{gettext("Success / Active")}</.badge>
+          <.badge kind={:warning}>{gettext("Warning / Pending")}</.badge>
+          <.badge kind={:danger}>{gettext("Danger / Suspended")}</.badge>
+        </div>
+        <p class="text-xs text-ink-muted">
+          {gettext(
+            "Displays an inline state dot with capitalized status text. Default kind is :neutral."
+          )}
+        </p>
+      </div>
+    </section>
+
+    <%!-- Section: Alert Component --%>
+    <section id="component-alert" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">
+          {gettext("Status Alerts (<.alert>)")}
+        </h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance:
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/alert.blade.php</code>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-line bg-surface p-5 space-y-3">
+        <.alert kind={:info}>
+          {gettext("Information alert: Standard contextual guidance or system note.")}
+        </.alert>
+        <.alert kind={:success}>
+          {gettext(
+            "Success alert: The operation completed successfully and changes were persisted."
+          )}
+        </.alert>
+        <.alert kind={:warning}>
+          {gettext("Warning alert: Session will expire soon or requires operator intervention.")}
+        </.alert>
+        <.alert kind={:error}>
+          {gettext("Error alert: Database schema mismatch or operation refused.")}
+        </.alert>
+      </div>
+    </section>
+
+    <%!-- Section: Table Component --%>
+    <section id="component-table" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">{gettext("Tables (<.table>)")}</h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance:
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/table.blade.php</code>
+          and
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/th.blade.php</code>
+        </p>
+      </div>
+
+      <div class="space-y-4">
+        <.table id="sample-table" rows={@sample_rows}>
+          <:col :let={row} label={gettext("ID")}>{row.id}</:col>
+          <:col :let={row} label={gettext("Company Name")}>
+            <span class="font-medium text-ink-strong">{row.name}</span>
+          </:col>
+          <:col :let={row} label={gettext("Code")}>
+            <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs">{row.code}</code>
+          </:col>
+          <:col :let={row} label={gettext("Status")}>
+            <.badge kind={row.kind}>{row.status}</.badge>
+          </:col>
+          <:col :let={row} label={gettext("Updated")}>
+            <.datetime id={"sample-updated-#{row.id}"} value={row.updated_at} format={:date} />
+          </:col>
+          <:action :let={_row}>
+            <.link
+              navigate={~p"/system/ui-reference"}
+              class="text-xs font-semibold text-action hover:underline"
+            >
+              {gettext("Edit")}
+            </.link>
+          </:action>
+        </.table>
+
+        <div class="rounded-xl border border-line bg-surface p-4 text-xs text-ink-muted space-y-1">
+          <p>
+            <strong>{gettext("Density Contract:")}</strong>
+            {gettext(
+              "Table cells use standard px-4 py-2.5 padding with text-sm text-ink. Table headers use text-xs uppercase tracking-wider text-ink-subtle."
+            )}
+          </p>
+          <p>
+            <strong>{gettext("Empty States:")}</strong>
+            {gettext(
+              "When rows are empty, render a sibling empty message block below the table with text-center py-8 text-sm text-ink-muted."
+            )}
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <%!-- Section: Form & Inputs --%>
+    <section id="component-inputs" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">
+          {gettext("Form Controls (<.input>)")}
+        </h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance: <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/input.blade.php</code>, <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">select.blade.php</code>, <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">checkbox.blade.php</code>,
+          and
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">textarea.blade.php</code>
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="rounded-xl border border-line bg-surface p-5 space-y-4">
+          <span class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+            {gettext("Standard Controls")}
+          </span>
+          <.form for={@sample_form} id="sample-form">
+            <.input
+              field={@sample_form[:text_field]}
+              label={gettext("Text Input")}
+              placeholder={gettext("Enter text...")}
+            />
+            <.input
+              field={@sample_form[:select_field]}
+              type="select"
+              label={gettext("Select Dropdown")}
+              prompt={gettext("Choose an option...")}
+              options={[{"Standard Option", "standard"}, {"Advanced Option", "advanced"}]}
+            />
+            <.input
+              field={@sample_form[:textarea_field]}
+              type="textarea"
+              label={gettext("Textarea")}
+              rows={3}
+            />
+            <.input
+              field={@sample_form[:checkbox_field]}
+              type="checkbox"
+              label={gettext("Enable operational synchronization")}
+            />
+          </.form>
+        </div>
+
+        <div class="rounded-xl border border-line bg-surface p-5 space-y-4">
+          <span class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+            {gettext("Validation & Disabled States")}
+          </span>
+          <.form for={@error_form} id="error-form">
+            <.input
+              field={@error_form[:invalid_text]}
+              label={gettext("Field with Validation Error")}
+              placeholder={gettext("Must not be blank")}
+            />
+            <.input
+              name="disabled_example"
+              value="System-managed immutable value"
+              label={gettext("Disabled / Readonly Field")}
+              disabled
+            />
+            <.input
+              name="date_example"
+              type="date"
+              value="2026-08-17"
+              label={gettext("Date Input")}
+            />
+          </.form>
+        </div>
+      </div>
+    </section>
+
+    <%!-- Section: Data List --%>
+    <section id="component-list" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">{gettext("Data List (<.list>)")}</h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance:
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/card.blade.php</code>
+          metadata sections
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-line bg-surface p-5">
+        <.list>
+          <:item title={gettext("Platform Version")}>
+            Bilimbi 1.0 (Phoenix 1.8 / Elixir 1.20)
+          </:item>
+          <:item title={gettext("Schema Baseline")}>Belimbing PostgreSQL Compatibility</:item>
+          <:item title={gettext("Active Tenancy")}>Explicit Tenancy Resolution</:item>
+          <:item title={gettext("Authz Engine")}>Base Authz Role Matrix</:item>
+        </.list>
+      </div>
+    </section>
+
+    <%!-- Section: Timestamps --%>
+    <section id="component-datetime" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">
+          {gettext("Timestamps (<.datetime>)")}
+        </h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance:
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/datetime.blade.php</code>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-line bg-surface p-5 space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 text-sm">
+          <div>
+            <span class="block text-xs font-semibold text-ink-subtle">{gettext("Datetime Format")}</span>
+            <.datetime
+              id="ref-dt-full"
+              value={@sample_datetime}
+              format={:datetime}
+              class="font-medium text-ink"
+            />
+          </div>
+          <div>
+            <span class="block text-xs font-semibold text-ink-subtle">{gettext("Date Format")}</span>
+            <.datetime
+              id="ref-dt-date"
+              value={@sample_datetime}
+              format={:date}
+              class="font-medium text-ink"
+            />
+          </div>
+          <div>
+            <span class="block text-xs font-semibold text-ink-subtle">{gettext("Time Format")}</span>
+            <.datetime
+              id="ref-dt-time"
+              value={@sample_datetime}
+              format={:time}
+              class="font-medium text-ink"
+            />
+          </div>
+          <div>
+            <span class="block text-xs font-semibold text-ink-subtle">{gettext(
+              "Nil / Unset Value"
+            )}</span>
+            <.datetime id="ref-dt-nil" value={nil} class="font-medium text-ink-muted" />
+          </div>
+        </div>
+        <p class="text-xs text-ink-muted">
+          {gettext(
+            "Renders truthful UTC server-rendered timestamps with phx-hook=\"DateTime\" for client-side local timezone enhancement."
+          )}
+        </p>
+      </div>
+    </section>
+
+    <%!-- Section: Icons --%>
+    <section id="component-icons" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">{gettext("Icons (<.icon>)")}</h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance:
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/icon.blade.php</code>
+          and
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">Bilimbi.Base.UI.IconRegistry</code>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-line bg-surface p-5 space-y-4">
+        <div class="flex flex-wrap items-center gap-6 text-ink">
+          <div class="flex items-center gap-2">
+            <.icon name="hero-building-office-2" class="size-5 text-action" />
+            <span class="text-xs font-mono">hero-building-office-2</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <.icon name="hero-shield-check" class="size-5 text-action" />
+            <span class="text-xs font-mono">hero-shield-check</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <.icon name="hero-paint-brush" class="size-5 text-action" />
+            <span class="text-xs font-mono">hero-paint-brush</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <.icon name="hero-cog-6-tooth" class="size-5 text-action" />
+            <span class="text-xs font-mono">hero-cog-6-tooth</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <.icon name="bilimbi-pin" class="size-5 text-action" />
+            <span class="text-xs font-mono">bilimbi-pin (IconRegistry)</span>
+          </div>
+        </div>
+        <p class="text-xs text-ink-muted">
+          {gettext(
+            "Heroicons are compiled into Tailwind CSS utilities. Runtime menu icons must be safelisted in assets/css/app.css. Custom icons are resolved from Bilimbi.Base.UI.IconRegistry."
+          )}
+        </p>
+      </div>
+    </section>
+  </div>
+</Layouts.app>
