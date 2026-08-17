@@ -90,7 +90,7 @@ Core Employee exposes the following public functions without leaking schemas or 
 - **Pros:**
   - Distinct companies can define custom employee types with identical codes without collision.
   - System types remain globally protected and immutable.
-  - Invariant `is_system = (company_id IS NULL)` is guaranteed at database level.
+  - System types are guaranteed to be company-less at the database level (`NOT is_system OR (company_id IS NULL)`).
   - Edit and delete parity is achieved for Employee Types, unblocking UI task #97.
   - Follows established Bilimbi migration disposition architecture (ADR 0002, ADR 0005).
 - **Cons:**
