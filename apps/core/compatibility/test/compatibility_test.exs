@@ -41,8 +41,8 @@ defmodule Bilimbi.Core.CompatibilityTest do
   test "fresh migration creates the complete compatible baseline with an independent ledger", %{
     schema: schema
   } do
-    assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) ==
-             Compatibility.baseline_versions()
+    all_versions = Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
+    assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) == all_versions
 
     assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
 
@@ -245,7 +245,7 @@ defmodule Bilimbi.Core.CompatibilityTest do
     assert relation(MigrationTestRepo, schema, "migrations") == nil
 
     assert recorded_versions(MigrationTestRepo, schema) ==
-             Compatibility.baseline_versions()
+             Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
   end
 
   test "fresh migration executes compatible and Bilimbi-only contributions", %{schema: schema} do
@@ -264,7 +264,7 @@ defmodule Bilimbi.Core.CompatibilityTest do
   test "adoption verifies a compatible Belimbing schema before recording baselines", %{
     schema: schema
   } do
-    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
     drop_bilimbi_ledger!(MigrationTestRepo, schema)
 
     assert {:ok, :adopted} =
@@ -278,7 +278,7 @@ defmodule Bilimbi.Core.CompatibilityTest do
   end
 
   test "adoption advances a verified prefix from an earlier Bilimbi baseline", %{schema: schema} do
-    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
     previous_versions = Enum.take(Compatibility.baseline_versions(), 3)
 
     SQL.query!(
@@ -299,7 +299,7 @@ defmodule Bilimbi.Core.CompatibilityTest do
   test "adoption leaves an interleaved Bilimbi-only migration pending for normal migration", %{
     schema: schema
   } do
-    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
     drop_bilimbi_ledger!(MigrationTestRepo, schema)
     synthetic_version = install_synthetic_migration!()
 
@@ -310,8 +310,12 @@ defmodule Bilimbi.Core.CompatibilityTest do
     assert recorded_versions(MigrationTestRepo, schema) == Compatibility.baseline_versions()
     refute synthetic_version in recorded_versions(MigrationTestRepo, schema)
 
-    assert [^synthetic_version] =
-             Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+    pending =
+      Compatibility.migration_entries()
+      |> Enum.filter(&(elem(&1, 2) == :bilimbi_only))
+      |> Enum.map(&elem(&1, 0))
+
+    assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) == pending
 
     assert relation(MigrationTestRepo, schema, "bilimbi_only_probe") != nil
 
@@ -323,7 +327,7 @@ defmodule Bilimbi.Core.CompatibilityTest do
   end
 
   test "adoption rejects non-prefix and unknown ledger versions", %{schema: schema} do
-    Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
     [first_version | _rest] = Compatibility.baseline_versions()
 
     SQL.query!(

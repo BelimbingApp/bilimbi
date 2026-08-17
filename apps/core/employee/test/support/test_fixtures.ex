@@ -92,9 +92,28 @@ defmodule Bilimbi.Core.Employee.TestFixtures do
         is_system boolean NOT NULL DEFAULT false,
         company_id bigint,
         created_at timestamp(0) without time zone,
-        updated_at timestamp(0) without time zone,
-        CONSTRAINT employee_types_code_unique UNIQUE (code)
+        updated_at timestamp(0) without time zone
       ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      """
+      CREATE UNIQUE INDEX employee_types_global_code_unique
+      ON employee_types (code)
+      WHERE company_id IS NULL AND is_system = true
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      """
+      CREATE UNIQUE INDEX employee_types_company_code_unique
+      ON employee_types (company_id, code)
+      WHERE company_id IS NOT NULL
       """,
       []
     )

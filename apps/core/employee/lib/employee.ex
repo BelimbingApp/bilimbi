@@ -213,7 +213,8 @@ defmodule Bilimbi.Core.Employee do
         end)
 
       repo.insert_all(EmployeeType, rows,
-        conflict_target: [:code],
+        conflict_target:
+          {:unsafe_fragment, "(code) WHERE company_id IS NULL AND is_system = true"},
         on_conflict: {:replace, [:label, :is_system, :company_id, :updated_at]}
       )
 
@@ -277,6 +278,85 @@ defmodule Bilimbi.Core.Employee do
            |> reject_reserved_system_type_code()
            |> Repo.insert() do
       {:ok, TypeSummary.from_schema(type)}
+    end
+  end
+
+  @spec update_employee_type(Scope.t(), pos_integer(), pos_integer(), map()) ::
+          {:ok, TypeSummary.t()}
+          | {:error, :company_not_found | :type_not_found | :is_system | Changeset.t()}
+  def update_employee_type(%Scope{} = scope, company_id, type_id, attributes)
+      when is_integer(company_id) and is_integer(type_id) and is_map(attributes) do
+    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+         {:ok, type} <- fetch_company_employee_type(company_id, type_id) do
+      type
+      |> EmployeeType.update_changeset(attributes)
+      |> Repo.update()
+      |> case do
+        {:ok, updated_type} -> {:ok, TypeSummary.from_schema(updated_type)}
+        {:error, changeset} -> {:error, changeset}
+      end
+    end
+  end
+
+  @spec delete_employee_type(Scope.t(), pos_integer(), pos_integer()) ::
+          :ok | {:error, :company_not_found | :type_not_found | :is_system | :in_use}
+  def delete_employee_type(%Scope{} = scope, company_id, type_id)
+      when is_integer(company_id) and is_integer(type_id) do
+    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+      Repo.transaction(fn ->
+        case Repo.one(
+               from(type in EmployeeType,
+                 where: type.id == ^type_id,
+                 lock: "FOR UPDATE"
+               )
+             ) do
+          nil ->
+            Repo.rollback(:type_not_found)
+
+          %EmployeeType{is_system: true} ->
+            Repo.rollback(:is_system)
+
+          %EmployeeType{company_id: owner_id} when owner_id != company_id ->
+            Repo.rollback(:type_not_found)
+
+          %EmployeeType{company_id: ^company_id, code: code} = type ->
+            in_use? =
+              Repo.exists?(
+                from(employee in Schema,
+                  where: employee.company_id == ^company_id and employee.employee_type == ^code
+                )
+              )
+
+            if in_use? do
+              Repo.rollback(:in_use)
+            else
+              case Repo.delete(type) do
+                {:ok, _} -> :ok
+                {:error, reason} -> Repo.rollback(reason)
+              end
+            end
+        end
+      end)
+      |> case do
+        {:ok, :ok} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  defp fetch_company_employee_type(company_id, type_id) do
+    case Repo.get(EmployeeType, type_id) do
+      nil ->
+        {:error, :type_not_found}
+
+      %EmployeeType{is_system: true} ->
+        {:error, :is_system}
+
+      %EmployeeType{company_id: owner_id} when owner_id != company_id ->
+        {:error, :type_not_found}
+
+      %EmployeeType{company_id: ^company_id} = type ->
+        {:ok, type}
     end
   end
 

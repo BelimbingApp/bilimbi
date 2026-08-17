@@ -44,7 +44,8 @@ defmodule Bilimbi.Core.Employee.ProductionSeedsTest do
     assert length(rows) == 5
 
     assert opts == [
-             conflict_target: [:code],
+             conflict_target:
+               {:unsafe_fragment, "(code) WHERE company_id IS NULL AND is_system = true"},
              on_conflict: {:replace, [:label, :is_system, :company_id, :updated_at]}
            ]
   end

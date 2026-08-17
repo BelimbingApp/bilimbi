@@ -13,7 +13,10 @@
     "core/company"
   ],
   migrations: "priv/repo/migrations",
-  migration_dispositions: %{20_260_812_112_641 => :compatible_baseline},
+  migration_dispositions: %{
+    20_260_812_112_641 => :compatible_baseline,
+    20_260_817_173_000 => :bilimbi_only
+  },
   web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Core.Employee.SchemaContract,
   contribution_provider: Bilimbi.Core.Employee.Contributions
