@@ -187,4 +187,18 @@ defmodule BilimbiWeb.AddressLiveTest do
     assert address.postcode == "50000"
     assert address.locality == "Kuala Lumpur"
   end
+
+  test "an empty list shows no pager at all", %{conn: conn} do
+    grant_capabilities!("admin.address.list")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses")
+
+    # With no rows there are no pages, and a paginator describing "Page 0 of 0"
+    # is describing a range that does not exist. /employees and /employee-types
+    # render nothing here, and so does Belimbing -- every pager sits inside
+    # `@if ($paginator->hasPages())` (#298).
+    # The empty slot carries no id, so assert the text it renders -- inventing
+    # `#addresses-empty` made this fail for the wrong reason first time round.
+    assert render(view) =~ "No addresses found."
+    refute has_element?(view, "#addresses-pagination")
+  end
 end
