@@ -2,6 +2,19 @@
   <.page id="users-index">
     <.header>
       User Management
+      <:title_actions>
+        <button
+          type="button"
+          id="users-pin"
+          data-nav-pin="nav-admin-user"
+          title="Pin Users to sidebar"
+          aria-label="Pin Users to sidebar"
+          aria-pressed="false"
+          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        >
+          <.icon name="bilimbi-pin" class="size-3.5" />
+        </button>
+      </:title_actions>
       <:subtitle>Search, filter, and manage the accounts in this workspace.</:subtitle>
       <:actions>
         <.button
@@ -14,30 +27,42 @@
         </.button>
       </:actions>
     </.header>
-    <section class="rounded-xl border border-line bg-surface" aria-labelledby="users-table-title">
+
+    <.card id="users-card" inner_class="p-0">
       <h2 id="users-table-title" class="sr-only">Workspace users</h2>
       <.form
         for={@filters_form}
         id="users-filters"
         phx-change="filters"
-        class="px-4 pt-4 pb-2"
+        class="p-2 mb-2"
       >
-        <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)_10rem]">
-          <.input
-            field={@filters_form[:search]}
-            id="users-search"
-            type="search"
-            phx-debounce="300"
-            maxlength="255"
-            label="Search users"
-            placeholder="Search by name or email..."
-          />
+        <div class="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(12rem,18rem)_10rem]">
+          <div class="relative">
+            <.icon
+              name="hero-magnifying-glass"
+              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+            />
+            <.input
+              field={@filters_form[:search]}
+              id="users-search"
+              type="search"
+              phx-debounce="300"
+              maxlength="255"
+              label="Search users"
+              label_class="sr-only"
+              wrapper_class="mb-0"
+              placeholder="Search by name or email..."
+              class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+            />
+          </div>
           <.input
             field={@filters_form[:roleIds]}
             id="users-role-filter"
             type="select"
             multiple
             label="Roles"
+            label_class="sr-only"
+            wrapper_class="mb-0"
             options={@role_options}
           />
           <.input
@@ -45,160 +70,158 @@
             id="users-page-size"
             type="select"
             label="Rows per page"
+            label_class="sr-only"
+            wrapper_class="mb-0"
             options={page_size_options()}
           />
         </div>
       </.form>
-      <div class="border-t border-line">
-        <.table
-          id="users"
-          rows={@streams.users}
-          row_id={fn {dom_id, _} -> dom_id end}
-          row_item={fn {_, user} -> user end}
-          sort_by={@index_state.sort_by}
-          sort_dir={@index_state.sort_dir}
-          framed={false}
-        >
-          <:col :let={user} label="Name" sort="name" sort_id="users-sort-name">
-            <div class="flex items-center gap-3">
-              <span class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-sunken text-xs font-semibold text-ink">
-                {initials(user.name)}
-              </span>
-              <.link
-                :if={allowed?(@current_scope, "admin.user.view")}
-                id={"user-#{user.id}-show"}
-                navigate={~p"/users/#{user.id}"}
-                class="font-medium text-ink-strong hover:underline"
-              >
-                {user.name}
-              </.link>
-              <span
-                :if={not allowed?(@current_scope, "admin.user.view")}
-                class="font-medium text-ink-strong"
-              >
-                {user.name}
-              </span>
-            </div>
-          </:col>
-          <:col :let={user} label="Email" sort="email" sort_id="users-sort-email">
-            <span class="whitespace-nowrap text-ink-muted">{user.email}</span>
-          </:col>
-          <:col :let={user} label="Company" sort="company_name" sort_id="users-sort-company">
-            <div class="flex items-center gap-2">
-              <.link
-                :if={
-                  not user.company_archived and
-                    allowed?(@current_scope, "admin.company.view")
-                }
-                id={"user-#{user.id}-company"}
-                navigate={~p"/companies/#{user.company_id}"}
-                class="hover:text-ink hover:underline"
-              >
-                {user.company_name}
-              </.link>
-              <span :if={
-                user.company_archived or
-                  not allowed?(@current_scope, "admin.company.view")
-              }>
-                {user.company_name}
-              </span>
-              <.badge :if={user.company_archived} kind={:warning}>archived</.badge>
-            </div>
-          </:col>
-          <:col :let={user} label="Roles">
-            <div class="flex flex-wrap gap-1.5">
-              <.badge
-                :for={role <- user.roles}
-                kind={if role.is_system, do: :success, else: :neutral}
-              >
-                {role.name}
-              </.badge>
-              <span :if={user.roles == []} class="text-ink-faint">—</span>
-            </div>
-          </:col>
-          <:col :let={user} label="Created" sort="created_at" sort_id="users-sort-created">
-            <span class="whitespace-nowrap tabular-nums text-ink-muted">
-              {format_created(user.created_at)}
+
+      <.table
+        id="users"
+        rows={@streams.users}
+        row_id={fn {dom_id, _} -> dom_id end}
+        row_item={fn {_, user} -> user end}
+        sort_by={@index_state.sort_by}
+        sort_dir={@index_state.sort_dir}
+        framed={false}
+      >
+        <:col :let={user} label="Name" sort="name" sort_id="users-sort-name">
+          <div class="flex items-center gap-3">
+            <span class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-sunken text-xs font-semibold text-ink">
+              {initials(user.name)}
             </span>
-          </:col>
-          <:action :let={user}>
-            <div class="flex items-center justify-end gap-3">
-              <.link
-                :if={allowed?(@current_scope, "admin.user.update") and not user.company_archived}
-                id={"user-#{user.id}-edit"}
-                navigate={~p"/users/#{user.id}/edit"}
-                class="text-xs font-semibold text-action hover:underline"
-              >
-                Edit
-              </.link>
-              <button
-                :if={allowed?(@current_scope, "admin.user.delete")}
-                id={"user-#{user.id}-delete"}
-                type="button"
-                phx-click="delete"
-                phx-value-id={user.id}
-                disabled={user.id == @current_scope.user["user_id"] or user.company_archived}
-                data-confirm={
-                  "Permanently delete #{user.name}? This account will be removed. This cannot be undone."
-                }
-                title={
-                  cond do
-                    user.id == @current_scope.user["user_id"] ->
-                      "You cannot delete your own account"
+            <.link
+              :if={allowed?(@current_scope, "admin.user.view")}
+              id={"user-#{user.id}-show"}
+              navigate={~p"/users/#{user.id}"}
+              class="font-medium text-ink-strong hover:underline"
+            >
+              {user.name}
+            </.link>
+            <span
+              :if={not allowed?(@current_scope, "admin.user.view")}
+              class="font-medium text-ink-strong"
+            >
+              {user.name}
+            </span>
+          </div>
+        </:col>
+        <:col :let={user} label="Email" sort="email" sort_id="users-sort-email">
+          <span class="whitespace-nowrap text-ink-muted">{user.email}</span>
+        </:col>
+        <:col :let={user} label="Company" sort="company_name" sort_id="users-sort-company">
+          <div class="flex items-center gap-2">
+            <.link
+              :if={
+                not user.company_archived and
+                  allowed?(@current_scope, "admin.company.view")
+              }
+              id={"user-#{user.id}-company"}
+              navigate={~p"/companies/#{user.company_id}"}
+              class="hover:text-ink hover:underline"
+            >
+              {user.company_name}
+            </.link>
+            <span :if={
+              user.company_archived or
+                not allowed?(@current_scope, "admin.company.view")
+            }>
+              {user.company_name}
+            </span>
+            <.badge :if={user.company_archived} kind={:warning}>archived</.badge>
+          </div>
+        </:col>
+        <:col :let={user} label="Roles">
+          <div class="flex flex-wrap gap-1.5">
+            <.badge
+              :for={role <- user.roles}
+              kind={if role.is_system, do: :success, else: :neutral}
+            >
+              {role.name}
+            </.badge>
+            <span :if={user.roles == []} class="text-ink-faint">—</span>
+          </div>
+        </:col>
+        <:col :let={user} label="Created" sort="created_at" sort_id="users-sort-created">
+          <span class="whitespace-nowrap tabular-nums text-ink-muted">
+            {format_created(user.created_at)}
+          </span>
+        </:col>
+        <:action :let={user}>
+          <div class="flex items-center justify-end gap-3">
+            <.link
+              :if={allowed?(@current_scope, "admin.user.update") and not user.company_archived}
+              id={"user-#{user.id}-edit"}
+              navigate={~p"/users/#{user.id}/edit"}
+              class="text-xs font-semibold text-action hover:underline"
+            >
+              Edit
+            </.link>
+            <button
+              :if={allowed?(@current_scope, "admin.user.delete")}
+              id={"user-#{user.id}-delete"}
+              type="button"
+              phx-click="delete"
+              phx-value-id={user.id}
+              disabled={user.id == @current_scope.user["user_id"] or user.company_archived}
+              data-confirm={
+                "Permanently delete #{user.name}? This account will be removed. This cannot be undone."
+              }
+              title={
+                cond do
+                  user.id == @current_scope.user["user_id"] ->
+                    "You cannot delete your own account"
 
-                    user.company_archived ->
-                      "Archived-company users are read-only"
+                  user.company_archived ->
+                    "Archived-company users are read-only"
 
-                    true ->
-                      "Permanently delete this user"
-                  end
-                }
-                class="rounded-md border border-danger-line bg-danger-surface px-2.5 py-1.5 text-xs font-semibold text-danger-ink transition hover:bg-danger disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Delete
-              </button>
-            </div>
-          </:action>
-          <:empty :if={@users_page.entries == []}>
-            No users found.
-          </:empty>
-        </.table>
-      </div>
+                  true ->
+                    "Permanently delete this user"
+                end
+              }
+              class="rounded-md border border-danger-line bg-danger-surface px-2.5 py-1.5 text-xs font-semibold text-danger-ink transition hover:bg-danger disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Delete
+            </button>
+          </div>
+        </:action>
+        <:empty :if={@users_page.entries == []}>
+          No users found.
+        </:empty>
+      </.table>
+
       <nav
         :if={@users_page.total_pages > 0}
         id="users-pagination"
         aria-label="Pagination"
-        class="flex items-center justify-between gap-3 border-t border-line-subtle px-4 py-3"
+        class="flex items-center justify-between gap-3 border-t border-line px-4 py-3"
       >
         <p id="users-pagination-summary" class="text-xs text-ink-subtle">
           {page_summary(@users_page)}
         </p>
         <div class="flex items-center gap-2">
-          <button
+          <.button
             id="users-pagination-previous"
-            type="button"
             phx-click="page"
             phx-value-page={@users_page.page - 1}
             disabled={@users_page.page <= 1}
-            class="rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs font-medium text-ink transition hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-50"
           >
             Previous
-          </button>
+          </.button>
           <span id="users-pagination-position" class="text-xs tabular-nums text-ink-muted">
             {page_position(@users_page)}
           </span>
-          <button
+          <.button
             id="users-pagination-next"
-            type="button"
             phx-click="page"
             phx-value-page={@users_page.page + 1}
             disabled={@users_page.page >= @users_page.total_pages or @users_page.total_pages == 0}
-            class="rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs font-medium text-ink transition hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-50"
           >
             Next
-          </button>
+          </.button>
         </div>
       </nav>
-    </section>
+    </.card>
   </.page>
 </Layouts.app>

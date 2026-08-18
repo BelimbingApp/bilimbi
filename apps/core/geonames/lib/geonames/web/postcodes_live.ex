@@ -60,12 +60,27 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.geonames.postcode">
       <.page id="postcodes-index" class="space-y-5">
-        <.header>Geonames Postcodes</.header>
+        <.header>
+          Geonames Postcodes
+          <:title_actions>
+            <button
+              type="button"
+              id="postcodes-pin"
+              data-nav-pin="nav-admin-geonames-postcode"
+              title="Pin Postcodes to sidebar"
+              aria-label="Pin Postcodes to sidebar"
+              aria-pressed="false"
+              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            >
+              <.icon name="bilimbi-pin" class="size-3.5" />
+            </button>
+          </:title_actions>
+        </.header>
 
-        <section
+        <.card
           :if={@postcode_country_summaries != []}
           id="postcodes-country-summary"
-          class="rounded-xl border border-line bg-surface"
+          inner_class="p-0"
         >
           <div class="border-b border-line px-4 py-3">
             <h2 class="text-sm font-semibold text-ink">Postcodes by country</h2>
@@ -89,14 +104,14 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
               <span class="whitespace-nowrap tabular-nums text-ink">{format_integer(summary.record_count)}</span>
             </:col>
           </.table>
-        </section>
+        </.card>
 
-        <section class="rounded-xl border border-line bg-surface">
+        <.card id="postcodes-card" inner_class="p-0">
           <.form
             for={@filters_form}
             id="postcodes-filters"
             phx-change="filters"
-            class="px-2 pt-2"
+            class="p-2 mb-2"
           >
             <div class="relative">
               <.icon
@@ -158,7 +173,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
             page_sizes={@page_sizes}
             filters_form={@filters_form}
           />
-        </section>
+        </.card>
       </.page>
     </Layouts.app>
     """

@@ -55,6 +55,8 @@ module may add a semantic role only when its workflow genuinely needs one.
   hierarchy for navigation links, secondary labels, and active hover text.
 - **`brand-strong` (`lime-600`)**: Orientation accent for active navigation,
   ascended parent branches, and brand selection.
+- **`action` (`#2c3801`) / `action-hover` (`var(--color-brand-strong)`) / `action-ink` (`#f5fcdc`)**:
+  Confident primary action colors used for primary buttons and page `<h1>` headings, with high-contrast text and standard accent hover.
 
 ## Compact typography
 
@@ -63,6 +65,7 @@ competent typography with enough contrast and line height for long sessions.
 Use tabular numerals where users compare amounts, dates, counts, or measurements.
 
 - **Global font:** `Instrument Sans` across all app views, forms, tables, and chrome.
+- **Page headings:** `<h1>` titles use `text-action` (`#2c3801`) to anchor the screen's operational scope with the platform's primary action color.
 - **Menu typography:** Scoped compact styling with thinner weight (`350` / `400`),
   `0.8125rem` (`13px`) font size, and `1.25rem` line height.
 - Typography should support scanning before reading. Avoid decorative type that

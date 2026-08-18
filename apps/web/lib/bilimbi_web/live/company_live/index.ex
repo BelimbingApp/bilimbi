@@ -22,19 +22,33 @@ defmodule BilimbiWeb.CompanyLive.Index do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <.page>
+      <.page id="companies-index">
         <.header>
           Companies
+          <:title_actions>
+            <button
+              type="button"
+              id="companies-pin"
+              data-nav-pin="nav-admin-company"
+              title="Pin Companies to sidebar"
+              aria-label="Pin Companies to sidebar"
+              aria-pressed="false"
+              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            >
+              <.icon name="bilimbi-pin" class="size-3.5" />
+            </button>
+          </:title_actions>
           <:subtitle>Every live company in this tenant</:subtitle>
         </.header>
 
-        <div class="mt-5">
+        <.card id="companies-card" inner_class="p-0">
           <.table
             id="companies"
             rows={@streams.companies}
             row_id={fn {id, _} -> id end}
             row_item={fn {_, company} -> company end}
             caption="Companies"
+            framed={false}
           >
             <:col :let={company} label="Name">
               <.link
@@ -59,7 +73,10 @@ defmodule BilimbiWeb.CompanyLive.Index do
               </.badge>
             </:col>
             <:action :let={company}>
-              <.link navigate={~p"/companies/#{company.id}"} class="text-xs font-medium">
+              <.link
+                navigate={~p"/companies/#{company.id}"}
+                class="text-xs font-medium text-action hover:underline"
+              >
                 Open
               </.link>
             </:action>
@@ -67,7 +84,7 @@ defmodule BilimbiWeb.CompanyLive.Index do
               No companies found in this workspace.
             </:empty>
           </.table>
-        </div>
+        </.card>
       </.page>
     </Layouts.app>
     """

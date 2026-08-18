@@ -36,9 +36,22 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <.page>
+      <.page id="employees-index">
         <.header>
           Employees
+          <:title_actions>
+            <button
+              type="button"
+              id="employees-pin"
+              data-nav-pin="nav-admin-employee"
+              title="Pin Employees to sidebar"
+              aria-label="Pin Employees to sidebar"
+              aria-pressed="false"
+              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            >
+              <.icon name="bilimbi-pin" class="size-3.5" />
+            </button>
+          </:title_actions>
           <:subtitle>People employed by {@current_scope.user["company_name"]}</:subtitle>
 
           <:actions>
@@ -61,12 +74,13 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
           </:actions>
         </.header>
 
-        <div class="mt-5">
+        <.card id="employees-card" inner_class="p-0">
           <.table
             id="employees"
             rows={@streams.employees}
             row_id={fn {id, _employee} -> id end}
             row_item={fn {_id, employee} -> employee end}
+            framed={false}
           >
             <:col :let={employee} label="Name">
               <.link
@@ -97,7 +111,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
               No employees found.
             </:empty>
           </.table>
-        </div>
+        </.card>
       </.page>
     </Layouts.app>
     """

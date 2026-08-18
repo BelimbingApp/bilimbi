@@ -301,6 +301,10 @@ Base Audit preserves Belimbing's `base_audit_mutations` and
 | Phoenix documentation | [phoenix.hexdocs.pm](https://phoenix.hexdocs.pm/) |
 | Elixir documentation | [hexdocs.pm/elixir](https://hexdocs.pm/elixir/) |
 
+## Contributors
+
+See [`CONTRIBUTORS.md`](./CONTRIBUTORS.md) for the team of architects and AI contributors building Bilimbi.
+
 ## License
 
 Bilimbi is released under the [MIT License](./LICENSE).

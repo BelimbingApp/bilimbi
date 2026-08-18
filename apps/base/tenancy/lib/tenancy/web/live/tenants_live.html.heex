@@ -1,7 +1,20 @@
 <Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.tenancy.tenant">
-  <.page>
+  <.page id="tenants-index">
     <.header>
       Tenants
+      <:title_actions>
+        <button
+          type="button"
+          id="tenants-pin"
+          data-nav-pin="nav-admin-tenancy-tenant"
+          title="Pin Tenants to sidebar"
+          aria-label="Pin Tenants to sidebar"
+          aria-pressed="false"
+          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        >
+          <.icon name="bilimbi-pin" class="size-3.5" />
+        </button>
+      </:title_actions>
       <:subtitle>Each tenant is an isolated customer of this instance</:subtitle>
       <:actions>
         <.button
@@ -15,7 +28,7 @@
       </:actions>
     </.header>
 
-    <div class="mt-5">
+    <.card id="tenants-card" inner_class="p-0">
       <.table
         id="tenants"
         rows={@streams.tenants}
@@ -23,6 +36,7 @@
         row_item={fn {_, tenant} -> tenant end}
         sort_by={@sort_by}
         sort_dir={@sort_dir}
+        framed={false}
       >
         <:col :let={tenant} label="ID" sort="id" sort_id="tenants-sort-id">
           <span class="tabular-nums text-ink-muted">{tenant.id}</span>
@@ -44,7 +58,7 @@
           No tenants found.
         </:empty>
       </.table>
-    </div>
+    </.card>
   </.page>
 
   <div
