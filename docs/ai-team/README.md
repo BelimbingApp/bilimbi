@@ -255,4 +255,13 @@ grep -rl "create('<table>'" /home/kiat/repo/laravel/blb/app/*/*/Database/Migrati
 
 # Raw palette classes outside @theme are defects
 grep -rnE '\b(bg|text|border)-(slate|gray|red|green|blue)-[0-9]+' apps/*/lib
+
+# Serve YOUR branch to look at it (PORT is overridable, default 4000)
+cd apps/web && PORT=4002 mix phx.server
 ```
+
+**Never judge a screen from the long-lived dev server on :4000.** It is
+somebody else's checkout, and its contribution snapshot is built once at boot:
+a capability contributed after that boot renders as `Unknown` and a merged fix
+is simply absent. Twice in one day that staleness was mistaken for a defect and
+nearly filed as one. Serve the code under test, then look.
