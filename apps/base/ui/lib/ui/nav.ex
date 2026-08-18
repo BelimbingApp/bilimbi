@@ -52,6 +52,7 @@ defmodule Bilimbi.Base.UI.Nav do
     |> Enum.map(fn node -> %{node | children: reject_unreachable(node.children)} end)
     |> Enum.reject(&unreachable?/1)
     |> Enum.map(&demote_unserved/1)
+    |> Enum.sort_by(&String.downcase(&1.item.label))
   end
 
   # A node survives on either merit: it leads somewhere, or something under it

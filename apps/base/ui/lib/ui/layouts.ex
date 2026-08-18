@@ -8,8 +8,21 @@ defmodule Bilimbi.Base.UI.Layouts do
       reset). Compact card on the warm canvas with the Bilimbi brand bar;
       the page is otherwise quiet so the form reads first.
     * `app/1` — the authenticated workspace shell: a full-width top bar,
-      a left menu rail, and a persistent status bar. The top bar names the
+      a left menu sidebar, and a persistent status bar. The top bar names the
       tenant the screen acts on.
+
+  Navigation sidebar conventions:
+
+    * Typography: `Instrument Sans` compact font styling with warm `#544c43`
+      link text and `#2c2418` hover state.
+    * Carets: Triangle glyphs (`&#x2BC8;` and `&#x2BC6;`) for expandable nodes
+      and figure-space indentation for leaf items.
+    * Active state: Selected items use `bg-surface text-brand-strong` without
+      bolding or right spine lines.
+    * Parent ascent: All parent branches containing the active item accent in
+      `text-brand-strong`.
+    * Pinned items: Rendered in `bg-brand-surface` (`#f3f5e8`) with `rounded-sm`.
+    * Collation: Nav roots and submenus sort alphabetically ascending (`ASC`).
 
   No authenticated screen is context-free.
   """
@@ -162,18 +175,18 @@ defmodule Bilimbi.Base.UI.Layouts do
           role="navigation"
           aria-label="Main navigation"
         >
-          <div id="app-pinned" class="app-pinned bg-surface-muted px-0.5 py-0.5" hidden>
-            <p class="app-pinned-heading px-1 pt-0.5 pb-px text-[0.65rem] font-medium uppercase tracking-[0.14em] text-ink-faint select-none">
+          <div id="app-pinned" class="app-pinned bg-brand-surface px-0.5 py-0.5 rounded-sm" hidden>
+            <p class="app-pinned-heading px-1 pt-0.5 pb-px text-[0.625rem] font-medium uppercase tracking-[0.14em] text-muted select-none">
               Pinned
             </p>
             <div id="app-pinned-items"></div>
-            <div class="app-pinned-divider mx-1 my-0.5 h-px bg-line/60" aria-hidden="true"></div>
+            <div class="app-pinned-divider mx-1 my-0.5 h-px bg-line/50" aria-hidden="true"></div>
           </div>
 
           <nav
             id="app-nav"
             aria-label="Main navigation"
-            class="flex-1 overflow-y-auto px-1 py-1"
+            class="flex-1 overflow-y-auto px-0.5 py-0.5"
           >
             <.nav_branch
               :for={node <- @nav}
@@ -194,22 +207,22 @@ defmodule Bilimbi.Base.UI.Layouts do
             </p>
           </nav>
 
-          <div id="app-user" class="border-t border-line px-1 py-1">
-            <div class="flex items-center gap-2 rounded-none px-1 py-0.5 text-sm text-ink-muted transition hover:bg-surface-sunken">
+          <div id="app-user" class="border-t border-line px-0.5 py-0.5">
+            <div class="flex items-center gap-2 rounded-none px-1 py-0.5 text-sm font-normal text-link transition hover:bg-surface-subtle">
               <span class="grid size-7 shrink-0 place-items-center rounded-full bg-action text-xs font-medium text-action-ink">
                 {user_initials(@current_scope.user["name"])}
               </span>
               <div class="app-user-expanded min-w-0 flex-1">
-                <p id="app-user-name" class="truncate text-sm font-medium text-ink">
+                <p id="app-user-name" class="truncate text-sm font-normal text-ink">
                   {@current_scope.user["name"]}
                 </p>
-                <p class="truncate text-xs text-ink-subtle">{@current_scope.user["email"]}</p>
+                <p class="truncate text-xs text-muted">{@current_scope.user["email"]}</p>
               </div>
               <.link
                 href={~p"/session"}
                 method="delete"
                 id="app-logout"
-                class="grid size-6 shrink-0 place-items-center rounded-sm text-ink-subtle transition hover:bg-surface-sunken hover:text-ink"
+                class="grid size-6 shrink-0 place-items-center rounded-sm text-muted transition hover:bg-surface-subtle hover:text-ink"
                 aria-label="Log out"
                 title="Log out"
               >
@@ -221,7 +234,7 @@ defmodule Bilimbi.Base.UI.Layouts do
 
         <div
           id="app-sidebar-drag"
-          class="app-sidebar-drag relative z-20 hidden w-2 shrink-0 cursor-col-resize hover:bg-surface-sunken lg:block"
+          class="app-sidebar-drag relative z-20 hidden w-2 shrink-0 cursor-col-resize hover:bg-surface-subtle lg:block"
           role="separator"
           aria-orientation="vertical"
           aria-label="Resize sidebar"
@@ -277,17 +290,15 @@ defmodule Bilimbi.Base.UI.Layouts do
         aria-current={@active && "page"}
         title={@label}
         class={[
-          "app-nav-item relative flex min-w-0 flex-1 items-center gap-1 rounded-none px-1 py-px text-sm font-normal transition",
-          @active && "bg-surface font-medium text-ink-strong",
-          !@active && "text-ink-muted hover:bg-surface-sunken hover:text-ink"
+          "app-nav-item relative flex min-w-0 flex-1 items-center rounded-none px-1 py-px text-sm font-normal transition",
+          @active && "bg-surface text-brand-strong",
+          !@active && "text-link hover:bg-surface-subtle hover:text-ink"
         ]}
       >
         <span
-          :if={@active}
-          class="app-nav-active-spine absolute inset-y-1 left-0 w-0.5 rounded-full bg-brand-strong"
+          class="app-nav-indent text-[11px] shrink-0 w-3 text-center mr-0.5 select-none"
           aria-hidden="true"
-        ></span>
-        <span class="app-nav-indent w-3 shrink-0 text-center" aria-hidden="true">&#8199;</span>
+        >&#8199;</span>
         <.icon
           name={@icon}
           class={["app-nav-icon size-[1.125rem] shrink-0", @active && "text-brand-strong"]}
@@ -308,6 +319,7 @@ defmodule Bilimbi.Base.UI.Layouts do
     dom_id = nav_dom_id(item.id)
     branch? = assigns.node.children != []
     expanded? = nav_branch_open?(assigns.node, assigns.active_nav)
+    has_active_child? = nav_has_active_child?(assigns.node, assigns.active_nav)
 
     assigns =
       assigns
@@ -315,6 +327,7 @@ defmodule Bilimbi.Base.UI.Layouts do
       |> assign(:dom_id, dom_id)
       |> assign(:expanded?, expanded?)
       |> assign(:active?, item.id == assigns.active_nav)
+      |> assign(:has_active_child?, has_active_child?)
 
     ~H"""
     <.nav_item
@@ -334,7 +347,11 @@ defmodule Bilimbi.Base.UI.Layouts do
       data-nav-expanded={to_string(@expanded?)}
       class="app-nav-branch"
     >
-      <div class="app-nav-parent flex min-w-0 items-center px-1 py-px text-sm font-normal text-ink-muted transition hover:bg-surface-sunken hover:text-ink">
+      <div class={[
+        "app-nav-parent group flex min-w-0 items-center px-1 py-px text-sm font-normal transition hover:bg-surface-subtle",
+        (@active? or @has_active_child?) && "text-brand-strong",
+        !(@active? or @has_active_child?) && "text-link hover:text-ink"
+      ]}>
         <button
           :if={is_nil(@node.item.route)}
           id={"nav-toggle-" <> @dom_id}
@@ -344,9 +361,15 @@ defmodule Bilimbi.Base.UI.Layouts do
           aria-expanded={to_string(@expanded?)}
           aria-label={"Toggle " <> @node.item.label}
           title={@node.item.label}
-          class="app-nav-container flex min-w-0 flex-1 items-center gap-1 text-left"
+          class="app-nav-container flex min-w-0 flex-1 items-center text-left"
         >
-          <.icon name="hero-chevron-right" class="app-nav-caret size-3 shrink-0 transition-transform" />
+          <span
+            class="app-nav-caret text-[11px] shrink-0 w-3 text-center mr-0.5 select-none"
+            aria-hidden="true"
+          >
+            <span class="app-nav-caret-closed">&#x2BC8;</span>
+            <span class="app-nav-caret-open">&#x2BC6;</span>
+          </span>
           <.icon name={nav_icon(@node.item.icon)} class="app-nav-icon size-[1.125rem] shrink-0" />
           <span class="app-nav-label min-w-0 truncate">{@node.item.label}</span>
         </button>
@@ -360,9 +383,15 @@ defmodule Bilimbi.Base.UI.Layouts do
           aria-expanded={to_string(@expanded?)}
           aria-label={"Toggle " <> @node.item.label}
           title={@node.item.label}
-          class="app-nav-toggle grid size-4 shrink-0 place-items-center rounded-sm text-ink-muted transition hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          class="app-nav-toggle grid size-4 shrink-0 place-items-center rounded-sm text-link transition hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
         >
-          <.icon name="hero-chevron-right" class="app-nav-caret size-3 transition-transform" />
+          <span
+            class="app-nav-caret text-[11px] shrink-0 w-3 text-center select-none"
+            aria-hidden="true"
+          >
+            <span class="app-nav-caret-closed">&#x2BC8;</span>
+            <span class="app-nav-caret-open">&#x2BC6;</span>
+          </span>
           <span class="sr-only">Toggle {@node.item.label}</span>
         </button>
 
@@ -375,16 +404,11 @@ defmodule Bilimbi.Base.UI.Layouts do
           aria-current={@active? && "page"}
           title={@node.item.label}
           class={[
-            "app-nav-parent-link relative flex min-w-0 flex-1 items-center gap-1 rounded-none px-1 py-px transition",
-            @active? && "font-medium text-ink-strong",
-            !@active? && "text-ink-muted hover:text-ink"
+            "app-nav-parent-link relative flex min-w-0 flex-1 items-center rounded-none px-1 py-px transition",
+            @active? && "bg-surface text-brand-strong font-normal",
+            !@active? && "text-link hover:text-ink"
           ]}
         >
-          <span
-            :if={@active?}
-            class="app-nav-active-spine absolute inset-y-0 left-0 w-0.5 rounded-full bg-brand-strong"
-            aria-hidden="true"
-          ></span>
           <.icon
             name={nav_icon(@node.item.icon)}
             class={["app-nav-icon size-[1.125rem] shrink-0", @active? && "text-brand-strong"]}
@@ -416,6 +440,12 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   defp nav_branch_open?(node, active_nav) do
     node.item.id == active_nav or Enum.any?(node.children, &nav_branch_open?(&1, active_nav))
+  end
+
+  defp nav_has_active_child?(node, active_nav) do
+    Enum.any?(node.children, fn child ->
+      child.item.id == active_nav or nav_has_active_child?(child, active_nav)
+    end)
   end
 
   defp nav_dom_id(id), do: String.replace(id, ".", "-")

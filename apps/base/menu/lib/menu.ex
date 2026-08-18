@@ -72,6 +72,7 @@ defmodule Bilimbi.Base.Menu do
   defp children_of(by_parent, parent) do
     by_parent
     |> Map.get(parent, [])
+    |> Enum.sort_by(&String.downcase(&1.label))
     |> Enum.map(fn item ->
       %{item: item, children: children_of(by_parent, item.id)}
     end)

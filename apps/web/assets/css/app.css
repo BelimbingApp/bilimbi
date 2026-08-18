@@ -25,6 +25,8 @@
  * anything.
  */
 @theme {
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
   /* Surfaces — a warm operational base. */
   --color-canvas: var(--color-stone-50);
   --color-surface: var(--color-white);
@@ -44,6 +46,8 @@
   --color-ink-subtle: var(--color-stone-500);
   --color-ink-faint: var(--color-stone-400);
   --color-ink-inverse: var(--color-white);
+  --color-link: #544c43;
+  --color-muted: #6b6057;
 
   /* Primary action — confident and quiet. Operational software, not a CTA. */
   --color-action: var(--color-stone-900);
@@ -53,7 +57,7 @@
   /* Product identity. Never used for status: a color that also means "good"
    * cannot report anything. */
   --color-brand: var(--color-lime-300);
-  --color-brand-surface: var(--color-lime-100);
+  --color-brand-surface: #f3f5e8;
   --color-brand-line: var(--color-lime-300);
   --color-brand-strong: var(--color-lime-600);
   --color-brand-hover: var(--color-lime-700);
@@ -92,15 +96,84 @@
 }
 
 body {
+  font-family: var(--font-sans);
   min-width: 20rem;
+}
+
+/* Menu typography & font colors matching Belimbing */
+#app-sidebar {
+  font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  font-weight: 350;
+  letter-spacing: -0.01em;
+  color: var(--color-link);
+}
+
+#app-sidebar .app-nav-item,
+#app-sidebar .app-nav-parent,
+#app-sidebar .app-nav-container,
+#app-sidebar .app-nav-parent-link,
+#app-pinned .app-pinned-link {
+  font-weight: 350;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+#app-sidebar .app-nav-item,
+#app-sidebar .app-nav-parent,
+#app-sidebar .app-nav-container,
+#app-sidebar .app-nav-parent-link,
+#app-pinned .app-pinned-link {
+  color: var(--color-link);
+}
+
+#app-sidebar .app-nav-item:hover,
+#app-sidebar .app-nav-parent:hover,
+#app-sidebar .app-nav-container:hover,
+#app-sidebar .app-nav-parent-link:hover,
+#app-pinned .app-pinned-link:hover {
+  color: var(--color-ink);
+}
+
+/* Active menu item styling */
+#app-sidebar .app-nav-item[aria-current="page"],
+#app-sidebar .app-nav-parent-link[aria-current="page"] {
+  font-weight: 350;
+  color: var(--color-brand-strong);
+  background-color: var(--color-surface);
+}
+
+/* Parent branch ascent when it contains the active menu item */
+#app-sidebar .app-nav-parent.text-brand-strong,
+#app-sidebar .app-nav-parent.text-brand-strong .app-nav-container,
+#app-sidebar .app-nav-parent.text-brand-strong .app-nav-parent-link,
+#app-sidebar .app-nav-parent.text-brand-strong .app-nav-label,
+#app-sidebar .app-nav-parent.text-brand-strong .app-nav-caret,
+#app-sidebar .app-nav-branch:has([aria-current="page"]) > .app-nav-parent,
+#app-sidebar .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-container,
+#app-sidebar .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-parent-link,
+#app-sidebar .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-label,
+#app-sidebar .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-caret {
+  color: var(--color-brand-strong);
 }
 
 #app-sidebar .app-nav-icon {
   display: none;
 }
 
-#app-sidebar [data-nav-expanded="true"] .app-nav-caret {
-  transform: rotate(90deg);
+#app-sidebar .app-nav-caret-open {
+  display: none;
+}
+
+#app-sidebar .app-nav-caret-closed {
+  display: inline;
+}
+
+#app-sidebar [data-nav-expanded="true"] > .app-nav-parent .app-nav-caret-open {
+  display: inline;
+}
+
+#app-sidebar [data-nav-expanded="true"] > .app-nav-parent .app-nav-caret-closed {
+  display: none;
 }
 
 #app-sidebar .app-pinned-row[draggable="true"] {

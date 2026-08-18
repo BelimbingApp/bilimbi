@@ -35,7 +35,7 @@ Two choices define the Bilimbi look:
 2. **Ledger geometry.** Compact scale with `rounded-md` controls and
    `rounded-xl` surfaces, hairline rules, and tabular numerals for IDs and
    counts. The lime `brand` marks orientation only — the card's top edge,
-   the active navigation item's spine, selection — and never reports status.
+   the active navigation highlighting, selection — and never reports status.
    The surface is ruled paper with a bookmark.
 
 ## Semantic color roles
@@ -47,14 +47,25 @@ status colors for real feedback.
 Keep color tokens and reusable theme rules in the shared web foundation. A
 module may add a semantic role only when its workflow genuinely needs one.
 
+- **`canvas` / `surface` / `surface-sidebar`**: Warm stone operational base.
+- **`brand-surface` (`#f3f5e8`)**: Subtle warm brand tint used on the pinned
+  navigation surface and highlight containers.
+- **`link` (`#544c43`) / `muted` (`#6b6057`) / `ink` (`#2c2418`)**: Warm font
+  hierarchy for navigation links, secondary labels, and active hover text.
+- **`brand-strong` (`lime-600`)**: Orientation accent for active navigation,
+  ascended parent branches, and brand selection.
+
 ## Compact typography
 
-Use compact, competent typography with enough contrast and line height for long
-sessions. Use tabular numerals where users compare amounts, dates, counts, or
-measurements.
+The platform uses `Instrument Sans` globally as `--font-sans`. Use compact,
+competent typography with enough contrast and line height for long sessions.
+Use tabular numerals where users compare amounts, dates, counts, or measurements.
 
-Typography should support scanning before reading. Avoid decorative type that
-competes with operational content.
+- **Global font:** `Instrument Sans` across all app views, forms, tables, and chrome.
+- **Menu typography:** Scoped compact styling with thinner weight (`350` / `400`),
+  `0.8125rem` (`13px`) font size, and `1.25rem` line height.
+- Typography should support scanning before reading. Avoid decorative type that
+  competes with operational content.
 
 ## Compact layout
 
@@ -104,13 +115,28 @@ Two shells exist and each stays minimal:
   workspace strip below. No navigation, no marketing.
 - **`Layouts.app`** — the authenticated workspace shell: a compact full-width
   top bar (sidebar toggle, transparent `size-6` brand mark, Bilimbi wordmark,
-  tenant on the right), a left menu rail with the active item marked by a
-  brand spine and a user footer with initials and logout, and a persistent
-  status bar (application version). In development only, the status bar
-  shows `dev` plus the listen address. Wide screens keep the rail; the
-  collapsed rail hides labels and logout, leaving the user initials.
-  Below `lg`, the menu is an off-canvas drawer. The logo is the product
-  mark on a transparent background — never a brand tile.
+  tenant on the right), a left menu sidebar, and a persistent status bar
+  (application version). In development only, the status bar shows `dev` plus
+  the listen address. Wide screens keep the rail; the collapsed rail hides
+  labels and logout, leaving the user initials. Below `lg`, the menu is an
+  off-canvas drawer. The logo is the product mark on a transparent background
+  — never a brand tile.
+
+### Navigation menu conventions
+
+- **Typography & Font:** `Instrument Sans`, `0.8125rem` (`13px`), normal/light weight (`350`),
+  `text-link` (`#544c43`), hover `text-ink` (`#2c2418`).
+- **Chevrons:** Triangular chevrons `&#x2BC8;` (`⯈`) for collapsed branches,
+  `&#x2BC6;` (`⯆`) for expanded branches, with figure space `&#8199;` indentation
+  for leaf items.
+- **Active Navigation:** Selected route uses card surface background (`bg-surface`),
+  lime accent text (`text-brand-strong`), no bolding, and no spine border.
+- **Parent Ascent:** All ancestor parent branches containing the active page accent
+  their labels, toggles, and chevrons in `text-brand-strong`.
+- **Pinned Surface:** Pinned container uses `bg-brand-surface` (`#f3f5e8`) with
+  `rounded-sm` and `text-muted` (`#6b6057`) uppercase section header.
+- **Ordering:** Menu roots and submenus are sorted strictly alphabetically ascending
+  (`ASC`, case-insensitive).
 
 The shell does not grow navigation items for pages that do not exist. A
 workflow joins the sidebar when its screen ships, not before. Notifications,
