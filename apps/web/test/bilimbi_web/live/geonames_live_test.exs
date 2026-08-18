@@ -5,6 +5,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
+  alias Bilimbi.Core.Geonames.Web.CountriesLive
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   setup do
@@ -219,5 +220,11 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     )
 
     assert has_element?(postcodes, "th[aria-sort='ascending'] #postcodes-summary-sort-iso")
+  end
+
+  test "ignores a country update while one is already in progress" do
+    socket = %Phoenix.LiveView.Socket{assigns: %{updating_countries?: true}}
+
+    assert {:noreply, ^socket} = CountriesLive.handle_event("update-countries", %{}, socket)
   end
 end

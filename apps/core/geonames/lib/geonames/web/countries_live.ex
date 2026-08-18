@@ -51,6 +51,10 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
     {:noreply, push_patch(socket, to: countries_path(state))}
   end
 
+  def handle_event("update-countries", _params, %{assigns: %{updating_countries?: true}} = socket) do
+    {:noreply, socket}
+  end
+
   def handle_event("update-countries", _params, socket) do
     {:noreply,
      socket
@@ -300,7 +304,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   defp update_success_message(_result), do: "Countries updated from GeoNames."
 
   defp update_error_message({:download, :countries, {:request, %{reason: :timeout}}}) do
-    "Countries were not changed. Bilimbi could not connect to download.geonames.org within 10 seconds. Check internet, proxy, or firewall access, then try Update again. If it persists, contact your administrator."
+    "Countries were not changed. Bilimbi could not connect to download.geonames.org. Check internet, proxy, or firewall access, then try Update again. If it persists, contact your administrator."
   end
 
   defp update_error_message({:download, :countries, {:http_status, status}}) do

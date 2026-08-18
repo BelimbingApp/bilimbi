@@ -21,12 +21,12 @@ const DateTime = {
     }
 
     if (format !== "date") {
-      Object.assign(options, {hour: "2-digit", minute: "2-digit", hourCycle: "h23"})
+      Object.assign(options, {hour: "2-digit", minute: "2-digit"})
     }
 
     if (format === "datetime") options.timeZoneName = "short"
 
-    this.el.textContent = new Intl.DateTimeFormat("en-GB", options).format(value)
+    this.el.textContent = new Intl.DateTimeFormat(undefined, options).format(value)
     this.el.dataset.timezone = timeZone
     this.el.title = `Rendered in ${timeZone}`
   },
