@@ -1,0 +1,204 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.audit.action">
+  <.page>
+    <.header>
+      Audit Actions
+      <:subtitle>Operational action log, newest first</:subtitle>
+    </.header>
+
+    <form id="actions-filters" phx-change="filter" phx-submit="filter" class="mt-5 flex flex-wrap gap-3">
+      <div class="flex-1 min-w-[200px]">
+        <label for="actions-search" class="sr-only">Search actions</label>
+        <input
+          type="search"
+          id="actions-search"
+          name="search"
+          value={@state.search}
+          placeholder="Search event, URL, actor role, or trace..."
+          phx-debounce="300"
+          autocomplete="off"
+          class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
+        />
+      </div>
+
+      <div>
+        <label for="actions-event-family" class="sr-only">Filter by event family</label>
+        <select
+          id="actions-event-family"
+          name="event_family"
+          class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
+        >
+          <option value="" selected={@state.event_family == ""}>All Events</option>
+          <option value="http" selected={@state.event_family == "http"}>HTTP</option>
+          <option value="auth" selected={@state.event_family == "auth"}>Authentication</option>
+          <option value="console" selected={@state.event_family == "console"}>Console</option>
+          <option value="queue" selected={@state.event_family == "queue"}>Queue</option>
+          <option value="domain" selected={@state.event_family == "domain"}>Domain</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="actions-result" class="sr-only">Filter by result</label>
+        <select
+          id="actions-result"
+          name="result"
+          class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
+        >
+          <option value="" selected={@state.result == ""}>All Results</option>
+          <option value="failure" selected={@state.result == "failure"}>Failures</option>
+          <option value="retained" selected={@state.result == "retained"}>Retained</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="actions-diagnostics" class="sr-only">Diagnostic traffic</label>
+        <select
+          id="actions-diagnostics"
+          name="diagnostics"
+          class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
+        >
+          <option value="hide" selected={@state.diagnostics == "hide"}>Hide Diagnostics</option>
+          <option value="show" selected={@state.diagnostics == "show"}>Show Diagnostics</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="actions-actor-type" class="sr-only">Filter by actor type</label>
+        <select
+          id="actions-actor-type"
+          name="actor_type"
+          class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
+        >
+          <option value="" selected={@state.actor_type == ""}>All Actor Types</option>
+          <option value="user" selected={@state.actor_type == "user"}>User</option>
+          <option value="agent" selected={@state.actor_type == "agent"}>Employee</option>
+          <option value="guest" selected={@state.actor_type == "guest"}>Guest</option>
+          <option value="console" selected={@state.actor_type == "console"}>Console</option>
+          <option value="scheduler" selected={@state.actor_type == "scheduler"}>Scheduler</option>
+          <option value="queue" selected={@state.actor_type == "queue"}>Queue</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="actions-page-size" class="sr-only">Per page</label>
+        <select
+          id="actions-page-size"
+          name="page_size"
+          class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
+        >
+          <option value="25" selected={@state.page_size == 25}>25 / page</option>
+          <option value="50" selected={@state.page_size == 50}>50 / page</option>
+          <option value="100" selected={@state.page_size == 100}>100 / page</option>
+          <option value="300" selected={@state.page_size == 300}>300 / page</option>
+        </select>
+      </div>
+    </form>
+
+    <p :if={@state.diagnostics == "hide"} class="mt-2 text-xs text-ink-muted">
+      Successful Livewire updates, AI event streams, and media streams are hidden. Failures still appear; switch to Show Diagnostics to inspect transport noise.
+    </p>
+
+    <div class="mt-4">
+      <.table
+        id="actions-table"
+        rows={@streams.actions}
+        row_id={fn {dom_id, _a} -> dom_id end}
+        row_item={fn {_dom_id, a} -> a end}
+        sort_by={@state.sort_by}
+        sort_dir={@state.sort_dir}
+      >
+        <:col :let={action} label="Occurred" sort="occurred_at" sort_id="actions-sort-occurred_at">
+          <span class="whitespace-nowrap tabular-nums text-xs text-ink-muted">
+            {occurred_at(action)}
+          </span>
+        </:col>
+
+        <:col :let={action} label="Actor" sort="actor_type" sort_id="actions-sort-actor_type">
+          <div class="whitespace-nowrap text-sm font-medium text-ink">
+            {actor_label(action)}
+          </div>
+          <div class="font-mono text-xs text-ink-muted">
+            {actor_subtext(action)}
+          </div>
+        </:col>
+
+        <:col :let={action} label="Action" sort="event" sort_id="actions-sort-event">
+          <% pres = action_presentation(action) %>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="text-sm font-medium text-ink">{pres.summary}</span>
+            <.badge>{pres.source}</.badge>
+            <.badge :if={pres.diagnostic} kind={:warning}>Diagnostic</.badge>
+          </div>
+          <div class="mt-0.5 font-mono text-xs text-ink-muted">{action.event}</div>
+        </:col>
+
+        <:col :let={action} label="Context">
+          <% pres = action_presentation(action) %>
+          <div class="max-w-xs truncate text-xs text-ink-muted" title={pres.context}>
+            {pres.context}
+          </div>
+        </:col>
+
+        <:col :let={action} label="Result">
+          <% pres = action_presentation(action) %>
+          <.badge kind={pres.variant}>
+            {pres.result}
+          </.badge>
+        </:col>
+
+        <:col :let={action} label="Trace" sort="trace_id" sort_id="actions-sort-trace_id">
+          <span :if={action.trace_id} class="font-mono text-xs text-ink-muted">
+            {action.trace_id}
+          </span>
+          <span :if={!action.trace_id} class="text-ink-muted">—</span>
+        </:col>
+
+        <:col :let={action} label="Retain" align={:right}>
+          <button
+            type="button"
+            phx-click="toggle_retain"
+            phx-value-id={action.id}
+            id={"action-retain-#{action.id}"}
+            class={[
+              "rounded p-1 transition-colors hover:bg-surface-sunken focus:outline-none focus:ring-1 focus:ring-brand-strong",
+              action.is_retained && "text-brand font-bold",
+              !action.is_retained && "text-ink-muted hover:text-ink"
+            ]}
+            title={if action.is_retained, do: "Remove retention", else: "Retain this entry"}
+            aria-label={if action.is_retained, do: "Remove retention for action #{action.id}", else: "Retain action #{action.id}"}
+          >
+            <.icon name={if action.is_retained, do: "hero-bookmark-solid", else: "hero-bookmark"} class="size-4" />
+          </button>
+        </:col>
+
+        <:empty :if={@page.total_entries == 0}>
+          {if @state.search == "" and @state.actor_type == "" and @state.event_family == "" and @state.result == "",
+            do: "No action logs match the current filters. Try Show Diagnostics if you are looking for Livewire or stream traffic.",
+            else: "No action logs match the current filters."}
+        </:empty>
+      </.table>
+    </div>
+
+    <div
+      :if={@page.total_pages > 1}
+      id="actions-pagination"
+      class="mt-3 flex items-center justify-between text-sm"
+    >
+      <p class="text-ink-subtle">
+        Page {@page.page} of {@page.total_pages} · {@page.total_entries} actions
+      </p>
+      <div class="flex gap-2">
+        <.button :if={@page.page > 1} id="actions-prev" phx-click="page" phx-value-page={@page.page - 1}>
+          Previous
+        </.button>
+        <.button
+          :if={@page.page < @page.total_pages}
+          id="actions-next"
+          phx-click="page"
+          phx-value-page={@page.page + 1}
+        >
+          Next
+        </.button>
+      </div>
+    </div>
+  </.page>
+</Layouts.app>
