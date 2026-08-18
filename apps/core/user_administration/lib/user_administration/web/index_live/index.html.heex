@@ -165,6 +165,7 @@
         </.table>
       </div>
       <nav
+        :if={@users_page.total_pages > 0}
         id="users-pagination"
         aria-label="Pagination"
         class="flex items-center justify-between gap-3 border-t border-line-subtle px-4 py-3"
