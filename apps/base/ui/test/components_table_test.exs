@@ -106,30 +106,14 @@ defmodule Bilimbi.Base.UI.ComponentsTableTest do
     assert html =~ ~s(phx-click="sort-summary")
   end
 
-  test "sortable and non-sortable headers get the same case treatment" do
+  test "sortable and non-sortable headers get the same proper case treatment" do
     html = render_component(&preview/1, rows: [%{name: "Ada", count: 1, note: "n"}])
 
-    # Browsers do not inherit `text-transform` into form controls, so the
-    # `uppercase` on the `<th>` does not reach a label wrapped in the sort
-    # button. Sortable columns rendered title case beside uppercase neighbours
-    # -- two styles in one header row (#275).
-    #
-    # This asserts the class, not the pixels: `{@col[:label]}` is "Name" in the
-    # DOM whether it paints NAME or Name, so no string assertion can see the
-    # difference. The rendered result was checked in a browser.
-    # Only the button's own opening tag. Splitting on "<button" and searching
-    # the whole chunk matches the NEXT column's <th>, which carries `uppercase`
-    # -- that version of this test passed with the fix reverted.
     [_, after_button] = String.split(html, ~s(id="people-sort-name"), parts: 2)
     [button_tag, _] = String.split(after_button, ">", parts: 2)
 
-    assert button_tag =~ "uppercase",
-           """
-           The sort button must carry `uppercase` itself.
-
-           Inheriting it from the <th> silently fails for form controls, which
-           is what put two header styles in one row on /authz/roles.
-           """
+    refute button_tag =~ "uppercase"
+    refute html =~ "uppercase tracking-wider"
   end
 
   test "a multiple select is sized in rows, so no row is painted in half" do

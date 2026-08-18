@@ -524,6 +524,14 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   selection, never an action or status. Async actions must show in-flight
   state, reject duplicate work, and truthfully report the data outcome and
   recovery.
+- **Data tables & inline editing:** Tables use compact density (`py-0.5` row
+  cells, `py-1.5` header cells, `px-2` cell horizontal padding, `bg-surface-sunken`
+  `#eaebe4` header background, proper case `text-xs font-semibold text-muted` headers,
+  tabular numbers for numeric/code/date columns). Search filters live in `<.card>` with
+  `p-2` and an `mb-2` gap before table headers. Inline editing uses `<.inline_edit>` with
+  subtle hover pencil icon, click/focus activation, Enter/blur save, Escape cancel, and
+  LiveView stream patching (`stream_insert/3`). Pagination uses compact rows-per-page select
+  (`w-14`, `h-7`, `pl-2 pr-4`) and accent focus rings (`focus:border-brand-strong focus:ring-brand-strong/30`).
 - Maintain the Tailwind v4 `source(none)` and `@source` imports in
   `assets/css/app.css`.
 - The platform uses `Instrument Sans` globally via `--font-sans` in `@theme`.

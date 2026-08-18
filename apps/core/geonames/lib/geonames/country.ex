@@ -24,4 +24,10 @@ defmodule Bilimbi.Core.Geonames.Country do
     field(:geoname_id, :integer)
     timestamps(type: :naive_datetime, inserted_at: :created_at)
   end
+
+  def name_changeset(country, attrs) do
+    country
+    |> Ecto.Changeset.cast(attrs, [:country])
+    |> Ecto.Changeset.validate_required([:country])
+  end
 end

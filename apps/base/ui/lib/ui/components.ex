@@ -506,6 +506,33 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Renders a card container with subtle border and rounded corners (Belimbing's `x-ui.card` counterpart).
+  """
+  attr :id, :string, default: nil
+  attr :title, :string, default: nil
+  attr :class, :any, default: nil
+  attr :inner_class, :any, default: nil
+  attr :rest, :global
+  slot :inner_block, required: true
+
+  def card(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={["rounded-xl border border-line bg-surface shadow-xs", @class]}
+      {@rest}
+    >
+      <div :if={@title} class="border-b border-line px-4 py-3">
+        <h3 class="text-base font-semibold text-ink">{@title}</h3>
+      </div>
+      <div class={["p-2", @inner_class]}>
+        {render_slot(@inner_block)}
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
   Renders the page content container at the width of its workflow kind.
 
   Every screen is one of three kinds, and the width is chosen here and
@@ -530,7 +557,7 @@ defmodule Bilimbi.Base.UI.Components do
       </.page>
   """
   attr :id, :string, default: nil
-  attr :variant, :atom, values: [:list, :form, :detail], default: :list
+  attr :variant, :atom, default: :list, values: [:list, :form, :detail]
   attr :class, :any, default: nil
   attr :rest, :global
 
@@ -582,11 +609,11 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
-  Renders a table with generic styling.
+  Renders a table with compact Belimbing-parity styling.
 
   Pass `sort` on a column to render a header button that pushes `"sort"`
   with `phx-value-sort`. The active column gets `aria-sort`. Density is
-  `px-4 py-2.5` — that is the in-repo contract until a denser primitive lands.
+  `px-2 py-1.5` for headers and `px-2 py-0.5` for row cells.
 
   `align={:right}` on a column right-aligns the header and cells (numeric
   columns). `caption` renders an `sr-only` `<caption>` so the grid has an
@@ -652,7 +679,7 @@ defmodule Bilimbi.Base.UI.Components do
               scope="col"
               aria-sort={table_aria_sort(col[:sort], @sort_by, @sort_dir)}
               class={[
-                "px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-ink-subtle",
+                "px-2 py-1.5 text-xs font-semibold text-ink-subtle",
                 col[:align] == :right && "text-right"
               ]}
             >
@@ -666,7 +693,7 @@ defmodule Bilimbi.Base.UI.Components do
               />
               <span :if={!col[:sort]}>{col[:label]}</span>
             </th>
-            <th :if={@action != []} scope="col" class="px-4 py-2.5">
+            <th :if={@action != []} scope="col" class="px-2 py-1.5">
               <span class="sr-only">{gettext("Actions")}</span>
             </th>
           </tr>
@@ -681,14 +708,14 @@ defmodule Bilimbi.Base.UI.Components do
               :for={col <- @col}
               phx-click={@row_click && @row_click.(row)}
               class={[
-                "px-4 py-2.5 text-ink",
+                "px-2 py-0.5 text-ink",
                 col[:align] == :right && "text-right",
                 @row_click && "hover:cursor-pointer"
               ]}
             >
               {render_slot(col, @row_item.(row))}
             </td>
-            <td :if={@action != []} class="w-0 px-4 py-2.5 font-semibold">
+            <td :if={@action != []} class="w-0 px-2 py-0.5 font-semibold">
               <div class="flex gap-4">
                 <%= for action <- @action do %>
                   {render_slot(action, @row_item.(row))}
@@ -701,13 +728,81 @@ defmodule Bilimbi.Base.UI.Components do
           <tr id={"#{@id}-empty"}>
             <td
               colspan={table_empty_colspan(@col, @action)}
-              class="px-4 py-8 text-center text-ink-muted"
+              class="px-2 py-8 text-center text-sm text-ink-muted"
             >
               {render_slot(@empty)}
             </td>
           </tr>
         </tbody>
       </table>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders an inline-editable text cell (Belimbing inline-edit pattern).
+
+  In display mode, shows the text with a pencil icon that appears on hover.
+  Clicking immediately reveals an input box. On blur or Enter, it commits the
+  change and pushes `@save_event` to LiveView with `%{id: @id_value, <@name>: new_value}`.
+  Pressing Escape cancels and reverts to the original value without pushing.
+
+  ## Examples
+
+      <.inline_edit
+        id={"country-\#{country.id}-name"}
+        value={country.country}
+        id_value={country.id}
+        save_event="save-country-name"
+        name="country"
+        label="Country name"
+      />
+  """
+  attr :id, :string, required: true
+  attr :value, :string, required: true
+  attr :id_value, :any, default: nil
+  attr :save_event, :string, default: "save"
+  attr :name, :string, default: "value"
+  attr :label, :string, default: "Edit value"
+  attr :class, :any, default: nil
+  attr :input_class, :any, default: nil
+  attr :rest, :global
+
+  def inline_edit(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      phx-hook="InlineEdit"
+      data-id={@id_value || @id}
+      data-field={@name}
+      data-save-event={@save_event}
+      class={["relative min-w-0 max-w-full text-sm text-ink", @class]}
+      {@rest}
+    >
+      <button
+        type="button"
+        data-role="trigger"
+        aria-label={@label}
+        class="group flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 -mx-1.5 text-left hover:bg-surface-sunken transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
+      >
+        <span data-role="text" class="text-ink">{@value}</span>
+        <.icon
+          name="hero-pencil"
+          class="size-3.5 text-ink-muted opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity"
+        />
+      </button>
+
+      <input
+        data-role="input"
+        type="text"
+        name={@name}
+        value={@value}
+        aria-label={@label}
+        class={[
+          "absolute left-0 top-0 hidden w-full min-w-0 max-w-full box-border rounded border border-brand-strong bg-surface px-1.5 py-0.5 -mx-1.5 text-sm text-ink focus:outline-none focus:border-brand-strong focus:ring-1 focus:ring-brand-strong/30",
+          @input_class
+        ]}
+      />
     </div>
     """
   end
@@ -727,13 +822,7 @@ defmodule Bilimbi.Base.UI.Components do
       phx-value-sort={@col[:sort]}
       class={
         [
-          # `uppercase` is repeated from the `<th>` on purpose. Browsers do not
-          # inherit `text-transform` into form controls, so a sortable header
-          # inside this button rendered title case while its non-sortable
-          # neighbours rendered uppercase -- two styles in one header row, and
-          # invisible to tests because the DOM text is identical either way
-          # (#275).
-          "inline-flex items-center gap-1 rounded uppercase transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25",
+          "inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25",
           @col[:align] == :right && "ml-auto",
           @col[:align] != :right && "text-left"
         ]

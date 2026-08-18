@@ -10,7 +10,7 @@ defmodule Bilimbi.Base.UI.ComponentsPageTest do
   import Phoenix.LiveViewTest
   import Bilimbi.Base.UI.Components
 
-  defp render_page(assigns \\ %{}, variant \\ nil) do
+  defp render_page(_assigns \\ %{}, variant \\ nil) do
     render_component(
       fn assigns ->
         ~H"""

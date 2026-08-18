@@ -125,6 +125,47 @@ defmodule Bilimbi.Core.Geonames do
   end
 
   @doc """
+  Updates a country's display name by its ID or ISO code.
+  """
+  @spec update_country_name(pos_integer() | String.t(), String.t()) ::
+          {:ok, CountryIndex.t()} | {:error, :not_found | Ecto.Changeset.t()}
+  def update_country_name(id_or_iso, name) when is_binary(name) do
+    trimmed_name = String.trim(name)
+
+    query =
+      case id_or_iso do
+        id when is_integer(id) ->
+          from(c in Country, where: c.id == ^id)
+
+        iso when is_binary(iso) ->
+          case Integer.parse(iso) do
+            {id, ""} ->
+              from(c in Country, where: c.id == ^id)
+
+            _ ->
+              case normalize_iso(iso) do
+                {:ok, valid_iso} -> from(c in Country, where: c.iso == ^valid_iso)
+                :error -> from(c in Country, where: false)
+              end
+          end
+      end
+
+    case Repo.one(query) do
+      nil ->
+        {:error, :not_found}
+
+      country ->
+        country
+        |> Country.name_changeset(%{country: trimmed_name})
+        |> Repo.update()
+        |> case do
+          {:ok, updated} -> {:ok, CountryIndex.from_schema(updated)}
+          {:error, changeset} -> {:error, changeset}
+        end
+    end
+  end
+
+  @doc """
   Returns a bounded, searchable, sortable page for the read-only Admin1 index.
 
   The optional `country_iso` filter is normalized as an ISO code. A malformed

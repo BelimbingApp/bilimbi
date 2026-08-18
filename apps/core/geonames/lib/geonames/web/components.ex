@@ -34,7 +34,7 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
             label_class="sr-only"
             wrapper_class="mb-0"
             options={page_size_options(@page_sizes)}
-            class="h-7 rounded-md border border-line bg-surface py-0 pl-2 pr-7 text-xs tabular-nums text-ink focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+            class="h-7 w-14 rounded-md border border-line bg-surface py-0 pl-2 pr-4 text-xs tabular-nums text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
           />
         </.form>
       </div>
@@ -47,7 +47,7 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
           disabled={@page.page <= 1}
           aria-label="Previous page"
           title="Previous page"
-          class="grid size-7 place-items-center rounded-md border border-line bg-surface text-ink transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25 disabled:cursor-not-allowed disabled:opacity-50"
+          class="grid size-7 place-items-center rounded-md border border-line bg-surface text-ink transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <.icon name="hero-chevron-left" class="size-3.5" />
         </button>
@@ -62,7 +62,7 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
             aria-current={if(step == @page.page, do: "page")}
             aria-label={"Page #{step}"}
             class={[
-              "grid size-7 place-items-center rounded-md border text-xs tabular-nums transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25",
+              "grid size-7 place-items-center rounded-md border text-xs tabular-nums transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
               step == @page.page && "border-brand-line bg-brand-surface text-brand-ink",
               step != @page.page && "border-line bg-surface text-ink hover:bg-surface-sunken"
             ]}
@@ -78,7 +78,7 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
           disabled={@page.page >= @page.total_pages or @page.total_pages == 0}
           aria-label="Next page"
           title="Next page"
-          class="grid size-7 place-items-center rounded-md border border-line bg-surface text-ink transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25 disabled:cursor-not-allowed disabled:opacity-50"
+          class="grid size-7 place-items-center rounded-md border border-line bg-surface text-ink transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <.icon name="hero-chevron-right" class="size-3.5" />
         </button>
