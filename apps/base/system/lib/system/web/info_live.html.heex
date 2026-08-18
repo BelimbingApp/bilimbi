@@ -1,0 +1,45 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.system.info">
+  <.page>
+    <.header>
+      System Info
+      <:subtitle>Server and application configuration</:subtitle>
+    </.header>
+
+    <div class="mt-5 grid gap-4 md:grid-cols-2">
+      <.card id="system-info-application" title="Application">
+        <.fact_list id="application" facts={@application_facts} />
+      </.card>
+
+      <.card id="system-info-runtime" title="Runtime">
+        <.fact_list id="runtime" facts={@runtime_facts} />
+      </.card>
+
+      <.card id="system-info-database" title="Database">
+        <.fact_list id="database" facts={@database_facts} />
+      </.card>
+
+      <.card id="system-info-server" title="Server">
+        <.fact_list id="server" facts={@server_facts} />
+      </.card>
+
+      <.card id="system-info-health" title="Health">
+        <.fact_list id="health" facts={@health_facts} />
+      </.card>
+
+      <.card id="system-info-applications" title="Applications">
+        <p class="px-2 pb-2 text-xs text-ink-muted">
+          {length(@applications)} loaded
+        </p>
+        <ul id="system-info-applications-list" class="flex flex-wrap gap-1 px-2 pb-2">
+          <li
+            :for={app <- @applications}
+            id={"system-info-application-#{app.name}"}
+            class="rounded-md border border-line bg-surface-sunken px-1.5 py-0.5 text-xs tabular-nums text-ink-muted"
+          >
+            {app.name} <span class="text-ink-faint">{app.version}</span>
+          </li>
+        </ul>
+      </.card>
+    </div>
+  </.page>
+</Layouts.app>
