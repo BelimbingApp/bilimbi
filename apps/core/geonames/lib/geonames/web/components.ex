@@ -8,6 +8,21 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
   attr(:page_sizes, :list, required: true)
   attr(:filters_form, :any, required: true)
 
+  @doc """
+  Pager chrome for the GeoNames indexes.
+
+  With zero rows the summary and the page buttons are omitted while the
+  rows-per-page selector stays. That split is Belimbing's
+  (`resources/core/views/components/ui/pagination.blade.php`): the nav renders
+  when `$hasPages || $hasSelector`, the summary is gated on `$summary &&
+  $hasPages`, and the page links are gated on `$hasPages` alone. Each table
+  already reports emptiness through its own `<:empty>` slot, so a "No results"
+  line flanked by two permanently disabled arrows is chrome describing nothing.
+
+  Only the zero case is handled here. Belimbing's `hasPages()` is also false for
+  a *single* page, and whether Bilimbi follows it there is the open question on
+  issue #298 -- not something to settle by widening this guard.
+  """
   def pagination(assigns) do
     ~H"""
     <nav
@@ -16,7 +31,7 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
       class="flex flex-col gap-2 border-t border-line-subtle px-2 py-2 sm:flex-row sm:items-center sm:justify-between"
     >
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <p id={"#{@id}-summary"} class="text-xs text-ink-muted">
+        <p :if={@page.total_pages > 0} id={"#{@id}-summary"} class="text-xs text-ink-muted">
           {page_summary(@page)}
         </p>
         <.form
@@ -38,7 +53,12 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
           />
         </.form>
       </div>
-      <div class="flex items-center gap-1" role="list" aria-label="Page navigation">
+      <div
+        :if={@page.total_pages > 0}
+        class="flex items-center gap-1"
+        role="list"
+        aria-label="Page navigation"
+      >
         <button
           id={"#{@id}-previous"}
           type="button"

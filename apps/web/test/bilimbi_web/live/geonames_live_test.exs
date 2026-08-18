@@ -155,6 +155,35 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     assert has_element?(postcodes, "#postcodes-table-empty", "No postcodes found.")
   end
 
+  test "hides the pager summary and page buttons when a filter matches nothing", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list"])
+
+    {:ok, postcodes, _html} = conn |> log_in_as() |> live(~p"/geonames/postcodes")
+
+    # Asserted while rows exist so the refutations below cannot pass against
+    # selectors that never rendered in the first place.
+    assert has_element?(postcodes, "#postcodes-pagination-summary")
+    assert has_element?(postcodes, "#postcodes-pagination-previous")
+    assert has_element?(postcodes, "#postcodes-pagination-next")
+
+    postcodes
+    |> element("#postcodes-filters")
+    |> render_change(%{"filters" => %{"search" => "missing"}})
+
+    # Zero rows: the table's own empty slot carries the message, so a "No
+    # results" line beside two disabled arrows is chrome reporting nothing.
+    assert has_element?(postcodes, "#postcodes-table-empty")
+    refute has_element?(postcodes, "#postcodes-pagination-summary")
+    refute has_element?(postcodes, "#postcodes-pagination-previous")
+    refute has_element?(postcodes, "#postcodes-pagination-next")
+
+    # The per-page selector deliberately survives. Belimbing renders the
+    # pagination nav whenever a selector exists and gates only the summary and
+    # the page links on hasPages()
+    # (resources/core/views/components/ui/pagination.blade.php:18-50).
+    assert has_element?(postcodes, "#postcodes-pagination-page-size")
+  end
+
   test "uses compact pagination controls for country page size and sorting", %{conn: conn} do
     grant_capabilities!(["admin.geonames.list"])
 
