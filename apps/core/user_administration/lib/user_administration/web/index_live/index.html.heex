@@ -55,11 +55,11 @@
               class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
             />
           </div>
-          <.input
+          <.multi_select
             field={@filters_form[:roleIds]}
             id="users-role-filter"
-            type="select"
-            multiple
+            placeholder="All roles"
+            selection_label=":count role selected|:count roles selected"
             label="Roles"
             label_class="sr-only"
             wrapper_class="mb-0"

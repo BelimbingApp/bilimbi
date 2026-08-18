@@ -180,8 +180,11 @@ defmodule BilimbiWeb.UserLiveTest do
       |> log_in_as()
       |> live(users_path(roleIds: [first.id, second.id], perPage: 10))
 
-    assert has_element?(view, "#users-role-filter option[value='#{first.id}']", "First")
-    assert has_element?(view, "#users-role-filter option[value='#{second.id}']", "Second")
+    assert has_element?(view, "#users-role-filter", "2 roles selected")
+    assert has_element?(view, "#users-role-filter-option-#{first.id}[checked]")
+    assert has_element?(view, "#users-role-filter-option-#{second.id}[checked]")
+    assert has_element?(view, "label[for='users-role-filter-option-#{first.id}']", "First")
+    assert has_element?(view, "label[for='users-role-filter-option-#{second.id}']", "Second")
     assert has_element?(view, "#users-pagination-summary", "Showing 1–10 of 12")
     assert has_element?(view, "#user-6", "First")
     assert has_element?(view, "#user-6", "Second")

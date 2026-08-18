@@ -255,7 +255,7 @@ defmodule Bilimbi.Base.UI.Components do
   attr :type, :string,
     default: "text",
     values: ~w(checkbox color date datetime-local email file month number password
-               search select tel text textarea time url week hidden)
+               search select multi_select tel text textarea time url week hidden)
 
   attr :field, Phoenix.HTML.FormField,
     doc: "a form field struct retrieved from the form, for example: @form[:email]"
@@ -386,6 +386,10 @@ defmodule Bilimbi.Base.UI.Components do
     """
   end
 
+  def input(%{type: "multi_select"} = assigns) do
+    multi_select(assigns)
+  end
+
   def input(%{type: "textarea"} = assigns) do
     ~H"""
     <div class={@wrapper_class || "mb-4"}>
@@ -452,6 +456,216 @@ defmodule Bilimbi.Base.UI.Components do
       "transition placeholder:text-ink-faint focus:border-action focus:outline-none " <>
       "focus:ring-2 focus:ring-action/20 disabled:cursor-not-allowed " <>
       "disabled:bg-surface-sunken disabled:text-ink-subtle"
+  end
+
+  @doc """
+  Renders a multi-select dropdown component (Belimbing's `x-ui.multi-select` counterpart).
+
+  Displays a button showing the selection summary (e.g. "All roles", "1 role selected",
+  or "3 roles selected") with a chevron icon, and toggles a floating menu containing
+  checkboxes for each option.
+
+  ## Examples
+
+      <.multi_select
+        id="users-role-filter"
+        field={@filters_form[:roleIds]}
+        placeholder="All roles"
+        selection_label=":count role selected|:count roles selected"
+        options={@role_options}
+      />
+  """
+  attr :id, :any, default: nil
+  attr :name, :any, default: nil
+  attr :label, :string, default: nil
+  attr :label_class, :any, default: nil
+  attr :wrapper_class, :any, default: nil
+  attr :class, :any, default: nil
+
+  attr :field, Phoenix.HTML.FormField,
+    doc: "a form field struct retrieved from the form, for example @form[:role_ids]"
+
+  attr :errors, :list, default: []
+
+  attr :options, :list,
+    default: [],
+    doc: "the options to display, list of {label, value} tuples, maps, or strings"
+
+  attr :value, :any, default: nil, doc: "the selected values (if not using field)"
+  attr :placeholder, :string, default: "All options", doc: "label when 0 items selected"
+
+  attr :selection_label, :string,
+    default: ":count option selected|:count options selected",
+    doc: "singular|plural template string for selection count"
+
+  attr :hint, :string, default: nil
+  attr :rest, :global, doc: "arbitrary HTML attributes for the button"
+
+  def multi_select(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
+    errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
+
+    name =
+      assigns[:name] ||
+        if(String.ends_with?(field.name, "[]"), do: field.name, else: field.name <> "[]")
+
+    value = if(is_nil(assigns[:value]), do: field.value, else: assigns[:value])
+    id = assigns[:id] || field.id
+
+    assigns
+    |> assign(field: nil, id: id, name: name, value: value)
+    |> assign(:errors, Enum.map(errors, &translate_error(&1)))
+    |> multi_select()
+  end
+
+  def multi_select(%{id: nil, name: name} = assigns) when is_binary(name) do
+    assigns |> assign(:id, name) |> multi_select()
+  end
+
+  def multi_select(assigns) do
+    input_name =
+      case assigns[:name] do
+        nil ->
+          "#{assigns.id}[]"
+
+        name when is_binary(name) ->
+          if String.ends_with?(name, "[]"), do: name, else: name <> "[]"
+
+        name ->
+          to_string(name) <> "[]"
+      end
+
+    selected_values =
+      assigns[:value]
+      |> List.wrap()
+      |> Enum.map(&to_string/1)
+
+    normalized_options =
+      Enum.map(assigns.options || [], fn
+        {label, val} ->
+          {to_string(label), to_string(val)}
+
+        [label, val] ->
+          {to_string(label), to_string(val)}
+
+        %{label: label, value: val} ->
+          {to_string(label), to_string(val)}
+
+        val when is_binary(val) or is_atom(val) or is_integer(val) ->
+          {to_string(val), to_string(val)}
+      end)
+
+    selected_count = Enum.count(normalized_options, fn {_, val} -> val in selected_values end)
+
+    summary_label =
+      format_selection_summary(
+        selected_count,
+        assigns.placeholder,
+        assigns.selection_label
+      )
+
+    assigns =
+      assigns
+      |> assign(:input_name, input_name)
+      |> assign(:selected_values, selected_values)
+      |> assign(:normalized_options, normalized_options)
+      |> assign(:selected_count, selected_count)
+      |> assign(:summary_label, summary_label)
+
+    ~H"""
+    <div
+      id={"#{@id}-wrapper"}
+      class={["relative", @wrapper_class || "mb-4"]}
+    >
+      <input type="hidden" name={@input_name} value="" />
+      <label
+        :if={@label}
+        id={"#{@id}-label"}
+        for={@id}
+        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
+      >
+        {@label}
+      </label>
+
+      <button
+        id={@id}
+        type="button"
+        aria-haspopup="true"
+        aria-expanded="false"
+        aria-controls={"#{@id}-options"}
+        phx-click={
+          JS.toggle(to: "##{@id}-options")
+          |> JS.toggle_class("rotate-180", to: "##{@id}-chevron")
+        }
+        class={[
+          "flex w-full items-center justify-between gap-3 rounded-lg border border-line bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-subtle focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20",
+          @class
+        ]}
+        {@rest}
+      >
+        <span class="truncate font-normal">
+          {@summary_label}
+        </span>
+        <span
+          id={"#{@id}-chevron"}
+          class="inline-flex shrink-0 transition-transform duration-200"
+        >
+          <.icon
+            name="hero-chevron-down"
+            class="size-4 text-ink-muted"
+          />
+        </span>
+      </button>
+
+      <div
+        id={"#{@id}-options"}
+        style="display: none;"
+        phx-click-away={
+          JS.hide(to: "##{@id}-options")
+          |> JS.remove_class("rotate-180", to: "##{@id}-chevron")
+        }
+        class="absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg space-y-0.5"
+      >
+        <label
+          :for={{opt_label, opt_value} <- @normalized_options}
+          for={"#{@id}-option-#{opt_value}"}
+          class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-ink hover:bg-surface-sunken select-none transition"
+        >
+          <input
+            type="checkbox"
+            id={"#{@id}-option-#{opt_value}"}
+            name={@input_name}
+            value={opt_value}
+            checked={opt_value in @selected_values}
+            class="size-4 shrink-0 rounded border-line text-action accent-action focus:ring-2 focus:ring-action/20"
+          />
+          <span class="truncate font-normal">{opt_label}</span>
+        </label>
+        <div
+          :if={@normalized_options == []}
+          class="px-2.5 py-2 text-sm text-ink-muted"
+        >
+          {gettext("No options available.")}
+        </div>
+      </div>
+
+      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={msg <- @errors}>{msg}</.error>
+    </div>
+    """
+  end
+
+  defp format_selection_summary(0, placeholder, _selection_label),
+    do: placeholder || "All options"
+
+  defp format_selection_summary(count, _placeholder, selection_label) do
+    template =
+      case String.split(selection_label || ":count selected", "|") do
+        [singular, _plural] when count == 1 -> singular
+        [_singular, plural] -> plural
+        [single] -> single
+      end
+
+    String.replace(template, ":count", Integer.to_string(count))
   end
 
   @doc """

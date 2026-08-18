@@ -387,7 +387,7 @@
           {gettext("Form Controls (<.input>)")}
         </h2>
         <p class="text-xs text-ink-muted">
-          Belimbing provenance: <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/input.blade.php</code>, <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">select.blade.php</code>, <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">checkbox.blade.php</code>,
+          Belimbing provenance: <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/input.blade.php</code>, <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">select.blade.php</code>, <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">multi-select.blade.php</code>, <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">checkbox.blade.php</code>,
           and
           <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">textarea.blade.php</code>
         </p>
@@ -410,6 +410,19 @@
               label={gettext("Select Dropdown")}
               prompt={gettext("Choose an option...")}
               options={[{"Standard Option", "standard"}, {"Advanced Option", "advanced"}]}
+            />
+            <.multi_select
+              id="ref-multi-select-sample"
+              label={gettext("Multi-Select Dropdown")}
+              placeholder={gettext("All roles")}
+              selection_label={gettext(":count role selected|:count roles selected")}
+              options={[
+                {"AI Operator", "1"},
+                {"Agent Operator", "2"},
+                {"Auditor", "3"},
+                {"Core Administrator", "4"}
+              ]}
+              value={["1", "4"]}
             />
             <.input
               field={@sample_form[:textarea_field]}
