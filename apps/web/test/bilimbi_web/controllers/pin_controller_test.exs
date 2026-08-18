@@ -73,4 +73,38 @@ defmodule BilimbiWeb.PinControllerTest do
     assert Enum.map(response["pins"], & &1["id"]) == [pin2.id, pin1.id]
     assert Enum.map(response["pins"], & &1["sort_order"]) == [0, 1]
   end
+
+  # `String.to_integer/1` raises on anything non-numeric, and the map clauses
+  # had no catch-all, so a logged-in client could turn a typo into a 500. This
+  # is the crash #302 fixed on the Countries screen, in new code.
+  test "POST /api/pins/reorder rejects malformed ids instead of crashing", %{conn: conn} do
+    {:ok, :pinned, [pin]} = User.toggle_user_pin(91, %{"label" => "Pin 1", "url" => "/page1"})
+
+    signed_in = log_in_as(conn)
+
+    for payload <- [
+          ["abc"],
+          [%{"id" => "abc"}],
+          [%{"id" => nil}],
+          [nil],
+          [%{"label" => "no id at all"}],
+          [%{"id" => to_string(pin.id)}, "12x"]
+        ] do
+      response =
+        signed_in
+        |> post(~p"/api/pins/reorder", %{"pins" => payload})
+        |> json_response(422)
+
+      assert response == %{"error" => "invalid_parameters"}
+    end
+
+    # A numeric string is a legitimate id shape and must still be accepted --
+    # a fix that rejected every binary would satisfy every assertion above.
+    response =
+      signed_in
+      |> post(~p"/api/pins/reorder", %{"pins" => [%{"id" => to_string(pin.id)}]})
+      |> json_response(200)
+
+    assert Enum.map(response["pins"], & &1["id"]) == [pin.id]
+  end
 end
