@@ -651,11 +651,19 @@ defmodule Bilimbi.Base.UI.Components do
       type="button"
       phx-click={@sort_event}
       phx-value-sort={@col[:sort]}
-      class={[
-        "inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25",
-        @col[:align] == :right && "ml-auto",
-        @col[:align] != :right && "text-left"
-      ]}
+      class={
+        [
+          # `uppercase` is repeated from the `<th>` on purpose. Browsers do not
+          # inherit `text-transform` into form controls, so a sortable header
+          # inside this button rendered title case while its non-sortable
+          # neighbours rendered uppercase -- two styles in one header row, and
+          # invisible to tests because the DOM text is identical either way
+          # (#275).
+          "inline-flex items-center gap-1 rounded uppercase transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25",
+          @col[:align] == :right && "ml-auto",
+          @col[:align] != :right && "text-left"
+        ]
+      }
     >
       {@col[:label]}
       <.icon
