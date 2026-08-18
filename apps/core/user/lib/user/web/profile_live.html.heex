@@ -14,25 +14,22 @@
     >
       <.input field={@form[:name]} type="text" label="Name" autocomplete="name" />
 
-      <div>
-        <.input field={@form[:email]} type="email" label="Email" autocomplete="email" />
-        <p class="mt-1 text-xs text-ink-subtle">
-          Changing this address means it needs verifying again before it is trusted.
-        </p>
-      </div>
+      <.input
+        field={@form[:email]}
+        type="email"
+        label="Email"
+        autocomplete="email"
+        hint="Changing this address means it needs verifying again before it is trusted."
+      />
 
-      <div>
-        <.input
-          field={@form[:landing_menu_id]}
-          type="select"
-          label="Landing page"
-          prompt="Default (first page you can open)"
-          options={@landing_options}
-        />
-        <p class="mt-1 text-xs text-ink-subtle">
-          Only pages you can open are listed. Leave it unset to keep the default.
-        </p>
-      </div>
+      <.input
+        field={@form[:landing_menu_id]}
+        type="select"
+        label="Landing page"
+        prompt="Default (first page you can open)"
+        options={@landing_options}
+        hint="Only pages you can open are listed. Leave it unset to keep the default."
+      />
 
       <div class="flex justify-end">
         <.button id="profile-save" type="submit" variant="primary">Save</.button>

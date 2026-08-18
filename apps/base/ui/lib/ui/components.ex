@@ -267,6 +267,18 @@ defmodule Bilimbi.Base.UI.Components do
   attr :multiple, :boolean, default: false, doc: "the multiple flag for select inputs"
   attr :class, :any, default: nil, doc: "the input class to use over defaults"
   attr :error_class, :any, default: nil, doc: "the input error class to use over defaults"
+
+  attr :hint, :string,
+    default: nil,
+    doc: """
+    helper text rendered inside the field wrapper, below the control.
+
+    Placing it here rather than in a sibling `<p>` is the point: a paragraph
+    after `<.input>` sits outside the wrapper that owns `mb-4`, so callers were
+    compensating with four different spacings -- `mt-1`, `mt-1 mb-4`, `mt-0.5`
+    and even `-mt-2 mb-4` (#279).
+    """
+
   attr :wrapper_class, :any, default: nil, doc: "the class for the control wrapper"
   attr :label_class, :any, default: nil, doc: "the class for the control label"
 
@@ -326,6 +338,7 @@ defmodule Bilimbi.Base.UI.Components do
           {@rest}
         />{@label}
       </label>
+      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
@@ -351,6 +364,7 @@ defmodule Bilimbi.Base.UI.Components do
         <option :if={@prompt} value="">{@prompt}</option>
         {Phoenix.HTML.Form.options_for_select(@options, @value)}
       </select>
+      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
@@ -372,6 +386,7 @@ defmodule Bilimbi.Base.UI.Components do
         class={field_class(@class, @error_class, @errors, "min-h-24")}
         {@rest}
       >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
+      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
@@ -396,6 +411,7 @@ defmodule Bilimbi.Base.UI.Components do
         class={field_class(@class, @error_class, @errors)}
         {@rest}
       />
+      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
     """
