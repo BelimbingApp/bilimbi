@@ -188,4 +188,143 @@ defmodule Bilimbi.Base.AuditTest do
       end)
     end)
   end
+
+  test "paginates and searches mutations by subject, event, and trace" do
+    insert_tenant!(%{id: 41})
+    {:ok, scope} = Tenancy.scope(41)
+
+    for i <- 1..30 do
+      Audit.record_mutation(
+        scope,
+        mutation_attrs(%{
+          auditable_id: to_string(i),
+          subject_name: if(rem(i, 2) == 0, do: "Widget #{i}", else: "Gadget #{i}"),
+          event: if(rem(i, 3) == 0, do: "created", else: "updated"),
+          trace_id: "trc#{i}",
+          occurred_at: NaiveDateTime.add(~N[2026-08-13 03:00:00], i, :second)
+        })
+      )
+    end
+
+    page1 =
+      Audit.list_mutations(scope, page: 1, page_size: 10, sort_by: :occurred_at, sort_dir: :desc)
+
+    assert page1.total_entries == 30
+    assert page1.total_pages == 3
+    assert length(page1.entries) == 10
+    assert hd(page1.entries).auditable_id == "30"
+
+    # Filter by event
+    created_page = Audit.list_mutations(scope, event: "created", page_size: 50)
+    assert created_page.total_entries == 10
+    assert Enum.all?(created_page.entries, &(&1.event == "created"))
+
+    # Search by subject_name
+    search_page = Audit.list_mutations(scope, search: "Widget 1", page_size: 50)
+    assert search_page.total_entries >= 1
+    assert Enum.all?(search_page.entries, &String.contains?(&1.subject_name || "", "Widget 1"))
+  end
+
+  test "paginates, searches, and filters actions by actor_type, event_family, result, and diagnostics" do
+    insert_tenant!(%{id: 41})
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, http_action} =
+      Audit.record_action(
+        scope,
+        action_attrs(%{
+          event: "http.request",
+          actor_type: "user",
+          payload: %{"method" => "GET", "status" => 200, "route" => "admin.users"},
+          url: "https://example.test/admin/users",
+          is_retained: false
+        })
+      )
+
+    {:ok, failed_http} =
+      Audit.record_action(
+        scope,
+        action_attrs(%{
+          event: "http.request",
+          actor_type: "user",
+          payload: %{"method" => "POST", "status" => 500, "route" => "admin.users.create"},
+          url: "https://example.test/admin/users/create",
+          is_retained: true
+        })
+      )
+
+    {:ok, auth_action} =
+      Audit.record_action(
+        scope,
+        action_attrs(%{
+          event: "auth.login.failed",
+          actor_type: "guest",
+          payload: %{"email" => "bad@example.test"}
+        })
+      )
+
+    # All actions
+    all_page = Audit.list_actions(scope, diagnostics: "show", page_size: 10)
+    assert all_page.total_entries == 3
+
+    # Filter by family
+    http_page = Audit.list_actions(scope, event_family: "http", diagnostics: "show")
+    assert http_page.total_entries == 2
+
+    # Filter by actor_type
+    guest_page = Audit.list_actions(scope, actor_type: "guest", diagnostics: "show")
+    assert guest_page.total_entries == 1
+    assert hd(guest_page.entries).id == auth_action.id
+
+    # Filter by result = failure
+    failed_page = Audit.list_actions(scope, result: "failure", diagnostics: "show")
+    assert failed_page.total_entries == 2
+
+    # Filter by result = retained
+    retained_page = Audit.list_actions(scope, result: "retained", diagnostics: "show")
+    assert retained_page.total_entries == 1
+    assert hd(retained_page.entries).id == failed_http.id
+
+    # Toggle retention
+    assert {:ok, updated} = Audit.toggle_retained(scope, http_action.id)
+    assert updated.is_retained == true
+    assert {:ok, toggled_back} = Audit.toggle_retained(scope, http_action.id)
+    assert toggled_back.is_retained == false
+
+    # Toggle retention on unknown id
+    assert {:error, :not_found} = Audit.toggle_retained(scope, 999_999)
+  end
+
+  test "safely escapes wildcard characters in search" do
+    insert_tenant!(%{id: 41})
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, _normal} =
+      Audit.record_mutation(
+        scope,
+        mutation_attrs(%{subject_name: "Widget", auditable_id: "w1"})
+      )
+
+    {:ok, _percent} =
+      Audit.record_mutation(
+        scope,
+        mutation_attrs(%{subject_name: "100% discount", auditable_id: "w2"})
+      )
+
+    {:ok, _underscore} =
+      Audit.record_mutation(
+        scope,
+        mutation_attrs(%{subject_name: "user_name", auditable_id: "w3"})
+      )
+
+    # Searching "%" matches only the literal "%" row, not all rows
+    percent_page = Audit.list_mutations(scope, search: "%")
+    assert percent_page.total_entries == 1
+    assert hd(percent_page.entries).subject_name == "100% discount"
+
+    # Searching "_" matches only the literal "_" row, not single-character wildcards
+    underscore_page = Audit.list_mutations(scope, search: "_")
+    assert underscore_page.total_entries == 1
+    assert hd(underscore_page.entries).subject_name == "user_name"
+  end
 end

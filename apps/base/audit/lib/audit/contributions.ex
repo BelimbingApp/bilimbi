@@ -3,6 +3,10 @@ defmodule Bilimbi.Base.Audit.Contributions do
 
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionProvider
 
+  @list "admin.audit.log.list"
+  @manage "admin.audit.log.manage"
+  @view "admin.audit.log.view"
+
   @impl true
   def contributions do
     %{
@@ -19,7 +23,7 @@ defmodule Bilimbi.Base.Audit.Contributions do
           label: "Actions",
           parent: "admin.audit",
           route: "/audit/actions",
-          capability: "admin.audit.log.list",
+          capability: @list,
           order: 10
         },
         %{
@@ -27,10 +31,17 @@ defmodule Bilimbi.Base.Audit.Contributions do
           label: "Data Mutations",
           parent: "admin.audit",
           route: "/audit/mutations",
-          capability: "admin.audit.log.list",
+          capability: @list,
           order: 20
         }
-      ]
+      ],
+      authz: %{
+        capabilities: [@list, @manage, @view],
+        roles: %{
+          "auditor" => %{capabilities: [@list, @manage, @view]},
+          "system_viewer" => %{capabilities: [@list, @view]}
+        }
+      }
     }
   end
 end
