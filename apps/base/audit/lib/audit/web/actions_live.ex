@@ -242,7 +242,7 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
         true -> :success
       end
 
-    diagnostic = is_diagnostic_http?(url, route)
+    diagnostic = diagnostic_http?(url, route)
 
     %{
       source: "HTTP",
@@ -380,7 +380,7 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
     }
   end
 
-  defp is_diagnostic_http?(url, route) do
+  defp diagnostic_http?(url, route) do
     url_str = to_string(url || "")
     route_str = to_string(route || "")
 
@@ -401,8 +401,7 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
   defp humanize(str) when is_binary(str) do
     str
     |> String.split([".", "_", "-"])
-    |> Enum.map(&String.capitalize/1)
-    |> Enum.join(" ")
+    |> Enum.map_join(" ", &String.capitalize/1)
   end
 
   defp humanize(other), do: to_string(other)

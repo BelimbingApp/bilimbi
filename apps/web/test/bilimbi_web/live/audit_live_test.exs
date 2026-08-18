@@ -4,10 +4,10 @@ defmodule BilimbiWeb.AuditLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
-  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
 
   setup do
     UserFixtures.create_user_tables!()
