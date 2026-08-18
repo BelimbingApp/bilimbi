@@ -26,6 +26,8 @@ defmodule Bilimbi.Core.Employee do
   alias Bilimbi.Core.Employee.EmployeeType
   alias Bilimbi.Core.Employee.Schema
   alias Bilimbi.Core.Employee.Summary
+  alias Bilimbi.Core.Employee.TypeAdministrationIndex
+  alias Bilimbi.Core.Employee.TypeAdministrationPage
   alias Bilimbi.Core.Employee.TypeSummary
   alias Ecto.Changeset
 
@@ -267,6 +269,28 @@ defmodule Bilimbi.Core.Employee do
       {:ok, types}
     end
   end
+
+  @doc """
+  Returns one bounded, deterministic employee types administration page for a live company.
+
+  Options are a plain keyword list. Supported values are `:page`, `:page_size`,
+  `:search`, `:sort_by` (`:code`, `:label`, `:is_system`, or `:employees_count`),
+  and `:sort_dir` (`:asc` or `:desc`).
+  """
+  @spec list_type_administration_page(Scope.t(), pos_integer(), keyword()) ::
+          {:ok, TypeAdministrationPage.t()} | {:error, :company_not_found | :invalid_options}
+  def list_type_administration_page(scope, company_id, options \\ [])
+
+  def list_type_administration_page(%Scope{} = scope, company_id, options)
+      when is_integer(company_id) and company_id > 0 do
+    with {:ok, normalized_options} <- TypeAdministrationIndex.normalize_options(options),
+         {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
+      {:ok, TypeAdministrationIndex.page(company_id, normalized_options)}
+    end
+  end
+
+  def list_type_administration_page(%Scope{}, _company_id, _options),
+    do: {:error, :company_not_found}
 
   @doc "Resolves one employee type visible to the company."
   @spec get_employee_type(Scope.t(), pos_integer(), pos_integer()) ::
