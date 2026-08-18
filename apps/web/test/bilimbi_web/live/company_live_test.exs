@@ -105,13 +105,17 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/companies/legal-entity-types")
     end
 
-    test "redirects without admin.company.view", %{conn: conn} do
+    # Belimbing gates both type index screens on `admin.company.list`, not
+    # `.view` (`app/Core/Company/Routes/web.php:25-30`), and that matches how
+    # this app already splits the two: `/companies` is `.list`, `/companies/:id`
+    # is `.view`. These are index screens.
+    test "redirects without admin.company.list", %{conn: conn} do
       assert {:error, {:redirect, %{to: "/dashboard"}}} =
                conn |> log_in_as() |> live(~p"/companies/legal-entity-types")
     end
 
     test "creates, validates, edits, toggles, and deletes legal entity types", %{conn: conn} do
-      grant_capabilities!(["admin.company.view"])
+      grant_capabilities!(["admin.company.list"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/legal-entity-types")
 
@@ -179,13 +183,13 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/companies/department-types")
     end
 
-    test "redirects without admin.company.view", %{conn: conn} do
+    test "redirects without admin.company.list", %{conn: conn} do
       assert {:error, {:redirect, %{to: "/dashboard"}}} =
                conn |> log_in_as() |> live(~p"/companies/department-types")
     end
 
     test "creates, filters, edits, toggles, and deletes department types", %{conn: conn} do
-      grant_capabilities!(["admin.company.view"])
+      grant_capabilities!(["admin.company.list"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/department-types")
 

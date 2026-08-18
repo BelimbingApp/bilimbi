@@ -3,13 +3,13 @@
     path: "/companies/legal-entity-types",
     live: Bilimbi.Core.Company.Web.LegalEntityTypesLive,
     session: :auth,
-    capability: "admin.company.view"
+    capability: "admin.company.list"
   },
   %{
     path: "/companies/department-types",
     live: Bilimbi.Core.Company.Web.DepartmentTypesLive,
     session: :auth,
-    capability: "admin.company.view"
+    capability: "admin.company.list"
   },
   %{
     path: "/companies/:id/departments",
