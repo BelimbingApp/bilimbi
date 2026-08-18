@@ -80,10 +80,7 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
 
     case Authz.create_role(scope, company_id, attributes) do
       {:ok, role} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Role created.")
-         |> push_navigate(to: after_create_path(socket, role))}
+        {:noreply, after_create(socket, role)}
 
       # Now that the operator picks the company, this is a correctable field
       # error rather than a broken session: the chosen company left scope
@@ -107,18 +104,30 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
   # where Belimbing lands the operator (`Create.php:53`). Returning to the index
   # leaves a row that looks finished and is inert.
   #
-  # Belimbing redirects there unconditionally, which 403s an actor holding
-  # `admin.authz.role.create` without `admin.authz.role.view` -- the two are
-  # separately gated in both apps (`app/Base/Authz/Routes/web.php:42`,
-  # `priv/web_routes.exs:17`). We deliberately do not copy that: the role is
-  # created either way, so this changes no business meaning, and dumping
-  # somebody on the dashboard after a successful create is worse than the list
-  # they came from.
-  defp after_create_path(socket, role) do
-    if allowed?(socket.assigns.current_scope, "admin.authz.role.view") do
-      ~p"/authz/roles/#{role.id}"
-    else
-      ~p"/authz/roles"
+  # Every destination is capability-gated, so the landing place has to be one
+  # this actor may actually open -- `/authz/roles` needs `role.list`, not
+  # `role.view` (`priv/web_routes.exs:6`). Navigating somewhere they will be
+  # bounced off is the same dashboard-dump this change exists to avoid; it just
+  # takes two redirects to get there instead of one.
+  #
+  # Belimbing redirects to Show unconditionally and 403s an actor holding
+  # `role.create` without `role.view`. Deliberately not copied: the role is
+  # created either way, so no business meaning changes.
+  defp after_create(socket, role) do
+    scope = socket.assigns.current_scope
+    socket = put_flash(socket, :info, "Role created.")
+
+    cond do
+      allowed?(scope, "admin.authz.role.view") ->
+        push_navigate(socket, to: ~p"/authz/roles/#{role.id}")
+
+      allowed?(scope, "admin.authz.role.list") ->
+        push_navigate(socket, to: ~p"/authz/roles")
+
+      # Create is the one page this actor can hold. Stay, with a cleared form,
+      # so the confirmation is visible and they can create another.
+      true ->
+        assign_form(socket, form_changeset(%{}, socket.assigns.company_ids))
     end
   end
 

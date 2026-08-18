@@ -257,7 +257,7 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       assert has_element?(view, "#role-cancel[href='/authz/roles']", "Cancel")
     end
 
-    test "creates a company-owned role and returns to the index", %{conn: conn, ours: ours} do
+    test "creates a company-owned role and lands on it", %{conn: conn, ours: ours} do
       {:ok, view, _html} = open_create(conn)
 
       assert {:error, {:live_redirect, %{to: path}}} =
@@ -340,21 +340,49 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       assert html =~ "Registrar"
     end
 
-    test "falls back to the index for an actor who cannot view roles", %{conn: conn, ours: ours} do
-      # Show is gated on admin.authz.role.view, create on admin.authz.role.create.
-      # Belimbing redirects to Show unconditionally and 403s this actor; we send
-      # them back to the list instead. The role is created either way.
+    test "falls back to the index for an actor who can list but not view", %{
+      conn: conn,
+      ours: ours
+    } do
+      grant_capabilities!(["admin.authz.role.create", "admin.authz.role.list"])
+      authed = log_in_as(conn)
+      {:ok, view, _html} = live(authed, ~p"/authz/roles/create")
+
+      result =
+        view
+        |> form("#role-form", %{
+          "role" => %{"company_id" => "73", "name" => "Clerk", "code" => "clerk"}
+        })
+        |> render_submit()
+
+      assert {:error, {:live_redirect, %{to: "/authz/roles"}}} = result
+
+      # Followed, not just asserted. The index is itself gated on role.list, so
+      # a redirect this actor cannot complete would look identical here.
+      {:ok, _index, html} = follow_redirect(result, authed)
+      assert html =~ "Role created."
+
+      assert ours |> Authz.list_roles() |> Enum.any?(&(&1.code == "clerk"))
+    end
+
+    test "stays on the form for an actor who can only create", %{conn: conn, ours: ours} do
+      # create without view or list. Every other landing page is gated on a
+      # capability this actor lacks, so navigating anywhere bounces them to the
+      # dashboard -- the outcome this whole change exists to avoid. Staying put
+      # shows the confirmation and lets them create another.
       grant_capabilities!("admin.authz.role.create")
+      authed = log_in_as(conn)
+      {:ok, view, _html} = live(authed, ~p"/authz/roles/create")
 
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/roles/create")
+      html =
+        view
+        |> form("#role-form", %{
+          "role" => %{"company_id" => "73", "name" => "Clerk", "code" => "clerk"}
+        })
+        |> render_submit()
 
-      assert {:error, {:live_redirect, %{to: "/authz/roles"}}} =
-               view
-               |> form("#role-form", %{
-                 "role" => %{"company_id" => "73", "name" => "Clerk", "code" => "clerk"}
-               })
-               |> render_submit()
-
+      assert html =~ "Role created."
+      assert has_element?(view, "#role-form")
       assert ours |> Authz.list_roles() |> Enum.any?(&(&1.code == "clerk"))
     end
 
