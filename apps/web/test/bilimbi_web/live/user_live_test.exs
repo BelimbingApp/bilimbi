@@ -6,7 +6,6 @@ defmodule BilimbiWeb.UserLiveTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
-  alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias Bilimbi.Core.UserAdministration.Web.IndexLive
 
@@ -317,55 +316,6 @@ defmodule BilimbiWeb.UserLiveTest do
     assert has_element?(out_of_range, "#users-pagination")
     assert has_element?(out_of_range, "#users-pagination-summary", "Showing 11 to 1 of 1 results")
     assert has_element?(out_of_range, "#users-pagination-page-1")
-  end
-
-  test "hard deletes another user and refreshes the bounded page", %{conn: conn} do
-    insert_user!(%{id: 91, company_id: 73, name: "Signed In"})
-    insert_user!(%{id: 92, company_id: 73, name: "Managed User"})
-    grant_capabilities!(["admin.user.list", "admin.user.delete"])
-
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
-    render_click(view, "delete", %{"id" => "92"})
-
-    assert has_element?(view, "#flash-group", "User deleted successfully")
-    refute has_element?(view, "#user-92")
-    assert {:error, :user_not_found} = User.get_tenant_user(scope!(), 92)
-  end
-
-  test "handles delete races, self deletion, missing capability, and archived companies", %{
-    conn: conn
-  } do
-    insert_user!(%{id: 91, company_id: 73, name: "Signed In"})
-    insert_user!(%{id: 92, company_id: 73, name: "Race User"})
-    insert_user!(%{id: 93, company_id: 73, name: "Permission User"})
-    insert_user!(%{id: 94, company_id: 76, name: "Archived User"})
-    grant_capabilities!(["admin.user.list", "admin.user.delete"])
-
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
-
-    assert :ok = User.delete_user(scope!(), 73, 92)
-    render_click(view, "delete", %{"id" => "92"})
-    assert has_element?(view, "#flash-group", "no longer exists")
-    refute has_element?(view, "#user-92")
-
-    render_click(view, "delete", %{"id" => "91"})
-    assert has_element?(view, "#flash-group", "cannot delete your own account")
-    assert {:ok, _user} = User.get_tenant_user(scope!(), 91)
-
-    render_click(view, "delete", %{"id" => "94"})
-    assert has_element?(view, "#flash-group", "while their company is archived")
-    assert {:ok, _user} = User.get_tenant_user(scope!(), 94)
-
-    grant_capabilities!("admin.user.list", user_id: 93)
-
-    {:ok, limited, _html} =
-      conn
-      |> log_in_as(%{"user_id" => 93, "company_id" => 73})
-      |> live(~p"/users")
-
-    render_click(limited, "delete", %{"id" => "91"})
-    assert has_element?(limited, "#flash-group", "do not have permission")
-    assert {:ok, _user} = User.get_tenant_user(scope!(), 91)
   end
 
   defp insert_user!(attributes) do

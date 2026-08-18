@@ -3,14 +3,12 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
   Tenant-scoped adapter for the bounded Users administration index.
 
   The adapter normalizes URL and form state before calling the strict read
-  facade. Account deletion remains a public Core User command and archived
-  company affiliations are presented as read-only.
+  facade. Archived company affiliations are presented as read-only.
   """
 
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
-  alias Bilimbi.Core.User
   alias Bilimbi.Core.UserAdministration
   alias Bilimbi.Core.UserAdministration.Options
 
@@ -78,60 +76,6 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
       )
 
     {:noreply, push_patch(socket, to: users_path(state))}
-  end
-
-  def handle_event("delete", %{"id" => id}, socket) do
-    user_id = positive_integer(id)
-
-    cond do
-      user_id == socket.assigns.current_scope.user["user_id"] ->
-        {:noreply, put_flash(socket, :error, "You cannot delete your own account.")}
-
-      is_integer(user_id) ->
-        delete_user(socket, user_id)
-
-      true ->
-        {:noreply, put_flash(socket, :error, "That user could not be deleted.")}
-    end
-  end
-
-  defp delete_user(socket, user_id) do
-    if allowed?(socket.assigns.current_scope, "admin.user.delete") do
-      scope = socket.assigns.current_scope.scope
-
-      case User.get_tenant_user(scope, user_id) do
-        {:ok, user} -> delete_visible_user(socket, user)
-        {:error, :user_not_found} -> deletion_race(socket)
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to delete users.")}
-    end
-  end
-
-  defp delete_visible_user(socket, user) do
-    case User.delete_user(socket.assigns.current_scope.scope, user.company_id, user.id) do
-      :ok ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "User deleted successfully.")
-         |> load_page(socket.assigns.index_state)}
-
-      {:error, :company_not_found} ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "That user cannot be deleted while their company is archived.")
-         |> load_page(socket.assigns.index_state)}
-
-      {:error, :user_not_found} ->
-        deletion_race(socket)
-    end
-  end
-
-  defp deletion_race(socket) do
-    {:noreply,
-     socket
-     |> put_flash(:error, "That user no longer exists.")
-     |> load_page(socket.assigns.index_state)}
   end
 
   defp load_page(socket, state) do
