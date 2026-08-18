@@ -16,13 +16,16 @@ defmodule Bilimbi.Core.Company do
   alias Bilimbi.Base.Tenancy.NotProvisionedError, as: TenantNotProvisionedError
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company.Department
+  alias Bilimbi.Core.Company.DepartmentType
   alias Bilimbi.Core.Company.ExternalAccess
   alias Bilimbi.Core.Company.ExternalAccessSummary
+  alias Bilimbi.Core.Company.LegalEntityType
   alias Bilimbi.Core.Company.LiveCompanyProof
   alias Bilimbi.Core.Company.PrimaryCompanyInvariantError
   alias Bilimbi.Core.Company.PrimaryCompanyManager
   alias Bilimbi.Core.Company.PrimaryCompanyNotProvisionedError
   alias Bilimbi.Core.Company.Relationship
+  alias Bilimbi.Core.Company.RelationshipType
   alias Bilimbi.Core.Company.Schema
   alias Bilimbi.Core.Company.Summary
 
@@ -31,7 +34,7 @@ defmodule Bilimbi.Core.Company do
   @list_limit 200
 
   @spec get_company(Scope.t(), pos_integer()) :: {:ok, Summary.t()} | {:error, :not_found}
-  def get_company(%Scope{} = scope, company_id) do
+  def get_company(%Scope{} = scope, company_id) when is_integer(company_id) and company_id > 0 do
     query =
       from company in Tenancy.scope_query(Schema, scope),
         where: company.id == ^company_id and is_nil(company.deleted_at)
@@ -41,6 +44,8 @@ defmodule Bilimbi.Core.Company do
       company -> {:ok, Summary.from_schema(company)}
     end
   end
+
+  def get_company(%Scope{}, _company_id), do: {:error, :not_found}
 
   @doc """
   Locks one live Company row for a sibling workflow already inside the shared Repo transaction.
@@ -201,15 +206,605 @@ defmodule Bilimbi.Core.Company do
   end
 
   @doc """
-  Lists live external accesses granted by a tenant-owned company, oldest id first.
+  Creates a company under the scope's tenant.
 
-  Soft-deleted rows are excluded. The three-argument form requires a positive
-  opaque `user_id`; Company does not resolve Core User rows. The result is capped.
+  When `is_primary: true` is passed, the write is executed inside a transaction
+  and atomically designated as that tenant's primary company.
   """
+  @spec create_company(Scope.t(), map(), keyword()) ::
+          {:ok, Summary.t()} | {:error, Ecto.Changeset.t()}
+  def create_company(%Scope{} = scope, attributes, opts \\ []) do
+    tenant_id = Scope.tenant_id(scope)
+    is_primary? = Keyword.get(opts, :is_primary, false)
+
+    Repo.transaction(fn ->
+      changeset = Schema.creation_changeset(tenant_id, attributes)
+
+      case Repo.insert(changeset) do
+        {:ok, company} ->
+          if is_primary? do
+            case assign_primary_company(scope, company.id) do
+              {:ok, _status} ->
+                Summary.from_schema(company)
+
+              {:error, reason} ->
+                Repo.rollback(reason)
+            end
+          else
+            Summary.from_schema(company)
+          end
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+    |> unwrap_mutation()
+  end
+
+  # ============================================================================
+  # Legal Entity Types
+  # ============================================================================
+
+  @spec list_legal_entity_types(keyword()) :: {:ok, [LegalEntityType.t()]}
+  def list_legal_entity_types(opts \\ []) do
+    sort_by = Keyword.get(opts, :sort_by, :name)
+    sort_dir = Keyword.get(opts, :sort_dir, :asc)
+
+    query = from(t in LegalEntityType)
+
+    query =
+      case sort_by do
+        :code -> from(t in query, order_by: [{^sort_dir, t.code}])
+        :is_active -> from(t in query, order_by: [{^sort_dir, t.is_active}, {:asc, t.name}])
+        _ -> from(t in query, order_by: [{^sort_dir, t.name}])
+      end
+
+    {:ok, Repo.all(query)}
+  end
+
+  @spec get_legal_entity_type(pos_integer()) :: {:ok, LegalEntityType.t()} | {:error, :not_found}
+  def get_legal_entity_type(id) when is_integer(id) and id > 0 do
+    case Repo.get(LegalEntityType, id) do
+      nil -> {:error, :not_found}
+      type -> {:ok, type}
+    end
+  end
+
+  def get_legal_entity_type(_id), do: {:error, :not_found}
+
+  @spec create_legal_entity_type(map()) ::
+          {:ok, LegalEntityType.t()} | {:error, Ecto.Changeset.t()}
+  def create_legal_entity_type(attrs) do
+    %LegalEntityType{}
+    |> LegalEntityType.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @spec update_legal_entity_type(pos_integer() | LegalEntityType.t(), map()) ::
+          {:ok, LegalEntityType.t()} | {:error, :not_found | Ecto.Changeset.t()}
+  def update_legal_entity_type(%LegalEntityType{} = type, attrs) do
+    type
+    |> LegalEntityType.update_changeset(attrs)
+    |> Repo.update()
+  end
+
+  def update_legal_entity_type(id, attrs) when is_integer(id) and id > 0 do
+    case Repo.get(LegalEntityType, id) do
+      nil -> {:error, :not_found}
+      type -> update_legal_entity_type(type, attrs)
+    end
+  end
+
+  def update_legal_entity_type(_id, _attrs), do: {:error, :not_found}
+
+  @spec toggle_legal_entity_type_active(pos_integer()) ::
+          {:ok, LegalEntityType.t()} | {:error, :not_found | Ecto.Changeset.t()}
+  def toggle_legal_entity_type_active(id) when is_integer(id) and id > 0 do
+    case Repo.get(LegalEntityType, id) do
+      nil ->
+        {:error, :not_found}
+
+      type ->
+        type
+        |> Ecto.Changeset.change(is_active: not type.is_active)
+        |> Repo.update()
+    end
+  end
+
+  def toggle_legal_entity_type_active(_id), do: {:error, :not_found}
+
+  @spec delete_legal_entity_type(pos_integer()) :: :ok | {:error, :not_found | :in_use}
+  def delete_legal_entity_type(id) when is_integer(id) and id > 0 do
+    case Repo.get(LegalEntityType, id) do
+      nil ->
+        {:error, :not_found}
+
+      type ->
+        in_use? =
+          Repo.exists?(
+            from(c in Schema, where: c.legal_entity_type_id == ^id and is_nil(c.deleted_at))
+          )
+
+        if in_use? do
+          {:error, :in_use}
+        else
+          case Repo.delete(type) do
+            {:ok, _} -> :ok
+            {:error, _} -> {:error, :in_use}
+          end
+        end
+    end
+  end
+
+  def delete_legal_entity_type(_id), do: {:error, :not_found}
+
+  # ============================================================================
+  # Department Types
+  # ============================================================================
+
+  @spec list_department_types(keyword()) :: {:ok, [DepartmentType.t()]}
+  def list_department_types(opts \\ []) do
+    category = Keyword.get(opts, :category)
+    active_only = Keyword.get(opts, :active_only, false)
+    sort_by = Keyword.get(opts, :sort_by, :name)
+    sort_dir = Keyword.get(opts, :sort_dir, :asc)
+
+    query = from(t in DepartmentType)
+
+    query =
+      if category in DepartmentType.categories(),
+        do: from(t in query, where: t.category == ^category),
+        else: query
+
+    query = if active_only, do: from(t in query, where: t.is_active == true), else: query
+
+    query =
+      case sort_by do
+        :code ->
+          from(t in query, order_by: [{^sort_dir, t.code}])
+
+        :category ->
+          from(t in query, order_by: [{^sort_dir, t.category}, {:asc, t.name}])
+
+        :is_active ->
+          from(t in query, order_by: [{^sort_dir, t.is_active}, {:asc, t.name}])
+
+        _ ->
+          from(t in query, order_by: [{^sort_dir, t.name}])
+      end
+
+    {:ok, Repo.all(query)}
+  end
+
+  @spec get_department_type(pos_integer()) :: {:ok, DepartmentType.t()} | {:error, :not_found}
+  def get_department_type(id) when is_integer(id) and id > 0 do
+    case Repo.get(DepartmentType, id) do
+      nil -> {:error, :not_found}
+      type -> {:ok, type}
+    end
+  end
+
+  def get_department_type(_id), do: {:error, :not_found}
+
+  @spec create_department_type(map()) ::
+          {:ok, DepartmentType.t()} | {:error, Ecto.Changeset.t()}
+  def create_department_type(attrs) do
+    %DepartmentType{}
+    |> DepartmentType.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @spec update_department_type(pos_integer() | DepartmentType.t(), map()) ::
+          {:ok, DepartmentType.t()} | {:error, :not_found | Ecto.Changeset.t()}
+  def update_department_type(%DepartmentType{} = type, attrs) do
+    type
+    |> DepartmentType.update_changeset(attrs)
+    |> Repo.update()
+  end
+
+  def update_department_type(id, attrs) when is_integer(id) and id > 0 do
+    case Repo.get(DepartmentType, id) do
+      nil -> {:error, :not_found}
+      type -> update_department_type(type, attrs)
+    end
+  end
+
+  def update_department_type(_id, _attrs), do: {:error, :not_found}
+
+  @spec toggle_department_type_active(pos_integer()) ::
+          {:ok, DepartmentType.t()} | {:error, :not_found | Ecto.Changeset.t()}
+  def toggle_department_type_active(id) when is_integer(id) and id > 0 do
+    case Repo.get(DepartmentType, id) do
+      nil ->
+        {:error, :not_found}
+
+      type ->
+        type
+        |> Ecto.Changeset.change(is_active: not type.is_active)
+        |> Repo.update()
+    end
+  end
+
+  def toggle_department_type_active(_id), do: {:error, :not_found}
+
+  @spec delete_department_type(pos_integer()) :: :ok | {:error, :not_found | :in_use}
+  def delete_department_type(id) when is_integer(id) and id > 0 do
+    case Repo.get(DepartmentType, id) do
+      nil ->
+        {:error, :not_found}
+
+      type ->
+        in_use? = Repo.exists?(from(d in Department, where: d.department_type_id == ^id))
+
+        if in_use? do
+          {:error, :in_use}
+        else
+          case Repo.delete(type) do
+            {:ok, _} -> :ok
+            {:error, _} -> {:error, :in_use}
+          end
+        end
+    end
+  end
+
+  def delete_department_type(_id), do: {:error, :not_found}
+
+  # ============================================================================
+  # Company Departments
+  # ============================================================================
+
+  @spec list_departments(Scope.t(), pos_integer(), keyword()) ::
+          {:ok, [Department.t()]} | {:error, :company_not_found}
+  def list_departments(%Scope{} = scope, company_id, opts \\ []) do
+    case live_company(scope, company_id) do
+      {:error, :company_not_found} ->
+        {:error, :company_not_found}
+
+      {:ok, _company} ->
+        sort_by = Keyword.get(opts, :sort_by, :name)
+        sort_dir = Keyword.get(opts, :sort_dir, :asc)
+
+        query =
+          from(d in Department,
+            join: t in assoc(d, :type),
+            where: d.company_id == ^company_id,
+            preload: [type: t]
+          )
+
+        query =
+          case sort_by do
+            :category ->
+              from([d, t] in query, order_by: [{^sort_dir, t.category}, {:asc, t.name}])
+
+            :status ->
+              from([d, t] in query, order_by: [{^sort_dir, d.status}, {:asc, t.name}])
+
+            :code ->
+              from([d, t] in query, order_by: [{^sort_dir, t.code}])
+
+            _ ->
+              from([d, t] in query, order_by: [{^sort_dir, t.name}])
+          end
+
+        {:ok, Repo.all(query)}
+    end
+  end
+
+  @spec list_available_department_types(Scope.t(), pos_integer()) ::
+          {:ok, [DepartmentType.t()]} | {:error, :company_not_found}
+  def list_available_department_types(%Scope{} = scope, company_id) do
+    case live_company(scope, company_id) do
+      {:error, :company_not_found} ->
+        {:error, :company_not_found}
+
+      {:ok, _company} ->
+        existing_type_ids =
+          Repo.all(
+            from(d in Department,
+              where: d.company_id == ^company_id,
+              select: d.department_type_id
+            )
+          )
+
+        query =
+          from(t in DepartmentType,
+            where: t.is_active == true and t.id not in ^existing_type_ids,
+            order_by: [asc: t.name]
+          )
+
+        {:ok, Repo.all(query)}
+    end
+  end
+
+  @spec create_department(Scope.t(), pos_integer(), map()) ::
+          {:ok, Department.t()} | {:error, :company_not_found | Ecto.Changeset.t()}
+  def create_department(%Scope{} = scope, company_id, attrs) do
+    case live_company(scope, company_id) do
+      {:error, :company_not_found} ->
+        {:error, :company_not_found}
+
+      {:ok, _company} ->
+        %Department{company_id: company_id}
+        |> Department.changeset(attrs)
+        |> Repo.insert()
+        |> case do
+          {:ok, dept} -> {:ok, Repo.preload(dept, :type)}
+          {:error, changeset} -> {:error, changeset}
+        end
+    end
+  end
+
+  @spec update_department_status(Scope.t(), pos_integer(), pos_integer(), String.t()) ::
+          {:ok, Department.t()} | {:error, :company_not_found | :not_found | Ecto.Changeset.t()}
+  def update_department_status(%Scope{} = scope, company_id, department_id, status) do
+    case live_company(scope, company_id) do
+      {:error, :company_not_found} ->
+        {:error, :company_not_found}
+
+      {:ok, _company} ->
+        query =
+          from(d in Department,
+            where: d.id == ^department_id and d.company_id == ^company_id,
+            preload: [:type]
+          )
+
+        case Repo.one(query) do
+          nil ->
+            {:error, :not_found}
+
+          dept ->
+            dept
+            |> Department.status_changeset(status)
+            |> Repo.update()
+        end
+    end
+  end
+
+  @spec delete_department(Scope.t(), pos_integer(), pos_integer()) ::
+          :ok | {:error, :company_not_found | :not_found}
+  def delete_department(%Scope{} = scope, company_id, department_id) do
+    case live_company(scope, company_id) do
+      {:error, :company_not_found} ->
+        {:error, :company_not_found}
+
+      {:ok, _company} ->
+        query =
+          from(d in Department, where: d.id == ^department_id and d.company_id == ^company_id)
+
+        case Repo.one(query) do
+          nil ->
+            {:error, :not_found}
+
+          dept ->
+            case Repo.delete(dept) do
+              {:ok, _} -> :ok
+              {:error, _} -> {:error, :not_found}
+            end
+        end
+    end
+  end
+
+  # ============================================================================
+  # Company Relationships
+  # ============================================================================
+
+  @spec list_relationships(Scope.t(), pos_integer(), keyword()) ::
+          {:ok, [map()]} | {:error, :company_not_found}
+  def list_relationships(%Scope{} = scope, company_id, _opts \\ []) do
+    case live_company(scope, company_id) do
+      {:error, :company_not_found} ->
+        {:error, :company_not_found}
+
+      {:ok, _company} ->
+        outgoing =
+          from(r in Relationship,
+            join: rc in assoc(r, :related_company),
+            join: t in assoc(r, :type),
+            where: r.company_id == ^company_id and is_nil(r.deleted_at) and is_nil(rc.deleted_at),
+            preload: [related_company: rc, type: t]
+          )
+          |> Repo.all()
+          |> Enum.map(fn r ->
+            %{
+              id: r.id,
+              direction: :outgoing,
+              relationship: r,
+              type: r.type,
+              other_company: Summary.from_schema(r.related_company),
+              effective_from: r.effective_from,
+              effective_to: r.effective_to,
+              is_active: Relationship.active?(r)
+            }
+          end)
+
+        incoming =
+          from(r in Relationship,
+            join: c in assoc(r, :company),
+            join: t in assoc(r, :type),
+            where:
+              r.related_company_id == ^company_id and is_nil(r.deleted_at) and
+                is_nil(c.deleted_at),
+            preload: [company: c, type: t]
+          )
+          |> Repo.all()
+          |> Enum.map(fn r ->
+            %{
+              id: r.id,
+              direction: :incoming,
+              relationship: r,
+              type: r.type,
+              other_company: Summary.from_schema(r.company),
+              effective_from: r.effective_from,
+              effective_to: r.effective_to,
+              is_active: Relationship.active?(r)
+            }
+          end)
+
+        all_rels =
+          (outgoing ++ incoming)
+          |> Enum.sort_by(fn item -> {item.other_company.name, item.type.name} end)
+
+        {:ok, all_rels}
+    end
+  end
+
+  @spec list_available_related_companies(Scope.t(), pos_integer()) ::
+          {:ok, [Summary.t()]} | {:error, :company_not_found}
+  def list_available_related_companies(%Scope{} = scope, company_id) do
+    case live_company(scope, company_id) do
+      {:error, :company_not_found} ->
+        {:error, :company_not_found}
+
+      {:ok, _company} ->
+        companies =
+          from(c in Tenancy.scope_query(Schema, scope),
+            where: c.id != ^company_id and is_nil(c.deleted_at),
+            order_by: c.name
+          )
+          |> Repo.all()
+          |> Enum.map(&Summary.from_schema/1)
+
+        {:ok, companies}
+    end
+  end
+
+  @spec list_active_relationship_types() :: {:ok, [RelationshipType.t()]}
+  def list_active_relationship_types do
+    types =
+      from(t in RelationshipType,
+        where: t.is_active == true,
+        order_by: t.name
+      )
+      |> Repo.all()
+
+    {:ok, types}
+  end
+
+  @spec create_relationship(Scope.t(), pos_integer(), map()) ::
+          {:ok, Relationship.t()}
+          | {:error, :company_not_found | :related_company_not_found | Ecto.Changeset.t()}
+  def create_relationship(%Scope{} = scope, company_id, attrs) do
+    raw_related_id =
+      Map.get(attrs, :related_company_id) || Map.get(attrs, "related_company_id")
+
+    related_id =
+      case raw_related_id do
+        id when is_integer(id) ->
+          id
+
+        id when is_binary(id) ->
+          case Integer.parse(id) do
+            {parsed, ""} -> parsed
+            _ -> nil
+          end
+
+        _ ->
+          nil
+      end
+
+    with {:ok, _company} <- live_company(scope, company_id) do
+      if related_id != nil do
+        case live_company(scope, related_id) do
+          {:ok, _related} ->
+            %Relationship{company_id: company_id}
+            |> Relationship.changeset(attrs)
+            |> Repo.insert()
+            |> case do
+              {:ok, rel} -> {:ok, Repo.preload(rel, [:type, :related_company, :company])}
+              {:error, changeset} -> {:error, changeset}
+            end
+
+          {:error, :company_not_found} ->
+            {:error, :company_not_found}
+        end
+      else
+        %Relationship{company_id: company_id}
+        |> Relationship.changeset(attrs)
+        |> Repo.insert()
+      end
+    end
+  end
+
+  @spec update_relationship(Scope.t(), pos_integer(), pos_integer(), map()) ::
+          {:ok, Relationship.t()}
+          | {:error, :company_not_found | :not_found | Ecto.Changeset.t()}
+  def update_relationship(%Scope{} = scope, company_id, relationship_id, attrs) do
+    case live_company(scope, company_id) do
+      {:error, :company_not_found} ->
+        {:error, :company_not_found}
+
+      {:ok, _company} ->
+        query =
+          from(r in Relationship,
+            where:
+              r.id == ^relationship_id and
+                (r.company_id == ^company_id or r.related_company_id == ^company_id) and
+                is_nil(r.deleted_at),
+            preload: [:type, :related_company, :company]
+          )
+
+        case Repo.one(query) do
+          nil ->
+            {:error, :not_found}
+
+          rel ->
+            rel
+            |> Relationship.update_changeset(attrs)
+            |> Repo.update()
+        end
+    end
+  end
+
+  @spec delete_relationship(Scope.t(), pos_integer(), pos_integer()) ::
+          :ok | {:error, :company_not_found | :not_found}
+  def delete_relationship(%Scope{} = scope, company_id, relationship_id) do
+    case live_company(scope, company_id) do
+      {:error, :company_not_found} ->
+        {:error, :company_not_found}
+
+      {:ok, _company} ->
+        query =
+          from(r in Relationship,
+            where:
+              r.id == ^relationship_id and
+                (r.company_id == ^company_id or r.related_company_id == ^company_id) and
+                is_nil(r.deleted_at)
+          )
+
+        case Repo.one(query) do
+          nil ->
+            {:error, :not_found}
+
+          rel ->
+            case Repo.update(Ecto.Changeset.change(rel, %{deleted_at: now()})) do
+              {:ok, _} -> :ok
+              {:error, _} -> {:error, :not_found}
+            end
+        end
+    end
+  end
+
+  # ============================================================================
+  # External Accesses
+  # ============================================================================
+
+  @spec list_company_accesses(Scope.t(), pos_integer()) ::
+          {:ok, [ExternalAccessSummary.t()]} | {:error, :company_not_found}
+  def list_company_accesses(%Scope{} = scope, company_id) do
+    list_company_accesses(scope, company_id, :all)
+  end
+
   @spec list_external_accesses(Scope.t(), pos_integer()) ::
           {:ok, [ExternalAccessSummary.t()]} | {:error, :company_not_found}
   def list_external_accesses(%Scope{} = scope, company_id) do
     list_company_accesses(scope, company_id, :all)
+  end
+
+  @spec list_company_accesses_for_user(Scope.t(), pos_integer(), pos_integer()) ::
+          {:ok, [ExternalAccessSummary.t()]} | {:error, :company_not_found}
+  def list_company_accesses_for_user(%Scope{} = scope, company_id, user_id)
+      when is_integer(user_id) and user_id > 0 do
+    list_company_accesses(scope, company_id, user_id)
   end
 
   @spec list_external_accesses(Scope.t(), pos_integer(), pos_integer()) ::
@@ -220,10 +815,13 @@ defmodule Bilimbi.Core.Company do
   end
 
   @doc """
-  Lists live external accesses for one opaque user across live companies in the
-  scope's tenant, oldest id first.
+  Lists active external accesses granting access TO scoped companies FOR a user.
 
-  The caller must already have proven that `user_id` belongs in this tenant
+  Returns accesses where the granted company is in scope and active, the access
+  is active and not deleted, and the target user ID matches.
+
+  Tenant isolation is preserved because the base query is scoped to companies
+  owned by the caller's tenant. The user ID filter is an opaque foreign integer
   (Core User's job). Company only filters by that identity against scoped
   companies and never queries `users`. The result is capped.
   """
@@ -236,7 +834,8 @@ defmodule Bilimbi.Core.Company do
         join: access in ExternalAccess,
         on: access.company_id == company.id,
         where:
-          access.user_id == ^user_id and is_nil(access.deleted_at) and is_nil(company.deleted_at),
+          access.user_id == ^user_id and is_nil(access.deleted_at) and
+            is_nil(company.deleted_at),
         order_by: access.id,
         limit: ^@list_limit,
         select: access
@@ -285,7 +884,8 @@ defmodule Bilimbi.Core.Company do
   end
 
   @spec grant_external_access(Scope.t(), pos_integer(), pos_integer()) ::
-          {:ok, ExternalAccessSummary.t()} | {:error, access_lookup_error() | Ecto.Changeset.t()}
+          {:ok, ExternalAccessSummary.t()}
+          | {:error, access_lookup_error() | Ecto.Changeset.t()}
   def grant_external_access(%Scope{} = scope, company_id, access_id) do
     update_external_access(scope, company_id, access_id, %{
       is_active: true,
@@ -294,7 +894,8 @@ defmodule Bilimbi.Core.Company do
   end
 
   @spec revoke_external_access(Scope.t(), pos_integer(), pos_integer()) ::
-          {:ok, ExternalAccessSummary.t()} | {:error, access_lookup_error() | Ecto.Changeset.t()}
+          {:ok, ExternalAccessSummary.t()}
+          | {:error, access_lookup_error() | Ecto.Changeset.t()}
   def revoke_external_access(%Scope{} = scope, company_id, access_id) do
     update_external_access(scope, company_id, access_id, %{is_active: false})
   end
@@ -436,7 +1037,8 @@ defmodule Bilimbi.Core.Company do
       Repo.exists?(
         from(relationship in Relationship,
           where:
-            relationship.id == ^relationship_id and relationship.company_id == ^company_id and
+            relationship.id == ^relationship_id and
+              relationship.company_id == ^company_id and
               is_nil(relationship.deleted_at)
         )
       )
