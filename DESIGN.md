@@ -67,6 +67,12 @@ not mean cramped:
 - keep tables readable without forcing unnecessary navigation;
 - use responsive layouts instead of a separate mobile product.
 
+Page content width is a shared decision, not a per-screen one. Every screen
+wraps its content in the `<.page>` component and lets its variant choose the
+width: `:list` for operational index screens, `:form` for single-column edit
+forms, `:detail` for show screens and the dashboard. Never hand-write
+`mx-auto max-w-*` on a screen's root container.
+
 ## Subtle depth and motion
 
 Use contrast, borders, and shadows with restraint. Motion should clarify state,

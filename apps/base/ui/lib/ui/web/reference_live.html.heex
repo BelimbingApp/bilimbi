@@ -84,6 +84,65 @@
       </div>
     </section>
 
+    <%!-- Section: Page Container --%>
+    <section id="component-page" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">
+          {gettext("Page Container (<.page>)")}
+        </h2>
+        <p class="text-xs text-ink-muted">
+          Bilimbi-native; no Belimbing counterpart. Settles the cross-screen width
+          drift recorded in #287.
+        </p>
+      </div>
+
+      <p class="text-sm text-ink-muted">
+        Every screen's content sits in one
+        <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">&lt;.page&gt;</code>
+        container, and the
+        <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">variant</code>
+        chooses the width — the value lives here, never in the screen:
+      </p>
+
+      <div class="grid gap-3 sm:grid-cols-3">
+        <div class="rounded-lg border border-line bg-surface p-3">
+          <p class="text-sm font-medium text-ink-strong">:list (default)</p>
+          <p class="mt-1 text-xs text-ink-muted">
+            <code class="rounded bg-surface-sunken px-1 py-0.5">max-w-7xl</code> — operational
+            index screens with tables and filters.
+          </p>
+        </div>
+        <div class="rounded-lg border border-line bg-surface p-3">
+          <p class="text-sm font-medium text-ink-strong">:form</p>
+          <p class="mt-1 text-xs text-ink-muted">
+            <code class="rounded bg-surface-sunken px-1 py-0.5">max-w-2xl</code> — single-column
+            edit forms.
+          </p>
+        </div>
+        <div class="rounded-lg border border-line bg-surface p-3">
+          <p class="text-sm font-medium text-ink-strong">:detail</p>
+          <p class="mt-1 text-xs text-ink-muted">
+            <code class="rounded bg-surface-sunken px-1 py-0.5">max-w-4xl</code> — show screens
+            and the dashboard.
+          </p>
+        </div>
+      </div>
+
+      <pre class="overflow-x-auto rounded-lg bg-surface-sunken p-3 text-xs text-ink">&lt;.page id="users-index"&gt;…&lt;/.page&gt;
+&lt;.page variant={:form}&gt;…&lt;/.page&gt;</pre>
+
+      <.page
+        id="ref-page-example"
+        variant={:form}
+        class="rounded-lg border border-dashed border-line p-3"
+      >
+        <p class="text-xs text-ink-muted">
+          Live example: this box is a <code class="rounded bg-surface-sunken px-1 py-0.5">&lt;.page variant={:form}&gt;</code>,
+          centred and capped at <code class="rounded bg-surface-sunken px-1 py-0.5">max-w-2xl</code>.
+        </p>
+      </.page>
+    </section>
+
     <%!-- Section: Header Component --%>
     <section id="component-header" class="space-y-4">
       <div class="border-b border-line pb-2">

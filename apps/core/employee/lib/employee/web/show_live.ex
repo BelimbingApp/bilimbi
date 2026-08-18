@@ -63,7 +63,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div class="mx-auto max-w-4xl">
+      <.page variant={:detail}>
         <p class="mb-2 text-xs">
           <.link navigate={~p"/employees"} class="font-medium text-ink-muted hover:text-ink">
             ← Employees
@@ -141,7 +141,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
             </.button>
           </div>
         </div>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

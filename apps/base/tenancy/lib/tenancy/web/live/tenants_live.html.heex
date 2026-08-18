@@ -1,5 +1,5 @@
 <Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.tenancy.tenant">
-  <div class="mx-auto max-w-5xl">
+  <.page>
     <.header>
       Tenants
       <:subtitle>Each tenant is an isolated customer of this instance</:subtitle>
@@ -45,7 +45,7 @@
         </:empty>
       </.table>
     </div>
-  </div>
+  </.page>
 
   <div
     :if={@show_create}

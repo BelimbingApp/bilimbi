@@ -59,7 +59,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.geonames.postcode">
-      <div id="postcodes-index" class="mx-auto max-w-7xl space-y-5">
+      <.page id="postcodes-index" class="space-y-5">
         <.header>Geonames Postcodes</.header>
 
         <section
@@ -159,7 +159,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
             filters_form={@filters_form}
           />
         </section>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

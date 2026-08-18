@@ -1,5 +1,5 @@
 <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={nil}>
-  <div class="mx-auto max-w-2xl">
+  <.page variant={:form}>
     <.header>
       Profile
       <:subtitle>Your account details and where signing in takes you</:subtitle>
@@ -35,5 +35,5 @@
         <.button id="profile-save" type="submit" variant="primary">Save</.button>
       </div>
     </.form>
-  </div>
+  </.page>
 </Layouts.app>

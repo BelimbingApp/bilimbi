@@ -56,7 +56,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
       current_scope={@current_scope}
       active_nav="admin.geonames.admin1-division"
     >
-      <div id="admin1-index" class="mx-auto max-w-7xl">
+      <.page id="admin1-index">
         <.header>
           Admin1 Divisions
           <:subtitle>States, provinces, and top-level administrative divisions</:subtitle>
@@ -143,7 +143,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
             filters_form={@filters_form}
           />
         </div>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end
