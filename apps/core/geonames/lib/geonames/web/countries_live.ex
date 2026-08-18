@@ -26,8 +26,11 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
 
   @impl true
   def handle_event("save-country-name", %{"id" => id, "country" => name}, socket) do
-    id = if is_binary(id), do: String.to_integer(id), else: id
-
+    # `id` arrives from the client. `String.to_integer/1` raised on anything
+    # non-numeric and took the LiveView down with it; `update_country_name/2`
+    # already parses binaries safely and answers `:not_found` for garbage
+    # (`geonames.ex:141-150`), so passing it straight through is both shorter
+    # and harder to break (#302).
     case Geonames.update_country_name(id, name) do
       {:ok, updated_country} ->
         {:noreply,
