@@ -149,6 +149,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
           </.table>
 
           <nav
+            :if={@addresses_page.total_pages > 0}
             id="addresses-pagination"
             aria-label="Address pagination"
             class="flex items-center justify-between gap-3 border-t border-line-subtle px-4 py-3"
