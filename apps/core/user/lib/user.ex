@@ -45,6 +45,7 @@ defmodule Bilimbi.Core.User do
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.User.EmailVerification
+  alias Bilimbi.Core.User.Notification
   alias Bilimbi.Core.User.Password
   alias Bilimbi.Core.User.PasswordResetToken
   alias Bilimbi.Core.User.Pin
@@ -459,6 +460,258 @@ defmodule Bilimbi.Core.User do
 
       list_user_pins(user_id)
     end)
+  end
+
+  # =========================================================================
+  # In-App Notifications
+  # =========================================================================
+
+  defp pubsub_server do
+    Application.get_env(:bilimbi_core_user, :pubsub_server)
+  end
+
+  @doc "Topic name for PubSub notification events per tenant and user."
+  @spec notification_topic(pos_integer(), pos_integer()) :: String.t()
+  def notification_topic(tenant_id, user_id)
+      when is_integer(tenant_id) and is_integer(user_id) do
+    "user_notifications:#{tenant_id}:#{user_id}"
+  end
+
+  @doc "Subscribes the calling process to notifications for the given user in tenant scope."
+  @spec subscribe_notifications(Scope.t(), pos_integer()) :: :ok | {:error, term()}
+  def subscribe_notifications(%Scope{tenant: %{id: tenant_id}}, user_id)
+      when is_integer(user_id) do
+    if server = pubsub_server() do
+      Phoenix.PubSub.subscribe(server, notification_topic(tenant_id, user_id))
+    else
+      :ok
+    end
+  rescue
+    _ -> :ok
+  end
+
+  @doc "Broadcasts a notification change event to subscribers."
+  @spec broadcast_notification(Scope.t(), pos_integer(), term()) :: :ok
+  def broadcast_notification(%Scope{tenant: %{id: tenant_id}}, user_id, event)
+      when is_integer(user_id) do
+    if server = pubsub_server() do
+      Phoenix.PubSub.broadcast(
+        server,
+        notification_topic(tenant_id, user_id),
+        {:notification_event, event}
+      )
+    else
+      :ok
+    end
+  rescue
+    _ -> :ok
+  end
+
+  @doc """
+  Sends an in-app database notification to a user within tenant scope.
+  `attrs` can be a map with `:title`, `:body`, `:url`, `:icon`, `:type`, `:data`, etc.
+  """
+  @spec send_notification(Scope.t(), pos_integer(), map()) ::
+          {:ok, Notification.t()} | {:error, :user_not_found | Changeset.t()}
+  def send_notification(%Scope{} = scope, user_id, attrs)
+      when is_integer(user_id) and user_id > 0 and is_map(attrs) do
+    with {:ok, _user} <- get_tenant_user(scope, user_id) do
+      type = Map.get(attrs, "type") || Map.get(attrs, :type) || "generic"
+
+      data =
+        cond do
+          is_map(attrs["data"]) ->
+            attrs["data"]
+
+          is_map(attrs[:data]) ->
+            attrs[:data]
+
+          true ->
+            attrs
+            |> Map.drop(["type", :type, "id", :id, "read_at", :read_at])
+        end
+
+      params = %{
+        "type" => to_string(type),
+        "notifiable_type" => notifiable_identity(),
+        "notifiable_id" => user_id,
+        "data" => data
+      }
+
+      case %Notification{} |> Notification.changeset(params) |> Repo.insert() do
+        {:ok, notification} ->
+          broadcast_notification(scope, user_id, {:created, notification})
+          {:ok, notification}
+
+        {:error, changeset} ->
+          {:error, changeset}
+      end
+    end
+  end
+
+  @doc """
+  Lists notifications for a user within tenant scope, ordered by creation descending.
+  Options:
+    - `:status` - `:all` (default), `:unread`, or `:read`
+    - `:page` - positive integer (default nil)
+    - `:per_page` - positive integer (default 25)
+    - `:limit` - positive integer or nil (default nil)
+    - `:offset` - non-negative integer (default 0)
+  """
+  @spec list_notifications(Scope.t(), pos_integer(), keyword()) ::
+          {:ok, [Notification.t()]} | {:error, :user_not_found}
+  def list_notifications(%Scope{} = scope, user_id, opts \\ [])
+      when is_integer(user_id) and user_id > 0 and is_list(opts) do
+    with {:ok, _user} <- get_tenant_user(scope, user_id) do
+      status = Keyword.get(opts, :status, :all)
+      page = Keyword.get(opts, :page)
+      per_page = Keyword.get(opts, :per_page, 25)
+      limit = Keyword.get(opts, :limit)
+      offset = Keyword.get(opts, :offset, 0)
+      morph = notifiable_identity()
+
+      query =
+        from(n in Notification,
+          where: n.notifiable_type == ^morph and n.notifiable_id == ^user_id,
+          order_by: [desc: n.created_at, desc: n.id]
+        )
+
+      query =
+        case status do
+          :unread -> from(n in query, where: is_nil(n.read_at))
+          :read -> from(n in query, where: not is_nil(n.read_at))
+          _ -> query
+        end
+
+      query =
+        cond do
+          is_integer(page) and page > 0 ->
+            from(n in query, limit: ^per_page, offset: ^((page - 1) * per_page))
+
+          is_integer(limit) and limit > 0 ->
+            from(n in query, limit: ^limit, offset: ^offset)
+
+          true ->
+            query
+        end
+
+      {:ok, Repo.all(query)}
+    end
+  end
+
+  @doc """
+  Counts total notifications for a user under given status within tenant scope.
+  """
+  @spec count_notifications(Scope.t(), pos_integer(), keyword()) ::
+          {:ok, non_neg_integer()} | {:error, :user_not_found}
+  def count_notifications(%Scope{} = scope, user_id, opts \\ [])
+      when is_integer(user_id) and user_id > 0 and is_list(opts) do
+    with {:ok, _user} <- get_tenant_user(scope, user_id) do
+      status = Keyword.get(opts, :status, :all)
+      morph = notifiable_identity()
+
+      query =
+        from(n in Notification,
+          where: n.notifiable_type == ^morph and n.notifiable_id == ^user_id
+        )
+
+      query =
+        case status do
+          :unread -> from(n in query, where: is_nil(n.read_at))
+          :read -> from(n in query, where: not is_nil(n.read_at))
+          _ -> query
+        end
+
+      {:ok, Repo.aggregate(query, :count, :id)}
+    end
+  end
+
+  @doc "Returns the count of unread notifications for a user within tenant scope."
+  @spec unread_notification_count(Scope.t(), pos_integer()) ::
+          {:ok, non_neg_integer()} | {:error, :user_not_found}
+  def unread_notification_count(%Scope{} = scope, user_id)
+      when is_integer(user_id) and user_id > 0 do
+    count_notifications(scope, user_id, status: :unread)
+  end
+
+  @doc "Gets a notification by UUID for a specific user within tenant scope."
+  @spec get_notification(Scope.t(), pos_integer(), binary()) ::
+          {:ok, Notification.t()} | {:error, :user_not_found | :not_found}
+  def get_notification(%Scope{} = scope, user_id, notification_id)
+      when is_integer(user_id) and user_id > 0 and is_binary(notification_id) do
+    with {:ok, _user} <- get_tenant_user(scope, user_id) do
+      morph = notifiable_identity()
+
+      query =
+        from(n in Notification,
+          where:
+            n.notifiable_type == ^morph and n.notifiable_id == ^user_id and
+              n.id == ^notification_id
+        )
+
+      case Repo.one(query) do
+        nil -> {:error, :not_found}
+        notification -> {:ok, notification}
+      end
+    end
+  end
+
+  @doc "Marks a specific notification as read for a user within tenant scope."
+  @spec mark_notification_as_read(Scope.t(), pos_integer(), binary()) ::
+          {:ok, Notification.t()} | {:error, :user_not_found | :not_found | Changeset.t()}
+  def mark_notification_as_read(%Scope{} = scope, user_id, notification_id)
+      when is_integer(user_id) and user_id > 0 and is_binary(notification_id) do
+    with {:ok, notification} <- get_notification(scope, user_id, notification_id) do
+      if Notification.read?(notification) do
+        {:ok, notification}
+      else
+        case notification |> Notification.mark_read_changeset() |> Repo.update() do
+          {:ok, updated} ->
+            broadcast_notification(scope, user_id, {:read, updated})
+            {:ok, updated}
+
+          {:error, changeset} ->
+            {:error, changeset}
+        end
+      end
+    end
+  end
+
+  @doc "Marks all unread notifications as read for a user within tenant scope."
+  @spec mark_all_notifications_as_read(Scope.t(), pos_integer()) ::
+          {:ok, non_neg_integer()} | {:error, :user_not_found}
+  def mark_all_notifications_as_read(%Scope{} = scope, user_id)
+      when is_integer(user_id) and user_id > 0 do
+    with {:ok, _user} <- get_tenant_user(scope, user_id) do
+      morph = notifiable_identity()
+      now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+      {count, _} =
+        from(n in Notification,
+          where: n.notifiable_type == ^morph and n.notifiable_id == ^user_id and is_nil(n.read_at)
+        )
+        |> Repo.update_all(set: [read_at: now, updated_at: now])
+
+      broadcast_notification(scope, user_id, {:all_read, count})
+      {:ok, count}
+    end
+  end
+
+  @doc "Deletes a notification for a user within tenant scope."
+  @spec delete_notification(Scope.t(), pos_integer(), binary()) ::
+          {:ok, Notification.t()} | {:error, :user_not_found | :not_found | Changeset.t()}
+  def delete_notification(%Scope{} = scope, user_id, notification_id)
+      when is_integer(user_id) and user_id > 0 and is_binary(notification_id) do
+    with {:ok, notification} <- get_notification(scope, user_id, notification_id) do
+      case Repo.delete(notification) do
+        {:ok, deleted} ->
+          broadcast_notification(scope, user_id, {:deleted, deleted})
+          {:ok, deleted}
+
+        {:error, changeset} ->
+          {:error, changeset}
+      end
+    end
   end
 
   @spec update_user(Scope.t(), pos_integer(), pos_integer(), map()) ::

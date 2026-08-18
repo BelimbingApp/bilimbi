@@ -73,6 +73,8 @@ defmodule Bilimbi.Core.User.TestFixtures do
       """,
       []
     )
+
+    create_notifications_table!()
   end
 
   def create_sessions_table! do
@@ -298,6 +300,31 @@ defmodule Bilimbi.Core.User.TestFixtures do
     SQL.query!(
       Repo,
       "CREATE INDEX user_pins_user_id_sort_order_index ON user_pins (user_id, sort_order)",
+      []
+    )
+  end
+
+  def create_notifications_table! do
+    SQL.query!(
+      Repo,
+      """
+      CREATE TEMPORARY TABLE IF NOT EXISTS notifications (
+        id uuid PRIMARY KEY,
+        type varchar(255) NOT NULL,
+        notifiable_type varchar(255) NOT NULL,
+        notifiable_id bigint NOT NULL,
+        data text NOT NULL,
+        read_at timestamp(0) without time zone,
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      "CREATE INDEX IF NOT EXISTS notifications_notifiable_type_notifiable_id_index ON notifications (notifiable_type, notifiable_id)",
       []
     )
   end
