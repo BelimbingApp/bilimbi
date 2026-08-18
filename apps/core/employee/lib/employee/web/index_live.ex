@@ -10,7 +10,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.Employee.AdministrationPage
 
-  @page_sizes [10, 15, 25, 50, 100]
+  @page_sizes [25, 50, 100, 300]
   @default_page_size 25
   @sorts %{
     "name" => :full_name,
@@ -114,6 +114,15 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
     ]
 
     case Employee.list_administration_page(scope, company_id, options) do
+      {:ok, %AdministrationPage{total_pages: total_pages}}
+      when total_pages > 0 and state.page > total_pages ->
+        clamped_state = %{state | page: total_pages}
+        load_page(socket, clamped_state)
+
+      {:ok, %AdministrationPage{total_pages: 0}} when state.page > 1 ->
+        clamped_state = %{state | page: 1}
+        load_page(socket, clamped_state)
+
       {:ok, %AdministrationPage{} = page} ->
         socket
         |> assign(:index_state, state)
@@ -247,8 +256,10 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
   end
 
   defp normalize_page_size(value) do
-    requested = positive_integer(value) || @default_page_size
-    Enum.find(@page_sizes, List.last(@page_sizes), &(&1 >= requested))
+    case positive_integer(value) do
+      size when size in @page_sizes -> size
+      _ -> @default_page_size
+    end
   end
 
   defp bounded_page(value, page) do

@@ -165,7 +165,10 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     refute has_element?(view, "#employees td", "Agent Bilimbi")
   end
 
-  test "sorts employees by name, type, and status", %{conn: conn, scope: scope} do
+  test "sorts employees by name, type, and status with aria-sort and verified row ordering", %{
+    conn: conn,
+    scope: scope
+  } do
     {:ok, _alice} =
       Employee.create_employee(scope, 73, %{
         employee_number: "EMP-002",
@@ -177,22 +180,39 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
 
-    # Initial order is asc by name (Alice, then John)
-    render(view)
+    # Initial order is asc by name (Alice Adams before John Doe)
+    html = render(view)
+    assert html =~ ~r/Alice Adams.*John Doe/s
+    assert has_element?(view, "th[aria-sort='ascending'] #employees-sort-name")
+    assert has_element?(view, "th[aria-sort='none'] #employees-sort-type")
+    assert has_element?(view, "th[aria-sort='none'] #employees-sort-status")
 
     # Click sort on full_name to toggle to desc
     view |> element("#employees-sort-name") |> render_click()
-    assert has_element?(view, "#employees-sort-name [aria-sort]", "") || true
+    html = render(view)
+    assert html =~ ~r/John Doe.*Alice Adams/s
+    assert has_element?(view, "th[aria-sort='descending'] #employees-sort-name")
+    assert has_element?(view, "th[aria-sort='none'] #employees-sort-type")
+    assert has_element?(view, "th[aria-sort='none'] #employees-sort-status")
 
     # Click sort on status
     view |> element("#employees-sort-status") |> render_click()
+    assert has_element?(view, "th[aria-sort='ascending'] #employees-sort-status")
+    assert has_element?(view, "th[aria-sort='none'] #employees-sort-name")
+    assert has_element?(view, "th[aria-sort='none'] #employees-sort-type")
 
     # Click sort on type
     view |> element("#employees-sort-type") |> render_click()
+    assert has_element?(view, "th[aria-sort='ascending'] #employees-sort-type")
+    assert has_element?(view, "th[aria-sort='none'] #employees-sort-name")
+    assert has_element?(view, "th[aria-sort='none'] #employees-sort-status")
   end
 
-  test "paginates employee index and changes page size", %{conn: conn, scope: scope} do
-    for i <- 2..12 do
+  test "paginates employee index with 25 rows per page and clamps out of bounds page", %{
+    conn: conn,
+    scope: scope
+  } do
+    for i <- 2..27 do
       num = String.pad_leading("#{i}", 3, "0")
 
       {:ok, _emp} =
@@ -204,19 +224,36 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
     grant_capabilities!("admin.employee.list")
 
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees?per_page=10")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
 
     assert has_element?(view, "#employees-pagination")
-    assert has_element?(view, "#employees-pagination-summary", "Showing 1–10 of 12")
+    assert has_element?(view, "#employees-pagination-summary", "Showing 1–25 of 27")
     assert has_element?(view, "#employees-pagination-position", "Page 1 of 2")
     assert has_element?(view, "#employees-pagination-previous[disabled]")
 
     # Navigate to page 2
     view |> element("#employees-pagination-next") |> render_click()
 
-    assert has_element?(view, "#employees-pagination-summary", "Showing 11–12 of 12")
+    assert has_element?(view, "#employees-pagination-summary", "Showing 26–27 of 27")
     assert has_element?(view, "#employees-pagination-position", "Page 2 of 2")
     assert has_element?(view, "#employees-pagination-next[disabled]")
+
+    # Navigate to out-of-bounds page 999: automatically clamps to page 2
+    {:ok, oob_view, _html} = conn |> log_in_as() |> live(~p"/employees?page=999")
+    assert has_element?(oob_view, "#employees-pagination-position", "Page 2 of 2")
+    assert has_element?(oob_view, "#employees-pagination-summary", "Showing 26–27 of 27")
+
+    # Changing page size to 50 shows all 27 on page 1
+    view
+    |> form("#employees-filters", %{"filters" => %{"perPage" => "50"}})
+    |> render_change()
+
+    assert has_element?(view, "#employees-pagination-summary", "Showing 1–27 of 27")
+    assert has_element?(view, "#employees-pagination-position", "Page 1 of 1")
+
+    # Invalid per_page falls back to 25
+    {:ok, invalid_view, _html} = conn |> log_in_as() |> live(~p"/employees?per_page=11")
+    assert has_element?(invalid_view, "#employees-pagination-summary", "Showing 1–25 of 27")
   end
 
   test "deletes an employee when authorized", %{conn: conn, scope: scope} do

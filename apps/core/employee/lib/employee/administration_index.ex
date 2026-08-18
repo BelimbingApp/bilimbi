@@ -11,7 +11,7 @@ defmodule Bilimbi.Core.Employee.AdministrationIndex do
 
   @default_page 1
   @default_page_size 25
-  @max_page_size 100
+  @max_page_size 300
   @allowed_option_keys [:page, :page_size, :search, :type_filter, :sort_by, :sort_dir]
 
   @type normalized_options :: %{
