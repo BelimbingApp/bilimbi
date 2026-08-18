@@ -21,7 +21,7 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
 
   Only the zero case is handled here. Belimbing's `hasPages()` is also false for
   a *single* page, and whether Bilimbi follows it there is the open question on
-  issue #298 -- not something to settle by widening this guard.
+  issue #306 -- not something to settle by widening this guard to `> 1`.
   """
   def pagination(assigns) do
     ~H"""
