@@ -2,24 +2,25 @@ defmodule BilimbiWeb.DashboardLive do
   @moduledoc """
   The workspace landing screen after sign-in.
 
-  Renders a widget grid whose widget catalogue is contributed by installed
-  modules through `Bilimbi.Base.Dashboard`. The catalogue determines which
-  widgets appear and in what order; this LiveView owns the rendering.
+  Renders a widget grid whose catalogue is contributed by installed modules
+  through `Bilimbi.Base.Dashboard`. The widget catalogue determines which
+  widgets appear; this LiveView owns the rendering.
+
+  Widget visibility is gated by capability. Widget ordering reads the
+  `ui.dashboard.layout` user setting when present and falls back to the
+  catalogue order. Adding, removing, and reordering widgets through the UI
+  is deferred to a subsequent delivery.
   """
 
   use BilimbiWeb, :live_view
 
+  alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Dashboard
+  alias Bilimbi.Base.Session
+  alias Bilimbi.Base.Settings
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
   alias BilimbiWeb.UserAuth
-
-  @widget_ids Enum.sort([
-                "base-dashboard-company-stats",
-                "base-dashboard-user-stats",
-                "base-dashboard-session-stats",
-                "base-dashboard-recent-audit"
-              ])
 
   @impl true
   def mount(_params, _session, socket) do
@@ -33,32 +34,78 @@ defmodule BilimbiWeb.DashboardLive do
         List.first(companies)
 
     catalogue = Dashboard.widgets()
-    visible_ids = visible_widget_ids(catalogue, socket)
+    layout = user_layout(socket.assigns.current_scope)
+    visible = ordered_visible(catalogue, layout, socket)
+
+    session_count =
+      try do
+        length(Session.list_sessions(limit: 500))
+      rescue
+        _ -> 0
+      end
+
+    audit_page =
+      try do
+        Audit.list_mutations(scope,
+          page: 1,
+          page_size: 5,
+          sort_by: :occurred_at,
+          sort_dir: :desc
+        )
+      rescue
+        _ -> %{entries: []}
+      end
 
     {:ok,
      socket
      |> assign(:page_title, "Dashboard")
      |> assign(:active_nav, nil)
-     |> assign(:visible_widget_ids, visible_ids)
+     |> assign(:widgets, visible)
      |> assign(:company_count, length(companies))
      |> assign(:user_count, length(users))
+     |> assign(:session_count, session_count)
+     |> assign(:audit_entries, audit_page.entries)
      |> assign(:companies, companies)
      |> assign(:users, users)
      |> assign(:current_company, current_company)}
   end
 
-  defp visible_widget_ids(catalogue, socket) do
-    catalogue_ids = Enum.map(catalogue, & &1.id)
+  defp user_layout(current_scope) do
+    settings_scope =
+      Settings.Scope.user(
+        current_scope.user["user_id"],
+        current_scope.user["company_id"],
+        current_scope.scope.tenant.id
+      )
+
+    case Settings.get("ui.dashboard.layout", settings_scope) do
+      value when is_list(value) -> value
+      _ -> nil
+    end
+  rescue
+    _ ->
+      # The Settings table may not exist in test sandboxes or during
+      # early adoption; fall back to catalogue order.
+      nil
+  end
+
+  defp ordered_visible(catalogue, layout, socket) do
     scope = socket.assigns.current_scope
 
-    @widget_ids
-    |> Enum.filter(fn id ->
-      id in catalogue_ids and
-        (
-          widget = Enum.find(catalogue, &(&1.id == id))
-          is_nil(widget.capability) or UserAuth.allowed?(scope, widget.capability)
-        )
-    end)
+    visible =
+      catalogue
+      |> Enum.filter(fn widget ->
+        is_nil(widget.capability) or UserAuth.allowed?(scope, widget.capability)
+      end)
+
+    case layout do
+      nil ->
+        visible
+
+      layout_ids when is_list(layout_ids) ->
+        by_id = Map.new(visible, &{&1.id, &1})
+        Enum.flat_map(layout_ids, fn id -> if by_id[id], do: [by_id[id]], else: [] end)
+    end
   end
 
   @impl true
@@ -73,30 +120,25 @@ defmodule BilimbiWeb.DashboardLive do
           </:subtitle>
         </.header>
 
-        <div id="dashboard-widgets" class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <.company_stat_card
-            :if={"base-dashboard-company-stats" in @visible_widget_ids}
-            id="stat-companies"
-            count={@company_count}
-            navigate={if UserAuth.allowed?(@current_scope, "admin.company.list"), do: ~p"/companies"}
-          />
-          <.user_stat_card
-            :if={"base-dashboard-user-stats" in @visible_widget_ids}
-            id="stat-users"
-            count={@user_count}
-            navigate={if UserAuth.allowed?(@current_scope, "admin.user.list"), do: ~p"/users"}
-          />
-          <.session_stat_card
-            :if={"base-dashboard-session-stats" in @visible_widget_ids}
-            id="stat-sessions"
-            navigate={~p"/system/sessions"}
-          />
-          <.audit_activity_card
-            :if={"base-dashboard-recent-audit" in @visible_widget_ids}
-            id="stat-recent-audit"
-            navigate={~p"/audit/mutations"}
+        <div
+          :if={@widgets != []}
+          id="dashboard-widgets"
+          class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3"
+        >
+          <.render_widget
+            :for={widget <- @widgets}
+            widget={widget}
+            company_count={@company_count}
+            user_count={@user_count}
+            session_count={@session_count}
+            audit_entries={@audit_entries}
+            current_scope={@current_scope}
           />
         </div>
+
+        <p :if={@widgets == []} class="mt-5 text-sm text-ink-subtle">
+          No widgets are visible for your capabilities.
+        </p>
 
         <section
           :if={@current_company}
@@ -169,6 +211,60 @@ defmodule BilimbiWeb.DashboardLive do
         </section>
       </.page>
     </Layouts.app>
+    """
+  end
+
+  # Each widget is rendered by its id against the known built-in catalogue.
+  # Domain and Extension widgets added through the contribution system are
+  # rendered as a placeholder card until their rendering adapters are delivered.
+  defp render_widget(%{widget: widget} = assigns) do
+    assigns = assign(assigns, :id, widget.id)
+
+    ~H"""
+    <%= case @id do %>
+      <% "base-dashboard-company-stats" -> %>
+        <.company_stat_card
+          id="stat-companies"
+          count={@company_count}
+          navigate={
+            if UserAuth.allowed?(@current_scope, "admin.company.list"),
+              do: ~p"/companies"
+          }
+        />
+      <% "base-dashboard-user-stats" -> %>
+        <.user_stat_card
+          id="stat-users"
+          count={@user_count}
+          navigate={
+            if UserAuth.allowed?(@current_scope, "admin.user.list"),
+              do: ~p"/users"
+          }
+        />
+      <% "base-dashboard-session-stats" -> %>
+        <.session_stat_card
+          id="stat-sessions"
+          count={@session_count}
+          navigate={~p"/system/sessions"}
+        />
+      <% "base-dashboard-recent-audit" -> %>
+        <.audit_activity_card
+          id="stat-recent-audit"
+          entries={@audit_entries}
+          navigate={
+            if UserAuth.allowed?(@current_scope, "admin.audit.log.list"),
+              do: ~p"/audit/mutations"
+          }
+        />
+      <% other_id -> %>
+        <div
+          id={"dashboard-widget-#{other_id}"}
+          class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+        >
+          <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+            {@widget.label}
+          </p>
+        </div>
+    <% end %>
     """
   end
 
@@ -245,6 +341,7 @@ defmodule BilimbiWeb.DashboardLive do
   end
 
   attr :id, :string, required: true
+  attr :count, :integer, required: true
   attr :navigate, :string, default: nil
 
   defp session_stat_card(assigns) do
@@ -256,12 +353,22 @@ defmodule BilimbiWeb.DashboardLive do
       <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
         Active Sessions
       </p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">—</p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+        {@count}
+      </p>
+      <.link
+        :if={@navigate}
+        navigate={@navigate}
+        class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
+      >
+        View all
+      </.link>
     </div>
     """
   end
 
   attr :id, :string, required: true
+  attr :entries, :list, required: true
   attr :navigate, :string, default: nil
 
   defp audit_activity_card(assigns) do
@@ -277,9 +384,26 @@ defmodule BilimbiWeb.DashboardLive do
           All activity
         </.link>
       </div>
-      <p class="px-4 py-6 text-center text-sm text-ink-subtle">
-        Audit log live views are not available yet.
-      </p>
+      <div :if={Enum.empty?(@entries)} class="px-4 py-6 text-center text-sm text-ink-subtle">
+        No recent activity.
+      </div>
+      <div :if={Enum.any?(@entries)} class="divide-y divide-line">
+        <div
+          :for={entry <- @entries}
+          class="flex items-center gap-3 px-4 py-2.5 text-sm"
+        >
+          <.icon name="hero-document-text" class="size-4 shrink-0 text-ink-faint" />
+          <div class="min-w-0 flex-1">
+            <span class="font-medium text-ink">{entry.event}</span>
+            <span class="ml-2 text-ink-subtle">{entry.auditable_type}</span>
+          </div>
+          <.datetime
+            id={"audit-entry-#{entry.id}"}
+            value={entry.occurred_at}
+            class="text-xs tabular-nums text-ink-faint"
+          />
+        </div>
+      </div>
     </div>
     """
   end

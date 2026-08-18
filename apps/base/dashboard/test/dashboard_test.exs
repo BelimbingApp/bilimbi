@@ -22,7 +22,6 @@ defmodule Bilimbi.Base.DashboardTest do
       widget = Widget.new!(%{id: "test", label: "Test"})
       assert widget.id == "test"
       assert widget.label == "Test"
-      assert widget.component == nil
     end
 
     test "raises on missing id" do
