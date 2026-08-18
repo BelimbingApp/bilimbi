@@ -89,7 +89,7 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div id="address-create-page" class="mx-auto max-w-3xl">
+      <.page id="address-create-page" variant={:form}>
         <.header>
           Create Address
           <:subtitle>Add a tenant-owned address</:subtitle>
@@ -217,7 +217,7 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
             </.link>
           </div>
         </.form>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

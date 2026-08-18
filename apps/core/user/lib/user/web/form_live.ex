@@ -164,7 +164,7 @@ defmodule Bilimbi.Core.User.Web.FormLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div class="mx-auto max-w-xl">
+      <.page variant={:form}>
         <.header>
           {@page_title}
           <:subtitle>{if @mode == :new, do: "Add a new user to the system", else: "Update user information"}</:subtitle>
@@ -189,7 +189,7 @@ defmodule Bilimbi.Core.User.Web.FormLive do
             <.link id="user-cancel" navigate={~p"/users"} class="text-sm font-medium text-ink-muted hover:text-ink">Cancel</.link>
           </div>
         </.form>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

@@ -36,7 +36,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div class="mx-auto max-w-4xl">
+      <.page>
         <.header>
           Employees
           <:subtitle>People employed by {@current_scope.user["company_name"]}</:subtitle>
@@ -47,7 +47,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
               navigate={~p"/employee-types"}
               id="employee-types"
             >
-              Employee types
+              Employee Types
             </.button>
 
             <.button
@@ -56,7 +56,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
               navigate={~p"/employees/new"}
               variant="primary"
             >
-              New employee
+              New Employee
             </.button>
           </:actions>
         </.header>
@@ -98,7 +98,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
             </:empty>
           </.table>
         </div>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

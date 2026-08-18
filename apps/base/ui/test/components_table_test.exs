@@ -131,4 +131,49 @@ defmodule Bilimbi.Base.UI.ComponentsTableTest do
            is what put two header styles in one row on /authz/roles.
            """
   end
+
+  test "a multiple select is sized in rows, so no row is painted in half" do
+    html =
+      render_component(&Bilimbi.Base.UI.Components.input/1,
+        id: "roles",
+        name: "roles[]",
+        value: [],
+        type: "select",
+        label: "Roles",
+        multiple: true,
+        options: ["Auditor", "Core Administrator", "Employee Editor"],
+        errors: []
+      )
+
+    [_, select_tag] = String.split(html, "<select", parts: 2)
+    [select_tag, _] = String.split(select_tag, ">", parts: 2)
+
+    # Without `size` a listbox defaults to four rows; `py-2` from the shared
+    # field class then makes the box taller than those rows and the browser
+    # fills the slack with a sliver of the next option, sliced through its
+    # glyphs (#281). Height has to come from the row count.
+    assert select_tag =~ ~s(size="5")
+
+    assert select_tag =~ "!py-0",
+           "the vertical padding must be cancelled, or the extra height paints a partial row"
+  end
+
+  test "a single select keeps its padding" do
+    html =
+      render_component(&Bilimbi.Base.UI.Components.input/1,
+        id: "one",
+        name: "one",
+        value: nil,
+        type: "select",
+        label: "One",
+        options: ["a"],
+        errors: []
+      )
+
+    [_, select_tag] = String.split(html, "<select", parts: 2)
+    [select_tag, _] = String.split(select_tag, ">", parts: 2)
+
+    refute select_tag =~ "!py-0"
+    refute select_tag =~ "size="
+  end
 end

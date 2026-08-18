@@ -18,7 +18,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
       {:ok, types} ->
         {:ok,
          socket
-         |> assign(:page_title, "Employee types")
+         |> assign(:page_title, "Employee Types")
          |> assign(:active_nav, "admin.employee-type")
          |> assign(:employee_types_count, length(types))
          |> stream(:employee_types, types)}
@@ -76,7 +76,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div class="mx-auto max-w-4xl">
+      <.page>
         <p class="mb-2 text-xs">
           <.link navigate={~p"/employees"} class="font-medium text-ink-muted hover:text-ink">
             ← Employees
@@ -84,7 +84,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
         </p>
 
         <.header>
-          Employee types
+          Employee Types
           <:subtitle>System types are company-less; custom types belong to this company.</:subtitle>
 
           <:actions>
@@ -147,7 +147,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
             </:empty>
           </.table>
         </div>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

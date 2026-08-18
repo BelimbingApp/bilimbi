@@ -31,7 +31,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
 
   defp apply_action(socket, :new, _params) do
     socket
-    |> assign(:page_title, "New employee type")
+    |> assign(:page_title, "New Employee Type")
     |> assign(:type, nil)
     |> assign_form(form_changeset(:new, %{}, nil))
   end
@@ -170,10 +170,10 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div class="mx-auto max-w-xl">
+      <.page variant={:form}>
         <p class="mb-2 text-xs">
           <.link navigate={~p"/employee-types"} class="font-medium text-ink-muted hover:text-ink">
-            ← Employee types
+            ← Employee Types
           </.link>
         </p>
 
@@ -221,7 +221,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
             </.link>
           </div>
         </.form>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

@@ -69,7 +69,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div class="mx-auto max-w-4xl">
+      <.page variant={:detail}>
         <.header>
           {@user.name}
           <:subtitle>User details</:subtitle>
@@ -121,7 +121,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             </.button>
           </div>
         </section>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

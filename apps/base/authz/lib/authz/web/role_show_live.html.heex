@@ -1,5 +1,5 @@
 <Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.authz.role">
-  <div class="mx-auto max-w-4xl">
+  <.page variant={:detail}>
     <.header>
       {@role.name}
       <:subtitle>
@@ -79,5 +79,5 @@
         </.table>
       </div>
     </section>
-  </div>
+  </.page>
 </Layouts.app>

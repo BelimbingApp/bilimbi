@@ -265,6 +265,11 @@ defmodule Bilimbi.Base.UI.Components do
   attr :prompt, :string, default: nil, doc: "the prompt for select inputs"
   attr :options, :list, doc: "the options to pass to Phoenix.HTML.Form.options_for_select/2"
   attr :multiple, :boolean, default: false, doc: "the multiple flag for select inputs"
+
+  attr :size, :integer,
+    default: nil,
+    doc: "visible rows for a `multiple` select; defaults to 5 so no row is half-painted"
+
   attr :class, :any, default: nil, doc: "the input class to use over defaults"
   attr :error_class, :any, default: nil, doc: "the input error class to use over defaults"
 
@@ -357,8 +362,19 @@ defmodule Bilimbi.Base.UI.Components do
       <select
         id={@id}
         name={@name}
-        class={field_class(@class, @error_class, @errors)}
+        class={
+          [
+            field_class(@class, @error_class, @errors),
+            # A listbox is sized in rows, not pixels. `py-2` makes the box taller
+            # than the rows it holds, and the browser fills the slack with the
+            # *next* option -- so the last row is painted sliced through its
+            # glyphs and reads as a rendering fault rather than "scroll for more"
+            # (#281). Height comes from `size` instead.
+            @multiple && "!py-0"
+          ]
+        }
         multiple={@multiple}
+        size={@multiple && (@size || 5)}
         {@rest}
       >
         <option :if={@prompt} value="">{@prompt}</option>
@@ -488,6 +504,49 @@ defmodule Bilimbi.Base.UI.Components do
     </p>
     """
   end
+
+  @doc """
+  Renders the page content container at the width of its workflow kind.
+
+  Every screen is one of three kinds, and the width is chosen here and
+  nowhere else (#287). Variation between same-kind screens has no
+  user-visible reason, which is what DESIGN.md's *Stay consistent* forbids.
+
+    * `:list` — operational index screens with tables and filters, at
+      `max-w-7xl`. The densest tables (seven columns) need the room; a
+      sparse table's trailing whitespace is benign, while a cramped dense
+      table forces the navigation *Compact layout* asks us to avoid.
+    * `:form` — single-column edit forms, at `max-w-2xl`.
+    * `:detail` — show screens and the dashboard, at `max-w-4xl`.
+
+  ## Examples
+
+      <.page id="users-index">
+        ...
+      </.page>
+
+      <.page variant={:form}>
+        ...
+      </.page>
+  """
+  attr :id, :string, default: nil
+  attr :variant, :atom, values: [:list, :form, :detail], default: :list
+  attr :class, :any, default: nil
+  attr :rest, :global
+
+  slot :inner_block, required: true
+
+  def page(assigns) do
+    ~H"""
+    <div id={@id} class={["mx-auto", page_width(@variant), @class]} {@rest}>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  defp page_width(:list), do: "max-w-7xl"
+  defp page_width(:form), do: "max-w-2xl"
+  defp page_width(:detail), do: "max-w-4xl"
 
   @doc """
   Renders a header with title.

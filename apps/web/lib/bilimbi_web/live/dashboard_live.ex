@@ -46,7 +46,7 @@ defmodule BilimbiWeb.DashboardLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div class="mx-auto max-w-4xl">
+      <.page variant={:detail}>
         <.header>
           Dashboard
           <:subtitle>
@@ -157,7 +157,7 @@ defmodule BilimbiWeb.DashboardLive do
             </:empty>
           </.table>
         </section>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

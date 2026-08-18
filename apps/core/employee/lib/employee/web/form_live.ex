@@ -72,7 +72,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
 
   defp apply_action(socket, :new, _params) do
     socket
-    |> assign(:page_title, "New employee")
+    |> assign(:page_title, "New Employee")
     |> assign(:employee, nil)
     |> assign_form(form_changeset(%{"status" => "active", "employee_type" => "full_time"}))
   end
@@ -199,7 +199,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div class="mx-auto max-w-xl">
+      <.page variant={:form}>
         <p class="mb-2 text-xs">
           <.link navigate={~p"/employees"} class="font-medium text-ink-muted hover:text-ink">
             ← Employees
@@ -278,7 +278,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
             </.link>
           </div>
         </.form>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end
