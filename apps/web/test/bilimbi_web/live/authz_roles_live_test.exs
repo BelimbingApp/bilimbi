@@ -316,6 +316,30 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       assert has_element?(view, "#role-form")
     end
 
+    test "carries the confirmation onto the role it lands on", %{conn: conn} do
+      # push_navigate crosses a LiveView boundary, which is where a flash can
+      # quietly be dropped -- and the flash is the only thing telling the
+      # operator the create succeeded once they are looking at Show.
+      grant_capabilities!(["admin.authz.role.create", "admin.authz.role.view"])
+      authed = log_in_as(conn)
+      {:ok, view, _html} = live(authed, ~p"/authz/roles/create")
+
+      result =
+        view
+        |> form("#role-form", %{
+          "role" => %{"company_id" => "73", "name" => "Registrar", "code" => "registrar"}
+        })
+        |> render_submit()
+
+      # `follow_redirect/2` needs the *authenticated* conn; handing it the bare
+      # test conn lands on the login page with the flash intact, which looks
+      # like a product bug and is not one.
+      {:ok, _show, html} = follow_redirect(result, authed)
+
+      assert html =~ "Role created."
+      assert html =~ "Registrar"
+    end
+
     test "falls back to the index for an actor who cannot view roles", %{conn: conn, ours: ours} do
       # Show is gated on admin.authz.role.view, create on admin.authz.role.create.
       # Belimbing redirects to Show unconditionally and 403s this actor; we send
