@@ -307,7 +307,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
       message =
         flash_for(%{
           cached: true,
-          download_status: :fallback,
+          download_status: {:fallback, :unreachable},
           cached_at: cached_at,
           imported: 252,
           skipped: 50
@@ -317,6 +317,23 @@ defmodule BilimbiWeb.GeonamesLiveTest do
       # country data is current (#273).
       assert message =~ "were not updated"
       assert message =~ "04 Mar 2026"
+      refute message =~ "Countries updated"
+    end
+
+    test "a server error names the server, not the network" do
+      message =
+        flash_for(%{
+          cached: true,
+          download_status: {:fallback, {:http_status, 503}},
+          cached_at: nil,
+          imported: 252,
+          skipped: 50
+        })
+
+      # Telling someone to check their firewall when GeoNames is simply down
+      # costs them an afternoon.
+      assert message =~ "GeoNames returned an error (HTTP 503)"
+      refute message =~ "could not be reached"
       refute message =~ "Countries updated"
     end
 
@@ -338,7 +355,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
       message =
         flash_for(%{
           cached: true,
-          download_status: :fallback,
+          download_status: {:fallback, :unreachable},
           cached_at: nil,
           imported: 1,
           skipped: 0

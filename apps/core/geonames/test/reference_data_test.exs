@@ -154,7 +154,13 @@ defmodule Bilimbi.Core.Geonames.ReferenceDataTest do
       File.cp!(Path.join(context.source_dir, Path.basename(destination)), destination)
 
       {:ok,
-       %{path: destination, cached: true, status: :fallback, etag: nil, cached_at: cached_at}}
+       %{
+         path: destination,
+         cached: true,
+         status: {:fallback, :unreachable},
+         etag: nil,
+         cached_at: cached_at
+       }}
     end
 
     assert {:ok, results} =
@@ -165,7 +171,7 @@ defmodule Bilimbi.Core.Geonames.ReferenceDataTest do
              )
 
     assert results.countries.cached
-    assert results.countries.download_status == :fallback
+    assert results.countries.download_status == {:fallback, :unreachable}
     assert results.countries.cached_at == cached_at
   end
 

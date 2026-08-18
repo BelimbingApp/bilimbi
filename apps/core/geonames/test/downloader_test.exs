@@ -125,7 +125,7 @@ defmodule Bilimbi.Core.Geonames.DownloaderTest do
              )
 
     assert result.cached
-    assert result.status == :fallback
+    assert result.status == {:fallback, :unreachable}
     assert result.etag == ~s("v1")
     assert File.read!(destination) == "cached fallback"
   end
@@ -149,7 +149,9 @@ defmodule Bilimbi.Core.Geonames.DownloaderTest do
              )
 
     assert result.cached
-    assert result.status == :fallback
+    # The cause matters: a 503 means GeoNames answered and refused, which is a
+    # different thing to tell an operator than an unreachable host (#273).
+    assert result.status == {:fallback, {:http_status, 503}}
     assert result.etag == ~s("v2")
     assert File.read!(destination) == "cached 503 fallback"
   end
@@ -168,7 +170,7 @@ defmodule Bilimbi.Core.Geonames.DownloaderTest do
                ]
              )
 
-    assert result.status == :fallback
+    assert result.status == {:fallback, :unreachable}
 
     # Without this the screen can say a fallback happened but not how old the
     # data is, which is the difference between "retry later" and "this is from

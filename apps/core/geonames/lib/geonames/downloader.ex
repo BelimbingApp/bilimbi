@@ -5,12 +5,21 @@ defmodule Bilimbi.Core.Geonames.Downloader do
   @default_connect_timeout 10_000
   @default_receive_timeout 300_000
 
+  @typedoc """
+  `:status` is the HTTP status, `nil` for a cache hit that made no request, or
+  `{:fallback, cause}` when a failed download reused the existing local file.
+  The cause is kept because "the server refused" and "the server was
+  unreachable" are different things to tell an operator (#273).
+  """
   @type result :: %{
           path: String.t(),
           cached: boolean(),
-          status: non_neg_integer() | nil,
-          etag: String.t() | nil
+          status: non_neg_integer() | nil | {:fallback, fallback_cause()},
+          etag: String.t() | nil,
+          cached_at: DateTime.t() | nil
         }
+
+  @type fallback_cause :: :unreachable | {:http_status, non_neg_integer()}
 
   @spec download(String.t(), String.t(), keyword()) :: {:ok, result()} | {:error, term()}
   def download(url, destination, opts \\ []) when is_binary(url) and is_binary(destination) do
@@ -75,7 +84,7 @@ defmodule Bilimbi.Core.Geonames.Downloader do
         File.rm(temporary_path)
 
         if not force? and status in [500, 502, 503, 504, 429] and valid_cached_file?(destination) do
-          {:ok, cached_result(destination, :fallback, stored_etag)}
+          {:ok, cached_result(destination, {:fallback, {:http_status, status}}, stored_etag)}
         else
           {:error, {:http_status, status}}
         end
@@ -84,7 +93,7 @@ defmodule Bilimbi.Core.Geonames.Downloader do
         File.rm(temporary_path)
 
         if not force? and valid_cached_file?(destination) do
-          {:ok, cached_result(destination, :fallback, stored_etag)}
+          {:ok, cached_result(destination, {:fallback, :unreachable}, stored_etag)}
         else
           {:error, {:request, exception}}
         end

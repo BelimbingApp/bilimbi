@@ -298,9 +298,10 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   # Saying "updated" there tells an operator with a week-dead proxy that their
   # country data is current.
   defp update_success_message(%{
-         countries: %{download_status: :fallback, imported: imported, skipped: skipped} = result
+         countries:
+           %{download_status: {:fallback, cause}, imported: imported, skipped: skipped} = result
        }) do
-    "Countries were not updated: GeoNames could not be reached#{as_of(result[:cached_at])}. " <>
+    "Countries were not updated: #{fallback_cause(cause)}#{as_of(result[:cached_at])}. " <>
       "Kept the existing local data (#{imported} imported, #{skipped} skipped). Try Update again later."
   end
 
@@ -314,6 +315,11 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   end
 
   defp update_success_message(_result), do: "Countries updated from GeoNames."
+
+  # A 503 is not the same as an unplugged cable, and telling an operator to
+  # check their firewall when GeoNames is simply down wastes their afternoon.
+  defp fallback_cause(:unreachable), do: "GeoNames could not be reached"
+  defp fallback_cause({:http_status, status}), do: "GeoNames returned an error (HTTP #{status})"
 
   defp as_of(%DateTime{} = cached_at),
     do: ", so this data is from #{Calendar.strftime(cached_at, "%d %b %Y")}"
