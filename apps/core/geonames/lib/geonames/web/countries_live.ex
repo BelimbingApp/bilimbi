@@ -92,7 +92,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.geonames.country">
-      <div id="countries-index" class="mx-auto max-w-7xl">
+      <.page id="countries-index">
         <.header>
           Countries
           <:title_actions>
@@ -201,7 +201,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
             filters_form={@filters_form}
           />
         </div>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

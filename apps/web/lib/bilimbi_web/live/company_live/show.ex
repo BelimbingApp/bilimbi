@@ -51,7 +51,7 @@ defmodule BilimbiWeb.CompanyLive.Show do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div class="mx-auto max-w-4xl">
+      <.page variant={:detail}>
         <.header>
           {Company.Summary.display_name(@company)}
           <:subtitle>
@@ -118,7 +118,7 @@ defmodule BilimbiWeb.CompanyLive.Show do
             </:empty>
           </.table>
         </section>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

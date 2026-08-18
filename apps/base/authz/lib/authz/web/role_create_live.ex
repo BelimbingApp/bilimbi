@@ -181,7 +181,7 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div id="role-create-page" class="mx-auto max-w-2xl">
+      <.page id="role-create-page" variant={:form}>
         <.header>
           Create Role
           <:subtitle>A custom role owned by a company in your tenant</:subtitle>
@@ -223,7 +223,7 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
             </.button>
           </div>
         </.form>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

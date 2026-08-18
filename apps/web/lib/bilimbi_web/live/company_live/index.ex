@@ -22,7 +22,7 @@ defmodule BilimbiWeb.CompanyLive.Index do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div class="mx-auto max-w-4xl">
+      <.page>
         <.header>
           Companies
           <:subtitle>Every live company in this tenant</:subtitle>
@@ -68,7 +68,7 @@ defmodule BilimbiWeb.CompanyLive.Index do
             </:empty>
           </.table>
         </div>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

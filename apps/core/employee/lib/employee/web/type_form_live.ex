@@ -170,7 +170,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div class="mx-auto max-w-xl">
+      <.page variant={:form}>
         <p class="mb-2 text-xs">
           <.link navigate={~p"/employee-types"} class="font-medium text-ink-muted hover:text-ink">
             ← Employee types
@@ -221,7 +221,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
             </.link>
           </div>
         </.form>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end

@@ -1,5 +1,5 @@
 <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@page.nav}>
-  <div class="mx-auto max-w-3xl">
+  <.page variant={:form}>
     <.header>
       {@page.title}
       <:subtitle>{@page.subtitle}</:subtitle>
@@ -91,5 +91,5 @@
         </div>
       </div>
     </form>
-  </div>
+  </.page>
 </Layouts.app>

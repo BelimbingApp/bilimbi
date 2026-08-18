@@ -55,7 +55,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <div id="addresses-index" class="mx-auto max-w-7xl">
+      <.page id="addresses-index">
         <.header>
           Addresses
           <:actions>
@@ -186,7 +186,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
             </div>
           </nav>
         </section>
-      </div>
+      </.page>
     </Layouts.app>
     """
   end
