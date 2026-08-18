@@ -2,16 +2,24 @@ defmodule BilimbiWeb.DashboardLive do
   @moduledoc """
   The workspace landing screen after sign-in.
 
-  Scan-first by design (`DESIGN.md`): the workspace identity reads first,
-  then the counts a user compares day to day, then the way into each list.
-  Every number is a real count from the owning module's public API.
+  Renders a widget grid whose widget catalogue is contributed by installed
+  modules through `Bilimbi.Base.Dashboard`. The catalogue determines which
+  widgets appear and in what order; this LiveView owns the rendering.
   """
 
   use BilimbiWeb, :live_view
 
+  alias Bilimbi.Base.Dashboard
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
   alias BilimbiWeb.UserAuth
+
+  @widget_ids Enum.sort([
+                "base.dashboard.company-stats",
+                "base.dashboard.user-stats",
+                "base.dashboard.session-stats",
+                "base.dashboard.recent-audit"
+              ])
 
   @impl true
   def mount(_params, _session, socket) do
@@ -20,26 +28,35 @@ defmodule BilimbiWeb.DashboardLive do
     {:ok, companies} = Company.list_companies(scope)
     {:ok, users} = User.list_users(scope)
 
+    current_company =
+      Enum.find(companies, &(&1.id == socket.assigns.current_scope.user["company_id"])) ||
+        List.first(companies)
+
+    catalogue = Dashboard.widgets()
+    visible_ids = visible_widget_ids(catalogue, socket)
+
     {:ok,
      socket
      |> assign(:page_title, "Dashboard")
      |> assign(:active_nav, nil)
+     |> assign(:visible_widget_ids, visible_ids)
+     |> assign(:company_count, length(companies))
+     |> assign(:user_count, length(users))
      |> assign(:companies, companies)
      |> assign(:users, users)
-     |> assign_primary_company(companies)}
+     |> assign(:current_company, current_company)}
   end
 
-  # The tenant's primary company is the workspace's own identity; the dev
-  # seed assigns it. Until a public primary-company read exists on the
-  # scoped API, the strip falls back to the first listed company and says
-  # nothing it cannot prove.
-  defp assign_primary_company(socket, companies) do
-    current_company_id = socket.assigns.current_scope.user["company_id"]
+  defp visible_widget_ids(catalogue, socket) do
+    catalogue_ids = Enum.map(catalogue, & &1.id)
+    scope = socket.assigns.current_scope
 
-    current =
-      Enum.find(companies, &(&1.id == current_company_id)) || List.first(companies)
-
-    assign(socket, :current_company, current)
+    @widget_ids
+    |> Enum.filter(&(&1 in catalogue_ids))
+    |> Enum.filter(fn id ->
+      widget = Enum.find(catalogue, &(&1.id == id))
+      is_nil(widget.capability) or UserAuth.allowed?(scope, widget.capability)
+    end)
   end
 
   @impl true
@@ -54,38 +71,29 @@ defmodule BilimbiWeb.DashboardLive do
           </:subtitle>
         </.header>
 
-        <div id="dashboard-stats" class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <.stat_card
-            id="stat-companies"
-            label="Companies"
-            count={length(@companies)}
+        <div id="dashboard-widgets" class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <.company_stat_card
+            :if={"base.dashboard.company-stats" in @visible_widget_ids}
+            id="dashboard-widget-base.dashboard.company-stats"
+            count={@company_count}
             navigate={if UserAuth.allowed?(@current_scope, "admin.company.list"), do: ~p"/companies"}
           />
-          <.stat_card
-            id="stat-users"
-            label="Users"
-            count={length(@users)}
+          <.user_stat_card
+            :if={"base.dashboard.user-stats" in @visible_widget_ids}
+            id="dashboard-widget-base.dashboard.user-stats"
+            count={@user_count}
             navigate={if UserAuth.allowed?(@current_scope, "admin.user.list"), do: ~p"/users"}
           />
-          <div
-            id="stat-tenant"
-            class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
-          >
-            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-              Tenant
-            </p>
-            <p class="mt-1 truncate text-sm font-semibold text-ink-strong">
-              {@current_scope.scope.tenant.name}
-            </p>
-            <div class="mt-1.5 flex items-center gap-2">
-              <span class="text-xs tabular-nums text-ink-subtle">#{@current_scope.scope.tenant.id}</span>
-              <.badge kind={
-                if @current_scope.scope.tenant.status == "active", do: :success, else: :warning
-              }>
-                {@current_scope.scope.tenant.status}
-              </.badge>
-            </div>
-          </div>
+          <.session_stat_card
+            :if={"base.dashboard.session-stats" in @visible_widget_ids}
+            id="dashboard-widget-base.dashboard.session-stats"
+            navigate={~p"/system/sessions"}
+          />
+          <.audit_activity_card
+            :if={"base.dashboard.recent-audit" in @visible_widget_ids}
+            id="dashboard-widget-base.dashboard.recent-audit"
+            navigate={~p"/audit/mutations"}
+          />
         </div>
 
         <section
@@ -163,44 +171,114 @@ defmodule BilimbiWeb.DashboardLive do
   end
 
   attr :id, :string, required: true
-  attr :label, :string, required: true
   attr :count, :integer, required: true
   attr :navigate, :string, default: nil
 
-  defp stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
+  defp company_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
     ~H"""
     <.link
       navigate={@navigate}
       id={@id}
       class="group rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
     >
-      <.stat_card_body label={@label} count={@count} />
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Companies</p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+        {@count}
+      </p>
+      <span class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 group-hover:text-ink">
+        View all
+      </span>
     </.link>
     """
   end
 
-  defp stat_card(assigns) do
+  defp company_stat_card(assigns) do
     ~H"""
     <div
       id={@id}
       class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
     >
-      <.stat_card_body label={@label} count={@count} />
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Companies</p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+        {@count}
+      </p>
     </div>
     """
   end
 
-  attr :label, :string, required: true
+  attr :id, :string, required: true
   attr :count, :integer, required: true
+  attr :navigate, :string, default: nil
 
-  defp stat_card_body(assigns) do
+  defp user_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
     ~H"""
-    <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-      {@label}
-    </p>
-    <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-      {@count}
-    </p>
+    <.link
+      navigate={@navigate}
+      id={@id}
+      class="group rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
+    >
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Users</p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+        {@count}
+      </p>
+      <span class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 group-hover:text-ink">
+        View all
+      </span>
+    </.link>
+    """
+  end
+
+  defp user_stat_card(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+    >
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Users</p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+        {@count}
+      </p>
+    </div>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :navigate, :string, default: nil
+
+  defp session_stat_card(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+    >
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+        Active Sessions
+      </p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">—</p>
+    </div>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :navigate, :string, default: nil
+
+  defp audit_activity_card(assigns) do
+    ~H"""
+    <div id={@id} class="rounded-xl border border-line bg-surface shadow-xs shadow-ink/[0.03]">
+      <div class="flex items-center justify-between border-b border-line px-4 py-3">
+        <h3 class="text-sm font-semibold text-ink-strong">Recent Activity</h3>
+        <.link
+          :if={@navigate}
+          navigate={@navigate}
+          class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
+        >
+          All activity
+        </.link>
+      </div>
+      <p class="px-4 py-6 text-center text-sm text-ink-subtle">
+        Audit log live views are not available yet.
+      </p>
+    </div>
     """
   end
 end

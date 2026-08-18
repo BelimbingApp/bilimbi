@@ -7,7 +7,7 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionProvider do
   request, tenant, or process-local state.
   """
 
-  @type consumer :: :settings | :authz | :menu
+  @type consumer :: :settings | :authz | :menu | :dashboard
 
   @callback contributions() :: %{optional(consumer()) => term()}
 end
