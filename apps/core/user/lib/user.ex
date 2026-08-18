@@ -47,6 +47,7 @@ defmodule Bilimbi.Core.User do
   alias Bilimbi.Core.User.EmailVerification
   alias Bilimbi.Core.User.Password
   alias Bilimbi.Core.User.PasswordResetToken
+  alias Bilimbi.Core.User.Pin
   alias Bilimbi.Core.User.Schema
   alias Bilimbi.Core.User.Summary
   alias Ecto.Changeset
@@ -380,6 +381,84 @@ defmodule Bilimbi.Core.User do
          {:ok, settings_scope} <- preference_scope(scope, company_id, user_id) do
       Settings.delete(key, settings_scope)
     end
+  end
+
+  @doc "Lists all pinned items for a user ordered by sort_order."
+  @spec list_user_pins(pos_integer()) :: [Pin.t()]
+  def list_user_pins(user_id) when is_integer(user_id) and user_id > 0 do
+    from(p in Pin,
+      where: p.user_id == ^user_id,
+      order_by: [asc: p.sort_order, asc: p.id]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Toggles a pinned item for a user.
+
+  If a pin with the same normalized URL already exists, it is deleted.
+  Otherwise, a new pin is appended with the next sort_order value.
+  Returns `{:ok, :pinned | :unpinned, [Pin.t()]}` or `{:error, Changeset.t()}`.
+  """
+  @spec toggle_user_pin(pos_integer(), map()) ::
+          {:ok, :pinned | :unpinned, [Pin.t()]} | {:error, Changeset.t()}
+  def toggle_user_pin(user_id, attrs)
+      when is_integer(user_id) and user_id > 0 and is_map(attrs) do
+    url = Map.get(attrs, "url") || Map.get(attrs, :url) || ""
+    url_hash = Pin.hash_url(to_string(url))
+
+    existing =
+      from(p in Pin,
+        where: p.user_id == ^user_id and p.url_hash == ^url_hash
+      )
+      |> Repo.one()
+
+    case existing do
+      %Pin{} = pin ->
+        with {:ok, _deleted} <- Repo.delete(pin) do
+          {:ok, :unpinned, list_user_pins(user_id)}
+        end
+
+      nil ->
+        max_order =
+          from(p in Pin,
+            where: p.user_id == ^user_id,
+            select: max(p.sort_order)
+          )
+          |> Repo.one() || -1
+
+        attrs_with_defaults =
+          attrs
+          |> Map.put("user_id", user_id)
+          |> Map.put_new("sort_order", max_order + 1)
+
+        %Pin{}
+        |> Pin.changeset(attrs_with_defaults)
+        |> Repo.insert()
+        |> case do
+          {:ok, _pin} -> {:ok, :pinned, list_user_pins(user_id)}
+          {:error, changeset} -> {:error, changeset}
+        end
+    end
+  end
+
+  @doc """
+  Reorders a user's pinned items according to a list of ordered pin IDs.
+  Returns `{:ok, [Pin.t()]}`.
+  """
+  @spec reorder_user_pins(pos_integer(), [pos_integer()]) :: {:ok, [Pin.t()]}
+  def reorder_user_pins(user_id, ordered_pin_ids)
+      when is_integer(user_id) and user_id > 0 and is_list(ordered_pin_ids) do
+    Repo.transaction(fn ->
+      Enum.each(Enum.with_index(ordered_pin_ids), fn {pin_id, index} ->
+        from(p in Pin,
+          where: p.user_id == ^user_id and p.id == ^pin_id
+        )
+        |> Repo.update_all(set: [sort_order: index])
+      end)
+
+      list_user_pins(user_id)
+    end)
   end
 
   @spec update_user(Scope.t(), pos_integer(), pos_integer(), map()) ::

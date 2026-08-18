@@ -29,6 +29,7 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
   use Bilimbi.Base.UI, :live_view
 
   import Ecto.Changeset
+  import Bilimbi.Core.User.Web.SettingsComponents
 
   alias Bilimbi.Base.Settings
   alias Bilimbi.Core.User
