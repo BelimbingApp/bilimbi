@@ -52,10 +52,12 @@ defmodule BilimbiWeb.DashboardLive do
     scope = socket.assigns.current_scope
 
     @widget_ids
-    |> Enum.filter(&(&1 in catalogue_ids))
     |> Enum.filter(fn id ->
-      widget = Enum.find(catalogue, &(&1.id == id))
-      is_nil(widget.capability) or UserAuth.allowed?(scope, widget.capability)
+      id in catalogue_ids and
+        (
+          widget = Enum.find(catalogue, &(&1.id == id))
+          is_nil(widget.capability) or UserAuth.allowed?(scope, widget.capability)
+        )
     end)
   end
 
