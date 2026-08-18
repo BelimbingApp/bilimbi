@@ -229,6 +229,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       {:ok, _note} = User.send_notification(scope, 91, %{title: "Mounted Dashboard Alert"})
 
       # The LiveView hook receives the event and updates the bell component live
+      _ = render(view)
       assert render(view) =~ "app-notifications-unread-badge"
       assert has_element?(view, "#app-notifications-unread-badge")
       assert element(view, "#app-notifications-unread-badge") |> render() =~ "1"
