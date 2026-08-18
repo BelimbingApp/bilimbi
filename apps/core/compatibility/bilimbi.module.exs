@@ -13,6 +13,7 @@
     "base/authz",
     "base/session",
     "base/settings",
+    "base/system",
     "base/tenancy",
     "base/audit",
     "core/company",
