@@ -112,7 +112,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
             <.button
               id="countries-update"
               type="button"
-              variant="brand"
+              variant="primary"
               phx-click="update-countries"
               disabled={@updating_countries?}
               class="px-3 py-1.5"

@@ -170,13 +170,12 @@ defmodule Bilimbi.Base.UI.Components do
   attr :rest, :global, include: ~w(href navigate patch method download name value disabled type)
 
   attr :class, :any
-  attr :variant, :string, values: ~w(primary brand)
+  attr :variant, :string, values: ~w(primary)
   slot :inner_block, required: true
 
   def button(%{rest: rest} = assigns) do
     variants = %{
       "primary" => "bg-action text-action-ink hover:bg-action-hover",
-      "brand" => "bg-brand-hover text-brand-action-ink hover:bg-brand-strong",
       nil => "border border-line-strong bg-surface text-ink hover:bg-surface-sunken"
     }
 
