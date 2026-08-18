@@ -262,6 +262,18 @@ defmodule Bilimbi.Base.UI.Layouts do
           >
             dev <span :if={@shell.listen_address} id="app-listen">{@shell.listen_address}</span>
           </span>
+
+          <.link
+            :if={@current_scope && Map.get(@current_scope, :impersonator)}
+            href={~p"/admin/impersonate/leave"}
+            method="post"
+            id="app-impersonation-stop"
+            class="inline-flex items-center gap-1 font-medium text-danger hover:underline"
+          >
+            <.icon name="hero-eye" class="size-3.5" />
+            <span>{gettext("Viewing as %{name}", name: @current_scope.user["name"])}</span>
+            <span class="font-semibold ml-1">{gettext("Stop")}</span>
+          </.link>
         </div>
         <span id="app-version" class="shrink-0 tabular-nums" title={"Bilimbi #{@shell.version}"}>
           v{@shell.version}

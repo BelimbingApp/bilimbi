@@ -140,40 +140,54 @@
           </span>
         </:col>
         <:action :let={user}>
-          <div class="flex items-center justify-end gap-3">
+          <div class="flex items-center justify-end">
             <.link
-              :if={allowed?(@current_scope, "admin.user.update") and not user.company_archived}
-              id={"user-#{user.id}-edit"}
-              navigate={~p"/users/#{user.id}/edit"}
-              class="text-xs font-semibold text-action hover:underline"
+              :if={
+                allowed?(@current_scope, "admin.user.impersonate") and
+                  not user.company_archived and
+                  user.id != @current_scope.user["user_id"] and
+                  is_nil(@current_scope.impersonator)
+              }
+              id={"user-#{user.id}-impersonate"}
+              href={~p"/admin/impersonate/#{user.id}"}
+              method="post"
+              aria-label={gettext("Impersonate %{name}", name: user.name)}
+              title={gettext("Impersonate this user")}
+              class="grid size-7 place-items-center rounded-md text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
             >
-              Edit
+              <.icon name="bilimbi-impersonate" class="size-4" />
+              <span class="sr-only">{gettext("Impersonate")}</span>
             </.link>
             <button
-              :if={allowed?(@current_scope, "admin.user.delete")}
-              id={"user-#{user.id}-delete"}
-              type="button"
-              phx-click="delete"
-              phx-value-id={user.id}
-              disabled={user.id == @current_scope.user["user_id"] or user.company_archived}
-              data-confirm={
-                "Permanently delete #{user.name}? This account will be removed. This cannot be undone."
+              :if={
+                allowed?(@current_scope, "admin.user.impersonate") and
+                  (user.company_archived or
+                     user.id == @current_scope.user["user_id"] or
+                     not is_nil(@current_scope.impersonator))
               }
+              id={"user-#{user.id}-impersonate"}
+              type="button"
+              disabled
+              aria-label={gettext("Impersonate %{name}", name: user.name)}
               title={
                 cond do
                   user.id == @current_scope.user["user_id"] ->
-                    "You cannot delete your own account"
+                    gettext("You cannot impersonate yourself")
+
+                  @current_scope.impersonator != nil ->
+                    gettext("Cannot impersonate while impersonating")
 
                   user.company_archived ->
-                    "Archived-company users are read-only"
+                    gettext("Archived-company users cannot be impersonated")
 
                   true ->
-                    "Permanently delete this user"
+                    gettext("Impersonate this user")
                 end
               }
-              class="rounded-md border border-danger-line bg-danger-surface px-2.5 py-1.5 text-xs font-semibold text-danger-ink transition hover:bg-danger disabled:cursor-not-allowed disabled:opacity-50"
+              class="grid size-7 place-items-center rounded-md text-ink-muted opacity-40 cursor-not-allowed"
             >
-              Delete
+              <.icon name="bilimbi-impersonate" class="size-4" />
+              <span class="sr-only">{gettext("Impersonate")}</span>
             </button>
           </div>
         </:action>

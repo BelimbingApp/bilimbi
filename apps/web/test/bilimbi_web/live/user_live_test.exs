@@ -75,7 +75,7 @@ defmodule BilimbiWeb.UserLiveTest do
     grant_capabilities!([
       "admin.user.list",
       "admin.user.view",
-      "admin.user.delete",
+      "admin.user.impersonate",
       "admin.company.view"
     ])
 
@@ -89,10 +89,10 @@ defmodule BilimbiWeb.UserLiveTest do
     refute has_element?(view, "#user-92-company")
     assert has_element?(view, "#user-92", "Archived Company")
     assert has_element?(view, "#user-92", "archived")
-    assert has_element?(view, "#user-92-delete[disabled]")
+    assert has_element?(view, "#user-92-impersonate[disabled]")
   end
 
-  test "gates create, view, update, and delete controls by existing capabilities", %{conn: conn} do
+  test "gates create, view, and impersonate controls by existing capabilities", %{conn: conn} do
     insert_user!(%{id: 91, company_id: 73, name: "Signed In"})
     insert_user!(%{id: 92, company_id: 73, name: "Managed User"})
     grant_capabilities!("admin.user.list")
@@ -101,23 +101,20 @@ defmodule BilimbiWeb.UserLiveTest do
 
     refute has_element?(limited, "#user-new")
     refute has_element?(limited, "#user-92-show")
-    refute has_element?(limited, "#user-92-edit")
-    refute has_element?(limited, "#user-92-delete")
+    refute has_element?(limited, "#user-92-impersonate")
 
     grant_capabilities!([
       "admin.user.create",
       "admin.user.view",
-      "admin.user.update",
-      "admin.user.delete"
+      "admin.user.impersonate"
     ])
 
     {:ok, allowed, _html} = conn |> log_in_as() |> live(~p"/users")
 
     assert has_element?(allowed, "#user-new[href='/users/new']")
     assert has_element?(allowed, "#user-92-show[href='/users/92']")
-    assert has_element?(allowed, "#user-92-edit[href='/users/92/edit']")
-    assert has_element?(allowed, "#user-92-delete:not([disabled])")
-    assert has_element?(allowed, "#user-91-delete[disabled]")
+    assert has_element?(allowed, "#user-92-impersonate[href='/admin/impersonate/92']")
+    assert has_element?(allowed, "#user-91-impersonate[disabled]")
   end
 
   test "preserves PostgreSQL LIKE contains, case, wildcard, and PHP-falsey search behavior", %{
@@ -328,7 +325,7 @@ defmodule BilimbiWeb.UserLiveTest do
     grant_capabilities!(["admin.user.list", "admin.user.delete"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
-    view |> element("#user-92-delete") |> render_click()
+    render_click(view, "delete", %{"id" => "92"})
 
     assert has_element?(view, "#flash-group", "User deleted successfully")
     refute has_element?(view, "#user-92")
@@ -347,7 +344,7 @@ defmodule BilimbiWeb.UserLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
 
     assert :ok = User.delete_user(scope!(), 73, 92)
-    view |> element("#user-92-delete") |> render_click()
+    render_click(view, "delete", %{"id" => "92"})
     assert has_element?(view, "#flash-group", "no longer exists")
     refute has_element?(view, "#user-92")
 
