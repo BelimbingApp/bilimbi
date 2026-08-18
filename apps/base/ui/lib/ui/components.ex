@@ -820,13 +820,11 @@ defmodule Bilimbi.Base.UI.Components do
       type="button"
       phx-click={@sort_event}
       phx-value-sort={@col[:sort]}
-      class={
-        [
-          "inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25",
-          @col[:align] == :right && "ml-auto",
-          @col[:align] != :right && "text-left"
-        ]
-      }
+      class={[
+        "inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25",
+        @col[:align] == :right && "ml-auto",
+        @col[:align] != :right && "text-left"
+      ]}
     >
       {@col[:label]}
       <.icon
