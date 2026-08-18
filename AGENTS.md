@@ -518,10 +518,12 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   `rounded-md`; surfaces are `rounded-xl`. Operational lists default to 25
   rows and only offer 25, 50, 100, or 300; their sortable headers expose
   `aria-sort`, and page, search, filters, sort, and page size stay in URL
-  state. Use `<.datetime>` for timestamps, `<.icon>` for all icons (put
-  product-only SVGs in `Bilimbi.Base.UI.IconRegistry`), and semantic button
-  variants/colors only. Async actions must show in-flight state, reject
-  duplicate work, and truthfully report the data outcome and recovery.
+  state. Use `<.datetime>` for timestamps and `<.icon>` for all icons (put
+  product-only SVGs in `Bilimbi.Base.UI.IconRegistry`). Primary actions use
+  `<.button variant="primary">`; lime `brand` is reserved for orientation and
+  selection, never an action or status. Async actions must show in-flight
+  state, reject duplicate work, and truthfully report the data outcome and
+  recovery.
 - Maintain the Tailwind v4 `source(none)` and `@source` imports in
   `assets/css/app.css`.
 - Do not use `@apply` in raw CSS.
