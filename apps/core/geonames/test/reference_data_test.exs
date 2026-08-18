@@ -107,6 +107,21 @@ defmodule Bilimbi.Core.Geonames.ReferenceDataTest do
     assert Geonames.get_country("MY").country == "Malaysia"
   end
 
+  test "respects GEONAMES_CACHE_DIR environment variable when cache_dir option is omitted",
+       context do
+    System.put_env("GEONAMES_CACHE_DIR", context.cache_dir)
+    on_exit(fn -> System.delete_env("GEONAMES_CACHE_DIR") end)
+
+    assert {:ok, results} =
+             ReferenceData.run(
+               datasets: [:countries],
+               downloader: context.downloader
+             )
+
+    assert results.countries.imported == 1
+    assert Geonames.get_country("MY").country == "Malaysia"
+  end
+
   defp create_zip!(path, entry, contents) do
     assert {:ok, _filename} =
              :zip.create(String.to_charlist(path), [

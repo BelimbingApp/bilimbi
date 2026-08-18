@@ -303,8 +303,12 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
 
   defp update_success_message(_result), do: "Countries updated from GeoNames."
 
-  defp update_error_message({:download, :countries, {:request, %{reason: :timeout}}}) do
-    "Countries were not changed. Bilimbi could not connect to download.geonames.org. Check internet, proxy, or firewall access, then try Update again. If it persists, contact your administrator."
+  defp update_error_message({:download, :countries, {:request, error}}) do
+    if network_timeout_or_unreachable?(error) do
+      "Countries were not changed. Bilimbi could not connect to download.geonames.org. Check internet, proxy, or firewall access, then try Update again. If it persists, contact your administrator."
+    else
+      "Countries were not changed because the GeoNames download failed. Try Update again; if it persists, contact your administrator."
+    end
   end
 
   defp update_error_message({:download, :countries, {:http_status, status}}) do
@@ -318,4 +322,12 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   defp update_error_message(_reason) do
     "Countries were not changed because the GeoNames update did not finish. Try Update again; if it persists, contact your administrator."
   end
+
+  defp network_timeout_or_unreachable?(%{reason: reason})
+       when reason in [:timeout, :connect_timeout, :nxdomain, :econnrefused, :closed, :etimedout] do
+    true
+  end
+
+  defp network_timeout_or_unreachable?(%{reason: {:timeout, _}}), do: true
+  defp network_timeout_or_unreachable?(_), do: false
 end

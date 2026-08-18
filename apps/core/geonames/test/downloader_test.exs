@@ -107,4 +107,50 @@ defmodule Bilimbi.Core.Geonames.DownloaderTest do
     refute result.cached
     assert File.read!(destination) == "recovered payload"
   end
+
+  test "falls back to existing valid cached file on request exception when force is false", %{
+    directory: directory
+  } do
+    destination = Path.join(directory, "countryInfo.txt")
+    File.write!(destination, "cached fallback")
+    File.write!(destination <> ".etag", ~s("v1"))
+
+    assert {:ok, result} =
+             Downloader.download("https://example.test/countries", destination,
+               req_options: [
+                 plug: fn _conn ->
+                   raise %Mint.TransportError{reason: :connect_timeout}
+                 end
+               ]
+             )
+
+    assert result.cached
+    assert result.status == :fallback
+    assert result.etag == ~s("v1")
+    assert File.read!(destination) == "cached fallback"
+  end
+
+  test "falls back to existing valid cached file on 503 error when force is false", %{
+    directory: directory
+  } do
+    destination = Path.join(directory, "countryInfo.txt")
+    File.write!(destination, "cached 503 fallback")
+    File.write!(destination <> ".etag", ~s("v2"))
+
+    Req.Test.expect(__MODULE__, fn conn ->
+      conn
+      |> Plug.Conn.put_status(503)
+      |> Req.Test.text("unavailable")
+    end)
+
+    assert {:ok, result} =
+             Downloader.download("https://example.test/countries", destination,
+               req_options: [plug: {Req.Test, __MODULE__}]
+             )
+
+    assert result.cached
+    assert result.status == :fallback
+    assert result.etag == ~s("v2")
+    assert File.read!(destination) == "cached 503 fallback"
+  end
 end

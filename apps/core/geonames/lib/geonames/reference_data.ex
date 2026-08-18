@@ -203,11 +203,12 @@ defmodule Bilimbi.Core.Geonames.ReferenceData do
 
   defp cache_dir(opts) do
     Keyword.get_lazy(opts, :cache_dir, fn ->
-      Application.get_env(
-        :bilimbi_core_geonames,
-        :cache_dir,
-        Path.join(System.tmp_dir!(), "bilimbi/geonames")
-      )
+      System.get_env("GEONAMES_CACHE_DIR") ||
+        Application.get_env(
+          :bilimbi_core_geonames,
+          :cache_dir,
+          Path.join(System.tmp_dir!(), "bilimbi/geonames")
+        )
     end)
   end
 end
