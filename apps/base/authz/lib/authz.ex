@@ -97,6 +97,19 @@ defmodule Bilimbi.Base.Authz do
           {:ok, Bilimbi.Base.Authz.RoleDetails.t()} | {:error, :not_found}
   def get_role(%Scope{} = scope, role_id), do: RoleService.get_role(scope, role_id, registry!())
 
+  @doc """
+  Companies the scope may own a custom role in, named for display.
+
+  Role create needs a picker, and Belimbing builds one from
+  `Company::query()->forTenant($tenantId)->orderBy('name')`. Base cannot query
+  Core, so the naming half of the directory seam answers instead (#183, #264).
+  """
+  @spec companies_in_scope(Scope.t()) :: [Bilimbi.Base.Authz.CompanyDirectory.named_company()]
+  def companies_in_scope(%Scope{} = scope) do
+    directory = directory!(registry!())
+    directory.companies_in_scope(scope)
+  end
+
   @spec create_role(Scope.t(), pos_integer(), map()) ::
           {:ok, Bilimbi.Base.Authz.RoleSummary.t()}
           | {:error, :company_not_found | Ecto.Changeset.t()}

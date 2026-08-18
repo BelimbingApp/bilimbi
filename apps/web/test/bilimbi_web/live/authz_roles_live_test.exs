@@ -261,6 +261,7 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
                view
                |> form("#role-form", %{
                  "role" => %{
+                   "company_id" => "73",
                    "name" => "Billing Manager",
                    "code" => "billing_manager",
                    "description" => "Handles invoices"
@@ -281,7 +282,9 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
 
       html =
         view
-        |> form("#role-form", %{"role" => %{"name" => "Bad", "code" => "Billing Manager"}})
+        |> form("#role-form", %{
+          "role" => %{"company_id" => "73", "name" => "Bad", "code" => "Billing Manager"}
+        })
         |> render_submit()
 
       assert html =~ "lowercase letters, digits and underscores"
@@ -298,11 +301,133 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       # :code rather than surfacing as a crash or a bare flash.
       html =
         view
-        |> form("#role-form", %{"role" => %{"name" => "Auditor Again", "code" => "auditor"}})
+        |> form("#role-form", %{
+          "role" => %{"company_id" => "73", "name" => "Auditor Again", "code" => "auditor"}
+        })
         |> render_submit()
 
       assert html =~ "has already been taken"
       assert has_element?(view, "#role-form")
+    end
+
+    test "offers every company in the tenant and nobody else's", %{conn: conn} do
+      CompanyFixtures.insert_company!(%{
+        id: 75,
+        tenant_id: 41,
+        name: "Anvil Works",
+        code: "anvil"
+      })
+
+      {:ok, view, _html} = open_create(conn)
+
+      assert has_element?(view, "select#role-company-scope")
+      assert has_element?(view, "#role-company-scope option[value='73']")
+      assert has_element?(view, "#role-company-scope option[value='75']")
+
+      # Company 74 belongs to tenant 42. A picker that offered it would be a
+      # tenancy leak the user could see, and then act on.
+      refute has_element?(view, "#role-company-scope option[value='74']")
+    end
+
+    test "preselects the session company when it is one of the options", %{conn: conn} do
+      {:ok, view, _html} = open_create(conn)
+
+      assert has_element?(view, "#role-company-scope option[value='73'][selected]")
+    end
+
+    test "will not create a role with no company chosen", %{conn: conn, ours: ours} do
+      {:ok, view, _html} = open_create(conn)
+
+      html =
+        view
+        |> form("#role-form", %{
+          "role" => %{"company_id" => "", "name" => "Nobody", "code" => "nobody"}
+        })
+        |> render_submit()
+
+      assert html =~ "can&#39;t be blank"
+      assert has_element?(view, "#role-form")
+      assert ours |> Authz.list_roles() |> Enum.all?(&(&1.code != "nobody"))
+    end
+
+    test "creates a role owned by a different company in the tenant", %{conn: conn, ours: ours} do
+      # The case the session binding could not express: a tenant administrator
+      # creating a role for a subsidiary without switching session context.
+      CompanyFixtures.insert_company!(%{
+        id: 75,
+        tenant_id: 41,
+        name: "Anvil Works",
+        code: "anvil"
+      })
+
+      {:ok, view, _html} = open_create(conn)
+
+      assert {:error, {:live_redirect, %{to: "/authz/roles"}}} =
+               view
+               |> form("#role-form", %{
+                 "role" => %{"company_id" => "75", "name" => "Foreman", "code" => "foreman"}
+               })
+               |> render_submit()
+
+      created = ours |> Authz.list_roles() |> Enum.find(&(&1.code == "foreman"))
+
+      assert created.company_id == 75
+      refute created.is_system
+    end
+
+    test "refuses a company the picker never offered, however it was submitted", %{
+      conn: conn,
+      ours: ours,
+      theirs: theirs
+    } do
+      {:ok, view, _html} = open_create(conn)
+
+      # Sent as raw events, not through `form/3`: LiveViewTest refuses to submit
+      # a select value the page never offered, which is the client-side
+      # assumption these payloads exist to go around. 74 belongs to another
+      # tenant, 0 and 999 are tampering. All must land on the field.
+      for tampered <- ["74", "0", "999"] do
+        html =
+          render_submit(view, :save, %{
+            "role" => %{"company_id" => tampered, "name" => "Trespass", "code" => "trespass"}
+          })
+
+        assert html =~ "is not a company you can create roles for",
+               "company_id=#{tampered} was not rejected on the form"
+      end
+
+      assert ours |> Authz.list_roles() |> Enum.all?(&(&1.code != "trespass"))
+      assert theirs |> Authz.list_roles() |> Enum.all?(&(&1.code != "trespass"))
+    end
+
+    test "fails closed when the chosen company leaves scope after the page loads", %{
+      conn: conn,
+      ours: ours
+    } do
+      CompanyFixtures.insert_company!(%{
+        id: 75,
+        tenant_id: 41,
+        name: "Anvil Works",
+        code: "anvil"
+      })
+
+      {:ok, view, _html} = open_create(conn)
+
+      # The options were read at mount. Form-level inclusion cannot see this,
+      # which is precisely why the domain check in create_role/3 stays: the
+      # window between rendering a picker and acting on it belongs to the
+      # domain, not the form.
+      Bilimbi.Base.Repo.query!("UPDATE companies SET deleted_at = NOW() WHERE id = 75")
+
+      html =
+        view
+        |> form("#role-form", %{
+          "role" => %{"company_id" => "75", "name" => "Foreman", "code" => "foreman"}
+        })
+        |> render_submit()
+
+      assert html =~ "no longer available"
+      assert ours |> Authz.list_roles() |> Enum.all?(&(&1.code != "foreman"))
     end
   end
 end
