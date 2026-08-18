@@ -8,6 +8,8 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.Department
 
+  @update_capability "admin.company.update"
+
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     scope = socket.assigns.current_scope.scope
@@ -22,6 +24,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
              socket
              |> assign(:page_title, "#{Company.Summary.display_name(company)} — Departments")
              |> assign(:active_nav, "admin.company")
+             |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
              |> assign(:company, company)
              |> assign(:departments_count, length(departments))
              |> assign(:modal_action, nil)
@@ -45,6 +48,10 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
   end
 
   @impl true
+  def handle_event(event, _params, %{assigns: %{can_update?: false}} = socket)
+      when event in ["new", "save", "update_status", "delete"],
+      do: write_forbidden(socket)
+
   def handle_event("new", _params, socket) do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.company.id
@@ -160,6 +167,15 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
     end
   end
 
+  defp write_forbidden(socket) do
+    {:noreply,
+     put_flash(
+       socket,
+       :error,
+       "You do not have permission to change company administration data."
+     )}
+  end
+
   defp assign_form(socket, nil), do: assign(socket, :form, nil)
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
@@ -196,6 +212,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
               Back to {Company.Summary.display_name(@company)}
             </.button>
             <.button
+              :if={@can_update?}
               id="add-dept-btn"
               phx-click="new"
               variant="primary"
@@ -240,7 +257,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
             <:action :let={dept}>
               <div class="flex items-center gap-2">
                 <button
-                  :if={dept.status != "active"}
+                  :if={@can_update? and dept.status != "active"}
                   type="button"
                   id={"activate-dept-#{dept.id}"}
                   phx-click="update_status"
@@ -251,7 +268,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
                   Activate
                 </button>
                 <button
-                  :if={dept.status != "suspended"}
+                  :if={@can_update? and dept.status != "suspended"}
                   type="button"
                   id={"suspend-dept-#{dept.id}"}
                   phx-click="update_status"
@@ -262,7 +279,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
                   Suspend
                 </button>
                 <button
-                  :if={dept.status != "inactive"}
+                  :if={@can_update? and dept.status != "inactive"}
                   type="button"
                   id={"deactivate-dept-#{dept.id}"}
                   phx-click="update_status"
@@ -273,6 +290,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
                   Deactivate
                 </button>
                 <button
+                  :if={@can_update?}
                   type="button"
                   id={"delete-dept-#{dept.id}"}
                   phx-click="delete"

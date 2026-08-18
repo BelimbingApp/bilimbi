@@ -3,6 +3,10 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Core.Company
+  alias Bilimbi.Core.Company.{Department, DepartmentType, LegalEntityType, Relationship}
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -115,7 +119,12 @@ defmodule BilimbiWeb.CompanyLiveTest do
     end
 
     test "creates, validates, edits, toggles, and deletes legal entity types", %{conn: conn} do
-      grant_capabilities!(["admin.company.list"])
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.create",
+        "admin.company.update",
+        "admin.company.delete"
+      ])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/legal-entity-types")
 
@@ -176,6 +185,42 @@ defmodule BilimbiWeb.CompanyLiveTest do
       view |> element("#delete-type-#{type.id}") |> render_click()
       assert has_element?(view, "#legal-entity-types-empty", "No legal entity types defined yet.")
     end
+
+    test "hides write controls and rejects direct write events without write capabilities", %{
+      conn: conn
+    } do
+      {:ok, type} =
+        Company.create_legal_entity_type(%{
+          code: "LLC",
+          name: "Limited Liability Company",
+          is_active: true
+        })
+
+      grant_capabilities!(["admin.company.list"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/legal-entity-types")
+
+      refute has_element?(view, "#new-legal-entity-type-btn")
+      refute has_element?(view, "#toggle-type-#{type.id}")
+      refute has_element?(view, "#edit-type-#{type.id}")
+      refute has_element?(view, "#delete-type-#{type.id}")
+
+      render_click(view, "toggle_active", %{"id" => to_string(type.id)})
+      render_click(view, "delete", %{"id" => to_string(type.id)})
+
+      render_submit(view, "save", %{
+        "legal_entity_type" => %{"code" => "NEW", "name" => "Unauthorized"}
+      })
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "You do not have permission to change company administration data."
+             )
+
+      assert Repo.get!(LegalEntityType, type.id).is_active
+      refute Repo.get_by(LegalEntityType, code: "NEW")
+    end
   end
 
   describe "Department Types Live" do
@@ -189,7 +234,12 @@ defmodule BilimbiWeb.CompanyLiveTest do
     end
 
     test "creates, filters, edits, toggles, and deletes department types", %{conn: conn} do
-      grant_capabilities!(["admin.company.list"])
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.create",
+        "admin.company.update",
+        "admin.company.delete"
+      ])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/department-types")
 
@@ -255,6 +305,47 @@ defmodule BilimbiWeb.CompanyLiveTest do
       view |> element("#delete-dept-type-#{hr.id}") |> render_click()
       refute has_element?(view, "#department-types td", "Human Resources")
     end
+
+    test "hides write controls and rejects direct write events without write capabilities", %{
+      conn: conn
+    } do
+      {:ok, type} =
+        Company.create_department_type(%{
+          code: "ENG",
+          name: "Engineering",
+          category: "operational",
+          is_active: true
+        })
+
+      grant_capabilities!(["admin.company.list"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/department-types")
+
+      refute has_element?(view, "#new-department-type-btn")
+      refute has_element?(view, "#toggle-dept-type-#{type.id}")
+      refute has_element?(view, "#edit-dept-type-#{type.id}")
+      refute has_element?(view, "#delete-dept-type-#{type.id}")
+
+      render_click(view, "toggle_active", %{"id" => to_string(type.id)})
+      render_click(view, "delete", %{"id" => to_string(type.id)})
+
+      render_submit(view, "save", %{
+        "department_type" => %{
+          "code" => "NEW",
+          "name" => "Unauthorized",
+          "category" => "operational"
+        }
+      })
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "You do not have permission to change company administration data."
+             )
+
+      assert Repo.get!(DepartmentType, type.id).is_active
+      refute Repo.get_by(DepartmentType, code: "NEW")
+    end
   end
 
   describe "Company Departments Live" do
@@ -268,7 +359,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
     end
 
     test "manages company departments and status transitions", %{conn: conn} do
-      grant_capabilities!(["admin.company.view"])
+      grant_capabilities!(["admin.company.view", "admin.company.update"])
 
       {:ok, eng} =
         Bilimbi.Core.Company.create_department_type(%{
@@ -317,6 +408,57 @@ defmodule BilimbiWeb.CompanyLiveTest do
       view |> element("#delete-dept-#{dept.id}") |> render_click()
       assert has_element?(view, "#company-departments-empty")
     end
+
+    test "hides write controls and rejects direct write events without update capability", %{
+      conn: conn
+    } do
+      {:ok, type} =
+        Company.create_department_type(%{
+          code: "ENG",
+          name: "Engineering",
+          category: "operational"
+        })
+
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, department} =
+        Company.create_department(scope, 73, %{
+          "department_type_id" => to_string(type.id),
+          "status" => "active"
+        })
+
+      grant_capabilities!(["admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73/departments")
+
+      refute has_element?(view, "#add-dept-btn")
+      refute has_element?(view, "#suspend-dept-#{department.id}")
+      refute has_element?(view, "#deactivate-dept-#{department.id}")
+      refute has_element?(view, "#delete-dept-#{department.id}")
+
+      render_click(view, "update_status", %{
+        "id" => to_string(department.id),
+        "status" => "suspended"
+      })
+
+      render_click(view, "delete", %{"id" => to_string(department.id)})
+
+      render_submit(view, "save", %{
+        "department" => %{
+          "department_type_id" => to_string(type.id),
+          "status" => "inactive"
+        }
+      })
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "You do not have permission to change company administration data."
+             )
+
+      assert Repo.get!(Department, department.id).status == "active"
+      assert Repo.aggregate(Department, :count) == 1
+    end
   end
 
   describe "Company Relationships Live" do
@@ -331,7 +473,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
     test "manages relationships and date edits", %{conn: conn} do
       CompanyFixtures.insert_relationship_type!(11)
-      grant_capabilities!(["admin.company.view"])
+      grant_capabilities!(["admin.company.view", "admin.company.update"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73/relationships")
 
@@ -376,6 +518,47 @@ defmodule BilimbiWeb.CompanyLiveTest do
       # Delete
       view |> element("#delete-rel-#{rel.id}") |> render_click()
       assert has_element?(view, "#company-relationships-empty")
+    end
+
+    test "hides write controls and rejects direct write events without update capability", %{
+      conn: conn
+    } do
+      CompanyFixtures.insert_relationship_type!(11)
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, relationship} =
+        Company.create_relationship(scope, 73, %{
+          "related_company_id" => "74",
+          "relationship_type_id" => "11",
+          "effective_from" => "2026-01-01"
+        })
+
+      grant_capabilities!(["admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73/relationships")
+
+      refute has_element?(view, "#add-rel-btn")
+      refute has_element?(view, "#edit-rel-#{relationship.id}")
+      refute has_element?(view, "#delete-rel-#{relationship.id}")
+
+      render_click(view, "delete", %{"id" => to_string(relationship.id)})
+
+      render_submit(view, "save", %{
+        "relationship" => %{
+          "related_company_id" => "74",
+          "relationship_type_id" => "11",
+          "effective_from" => "2026-02-01"
+        }
+      })
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "You do not have permission to change company administration data."
+             )
+
+      assert is_nil(Repo.get!(Relationship, relationship.id).deleted_at)
+      assert Repo.aggregate(Relationship, :count) == 1
     end
   end
 end
