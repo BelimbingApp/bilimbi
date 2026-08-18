@@ -65,6 +65,9 @@ defmodule BilimbiWeb.Router do
   scope "/", BilimbiWeb do
     pipe_through [:browser, :require_authenticated]
 
+    post "/admin/impersonate/leave", ImpersonationController, :delete
+    post "/admin/impersonate/:id", ImpersonationController, :create
+
     live_session :authenticated,
       on_mount: [{BilimbiWeb.UserAuth, :require_authenticated}] do
       live "/dashboard", DashboardLive

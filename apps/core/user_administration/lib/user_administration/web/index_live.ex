@@ -34,6 +34,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
      socket
      |> assign(:page_title, "User Management")
      |> assign(:active_nav, "admin.user")
+     |> assign(:page_sizes, @page_sizes)
      |> assign(:role_options, role_options(scope))
      |> stream_configure(:users, dom_id: &"user-#{&1.id}")}
   end
@@ -209,8 +210,6 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
     |> Enum.map(&{&1.name, &1.id})
   end
 
-  defp page_size_options, do: Enum.map(@page_sizes, &{"#{&1} rows", &1})
-
   defp normalize_search(value) when is_binary(value) do
     value
     |> String.graphemes()
@@ -292,22 +291,4 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
 
   defp format_created(%NaiveDateTime{} = value), do: Calendar.strftime(value, "%Y-%m-%d")
   defp format_created(_value), do: "—"
-
-  defp page_summary(%{total_entries: 0}), do: "No results"
-
-  defp page_summary(%{entries: [], total_entries: total_entries}) do
-    "No results on this page · #{total_entries} total"
-  end
-
-  defp page_summary(%{page: page, page_size: page_size, total_entries: total_entries}) do
-    first = (page - 1) * page_size + 1
-    last = min(page * page_size, total_entries)
-    "Showing #{first}–#{last} of #{total_entries}"
-  end
-
-  defp page_position(%{total_pages: 0}), do: "Page 0 of 0"
-
-  defp page_position(%{page: page, total_pages: total_pages}) do
-    "Page #{page} of #{total_pages}"
-  end
 end

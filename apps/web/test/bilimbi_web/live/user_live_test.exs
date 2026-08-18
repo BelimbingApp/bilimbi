@@ -75,7 +75,7 @@ defmodule BilimbiWeb.UserLiveTest do
     grant_capabilities!([
       "admin.user.list",
       "admin.user.view",
-      "admin.user.delete",
+      "admin.user.impersonate",
       "admin.company.view"
     ])
 
@@ -89,10 +89,10 @@ defmodule BilimbiWeb.UserLiveTest do
     refute has_element?(view, "#user-92-company")
     assert has_element?(view, "#user-92", "Archived Company")
     assert has_element?(view, "#user-92", "archived")
-    assert has_element?(view, "#user-92-delete[disabled]")
+    assert has_element?(view, "#user-92-impersonate[disabled]")
   end
 
-  test "gates create, view, update, and delete controls by existing capabilities", %{conn: conn} do
+  test "gates create, view, and impersonate controls by existing capabilities", %{conn: conn} do
     insert_user!(%{id: 91, company_id: 73, name: "Signed In"})
     insert_user!(%{id: 92, company_id: 73, name: "Managed User"})
     grant_capabilities!("admin.user.list")
@@ -101,23 +101,20 @@ defmodule BilimbiWeb.UserLiveTest do
 
     refute has_element?(limited, "#user-new")
     refute has_element?(limited, "#user-92-show")
-    refute has_element?(limited, "#user-92-edit")
-    refute has_element?(limited, "#user-92-delete")
+    refute has_element?(limited, "#user-92-impersonate")
 
     grant_capabilities!([
       "admin.user.create",
       "admin.user.view",
-      "admin.user.update",
-      "admin.user.delete"
+      "admin.user.impersonate"
     ])
 
     {:ok, allowed, _html} = conn |> log_in_as() |> live(~p"/users")
 
     assert has_element?(allowed, "#user-new[href='/users/new']")
     assert has_element?(allowed, "#user-92-show[href='/users/92']")
-    assert has_element?(allowed, "#user-92-edit[href='/users/92/edit']")
-    assert has_element?(allowed, "#user-92-delete:not([disabled])")
-    assert has_element?(allowed, "#user-91-delete[disabled]")
+    assert has_element?(allowed, "#user-92-impersonate[href='/admin/impersonate/92']")
+    assert has_element?(allowed, "#user-91-impersonate[disabled]")
   end
 
   test "preserves PostgreSQL LIKE contains, case, wildcard, and PHP-falsey search behavior", %{
@@ -180,9 +177,12 @@ defmodule BilimbiWeb.UserLiveTest do
       |> log_in_as()
       |> live(users_path(roleIds: [first.id, second.id], perPage: 10))
 
-    assert has_element?(view, "#users-role-filter option[value='#{first.id}']", "First")
-    assert has_element?(view, "#users-role-filter option[value='#{second.id}']", "Second")
-    assert has_element?(view, "#users-pagination-summary", "Showing 1–10 of 12")
+    assert has_element?(view, "#users-role-filter", "2 roles selected")
+    assert has_element?(view, "#users-role-filter-option-#{first.id}[checked]")
+    assert has_element?(view, "#users-role-filter-option-#{second.id}[checked]")
+    assert has_element?(view, "label[for='users-role-filter-option-#{first.id}']", "First")
+    assert has_element?(view, "label[for='users-role-filter-option-#{second.id}']", "Second")
+    assert has_element?(view, "#users-pagination-summary", "Showing 1 to 10 of 12 results")
     assert has_element?(view, "#user-6", "First")
     assert has_element?(view, "#user-6", "Second")
     assert has_element?(view, "#user-6")
@@ -271,29 +271,29 @@ defmodule BilimbiWeb.UserLiveTest do
     signed_in = log_in_as(conn)
 
     {:ok, ten, _html} = live(signed_in, users_path(perPage: 1))
-    assert has_element?(ten, "#users-page-size option[value='10'][selected]")
-    assert has_element?(ten, "#users-pagination-summary", "Showing 1–10 of 12")
+    assert has_element?(ten, "#users-pagination-page-size option[value='10'][selected]")
+    assert has_element?(ten, "#users-pagination-summary", "Showing 1 to 10 of 12 results")
 
     {:ok, fifty, _html} = live(signed_in, users_path(perPage: 30))
-    assert has_element?(fifty, "#users-page-size option[value='50'][selected]")
-    assert has_element?(fifty, "#users-pagination-summary", "Showing 1–12 of 12")
+    assert has_element?(fifty, "#users-pagination-page-size option[value='50'][selected]")
+    assert has_element?(fifty, "#users-pagination-summary", "Showing 1 to 12 of 12 results")
 
     {:ok, hundred, _html} = live(signed_in, users_path(perPage: 9999))
-    assert has_element?(hundred, "#users-page-size option[value='100'][selected]")
+    assert has_element?(hundred, "#users-pagination-page-size option[value='100'][selected]")
 
     {:ok, view, _html} = live(signed_in, users_path(page: 2, perPage: 10))
-    assert has_element?(view, "#users-pagination-position", "Page 2 of 2")
+    assert has_element?(view, "#users-pagination-page-2[aria-current='page']")
 
     view
-    |> form("#users-filters", filters: %{search: "Page", roleIds: [], perPage: "50"})
+    |> form("#users-pagination-page-size-form", filters: %{perPage: "50"})
     |> render_change()
 
-    assert has_element?(view, "#users-page-size option[value='50'][selected]")
-    assert has_element?(view, "#users-pagination-position", "Page 1 of 1")
+    assert has_element?(view, "#users-pagination-page-size option[value='50'][selected]")
+    assert has_element?(view, "#users-pagination-page-1[aria-current='page']")
 
     {:ok, sort_view, _html} = live(signed_in, users_path(page: 2, perPage: 10))
     sort_view |> element("#users-sort-created") |> render_click()
-    assert has_element?(sort_view, "#users-pagination-position", "Page 1 of 2")
+    assert has_element?(sort_view, "#users-pagination-page-1[aria-current='page']")
     assert has_element?(sort_view, "#users-sort-created .hero-chevron-down.text-action")
   end
 
@@ -303,31 +303,20 @@ defmodule BilimbiWeb.UserLiveTest do
     signed_in = log_in_as(conn)
 
     # Nothing matched, so the table's empty slot is the whole truth and the
-    # pager has nothing to add: "No results · Page 0 of 0" beside two disabled
-    # buttons restates it in a shape that implies pages exist. Hidden, as in
-    # core/address (#299), core/geonames (#305) and Belimbing.
+    # pager summary and page links are omitted while the selector stays.
     {:ok, empty, _html} = live(signed_in, users_path(search: "no such account"))
     assert has_element?(empty, "#users-empty", "No users found")
-    refute has_element?(empty, "#users-pagination")
+    assert has_element?(empty, "#users-pagination")
     refute has_element?(empty, "#users-pagination-summary")
-    refute has_element?(empty, "#users-pagination-position")
     refute has_element?(empty, "#users-pagination-previous")
     refute has_element?(empty, "#users-pagination-next")
 
-    # The opposite case, and the reason the guard is `total_pages > 0` rather
-    # than "this page is empty": users exist, you are just past the end. Here
-    # the pager is the only thing that says so, so it stays.
+    # When users exist but we are past the end, the pager stays and shows summary.
     {:ok, out_of_range, _html} = live(signed_in, users_path(page: 2, perPage: 10))
     assert has_element?(out_of_range, "#users-empty", "No users found")
     assert has_element?(out_of_range, "#users-pagination")
-
-    assert has_element?(
-             out_of_range,
-             "#users-pagination-summary",
-             "No results on this page · 1 total"
-           )
-
-    assert has_element?(out_of_range, "#users-pagination-position", "Page 2 of 1")
+    assert has_element?(out_of_range, "#users-pagination-summary", "Showing 11 to 1 of 1 results")
+    assert has_element?(out_of_range, "#users-pagination-page-1")
   end
 
   test "hard deletes another user and refreshes the bounded page", %{conn: conn} do
@@ -336,7 +325,7 @@ defmodule BilimbiWeb.UserLiveTest do
     grant_capabilities!(["admin.user.list", "admin.user.delete"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
-    view |> element("#user-92-delete") |> render_click()
+    render_click(view, "delete", %{"id" => "92"})
 
     assert has_element?(view, "#flash-group", "User deleted successfully")
     refute has_element?(view, "#user-92")
@@ -355,7 +344,7 @@ defmodule BilimbiWeb.UserLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
 
     assert :ok = User.delete_user(scope!(), 73, 92)
-    view |> element("#user-92-delete") |> render_click()
+    render_click(view, "delete", %{"id" => "92"})
     assert has_element?(view, "#flash-group", "no longer exists")
     refute has_element?(view, "#user-92")
 

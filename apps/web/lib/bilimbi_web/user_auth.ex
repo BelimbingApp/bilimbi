@@ -50,6 +50,7 @@ defmodule BilimbiWeb.UserAuth do
   alias Bilimbi.Core.User.Summary
 
   @session_key "current_user"
+  @impersonation_key "impersonation"
   @return_to_key "user_return_to"
   @login_token_salt "session-login"
   @login_token_max_age 120
@@ -166,11 +167,11 @@ defmodule BilimbiWeb.UserAuth do
     |> redirect(to: ~p"/")
   end
 
-  defp persist_durable_session(conn, user_id, company_id) do
+  defp persist_durable_session(conn, user_id, company_id, existing_session_id \\ nil) do
     with {:ok, tenant_id} <- Company.fetch_tenant_id_for_company(company_id),
          {:ok, %Scope{} = scope} <- Tenancy.scope(tenant_id),
          {:ok, %Summary{id: ^user_id}} <- User.get_user(scope, company_id, user_id) do
-      session_id = generate_session_id()
+      session_id = existing_session_id || generate_session_id()
 
       attributes = %{
         user_id: user_id,
@@ -185,6 +186,13 @@ defmodule BilimbiWeb.UserAuth do
       end
     else
       _ -> :error
+    end
+  end
+
+  defp current_session_id(conn) do
+    case get_session(conn, @session_key) do
+      %{"session_id" => session_id} when is_binary(session_id) and session_id != "" -> session_id
+      _ -> nil
     end
   end
 
@@ -222,13 +230,87 @@ defmodule BilimbiWeb.UserAuth do
     |> redirect(to: ~p"/")
   end
 
+  @doc """
+  Switches the active session to `target_user` and records the administrator's
+  identity in the `@impersonation_key` cookie payload. Updates the durable session
+  row in place without leaving stranded authentication records.
+  """
+  def impersonate_user(
+        conn,
+        %{"user_id" => original_user_id, "name" => original_user_name},
+        %Summary{} = target_user
+      )
+      when is_integer(original_user_id) and is_binary(original_user_name) do
+    current_id = current_session_id(conn)
+
+    with {:ok, _target_session_user} <- session_user(target_user),
+         {:ok, session_id} <-
+           persist_durable_session(conn, target_user.id, target_user.company_id, current_id) do
+      conn
+      |> configure_session(renew: true)
+      |> put_session(@impersonation_key, %{
+        "original_user_id" => original_user_id,
+        "original_user_name" => original_user_name
+      })
+      |> put_session(@session_key, %{
+        "session_id" => session_id,
+        "user_id" => target_user.id,
+        "company_id" => target_user.company_id
+      })
+      |> redirect(to: ~p"/dashboard")
+    else
+      _ ->
+        conn
+        |> put_flash(:error, "Unable to impersonate that user.")
+        |> redirect(to: ~p"/users")
+    end
+  end
+
+  @doc """
+  Leaves impersonation by clearing `@impersonation_key` and restoring the
+  original administrator's authenticated session in place.
+  """
+  def leave_impersonation(conn) do
+    case get_session(conn, @impersonation_key) do
+      %{"original_user_id" => original_user_id} when is_integer(original_user_id) ->
+        scope = conn.assigns[:current_scope] && conn.assigns[:current_scope].scope
+        current_id = current_session_id(conn)
+
+        with %Scope{} <- scope,
+             {:ok, %Summary{} = original_user} <- User.get_tenant_user(scope, original_user_id),
+             {:ok, session_id} <-
+               persist_durable_session(
+                 conn,
+                 original_user.id,
+                 original_user.company_id,
+                 current_id
+               ) do
+          conn
+          |> configure_session(renew: true)
+          |> delete_session(@impersonation_key)
+          |> put_session(@session_key, %{
+            "session_id" => session_id,
+            "user_id" => original_user.id,
+            "company_id" => original_user.company_id
+          })
+          |> redirect(to: ~p"/dashboard")
+        else
+          _ ->
+            log_out_user(conn)
+        end
+
+      _ ->
+        redirect(conn, to: ~p"/dashboard")
+    end
+  end
+
   # ------------------------------------------------------------------
   # Plugs
   # ------------------------------------------------------------------
 
   @doc """
   Loads `conn.assigns.current_scope` from live identity. The assign is a map
-  `%{user: map, scope: Scope.t(), actor: Authz.Actor.t(), capabilities: [String.t()]}`
+  `%{user: map, scope: Scope.t(), actor: Authz.Actor.t(), capabilities: [String.t()], impersonator: map | nil}`
   or `nil`. Templates read `@current_scope.user["name"]`; module calls use
   `@current_scope.scope`.
 
@@ -236,7 +318,10 @@ defmodule BilimbiWeb.UserAuth do
   dropped: the request falls through as unauthenticated.
   """
   def fetch_current_scope(conn, _opts) do
-    case current_scope_from(get_session(conn, @session_key)) do
+    session_user = get_session(conn, @session_key)
+    impersonation = get_session(conn, @impersonation_key)
+
+    case current_scope_from(session_user, impersonation) do
       %{scope: %Scope{}} = current_scope ->
         assign(conn, :current_scope, current_scope)
 
@@ -368,14 +453,21 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   defp mount_current_scope(socket, session) do
-    Phoenix.Component.assign(socket, :current_scope, current_scope_from(session[@session_key]))
+    Phoenix.Component.assign(
+      socket,
+      :current_scope,
+      current_scope_from(session[@session_key], session[@impersonation_key])
+    )
   end
 
-  defp current_scope_from(%{
-         "session_id" => session_id,
-         "user_id" => user_id,
-         "company_id" => company_id
-       })
+  defp current_scope_from(
+         %{
+           "session_id" => session_id,
+           "user_id" => user_id,
+           "company_id" => company_id
+         },
+         impersonation
+       )
        when is_binary(session_id) and session_id != "" and is_integer(user_id) and user_id > 0 and
               is_integer(company_id) and company_id > 0 do
     with {:ok, %Entry{} = entry} <- Session.fetch_session(session_id),
@@ -390,14 +482,25 @@ defmodule BilimbiWeb.UserAuth do
         user: presentation_user(user, scope),
         scope: scope,
         actor: actor,
-        capabilities: allowed
+        capabilities: allowed,
+        impersonator: extract_impersonator(impersonation)
       }
     else
       _ -> nil
     end
   end
 
-  defp current_scope_from(_session_user), do: nil
+  defp current_scope_from(_session_user, _impersonation), do: nil
+
+  defp extract_impersonator(%{
+         "original_user_id" => id,
+         "original_user_name" => name
+       })
+       when is_integer(id) and is_binary(name) do
+    %{id: id, name: name}
+  end
+
+  defp extract_impersonator(_), do: nil
 
   defp presentation_user(%Summary{} = user, %Scope{} = scope) do
     %{

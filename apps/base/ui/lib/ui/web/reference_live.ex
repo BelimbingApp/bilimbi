@@ -61,6 +61,13 @@ defmodule Bilimbi.Base.UI.Web.ReferenceLive do
        :error_form,
        to_form(error_data, as: :error_sample, errors: [invalid_text: {"can't be blank", []}])
      )
+     |> assign(:pagination_sample_page, %{
+       page: 2,
+       page_size: 25,
+       total_pages: 5,
+       total_entries: 120
+     })
+     |> assign(:pagination_sample_form, to_form(%{"perPage" => 25}, as: :filters))
      |> assign(:sample_datetime, ~U[2026-08-17 14:30:00Z])
      |> assign(:click_count, 0)}
   end
