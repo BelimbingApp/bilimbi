@@ -137,6 +137,7 @@ defmodule Bilimbi.Core.Employee.AdministrationIndex do
   defp page_size(value) when is_integer(value) and value in 1..@max_page_size, do: {:ok, value}
   defp page_size(_value), do: :error
 
+  defp search(nil), do: {:ok, ""}
   defp search(value) when is_binary(value), do: {:ok, value}
   defp search(_value), do: :error
 

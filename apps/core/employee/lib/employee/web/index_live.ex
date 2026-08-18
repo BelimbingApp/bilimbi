@@ -44,7 +44,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
     {:ok,
      socket
      |> assign(:page_title, "Employees")
-     |> assign(:active_nav, "admin-employee")
+     |> assign(:active_nav, "admin.employee")
      |> assign(:page_sizes, @page_sizes)
      |> assign(:index_state, %State{})
      |> assign(:employees_page, empty_page())
@@ -89,11 +89,11 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
 
   @impl true
   def handle_event("delete", %{"id" => id}, socket) do
-    scope = socket.assigns.current_scope
+    scope = resolve_scope(socket)
     company_id = resolve_company_id(socket)
 
     case Employee.delete_employee(scope, company_id, id) do
-      {:ok, _employee} ->
+      :ok ->
         socket =
           socket
           |> put_flash(:info, "Employee deleted successfully.")
@@ -101,16 +101,13 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
 
         {:noreply, socket}
 
-      {:error, :unauthorized} ->
-        {:noreply, put_flash(socket, :error, "You do not have permission to delete employees.")}
-
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to delete employee.")}
     end
   end
 
   defp load_page(socket, state) do
-    scope = socket.assigns.current_scope
+    scope = resolve_scope(socket)
     company_id = resolve_company_id(socket)
 
     options = [
@@ -149,7 +146,6 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
     end
   end
 
-
   defp empty_page do
     %AdministrationPage{
       entries: [],
@@ -160,6 +156,10 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
       has_prev?: false,
       has_next?: false
     }
+  end
+
+  defp resolve_scope(socket) do
+    socket.assigns.current_scope.scope
   end
 
   defp resolve_company_id(socket) do
@@ -261,14 +261,21 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
   end
 
   defp employees_path(state) do
+    search_val = if state.search not in [nil, ""], do: state.search
+    type_val = if state.type_filter != :all, do: to_string(state.type_filter)
+    sort_val = if state.sort_by != :full_name, do: to_string(state.sort_by)
+    dir_val = if state.sort_dir != :asc, do: to_string(state.sort_dir)
+    page_val = if state.page != @default_page, do: state.page
+    per_page_val = if state.per_page != @default_page_size, do: state.per_page
+
     params =
       []
-      |> maybe_put(:search, state.search)
-      |> maybe_put(:type, if(state.type_filter != :all, do: to_string(state.type_filter)))
-      |> maybe_put(:sort, if(state.sort_by != :full_name, do: to_string(state.sort_by)))
-      |> maybe_put(:dir, if(state.sort_dir != :asc, do: to_string(state.sort_dir)))
-      |> maybe_put(:page, if(state.page != @default_page, do: state.page))
-      |> maybe_put(:per_page, if(state.per_page != @default_page_size, do: state.per_page))
+      |> maybe_put(:search, search_val)
+      |> maybe_put(:type, type_val)
+      |> maybe_put(:sort, sort_val)
+      |> maybe_put(:dir, dir_val)
+      |> maybe_put(:page, page_val)
+      |> maybe_put(:per_page, per_page_val)
 
     case params do
       [] -> ~p"/employees"
