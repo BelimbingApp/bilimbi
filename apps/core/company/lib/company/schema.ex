@@ -7,6 +7,27 @@ defmodule Bilimbi.Core.Company.Schema do
 
   @primary_key {:id, :id, autogenerate: true}
 
+  @type t :: %__MODULE__{
+          id: pos_integer() | nil,
+          parent_id: pos_integer() | nil,
+          tenant_id: pos_integer() | nil,
+          name: String.t() | nil,
+          code: String.t() | nil,
+          status: String.t() | nil,
+          legal_name: String.t() | nil,
+          registration_number: String.t() | nil,
+          tax_id: String.t() | nil,
+          legal_entity_type_id: pos_integer() | nil,
+          jurisdiction: String.t() | nil,
+          email: String.t() | nil,
+          website: String.t() | nil,
+          scope_activities: map() | nil,
+          metadata: map() | nil,
+          created_at: NaiveDateTime.t() | nil,
+          updated_at: NaiveDateTime.t() | nil,
+          deleted_at: NaiveDateTime.t() | nil
+        }
+
   schema "companies" do
     field :parent_id, :id
     field :tenant_id, :id

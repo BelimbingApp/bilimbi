@@ -101,23 +101,72 @@ defmodule Bilimbi.Core.Company.TestFixtures do
   end
 
   def create_departments_table! do
+    create_department_types_table!()
+
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE company_departments (
+      CREATE TEMPORARY TABLE IF NOT EXISTS company_departments (
         id bigserial PRIMARY KEY,
-        company_id bigint NOT NULL
+        company_id bigint NOT NULL,
+        department_type_id bigint,
+        head_id bigint,
+        status varchar(255) NOT NULL DEFAULT 'active',
+        metadata json,
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone
       ) ON COMMIT PRESERVE ROWS
       """,
       []
     )
   end
 
-  def insert_department!(id, company_id) do
+  def create_department_types_table! do
     SQL.query!(
       Repo,
-      "INSERT INTO company_departments (id, company_id) VALUES ($1, $2)",
-      [id, company_id]
+      """
+      CREATE TEMPORARY TABLE IF NOT EXISTS company_department_types (
+        id bigserial PRIMARY KEY,
+        code varchar(255) NOT NULL,
+        name varchar(255) NOT NULL,
+        category varchar(255) NOT NULL,
+        description text,
+        is_active boolean NOT NULL DEFAULT true,
+        metadata json,
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone,
+        CONSTRAINT company_department_types_code_unique UNIQUE (code)
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+  end
+
+  def create_legal_entity_types_table! do
+    SQL.query!(
+      Repo,
+      """
+      CREATE TEMPORARY TABLE IF NOT EXISTS company_legal_entity_types (
+        id bigserial PRIMARY KEY,
+        code varchar(255) NOT NULL,
+        name varchar(255) NOT NULL,
+        description text,
+        is_active boolean NOT NULL DEFAULT true,
+        metadata json,
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone,
+        CONSTRAINT company_legal_entity_types_code_unique UNIQUE (code)
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+  end
+
+  def insert_department!(id, company_id, type_id \\ nil) do
+    SQL.query!(
+      Repo,
+      "INSERT INTO company_departments (id, company_id, department_type_id, status) VALUES ($1, $2, $3, 'active')",
+      [id, company_id, type_id]
     )
   end
 
@@ -125,10 +174,16 @@ defmodule Bilimbi.Core.Company.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE company_relationship_types (
+      CREATE TEMPORARY TABLE IF NOT EXISTS company_relationship_types (
         id bigserial PRIMARY KEY,
         code varchar(255) NOT NULL UNIQUE,
-        name varchar(255) NOT NULL
+        name varchar(255) NOT NULL,
+        description text,
+        is_external boolean NOT NULL DEFAULT false,
+        is_active boolean NOT NULL DEFAULT true,
+        metadata json,
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone
       ) ON COMMIT PRESERVE ROWS
       """,
       []
@@ -137,11 +192,16 @@ defmodule Bilimbi.Core.Company.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE company_relationships (
+      CREATE TEMPORARY TABLE IF NOT EXISTS company_relationships (
         id bigserial PRIMARY KEY,
         company_id bigint NOT NULL,
         related_company_id bigint NOT NULL,
         relationship_type_id bigint NOT NULL,
+        effective_from date,
+        effective_to date,
+        metadata json,
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone,
         deleted_at timestamp(0) without time zone
       ) ON COMMIT PRESERVE ROWS
       """,
@@ -151,7 +211,7 @@ defmodule Bilimbi.Core.Company.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE company_external_accesses (
+      CREATE TEMPORARY TABLE IF NOT EXISTS company_external_accesses (
         id bigserial PRIMARY KEY,
         company_id bigint NOT NULL,
         relationship_id bigint NOT NULL,
@@ -173,7 +233,7 @@ defmodule Bilimbi.Core.Company.TestFixtures do
   def insert_relationship_type!(id \\ 11) do
     SQL.query!(
       Repo,
-      "INSERT INTO company_relationship_types (id, code, name) VALUES ($1, $2, $3)",
+      "INSERT INTO company_relationship_types (id, code, name, is_active) VALUES ($1, $2, $3, true)",
       [id, "customer_#{id}", "Customer"]
     )
   end
