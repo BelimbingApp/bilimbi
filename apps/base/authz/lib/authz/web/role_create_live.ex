@@ -201,20 +201,16 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
               label="Company Scope"
               prompt="Select a company"
               options={@company_options}
+              hint="The owning company keeps this custom role inside the current tenant."
             />
-            <p class="mt-1 mb-4 text-xs text-ink-subtle">
-              The owning company keeps this custom role inside the current tenant.
-            </p>
             <.input field={@form[:name]} type="text" label="Name" />
             <.input
               field={@form[:code]}
               type="text"
               label="Code"
               placeholder="billing_manager"
+              hint="Lowercase letters, digits and underscores. Unique within the selected company."
             />
-            <p class="mt-1 text-xs text-ink-subtle">
-              Lowercase letters, digits and underscores. Unique within the selected company.
-            </p>
             <.input field={@form[:description]} type="textarea" label="Description" />
           </section>
 
