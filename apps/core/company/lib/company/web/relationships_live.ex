@@ -8,6 +8,8 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.Relationship
 
+  @update_capability "admin.company.update"
+
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     scope = socket.assigns.current_scope.scope
@@ -22,6 +24,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
              socket
              |> assign(:page_title, "#{Company.Summary.display_name(company)} — Relationships")
              |> assign(:active_nav, "admin.company")
+             |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
              |> assign(:company, company)
              |> assign(:relationships_count, length(relationships))
              |> assign(:modal_action, nil)
@@ -47,6 +50,10 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
   end
 
   @impl true
+  def handle_event(event, _params, %{assigns: %{can_update?: false}} = socket)
+      when event in ["new", "edit", "save", "delete"],
+      do: write_forbidden(socket)
+
   def handle_event("new", _params, socket) do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.company.id
@@ -204,6 +211,15 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
     end
   end
 
+  defp write_forbidden(socket) do
+    {:noreply,
+     put_flash(
+       socket,
+       :error,
+       "You do not have permission to change company administration data."
+     )}
+  end
+
   defp assign_form(socket, nil), do: assign(socket, :form, nil)
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
@@ -242,6 +258,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
               Back to {Company.Summary.display_name(@company)}
             </.button>
             <.button
+              :if={@can_update?}
               id="add-rel-btn"
               phx-click="new"
               variant="primary"
@@ -288,6 +305,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
             <:action :let={item}>
               <div class="flex items-center gap-2">
                 <button
+                  :if={@can_update?}
                   type="button"
                   id={"edit-rel-#{item.id}"}
                   phx-click="edit"
@@ -297,6 +315,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
                   Edit Dates
                 </button>
                 <button
+                  :if={@can_update?}
                   type="button"
                   id={"delete-rel-#{item.id}"}
                   phx-click="delete"

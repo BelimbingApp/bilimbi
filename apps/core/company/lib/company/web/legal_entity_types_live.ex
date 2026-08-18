@@ -8,6 +8,10 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.LegalEntityType
 
+  @create_capability "admin.company.create"
+  @update_capability "admin.company.update"
+  @delete_capability "admin.company.delete"
+
   @impl true
   def mount(_params, _session, socket) do
     {:ok, types} = Company.list_legal_entity_types()
@@ -16,6 +20,9 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
      socket
      |> assign(:page_title, "Legal Entity Types")
      |> assign(:active_nav, "admin.company")
+     |> assign(:can_create?, allowed?(socket.assigns.current_scope, @create_capability))
+     |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
+     |> assign(:can_delete?, allowed?(socket.assigns.current_scope, @delete_capability))
      |> assign(:types_count, length(types))
      |> assign(:modal_action, nil)
      |> assign(:editing_type, nil)
@@ -24,6 +31,9 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
   end
 
   @impl true
+  def handle_event("new", _params, %{assigns: %{can_create?: false}} = socket),
+    do: write_forbidden(socket)
+
   def handle_event("new", _params, socket) do
     changeset = LegalEntityType.changeset(%LegalEntityType{}, %{is_active: true})
 
@@ -33,6 +43,9 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
      |> assign(:editing_type, %LegalEntityType{})
      |> assign_form(changeset)}
   end
+
+  def handle_event("edit", _params, %{assigns: %{can_update?: false}} = socket),
+    do: write_forbidden(socket)
 
   def handle_event("edit", %{"id" => id}, socket) do
     case Integer.parse(id) do
@@ -80,6 +93,21 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
 
     {:noreply, assign_form(socket, changeset)}
   end
+
+  def handle_event(
+        "save",
+        _params,
+        %{assigns: %{modal_action: :edit, can_update?: false}} = socket
+      ),
+      do: write_forbidden(socket)
+
+  def handle_event(
+        "save",
+        _params,
+        %{assigns: %{modal_action: action, can_create?: false}} = socket
+      )
+      when action != :edit,
+      do: write_forbidden(socket)
 
   def handle_event("save", %{"legal_entity_type" => params}, socket) do
     case socket.assigns.modal_action do
@@ -129,6 +157,9 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
     end
   end
 
+  def handle_event("toggle_active", _params, %{assigns: %{can_update?: false}} = socket),
+    do: write_forbidden(socket)
+
   def handle_event("toggle_active", %{"id" => id}, socket) do
     case Integer.parse(id) do
       {type_id, ""} ->
@@ -147,6 +178,9 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
         {:noreply, socket}
     end
   end
+
+  def handle_event("delete", _params, %{assigns: %{can_delete?: false}} = socket),
+    do: write_forbidden(socket)
 
   def handle_event("delete", %{"id" => id}, socket) do
     case Integer.parse(id) do
@@ -178,6 +212,15 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
     end
   end
 
+  defp write_forbidden(socket) do
+    {:noreply,
+     put_flash(
+       socket,
+       :error,
+       "You do not have permission to change company administration data."
+     )}
+  end
+
   defp assign_form(socket, nil), do: assign(socket, :form, nil)
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
@@ -197,6 +240,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
               Back to companies
             </.button>
             <.button
+              :if={@can_create?}
               id="new-legal-entity-type-btn"
               phx-click="new"
               variant="primary"
@@ -233,6 +277,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
             <:action :let={type}>
               <div class="flex items-center gap-2">
                 <button
+                  :if={@can_update?}
                   type="button"
                   id={"toggle-type-#{type.id}"}
                   phx-click="toggle_active"
@@ -242,6 +287,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
                   {if type.is_active, do: "Deactivate", else: "Activate"}
                 </button>
                 <button
+                  :if={@can_update?}
                   type="button"
                   id={"edit-type-#{type.id}"}
                   phx-click="edit"
@@ -251,6 +297,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
                   Edit
                 </button>
                 <button
+                  :if={@can_delete?}
                   type="button"
                   id={"delete-type-#{type.id}"}
                   phx-click="delete"
