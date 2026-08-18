@@ -8,6 +8,7 @@ defmodule Bilimbi.Base.Database do
 
   alias Bilimbi.Base.Database.ProductionSeed
   alias Bilimbi.Base.Database.ProductionSeeds
+  alias Bilimbi.Base.Database.QueryExecutor
   alias Bilimbi.Base.Repo
 
   @doc "Builds a validated production-seed definition from an installed module."
@@ -36,5 +37,22 @@ defmodule Bilimbi.Base.Database do
   def list_production_seed_runs(opts \\ []) do
     {repo, opts} = Keyword.pop(opts, :repo, Repo)
     ProductionSeeds.list_runs(repo, opts)
+  end
+
+  @doc """
+  Executes a read-only SQL query safely with timeout, pagination, and parameter binding.
+  """
+  @spec execute_readonly(String.t(), map() | list(), keyword()) ::
+          {:ok, QueryExecutor.result()} | {:error, String.t()}
+  def execute_readonly(sql, params \\ %{}, opts \\ []) do
+    QueryExecutor.execute_readonly(sql, params, opts)
+  end
+
+  @doc """
+  Extracts named parameters (`:param_name`) from raw SQL text.
+  """
+  @spec extract_named_parameters(String.t()) :: [String.t()]
+  def extract_named_parameters(sql) do
+    QueryExecutor.extract_named_parameters(sql)
   end
 end

@@ -102,6 +102,39 @@ defmodule Bilimbi.Core.User.TestFixtures do
     )
   end
 
+  def create_user_database_queries_table! do
+    SQL.query!(
+      Repo,
+      """
+      CREATE TEMPORARY TABLE user_database_queries (
+        id bigserial PRIMARY KEY,
+        user_id bigint NOT NULL,
+        name varchar(150) NOT NULL,
+        slug varchar(200) NOT NULL,
+        prompt text,
+        sql_query text NOT NULL,
+        description text,
+        icon varchar(100),
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      "CREATE UNIQUE INDEX user_database_queries_user_id_slug_unique ON user_database_queries (user_id, slug)",
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      "CREATE INDEX user_database_queries_user_id_index ON user_database_queries (user_id)",
+      []
+    )
+  end
+
   def install_user_authz_registry! do
     authz =
       ContributionValidator.validate_contributions!([
