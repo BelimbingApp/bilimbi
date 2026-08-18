@@ -18,9 +18,6 @@
     capability: "admin.user.update"
   },
   %{
-    # No capability: this is the signed-in account's own profile, and
-    # Belimbing guards it with authentication alone. The landing-page field
-    # is separately governed by base.settings.user.manage on its definition.
     path: "/settings/profile",
     live: Bilimbi.Core.User.Web.ProfileLive,
     session: :auth
@@ -43,5 +40,17 @@
     path: "/notifications",
     live: Bilimbi.Core.User.Web.NotificationsLive,
     session: :auth
+  },
+  %{
+    path: "/admin/system/database-queries",
+    live: Bilimbi.Core.User.Web.DatabaseQueriesLive.Index,
+    session: :auth,
+    capability: "admin.system.database-table.list"
+  },
+  %{
+    path: "/admin/system/database-queries/:slug",
+    live: Bilimbi.Core.User.Web.DatabaseQueriesLive.Show,
+    session: :auth,
+    capability: "admin.system.database-table.list"
   }
 ]
