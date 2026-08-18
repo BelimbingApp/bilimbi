@@ -3,6 +3,7 @@ defmodule BilimbiWeb.ImpersonationControllerTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Session
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -26,15 +27,18 @@ defmodule BilimbiWeb.ImpersonationControllerTest do
     :ok
   end
 
-  test "starts and leaves impersonation with status bar updates", %{conn: conn} do
+  test "starts and leaves impersonation maintaining exactly one durable session", %{conn: conn} do
     grant_capabilities!(["admin.user.list", "admin.user.impersonate"])
 
     # 1. Sign in as Admin User
     authed_conn = conn |> log_in_as(%{"user_id" => 91, "company_id" => 73})
+    assert [%Session.Summary{user_id: 91}] = Session.list_sessions()
 
     # 2. Impersonate Target User
     resp_conn = post(authed_conn, ~p"/admin/impersonate/92")
     assert redirected_to(resp_conn) == ~p"/dashboard"
+    # Verify session row updated in place, no extra row created
+    assert [%Session.Summary{user_id: 92}] = Session.list_sessions()
 
     # 3. Mount LiveView on dashboard to verify impersonation state and status bar
     {:ok, view, html} = live(resp_conn, ~p"/dashboard")
@@ -44,11 +48,30 @@ defmodule BilimbiWeb.ImpersonationControllerTest do
     # 4. Stop impersonation
     leave_conn = post(resp_conn, ~p"/admin/impersonate/leave")
     assert redirected_to(leave_conn) == ~p"/dashboard"
+    # Verify session row restored to admin, still exactly one row
+    assert [%Session.Summary{user_id: 91}] = Session.list_sessions()
 
     # 5. Verify back to Admin User and no impersonation in status bar
     {:ok, admin_view, admin_html} = live(leave_conn, ~p"/dashboard")
     refute admin_html =~ "Viewing as"
     refute has_element?(admin_view, "#app-impersonation-stop")
+  end
+
+  test "logging out during impersonation deletes durable session without leaving orphaned rows",
+       %{conn: conn} do
+    grant_capabilities!(["admin.user.list", "admin.user.impersonate"])
+
+    authed_conn = conn |> log_in_as(%{"user_id" => 91, "company_id" => 73})
+    assert [%Session.Summary{user_id: 91}] = Session.list_sessions()
+
+    resp_conn = post(authed_conn, ~p"/admin/impersonate/92")
+    assert redirected_to(resp_conn) == ~p"/dashboard"
+    assert [%Session.Summary{user_id: 92}] = Session.list_sessions()
+
+    # Logout while impersonating
+    logout_conn = delete(resp_conn, ~p"/session")
+    assert redirected_to(logout_conn) == ~p"/"
+    assert Session.list_sessions() == []
   end
 
   test "refuses to impersonate self", %{conn: conn} do
