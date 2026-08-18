@@ -388,7 +388,7 @@ const AppShell = {
 
       const grip = document.createElement("span")
       grip.className =
-        "app-pinned-grip mr-0.5 w-3 shrink-0 select-none text-center text-[0.625rem] text-ink-faint opacity-0 transition-opacity group-hover:opacity-60"
+        "app-pinned-grip mr-0.5 w-3 shrink-0 select-none text-center text-[0.625rem] text-muted opacity-0 transition-opacity group-hover:opacity-60"
       grip.textContent = "⠁⠁"
       grip.setAttribute("aria-hidden", "true")
       grip.title = "Drag to reorder"
@@ -396,7 +396,7 @@ const AppShell = {
       const link = document.createElement("a")
       link.href = item.href
       link.className =
-        "app-pinned-link flex min-w-0 flex-1 items-center gap-1 rounded-none px-1 py-px text-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink"
+        "app-pinned-link flex min-w-0 flex-1 items-center rounded-none px-1 py-px text-sm font-normal text-link transition hover:bg-surface-subtle hover:text-ink"
 
       for (const attribute of ["data-phx-link", "data-phx-link-state"]) {
         if (item.hasAttribute(attribute)) link.setAttribute(attribute, item.getAttribute(attribute))
@@ -416,7 +416,7 @@ const AppShell = {
       unpin.title = `Unpin ${item.dataset.navLabel}`
       unpin.setAttribute("aria-label", `Unpin ${item.dataset.navLabel}`)
       unpin.className =
-        "app-pinned-unpin grid size-4 shrink-0 place-items-center rounded-sm text-ink-faint opacity-0 transition hover:bg-surface hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        "app-pinned-unpin grid size-4 shrink-0 place-items-center rounded-sm text-muted opacity-0 transition hover:bg-surface-subtle hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
 
       const pinIcon = item.parentElement?.querySelector("[data-nav-pin] svg")?.cloneNode(true)
       if (pinIcon) unpin.append(pinIcon)

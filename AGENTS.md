@@ -526,14 +526,24 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   recovery.
 - Maintain the Tailwind v4 `source(none)` and `@source` imports in
   `assets/css/app.css`.
+- The platform uses `Instrument Sans` globally via `--font-sans` in `@theme`.
+- **Navigation & menu design:** Navigation items use `Instrument Sans` with compact
+  styling (`font-weight: 350`, `0.8125rem`/13px, `line-height: 1.25rem`). Default link
+  text is `text-link` (`#544c43`), hover is `text-ink` (`#2c2418`), pinned headers and
+  grips are `text-muted` (`#6b6057`). Active navigation uses `bg-surface text-brand-strong`
+  without bolding or spine borders. Parent branches of active items ascend with
+  `text-brand-strong`. Chevrons use triangle characters `&#x2BC8;` (`⯈`) and `&#x2BC6;`
+  (`⯆`) with figure space indentation for leaf items. Menu items and submenus are sorted
+  alphabetically ascending (`ASC`). Pinned items sit in `bg-brand-surface` (`#f3f5e8`).
 - Do not use `@apply` in raw CSS.
 - Build the design system with hand-written Tailwind-based components. Do not
   make daisyUI or another component library the product design system.
 - The `@theme` block in `apps/web/assets/css/app.css` is the only place a color
   is chosen. Components and templates use the semantic roles it declares —
-  `canvas`, `surface`, `surface-sunken`, `line`, `ink`, `action`, `brand`,
+  `canvas`, `surface`, `surface-sunken`, `surface-muted`, `surface-sidebar`,
+  `brand-surface`, `line`, `ink`, `link`, `muted`, `action`, `brand`, `brand-strong`,
   `success`, `warning`, `danger` — as ordinary Tailwind utilities such as
-  `bg-surface`, `text-ink-muted`, `border-line`, `text-danger`.
+  `bg-surface`, `text-ink-muted`, `text-link`, `border-line`, `text-danger`.
 - A raw palette class such as `stone-200` or `emerald-600` outside that
   `@theme` block is a defect. It is greppable, so treat it as one:
 
