@@ -79,11 +79,8 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
     }
 
     case Authz.create_role(scope, company_id, attributes) do
-      {:ok, _role} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Role created.")
-         |> push_navigate(to: ~p"/authz/roles")}
+      {:ok, role} ->
+        {:noreply, after_create(socket, role)}
 
       # Now that the operator picks the company, this is a correctable field
       # error rather than a broken session: the chosen company left scope
@@ -99,6 +96,38 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
 
       {:error, %Changeset{} = domain} ->
         {:noreply, assign_form(socket, copy_domain_errors(changeset, domain))}
+    end
+  end
+
+  # A new custom role has no capabilities, so it does nothing until someone
+  # opens it and grants some. `RoleShowLive` is where that happens, and it is
+  # where Belimbing lands the operator (`Create.php:53`). Returning to the index
+  # leaves a row that looks finished and is inert.
+  #
+  # Every destination is capability-gated, so the landing place has to be one
+  # this actor may actually open -- `/authz/roles` needs `role.list`, not
+  # `role.view` (`priv/web_routes.exs:6`). Navigating somewhere they will be
+  # bounced off is the same dashboard-dump this change exists to avoid; it just
+  # takes two redirects to get there instead of one.
+  #
+  # Belimbing redirects to Show unconditionally and 403s an actor holding
+  # `role.create` without `role.view`. Deliberately not copied: the role is
+  # created either way, so no business meaning changes.
+  defp after_create(socket, role) do
+    scope = socket.assigns.current_scope
+    socket = put_flash(socket, :info, "Role created.")
+
+    cond do
+      allowed?(scope, "admin.authz.role.view") ->
+        push_navigate(socket, to: ~p"/authz/roles/#{role.id}")
+
+      allowed?(scope, "admin.authz.role.list") ->
+        push_navigate(socket, to: ~p"/authz/roles")
+
+      # Create is the one page this actor can hold. Stay, with a cleared form,
+      # so the confirmation is visible and they can create another.
+      true ->
+        assign_form(socket, form_changeset(%{}, socket.assigns.company_ids))
     end
   end
 
