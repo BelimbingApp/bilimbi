@@ -227,7 +227,8 @@ defmodule Bilimbi.Base.Audit do
   defp maybe_search_mutations(query, ""), do: query
 
   defp maybe_search_mutations(query, search) do
-    pattern = "%#{search}%"
+    escaped = escape_like(search)
+    pattern = "%#{escaped}%"
 
     from(m in query,
       where:
@@ -254,9 +255,11 @@ defmodule Bilimbi.Base.Audit do
   defp maybe_search_actions(query, ""), do: query
 
   defp maybe_search_actions(query, search) do
-    pattern = "%#{search}%"
+    escaped = escape_like(search)
+    pattern = "%#{escaped}%"
 
     from(a in query,
+      # Note: Casts JSONB payload to text for substring searching across unstructured payload attributes.
       where:
         ilike(a.event, ^pattern) or
           ilike(coalesce(a.actor_role, ""), ^pattern) or
@@ -265,6 +268,13 @@ defmodule Bilimbi.Base.Audit do
           ilike(a.actor_type, ^pattern) or
           fragment("?::text ILIKE ?", a.payload, ^pattern)
     )
+  end
+
+  defp escape_like(value) when is_binary(value) do
+    value
+    |> String.replace("\\", "\\\\")
+    |> String.replace("%", "\\%")
+    |> String.replace("_", "\\_")
   end
 
   defp maybe_filter_action_actor_type(query, nil), do: query

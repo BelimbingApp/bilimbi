@@ -154,6 +154,7 @@
 
         <:col :let={action} label="Retain" align={:right}>
           <button
+            :if={@can_manage}
             type="button"
             phx-click="toggle_retain"
             phx-value-id={action.id}
@@ -168,6 +169,13 @@
           >
             <.icon name={if action.is_retained, do: "hero-bookmark-solid", else: "hero-bookmark"} class="size-4" />
           </button>
+          <span
+            :if={!@can_manage}
+            class="inline-block p-1 text-ink-muted/40 cursor-not-allowed"
+            title="Retention management requires admin.audit.log.manage permission"
+          >
+            <.icon name={if action.is_retained, do: "hero-bookmark-solid", else: "hero-bookmark"} class="size-4" />
+          </span>
         </:col>
 
         <:empty :if={@page.total_entries == 0}>

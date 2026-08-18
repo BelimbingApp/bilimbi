@@ -18,10 +18,14 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
   @results ~w(failure retained)
   @diagnostics ~w(hide show)
   @page_sizes [25, 50, 100, 300]
+  @manage_cap "admin.audit.log.manage"
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, page_title: "Audit Actions")}
+    {:ok,
+     socket
+     |> assign(page_title: "Audit Actions")
+     |> assign(can_manage: allowed?(socket.assigns.current_scope, @manage_cap))}
   end
 
   @impl true
@@ -69,15 +73,19 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
 
   @impl true
   def handle_event("toggle_retain", %{"id" => id_str}, socket) do
-    id = to_int(id_str, 0)
-    scope = socket.assigns.current_scope.scope
+    if allowed?(socket.assigns.current_scope, @manage_cap) do
+      id = to_int(id_str, 0)
+      scope = socket.assigns.current_scope.scope
 
-    case Audit.toggle_retained(scope, id) do
-      {:ok, _updated_action} ->
-        {:noreply, load(socket, socket.assigns.state)}
+      case Audit.toggle_retained(scope, id) do
+        {:ok, _updated_action} ->
+          {:noreply, load(socket, socket.assigns.state)}
 
-      {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, "Could not update retention status.")}
+        {:error, _reason} ->
+          {:noreply, put_flash(socket, :error, "Could not update retention status.")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "You do not have permission to manage audit logs.")}
     end
   end
 
@@ -108,6 +116,7 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
+      |> assign(:can_manage, allowed?(socket.assigns.current_scope, @manage_cap))
       |> stream(:actions, page.entries, reset: true)
     end
   end

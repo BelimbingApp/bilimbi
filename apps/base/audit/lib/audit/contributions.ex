@@ -4,6 +4,8 @@ defmodule Bilimbi.Base.Audit.Contributions do
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionProvider
 
   @list "admin.audit.log.list"
+  @manage "admin.audit.log.manage"
+  @view "admin.audit.log.view"
 
   @impl true
   def contributions do
@@ -34,10 +36,10 @@ defmodule Bilimbi.Base.Audit.Contributions do
         }
       ],
       authz: %{
-        capabilities: [@list],
+        capabilities: [@list, @manage, @view],
         roles: %{
-          "auditor" => %{capabilities: [@list]},
-          "system_viewer" => %{capabilities: [@list]}
+          "auditor" => %{capabilities: [@list, @manage, @view]},
+          "system_viewer" => %{capabilities: [@list, @view]}
         }
       }
     }

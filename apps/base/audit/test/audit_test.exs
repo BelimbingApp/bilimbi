@@ -294,4 +294,37 @@ defmodule Bilimbi.Base.AuditTest do
     # Toggle retention on unknown id
     assert {:error, :not_found} = Audit.toggle_retained(scope, 999_999)
   end
+
+  test "safely escapes wildcard characters in search" do
+    insert_tenant!(%{id: 41})
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, _normal} =
+      Audit.record_mutation(
+        scope,
+        mutation_attrs(%{subject_name: "Widget", auditable_id: "w1"})
+      )
+
+    {:ok, _percent} =
+      Audit.record_mutation(
+        scope,
+        mutation_attrs(%{subject_name: "100% discount", auditable_id: "w2"})
+      )
+
+    {:ok, _underscore} =
+      Audit.record_mutation(
+        scope,
+        mutation_attrs(%{subject_name: "user_name", auditable_id: "w3"})
+      )
+
+    # Searching "%" matches only the literal "%" row, not all rows
+    percent_page = Audit.list_mutations(scope, search: "%")
+    assert percent_page.total_entries == 1
+    assert hd(percent_page.entries).subject_name == "100% discount"
+
+    # Searching "_" matches only the literal "_" row, not single-character wildcards
+    underscore_page = Audit.list_mutations(scope, search: "_")
+    assert underscore_page.total_entries == 1
+    assert hd(underscore_page.entries).subject_name == "user_name"
+  end
 end

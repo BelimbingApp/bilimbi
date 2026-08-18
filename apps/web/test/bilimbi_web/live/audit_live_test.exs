@@ -152,6 +152,30 @@ defmodule BilimbiWeb.AuditLiveTest do
   end
 
   describe "Audit Actions (/audit/actions)" do
+    test "cannot toggle retention without admin.audit.log.manage", %{conn: conn, scope: scope} do
+      grant_capabilities!("admin.audit.log.list")
+
+      {:ok, action} =
+        Audit.record_action(
+          scope,
+          %{
+            company_id: 73,
+            actor_type: "user",
+            actor_id: 91,
+            event: "http.request",
+            occurred_at: ~N[2026-08-18 10:15:00],
+            is_retained: false
+          }
+        )
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/actions?diagnostics=show")
+
+      refute has_element?(view, "button#action-retain-#{action.id}")
+
+      render_hook(view, "toggle_retain", %{"id" => to_string(action.id)})
+      assert render(view) =~ "You do not have permission to manage audit logs."
+    end
+
     test "requires authentication", %{conn: conn} do
       assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/audit/actions")
     end
@@ -162,7 +186,7 @@ defmodule BilimbiWeb.AuditLiveTest do
     end
 
     test "renders actions, toggles retention, and marks nav active", %{conn: conn, scope: scope} do
-      grant_capabilities!("admin.audit.log.list")
+      grant_capabilities!(["admin.audit.log.list", "admin.audit.log.manage"])
 
       {:ok, action} =
         Audit.record_action(
