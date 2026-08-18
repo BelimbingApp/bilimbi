@@ -15,11 +15,11 @@ defmodule BilimbiWeb.DashboardLive do
   alias BilimbiWeb.UserAuth
 
   @widget_ids Enum.sort([
-                "base.dashboard.company-stats",
-                "base.dashboard.user-stats",
-                "base.dashboard.session-stats",
-                "base.dashboard.recent-audit"
-              ])
+               "base-dashboard-company-stats",
+               "base-dashboard-user-stats",
+               "base-dashboard-session-stats",
+               "base-dashboard-recent-audit"
+             ])
 
   @impl true
   def mount(_params, _session, socket) do
@@ -75,25 +75,25 @@ defmodule BilimbiWeb.DashboardLive do
 
         <div id="dashboard-widgets" class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <.company_stat_card
-            :if={"base.dashboard.company-stats" in @visible_widget_ids}
-            id="dashboard-widget-base.dashboard.company-stats"
+            :if={"base-dashboard-company-stats" in @visible_widget_ids}
+            id="stat-companies"
             count={@company_count}
             navigate={if UserAuth.allowed?(@current_scope, "admin.company.list"), do: ~p"/companies"}
           />
           <.user_stat_card
-            :if={"base.dashboard.user-stats" in @visible_widget_ids}
-            id="dashboard-widget-base.dashboard.user-stats"
+            :if={"base-dashboard-user-stats" in @visible_widget_ids}
+            id="stat-users"
             count={@user_count}
             navigate={if UserAuth.allowed?(@current_scope, "admin.user.list"), do: ~p"/users"}
           />
           <.session_stat_card
-            :if={"base.dashboard.session-stats" in @visible_widget_ids}
-            id="dashboard-widget-base.dashboard.session-stats"
+            :if={"base-dashboard-session-stats" in @visible_widget_ids}
+            id="stat-sessions"
             navigate={~p"/system/sessions"}
           />
           <.audit_activity_card
-            :if={"base.dashboard.recent-audit" in @visible_widget_ids}
-            id="dashboard-widget-base.dashboard.recent-audit"
+            :if={"base-dashboard-recent-audit" in @visible_widget_ids}
+            id="stat-recent-audit"
             navigate={~p"/audit/mutations"}
           />
         </div>

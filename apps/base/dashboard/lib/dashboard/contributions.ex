@@ -15,28 +15,26 @@ defmodule Bilimbi.Base.Dashboard.Contributions do
       menu: [],
       dashboard: [
         %{
-          id: "base.dashboard.company-stats",
+          id: "base-dashboard-company-stats",
           label: "Companies",
           size: :small,
-          order: 10,
-          capability: "admin.company.list"
+          order: 10
         },
         %{
-          id: "base.dashboard.user-stats",
+          id: "base-dashboard-user-stats",
           label: "Users",
           size: :small,
-          order: 20,
-          capability: "admin.user.list"
+          order: 20
         },
         %{
-          id: "base.dashboard.session-stats",
+          id: "base-dashboard-session-stats",
           label: "Active Sessions",
           size: :small,
           order: 30,
           capability: "admin.session.list"
         },
         %{
-          id: "base.dashboard.recent-audit",
+          id: "base-dashboard-recent-audit",
           label: "Recent Activity",
           size: :medium,
           order: 40,
