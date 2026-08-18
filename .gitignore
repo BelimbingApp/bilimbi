@@ -1,14 +1,14 @@
 # The directory Mix will write compiled artifacts to.
-/_build/
+/_build
 
 # If you run "mix test --cover", coverage assets end up here.
-/cover/
+/cover
 
 # The directory Mix downloads your dependencies sources to.
-/deps/
+/deps
 
 # Where 3rd-party dependencies like ExDoc output generated docs.
-/doc/
+/doc
 
 # Ignore .fetch files in case you like to edit your project deps locally.
 /.fetch
@@ -20,14 +20,14 @@ erl_crash.dump
 *.ez
 
 # Temporary files, for example, from tests.
-/tmp/
+/tmp
 
 # Ignore package tarball (built via "mix hex.build").
 bilimbi-*.tar
 
 # Ignore assets that are produced by build tools.
-/priv/static/assets/
-/apps/web/priv/static/assets/
+/priv/static/assets
+/apps/web/priv/static/assets
 
 # Ignore digested assets cache.
 /priv/static/cache_manifest.json
@@ -35,18 +35,17 @@ bilimbi-*.tar
 
 # In case you use Node.js/npm, you want to ignore these.
 npm-debug.log
-/assets/node_modules/
-/apps/web/assets/node_modules/
+/assets/node_modules
+/apps/web/assets/node_modules
 
 # Local Elixir language-server state.
-/.elixir_ls/
+/.elixir_ls
 
 # Claude is part of the project AI team; only personal overrides stay local.
 /.claude/settings.local.json
 
 # Convenient store for human and AI agents
 /docs/scratch
-/tmp/
 
 # Base, Core, and Web belong to the Platform repository. Domains and Extensions
 # mount as independent nested repositories directly below `apps/`, so ignore
@@ -59,5 +58,5 @@ npm-debug.log
 !/apps/web/
 
 # Python bytecode from .github/scripts tests
-__pycache__/
+__pycache__
 *.pyc

@@ -100,6 +100,18 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
     end
   end
 
+  test ".gitignore ignores deps, _build, and build artifacts without trailing slash restriction" do
+    gitignore = File.read!(Path.join(@workspace_root, ".gitignore"))
+
+    for path <- ~w(/_build /deps /cover /doc /tmp /.elixir_ls) do
+      assert gitignore =~ "\n#{path}\n" or gitignore =~ "#{path}\n",
+             "expected #{path} to be ignored without a trailing slash"
+
+      refute gitignore =~ "#{path}/\n",
+             "expected #{path} not to have a trailing slash restricting it to directories only"
+    end
+  end
+
   defp module_roots_on_disk do
     @workspace_root
     |> Path.join("apps/*/bilimbi.container.exs")
