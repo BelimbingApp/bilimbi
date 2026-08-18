@@ -227,4 +227,29 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     assert {:noreply, ^socket} = CountriesLive.handle_event("update-countries", %{}, socket)
   end
+
+  test "handles country update async result with connection timeout error" do
+    socket = %Phoenix.LiveView.Socket{
+      endpoint: BilimbiWeb.Endpoint,
+      router: BilimbiWeb.Router,
+      assigns: %{
+        __changed__: %{},
+        flash: %{},
+        updating_countries?: true
+      }
+    }
+
+    assert {:noreply, socket} =
+             CountriesLive.handle_async(
+               :update_countries,
+               {:ok,
+                {:error,
+                 {:download, :countries,
+                  {:request, %Mint.TransportError{reason: :connect_timeout}}}}},
+               socket
+             )
+
+    refute socket.assigns.updating_countries?
+    assert socket.assigns.flash["error"] =~ "could not connect to download.geonames.org"
+  end
 end

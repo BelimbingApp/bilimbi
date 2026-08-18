@@ -47,7 +47,14 @@ defmodule Bilimbi.Core.Geonames.Downloader do
         retry: false
       )
 
-    case Req.get(request_options) do
+    response =
+      try do
+        Req.get(request_options)
+      rescue
+        exception -> {:error, exception}
+      end
+
+    case response do
       {:ok, %Req.Response{status: 304}} when not is_nil(stored_etag) ->
         File.rm(temporary_path)
         {:ok, cached_result(destination, 304, stored_etag)}
@@ -62,11 +69,28 @@ defmodule Bilimbi.Core.Geonames.Downloader do
 
       {:ok, %Req.Response{status: status}} ->
         File.rm(temporary_path)
-        {:error, {:http_status, status}}
+
+        if not force? and status in [500, 502, 503, 504, 429] and valid_cached_file?(destination) do
+          {:ok, cached_result(destination, :fallback, stored_etag)}
+        else
+          {:error, {:http_status, status}}
+        end
 
       {:error, exception} ->
         File.rm(temporary_path)
-        {:error, {:request, exception}}
+
+        if not force? and valid_cached_file?(destination) do
+          {:ok, cached_result(destination, :fallback, stored_etag)}
+        else
+          {:error, {:request, exception}}
+        end
+    end
+  end
+
+  defp valid_cached_file?(destination) do
+    case File.stat(destination) do
+      {:ok, %{size: size}} when size > 0 -> true
+      _other -> false
     end
   end
 
