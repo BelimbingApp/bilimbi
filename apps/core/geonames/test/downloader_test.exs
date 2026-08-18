@@ -125,7 +125,7 @@ defmodule Bilimbi.Core.Geonames.DownloaderTest do
              )
 
     assert result.cached
-    assert result.status == :fallback
+    assert result.status == {:fallback, :unreachable}
     assert result.etag == ~s("v1")
     assert File.read!(destination) == "cached fallback"
   end
@@ -149,8 +149,48 @@ defmodule Bilimbi.Core.Geonames.DownloaderTest do
              )
 
     assert result.cached
-    assert result.status == :fallback
+    # The cause matters: a 503 means GeoNames answered and refused, which is a
+    # different thing to tell an operator than an unreachable host (#273).
+    assert result.status == {:fallback, {:http_status, 503}}
     assert result.etag == ~s("v2")
     assert File.read!(destination) == "cached 503 fallback"
+  end
+
+  test "a fallback reports when the data it served was written", %{directory: directory} do
+    destination = Path.join(directory, "countryInfo.txt")
+    File.write!(destination, "cached fallback")
+    # Without an etag the fresh-cache path returns before any request is made,
+    # so there would be no fallback to observe.
+    File.write!(destination <> ".etag", ~s("v1"))
+
+    assert {:ok, result} =
+             Downloader.download("https://example.test/countries", destination,
+               req_options: [
+                 plug: fn _conn -> raise %Mint.TransportError{reason: :nxdomain} end
+               ]
+             )
+
+    assert result.status == {:fallback, :unreachable}
+
+    # Without this the screen can say a fallback happened but not how old the
+    # data is, which is the difference between "retry later" and "this is from
+    # March" (#273).
+    assert %DateTime{} = result.cached_at
+    assert DateTime.diff(DateTime.utc_now(), result.cached_at) < 60
+  end
+
+  test "a programming error is not disguised as a cache fallback", %{directory: directory} do
+    destination = Path.join(directory, "countryInfo.txt")
+    File.write!(destination, "cached fallback")
+    File.write!(destination <> ".etag", ~s("v1"))
+
+    # An ArgumentError stands in for a bug in our own request construction. The
+    # blanket rescue turned every such bug into a served-from-cache success, so
+    # a broken downloader looked like a working page (#273).
+    assert_raise ArgumentError, fn ->
+      Downloader.download("https://example.test/countries", destination,
+        req_options: [plug: fn _conn -> raise ArgumentError, "bug in our own code" end]
+      )
+    end
   end
 end

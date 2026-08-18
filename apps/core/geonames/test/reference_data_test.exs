@@ -142,4 +142,52 @@ defmodule Bilimbi.Core.Geonames.ReferenceDataTest do
   defp postcode_file do
     "MY\t50000\tKuala Lumpur\tKuala Lumpur\t14\t\t\t\t\t3.139\t101.6869\t4\n"
   end
+
+  test "the download status reaches the caller, not just the cached flag", context do
+    cached_at = DateTime.new!(~D[2026-03-04], ~T[09:00:00], "Etc/UTC")
+
+    # A fallback and a 304 both report `cached: true`. Only `:status` separates
+    # "the server confirmed you are current" from "the download failed and we
+    # kept what we had", and the screen cannot tell the operator the difference
+    # unless this layer passes it on (#273).
+    fallback_downloader = fn _url, destination, _opts ->
+      File.cp!(Path.join(context.source_dir, Path.basename(destination)), destination)
+
+      {:ok,
+       %{
+         path: destination,
+         cached: true,
+         status: {:fallback, :unreachable},
+         etag: nil,
+         cached_at: cached_at
+       }}
+    end
+
+    assert {:ok, results} =
+             ReferenceData.run(
+               datasets: [:countries],
+               cache_dir: context.cache_dir,
+               downloader: fallback_downloader
+             )
+
+    assert results.countries.cached
+    assert results.countries.download_status == {:fallback, :unreachable}
+    assert results.countries.cached_at == cached_at
+  end
+
+  test "a genuine cache hit is not reported as a fallback", context do
+    not_modified = fn _url, destination, _opts ->
+      File.cp!(Path.join(context.source_dir, Path.basename(destination)), destination)
+      {:ok, %{path: destination, cached: true, status: 304, etag: ~s("v1"), cached_at: nil}}
+    end
+
+    assert {:ok, results} =
+             ReferenceData.run(
+               datasets: [:countries],
+               cache_dir: context.cache_dir,
+               downloader: not_modified
+             )
+
+    assert results.countries.download_status == 304
+  end
 end

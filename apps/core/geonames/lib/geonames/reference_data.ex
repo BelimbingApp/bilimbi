@@ -53,7 +53,14 @@ defmodule Bilimbi.Core.Geonames.ReferenceData do
       with {:ok, download} <- downloader.(url, destination, download_opts),
            {:ok, import_path} <- import_path(dataset, download, entry, cache_dir),
            {:ok, result} <- import_file(dataset, import_path, opts) do
-        {:ok, Map.put(result, :cached, download.cached)}
+        {:ok,
+         result
+         |> Map.put(:cached, download.cached)
+         # `:status` is what separates "the server confirmed you are current"
+         # from "the download failed and we kept what we had". Dropping it here
+         # made those two identical to every caller (#273).
+         |> Map.put(:download_status, download.status)
+         |> Map.put(:cached_at, Map.get(download, :cached_at))}
       else
         {:error, {:download, _dataset, _reason} = reason} -> {:error, reason}
         {:error, {:extract, _dataset, _reason} = reason} -> {:error, reason}
