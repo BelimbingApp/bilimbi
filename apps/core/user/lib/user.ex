@@ -1488,129 +1488,162 @@ defmodule Bilimbi.Core.User do
   # --- User Database Queries ---
 
   @doc """
-  Lists saved database queries owned by the given user ID.
+  Lists saved database queries owned by the given user ID within the tenant scope.
   """
-  @spec list_database_queries(pos_integer(), keyword()) :: [DatabaseQuery.t()]
-  def list_database_queries(user_id, opts \\ []) when is_integer(user_id) do
-    search = Keyword.get(opts, :search)
-    sort_by = Keyword.get(opts, :sort_by, :name)
-    sort_dir = Keyword.get(opts, :sort_dir, :asc)
+  @spec list_database_queries(Scope.t(), pos_integer(), keyword()) ::
+          {:ok, [DatabaseQuery.t()]} | {:error, :user_not_found}
+  def list_database_queries(%Scope{} = scope, user_id, opts \\ [])
+      when is_integer(user_id) and user_id > 0 and is_list(opts) do
+    with {:ok, _user} <- get_tenant_user(scope, user_id) do
+      search = Keyword.get(opts, :search)
+      sort_by = Keyword.get(opts, :sort_by, :name)
+      sort_dir = Keyword.get(opts, :sort_dir, :asc)
 
-    base_query = from(q in DatabaseQuery, where: q.user_id == ^user_id)
+      base_query = from(q in DatabaseQuery, where: q.user_id == ^user_id)
 
-    query =
-      if is_binary(search) and String.trim(search) != "" do
-        pattern = "%#{String.trim(search)}%"
-        from(q in base_query, where: ilike(q.name, ^pattern) or ilike(q.description, ^pattern))
-      else
-        base_query
-      end
+      query =
+        if is_binary(search) and String.trim(search) != "" do
+          pattern = "%#{String.trim(search)}%"
+          from(q in base_query, where: ilike(q.name, ^pattern) or ilike(q.description, ^pattern))
+        else
+          base_query
+        end
 
-    order_field =
-      case sort_by do
-        :name -> :name
-        :description -> :description
-        :created_at -> :created_at
-        :updated_at -> :updated_at
-        "name" -> :name
-        "description" -> :description
-        "created_at" -> :created_at
-        "updated_at" -> :updated_at
-        _ -> :name
-      end
+      order_field =
+        case sort_by do
+          :name -> :name
+          :description -> :description
+          :created_at -> :created_at
+          :updated_at -> :updated_at
+          "name" -> :name
+          "description" -> :description
+          "created_at" -> :created_at
+          "updated_at" -> :updated_at
+          _ -> :name
+        end
 
-    order_expr =
-      if sort_dir in [:desc, "desc", "DESC"] do
-        [desc: order_field, desc: :id]
-      else
-        [asc: order_field, asc: :id]
-      end
+      order_expr =
+        if sort_dir in [:desc, "desc", "DESC"] do
+          [desc: order_field, desc: :id]
+        else
+          [asc: order_field, asc: :id]
+        end
 
-    from(q in query, order_by: ^order_expr)
-    |> Repo.all()
-  end
+      queries =
+        from(q in query, order_by: ^order_expr)
+        |> Repo.all()
 
-  @doc """
-  Fetches a database query owned by the user by integer ID or binary slug.
-  """
-  @spec get_database_query(pos_integer(), pos_integer() | String.t()) ::
-          {:ok, DatabaseQuery.t()} | {:error, :not_found}
-  def get_database_query(user_id, id) when is_integer(user_id) and is_integer(id) do
-    case Repo.get_by(DatabaseQuery, id: id, user_id: user_id) do
-      nil -> {:error, :not_found}
-      %DatabaseQuery{} = query -> {:ok, query}
+      {:ok, queries}
     end
   end
 
-  def get_database_query(user_id, slug) when is_integer(user_id) and is_binary(slug) do
-    case Repo.get_by(DatabaseQuery, slug: slug, user_id: user_id) do
-      nil -> {:error, :not_found}
-      %DatabaseQuery{} = query -> {:ok, query}
+  @doc """
+  Fetches a database query owned by the user by integer ID or binary slug within the tenant scope.
+  """
+  @spec get_database_query(Scope.t(), pos_integer(), pos_integer() | String.t()) ::
+          {:ok, DatabaseQuery.t()} | {:error, :user_not_found | :not_found}
+  def get_database_query(%Scope{} = scope, user_id, id)
+      when is_integer(user_id) and user_id > 0 and is_integer(id) do
+    with {:ok, _user} <- get_tenant_user(scope, user_id) do
+      case Repo.get_by(DatabaseQuery, id: id, user_id: user_id) do
+        nil -> {:error, :not_found}
+        %DatabaseQuery{} = query -> {:ok, query}
+      end
     end
   end
 
-  def get_database_query(_user_id, _invalid), do: {:error, :not_found}
+  def get_database_query(%Scope{} = scope, user_id, slug)
+      when is_integer(user_id) and user_id > 0 and is_binary(slug) do
+    with {:ok, _user} <- get_tenant_user(scope, user_id) do
+      case Repo.get_by(DatabaseQuery, slug: slug, user_id: user_id) do
+        nil -> {:error, :not_found}
+        %DatabaseQuery{} = query -> {:ok, query}
+      end
+    end
+  end
+
+  def get_database_query(%Scope{}, _user_id, _invalid), do: {:error, :not_found}
 
   @doc """
-  Creates a new saved database query for the given user ID.
+  Creates a new saved database query for the given user ID within the tenant scope.
   """
-  @spec create_database_query(pos_integer(), map()) ::
-          {:ok, DatabaseQuery.t()} | {:error, Changeset.t()}
-  def create_database_query(user_id, attrs) when is_integer(user_id) and is_map(attrs) do
-    key = if Enum.any?(Map.keys(attrs), &is_binary/1), do: "user_id", else: :user_id
-    attrs = Map.put(attrs, key, user_id)
-
-    %DatabaseQuery{}
-    |> DatabaseQuery.changeset(attrs)
-    |> Repo.insert()
+  @spec create_database_query(Scope.t(), pos_integer(), map()) ::
+          {:ok, DatabaseQuery.t()} | {:error, :user_not_found | Changeset.t()}
+  def create_database_query(%Scope{} = scope, user_id, attrs)
+      when is_integer(user_id) and user_id > 0 and is_map(attrs) do
+    with {:ok, _user} <- get_tenant_user(scope, user_id) do
+      user_id
+      |> DatabaseQuery.creation_changeset(attrs)
+      |> Repo.insert()
+    end
   end
 
   @doc """
-  Updates an existing database query owned by the user.
+  Updates an existing database query owned by the user within the tenant scope.
   """
   @spec update_database_query(
+          Scope.t(),
           pos_integer(),
           DatabaseQuery.t() | pos_integer() | String.t(),
           map()
         ) ::
-          {:ok, DatabaseQuery.t()} | {:error, Changeset.t() | :not_found}
-  def update_database_query(user_id, %DatabaseQuery{user_id: user_id} = query, attrs)
-      when is_integer(user_id) and is_map(attrs) do
-    query
-    |> DatabaseQuery.changeset(attrs)
-    |> Repo.update()
+          {:ok, DatabaseQuery.t()} | {:error, :user_not_found | :not_found | Changeset.t()}
+  def update_database_query(
+        %Scope{} = scope,
+        user_id,
+        %DatabaseQuery{user_id: user_id} = query,
+        attrs
+      )
+      when is_integer(user_id) and user_id > 0 and is_map(attrs) do
+    with {:ok, _user} <- get_tenant_user(scope, user_id) do
+      query
+      |> DatabaseQuery.changeset(attrs)
+      |> Repo.update()
+    end
   end
 
-  def update_database_query(user_id, id_or_slug, attrs)
-      when is_integer(user_id) and is_map(attrs) do
-    with {:ok, query} <- get_database_query(user_id, id_or_slug) do
-      update_database_query(user_id, query, attrs)
+  def update_database_query(%Scope{} = scope, user_id, id_or_slug, attrs)
+      when is_integer(user_id) and user_id > 0 and is_map(attrs) do
+    with {:ok, query} <- get_database_query(scope, user_id, id_or_slug) do
+      update_database_query(scope, user_id, query, attrs)
     end
   end
 
   @doc """
-  Deletes a saved database query owned by the user.
+  Deletes a saved database query owned by the user within the tenant scope.
   """
-  @spec delete_database_query(pos_integer(), DatabaseQuery.t() | pos_integer() | String.t()) ::
-          {:ok, DatabaseQuery.t()} | {:error, Changeset.t() | :not_found}
-  def delete_database_query(user_id, %DatabaseQuery{user_id: user_id} = query)
-      when is_integer(user_id) do
-    Repo.delete(query)
+  @spec delete_database_query(
+          Scope.t(),
+          pos_integer(),
+          DatabaseQuery.t() | pos_integer() | String.t()
+        ) ::
+          {:ok, DatabaseQuery.t()} | {:error, :user_not_found | :not_found | Changeset.t()}
+  def delete_database_query(%Scope{} = scope, user_id, %DatabaseQuery{user_id: user_id} = query)
+      when is_integer(user_id) and user_id > 0 do
+    with {:ok, _user} <- get_tenant_user(scope, user_id) do
+      Repo.delete(query)
+    end
   end
 
-  def delete_database_query(user_id, id_or_slug) when is_integer(user_id) do
-    with {:ok, query} <- get_database_query(user_id, id_or_slug) do
-      delete_database_query(user_id, query)
+  def delete_database_query(%Scope{} = scope, user_id, id_or_slug)
+      when is_integer(user_id) and user_id > 0 do
+    with {:ok, query} <- get_database_query(scope, user_id, id_or_slug) do
+      delete_database_query(scope, user_id, query)
     end
   end
 
   @doc """
   Duplicates an existing database query for the user, assigning a new unique slug.
   """
-  @spec duplicate_database_query(pos_integer(), DatabaseQuery.t() | pos_integer() | String.t()) ::
-          {:ok, DatabaseQuery.t()} | {:error, Changeset.t() | :not_found}
-  def duplicate_database_query(user_id, id_or_slug) when is_integer(user_id) do
-    with {:ok, original} <- get_database_query(user_id, id_or_slug) do
+  @spec duplicate_database_query(
+          Scope.t(),
+          pos_integer(),
+          DatabaseQuery.t() | pos_integer() | String.t()
+        ) ::
+          {:ok, DatabaseQuery.t()} | {:error, :user_not_found | :not_found | Changeset.t()}
+  def duplicate_database_query(%Scope{} = scope, user_id, id_or_slug)
+      when is_integer(user_id) and user_id > 0 do
+    with {:ok, original} <- get_database_query(scope, user_id, id_or_slug) do
       attrs = %{
         name: "#{original.name} (Copy)",
         prompt: original.prompt,
@@ -1619,7 +1652,7 @@ defmodule Bilimbi.Core.User do
         icon: original.icon
       }
 
-      create_database_query(user_id, attrs)
+      create_database_query(scope, user_id, attrs)
     end
   end
 

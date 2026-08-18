@@ -90,10 +90,11 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
   @impl true
   def handle_event("duplicate", %{"id" => id_str}, socket) do
     if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
+      scope = socket.assigns.current_scope.scope
       user_id = current_user_id(socket)
       query_id = to_integer(id_str, 0)
 
-      case User.duplicate_database_query(user_id, query_id) do
+      case User.duplicate_database_query(scope, user_id, query_id) do
         {:ok, duplicate} ->
           {:noreply,
            socket
@@ -111,10 +112,11 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
   @impl true
   def handle_event("delete", %{"id" => id_str}, socket) do
     if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
+      scope = socket.assigns.current_scope.scope
       user_id = current_user_id(socket)
       query_id = to_integer(id_str, 0)
 
-      case User.delete_database_query(user_id, query_id) do
+      case User.delete_database_query(scope, user_id, query_id) do
         {:ok, _deleted} ->
           {:noreply,
            socket
@@ -133,6 +135,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
   defp default_sort_dir(_col), do: :asc
 
   defp load_queries(socket) do
+    scope = socket.assigns.current_scope.scope
     user_id = current_user_id(socket)
 
     opts = [
@@ -141,7 +144,12 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
       sort_dir: socket.assigns.sort_dir
     ]
 
-    all_queries = User.list_database_queries(user_id, opts)
+    all_queries =
+      case User.list_database_queries(scope, user_id, opts) do
+        {:ok, queries} -> queries
+        {:error, _} -> []
+      end
+
     total_count = length(all_queries)
     per_page = socket.assigns.per_page
     total_pages = max(ceil(total_count / per_page), 1)

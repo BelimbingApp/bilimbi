@@ -54,9 +54,10 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
 
   @impl true
   def handle_params(%{"slug" => slug}, _uri, socket) do
+    scope = socket.assigns.current_scope.scope
     user_id = current_user_id(socket)
 
-    case User.get_database_query(user_id, slug) do
+    case User.get_database_query(scope, user_id, slug) do
       {:ok, query} ->
         sql = query.sql_query || ""
         detected = Database.extract_named_parameters(sql)
@@ -79,7 +80,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
         # Automatically execute query if SQL is non-empty
         {:noreply, if(String.trim(sql) != "", do: execute_query(socket), else: socket)}
 
-      {:error, :not_found} ->
+      {:error, _} ->
         {:noreply,
          socket
          |> put_flash(:error, "Query not found.")
@@ -130,6 +131,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   @impl true
   def handle_event("save", _params, socket) do
     if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
+      scope = socket.assigns.current_scope.scope
       user_id = current_user_id(socket)
 
       attrs = %{
@@ -140,7 +142,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
       }
 
       if socket.assigns.is_new do
-        case User.create_database_query(user_id, attrs) do
+        case User.create_database_query(scope, user_id, attrs) do
           {:ok, query} ->
             {:noreply,
              socket
@@ -152,7 +154,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
             {:noreply, assign(socket, :error, "Failed to save query: " <> error_msg)}
         end
       else
-        case User.update_database_query(user_id, socket.assigns.query.id, attrs) do
+        case User.update_database_query(scope, user_id, socket.assigns.query.id, attrs) do
           {:ok, updated_query} ->
             {:noreply,
              socket
@@ -215,10 +217,11 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   @impl true
   def handle_event("duplicate", _params, socket) do
     if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
+      scope = socket.assigns.current_scope.scope
       user_id = current_user_id(socket)
 
       if socket.assigns.query do
-        case User.duplicate_database_query(user_id, socket.assigns.query.id) do
+        case User.duplicate_database_query(scope, user_id, socket.assigns.query.id) do
           {:ok, duplicate} ->
             {:noreply,
              socket
@@ -239,6 +242,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   @impl true
   def handle_event("delete", _params, socket) do
     if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
+      scope = socket.assigns.current_scope.scope
       user_id = current_user_id(socket)
 
       if socket.assigns.is_new || is_nil(socket.assigns.query) do
@@ -247,7 +251,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
          |> put_flash(:info, "Query discarded.")
          |> push_navigate(to: ~p"/admin/system/database-queries")}
       else
-        case User.delete_database_query(user_id, socket.assigns.query.id) do
+        case User.delete_database_query(scope, user_id, socket.assigns.query.id) do
           {:ok, _deleted} ->
             {:noreply,
              socket
@@ -290,16 +294,22 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
 
   defp maybe_record_audit(socket, sql) do
     if Map.has_key?(socket.assigns, :current_scope) and
-         Map.has_key?(socket.assigns.current_scope, :scope) do
+         Map.has_key?(socket.assigns.current_scope, :scope) and
+         Map.has_key?(socket.assigns.current_scope, :actor) do
       scope = socket.assigns.current_scope.scope
+      actor = socket.assigns.current_scope.actor
 
-      if Code.ensure_loaded?(Bilimbi.Base.Audit) do
-        apply(Bilimbi.Base.Audit, :record_action, [
-          scope,
-          "database_query.executed",
-          %{name: socket.assigns.name, sql: sql}
-        ])
-      end
+      audit_attrs = %{
+        actor_type: to_string(actor.type),
+        actor_id: actor.id,
+        company_id: actor.company_id,
+        event: "database_query.executed",
+        payload: %{"name" => socket.assigns.name, "sql" => sql},
+        is_retained: false,
+        occurred_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+      }
+
+      Bilimbi.Base.Audit.record_action(scope, audit_attrs)
     end
   rescue
     _ -> :ok

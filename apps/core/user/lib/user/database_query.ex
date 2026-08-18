@@ -25,17 +25,23 @@ defmodule Bilimbi.Core.User.DatabaseQuery do
     timestamps(type: :naive_datetime, inserted_at: :created_at)
   end
 
-  @fields [:user_id, :name, :slug, :prompt, :sql_query, :description, :icon]
-  @required_fields [:user_id, :name, :sql_query]
+  @cast_fields [:name, :slug, :prompt, :sql_query, :description, :icon]
+  @required_fields [:name, :sql_query]
 
-  def changeset(query, attrs) do
+  def changeset(%__MODULE__{} = query, attrs) do
     query
-    |> cast(attrs, @fields)
+    |> cast(attrs, @cast_fields)
     |> validate_required(@required_fields)
     |> validate_length(:name, max: 150)
     |> validate_length(:slug, max: 200)
     |> maybe_generate_slug()
     |> unique_constraint([:user_id, :slug], name: :user_database_queries_user_id_slug_unique)
+  end
+
+  def creation_changeset(user_id, attrs) when is_integer(user_id) and user_id > 0 do
+    %__MODULE__{user_id: user_id}
+    |> changeset(attrs)
+    |> validate_required([:user_id])
   end
 
   defp maybe_generate_slug(changeset) do
