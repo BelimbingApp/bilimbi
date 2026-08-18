@@ -53,15 +53,8 @@ defmodule BilimbiWeb.PinController do
           id when is_binary(id) -> String.to_integer(id)
         end)
 
-      case User.reorder_user_pins(user_id, pin_ids) do
-        {:ok, pins} ->
-          json(conn, %{pins: format_pins(pins)})
-
-        {:error, _reason} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "could_not_reorder"})
-      end
+      {:ok, pins} = User.reorder_user_pins(user_id, pin_ids)
+      json(conn, %{pins: format_pins(pins)})
     else
       conn
       |> put_status(:unauthorized)
