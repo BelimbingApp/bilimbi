@@ -430,6 +430,32 @@ defmodule BilimbiWeb.UserAuth do
     socket = mount_current_scope(socket, session)
 
     if socket.assigns.current_scope do
+      current_scope = socket.assigns.current_scope
+      user_id = current_scope.actor.id
+
+      if Phoenix.LiveView.connected?(socket) do
+        User.subscribe_notifications(current_scope.scope, user_id)
+      end
+
+      socket =
+        Phoenix.LiveView.attach_hook(
+          socket,
+          :user_notifications_live_subscriber,
+          :handle_info,
+          fn
+            {:notification_event, _event}, socket ->
+              Phoenix.LiveView.send_update(
+                Bilimbi.Core.User.Web.NotificationBellComponent,
+                id: "topbar-notification-bell"
+              )
+
+              {:cont, socket}
+
+            _other, socket ->
+              {:cont, socket}
+          end
+        )
+
       {:cont, socket}
     else
       {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}

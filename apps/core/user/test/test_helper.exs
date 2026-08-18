@@ -9,3 +9,10 @@ Code.require_file(Path.expand("../../employee/test/support/test_fixtures.ex", __
 
 ExUnit.start()
 Ecto.Adapters.SQL.Sandbox.mode(Bilimbi.Base.Repo, :manual)
+
+pubsub_server = Bilimbi.Core.User.TestPubSub
+Application.put_env(:bilimbi_core_user, :pubsub_server, pubsub_server)
+
+unless Process.whereis(pubsub_server) do
+  Supervisor.start_link([{Phoenix.PubSub, name: pubsub_server}], strategy: :one_for_one)
+end

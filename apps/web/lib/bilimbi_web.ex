@@ -89,7 +89,7 @@ defmodule BilimbiWeb do
       import Bilimbi.Base.UI.Components
 
       # Common modules used in templates
-      alias Bilimbi.Base.UI.Layouts
+      alias BilimbiWeb.Layouts
       alias Phoenix.LiveView.JS
 
       # Routes generation with the ~p sigil

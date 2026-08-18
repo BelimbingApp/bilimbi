@@ -36,5 +36,12 @@
     path: "/settings/appearance",
     live: Bilimbi.Core.User.Web.AppearanceLive,
     session: :auth
+  },
+  %{
+    # No capability: notifications belong to the signed-in account, and
+    # Belimbing guards it with authentication alone.
+    path: "/notifications",
+    live: Bilimbi.Core.User.Web.NotificationsLive,
+    session: :auth
   }
 ]

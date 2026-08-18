@@ -1,0 +1,108 @@
+<div
+  id={@id}
+  class="relative"
+  phx-click-away={JS.push("close_dropdown", target: @myself)}
+  phx-window-keydown={JS.push("close_dropdown", target: @myself)}
+  phx-key="escape"
+>
+  <button
+    type="button"
+    id="app-notifications-bell"
+    phx-click="toggle_dropdown"
+    phx-target={@myself}
+    class="relative inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-action transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong cursor-pointer"
+    aria-haspopup="true"
+    aria-expanded={to_string(@open)}
+    aria-label={aria_label(@unread_count)}
+    title="Notifications"
+  >
+    <.icon name="hero-bell" class="size-4" />
+    <span
+      :if={@unread_count > 0}
+      id="app-notifications-unread-badge"
+      class="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-0.5 inline-flex items-center justify-center rounded-full bg-brand-strong text-white text-[9px] font-semibold leading-none tabular-nums"
+    >
+      {badge_count(@unread_count)}
+    </span>
+  </button>
+
+  <div
+    :if={@open}
+    id="app-notifications-dropdown"
+    class="absolute right-0 top-full mt-1 w-80 rounded-lg border border-line bg-surface shadow-lg z-50 overflow-hidden"
+  >
+    <div class="flex items-center justify-between border-b border-line px-3 py-2 bg-surface-subtle/50">
+      <span class="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+        Notifications
+      </span>
+      <div class="flex items-center gap-2">
+        <button
+          :if={@unread_count > 0}
+          id="bell-mark-all-read"
+          type="button"
+          phx-click="mark_all_read"
+          phx-target={@myself}
+          class="text-xs text-brand font-medium hover:underline cursor-pointer"
+        >
+          Mark all read
+        </button>
+        <.link
+          navigate={~p"/notifications"}
+          class="text-xs text-ink-muted hover:text-ink hover:underline"
+        >
+          View all
+        </.link>
+      </div>
+    </div>
+
+    <ul class="max-h-80 overflow-y-auto divide-y divide-line py-0.5" aria-label="Recent notifications">
+      <li
+        :for={item <- @items}
+        id={"bell-item-#{item.id}"}
+        class="group"
+      >
+        <button
+          type="button"
+          phx-click="visit"
+          phx-value-id={item.id}
+          phx-target={@myself}
+          class={[
+            "w-full flex items-start gap-2.5 px-3 py-2 text-left transition hover:bg-surface-sunken cursor-pointer",
+            if(Bilimbi.Core.User.Notification.unread?(item), do: "bg-surface", else: "bg-surface-subtle/30")
+          ]}
+        >
+          <span
+            class={[
+              "mt-1.5 size-1.5 shrink-0 rounded-full",
+              if(Bilimbi.Core.User.Notification.unread?(item), do: "bg-brand", else: "bg-transparent")
+            ]}
+            aria-hidden="true"
+          />
+          <div class="min-w-0 flex-1">
+            <span class={[
+              "block text-xs truncate",
+              if(Bilimbi.Core.User.Notification.unread?(item), do: "font-semibold text-ink", else: "font-normal text-ink-muted")
+            ]}>
+              {Bilimbi.Core.User.Notification.title(item)}
+            </span>
+            <span :if={Bilimbi.Core.User.Notification.body(item) != ""} class="block text-[11px] text-ink-subtle line-clamp-2">
+              {Bilimbi.Core.User.Notification.body(item)}
+            </span>
+          </div>
+        </button>
+      </li>
+      <li :if={@items == []} class="px-3 py-6 text-center text-xs text-ink-subtle">
+        You're all caught up.
+      </li>
+    </ul>
+
+    <div class="border-t border-line bg-surface-subtle/30 px-3 py-1.5 text-center">
+      <.link
+        navigate={~p"/notifications"}
+        class="text-xs font-medium text-brand hover:underline"
+      >
+        Open notifications page →
+      </.link>
+    </div>
+  </div>
+</div>
