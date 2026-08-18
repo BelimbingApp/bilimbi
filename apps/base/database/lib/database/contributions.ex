@@ -7,7 +7,6 @@ defmodule Bilimbi.Base.Database.Contributions do
     "admin.system.database-table.list",
     "admin.system.database-table.view",
     "admin.system.database-table.edit",
-    "admin.system.database-incubation.manage",
     "admin.system.database-backup.list",
     "admin.system.database-backup.create",
     "admin.system.database-backup.delete",
