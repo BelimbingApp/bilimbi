@@ -343,6 +343,23 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     assert has_element?(view, "#employees-pagination-summary", "Showing 1 to 25 of 25 results")
   end
 
+  test "refuses delete event when actor lacks admin.employee.delete capability", %{
+    conn: conn,
+    scope: scope,
+    employee: employee
+  } do
+    grant_capabilities!("admin.employee.list")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
+
+    refute has_element?(view, "#employee-#{employee.id}-delete")
+
+    assert render_click(view, "delete", %{"id" => to_string(employee.id)}) =~
+             "You do not have permission to delete employees."
+
+    assert {:ok, _found} = Employee.get_employee(scope, 73, employee.id)
+  end
+
   test "renders show page with standard edit button", %{conn: conn, employee: employee} do
     grant_capabilities!(["admin.employee.view", "admin.employee.update"])
 

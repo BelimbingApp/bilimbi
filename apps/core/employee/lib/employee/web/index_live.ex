@@ -89,20 +89,38 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
 
   @impl true
   def handle_event("delete", %{"id" => id}, socket) do
-    scope = resolve_scope(socket)
-    company_id = resolve_company_id(socket)
+    if allowed?(socket.assigns.current_scope, "admin.employee.delete") do
+      scope = resolve_scope(socket)
+      company_id = resolve_company_id(socket)
 
-    case Employee.delete_employee(scope, company_id, id) do
-      :ok ->
-        socket =
-          socket
-          |> put_flash(:info, "Employee deleted successfully.")
-          |> load_page(socket.assigns.index_state)
+      case positive_integer(id) do
+        employee_id when is_integer(employee_id) ->
+          case Employee.delete_employee(scope, company_id, employee_id) do
+            :ok ->
+              socket =
+                socket
+                |> put_flash(:info, "Employee deleted successfully.")
+                |> load_page(socket.assigns.index_state)
 
-        {:noreply, socket}
+              {:noreply, socket}
 
-      {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to delete employee.")}
+            {:error, :employee_not_found} ->
+              socket =
+                socket
+                |> put_flash(:error, "That employee no longer exists.")
+                |> load_page(socket.assigns.index_state)
+
+              {:noreply, socket}
+
+            {:error, _reason} ->
+              {:noreply, put_flash(socket, :error, "Failed to delete employee.")}
+          end
+
+        _ ->
+          {:noreply, put_flash(socket, :error, "Failed to delete employee.")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "You do not have permission to delete employees.")}
     end
   end
 
