@@ -24,5 +24,17 @@
     path: "/settings/profile",
     live: Bilimbi.Core.User.Web.ProfileLive,
     session: :auth
+  },
+  %{
+    # Self-service password change for signed-in account.
+    path: "/settings/password",
+    live: Bilimbi.Core.User.Web.PasswordLive,
+    session: :auth
+  },
+  %{
+    # Self-service appearance preference for signed-in account.
+    path: "/settings/appearance",
+    live: Bilimbi.Core.User.Web.AppearanceLive,
+    session: :auth
   }
 ]

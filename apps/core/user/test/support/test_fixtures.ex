@@ -269,4 +269,36 @@ defmodule Bilimbi.Core.User.TestFixtures do
       [~N[2000-01-01 00:00:00], email]
     )
   end
+
+  def create_user_pins_table! do
+    SQL.query!(
+      Repo,
+      """
+      CREATE TEMPORARY TABLE user_pins (
+        id bigserial PRIMARY KEY,
+        user_id bigint NOT NULL,
+        label varchar(150) NOT NULL,
+        url varchar(500) NOT NULL,
+        url_hash char(32) NOT NULL,
+        icon varchar(100),
+        sort_order smallint NOT NULL DEFAULT 0,
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      "CREATE UNIQUE INDEX user_pins_user_id_url_hash_unique ON user_pins (user_id, url_hash)",
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      "CREATE INDEX user_pins_user_id_sort_order_index ON user_pins (user_id, sort_order)",
+      []
+    )
+  end
 end

@@ -1,0 +1,83 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} active_nav={nil}>
+  <.settings_layout
+    current_page={:appearance}
+    heading="Appearance Settings"
+    subheading="Update the theme and visual appearance of your interface."
+  >
+    <form
+      id="appearance-form"
+      phx-change="save"
+      class="space-y-4 rounded-xl border border-line bg-surface p-6"
+    >
+      <fieldset class="space-y-4">
+        <legend class="text-sm font-medium text-ink">Theme</legend>
+
+        <label
+          for="theme-light"
+          class={[
+            "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors",
+            @theme == "light" && "border-action bg-surface-subtle",
+            @theme != "light" && "border-line hover:bg-surface-subtle"
+          ]}
+        >
+          <input
+            type="radio"
+            id="theme-light"
+            name="appearance[theme]"
+            value="light"
+            checked={@theme == "light"}
+            class="mt-1"
+          />
+          <div>
+            <div class="text-sm font-medium text-ink">Light</div>
+            <div class="text-xs text-muted">Light theme with light surfaces and dark text.</div>
+          </div>
+        </label>
+
+        <label
+          for="theme-dark"
+          class={[
+            "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors",
+            @theme == "dark" && "border-action bg-surface-subtle",
+            @theme != "dark" && "border-line hover:bg-surface-subtle"
+          ]}
+        >
+          <input
+            type="radio"
+            id="theme-dark"
+            name="appearance[theme]"
+            value="dark"
+            checked={@theme == "dark"}
+            class="mt-1"
+          />
+          <div>
+            <div class="text-sm font-medium text-ink">Dark</div>
+            <div class="text-xs text-muted">Dark theme with dark surfaces and light text.</div>
+          </div>
+        </label>
+
+        <label
+          for="theme-system"
+          class={[
+            "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors",
+            @theme == "system" && "border-action bg-surface-subtle",
+            @theme != "system" && "border-line hover:bg-surface-subtle"
+          ]}
+        >
+          <input
+            type="radio"
+            id="theme-system"
+            name="appearance[theme]"
+            value="system"
+            checked={@theme == "system"}
+            class="mt-1"
+          />
+          <div>
+            <div class="text-sm font-medium text-ink">System</div>
+            <div class="text-xs text-muted">Automatically follow the light or dark preference on this device.</div>
+          </div>
+        </label>
+      </fieldset>
+    </form>
+  </.settings_layout>
+</Layouts.app>

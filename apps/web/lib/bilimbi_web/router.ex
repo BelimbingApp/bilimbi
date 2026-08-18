@@ -79,10 +79,13 @@ defmodule BilimbiWeb.Router do
   require BilimbiWeb.DiscoveredRoutes
   BilimbiWeb.DiscoveredRoutes.inject()
 
-  # Other scopes may use custom stacks.
-  # scope "/api", BilimbiWeb do
-  #   pipe_through :api
-  # end
+  scope "/api", BilimbiWeb do
+    pipe_through [:browser, :require_authenticated]
+
+    post "/theme", ThemeController, :update
+    post "/pins/toggle", PinController, :toggle
+    post "/pins/reorder", PinController, :reorder
+  end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:web, :dev_routes) do
