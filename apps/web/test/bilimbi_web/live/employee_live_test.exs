@@ -1,61 +1,84 @@
 defmodule BilimbiWeb.EmployeeLiveTest do
-  use BilimbiWeb.ConnCase, async: false
+  use BilimbiWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
+  import Bilimbi.Base.Authz.TestSupport
 
-  alias Bilimbi.Base.Tenancy
-  alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
+  alias Bilimbi.Core.Company.TestSupport, as: CompanyFixtures
   alias Bilimbi.Core.Employee
-  alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
+  alias Bilimbi.Core.User.TestSupport, as: UserFixtures
 
   setup do
-    UserFixtures.create_user_tables!()
-    CompanyFixtures.insert_tenant!(%{id: 41})
-    CompanyFixtures.insert_tenant!(%{id: 42, name: "Other tenant", is_platform_operator: false})
-    CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
+    company =
+      CompanyFixtures.insert_company!(%{
+        id: 73,
+        tenant_id: 41,
+        name: "Acme Corp",
+        code: "acme"
+      })
 
-    CompanyFixtures.insert_company!(%{
-      id: 74,
-      tenant_id: 42,
-      name: "Elsewhere",
-      code: "elsewhere"
-    })
+    user =
+      UserFixtures.insert_user!(%{
+        id: 91,
+        company_id: company.id,
+        name: "Admin User",
+        email: "admin@example.test"
+      })
 
-    UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
-    :ok = Employee.ensure_system_types()
-    {:ok, scope} = Tenancy.scope(41)
+    scope = %{
+      user: %{
+        "id" => user.id,
+        "company_id" => company.id,
+        "company_name" => company.name,
+        "tenant_id" => company.tenant_id
+      },
+      capabilities: []
+    }
 
-    {:ok, employee} =
-      Employee.create_employee(scope, 73, %{
+    employee =
+      Employee.TestSupport.insert_employee!(%{
+        company_id: company.id,
         employee_number: "EMP-001",
         full_name: "John Doe",
-        short_name: "John",
-        designation: "Engineer",
-        email: "john@example.test"
+        designation: "Software Engineer",
+        email: "john@example.test",
+        status: "active",
+        employee_type: "human"
       })
 
-    %{employee: employee, scope: scope}
+    %{company: company, user: user, scope: scope, employee: employee}
   end
 
-  test "requires authentication", %{conn: conn} do
-    assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/employees")
+  test "redirects guests to the login page", %{conn: conn} do
+    assert {:error, {:redirect, %{to: "/auth/login"}}} = live(conn, ~p"/employees")
   end
 
-  test "redirects away when the actor lacks admin.employee.list", %{conn: conn} do
-    assert {:error, {:redirect, %{to: "/dashboard"}}} =
-             conn |> log_in_as() |> live(~p"/employees")
+  test "renders 403 when the actor lacks admin.employee.list", %{conn: conn} do
+    assert {:error, {:redirect, %{to: "/"}}} = conn |> log_in_as() |> live(~p"/employees")
   end
 
-  test "lists employees for the signed-in company only", %{conn: conn} do
-    {:ok, other} = Tenancy.scope(42)
-
-    {:ok, _elsewhere} =
-      Employee.create_employee(other, 74, %{
-        employee_number: "EMP-074",
-        full_name: "Grace Hopper"
-      })
-
+  test "renders employee index for authorized actors and highlights the navigation", %{
+    conn: conn,
+    employee: employee
+  } do
     grant_capabilities!("admin.employee.list")
+
+    other_company =
+      CompanyFixtures.insert_company!(%{
+        id: 74,
+        tenant_id: 41,
+        name: "Other Co",
+        code: "other"
+      })
+
+    Employee.TestSupport.insert_employee!(%{
+      company_id: other_company.id,
+      employee_number: "EMP-999",
+      full_name: "Grace Hopper",
+      designation: "Admiral",
+      email: "grace@other.test",
+      status: "active"
+    })
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
 
@@ -104,7 +127,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     assert has_element?(view, "#employees-empty", "No employees found.")
   end
 
-  test "filters employees by search term", %{conn: conn, scope: scope} do
+  test "filters employees by search term and patches URL", %{conn: conn, scope: scope} do
     {:ok, _jane} =
       Employee.create_employee(scope, 73, %{
         employee_number: "EMP-002",
@@ -124,6 +147,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     |> form("#employees-filters", %{"filters" => %{"search" => "Jane"}})
     |> render_change()
 
+    assert_patched(view, ~p"/employees?search=Jane")
     assert has_element?(view, "#employees td", "Jane Smith")
     refute has_element?(view, "#employees td", "John Doe")
 
@@ -131,11 +155,12 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     |> form("#employees-filters", %{"filters" => %{"search" => "Designer"}})
     |> render_change()
 
+    assert_patched(view, ~p"/employees?search=Designer")
     assert has_element?(view, "#employees td", "Jane Smith")
     refute has_element?(view, "#employees td", "John Doe")
   end
 
-  test "filters employees by human or agent type", %{conn: conn, scope: scope} do
+  test "filters employees by human or agent type and patches URL", %{conn: conn, scope: scope} do
     {:ok, _agent} =
       Employee.create_employee(scope, 73, %{
         employee_number: "BOT-001",
@@ -154,6 +179,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     |> form("#employees-filters", %{"filters" => %{"type_filter" => "agent"}})
     |> render_change()
 
+    assert_patched(view, ~p"/employees?type=agent")
     assert has_element?(view, "#employees td", "Agent Bilimbi")
     refute has_element?(view, "#employees td", "John Doe")
 
@@ -161,11 +187,12 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     |> form("#employees-filters", %{"filters" => %{"type_filter" => "human"}})
     |> render_change()
 
+    assert_patched(view, ~p"/employees?type=human")
     assert has_element?(view, "#employees td", "John Doe")
     refute has_element?(view, "#employees td", "Agent Bilimbi")
   end
 
-  test "sorts employees by name, type, and status with aria-sort and verified row ordering", %{
+  test "sorts employees by name, type, and status with aria-sort, url patch, and verified row ordering", %{
     conn: conn,
     scope: scope
   } do
@@ -173,42 +200,70 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       Employee.create_employee(scope, 73, %{
         employee_number: "EMP-002",
         full_name: "Alice Adams",
-        status: "terminated"
+        status: "terminated",
+        employee_type: "human"
+      })
+
+    {:ok, _bot} =
+      Employee.create_employee(scope, 73, %{
+        employee_number: "BOT-001",
+        full_name: "Bot Baker",
+        status: "probation",
+        employee_type: "agent"
       })
 
     grant_capabilities!("admin.employee.list")
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
 
-    # Initial order is asc by name (Alice Adams before John Doe)
+    # Initial order is asc by name (Alice Adams -> Bot Baker -> John Doe)
     html = render(view)
-    assert html =~ ~r/Alice Adams.*John Doe/s
+    assert html =~ ~r/Alice Adams.*Bot Baker.*John Doe/s
     assert has_element?(view, "th[aria-sort='ascending'] #employees-sort-name")
     assert has_element?(view, "th[aria-sort='none'] #employees-sort-type")
     assert has_element?(view, "th[aria-sort='none'] #employees-sort-status")
 
     # Click sort on full_name to toggle to desc
     view |> element("#employees-sort-name") |> render_click()
+    assert_patched(view, ~p"/employees?dir=desc")
     html = render(view)
-    assert html =~ ~r/John Doe.*Alice Adams/s
+    assert html =~ ~r/John Doe.*Bot Baker.*Alice Adams/s
     assert has_element?(view, "th[aria-sort='descending'] #employees-sort-name")
     assert has_element?(view, "th[aria-sort='none'] #employees-sort-type")
     assert has_element?(view, "th[aria-sort='none'] #employees-sort-status")
 
-    # Click sort on status
+    # Click sort on status (asc: active -> probation -> terminated)
     view |> element("#employees-sort-status") |> render_click()
+    assert_patched(view, ~p"/employees?sort=status")
+    html = render(view)
+    assert html =~ ~r/John Doe.*Bot Baker.*Alice Adams/s
     assert has_element?(view, "th[aria-sort='ascending'] #employees-sort-status")
     assert has_element?(view, "th[aria-sort='none'] #employees-sort-name")
     assert has_element?(view, "th[aria-sort='none'] #employees-sort-type")
 
-    # Click sort on type
+    # Click sort on status again (desc: terminated -> probation -> active)
+    view |> element("#employees-sort-status") |> render_click()
+    assert_patched(view, ~p"/employees?sort=status&dir=desc")
+    html = render(view)
+    assert html =~ ~r/Alice Adams.*Bot Baker.*John Doe/s
+    assert has_element?(view, "th[aria-sort='descending'] #employees-sort-status")
+
+    # Click sort on type (asc: Agent -> Full-time Employee)
     view |> element("#employees-sort-type") |> render_click()
+    assert_patched(view, ~p"/employees?sort=employee_type_label")
+    html = render(view)
+    assert html =~ ~r/Bot Baker.*Alice Adams/s
     assert has_element?(view, "th[aria-sort='ascending'] #employees-sort-type")
-    assert has_element?(view, "th[aria-sort='none'] #employees-sort-name")
-    assert has_element?(view, "th[aria-sort='none'] #employees-sort-status")
+
+    # Click sort on type again (desc: Full-time Employee -> Agent)
+    view |> element("#employees-sort-type") |> render_click()
+    assert_patched(view, ~p"/employees?sort=employee_type_label&dir=desc")
+    html = render(view)
+    assert html =~ ~r/Alice Adams.*Bot Baker/s
+    assert has_element?(view, "th[aria-sort='descending'] #employees-sort-type")
   end
 
-  test "paginates employee index with 25 rows per page and clamps out of bounds page", %{
+  test "paginates employee index with 25 rows per page and canonicalizes out of bounds page in address bar", %{
     conn: conn,
     scope: scope
   } do
@@ -227,52 +282,72 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
 
     assert has_element?(view, "#employees-pagination")
-    assert has_element?(view, "#employees-pagination-summary", "Showing 1–25 of 27")
-    assert has_element?(view, "#employees-pagination-position", "Page 1 of 2")
+    assert has_element?(view, "#employees-pagination-summary", "Showing 1 to 25 of 27 results")
     assert has_element?(view, "#employees-pagination-previous[disabled]")
+    assert has_element?(view, "#employees-pagination-page-1[aria-current='page']")
 
     # Navigate to page 2
     view |> element("#employees-pagination-next") |> render_click()
+    assert_patched(view, ~p"/employees?page=2")
 
-    assert has_element?(view, "#employees-pagination-summary", "Showing 26–27 of 27")
-    assert has_element?(view, "#employees-pagination-position", "Page 2 of 2")
+    assert has_element?(view, "#employees-pagination-summary", "Showing 26 to 27 of 27 results")
+    assert has_element?(view, "#employees-pagination-page-2[aria-current='page']")
     assert has_element?(view, "#employees-pagination-next[disabled]")
 
-    # Navigate to out-of-bounds page 999: automatically clamps to page 2
+    # Navigate to out-of-bounds page 999: automatically canonicalizes and patches URL to page 2
     {:ok, oob_view, _html} = conn |> log_in_as() |> live(~p"/employees?page=999")
-    assert has_element?(oob_view, "#employees-pagination-position", "Page 2 of 2")
-    assert has_element?(oob_view, "#employees-pagination-summary", "Showing 26–27 of 27")
+    assert_patched(oob_view, ~p"/employees?page=2")
+    assert has_element?(oob_view, "#employees-pagination-summary", "Showing 26 to 27 of 27 results")
 
-    # Changing page size to 50 shows all 27 on page 1
+    # Changing page size to 50 shows all 27 on page 1 and patches URL
     view
-    |> form("#employees-filters", %{"filters" => %{"perPage" => "50"}})
+    |> form("#employees-pagination-page-size-form", %{"filters" => %{"perPage" => "50"}})
     |> render_change()
 
-    assert has_element?(view, "#employees-pagination-summary", "Showing 1–27 of 27")
-    assert has_element?(view, "#employees-pagination-position", "Page 1 of 1")
+    assert_patched(view, ~p"/employees?per_page=50")
+    assert has_element?(view, "#employees-pagination-summary", "Showing 1 to 27 of 27 results")
 
     # Invalid per_page falls back to 25
     {:ok, invalid_view, _html} = conn |> log_in_as() |> live(~p"/employees?per_page=11")
-    assert has_element?(invalid_view, "#employees-pagination-summary", "Showing 1–25 of 27")
+    assert has_element?(invalid_view, "#employees-pagination-summary", "Showing 1 to 25 of 27 results")
   end
 
-  test "deletes an employee when authorized", %{conn: conn, scope: scope} do
+  test "deletes an employee when authorized and clamps page if page becomes empty", %{
+    conn: conn,
+    scope: scope
+  } do
+    for i <- 2..26 do
+      num = String.pad_leading("#{i}", 3, "0")
+
+      {:ok, _emp} =
+        Employee.create_employee(scope, 73, %{
+          employee_number: "EMP-#{num}",
+          full_name: "Person #{num}"
+        })
+    end
+
     {:ok, to_delete} =
       Employee.create_employee(scope, 73, %{
-        employee_number: "EMP-999",
+        employee_number: "EMP-027",
         full_name: "Temp Worker"
       })
 
     grant_capabilities!(["admin.employee.list", "admin.employee.delete"])
 
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
+    # Visit page 2 where Temp Worker is the only employee (item 27 of 27)
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees?page=2")
 
     assert has_element?(view, "#employee-#{to_delete.id}-delete")
+    assert has_element?(view, "#employees-pagination-summary", "Showing 26 to 27 of 27 results")
 
     view |> element("#employee-#{to_delete.id}-delete") |> render_click()
 
     assert render(view) =~ "Employee deleted successfully."
     refute has_element?(view, "#employees td", "Temp Worker")
+
+    # Because page 2 is now empty (total 26 employees on 25-per-page), it automatically clamped and patched to page 1
+    assert_patched(view, ~p"/employees")
+    assert has_element?(view, "#employees-pagination-summary", "Showing 1 to 25 of 26 results")
   end
 
   test "renders show page with standard edit button", %{conn: conn, employee: employee} do

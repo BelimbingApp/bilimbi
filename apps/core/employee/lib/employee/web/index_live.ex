@@ -25,88 +25,97 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
     "human" => :human,
     "agent" => :agent
   }
-  @maximum_search_bytes 255
+  @default_sort_by :full_name
+  @default_sort_dir :asc
+  @default_page 1
+
+  defmodule State do
+    @moduledoc false
+    defstruct search: nil,
+              type_filter: :all,
+              sort_by: :full_name,
+              sort_dir: :asc,
+              page: 1,
+              per_page: 25
+  end
 
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
      socket
      |> assign(:page_title, "Employees")
-     |> assign(:active_nav, "admin.employee")
-     |> stream_configure(:employees, dom_id: &"employee-#{&1.id}")}
+     |> assign(:active_nav, "admin-employee")
+     |> assign(:page_sizes, @page_sizes)
+     |> assign(:index_state, %State{})
+     |> assign(:employees_page, %AdministrationPage{})
+     |> assign(:filters_form, to_form(filters_form_params(%State{}), as: :filters))}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, load_page(socket, state_from_params(params))}
+    state = state_from_params(params)
+    {:noreply, load_page(socket, state)}
   end
 
   @impl true
-  def handle_event("filters", params, socket) do
-    filters = Map.get(params, "filters", %{})
-
+  def handle_event("filters", %{"filters" => filters}, socket) do
     state =
       socket.assigns.index_state
-      |> Map.put(:search, normalize_search(Map.get(filters, "search", "")))
-      |> Map.put(:type_filter, normalize_type_filter(Map.get(filters, "type_filter", "all")))
-      |> Map.put(
-        :page_size,
-        normalize_page_size(Map.get(filters, "perPage", socket.assigns.index_state.page_size))
-      )
+      |> Map.put(:search, Map.get(filters, "search", socket.assigns.index_state.search))
+      |> Map.put(:type_filter, normalize_type_filter(Map.get(filters, "type_filter")))
+      |> Map.put(:per_page, normalize_page_size(Map.get(filters, "perPage")))
       |> Map.put(:page, 1)
 
     {:noreply, push_patch(socket, to: employees_path(state))}
   end
 
-  def handle_event("sort", %{"sort" => requested_sort}, socket) do
+  @impl true
+  def handle_event("sort", %{"sort" => sort_by}, socket) do
     {:noreply,
-     push_patch(socket, to: employees_path(next_sort(socket.assigns.index_state, requested_sort)))}
+     push_patch(socket, to: employees_path(next_sort(socket.assigns.index_state, sort_by)))}
   end
 
+  @impl true
   def handle_event("page", %{"page" => page}, socket) do
-    state =
-      Map.put(
-        socket.assigns.index_state,
-        :page,
-        bounded_page(page, socket.assigns.employees_page)
-      )
+    target_page =
+      case positive_integer(page) do
+        n when is_integer(n) -> n
+        _ -> 1
+      end
 
+    state = Map.put(socket.assigns.index_state, :page, target_page)
     {:noreply, push_patch(socket, to: employees_path(state))}
   end
 
+  @impl true
   def handle_event("delete", %{"id" => id}, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.employee.delete") do
-      scope = socket.assigns.current_scope.scope
-      company_id = socket.assigns.current_scope.user["company_id"]
+    scope = socket.assigns.current_scope
+    company_id = resolve_company_id(socket)
 
-      with {employee_id, ""} <- Integer.parse(to_string(id)),
-           :ok <- Employee.delete_employee(scope, company_id, employee_id) do
-        {:noreply,
-         socket
-         |> put_flash(:info, "Employee deleted successfully.")
-         |> push_patch(to: employees_path(socket.assigns.index_state))}
-      else
-        {:error, :invariant_violation} ->
-          {:noreply, put_flash(socket, :error, "The platform orchestrator cannot be deleted.")}
+    case Employee.delete_employee(scope, company_id, id) do
+      {:ok, _employee} ->
+        socket =
+          socket
+          |> put_flash(:info, "Employee deleted successfully.")
+          |> load_page(socket.assigns.index_state)
 
-        {:error, :employee_not_found} ->
-          {:noreply, put_flash(socket, :error, "That employee does not exist in this company.")}
+        {:noreply, socket}
 
-        _ ->
-          {:noreply, put_flash(socket, :error, "That employee could not be deleted.")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have access to that action.")}
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "You do not have permission to delete employees.")}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to delete employee.")}
     end
   end
 
   defp load_page(socket, state) do
-    scope = socket.assigns.current_scope.scope
-    company_id = socket.assigns.current_scope.user["company_id"]
+    scope = socket.assigns.current_scope
+    company_id = resolve_company_id(socket)
 
     options = [
       page: state.page,
-      page_size: state.page_size,
+      page_size: state.per_page,
       search: state.search,
       type_filter: state.type_filter,
       sort_by: state.sort_by,
@@ -117,11 +126,11 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
       {:ok, %AdministrationPage{total_pages: total_pages}}
       when total_pages > 0 and state.page > total_pages ->
         clamped_state = %{state | page: total_pages}
-        load_page(socket, clamped_state)
+        push_patch(socket, to: employees_path(clamped_state))
 
       {:ok, %AdministrationPage{total_pages: 0}} when state.page > 1 ->
         clamped_state = %{state | page: 1}
-        load_page(socket, clamped_state)
+        push_patch(socket, to: employees_path(clamped_state))
 
       {:ok, %AdministrationPage{} = page} ->
         socket
@@ -131,127 +140,71 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
         |> assign(:filters_form, to_form(filters_form_params(state), as: :filters))
         |> stream(:employees, page.entries, reset: true)
 
-      {:error, :company_not_found} ->
-        socket
-        |> put_flash(:error, "That company is not in this workspace.")
-        |> push_navigate(to: ~p"/dashboard")
-
       {:error, _reason} ->
         socket
+        |> put_flash(:error, "Failed to load employees.")
         |> assign(:index_state, state)
-        |> assign(:employees_page, %AdministrationPage{
-          entries: [],
-          page: state.page,
-          page_size: state.page_size,
-          total_entries: 0,
-          total_pages: 0,
-          has_prev?: false,
-          has_next?: false
-        })
-        |> assign(:company_id, company_id)
-        |> assign(:filters_form, to_form(filters_form_params(state), as: :filters))
+        |> assign(:employees_page, %AdministrationPage{})
         |> stream(:employees, [], reset: true)
     end
   end
 
+  defp resolve_company_id(socket) do
+    socket.assigns.current_scope.user["company_id"]
+  end
+
   defp state_from_params(params) do
-    %{
-      search: normalize_search(Map.get(params, "search", "")),
-      type_filter: normalize_type_filter(Map.get(params, "type_filter", "all")),
-      sort_by: normalize_sort(Map.get(params, "sort", "full_name")),
-      sort_dir: normalize_direction(Map.get(params, "direction", "asc")),
-      page: normalize_page(Map.get(params, "page", "1")),
-      page_size: normalize_page_size(Map.get(params, "per_page", @default_page_size))
+    %State{
+      search: normalize_search(params["search"] || params["q"]),
+      type_filter: normalize_type_filter(params["type"] || params["type_filter"]),
+      sort_by: normalize_sort_by(params["sort"]),
+      sort_dir: normalize_sort_dir(params["dir"]),
+      page: normalize_page(params["page"]),
+      per_page: normalize_page_size(params["per_page"] || params["perPage"])
     }
   end
 
-  defp next_sort(state, requested_sort) do
-    normalized_requested = normalize_sort(requested_sort)
-
-    direction =
-      if state.sort_by == normalized_requested do
-        flip_direction(state.sort_dir)
-      else
-        :asc
-      end
-
-    %{state | sort_by: normalized_requested, sort_dir: direction, page: 1}
-  end
-
-  defp filters_form_params(state) do
-    %{
-      "search" => state.search,
-      "type_filter" => Atom.to_string(state.type_filter),
-      "perPage" => Integer.to_string(state.page_size)
-    }
-  end
-
-  defp employees_path(state) do
-    query = %{
-      "search" => (state.search != "" && state.search) || nil,
-      "type_filter" => (state.type_filter != :all && Atom.to_string(state.type_filter)) || nil,
-      "sort" => sort_param(state.sort_by),
-      "direction" => (state.sort_dir != :asc && Atom.to_string(state.sort_dir)) || nil,
-      "page" => (state.page > 1 && Integer.to_string(state.page)) || nil,
-      "per_page" =>
-        (state.page_size != @default_page_size && Integer.to_string(state.page_size)) || nil
-    }
-
-    ~p"/employees?#{query}"
-  end
-
-  defp sort_param(:full_name), do: nil
-  defp sort_param(:employee_type_label), do: "type"
-  defp sort_param(:status), do: "status"
-  defp sort_param(_), do: nil
+  defp normalize_search(nil), do: nil
 
   defp normalize_search(value) when is_binary(value) do
-    value
-    |> String.graphemes()
-    |> Enum.reduce_while({[], 0}, fn grapheme, {graphemes, bytes} ->
-      next_bytes = bytes + byte_size(grapheme)
-
-      if next_bytes <= @maximum_search_bytes do
-        {:cont, {[grapheme | graphemes], next_bytes}}
-      else
-        {:halt, {graphemes, bytes}}
-      end
-    end)
-    |> elem(0)
-    |> Enum.reverse()
-    |> Enum.join()
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
   end
 
-  defp normalize_search(_value), do: ""
+  defp normalize_type_filter(nil), do: :all
 
   defp normalize_type_filter(value) when is_binary(value) do
-    Map.get(@type_filters, value, :all)
+    Map.get(@type_filters, String.downcase(String.trim(value)), :all)
   end
 
-  defp normalize_type_filter(value) when is_atom(value) and value in [:all, :human, :agent],
-    do: value
-
+  defp normalize_type_filter(value) when is_atom(value), do: value
   defp normalize_type_filter(_value), do: :all
 
-  defp normalize_sort(value) when is_map_key(@sorts, value), do: Map.fetch!(@sorts, value)
+  defp normalize_sort_by(nil), do: @default_sort_by
 
-  defp normalize_sort(value)
-       when is_atom(value) and value in [:full_name, :employee_type_label, :status],
-       do: value
+  defp normalize_sort_by(value) when is_binary(value) do
+    Map.get(@sorts, String.downcase(String.trim(value)), @default_sort_by)
+  end
 
-  defp normalize_sort(_value), do: :full_name
+  defp normalize_sort_by(_value), do: @default_sort_by
 
-  defp normalize_direction("desc"), do: :desc
-  defp normalize_direction(:desc), do: :desc
-  defp normalize_direction(_value), do: :asc
+  defp normalize_sort_dir(nil), do: @default_sort_dir
 
-  defp flip_direction(:asc), do: :desc
-  defp flip_direction(_direction), do: :asc
+  defp normalize_sort_dir(value) when is_binary(value) do
+    case String.downcase(String.trim(value)) do
+      "desc" -> :desc
+      _ -> :asc
+    end
+  end
+
+  defp normalize_sort_dir(_value), do: @default_sort_dir
 
   defp normalize_page(value) do
     case positive_integer(value) do
-      nil -> 1
-      page -> page
+      page when is_integer(page) -> page
+      _ -> @default_page
     end
   end
 
@@ -262,41 +215,56 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
     end
   end
 
-  defp bounded_page(value, page) do
-    requested = normalize_page(value)
-    requested |> min(max(page.total_pages, 1)) |> max(1)
-  end
-
   defp positive_integer(value) when is_integer(value) and value > 0, do: value
 
   defp positive_integer(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {integer, ""} when integer > 0 -> integer
-      _other -> nil
+    case Integer.parse(String.trim(value)) do
+      {int, ""} when int > 0 -> int
+      _ -> nil
     end
   end
 
   defp positive_integer(_value), do: nil
 
-  defp page_size_options, do: Enum.map(@page_sizes, &{"#{&1} rows", &1})
+  defp next_sort(state, sort_key) do
+    field = Map.get(@sorts, sort_key, :full_name)
 
-  defp page_summary(%{total_entries: 0}), do: "No employees found"
-
-  defp page_summary(%{entries: [], total_entries: total_entries}) do
-    "No employees on this page · #{total_entries} total"
+    if state.sort_by == field do
+      %{state | sort_dir: toggle_sort_dir(state.sort_dir), page: 1}
+    else
+      %{state | sort_by: field, sort_dir: :asc, page: 1}
+    end
   end
 
-  defp page_summary(%{page: page, page_size: page_size, total_entries: total_entries}) do
-    first = (page - 1) * page_size + 1
-    last = min(page * page_size, total_entries)
-    "Showing #{first}–#{last} of #{total_entries}"
+  defp toggle_sort_dir(:asc), do: :desc
+  defp toggle_sort_dir(:desc), do: :asc
+
+  defp filters_form_params(state) do
+    %{
+      "search" => state.search || "",
+      "type_filter" => to_string(state.type_filter),
+      "perPage" => to_string(state.per_page)
+    }
   end
 
-  defp page_position(%{total_pages: 0}), do: "Page 0 of 0"
+  defp employees_path(state) do
+    params =
+      []
+      |> maybe_put(:search, state.search)
+      |> maybe_put(:type, if(state.type_filter != :all, do: to_string(state.type_filter)))
+      |> maybe_put(:sort, if(state.sort_by != :full_name, do: to_string(state.sort_by)))
+      |> maybe_put(:dir, if(state.sort_dir != :asc, do: to_string(state.sort_dir)))
+      |> maybe_put(:page, if(state.page != @default_page, do: state.page))
+      |> maybe_put(:per_page, if(state.per_page != @default_page_size, do: state.per_page))
 
-  defp page_position(%{page: page, total_pages: total_pages}) do
-    "Page #{page} of #{total_pages}"
+    case params do
+      [] -> ~p"/employees"
+      _ -> ~p"/employees?#{params}"
+    end
   end
+
+  defp maybe_put(params, _key, nil), do: params
+  defp maybe_put(params, key, value), do: params ++ [{key, value}]
 
   defp status_badge_kind("active"), do: :success
   defp status_badge_kind("probation"), do: :warning
@@ -353,7 +321,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
             phx-change="filters"
             class="p-2 mb-2"
           >
-            <div class="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)_10rem]">
+            <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)]">
               <div class="relative">
                 <.icon
                   name="hero-magnifying-glass"
@@ -384,15 +352,6 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
                   {"Human only", "human"},
                   {"Agent only", "agent"}
                 ]}
-              />
-              <.input
-                field={@filters_form[:perPage]}
-                id="employees-page-size"
-                type="select"
-                label="Rows per page"
-                label_class="sr-only"
-                wrapper_class="mb-0"
-                options={page_size_options()}
               />
             </div>
           </.form>
@@ -470,40 +429,12 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
             </:empty>
           </.table>
 
-          <nav
-            :if={@employees_page.total_pages > 0}
+          <.pagination
             id="employees-pagination"
-            aria-label="Pagination"
-            class="flex items-center justify-between gap-3 border-t border-line px-4 py-3"
-          >
-            <p id="employees-pagination-summary" class="text-xs text-ink-subtle">
-              {page_summary(@employees_page)}
-            </p>
-            <div class="flex items-center gap-2">
-              <.button
-                id="employees-pagination-previous"
-                phx-click="page"
-                phx-value-page={@employees_page.page - 1}
-                disabled={@employees_page.page <= 1}
-              >
-                Previous
-              </.button>
-              <span id="employees-pagination-position" class="text-xs tabular-nums text-ink-muted">
-                {page_position(@employees_page)}
-              </span>
-              <.button
-                id="employees-pagination-next"
-                phx-click="page"
-                phx-value-page={@employees_page.page + 1}
-                disabled={
-                  @employees_page.page >= @employees_page.total_pages or
-                    @employees_page.total_pages == 0
-                }
-              >
-                Next
-              </.button>
-            </div>
-          </nav>
+            page={@employees_page}
+            page_sizes={@page_sizes}
+            filters_form={@filters_form}
+          />
         </.card>
       </.page>
     </Layouts.app>
