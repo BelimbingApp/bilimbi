@@ -98,9 +98,17 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
 
     cond do
       delta < 60 -> "just now"
-      delta < 3_600 -> "#{div(delta, 60)} minutes ago"
-      delta < 86_400 -> "#{div(delta, 3_600)} hours ago"
-      true -> "#{div(delta, 86_400)} days ago"
+      delta < 3_600 -> ago(div(delta, 60), "minute")
+      delta < 86_400 -> ago(div(delta, 3_600), "hour")
+      true -> ago(div(delta, 86_400), "day")
     end
   end
+
+  # Belimbing renders this column through Carbon's `diffForHumans()`
+  # (`resources/core/views/livewire/admin/system/sessions/index.blade.php:58`),
+  # which pluralises per unit. Interpolating a hard-coded "s" meant every
+  # session last seen between 24 and 48 hours ago read "1 days ago" -- a full
+  # day wide, not an edge case.
+  defp ago(1, unit), do: "1 #{unit} ago"
+  defp ago(count, unit), do: "#{count} #{unit}s ago"
 end

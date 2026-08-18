@@ -53,6 +53,38 @@ defmodule BilimbiWeb.SessionsLiveTest do
     assert has_element?(view, "#sessions-empty", "No sessions found.")
   end
 
+  test "renders singular units at one minute, one hour and one day", %{conn: conn} do
+    grant_capabilities!("admin.system.session.list")
+    now = System.system_time(:second)
+
+    for {id, ago} <- [
+          {"age-minute", 90},
+          {"age-hour", 3_700},
+          {"age-day", 90_000},
+          {"age-plural", 2 * 86_400}
+        ] do
+      {:ok, _} =
+        Session.put_session(id, "{}", %{
+          ip_address: "10.0.0.9",
+          user_agent: "Agent/#{id}",
+          last_activity: now - ago
+        })
+    end
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/sessions")
+
+    # Scoped per row on purpose: "21 minutes ago" contains "1 minutes ago", so
+    # a refutation against the whole page would depend on which other rows
+    # happen to be present.
+    assert has_element?(view, "#sessions-age-minute", "1 minute ago")
+    assert has_element?(view, "#sessions-age-hour", "1 hour ago")
+    assert has_element?(view, "#sessions-age-day", "1 day ago")
+
+    # Guards the obvious wrong fix. Dropping the "s" from every unit would
+    # satisfy all three assertions above and break this one.
+    assert has_element?(view, "#sessions-age-plural", "2 days ago")
+  end
+
   test "terminates a non-current session when the actor can manage sessions", %{conn: conn} do
     grant_capabilities!(["admin.system.session.list", "admin.system.session.manage"])
 
