@@ -381,4 +381,23 @@ defmodule Bilimbi.Core.GeonamesTest do
     refute "Candidate 16" in names
     assert Enum.all?(names, &is_binary/1)
   end
+
+  describe "update_country_name/2 with untrusted input" do
+    test "a non-numeric id is refused, not raised on" do
+      # The id reaches this from the browser via the inline-edit hook's
+      # data-id. The LiveView used to call String.to_integer/1 on it first,
+      # which raised ArgumentError and took the process down; this function
+      # already answers :not_found for garbage, so the guard was removed (#302).
+      assert {:error, :not_found} = Geonames.update_country_name("abc", "Nowhere")
+      assert {:error, :not_found} = Geonames.update_country_name("", "Nowhere")
+      assert {:error, :not_found} = Geonames.update_country_name("1; DROP TABLE", "Nowhere")
+    end
+
+    test "a numeric string id still resolves" do
+      {:ok, %{id: id}} = Geonames.update_country_name("US", "United States of America")
+
+      assert {:ok, %{country: "Renamed"}} =
+               Geonames.update_country_name(Integer.to_string(id), "Renamed")
+    end
+  end
 end

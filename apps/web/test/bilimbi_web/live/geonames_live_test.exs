@@ -365,4 +365,28 @@ defmodule BilimbiWeb.GeonamesLiveTest do
       refute message =~ "Countries updated"
     end
   end
+
+  test "a crafted country id is refused rather than crashing the LiveView" do
+    socket = %Phoenix.LiveView.Socket{
+      endpoint: BilimbiWeb.Endpoint,
+      router: BilimbiWeb.Router,
+      assigns: %{__changed__: %{}, flash: %{}}
+    }
+
+    # `id` comes from the browser via the inline-edit hook's data-id. The
+    # handler used to call String.to_integer/1 on it, which raised
+    # ArgumentError and took the process down. Geonames already answers
+    # :not_found for garbage, so the value is passed straight through (#302).
+    for bad <- ["abc", "", "1; DROP TABLE countries"] do
+      assert {:noreply, socket} =
+               CountriesLive.handle_event(
+                 "save-country-name",
+                 %{"id" => bad, "country" => "Nowhere"},
+                 socket
+               )
+
+      assert socket.assigns.flash["error"] =~ "Failed to save",
+             "expected a refusal flash for id #{inspect(bad)}"
+    end
+  end
 end

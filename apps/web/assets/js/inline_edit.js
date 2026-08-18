@@ -43,12 +43,20 @@ const InlineEdit = {
 
   syncValue() {
     if (!this.inputEl || !this.textEl) return
-    this.originalValue = this.inputEl.value
-    if (this.textEl) {
-      this.textEl.textContent = this.inputEl.value
-    }
-    this.inputEl.classList.add("hidden")
-    this.triggerEl.classList.remove("invisible", "pointer-events-none")
+
+    // Never disturb an open editor. A patch can land mid-typing -- a search, a
+    // sort, a page change, another agent saving this row -- and closing the
+    // input here would publish half-typed text as though it were saved, and
+    // overwrite originalValue so Escape could no longer restore it.
+    if (!this.inputEl.classList.contains("hidden")) return
+
+    // The ATTRIBUTE, not the property: morphdom patches the attribute, but the
+    // browser decouples .value from it once a user has typed. Reading the
+    // property would show what was typed rather than what the server stored.
+    const serverValue = this.inputEl.getAttribute("value")
+
+    this.originalValue = serverValue === null ? this.inputEl.value : serverValue
+    this.inputEl.value = this.originalValue
   },
 
   startEdit() {
@@ -68,13 +76,14 @@ const InlineEdit = {
     this.inputEl.classList.add("hidden")
     this.triggerEl.classList.remove("invisible", "pointer-events-none")
 
+    // The displayed text is the server's to write. Painting it here made a
+    // FAILED save look like a successful one: the flash said "Failed to save"
+    // while the row showed the new name indefinitely, because the error branch
+    // sends no patch. Leaving the text alone means a failure needs no rollback
+    // -- the row simply never changed (#302).
     if (newValue !== "" && newValue !== this.originalValue) {
-      this.originalValue = newValue
-      if (this.textEl) {
-        this.textEl.textContent = newValue
-      }
       this.pushEvent(saveEvent, {id: id, [field]: newValue})
-    } else if (newValue === "") {
+    } else {
       this.inputEl.value = this.originalValue
     }
   },
