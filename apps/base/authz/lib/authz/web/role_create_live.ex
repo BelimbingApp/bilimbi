@@ -79,11 +79,11 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
     }
 
     case Authz.create_role(scope, company_id, attributes) do
-      {:ok, _role} ->
+      {:ok, role} ->
         {:noreply,
          socket
          |> put_flash(:info, "Role created.")
-         |> push_navigate(to: ~p"/authz/roles")}
+         |> push_navigate(to: after_create_path(socket, role))}
 
       # Now that the operator picks the company, this is a correctable field
       # error rather than a broken session: the chosen company left scope
@@ -99,6 +99,26 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
 
       {:error, %Changeset{} = domain} ->
         {:noreply, assign_form(socket, copy_domain_errors(changeset, domain))}
+    end
+  end
+
+  # A new custom role has no capabilities, so it does nothing until someone
+  # opens it and grants some. `RoleShowLive` is where that happens, and it is
+  # where Belimbing lands the operator (`Create.php:53`). Returning to the index
+  # leaves a row that looks finished and is inert.
+  #
+  # Belimbing redirects there unconditionally, which 403s an actor holding
+  # `admin.authz.role.create` without `admin.authz.role.view` -- the two are
+  # separately gated in both apps (`app/Base/Authz/Routes/web.php:42`,
+  # `priv/web_routes.exs:17`). We deliberately do not copy that: the role is
+  # created either way, so this changes no business meaning, and dumping
+  # somebody on the dashboard after a successful create is worse than the list
+  # they came from.
+  defp after_create_path(socket, role) do
+    if allowed?(socket.assigns.current_scope, "admin.authz.role.view") do
+      ~p"/authz/roles/#{role.id}"
+    else
+      ~p"/authz/roles"
     end
   end
 

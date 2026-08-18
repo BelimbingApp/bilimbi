@@ -227,8 +227,11 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
   end
 
   describe "create" do
+    # Both capabilities, because that is the actor who actually administers
+    # roles: create alone cannot open the Show page it now lands on. The
+    # create-only actor is exercised separately.
     defp open_create(conn) do
-      grant_capabilities!("admin.authz.role.create")
+      grant_capabilities!(["admin.authz.role.create", "admin.authz.role.view"])
       conn |> log_in_as() |> live(~p"/authz/roles/create")
     end
 
@@ -257,7 +260,7 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
     test "creates a company-owned role and returns to the index", %{conn: conn, ours: ours} do
       {:ok, view, _html} = open_create(conn)
 
-      assert {:error, {:live_redirect, %{to: "/authz/roles"}}} =
+      assert {:error, {:live_redirect, %{to: path}}} =
                view
                |> form("#role-form", %{
                  "role" => %{
@@ -270,6 +273,9 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
                |> render_submit()
 
       created = ours |> Authz.list_roles() |> Enum.find(&(&1.code == "billing_manager"))
+
+      # A new role has no capabilities; Show is where they get granted (#269).
+      assert path == "/authz/roles/#{created.id}"
 
       assert created.name == "Billing Manager"
       # create_role/3 forces both, so a system role can never be built here.
@@ -308,6 +314,24 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
 
       assert html =~ "has already been taken"
       assert has_element?(view, "#role-form")
+    end
+
+    test "falls back to the index for an actor who cannot view roles", %{conn: conn, ours: ours} do
+      # Show is gated on admin.authz.role.view, create on admin.authz.role.create.
+      # Belimbing redirects to Show unconditionally and 403s this actor; we send
+      # them back to the list instead. The role is created either way.
+      grant_capabilities!("admin.authz.role.create")
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/roles/create")
+
+      assert {:error, {:live_redirect, %{to: "/authz/roles"}}} =
+               view
+               |> form("#role-form", %{
+                 "role" => %{"company_id" => "73", "name" => "Clerk", "code" => "clerk"}
+               })
+               |> render_submit()
+
+      assert ours |> Authz.list_roles() |> Enum.any?(&(&1.code == "clerk"))
     end
 
     test "offers every company in the tenant and nobody else's", %{conn: conn} do
@@ -362,7 +386,7 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
 
       {:ok, view, _html} = open_create(conn)
 
-      assert {:error, {:live_redirect, %{to: "/authz/roles"}}} =
+      assert {:error, {:live_redirect, %{to: _path}}} =
                view
                |> form("#role-form", %{
                  "role" => %{"company_id" => "75", "name" => "Foreman", "code" => "foreman"}
