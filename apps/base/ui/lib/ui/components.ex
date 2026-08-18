@@ -265,6 +265,11 @@ defmodule Bilimbi.Base.UI.Components do
   attr :prompt, :string, default: nil, doc: "the prompt for select inputs"
   attr :options, :list, doc: "the options to pass to Phoenix.HTML.Form.options_for_select/2"
   attr :multiple, :boolean, default: false, doc: "the multiple flag for select inputs"
+
+  attr :size, :integer,
+    default: nil,
+    doc: "visible rows for a `multiple` select; defaults to 5 so no row is half-painted"
+
   attr :class, :any, default: nil, doc: "the input class to use over defaults"
   attr :error_class, :any, default: nil, doc: "the input error class to use over defaults"
 
@@ -357,8 +362,19 @@ defmodule Bilimbi.Base.UI.Components do
       <select
         id={@id}
         name={@name}
-        class={field_class(@class, @error_class, @errors)}
+        class={
+          [
+            field_class(@class, @error_class, @errors),
+            # A listbox is sized in rows, not pixels. `py-2` makes the box taller
+            # than the rows it holds, and the browser fills the slack with the
+            # *next* option -- so the last row is painted sliced through its
+            # glyphs and reads as a rendering fault rather than "scroll for more"
+            # (#281). Height comes from `size` instead.
+            @multiple && "!py-0"
+          ]
+        }
         multiple={@multiple}
+        size={@multiple && (@size || 5)}
         {@rest}
       >
         <option :if={@prompt} value="">{@prompt}</option>
