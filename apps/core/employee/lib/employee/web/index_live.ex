@@ -47,7 +47,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
      |> assign(:active_nav, "admin-employee")
      |> assign(:page_sizes, @page_sizes)
      |> assign(:index_state, %State{})
-     |> assign(:employees_page, %AdministrationPage{})
+     |> assign(:employees_page, empty_page())
      |> assign(:filters_form, to_form(filters_form_params(%State{}), as: :filters))}
   end
 
@@ -144,9 +144,22 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
         socket
         |> put_flash(:error, "Failed to load employees.")
         |> assign(:index_state, state)
-        |> assign(:employees_page, %AdministrationPage{})
+        |> assign(:employees_page, empty_page())
         |> stream(:employees, [], reset: true)
     end
+  end
+
+
+  defp empty_page do
+    %AdministrationPage{
+      entries: [],
+      page: 1,
+      page_size: @default_page_size,
+      total_entries: 0,
+      total_pages: 0,
+      has_prev?: false,
+      has_next?: false
+    }
   end
 
   defp resolve_company_id(socket) do
