@@ -12,7 +12,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
   alias Bilimbi.Core.UserAdministration
   alias Bilimbi.Core.UserAdministration.Options
 
-  @page_sizes [10, 25, 50, 100]
+  @page_sizes [25, 50, 100, 300]
   @sorts %{
     "name" => :name,
     "email" => :email,
@@ -203,8 +203,10 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
   end
 
   defp normalize_page_size(value) do
-    requested = positive_integer(value) || 25
-    Enum.find(@page_sizes, List.last(@page_sizes), &(&1 >= requested))
+    case positive_integer(value) do
+      size when size in @page_sizes -> size
+      _ -> 25
+    end
   end
 
   defp bounded_page(value, page) do

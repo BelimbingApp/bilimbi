@@ -2,7 +2,7 @@ defmodule Bilimbi.Core.UserAdministration.Options do
   @moduledoc false
 
   @allowed_keys [:search, :role_ids, :sort_by, :sort_dir, :page, :page_size]
-  @page_sizes [10, 25, 50, 100]
+  @page_sizes [25, 50, 100, 300]
   @sort_fields [:name, :email, :company_name, :created_at]
   @sort_directions [:asc, :desc]
   @maximum_search_bytes 255
@@ -23,7 +23,7 @@ defmodule Bilimbi.Core.UserAdministration.Options do
           sort_by: :name | :email | :company_name | :created_at,
           sort_dir: :asc | :desc,
           page: pos_integer(),
-          page_size: 10 | 25 | 50 | 100
+          page_size: 25 | 50 | 100 | 300
         }
 
   @spec new!(keyword()) :: t()

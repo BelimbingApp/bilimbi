@@ -18,11 +18,10 @@ authorization; the web adapter enforces `admin.user.list` before it calls the
 facade.
 
 The adapter keeps `active_nav` at `admin.user`, so Core User's existing menu
-contribution remains the navigation owner. Create, view, update, and delete
-controls are gated by their existing Core User capabilities. Deletion calls
-only Core User's public tenant-scoped APIs, protects the signed-in account,
-reports disappearance races, and presents archived-company accounts as
-read-only.
+contribution remains the navigation owner. Create, view, and impersonate
+controls are available on the index, while account editing and deletion
+remain owned by Core User's ShowLive adapter. Archived-company accounts
+are presented as read-only.
 
 Options accept only a keyword list containing the following normalized values:
 
@@ -31,23 +30,24 @@ Options accept only a keyword list containing the following normalized values:
 - `sort_by`: `:name`, `:email`, `:company_name`, or `:created_at`;
 - `sort_dir`: `:asc` or `:desc`;
 - `page`: an integer from 1 through 1,000,000; and
-- `page_size`: exactly `10`, `25`, `50`, or `100`.
+- `page_size`: exactly `25`, `50`, `100`, or `300`.
 
 Defaults are no search or Role filter, Name ascending, page 1, and 25 entries.
 Search uses PostgreSQL `LIKE`, including its case behavior and `%`/`_` wildcard
 meaning, around a parameterized contains pattern. The deliberate page cap
-keeps the largest supported page-size offset below 100 million rows, far below
-PostgreSQL's signed-bigint `OFFSET` ceiling, while rejecting impractical URL
-inputs before arithmetic reaches the adapter. Every primary ordering ends with
-User ID descending. Empty and out-of-range pages keep truthful totals.
+of 1,000,000 keeps the largest supported page-size offset (page 1,000,000 with
+page size 300 is offset 299,999,700) far below PostgreSQL's signed-bigint
+`OFFSET` ceiling, while rejecting impractical URL inputs before arithmetic
+reaches the adapter. Every primary ordering ends with User ID descending.
+Empty and out-of-range pages keep truthful totals.
 
 The adapter accepts plain URL and form values and normalizes them into this
-strict contract without creating atoms. Page sizes clamp upward over `10`,
-`25`, `50`, and `100`, so `1` becomes `10`, `30` becomes `50`, and `9999`
-becomes `100`. Empty search and exact `"0"` retain their PHP-falsey meaning.
-Changing search, Roles, page size, or sorting resets to page 1; pagination
-alone preserves the other filters. A first Created sort uses descending order,
-while Name, Email, and Company begin ascending.
+strict contract without creating atoms. Page sizes normalize to `25`, `50`,
+`100`, or `300`; any unsupported or invalid value falls back to `25`. Empty
+search and exact `"0"` retain their PHP-falsey meaning. Changing search,
+Roles, page size, or sorting resets to page 1; pagination alone preserves the
+other filters. A first Created sort uses descending order, while Name, Email,
+and Company begin ascending.
 
 Role summaries use the integration-only containment rule from ADR 0007. The
 assignment must be visible through a live in-scope Company (or the documented

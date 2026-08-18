@@ -9,7 +9,7 @@ defmodule Bilimbi.Core.UserAdministration.Page do
   @type t :: %__MODULE__{
           entries: [Entry.t()],
           page: pos_integer(),
-          page_size: 10 | 25 | 50 | 100,
+          page_size: 25 | 50 | 100 | 300,
           total_entries: non_neg_integer(),
           total_pages: non_neg_integer()
         }
