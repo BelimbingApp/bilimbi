@@ -72,7 +72,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
 
   defp apply_action(socket, :new, _params) do
     socket
-    |> assign(:page_title, "New employee")
+    |> assign(:page_title, "New Employee")
     |> assign(:employee, nil)
     |> assign_form(form_changeset(%{"status" => "active", "employee_type" => "full_time"}))
   end
