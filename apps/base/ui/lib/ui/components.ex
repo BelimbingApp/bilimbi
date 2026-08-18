@@ -377,7 +377,7 @@ defmodule Bilimbi.Base.UI.Components do
         size={@multiple && (@size || 5)}
         {@rest}
       >
-        <option :if={@prompt} value="">{@prompt}</option>
+        <option :if={@prompt} value="" selected={@value in [nil, ""]}>{@prompt}</option>
         {Phoenix.HTML.Form.options_for_select(@options, @value)}
       </select>
       <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
@@ -588,14 +588,14 @@ defmodule Bilimbi.Base.UI.Components do
     <header class={[@actions != [] && "flex items-start justify-between gap-6", "pb-4"]}>
       <div>
         <div :if={@title_actions != []} class="flex items-center gap-1.5">
-          <h1 class="text-lg font-semibold leading-8 tracking-tight text-ink-strong">
+          <h1 class="text-lg font-semibold leading-8 tracking-tight text-action">
             {render_slot(@inner_block)}
           </h1>
           {render_slot(@title_actions)}
         </div>
         <h1
           :if={@title_actions == []}
-          class="text-lg font-semibold leading-8 tracking-tight text-ink-strong"
+          class="text-lg font-semibold leading-8 tracking-tight text-action"
         >
           {render_slot(@inner_block)}
         </h1>

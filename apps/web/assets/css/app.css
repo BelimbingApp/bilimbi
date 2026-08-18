@@ -50,9 +50,9 @@
   --color-muted: #6b6057;
 
   /* Primary action — confident and quiet. Operational software, not a CTA. */
-  --color-action: var(--color-stone-900);
-  --color-action-hover: var(--color-stone-700);
-  --color-action-ink: var(--color-white);
+  --color-action: #2c3801;
+  --color-action-hover: var(--color-brand-strong);
+  --color-action-ink: #f5fcdc;
 
   /* Product identity. Never used for status: a color that also means "good"
    * cannot report anything. */

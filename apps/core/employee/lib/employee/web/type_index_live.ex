@@ -76,7 +76,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <.page>
+      <.page id="employee-types-index">
         <p class="mb-2 text-xs">
           <.link navigate={~p"/employees"} class="font-medium text-ink-muted hover:text-ink">
             ← Employees
@@ -85,6 +85,19 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
 
         <.header>
           Employee Types
+          <:title_actions>
+            <button
+              type="button"
+              id="employee-types-pin"
+              data-nav-pin="nav-admin-employee-type"
+              title="Pin Employee Types to sidebar"
+              aria-label="Pin Employee Types to sidebar"
+              aria-pressed="false"
+              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            >
+              <.icon name="bilimbi-pin" class="size-3.5" />
+            </button>
+          </:title_actions>
           <:subtitle>System types are company-less; custom types belong to this company.</:subtitle>
 
           <:actions>
@@ -99,12 +112,13 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
           </:actions>
         </.header>
 
-        <div class="mt-5">
+        <.card id="employee-types-card" inner_class="p-0">
           <.table
             id="employee-types"
             rows={@streams.employee_types}
             row_id={fn {id, _type} -> id end}
             row_item={fn {_id, type} -> type end}
+            framed={false}
           >
             <:col :let={type} label="Label">{type.label}</:col>
 
@@ -146,7 +160,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
               No employee types found.
             </:empty>
           </.table>
-        </div>
+        </.card>
       </.page>
     </Layouts.app>
     """

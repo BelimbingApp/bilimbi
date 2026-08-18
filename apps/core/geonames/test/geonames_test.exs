@@ -400,4 +400,49 @@ defmodule Bilimbi.Core.GeonamesTest do
                Geonames.update_country_name(Integer.to_string(id), "Renamed")
     end
   end
+
+  describe "update_admin1_name/2 with untrusted input" do
+    test "a non-numeric or non-integer id is refused" do
+      assert {:error, :not_found} = Geonames.update_admin1_name("abc", "Somewhere")
+      assert {:error, :not_found} = Geonames.update_admin1_name("", "Somewhere")
+      assert {:error, :not_found} = Geonames.update_admin1_name(nil, "Somewhere")
+      assert {:error, :not_found} = Geonames.update_admin1_name(:invalid, "Somewhere")
+      assert {:error, :not_found} = Geonames.update_admin1_name(999_999, "Somewhere")
+    end
+
+    test "an empty or invalid name fails validation" do
+      admin1 = hd(Geonames.page_admin1().entries)
+      assert {:error, changeset} = Geonames.update_admin1_name(admin1.id, "")
+      assert "can't be blank" in errors_on(changeset).name
+      assert {:error, :not_found} = Geonames.update_admin1_name(admin1.id, nil)
+    end
+
+    test "a numeric string or integer id updates successfully" do
+      admin1 = hd(Geonames.page_admin1().entries)
+
+      assert {:ok, %{name: "New Division Name", country_name: country_name}} =
+               Geonames.update_admin1_name(admin1.id, "  New Division Name  ")
+
+      assert is_binary(country_name)
+
+      assert {:ok, %{name: "Second Name"}} =
+               Geonames.update_admin1_name(to_string(admin1.id), "Second Name")
+    end
+
+    test "admin1 with code lacking country dot resolves country_name as nil gracefully" do
+      insert_admin1!(%{code: "NODOT", name: "No Country Dot", geoname_id: 9_999_998})
+      unlinked = hd(Geonames.page_admin1(%{"search" => "NODOT"}).entries)
+
+      assert {:ok, %{name: "Renamed No Dot", country_name: nil}} =
+               Geonames.update_admin1_name(unlinked.id, "Renamed No Dot")
+    end
+  end
+
+  defp errors_on(changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
+      Regex.replace(~r"%{(\w+)}", message, fn _, key ->
+        opts |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
+      end)
+    end)
+  end
 end

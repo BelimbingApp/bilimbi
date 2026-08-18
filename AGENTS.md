@@ -520,10 +520,12 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   `aria-sort`, and page, search, filters, sort, and page size stay in URL
   state. Use `<.datetime>` for timestamps and `<.icon>` for all icons (put
   product-only SVGs in `Bilimbi.Base.UI.IconRegistry`). Primary actions use
-  `<.button variant="primary">`; lime `brand` is reserved for orientation and
-  selection, never an action or status. Async actions must show in-flight
-  state, reject duplicate work, and truthfully report the data outcome and
-  recovery.
+  `<.button variant="primary">` with deep olive base (`bg-action` `#2c3801`),
+  high-contrast text (`text-action-ink` `#f5fcdc`), and standard lime accent hover
+  (`hover:bg-action-hover` `var(--color-brand-strong)` / `lime-600`). Lime `brand`
+  is reserved for orientation and selection, never an action or status. Async actions
+  must show in-flight state, reject duplicate work, and truthfully report the data
+  outcome and recovery.
 - **Data tables & inline editing:** Tables use compact density (`py-0.5` row
   cells, `py-1.5` header cells, `px-2` cell horizontal padding, `bg-surface-sunken`
   `#eaebe4` header background, proper case `text-xs font-semibold text-muted` headers,

@@ -48,6 +48,19 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
     {:noreply, push_patch(socket, to: admin1_path(state))}
   end
 
+  def handle_event("save-admin1-name", %{"id" => id, "name" => name}, socket) do
+    case Geonames.update_admin1_name(id, name) do
+      {:ok, updated_admin1} ->
+        {:noreply,
+         socket
+         |> stream_insert(:admin1, updated_admin1)
+         |> put_flash(:info, "Admin1 division #{updated_admin1.code} updated.")}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to save division name.")}
+    end
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -59,15 +72,28 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
       <.page id="admin1-index">
         <.header>
           Admin1 Divisions
+          <:title_actions>
+            <button
+              type="button"
+              id="admin1-pin"
+              data-nav-pin="nav-admin-geonames-admin1-division"
+              title="Pin Admin1 Divisions to sidebar"
+              aria-label="Pin Admin1 Divisions to sidebar"
+              aria-pressed="false"
+              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            >
+              <.icon name="bilimbi-pin" class="size-3.5" />
+            </button>
+          </:title_actions>
           <:subtitle>States, provinces, and top-level administrative divisions</:subtitle>
         </.header>
 
-        <div class="rounded-xl border border-line bg-surface">
+        <.card id="admin1-card" inner_class="p-0">
           <.form
             for={@filters_form}
             id="admin1-filters"
             phx-change="filters"
-            class="px-2 pt-2"
+            class="p-2 mb-2"
           >
             <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_16rem]">
               <div class="relative">
@@ -121,7 +147,14 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
               <span class="whitespace-nowrap font-mono text-ink">{admin1.code}</span>
             </:col>
             <:col :let={admin1} label="Name" sort="name" sort_id="admin1-sort-name">
-              <span class="whitespace-nowrap text-ink">{admin1.name}</span>
+              <.inline_edit
+                id={"admin1-#{admin1.id}-name"}
+                value={admin1.name}
+                id_value={admin1.id}
+                save_event="save-admin1-name"
+                name="name"
+                label="Admin1 division name"
+              />
             </:col>
             <:col :let={admin1} label="Alt Name" sort="alt_name" sort_id="admin1-sort-alt-name">
               <span class="whitespace-nowrap text-ink-muted">{admin1.alt_name || "—"}</span>
@@ -142,7 +175,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
             page_sizes={@page_sizes}
             filters_form={@filters_form}
           />
-        </div>
+        </.card>
       </.page>
     </Layouts.app>
     """

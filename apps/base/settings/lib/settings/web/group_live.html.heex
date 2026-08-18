@@ -1,7 +1,20 @@
 <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@page.nav}>
-  <.page variant={:form}>
+  <.page id="settings-group" variant={:form}>
     <.header>
       {@page.title}
+      <:title_actions>
+        <button
+          type="button"
+          id="settings-pin"
+          data-nav-pin="nav-admin-system-settings"
+          title={"Pin #{@page.title} to sidebar"}
+          aria-label={"Pin #{@page.title} to sidebar"}
+          aria-pressed="false"
+          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        >
+          <.icon name="bilimbi-pin" class="size-3.5" />
+        </button>
+      </:title_actions>
       <:subtitle>{@page.subtitle}</:subtitle>
     </.header>
 
@@ -54,7 +67,7 @@
             name={"settings[#{field.key}]"}
             value={input_value(field)}
             autocomplete="off"
-            class="mt-2.5 w-full rounded-md border border-line bg-surface-sunken px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
+            class="mt-2.5 w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
           />
 
           <div class="mt-1.5 flex items-center gap-2 text-xs">

@@ -216,6 +216,57 @@ defmodule Bilimbi.Core.Geonames do
   end
 
   @doc """
+  Updates an admin1 division's display name by its ID.
+  """
+  @spec update_admin1_name(term(), term()) ::
+          {:ok, Admin1Index.t()} | {:error, :not_found | Ecto.Changeset.t()}
+  def update_admin1_name(id, name) when is_binary(name) do
+    trimmed_name = String.trim(name)
+
+    query =
+      case id do
+        int_id when is_integer(int_id) ->
+          from(a in Admin1, where: a.id == ^int_id)
+
+        str_id when is_binary(str_id) ->
+          case Integer.parse(str_id) do
+            {int_id, ""} -> from(a in Admin1, where: a.id == ^int_id)
+            _ -> from(a in Admin1, where: false)
+          end
+
+        _ ->
+          from(a in Admin1, where: false)
+      end
+
+    case Repo.one(query) do
+      nil ->
+        {:error, :not_found}
+
+      admin1 ->
+        country_iso =
+          case String.split(admin1.code || "", ".", parts: 2) do
+            [iso | _] when iso != "" -> iso
+            _ -> nil
+          end
+
+        country_name =
+          if country_iso do
+            Repo.one(from(c in Country, where: c.iso == ^country_iso, select: c.country))
+          end
+
+        admin1
+        |> Admin1.name_changeset(%{name: trimmed_name})
+        |> Repo.update()
+        |> case do
+          {:ok, updated} -> {:ok, Admin1Index.from_schema(updated, country_name)}
+          {:error, changeset} -> {:error, changeset}
+        end
+    end
+  end
+
+  def update_admin1_name(_id, _name), do: {:error, :not_found}
+
+  @doc """
   Returns a bounded, searchable, sortable page for the read-only Postcodes index.
   """
   @spec page_postcodes(index_query()) :: Page.t(PostcodeIndex.t())

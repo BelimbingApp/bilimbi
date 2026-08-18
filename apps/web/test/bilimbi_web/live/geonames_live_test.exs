@@ -251,6 +251,43 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     assert has_element?(postcodes, "th[aria-sort='ascending'] #postcodes-summary-sort-iso")
   end
 
+  test "updates country and admin1 names via inline editing", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list"])
+
+    {:ok, countries, _html} = conn |> log_in_as() |> live(~p"/geonames/countries")
+
+    assert has_element?(countries, "#country-1-name")
+
+    countries
+    |> element("#country-1-name")
+    |> render_hook("save-country-name", %{"id" => 1, "country" => "Malaysia Federation"})
+
+    assert has_element?(countries, "#country-1-name [data-role='text']", "Malaysia Federation")
+
+    {:ok, admin1, _html} = conn |> log_in_as() |> live(~p"/geonames/admin1")
+
+    assert has_element?(admin1, "#admin1-1-name")
+
+    admin1
+    |> element("#admin1-1-name")
+    |> render_hook("save-admin1-name", %{"id" => 1, "name" => "Wilayah Persekutuan KL"})
+
+    assert has_element?(admin1, "#admin1-1-name [data-role='text']", "Wilayah Persekutuan KL")
+
+    # Invalid ID or empty name flashes error gracefully
+    admin1
+    |> element("#admin1-1-name")
+    |> render_hook("save-admin1-name", %{"id" => "invalid", "name" => "Some Division"})
+
+    assert render(admin1) =~ "Failed to save division name."
+
+    admin1
+    |> element("#admin1-1-name")
+    |> render_hook("save-admin1-name", %{"id" => 1, "name" => ""})
+
+    assert render(admin1) =~ "Failed to save division name."
+  end
+
   test "ignores a country update while one is already in progress" do
     socket = %Phoenix.LiveView.Socket{assigns: %{updating_countries?: true}}
 

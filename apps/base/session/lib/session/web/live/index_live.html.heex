@@ -1,27 +1,58 @@
 <Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.system.session">
-  <.page>
+  <.page id="sessions-index">
     <.header>
       Sessions
+      <:title_actions>
+        <button
+          type="button"
+          id="sessions-pin"
+          data-nav-pin="nav-admin-system-session"
+          title="Pin Sessions to sidebar"
+          aria-label="Pin Sessions to sidebar"
+          aria-pressed="false"
+          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        >
+          <.icon name="bilimbi-pin" class="size-3.5" />
+        </button>
+      </:title_actions>
       <:subtitle>View and manage active sessions</:subtitle>
     </.header>
 
-    <form id="sessions-search" phx-change="search" phx-submit="search" class="mt-5">
-      <.input
-        type="search"
-        name="q"
-        id="sessions-search-q"
-        value={@query}
-        phx-debounce="300"
-        placeholder="Search by IP address or user agent..."
-      />
-    </form>
+    <.card id="sessions-card" inner_class="p-0">
+      <.form
+        for={%{}}
+        as={:filters}
+        id="sessions-search"
+        phx-change="search"
+        phx-submit="search"
+        class="p-2 mb-2"
+      >
+        <div class="relative">
+          <.icon
+            name="hero-magnifying-glass"
+            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+          />
+          <.input
+            type="search"
+            name="q"
+            id="sessions-search-q"
+            value={@query}
+            phx-debounce="300"
+            label="Search sessions"
+            label_class="sr-only"
+            wrapper_class="mb-0"
+            placeholder="Search by IP address or user agent..."
+            class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+          />
+        </div>
+      </.form>
 
-    <div class="mt-2">
       <.table
         id="sessions"
         rows={@streams.sessions}
         row_id={fn {id, _session} -> id end}
         row_item={fn {_id, session} -> session end}
+        framed={false}
       >
         <:col :let={session} label="User">{user_label(session)}</:col>
         <:col :let={session} label="IP Address">
@@ -49,7 +80,7 @@
             phx-value-id={session.id}
             data-confirm="Are you sure you want to terminate this session?"
             title="Terminate session"
-            class="text-danger hover:bg-danger-surface"
+            class="text-danger hover:bg-danger-surface hover:text-danger"
           >
             <.icon name="hero-x-circle" class="size-4" />
             <span class="sr-only">Terminate</span>
@@ -59,6 +90,6 @@
           No sessions found.
         </:empty>
       </.table>
-    </div>
+    </.card>
   </.page>
 </Layouts.app>

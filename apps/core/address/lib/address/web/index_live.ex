@@ -58,6 +58,19 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
       <.page id="addresses-index">
         <.header>
           Addresses
+          <:title_actions>
+            <button
+              type="button"
+              id="addresses-pin"
+              data-nav-pin="nav-admin-address"
+              title="Pin Addresses to sidebar"
+              aria-label="Pin Addresses to sidebar"
+              aria-pressed="false"
+              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            >
+              <.icon name="bilimbi-pin" class="size-3.5" />
+            </button>
+          </:title_actions>
           <:actions>
             <.button
               :if={allowed?(@current_scope, "admin.address.create")}
@@ -70,21 +83,30 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
           </:actions>
         </.header>
 
-        <section class="rounded-xl border border-line bg-surface" aria-label="Address list">
+        <.card id="addresses-card" inner_class="p-0">
           <.form
             for={@filters_form}
             id="addresses-filters"
             phx-change="filters"
-            class="px-4 pt-4"
+            class="p-2 mb-2"
           >
-            <.input
-              field={@filters_form[:search]}
-              id="addresses-search"
-              type="search"
-              phx-debounce="300"
-              label="Search addresses"
-              placeholder="Search by label, address, locality, postcode, or country..."
-            />
+            <div class="relative">
+              <.icon
+                name="hero-magnifying-glass"
+                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              />
+              <.input
+                field={@filters_form[:search]}
+                id="addresses-search"
+                type="search"
+                phx-debounce="300"
+                label="Search addresses"
+                label_class="sr-only"
+                wrapper_class="mb-0"
+                placeholder="Search by label, address, locality, postcode, or country..."
+                class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+              />
+            </div>
           </.form>
 
           <.table
@@ -152,41 +174,37 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
             :if={@addresses_page.total_pages > 0}
             id="addresses-pagination"
             aria-label="Address pagination"
-            class="flex items-center justify-between gap-3 border-t border-line-subtle px-4 py-3"
+            class="flex items-center justify-between gap-3 border-t border-line px-4 py-3"
           >
             <p id="addresses-pagination-summary" class="text-xs text-ink-subtle">
               {page_summary(@addresses_page)}
             </p>
             <div class="flex items-center gap-2">
-              <button
+              <.button
                 id="addresses-page-previous"
-                type="button"
                 phx-click="page"
                 phx-value-page={@addresses_page.page - 1}
                 disabled={@addresses_page.page <= 1}
-                class="rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs font-medium text-ink transition hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Previous
-              </button>
+              </.button>
               <span class="text-xs tabular-nums text-ink-muted">
                 {page_position(@addresses_page)}
               </span>
-              <button
+              <.button
                 id="addresses-page-next"
-                type="button"
                 phx-click="page"
                 phx-value-page={@addresses_page.page + 1}
                 disabled={
                   @addresses_page.total_pages == 0 or
                     @addresses_page.page >= @addresses_page.total_pages
                 }
-                class="rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs font-medium text-ink transition hover:bg-surface-sunken disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Next
-              </button>
+              </.button>
             </div>
           </nav>
-        </section>
+        </.card>
       </.page>
     </Layouts.app>
     """

@@ -27,5 +27,6 @@ defmodule Bilimbi.Core.Geonames.Admin1Index do
     }
   end
 
+  defp country_iso(nil), do: ""
   defp country_iso(code), do: code |> String.split(".", parts: 2) |> hd()
 end
