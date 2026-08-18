@@ -49,7 +49,7 @@ defmodule Bilimbi.Core.Geonames.Web.Components do
             label_class="sr-only"
             wrapper_class="mb-0"
             options={page_size_options(@page_sizes)}
-            class="h-7 w-auto w-auto rounded-md border border-line bg-surface py-0 pl-2 pr-6 text-xs tabular-nums text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
+            class="h-7 w-auto rounded-md border border-line bg-surface py-0 pl-2 pr-6 text-xs tabular-nums text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
           />
         </.form>
       </div>
