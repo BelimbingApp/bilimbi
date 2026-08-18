@@ -94,7 +94,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
               navigate={~p"/employee-types/new"}
               variant="primary"
             >
-              New type
+              New Type
             </.button>
           </:actions>
         </.header>
