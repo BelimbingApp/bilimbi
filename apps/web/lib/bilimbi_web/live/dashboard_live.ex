@@ -15,11 +15,11 @@ defmodule BilimbiWeb.DashboardLive do
   alias BilimbiWeb.UserAuth
 
   @widget_ids Enum.sort([
-               "base-dashboard-company-stats",
-               "base-dashboard-user-stats",
-               "base-dashboard-session-stats",
-               "base-dashboard-recent-audit"
-             ])
+                "base-dashboard-company-stats",
+                "base-dashboard-user-stats",
+                "base-dashboard-session-stats",
+                "base-dashboard-recent-audit"
+              ])
 
   @impl true
   def mount(_params, _session, socket) do
