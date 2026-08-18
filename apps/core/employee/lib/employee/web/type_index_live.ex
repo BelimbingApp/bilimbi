@@ -18,7 +18,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
       {:ok, types} ->
         {:ok,
          socket
-         |> assign(:page_title, "Employee types")
+         |> assign(:page_title, "Employee Types")
          |> assign(:active_nav, "admin.employee-type")
          |> assign(:employee_types_count, length(types))
          |> stream(:employee_types, types)}
@@ -84,7 +84,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
         </p>
 
         <.header>
-          Employee types
+          Employee Types
           <:subtitle>System types are company-less; custom types belong to this company.</:subtitle>
 
           <:actions>

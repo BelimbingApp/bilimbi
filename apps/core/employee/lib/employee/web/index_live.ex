@@ -47,7 +47,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
               navigate={~p"/employee-types"}
               id="employee-types"
             >
-              Employee types
+              Employee Types
             </.button>
 
             <.button
@@ -56,7 +56,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
               navigate={~p"/employees/new"}
               variant="primary"
             >
-              New employee
+              New Employee
             </.button>
           </:actions>
         </.header>

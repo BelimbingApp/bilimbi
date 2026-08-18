@@ -181,4 +181,19 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
     assert has_element?(view, "#employee-types-empty", "No employee types found.")
   end
+
+  test "the heading matches the nav label that leads here", %{conn: conn} do
+    grant_capabilities!("admin.employee-type.list")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+
+    # Derived from the contribution rather than repeated as a literal: the nav
+    # label is the source of truth, and the page used to say "Employee types"
+    # while the menu item said "Employee Types" (#291).
+    label =
+      Bilimbi.Core.Employee.Contributions.contributions().menu
+      |> Enum.find(&(&1.id == "admin.employee-type"))
+      |> Map.fetch!(:label)
+
+    assert render(view) =~ label
+  end
 end

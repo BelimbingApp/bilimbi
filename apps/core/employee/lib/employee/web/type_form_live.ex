@@ -31,7 +31,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
 
   defp apply_action(socket, :new, _params) do
     socket
-    |> assign(:page_title, "New employee type")
+    |> assign(:page_title, "New Employee Type")
     |> assign(:type, nil)
     |> assign_form(form_changeset(:new, %{}, nil))
   end
@@ -173,7 +173,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
       <.page variant={:form}>
         <p class="mb-2 text-xs">
           <.link navigate={~p"/employee-types"} class="font-medium text-ink-muted hover:text-ink">
-            ← Employee types
+            ← Employee Types
           </.link>
         </p>
 
