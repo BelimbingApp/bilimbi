@@ -5,8 +5,6 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
 
   alias Bilimbi.Core.Geonames
 
-  import Bilimbi.Core.Geonames.Web.Components
-
   @page_sizes [25, 50, 100, 300]
   @sorts ~w(country_name code name alt_name updated_at)
   @initial_directions %{"updated_at" => "desc"}

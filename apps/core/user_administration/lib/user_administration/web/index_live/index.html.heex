@@ -65,15 +65,6 @@
             wrapper_class="mb-0"
             options={@role_options}
           />
-          <.input
-            field={@filters_form[:perPage]}
-            id="users-page-size"
-            type="select"
-            label="Rows per page"
-            label_class="sr-only"
-            wrapper_class="mb-0"
-            options={page_size_options()}
-          />
         </div>
       </.form>
 
@@ -191,37 +182,12 @@
         </:empty>
       </.table>
 
-      <nav
-        :if={@users_page.total_pages > 0}
+      <.pagination
         id="users-pagination"
-        aria-label="Pagination"
-        class="flex items-center justify-between gap-3 border-t border-line px-4 py-3"
-      >
-        <p id="users-pagination-summary" class="text-xs text-ink-subtle">
-          {page_summary(@users_page)}
-        </p>
-        <div class="flex items-center gap-2">
-          <.button
-            id="users-pagination-previous"
-            phx-click="page"
-            phx-value-page={@users_page.page - 1}
-            disabled={@users_page.page <= 1}
-          >
-            Previous
-          </.button>
-          <span id="users-pagination-position" class="text-xs tabular-nums text-ink-muted">
-            {page_position(@users_page)}
-          </span>
-          <.button
-            id="users-pagination-next"
-            phx-click="page"
-            phx-value-page={@users_page.page + 1}
-            disabled={@users_page.page >= @users_page.total_pages or @users_page.total_pages == 0}
-          >
-            Next
-          </.button>
-        </div>
-      </nav>
+        page={@users_page}
+        page_sizes={@page_sizes}
+        filters_form={@filters_form}
+      />
     </.card>
   </.page>
 </Layouts.app>

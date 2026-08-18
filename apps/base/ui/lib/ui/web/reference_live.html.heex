@@ -380,6 +380,39 @@
       </div>
     </section>
 
+    <%!-- Section: Pagination Component --%>
+    <section id="component-pagination" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">
+          {gettext("Pagination (<.pagination>)")}
+        </h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance:
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/pagination.blade.php</code>
+        </p>
+      </div>
+
+      <div class="space-y-4">
+        <div class="rounded-xl border border-line bg-surface">
+          <.pagination
+            id="ref-pagination-sample"
+            page={@pagination_sample_page}
+            page_sizes={[10, 25, 50, 100]}
+            filters_form={@pagination_sample_form}
+          />
+        </div>
+
+        <div class="rounded-xl border border-line bg-surface p-4 text-xs text-ink-muted space-y-1">
+          <p>
+            <strong>{gettext("Pagination Contract:")}</strong>
+            {gettext(
+              "Compact responsive pagination toolbar with summary count, compact rows-per-page selector, and numbered page steps."
+            )}
+          </p>
+        </div>
+      </div>
+    </section>
+
     <%!-- Section: Form & Inputs --%>
     <section id="component-inputs" class="space-y-4">
       <div class="border-b border-line pb-2">

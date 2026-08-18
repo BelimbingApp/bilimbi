@@ -30,6 +30,7 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
 
     assert html =~ "All roles"
     assert html =~ ~s(id="roles-filter-options")
+    assert html =~ "hidden absolute"
     assert html =~ ~s(id="roles-filter-option-1")
     assert html =~ ~s(id="roles-filter-option-2")
     refute html =~ "checked"

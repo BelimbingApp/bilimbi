@@ -185,7 +185,7 @@ defmodule BilimbiWeb.UserLiveTest do
     assert has_element?(view, "#users-role-filter-option-#{second.id}[checked]")
     assert has_element?(view, "label[for='users-role-filter-option-#{first.id}']", "First")
     assert has_element?(view, "label[for='users-role-filter-option-#{second.id}']", "Second")
-    assert has_element?(view, "#users-pagination-summary", "Showing 1–10 of 12")
+    assert has_element?(view, "#users-pagination-summary", "Showing 1 to 10 of 12 results")
     assert has_element?(view, "#user-6", "First")
     assert has_element?(view, "#user-6", "Second")
     assert has_element?(view, "#user-6")
@@ -274,29 +274,29 @@ defmodule BilimbiWeb.UserLiveTest do
     signed_in = log_in_as(conn)
 
     {:ok, ten, _html} = live(signed_in, users_path(perPage: 1))
-    assert has_element?(ten, "#users-page-size option[value='10'][selected]")
-    assert has_element?(ten, "#users-pagination-summary", "Showing 1–10 of 12")
+    assert has_element?(ten, "#users-pagination-page-size option[value='10'][selected]")
+    assert has_element?(ten, "#users-pagination-summary", "Showing 1 to 10 of 12 results")
 
     {:ok, fifty, _html} = live(signed_in, users_path(perPage: 30))
-    assert has_element?(fifty, "#users-page-size option[value='50'][selected]")
-    assert has_element?(fifty, "#users-pagination-summary", "Showing 1–12 of 12")
+    assert has_element?(fifty, "#users-pagination-page-size option[value='50'][selected]")
+    assert has_element?(fifty, "#users-pagination-summary", "Showing 1 to 12 of 12 results")
 
     {:ok, hundred, _html} = live(signed_in, users_path(perPage: 9999))
-    assert has_element?(hundred, "#users-page-size option[value='100'][selected]")
+    assert has_element?(hundred, "#users-pagination-page-size option[value='100'][selected]")
 
     {:ok, view, _html} = live(signed_in, users_path(page: 2, perPage: 10))
-    assert has_element?(view, "#users-pagination-position", "Page 2 of 2")
+    assert has_element?(view, "#users-pagination-page-2[aria-current='page']")
 
     view
-    |> form("#users-filters", filters: %{search: "Page", roleIds: [], perPage: "50"})
+    |> form("#users-pagination-page-size-form", filters: %{perPage: "50"})
     |> render_change()
 
-    assert has_element?(view, "#users-page-size option[value='50'][selected]")
-    assert has_element?(view, "#users-pagination-position", "Page 1 of 1")
+    assert has_element?(view, "#users-pagination-page-size option[value='50'][selected]")
+    assert has_element?(view, "#users-pagination-page-1[aria-current='page']")
 
     {:ok, sort_view, _html} = live(signed_in, users_path(page: 2, perPage: 10))
     sort_view |> element("#users-sort-created") |> render_click()
-    assert has_element?(sort_view, "#users-pagination-position", "Page 1 of 2")
+    assert has_element?(sort_view, "#users-pagination-page-1[aria-current='page']")
     assert has_element?(sort_view, "#users-sort-created .hero-chevron-down.text-action")
   end
 
@@ -306,31 +306,20 @@ defmodule BilimbiWeb.UserLiveTest do
     signed_in = log_in_as(conn)
 
     # Nothing matched, so the table's empty slot is the whole truth and the
-    # pager has nothing to add: "No results · Page 0 of 0" beside two disabled
-    # buttons restates it in a shape that implies pages exist. Hidden, as in
-    # core/address (#299), core/geonames (#305) and Belimbing.
+    # pager summary and page links are omitted while the selector stays.
     {:ok, empty, _html} = live(signed_in, users_path(search: "no such account"))
     assert has_element?(empty, "#users-empty", "No users found")
-    refute has_element?(empty, "#users-pagination")
+    assert has_element?(empty, "#users-pagination")
     refute has_element?(empty, "#users-pagination-summary")
-    refute has_element?(empty, "#users-pagination-position")
     refute has_element?(empty, "#users-pagination-previous")
     refute has_element?(empty, "#users-pagination-next")
 
-    # The opposite case, and the reason the guard is `total_pages > 0` rather
-    # than "this page is empty": users exist, you are just past the end. Here
-    # the pager is the only thing that says so, so it stays.
+    # When users exist but we are past the end, the pager stays and shows summary.
     {:ok, out_of_range, _html} = live(signed_in, users_path(page: 2, perPage: 10))
     assert has_element?(out_of_range, "#users-empty", "No users found")
     assert has_element?(out_of_range, "#users-pagination")
-
-    assert has_element?(
-             out_of_range,
-             "#users-pagination-summary",
-             "No results on this page · 1 total"
-           )
-
-    assert has_element?(out_of_range, "#users-pagination-position", "Page 2 of 1")
+    assert has_element?(out_of_range, "#users-pagination-summary", "Showing 11 to 1 of 1 results")
+    assert has_element?(out_of_range, "#users-pagination-page-1")
   end
 
   test "hard deletes another user and refreshes the bounded page", %{conn: conn} do
