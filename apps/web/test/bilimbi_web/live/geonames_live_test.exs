@@ -252,4 +252,100 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     refute socket.assigns.updating_countries?
     assert socket.assigns.flash["error"] =~ "could not connect to download.geonames.org"
   end
+
+  describe "country update outcome messages" do
+    # `handle_async/3` reloads the page after flashing, so the socket needs the
+    # index state that a mounted view would carry. Streams are configured too,
+    # otherwise the reload raises before the flash can be read.
+    defp update_socket do
+      %Phoenix.LiveView.Socket{
+        endpoint: BilimbiWeb.Endpoint,
+        router: BilimbiWeb.Router,
+        assigns: %{
+          __changed__: %{},
+          flash: %{},
+          updating_countries?: true,
+          index_state: %{
+            search: "",
+            page: 1,
+            per_page: 25,
+            sort_by: :iso,
+            sort_dir: :asc
+          },
+          streams: %{
+            __changed__: MapSet.new(),
+            __configured__: %{},
+            __ref__: 0,
+            countries: %Phoenix.LiveView.LiveStream{
+              name: :countries,
+              dom_id: & &1.id,
+              ref: "0",
+              inserts: [],
+              deletes: [],
+              reset?: false,
+              consumable?: false
+            }
+          }
+        }
+      }
+    end
+
+    defp flash_for(countries) do
+      assert {:noreply, socket} =
+               CountriesLive.handle_async(
+                 :update_countries,
+                 {:ok, {:ok, %{countries: countries}}},
+                 update_socket()
+               )
+
+      socket.assigns.flash["info"]
+    end
+
+    test "a fallback says the update did not happen and dates the data" do
+      cached_at = DateTime.new!(~D[2026-03-04], ~T[09:00:00], "Etc/UTC")
+
+      message =
+        flash_for(%{
+          cached: true,
+          download_status: :fallback,
+          cached_at: cached_at,
+          imported: 252,
+          skipped: 50
+        })
+
+      # The whole point: an operator whose network died must not be told their
+      # country data is current (#273).
+      assert message =~ "were not updated"
+      assert message =~ "04 Mar 2026"
+      refute message =~ "Countries updated"
+    end
+
+    test "a 304 still reads as an update, because it is one" do
+      message =
+        flash_for(%{cached: true, download_status: 304, imported: 252, skipped: 50})
+
+      assert message =~ "Countries updated from the current local GeoNames download"
+    end
+
+    test "a fresh download reads as an update" do
+      message =
+        flash_for(%{cached: false, download_status: 200, imported: 252, skipped: 50})
+
+      assert message =~ "Countries updated from a fresh GeoNames download"
+    end
+
+    test "a fallback with no readable timestamp still refuses to claim an update" do
+      message =
+        flash_for(%{
+          cached: true,
+          download_status: :fallback,
+          cached_at: nil,
+          imported: 1,
+          skipped: 0
+        })
+
+      assert message =~ "were not updated"
+      refute message =~ "Countries updated"
+    end
+  end
 end

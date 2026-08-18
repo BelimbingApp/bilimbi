@@ -292,6 +292,18 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
     max(page.total_pages, 1) |> min(page_number) |> max(1)
   end
 
+  # A fallback is NOT an update. `:fallback` means the download failed and the
+  # existing local file was reused -- previously indistinguishable from a 304,
+  # because both carry `cached: true` and only `:status` told them apart (#273).
+  # Saying "updated" there tells an operator with a week-dead proxy that their
+  # country data is current.
+  defp update_success_message(%{
+         countries: %{download_status: :fallback, imported: imported, skipped: skipped} = result
+       }) do
+    "Countries were not updated: GeoNames could not be reached#{as_of(result[:cached_at])}. " <>
+      "Kept the existing local data (#{imported} imported, #{skipped} skipped). Try Update again later."
+  end
+
   defp update_success_message(%{
          countries: %{cached: cached, imported: imported, skipped: skipped}
        }) do
@@ -302,6 +314,11 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   end
 
   defp update_success_message(_result), do: "Countries updated from GeoNames."
+
+  defp as_of(%DateTime{} = cached_at),
+    do: ", so this data is from #{Calendar.strftime(cached_at, "%d %b %Y")}"
+
+  defp as_of(_cached_at), do: ""
 
   defp update_error_message({:download, :countries, {:request, error}}) do
     if network_timeout_or_unreachable?(error) do

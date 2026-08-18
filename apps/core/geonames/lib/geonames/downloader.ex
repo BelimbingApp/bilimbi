@@ -47,11 +47,15 @@ defmodule Bilimbi.Core.Geonames.Downloader do
         retry: false
       )
 
+    # Only transport failures become a fallback. A blanket `rescue` also swallows
+    # our own bugs -- a malformed request option would be served from cache and
+    # look like a working page (#273).
     response =
       try do
         Req.get(request_options)
       rescue
-        exception -> {:error, exception}
+        exception in [Mint.TransportError, Mint.HTTPError, Req.TransportError] ->
+          {:error, exception}
       end
 
     case response do
@@ -91,6 +95,17 @@ defmodule Bilimbi.Core.Geonames.Downloader do
     case File.stat(destination) do
       {:ok, %{size: size}} when size > 0 -> true
       _other -> false
+    end
+  end
+
+  # How old the data we fell back to actually is. Reported rather than used to
+  # refuse: a hard age bound would turn an unreachable server into a failed
+  # screen, which is the resilience this feature exists to provide. Telling the
+  # operator the date lets them judge (#273).
+  defp cached_at(destination) do
+    case File.stat(destination, time: :posix) do
+      {:ok, %{mtime: mtime}} -> DateTime.from_unix!(mtime)
+      _other -> nil
     end
   end
 
@@ -141,6 +156,6 @@ defmodule Bilimbi.Core.Geonames.Downloader do
   end
 
   defp cached_result(path, status, etag) do
-    %{path: path, cached: true, status: status, etag: etag}
+    %{path: path, cached: true, status: status, etag: etag, cached_at: cached_at(path)}
   end
 end
