@@ -6,36 +6,7 @@ defmodule Bilimbi.Core.Employee.TestFixtures do
 
   def create_employee_tables! do
     apply(Bilimbi.Core.Company.TestFixtures, :create_company_identity_tables!, [])
-
-    SQL.query!(
-      Repo,
-      """
-      CREATE TEMPORARY TABLE company_department_types (
-        id bigserial PRIMARY KEY,
-        code varchar(255) NOT NULL UNIQUE,
-        name varchar(255) NOT NULL,
-        category varchar(255) NOT NULL
-      ) ON COMMIT PRESERVE ROWS
-      """,
-      []
-    )
-
-    SQL.query!(
-      Repo,
-      """
-      CREATE TEMPORARY TABLE company_departments (
-        id bigserial PRIMARY KEY,
-        company_id bigint NOT NULL,
-        department_type_id bigint NOT NULL,
-        head_id bigint,
-        status varchar(255) NOT NULL DEFAULT 'active',
-        metadata json,
-        created_at timestamp(0) without time zone,
-        updated_at timestamp(0) without time zone
-      ) ON COMMIT PRESERVE ROWS
-      """,
-      []
-    )
+    apply(Bilimbi.Core.Company.TestFixtures, :create_departments_table!, [])
 
     SQL.query!(
       Repo,

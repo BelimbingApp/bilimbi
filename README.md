@@ -125,7 +125,8 @@ apps/
 │   ├── settings/                 # Immutable definitions and scoped values
 │   ├── tenancy/                  # base/tenancy module package
 │   ├── authz/                    # Capability, role, grant, and decision engine
-│   └── audit/                    # base/audit module package
+│   ├── audit/                    # base/audit module package
+│   └── system/                   # Read-only instance facts (System Info)
 ├── core/                         # Mandatory composition application
 │   ├── bilimbi.container.exs     # Declares the Core layer
 │   ├── company/                  # core/company module package

@@ -5,8 +5,7 @@ defmodule BilimbiWeb.Router do
     only: [
       fetch_current_scope: 2,
       require_authenticated: 2,
-      redirect_if_authenticated: 2,
-      require_capability: 2
+      redirect_if_authenticated: 2
     ]
 
   @content_security_policy Enum.join(
@@ -43,16 +42,6 @@ defmodule BilimbiWeb.Router do
     plug :accepts, ["json"]
   end
 
-  pipeline :ensure_company_list do
-    plug :require_authenticated
-    plug :require_capability, "admin.company.list"
-  end
-
-  pipeline :ensure_company_view do
-    plug :require_authenticated
-    plug :require_capability, "admin.company.view"
-  end
-
   # The homepage is the sign-in screen; authenticated visitors are forwarded
   # to their workspace.
   scope "/", BilimbiWeb do
@@ -85,30 +74,6 @@ defmodule BilimbiWeb.Router do
     end
   end
 
-  scope "/", BilimbiWeb do
-    pipe_through [:browser, :ensure_company_list]
-
-    live_session :companies_index,
-      on_mount: [
-        {BilimbiWeb.UserAuth, :require_authenticated},
-        {BilimbiWeb.UserAuth, {:require_capability, "admin.company.list"}}
-      ] do
-      live "/companies", CompanyLive.Index
-    end
-  end
-
-  scope "/", BilimbiWeb do
-    pipe_through [:browser, :ensure_company_view]
-
-    live_session :companies_show,
-      on_mount: [
-        {BilimbiWeb.UserAuth, :require_authenticated},
-        {BilimbiWeb.UserAuth, {:require_capability, "admin.company.view"}}
-      ] do
-      live "/companies/:id", CompanyLive.Show
-    end
-  end
-
   @manifest_path Path.expand(
                    "../../../../_build/#{Application.compile_env!(:web, :mix_env)}/bilimbi_routes.exs",
                    __DIR__
@@ -117,10 +82,13 @@ defmodule BilimbiWeb.Router do
   require BilimbiWeb.DiscoveredRoutes
   BilimbiWeb.DiscoveredRoutes.inject()
 
-  # Other scopes may use custom stacks.
-  # scope "/api", BilimbiWeb do
-  #   pipe_through :api
-  # end
+  scope "/api", BilimbiWeb do
+    pipe_through [:browser, :require_authenticated]
+
+    post "/theme", ThemeController, :update
+    post "/pins/toggle", PinController, :toggle
+    post "/pins/reorder", PinController, :reorder
+  end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:web, :dev_routes) do

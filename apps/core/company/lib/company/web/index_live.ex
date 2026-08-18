@@ -1,7 +1,7 @@
-defmodule BilimbiWeb.CompanyLive.Index do
+defmodule Bilimbi.Core.Company.Web.IndexLive do
   @moduledoc "Tenant-wide company list, via `Bilimbi.Core.Company.list_companies/1`."
 
-  use BilimbiWeb, :live_view
+  use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Core.Company
 
@@ -39,6 +39,20 @@ defmodule BilimbiWeb.CompanyLive.Index do
             </button>
           </:title_actions>
           <:subtitle>Every live company in this tenant</:subtitle>
+          <:actions>
+            <.button
+              navigate={~p"/companies/department-types"}
+              class="text-xs"
+            >
+              Department Types
+            </.button>
+            <.button
+              navigate={~p"/companies/legal-entity-types"}
+              class="text-xs"
+            >
+              Legal Entity Types
+            </.button>
+          </:actions>
         </.header>
 
         <.card id="companies-card" inner_class="p-0">
