@@ -48,6 +48,7 @@ Keep color tokens and reusable theme rules in the shared web foundation. A
 module may add a semantic role only when its workflow genuinely needs one.
 
 - **`canvas` / `surface` / `surface-sidebar`**: Warm stone operational base.
+- **`surface-sunken` (`#eaebe4`)**: Muted sunken surface used for table headers, code blocks, and subtle containers.
 - **`brand-surface` (`#f3f5e8`)**: Subtle warm brand tint used on the pinned
   navigation surface and highlight containers.
 - **`link` (`#544c43`) / `muted` (`#6b6057`) / `ink` (`#2c2418`)**: Warm font
@@ -83,6 +84,29 @@ wraps its content in the `<.page>` component and lets its variant choose the
 width: `:list` for operational index screens, `:form` for single-column edit
 forms, `:detail` for show screens and the dashboard. Never hand-write
 `mx-auto max-w-*` on a screen's root container.
+
+## Data tables & row density
+
+Operational tables use compact, dense geometry for high-information density
+during long operational sessions:
+
+- **Row padding:** `py-0.5` (`0.125rem` / `2px`), `px-2` (`0.5rem` / `8px`) horizontal cell padding.
+- **Header padding:** `py-1.5` (`0.375rem` / `6px`), `px-2` horizontal header padding.
+- **Header background:** `bg-surface-sunken` (`#eaebe4`).
+- **Header typography:** Proper case `text-xs font-semibold text-muted` (`text-ink-subtle`).
+- **Body typography:** `text-sm text-ink`, with `tabular-nums text-muted` (`text-ink-muted`) for codes, IDs, currencies, phones, populations, dates, and measurements.
+- **Search & filter cards:** Search inputs live in an outer `<.card>` container with `p-2` and a distinct bottom gap (`mb-2`) before the table headers begin, preventing search inputs from gluing directly to table headers.
+- **Pagination controls:** Rows per page selector uses compact geometry (`w-14`, `h-7`, `pl-2 pr-4`) with accent focus styling (`focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30`). Navigation buttons use `size-7` with accent focus rings (`focus-visible:ring-1 focus-visible:ring-brand-strong/40`) and active page highlight (`border-brand-line bg-brand-surface text-brand-ink`).
+
+## Inline editing
+
+Inline editing allows quick modifications to entity fields without leaving the
+table view:
+
+- **Display mode:** Shows the field value in `text-ink` alongside a subtle hover pencil icon (`size-3.5 text-muted opacity-0 group-hover:opacity-100 transition-opacity`).
+- **Activation:** Clicking the cell or pressing Enter when focused activates edit mode.
+- **Editing mode:** Replaces the cell with an inline `<input>` styled with `border-action` / `border-brand-strong`, autofocusing and selecting the text.
+- **Save & Cancel:** Pressing `Enter` or blurring saves the field, updates the LiveView stream item (`stream_insert/3`), clears edit state, and flashes feedback (`"<Entity> saved."`). Pressing `Escape` cancels editing and reverts to display mode.
 
 ## Subtle depth and motion
 

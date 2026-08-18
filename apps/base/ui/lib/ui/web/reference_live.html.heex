@@ -475,6 +475,59 @@
       </div>
     </section>
 
+    <%!-- Section: Card Container --%>
+    <section id="component-card" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">{gettext("Card (<.card>)")}</h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance:
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/card.blade.php</code>
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <.card id="ref-card-basic">
+          <p class="text-sm text-ink">
+            {gettext("Simple card container with subtle line border and rounded geometry.")}
+          </p>
+        </.card>
+        <.card id="ref-card-title" title={gettext("Card with Title")}>
+          <p class="text-sm text-ink">
+            {gettext("Card container with distinct header title section.")}
+          </p>
+        </.card>
+      </div>
+    </section>
+
+    <%!-- Section: Inline Edit --%>
+    <section id="component-inline-edit" class="space-y-4">
+      <div class="border-b border-line pb-2">
+        <h2 class="text-base font-semibold text-ink-strong">
+          {gettext("Inline Edit (<.inline_edit>)")}
+        </h2>
+        <p class="text-xs text-ink-muted">
+          Belimbing provenance:
+          <code class="rounded bg-surface-sunken px-1.5 py-0.5 text-xs text-ink">resources/core/views/components/ui/edit-in-place/text.blade.php</code>
+        </p>
+      </div>
+
+      <div class="rounded-xl border border-line bg-surface p-5 space-y-3">
+        <div class="max-w-xs">
+          <.inline_edit
+            id="ref-inline-edit-sample"
+            id_value={1}
+            value="Editable Entity Value"
+            save_event="save-sample"
+          />
+        </div>
+        <p class="text-xs text-ink-muted">
+          {gettext(
+            "In-place inline edit with hover pencil icon, click/focus activation, Enter/blur commit, and Escape cancel."
+          )}
+        </p>
+      </div>
+    </section>
+
     <%!-- Section: Timestamps --%>
     <section id="component-datetime" class="space-y-4">
       <div class="border-b border-line pb-2">

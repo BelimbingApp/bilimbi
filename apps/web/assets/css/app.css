@@ -30,7 +30,7 @@
   /* Surfaces — a warm operational base. */
   --color-canvas: var(--color-stone-50);
   --color-surface: var(--color-white);
-  --color-surface-sunken: var(--color-stone-50);
+  --color-surface-sunken: #eaebe4;
   --color-surface-muted: var(--color-stone-100);
   --color-surface-sidebar: var(--color-stone-100);
 

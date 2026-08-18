@@ -25,6 +25,23 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   end
 
   @impl true
+  def handle_event("save-country-name", %{"id" => id, "country" => name}, socket) do
+    id = if is_binary(id), do: String.to_integer(id), else: id
+
+    case Geonames.update_country_name(id, name) do
+      {:ok, updated_country} ->
+        {:noreply,
+         socket
+         |> stream_insert(:countries, updated_country)
+         |> put_flash(:info, "Country #{updated_country.iso} name updated.")}
+
+      {:error, _reason} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "Failed to save country name.")}
+    end
+  end
+
   def handle_event("filters", %{"filters" => filters}, socket) do
     state =
       socket.assigns.index_state
@@ -126,12 +143,12 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
           </:actions>
         </.header>
 
-        <div class="rounded-xl border border-line bg-surface">
+        <.card id="countries-card" inner_class="p-0">
           <.form
             for={@filters_form}
             id="countries-filters"
             phx-change="filters"
-            class="px-2 pt-2"
+            class="p-2 mb-2"
           >
             <div class="relative">
               <.icon
@@ -166,10 +183,17 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
               <span class="whitespace-nowrap font-medium tabular-nums text-ink">{country.iso}</span>
             </:col>
             <:col :let={country} label="Country" sort="country" sort_id="countries-sort-country">
-              <span class="whitespace-nowrap text-ink">{country.country}</span>
+              <.inline_edit
+                id={"country-#{country.id}-name"}
+                value={country.country}
+                id_value={country.id}
+                save_event="save-country-name"
+                name="country"
+                label="Country name"
+              />
             </:col>
             <:col :let={country} label="Capital" sort="capital" sort_id="countries-sort-capital">
-              <span class="whitespace-nowrap text-ink-muted">{country.capital || "—"}</span>
+              <span class="whitespace-nowrap tabular-nums text-ink-muted">{country.capital || "—"}</span>
             </:col>
             <:col :let={country} label="Phone" sort="phone" sort_id="countries-sort-phone">
               <span class="whitespace-nowrap tabular-nums text-ink-muted">{country.phone || "—"}</span>
@@ -200,7 +224,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
             page_sizes={@page_sizes}
             filters_form={@filters_form}
           />
-        </div>
+        </.card>
       </.page>
     </Layouts.app>
     """
