@@ -196,4 +196,18 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     assert render(view) =~ label
   end
+
+  test "the primary action is Title Case like every other index screen", %{conn: conn} do
+    # `create` as well as `list`: the action is capability-gated, so with only
+    # `list` the element does not render and the assertion fails for a reason
+    # that has nothing to do with its label.
+    grant_capabilities!(["admin.employee-type.list", "admin.employee-type.create"])
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+
+    # A literal, unlike the heading test above, because button labels have no
+    # contribution to derive from -- the nav owns page names, nothing owns
+    # action names. #292 fixed the titles and left this one behind, so it is
+    # pinned rather than trusted (#296).
+    assert has_element?(view, "#employee-type-new", "New Type")
+  end
 end
