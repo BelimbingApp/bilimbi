@@ -96,7 +96,7 @@ during long operational sessions:
 - **Header typography:** Proper case `text-xs font-semibold text-muted` (`text-ink-subtle`).
 - **Body typography:** `text-sm text-ink`, with `tabular-nums text-muted` (`text-ink-muted`) for codes, IDs, currencies, phones, populations, dates, and measurements.
 - **Search & filter cards:** Search inputs live in an outer `<.card>` container with `p-2` and a distinct bottom gap (`mb-2`) before the table headers begin, preventing search inputs from gluing directly to table headers.
-- **Pagination controls:** Rows per page selector uses compact geometry (`w-14`, `h-7`, `pl-2 pr-4`) with accent focus styling (`focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30`). Navigation buttons use `size-7` with accent focus rings (`focus-visible:ring-1 focus-visible:ring-brand-strong/40`) and active page highlight (`border-brand-line bg-brand-surface text-brand-ink`).
+- **Pagination controls:** Rows per page selector uses compact geometry (`w-auto`, `h-7`, `pl-2 pr-6`) — sized to its content, because the options run to three digits and a fixed `w-14` clipped even `25` behind the dropdown arrow (#304) with accent focus styling (`focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30`). Navigation buttons use `size-7` with accent focus rings (`focus-visible:ring-1 focus-visible:ring-brand-strong/40`) and active page highlight (`border-brand-line bg-brand-surface text-brand-ink`).
 
 ## Inline editing
 

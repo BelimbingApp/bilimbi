@@ -389,4 +389,24 @@ defmodule BilimbiWeb.GeonamesLiveTest do
              "expected a refusal flash for id #{inspect(bad)}"
     end
   end
+
+  test "the rows-per-page selector is sized to its options, not to a fixed width", %{conn: conn} do
+    grant_capabilities!("admin.geonames.list")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/geonames/countries")
+
+    select = view |> element("#countries-pagination-page-size") |> render()
+
+    # The options run to three digits (100, 300). A fixed `w-14` left ~32px for
+    # the value AND the native dropdown arrow, so even "25" painted as "2" with
+    # the 5 hidden behind the arrow (#304). Nothing about the DOM was wrong --
+    # every option is present -- only the width, so this guards the class.
+    assert select =~ "w-auto",
+           "the selector must size to its content; a fixed width clips three-digit options"
+
+    refute select =~ "w-14"
+
+    for value <- ~w(25 50 100 300) do
+      assert select =~ ">#{value}</option>", "expected the #{value} option to be offered"
+    end
+  end
 end
