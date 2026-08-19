@@ -11,8 +11,10 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Core.Address
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
+  alias Bilimbi.Core.User
 
   @valid_address_kinds ~w(headquarters billing shipping branch other)
 
@@ -506,15 +508,15 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
           _ -> 0
         end
 
-      case Integer.parse(address_id_str) do
-        {address_id, ""} when address_id > 0 ->
+      case parse_id(address_id_str) do
+        address_id when is_integer(address_id) and address_id > 0 ->
           attrs = %{
             kind: kinds,
             is_primary: is_primary,
             priority: priority_int
           }
 
-          case attach_address_to_employee(scope, address_id, employee.id, attrs) do
+          case Address.attach_to_employee(scope, address_id, employee.id, attrs) do
             {:ok, :attached} ->
               {:noreply,
                socket
@@ -542,9 +544,9 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       scope = socket.assigns.current_scope.scope
       employee = socket.assigns.employee
 
-      case Integer.parse(address_id_str) do
-        {address_id, ""} ->
-          case detach_address_from_employee(scope, address_id, employee.id) do
+      case parse_id(address_id_str) do
+        address_id when is_integer(address_id) and address_id > 0 ->
+          case Address.detach_from_employee(scope, address_id, employee.id) do
             :ok ->
               {:noreply,
                socket
@@ -568,12 +570,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       scope = socket.assigns.current_scope.scope
       employee = socket.assigns.employee
 
-      case Integer.parse(address_id_str) do
-        {address_id, ""} ->
+      case parse_id(address_id_str) do
+        address_id when is_integer(address_id) and address_id > 0 ->
           target_addr = Enum.find(socket.assigns.attached_addresses, &(&1.id == address_id))
           new_primary = if target_addr, do: not target_addr.is_primary, else: true
 
-          case update_employee_address_attachment(scope, address_id, employee.id, %{
+          case Address.update_employee_attachment(scope, address_id, employee.id, %{
                  is_primary: new_primary
                }) do
             {:ok, :updated} ->
@@ -595,8 +597,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   end
 
   def handle_event("edit_address_priority", %{"id" => address_id_str}, socket) do
-    case Integer.parse(address_id_str) do
-      {address_id, ""} ->
+    case parse_id(address_id_str) do
+      address_id when is_integer(address_id) and address_id > 0 ->
         target_addr = Enum.find(socket.assigns.attached_addresses, &(&1.id == address_id))
         val = if target_addr, do: to_string(target_addr.priority), else: "0"
 
@@ -630,22 +632,24 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
           _ -> 0
         end
 
-      if address_id do
-        id = if is_binary(address_id), do: String.to_integer(address_id), else: address_id
+      case parse_id(address_id) do
+        id when is_integer(id) and id > 0 ->
+          case Address.update_employee_attachment(scope, id, employee.id, %{
+                 priority: priority_int
+               }) do
+            {:ok, :updated} ->
+              {:noreply,
+               socket
+               |> put_flash(:info, "Address setting updated.")
+               |> assign(:editing_priority_address_id, nil)
+               |> load_data(employee)}
 
-        case update_employee_address_attachment(scope, id, employee.id, %{priority: priority_int}) do
-          {:ok, :updated} ->
-            {:noreply,
-             socket
-             |> put_flash(:info, "Address setting updated.")
-             |> assign(:editing_priority_address_id, nil)
-             |> load_data(employee)}
+            {:error, _} ->
+              {:noreply, put_flash(socket, :error, "Failed to update priority.")}
+          end
 
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, "Failed to update priority.")}
-        end
-      else
-        {:noreply, socket}
+        _ ->
+          {:noreply, socket}
       end
     else
       {:noreply, put_flash(socket, :error, "You do not have permission to edit employees.")}
@@ -653,8 +657,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   end
 
   def handle_event("edit_address_kinds", %{"id" => address_id_str}, socket) do
-    case Integer.parse(address_id_str) do
-      {address_id, ""} ->
+    case parse_id(address_id_str) do
+      address_id when is_integer(address_id) and address_id > 0 ->
         target_addr = Enum.find(socket.assigns.attached_addresses, &(&1.id == address_id))
         kinds = if target_addr, do: target_addr.kind || [], else: []
 
@@ -697,22 +701,22 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
           _ -> socket.assigns.selected_edit_kinds
         end
 
-      if address_id do
-        id = if is_binary(address_id), do: String.to_integer(address_id), else: address_id
+      case parse_id(address_id) do
+        id when is_integer(id) and id > 0 ->
+          case Address.update_employee_attachment(scope, id, employee.id, %{kind: kinds}) do
+            {:ok, :updated} ->
+              {:noreply,
+               socket
+               |> put_flash(:info, "Address kinds updated.")
+               |> assign(:editing_kinds_address_id, nil)
+               |> load_data(employee)}
 
-        case update_employee_address_attachment(scope, id, employee.id, %{kind: kinds}) do
-          {:ok, :updated} ->
-            {:noreply,
-             socket
-             |> put_flash(:info, "Address kinds updated.")
-             |> assign(:editing_kinds_address_id, nil)
-             |> load_data(employee)}
+            {:error, _} ->
+              {:noreply, put_flash(socket, :error, "Failed to update address kinds.")}
+          end
 
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, "Failed to update address kinds.")}
-        end
-      else
-        {:noreply, socket}
+        _ ->
+          {:noreply, socket}
       end
     else
       {:noreply, put_flash(socket, :error, "You do not have permission to edit employees.")}
@@ -769,104 +773,39 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     end
   end
 
-  # --- Dynamic Dispatch Helpers for Higher-Layer Modules ---
-
   defp list_company_users(scope, company_id) do
-    user_mod = Module.concat(["Bilimbi", "Core", "User"])
-
-    if Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :list_company_users, 2) do
-      try do
-        case apply(user_mod, :list_company_users, [scope, company_id]) do
-          {:ok, users} -> users
-          _ -> []
-        end
-      rescue
-        _ -> []
-      end
-    else
-      []
+    case User.list_users(scope) do
+      {:ok, users} -> Enum.filter(users, &(&1.company_id == company_id))
     end
+  rescue
+    _ -> []
   end
 
   defp update_user_employee_id(scope, company_id, user_id, employee_id) do
-    user_mod = Module.concat(["Bilimbi", "Core", "User"])
-
-    if Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :update_user, 4) do
-      try do
-        apply(user_mod, :update_user, [scope, company_id, user_id, %{employee_id: employee_id}])
-      rescue
-        _ -> {:ok, nil}
-      end
-    else
-      {:ok, nil}
+    case User.update_user(scope, company_id, user_id, %{employee_id: employee_id}) do
+      {:ok, user} -> {:ok, user}
+      error -> error
     end
+  rescue
+    _ -> {:ok, nil}
   end
 
   defp list_employee_attached_addresses(scope, employee_id) do
-    addr_mod = Module.concat(["Bilimbi", "Core", "Address"])
-
-    if Code.ensure_loaded?(addr_mod) and
-         function_exported?(addr_mod, :list_employee_attached_addresses, 2) do
-      try do
-        case apply(addr_mod, :list_employee_attached_addresses, [scope, employee_id]) do
-          {:ok, addrs} -> addrs
-          _ -> []
-        end
-      rescue
-        _ -> []
-      end
-    else
-      []
+    case Address.list_employee_attached_addresses(scope, employee_id) do
+      {:ok, addrs} -> addrs
+      _ -> []
     end
+  rescue
+    _ -> []
   end
 
   defp list_available_employee_addresses(scope, employee_id) do
-    addr_mod = Module.concat(["Bilimbi", "Core", "Address"])
-
-    if Code.ensure_loaded?(addr_mod) and
-         function_exported?(addr_mod, :list_available_employee_addresses, 2) do
-      try do
-        case apply(addr_mod, :list_available_employee_addresses, [scope, employee_id]) do
-          {:ok, addrs} -> addrs
-          _ -> []
-        end
-      rescue
-        _ -> []
-      end
-    else
-      []
+    case Address.list_available_employee_addresses(scope, employee_id) do
+      {:ok, addrs} -> addrs
+      _ -> []
     end
-  end
-
-  defp attach_address_to_employee(scope, address_id, employee_id, attrs) do
-    addr_mod = Module.concat(["Bilimbi", "Core", "Address"])
-
-    if Code.ensure_loaded?(addr_mod) and function_exported?(addr_mod, :attach_to_employee, 4) do
-      apply(addr_mod, :attach_to_employee, [scope, address_id, employee_id, attrs])
-    else
-      {:error, :address_module_unavailable}
-    end
-  end
-
-  defp detach_address_from_employee(scope, address_id, employee_id) do
-    addr_mod = Module.concat(["Bilimbi", "Core", "Address"])
-
-    if Code.ensure_loaded?(addr_mod) and function_exported?(addr_mod, :detach_from_employee, 3) do
-      apply(addr_mod, :detach_from_employee, [scope, address_id, employee_id])
-    else
-      {:error, :address_module_unavailable}
-    end
-  end
-
-  defp update_employee_address_attachment(scope, address_id, employee_id, attrs) do
-    addr_mod = Module.concat(["Bilimbi", "Core", "Address"])
-
-    if Code.ensure_loaded?(addr_mod) and
-         function_exported?(addr_mod, :update_employee_attachment, 4) do
-      apply(addr_mod, :update_employee_attachment, [scope, address_id, employee_id, attrs])
-    else
-      {:error, :address_module_unavailable}
-    end
+  rescue
+    _ -> []
   end
 
   # --- Private Extraction & Formatting Helpers ---
@@ -1001,12 +940,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
           <:subtitle>
             {@employee.designation || @employee.job_description || @employee.employee_number}
           </:subtitle>
-
+          
           <:actions>
             <.button id="employee-back" navigate={~p"/employees"}>
               Back to List
             </.button>
-
+            
             <.button
               :if={@can_manage?}
               id="employee-edit"
@@ -1017,7 +956,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
             </.button>
           </:actions>
         </.header>
-
+        
         <div class="mt-6 space-y-6">
           <!-- Card 1: Employee Details with In-place Editing -->
           <.card id="employee-details-card">
@@ -1025,13 +964,13 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
               <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                 Employee Details
               </h3>
-
+              
               <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                     Full Name
                   </dt>
-
+                  
                   <dd class="mt-0.5 text-sm text-ink">
                     <%= if @can_manage? do %>
                       <.inline_edit
@@ -1047,12 +986,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     <% end %>
                   </dd>
                 </div>
-
+                
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                     Short Name
                   </dt>
-
+                  
                   <dd class="mt-0.5 text-sm text-ink">
                     <%= if @can_manage? do %>
                       <.inline_edit
@@ -1068,12 +1007,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     <% end %>
                   </dd>
                 </div>
-
+                
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                     Employee Number
                   </dt>
-
+                  
                   <dd class="mt-0.5 text-sm text-ink">
                     <%= if @can_manage? do %>
                       <.inline_edit
@@ -1090,13 +1029,13 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     <% end %>
                   </dd>
                 </div>
-
+                
                 <%= if @employee.employee_type == "agent" do %>
                   <div>
                     <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                       Job Description
                     </dt>
-
+                    
                     <dd class="mt-0.5 text-sm text-ink">
                       <%= if @can_manage? do %>
                         <.inline_edit
@@ -1113,12 +1052,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     </dd>
                   </div>
                 <% end %>
-
+                
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                     Designation
                   </dt>
-
+                  
                   <dd class="mt-0.5 text-sm text-ink">
                     <%= if @can_manage? do %>
                       <.inline_edit
@@ -1134,12 +1073,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     <% end %>
                   </dd>
                 </div>
-
+                
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                     Email
                   </dt>
-
+                  
                   <dd class="mt-0.5 text-sm text-ink">
                     <%= if @can_manage? do %>
                       <.inline_edit
@@ -1155,12 +1094,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     <% end %>
                   </dd>
                 </div>
-
+                
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                     Mobile Number
                   </dt>
-
+                  
                   <dd class="mt-0.5 text-sm text-ink">
                     <%= if @can_manage? do %>
                       <.inline_edit
@@ -1185,21 +1124,21 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
               <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                 Employment Information
               </h3>
-
+              
               <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                     Company
                   </dt>
-
+                  
                   <dd class="mt-0.5 text-sm text-ink px-1 -mx-1 py-0.5">{@company_name}</dd>
                 </div>
-
+                
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                     Department
                   </dt>
-
+                  
                   <dd class="mt-0.5 text-sm text-ink">
                     <%= if @can_manage? do %>
                       <form
@@ -1213,7 +1152,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                         >
                           <option value="" selected={is_nil(@employee.department_id)}>None</option>
-
+                          
                           <%= for dept <- @departments do %>
                             <option value={dept.id} selected={@employee.department_id == dept.id}>
                               {if dept.type, do: dept.type.name, else: "Department #{dept.id}"}
@@ -1226,12 +1165,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     <% end %>
                   </dd>
                 </div>
-
+                
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                     Supervisor
                   </dt>
-
+                  
                   <dd class="mt-0.5 text-sm text-ink">
                     <%= if @can_manage? do %>
                       <form
@@ -1245,7 +1184,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                         >
                           <option value="" selected={is_nil(@employee.supervisor_id)}>None</option>
-
+                          
                           <%= for sup <- @supervisors do %>
                             <option value={sup.id} selected={@employee.supervisor_id == sup.id}>
                               {sup.full_name}
@@ -1258,12 +1197,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     <% end %>
                   </dd>
                 </div>
-
+                
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                     Employee Type
                   </dt>
-
+                  
                   <dd class="mt-0.5 text-sm text-ink">
                     <%= if @can_manage? do %>
                       <form
@@ -1286,7 +1225,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                               </option>
                             <% end %>
                           </optgroup>
-
+                          
                           <optgroup label="Agent">
                             <%= for type <- Enum.filter(@employee_types, &(&1.code == "agent")) do %>
                               <option
@@ -1306,12 +1245,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     <% end %>
                   </dd>
                 </div>
-
+                
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                     Status
                   </dt>
-
+                  
                   <dd class="mt-0.5 text-sm text-ink">
                     <%= if @can_manage? do %>
                       <form phx-change="save_status" id="employee-status-form" class="inline-block">
@@ -1323,19 +1262,19 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <option value="pending" selected={@employee.status == "pending"}>
                             Pending
                           </option>
-
+                          
                           <option value="probation" selected={@employee.status == "probation"}>
                             Probation
                           </option>
-
+                          
                           <option value="active" selected={@employee.status == "active"}>
                             Active
                           </option>
-
+                          
                           <option value="inactive" selected={@employee.status == "inactive"}>
                             Inactive
                           </option>
-
+                          
                           <option value="terminated" selected={@employee.status == "terminated"}>
                             Terminated
                           </option>
@@ -1348,13 +1287,13 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     <% end %>
                   </dd>
                 </div>
-
+                
                 <%= if @employee.employee_type != "agent" do %>
                   <div>
                     <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                       User
                     </dt>
-
+                    
                     <dd class="mt-0.5 text-sm text-ink">
                       <%= if @can_manage? do %>
                         <form
@@ -1368,14 +1307,14 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                             class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                           >
                             <option value="" selected={is_nil(@linked_user)}>None</option>
-
+                            
                             <%= for u <- @available_users do %>
                               <option value={u.id} selected={@linked_user && @linked_user.id == u.id}>
                                 {u.name}
                               </option>
                             <% end %>
                           </select>
-
+                          
                           <%= if @linked_user do %>
                             <.link
                               navigate={~p"/users/#{@linked_user.id}"}
@@ -1400,22 +1339,22 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     </dd>
                   </div>
                 <% end %>
-
+                
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                     Employment Start
                   </dt>
-
+                  
                   <dd class="mt-0.5 text-sm text-ink px-1 -mx-1 py-0.5 tabular-nums">
                     {display_or_dash(@employee.employment_start)}
                   </dd>
                 </div>
-
+                
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                     Employment End
                   </dt>
-
+                  
                   <dd class="mt-0.5 text-sm text-ink px-1 -mx-1 py-0.5 tabular-nums">
                     {display_or_dash(@employee.employment_end)}
                   </dd>
@@ -1433,7 +1372,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     {length(@subordinates)}
                   </span>
                 </h3>
-
+                
                 <%= if @can_manage? do %>
                   <div class="flex items-center gap-2">
                     <%= if @adding_subordinate do %>
@@ -1448,12 +1387,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           class="min-w-48 rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                         >
                           <option value="">Select employee...</option>
-
+                          
                           <%= for avail <- @available_subordinates do %>
                             <option value={avail.id}>{avail.full_name}</option>
                           <% end %>
                         </select>
-
+                        
                         <.button
                           id="btn-assign-subordinate"
                           type="submit"
@@ -1462,7 +1401,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                         >
                           Assign
                         </.button>
-
+                        
                         <.button
                           id="btn-cancel-add-subordinate"
                           type="button"
@@ -1485,7 +1424,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   </div>
                 <% end %>
               </div>
-
+              
               <div class="overflow-x-auto">
                 <table id="subordinates-table" class="w-full text-left text-xs text-ink">
                   <thead>
@@ -1503,7 +1442,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <% end %>
                         </button>
                       </th>
-
+                      
                       <th class="py-2 px-4 font-semibold">
                         <button
                           type="button"
@@ -1517,7 +1456,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <% end %>
                         </button>
                       </th>
-
+                      
                       <th class="py-2 px-4 font-semibold">
                         <button
                           type="button"
@@ -1531,7 +1470,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <% end %>
                         </button>
                       </th>
-
+                      
                       <th class="py-2 px-4 font-semibold">
                         <button
                           type="button"
@@ -1545,11 +1484,11 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <% end %>
                         </button>
                       </th>
-
+                      
                       <th :if={@can_manage?} class="py-2 pl-4 text-right font-semibold">Actions</th>
                     </tr>
                   </thead>
-
+                  
                   <tbody class="divide-y divide-line">
                     <%= if @sorted_subordinates == [] do %>
                       <tr>
@@ -1574,21 +1513,21 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                               {sub.full_name}
                             </.link>
                           </td>
-
+                          
                           <td class="py-2 px-4 text-ink-subtle">
                             {display_or_dash(sub.designation)}
                           </td>
-
+                          
                           <td class="py-2 px-4">
                             <.badge kind={status_badge_kind(sub.status)}>
                               {String.capitalize(sub.status)}
                             </.badge>
                           </td>
-
+                          
                           <td class="py-2 px-4 text-ink-subtle">
                             {Map.get(@department_map, sub.department_id, "—")}
                           </td>
-
+                          
                           <td :if={@can_manage?} class="py-2 pl-4 text-right">
                             <.button
                               id={"remove-subordinate-#{sub.id}"}
@@ -1620,7 +1559,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     {length(@attached_addresses)}
                   </span>
                 </h3>
-
+                
                 <.button
                   :if={@can_manage?}
                   id="btn-open-attach-address"
@@ -1631,7 +1570,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   <.icon name="bilimbi-plus" class="size-3.5" /> <span>Attach Address</span>
                 </.button>
               </div>
-
+              
               <div class="overflow-x-auto">
                 <table id="addresses-table" class="w-full text-left text-xs text-ink">
                   <thead>
@@ -1649,7 +1588,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <% end %>
                         </button>
                       </th>
-
+                      
                       <th class="py-2 px-3 font-semibold">
                         <button
                           type="button"
@@ -1663,7 +1602,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <% end %>
                         </button>
                       </th>
-
+                      
                       <th class="py-2 px-3 font-semibold">
                         <button
                           type="button"
@@ -1677,7 +1616,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <% end %>
                         </button>
                       </th>
-
+                      
                       <th class="py-2 px-3 font-semibold">
                         <button
                           type="button"
@@ -1691,7 +1630,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <% end %>
                         </button>
                       </th>
-
+                      
                       <th class="py-2 px-3 font-semibold">
                         <button
                           type="button"
@@ -1705,7 +1644,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <% end %>
                         </button>
                       </th>
-
+                      
                       <th class="py-2 px-3 font-semibold">
                         <button
                           type="button"
@@ -1719,7 +1658,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <% end %>
                         </button>
                       </th>
-
+                      
                       <th class="py-2 px-3 font-semibold">
                         <button
                           type="button"
@@ -1733,11 +1672,11 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <% end %>
                         </button>
                       </th>
-
+                      
                       <th :if={@can_manage?} class="py-2 pl-3 text-right font-semibold">Actions</th>
                     </tr>
                   </thead>
-
+                  
                   <tbody class="divide-y divide-line">
                     <%= if @sorted_addresses == [] do %>
                       <tr>
@@ -1757,11 +1696,11 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <td class="py-2 pr-3 font-medium text-ink">
                             <span>{addr.label || "Address #{addr.id}"}</span>
                           </td>
-
+                          
                           <td class="py-2 px-3 text-ink-subtle">
                             {format_address_summary(addr)}
                           </td>
-
+                          
                           <td class="py-2 px-3">
                             <%= if @editing_kinds_address_id == addr.id do %>
                               <div class="space-y-1">
@@ -1777,7 +1716,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                                     /> <span>{String.capitalize(k)}</span>
                                   </label>
                                 <% end %>
-
+                                
                                 <div class="flex items-center gap-1 pt-1">
                                   <.button
                                     id={"save-kinds-#{addr.id}"}
@@ -1789,7 +1728,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                                   >
                                     Save
                                   </.button>
-
+                                  
                                   <.button
                                     id={"cancel-kinds-#{addr.id}"}
                                     type="button"
@@ -1818,7 +1757,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                                     </span>
                                   <% end %>
                                 <% end %>
-
+                                
                                 <.icon
                                   :if={@can_manage?}
                                   name="bilimbi-pencil"
@@ -1827,7 +1766,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                               </div>
                             <% end %>
                           </td>
-
+                          
                           <td class="py-2 px-3">
                             <%= if @can_manage? do %>
                               <button
@@ -1852,7 +1791,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                               <% end %>
                             <% end %>
                           </td>
-
+                          
                           <td class="py-2 px-3 tabular-nums">
                             <%= if @editing_priority_address_id == addr.id do %>
                               <form
@@ -1894,15 +1833,15 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                               </div>
                             <% end %>
                           </td>
-
+                          
                           <td class="py-2 px-3 tabular-nums text-ink-subtle">
                             {display_or_dash(addr.valid_from)}
                           </td>
-
+                          
                           <td class="py-2 px-3 tabular-nums text-ink-subtle">
                             {display_or_dash(addr.valid_to)}
                           </td>
-
+                          
                           <td :if={@can_manage?} class="py-2 pl-3 text-right">
                             <.button
                               id={"unlink-address-#{addr.id}"}
@@ -1933,12 +1872,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
             <div class="flex items-center justify-between gap-4">
               <div>
                 <h2 class="text-sm font-semibold text-ink-strong">Delete this employee</h2>
-
+                
                 <p class="mt-0.5 text-xs text-ink-subtle">
                   Removes the employment record. The platform orchestrator cannot be deleted.
                 </p>
               </div>
-
+              
               <.button
                 id="employee-delete"
                 phx-click="delete"
@@ -1960,11 +1899,11 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
             <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
               Attach Address
             </h3>
-
+            
             <p class="text-xs text-ink-muted">
               Select an address from the company to attach to this employee.
             </p>
-
+            
             <.form
               for={@attach_form}
               phx-submit="attach_address"
@@ -1978,31 +1917,31 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                 >
                   Address
                 </label>
-
+                
                 <select
                   id="employee-attach-address"
                   name="address[address_id]"
                   class="w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                 >
                   <option value="">Select an address...</option>
-
+                  
                   <%= for addr <- @available_addresses do %>
                     <option value={addr.id}>
                       {addr.label} — {format_address_summary(addr)}
                     </option>
                   <% end %>
                 </select>
-
+                
                 <%= if Map.has_key?(@attach_errors, :address_id) do %>
                   <p class="text-xs text-danger mt-1">{@attach_errors.address_id}</p>
                 <% end %>
               </div>
-
+              
               <div>
                 <span class="block text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-1">
                   Kind
                 </span>
-
+                
                 <div class="flex flex-wrap gap-x-4 gap-y-2">
                   <%= for k <- @address_kinds do %>
                     <label class="flex items-center gap-2 text-xs text-ink cursor-pointer">
@@ -2017,7 +1956,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   <% end %>
                 </div>
               </div>
-
+              
               <div class="flex items-center gap-2">
                 <input
                   id="employee-attach-is-primary"
@@ -2033,7 +1972,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   Primary Address
                 </label>
               </div>
-
+              
               <div>
                 <label
                   for="employee-attach-priority"
@@ -2041,7 +1980,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                 >
                   Priority
                 </label>
-
+                
                 <input
                   id="employee-attach-priority"
                   type="number"
@@ -2054,12 +1993,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   Lower number = higher priority. Used to order addresses of the same kind (0 = top).
                 </p>
               </div>
-
+              
               <div class="flex items-center justify-end gap-2 pt-2 border-t border-line">
                 <.button type="button" phx-click="close_attach_modal" class="text-xs px-3 py-1.5">
                   Cancel
                 </.button>
-
+                
                 <.button
                   id="btn-submit-attach-address"
                   type="submit"
@@ -2091,4 +2030,15 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   defp display_or_dash(nil), do: "—"
   defp display_or_dash(""), do: "—"
   defp display_or_dash(value), do: to_string(value)
+
+  defp parse_id(id) when is_integer(id), do: id
+
+  defp parse_id(id) when is_binary(id) do
+    case Integer.parse(id) do
+      {int, ""} -> int
+      _ -> nil
+    end
+  end
+
+  defp parse_id(_), do: nil
 end
