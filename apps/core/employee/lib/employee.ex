@@ -266,22 +266,6 @@ defmodule Bilimbi.Core.Employee do
         |> Repo.all()
         |> Enum.map(&TypeSummary.from_schema/1)
 
-      types =
-        if types == [] do
-          _ = ensure_system_types()
-
-          from(type in EmployeeType,
-            where:
-              (type.is_system == true and is_nil(type.company_id)) or
-                type.company_id == ^company_id,
-            order_by: [desc: type.is_system, asc: type.label, asc: type.code]
-          )
-          |> Repo.all()
-          |> Enum.map(&TypeSummary.from_schema/1)
-        else
-          types
-        end
-
       {:ok, types}
     end
   end

@@ -139,7 +139,13 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
   def handle_event("validate", %{"employee" => params}, socket) do
     scope = socket.assigns.current_scope.scope
     current_company_id = socket.assigns.company_id
-    new_company_id = parse_id(params["company_id"]) || current_company_id
+
+    new_company_id =
+      if socket.assigns.live_action == :edit do
+        current_company_id
+      else
+        parse_id(params["company_id"]) || current_company_id
+      end
 
     current_employee_id = if socket.assigns.employee, do: socket.assigns.employee.id, else: nil
 
@@ -194,7 +200,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
     changeset = form_changeset(params)
 
     if changeset.valid? do
-      company_id = parse_id(params["company_id"]) || employee.company_id
+      company_id = employee.company_id
       user_id = parse_id(params["user_id"])
       attributes = extract_attributes(params, company_id)
 
@@ -320,24 +326,35 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
               ])
 
             not is_nil(new_user_id) ->
-              if currently_linked && currently_linked.id != new_user_id do
-                apply(user_mod, :update_user, [
-                  scope,
-                  currently_linked.company_id || company_id,
-                  currently_linked.id,
-                  %{employee_id: nil}
-                ])
+              target_user =
+                Enum.find(users, fn u ->
+                  u.id == new_user_id and (u.company_id == company_id or is_nil(u.company_id))
+                end)
+
+              if target_user do
+                if currently_linked && currently_linked.id != new_user_id do
+                  apply(user_mod, :update_user, [
+                    scope,
+                    currently_linked.company_id || company_id,
+                    currently_linked.id,
+                    %{employee_id: nil}
+                  ])
+                end
+
+                target_company_id = target_user.company_id || company_id
+
+                case apply(user_mod, :update_user, [
+                       scope,
+                       target_company_id,
+                       new_user_id,
+                       %{employee_id: employee_id}
+                     ]) do
+                  {:ok, _} -> :ok
+                  {:error, _} = error -> error
+                end
+              else
+                {:error, :invalid_user}
               end
-
-              target_user = Enum.find(users, &(&1.id == new_user_id))
-              target_company_id = (target_user && target_user.company_id) || company_id
-
-              apply(user_mod, :update_user, [
-                scope,
-                target_company_id,
-                new_user_id,
-                %{employee_id: employee_id}
-              ])
 
             true ->
               :ok
@@ -480,6 +497,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
                 label_class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
                 prompt="Select company..."
                 options={for company <- @companies, do: {company.name, company.id}}
+                disabled={@live_action == :edit}
                 required
               />
             </div>
