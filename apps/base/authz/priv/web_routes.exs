@@ -1,5 +1,11 @@
 [
   %{
+    path: "/authz/capabilities",
+    live: Bilimbi.Base.Authz.Web.CapabilitiesLive,
+    session: :auth,
+    capability: "admin.authz.capability.list"
+  },
+  %{
     path: "/authz/roles",
     live: Bilimbi.Base.Authz.Web.RolesIndexLive,
     session: :auth,

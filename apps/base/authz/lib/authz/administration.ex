@@ -3,6 +3,8 @@ defmodule Bilimbi.Base.Authz.Administration do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Authz.CapabilityKey
+  alias Bilimbi.Base.Authz.CapabilitySummary
   alias Bilimbi.Base.Authz.DecisionLog
   alias Bilimbi.Base.Authz.DecisionLogSummary
   alias Bilimbi.Base.Authz.Page
@@ -18,6 +20,13 @@ defmodule Bilimbi.Base.Authz.Administration do
 
   @default_page_size 25
   @maximum_page_size 100
+  @capability_sort_fields %{
+    key: :key,
+    domain: :domain,
+    resource: :resource,
+    action: :action,
+    module: :module
+  }
   @role_sort_fields %{
     name: :name,
     code: :code,
@@ -42,6 +51,66 @@ defmodule Bilimbi.Base.Authz.Administration do
     company_id: :company_id,
     company_name: :company_name
   }
+
+  @spec list_capabilities(keyword(), map()) :: Page.t(CapabilitySummary.t())
+  def list_capabilities(opts, registry) when is_list(opts) and is_map(registry) do
+    opts =
+      page_options!(opts,
+        search: nil,
+        domain: nil,
+        sort_by: :key,
+        sort_dir: :asc
+      )
+
+    search = search!(opts[:search])
+    domain = domain_filter!(opts[:domain])
+    sort_by = sort_by!(opts[:sort_by], @capability_sort_fields)
+    sort_dir = sort_dir!(opts[:sort_dir])
+    page = page!(opts[:page])
+    page_size = page_size!(opts[:page_size])
+
+    owners = Map.get(registry, :capability_owners, %{})
+    capabilities = Map.get(registry, :capabilities, [])
+
+    items =
+      capabilities
+      |> Enum.map(fn key ->
+        parts = CapabilityKey.parse!(key)
+        owner = Map.get(owners, key)
+
+        %CapabilitySummary{
+          id: key,
+          key: key,
+          domain: parts.domain,
+          resource: parts.resource,
+          action: parts.action,
+          module: humanize_module(owner)
+        }
+      end)
+      |> maybe_search_capabilities(search)
+      |> maybe_filter_capability_domain(domain)
+      |> sort_capabilities(sort_by, sort_dir)
+
+    total_entries = length(items)
+    total_pages = total_pages(total_entries, page_size)
+    entries = Enum.slice(items, (page - 1) * page_size, page_size)
+
+    %Page{
+      entries: entries,
+      page: page,
+      page_size: page_size,
+      total_entries: total_entries,
+      total_pages: total_pages
+    }
+  end
+
+  @spec capability_domains(map()) :: [String.t()]
+  def capability_domains(registry) when is_map(registry) do
+    Map.get(registry, :capabilities, [])
+    |> Enum.map(fn key -> CapabilityKey.parse!(key).domain end)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
 
   @spec list_roles(Scope.t(), keyword(), map()) :: Page.t(RoleSummary.t())
   def list_roles(%Scope{} = scope, opts, registry) when is_list(opts) do
@@ -490,6 +559,79 @@ defmodule Bilimbi.Base.Authz.Administration do
       dynamic([row], row.company_id in ^company_ids or is_nil(row.company_id))
     else
       dynamic([row], row.company_id in ^company_ids)
+    end
+  end
+
+  defp humanize_module(owner) when is_binary(owner) do
+    owner
+    |> String.split("/")
+    |> Enum.map_join(" / ", &Macro.camelize/1)
+  end
+
+  defp humanize_module(_), do: "Unknown"
+
+  defp domain_filter!(nil), do: nil
+
+  defp domain_filter!(domain) when is_binary(domain) do
+    case String.trim(domain) do
+      "" -> nil
+      value -> value
+    end
+  end
+
+  defp domain_filter!(value),
+    do: raise(ArgumentError, "domain must be a string or nil, got: #{inspect(value)}")
+
+  defp maybe_search_capabilities(items, nil), do: items
+
+  defp maybe_search_capabilities(items, search) do
+    search = String.downcase(search)
+
+    Enum.filter(items, fn %CapabilitySummary{key: key, module: module} ->
+      String.contains?(String.downcase(key), search) or
+        String.contains?(String.downcase(module), search)
+    end)
+  end
+
+  defp maybe_filter_capability_domain(items, nil), do: items
+
+  defp maybe_filter_capability_domain(items, domain) do
+    Enum.filter(items, fn %CapabilitySummary{domain: d} -> d == domain end)
+  end
+
+  defp sort_capabilities(items, sort_by, sort_dir) do
+    dir = if sort_dir == :desc, do: -1, else: 1
+
+    Enum.sort(items, fn a, b ->
+      left = Map.fetch!(a, sort_by)
+      right = Map.fetch!(b, sort_by)
+
+      cmp = compare_values(left, right)
+
+      if cmp != 0 do
+        dir * cmp <= 0
+      else
+        compare_values(a.key, b.key) <= 0
+      end
+    end)
+  end
+
+  defp compare_values(left, right) when is_binary(left) and is_binary(right) do
+    l = String.downcase(left)
+    r = String.downcase(right)
+
+    cond do
+      l < r -> -1
+      l > r -> 1
+      true -> 0
+    end
+  end
+
+  defp compare_values(left, right) do
+    cond do
+      left < right -> -1
+      left > right -> 1
+      true -> 0
     end
   end
 

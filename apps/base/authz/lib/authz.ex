@@ -12,6 +12,7 @@ defmodule Bilimbi.Base.Authz do
   alias Bilimbi.Base.Authz.Actor
   alias Bilimbi.Base.Authz.Administration
   alias Bilimbi.Base.Authz.AuthorizationDeniedError
+  alias Bilimbi.Base.Authz.CapabilitySummary
   alias Bilimbi.Base.Authz.DatabaseDecisionLogger
   alias Bilimbi.Base.Authz.Decision
   alias Bilimbi.Base.Authz.DecisionLog
@@ -36,6 +37,18 @@ defmodule Bilimbi.Base.Authz do
 
   @spec capabilities() :: [String.t()]
   def capabilities, do: registry!().capabilities
+
+  @doc "Lists registered capabilities through a bounded catalog page."
+  @spec list_capabilities(keyword()) :: Bilimbi.Base.Authz.Page.t(CapabilitySummary.t())
+  def list_capabilities(opts \\ []) when is_list(opts) do
+    Administration.list_capabilities(opts, registry!())
+  end
+
+  @doc "Lists unique domain names from registered capabilities."
+  @spec capability_domains() :: [String.t()]
+  def capability_domains do
+    Administration.capability_domains(registry!())
+  end
 
   @spec capability_known?(String.t()) :: boolean()
   def capability_known?(capability) when is_binary(capability) do
