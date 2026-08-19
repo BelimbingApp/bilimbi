@@ -11,10 +11,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   use Bilimbi.Base.UI, :live_view
 
-  alias Bilimbi.Core.Address
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
-  alias Bilimbi.Core.User
 
   @valid_address_kinds ~w(headquarters billing shipping branch other)
 
@@ -516,7 +514,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
             priority: priority_int
           }
 
-          case Address.attach_to_employee(scope, address_id, employee.id, attrs) do
+          case attach_address_to_employee(scope, address_id, employee.id, attrs) do
             {:ok, :attached} ->
               {:noreply,
                socket
@@ -546,7 +544,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
       case parse_id(address_id_str) do
         address_id when is_integer(address_id) and address_id > 0 ->
-          case Address.detach_from_employee(scope, address_id, employee.id) do
+          case detach_address_from_employee(scope, address_id, employee.id) do
             :ok ->
               {:noreply,
                socket
@@ -575,7 +573,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
           target_addr = Enum.find(socket.assigns.attached_addresses, &(&1.id == address_id))
           new_primary = if target_addr, do: not target_addr.is_primary, else: true
 
-          case Address.update_employee_attachment(scope, address_id, employee.id, %{
+          case update_address_attachment(scope, address_id, employee.id, %{
                  is_primary: new_primary
                }) do
             {:ok, :updated} ->
