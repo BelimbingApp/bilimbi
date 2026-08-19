@@ -279,6 +279,16 @@ defmodule Bilimbi.Base.UI.Layouts do
             <span>{gettext("Viewing as %{name}", name: @current_scope.user["name"])}</span>
             <span class="font-semibold ml-1">{gettext("Stop")}</span>
           </.link>
+
+          <.link
+            :if={operator_company_missing?(@current_scope)}
+            navigate={~p"/setup/platform-operator"}
+            id="app-operator-company-missing"
+            class="inline-flex items-center gap-1 font-medium text-danger hover:underline"
+          >
+            <.icon name="hero-exclamation-triangle" class="size-3.5" />
+            <span>{gettext("Operator company not set")}</span>
+          </.link>
         </div>
         <span id="app-version" class="shrink-0 tabular-nums" title={"Bilimbi #{@shell.version}"}>
           v{@shell.version}
@@ -536,6 +546,9 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   defp env_title(%{listen_address: address}) when is_binary(address), do: "dev · #{address}"
   defp env_title(_shell), do: "dev"
+
+  defp operator_company_missing?(%{operator_company_missing: true}), do: true
+  defp operator_company_missing?(_current_scope), do: false
 
   attr(:flash, :map, required: true)
   attr(:id, :string, default: "flash-group")
