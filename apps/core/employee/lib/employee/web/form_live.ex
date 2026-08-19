@@ -174,6 +174,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
 
   defp save(socket, :new, params) do
     scope = socket.assigns.current_scope.scope
+    params = drop_user_for_agent(params)
     changeset = form_changeset(params)
 
     if changeset.valid? do
@@ -183,11 +184,12 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
 
       case Employee.create_employee(scope, company_id, attributes) do
         {:ok, employee} ->
-          _ = sync_user_link(scope, company_id, employee.id, user_id)
+          link_result = sync_user_link(scope, company_id, employee.id, user_id)
 
           {:noreply,
            socket
            |> put_flash(:info, "#{employee.full_name} was created.")
+           |> flash_rejected_link(link_result)
            |> push_navigate(to: ~p"/employees/#{employee.id}")}
 
         {:error, :company_not_found} ->
@@ -204,7 +206,12 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
   defp save(socket, :edit, params) do
     scope = socket.assigns.current_scope.scope
     employee = socket.assigns.employee
-    params = Map.put(params, "company_id", employee.company_id)
+
+    params =
+      params
+      |> Map.put("company_id", employee.company_id)
+      |> drop_user_for_agent()
+
     changeset = form_changeset(params)
 
     if changeset.valid? do
@@ -214,11 +221,12 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
 
       case Employee.update_employee(scope, company_id, employee.id, attributes) do
         {:ok, updated} ->
-          _ = sync_user_link(scope, company_id, updated.id, user_id)
+          link_result = sync_user_link(scope, company_id, updated.id, user_id)
 
           {:noreply,
            socket
            |> put_flash(:info, "#{updated.full_name} was updated.")
+           |> flash_rejected_link(link_result)
            |> push_navigate(to: ~p"/employees/#{updated.id}")}
 
         {:error, %Changeset{} = domain_changeset} ->
@@ -334,9 +342,16 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
               ])
 
             not is_nil(new_user_id) ->
+              # Belimbing validates the same two conditions in its rule rather
+              # than only in the render (`Create.php:114-119`:
+              # `->where('company_id', ...)->whereNull('employee_id')`). Keeping
+              # them in `list_assignable_users/3` alone left the select correct
+              # and the save path open: a forged `user_id` naming a user already
+              # linked to another employee took the account off them silently.
               target_user =
                 Enum.find(users, fn u ->
-                  u.id == new_user_id and (u.company_id == company_id or is_nil(u.company_id))
+                  u.id == new_user_id and u.company_id == company_id and
+                    (is_nil(u.employee_id) or u.employee_id == employee_id)
                 end)
 
               if target_user do
@@ -375,6 +390,19 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
       :ok
     end
   end
+
+  # A refused link used to be discarded, so an operator whose chosen account was
+  # taken between render and submit saw an unqualified success. The employee is
+  # still saved -- only the link is refused -- so this reports rather than fails.
+  defp flash_rejected_link(socket, {:error, :invalid_user}) do
+    put_flash(
+      socket,
+      :error,
+      "That user account is no longer available to link, so the employee was saved without it."
+    )
+  end
+
+  defp flash_rejected_link(socket, _result), do: socket
 
   defp extract_attributes(params, company_id) do
     params
@@ -423,9 +451,29 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
     |> cast(params, Map.keys(@field_types))
     |> validate_required([:company_id, :employee_number, :full_name, :employee_type, :status])
     |> validate_inclusion(:status, @statuses)
+    |> validate_supervisor_for_agent()
     |> validate_employment_period()
     |> Map.put(:action, :validate)
   end
+
+  # Belimbing makes the supervisor mandatory for agent employees and optional
+  # for everyone else (`Create.php:121`). An agent acts on someone's behalf, so
+  # the record has to say whose.
+  defp validate_supervisor_for_agent(changeset) do
+    if get_field(changeset, :employee_type) == "agent" do
+      validate_required(changeset, [:supervisor_id])
+    else
+      changeset
+    end
+  end
+
+  # Belimbing clears the account before writing when the type is agent
+  # (`Create.php:57-59`). An agent employee is not a person with a login, and
+  # the form leaves the select populated when the type is switched.
+  defp drop_user_for_agent(%{"employee_type" => "agent"} = params),
+    do: Map.put(params, "user_id", "")
+
+  defp drop_user_for_agent(params), do: params
 
   defp validate_employment_period(changeset) do
     start_date = get_field(changeset, :employment_start)

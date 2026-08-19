@@ -18,6 +18,100 @@ defmodule BilimbiWeb.EmployeeFormTest do
     :ok
   end
 
+  test "a forged user_id cannot take a user account off another employee", %{conn: conn} do
+    grant_capabilities!(["admin.employee.create", "admin.employee.view"])
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, incumbent} =
+      Employee.create_employee(scope, 73, %{
+        employee_number: "EMP-INCUMBENT",
+        full_name: "Incumbent Ida",
+        employee_type: "full_time",
+        status: "active"
+      })
+
+    UserFixtures.insert_user!(%{id: 92, company_id: 73, name: "Grace Hopper", email: "g@e.test"})
+    {:ok, _} = User.update_user(scope, 73, 92, %{employee_id: incumbent.id})
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/new")
+
+    # The select already withholds a linked account, so reaching the handler at
+    # all means forging the event -- which is the case the guard has to hold for.
+    refute has_element?(view, "#employee-user-id option[value='92']")
+
+    render_submit(view, "save", %{
+      "employee" => %{
+        "company_id" => "73",
+        "employee_number" => "EMP-THIEF",
+        "full_name" => "Thief Theo",
+        "employee_type" => "full_time",
+        "status" => "active",
+        "user_id" => "92"
+      }
+    })
+
+    {:ok, still_linked} = User.get_user(scope, 73, 92)
+    assert still_linked.employee_id == incumbent.id
+  end
+
+  test "an agent employee is saved without a user account", %{conn: conn} do
+    grant_capabilities!(["admin.employee.create", "admin.employee.view"])
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, supervisor} =
+      Employee.create_employee(scope, 73, %{
+        employee_number: "SUP-AGENT",
+        full_name: "Alan Turing",
+        employee_type: "full_time",
+        status: "active"
+      })
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/new")
+
+    render_submit(view, "save", %{
+      "employee" => %{
+        "company_id" => "73",
+        "employee_number" => "EMP-AGENT",
+        "full_name" => "Helper Agent",
+        "employee_type" => "agent",
+        "status" => "active",
+        "supervisor_id" => "#{supervisor.id}",
+        "user_id" => "91"
+      }
+    })
+
+    # Belimbing nulls the account for an agent before writing (`Create.php:57-59`).
+    {:ok, user} = User.get_user(scope, 73, 91)
+    assert is_nil(user.employee_id)
+
+    {:ok, employees} = Employee.list_employees(scope, 73)
+    assert Enum.find(employees, &(&1.employee_number == "EMP-AGENT"))
+  end
+
+  test "an agent employee requires a supervisor", %{conn: conn} do
+    grant_capabilities!(["admin.employee.create", "admin.employee.view"])
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/new")
+
+    html =
+      render_submit(view, "save", %{
+        "employee" => %{
+          "company_id" => "73",
+          "employee_number" => "EMP-NOSUP",
+          "full_name" => "Orphan Agent",
+          "employee_type" => "agent",
+          "status" => "active",
+          "supervisor_id" => ""
+        }
+      })
+
+    assert html =~ "can&#39;t be blank"
+
+    {:ok, employees} = Employee.list_employees(scope, 73)
+    refute Enum.find(employees, &(&1.employee_number == "EMP-NOSUP"))
+  end
+
   test "requires authentication", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/employees/new")
   end
@@ -103,7 +197,14 @@ defmodule BilimbiWeb.EmployeeFormTest do
     assert path =~ ~r"^/employees/\d+$"
 
     {:ok, show, _html} = conn |> log_in_as() |> live(path)
-    assert has_element?(show, "h1", "Grace Hopper")
+    # The page heads on `display_name/1`, which is `short_name || full_name` --
+    # Belimbing does the same (`show.blade.php:5` headers on `displayName()`).
+    # The full name lives in the details card, where Belimbing puts it (`:27`).
+    assert has_element?(show, "h1", "Grace")
+    # Asserted against the card rather than `#employee-full-name`: that id only
+    # exists on the inline editor, so a viewer without `admin.employee.update`
+    # sees the name in a plain span with no id at all.
+    assert has_element?(show, "#employee-details-card", "Grace Hopper")
 
     assert {:ok, employees} = Employee.list_employees(scope, 73)
     created = Enum.find(employees, &(&1.employee_number == "EMP-009"))
@@ -162,7 +263,8 @@ defmodule BilimbiWeb.EmployeeFormTest do
     assert path == "/employees/#{employee.id}"
 
     {:ok, show, _html} = conn |> log_in_as() |> live(path)
-    assert has_element?(show, "h1", "John Richard Doe")
+    assert has_element?(show, "h1", "Johnny")
+    assert has_element?(show, "#employee-details-card", "John Richard Doe")
 
     {:ok, updated} = Employee.get_employee(scope, 73, employee.id)
     assert updated.full_name == "John Richard Doe"

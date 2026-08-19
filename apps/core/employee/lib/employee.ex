@@ -548,15 +548,14 @@ defmodule Bilimbi.Core.Employee do
         changeset
 
       code ->
-        if code in @system_type_codes or
-             Repo.exists?(
-               from(type in EmployeeType,
-                 where:
-                   type.code == ^code and
-                     ((type.is_system == true and is_nil(type.company_id)) or
-                        type.company_id == ^company_id)
-               )
-             ) do
+        if Repo.exists?(
+             from(type in EmployeeType,
+               where:
+                 type.code == ^code and
+                   ((type.is_system == true and is_nil(type.company_id)) or
+                      type.company_id == ^company_id)
+             )
+           ) do
           changeset
         else
           Changeset.add_error(changeset, :employee_type, "is not available to the company")
