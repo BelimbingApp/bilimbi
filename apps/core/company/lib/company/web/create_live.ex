@@ -159,7 +159,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
                 id="company-jurisdiction"
                 type="select"
                 label="Jurisdiction"
-                prompt="None"
+                prompt="Select country..."
                 options={country_options(@countries)}
               />
               <.input

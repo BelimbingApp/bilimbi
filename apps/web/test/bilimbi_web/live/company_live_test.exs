@@ -176,6 +176,11 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#company-jurisdiction")
       assert has_element?(view, "#company-jurisdiction option[value='MY']", "Malaysia (MY)")
 
+      # Belimbing labels each select's empty option differently and on purpose:
+      # "None" for Parent Company, "Select type..." for Legal Entity Type,
+      # "Select country..." here (`create.blade.php:88`).
+      assert has_element?(view, "#company-jurisdiction option[value='']", "Select country...")
+
       view
       |> form("#company-form",
         company: %{name: "MY Branch", status: "active", jurisdiction: "MY"}
