@@ -4,6 +4,7 @@ defmodule Bilimbi.Base.System.Contributions do
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionProvider
 
   @view "admin.system.info.view"
+  @inspector "admin.system.menu-inspector.view"
 
   @impl true
   def contributions do
@@ -18,12 +19,21 @@ defmodule Bilimbi.Base.System.Contributions do
           route: "/system/info",
           capability: @view,
           order: 5
+        },
+        %{
+          id: "admin.system.menu-inspector",
+          label: "Menu Inspector",
+          icon: "magnifying-glass",
+          parent: "admin.system.diagnostics",
+          route: "/system/menu-inspector",
+          capability: @inspector,
+          order: 10
         }
       ],
       authz: %{
-        capabilities: [@view],
+        capabilities: [@view, @inspector],
         roles: %{
-          "system_viewer" => %{capabilities: [@view]}
+          "system_viewer" => %{capabilities: [@view, @inspector]}
         }
       }
     }
