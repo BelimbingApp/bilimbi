@@ -12,7 +12,17 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Pull requests keep cancelling their own superseded runs -- `github.ref` is
+  # `refs/pull/<n>/merge`, so each PR has its own group.
+  #
+  # Pushes to `main` must not. Every merge shares the group
+  # `ci-CI-refs/heads/main`, so with this set to `true` each merge cancelled the
+  # previous merge's run: six merges in eight minutes left five cancelled runs
+  # and one survivor (#389). The push run is the only thing that tests the tree
+  # merging actually produced -- the PR's own run tested its branch, not the
+  # combination -- so cancelling it means a bad merge between two good ones
+  # leaves no trace.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   ERL_COMPILER_OPTIONS: deterministic
