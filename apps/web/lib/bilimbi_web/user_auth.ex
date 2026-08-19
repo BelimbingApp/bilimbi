@@ -523,7 +523,8 @@ defmodule BilimbiWeb.UserAuth do
   # has no primary company. Failures other than "not provisioned" stay quiet:
   # a missing fixture table must not paint a setup warning.
   defp operator_company_missing?(%Scope{} = scope) do
-    Scope.platform_operator?(scope) and Company.platform_operator_company() == {:error, :not_provisioned}
+    Scope.platform_operator?(scope) and
+      Company.platform_operator_company() == {:error, :not_provisioned}
   end
 
   defp extract_impersonator(%{
