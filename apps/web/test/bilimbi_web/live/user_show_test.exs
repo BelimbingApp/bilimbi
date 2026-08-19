@@ -318,7 +318,7 @@ defmodule BilimbiWeb.UserShowTest do
 
     {:ok, _} = Bilimbi.Base.Authz.assign_role(scope, 73, :user, 92, role.id)
 
-    grant_capabilities!(["admin.user.view", "admin.user.update"])
+    grant_capabilities!(["admin.user.view", "admin.user.update", "admin.company.list"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
 
@@ -345,6 +345,92 @@ defmodule BilimbiWeb.UserShowTest do
     # Remove direct capability grant
     view |> element("#remove-direct-cap-admin-company-list") |> render_click()
     assert has_element?(view, "#flash-group", "Capability rule removed.")
+  end
+
+  test "prevents privilege escalation when assigning roles not held by the administrator", %{
+    conn: conn
+  } do
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    {:ok, privileged_role} =
+      Bilimbi.Base.Authz.create_role(scope, 73, %{name: "Executive", code: "executive"})
+
+    {:ok, _} =
+      Bilimbi.Base.Authz.replace_role_capabilities(scope, privileged_role.id, [
+        "admin.company.create",
+        "admin.company.delete"
+      ])
+
+    {:ok, basic_role} =
+      Bilimbi.Base.Authz.create_role(scope, 73, %{name: "Auditor", code: "auditor"})
+
+    {:ok, _} =
+      Bilimbi.Base.Authz.replace_role_capabilities(scope, basic_role.id, ["admin.user.view"])
+
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    # Administrator only holds admin.user.view and admin.user.update
+    grant_capabilities!(["admin.user.view", "admin.user.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+
+    # Toggle assign roles panel
+    view |> element("#toggle-assign-roles-btn") |> render_click()
+
+    # Basic role (Auditor with admin.user.view) is grantable because actor holds its capabilities
+    assert has_element?(view, "#assign-roles-form", "Auditor")
+
+    # Privileged role (Executive with admin.company.create/delete) is hidden from available roles
+    refute has_element?(view, "#assign-roles-form", "Executive")
+
+    # Attempt forged assignment of the privileged role
+    view
+    |> form("#assign-roles-form")
+    |> render_submit(%{"role_ids" => ["#{privileged_role.id}"]})
+
+    assert has_element?(view, "#flash-group", "You cannot grant roles you do not hold.")
+
+    # Target user did not receive the privileged role
+    assignments = Bilimbi.Base.Authz.list_principal_role_assignments(scope, :user, 92)
+    assert assignments.entries == []
+  end
+
+  test "prevents privilege escalation when granting direct capabilities not held by the administrator",
+       %{conn: conn} do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    # Administrator only holds admin.user.view and admin.user.update
+    grant_capabilities!(["admin.user.view", "admin.user.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+
+    # Toggle permissions disclosure
+    view |> element("#toggle-permissions-btn") |> render_click()
+
+    # Capabilities not held by the actor should not appear in the available capabilities picker
+    refute has_element?(view, "#add-capabilities-form", "admin.system.database-table.edit")
+    refute has_element?(view, "#add-capabilities-form", "admin.company.delete")
+
+    # Attempt forged grant of an unheld capability
+    view
+    |> form("#add-capabilities-form")
+    |> render_submit(%{"capability_keys" => ["admin.system.database-table.edit"]})
+
+    assert has_element?(view, "#flash-group", "You cannot grant capabilities you do not hold.")
   end
 
   test "changes user password as administrator with confirmation validation", %{conn: conn} do
