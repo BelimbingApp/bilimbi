@@ -306,7 +306,10 @@ defmodule BilimbiWeb.UserLiveTest do
     |> render_change()
 
     assert has_element?(view, "#users-pagination-page-size option[value='50'][selected]")
-    assert has_element?(view, "#users-pagination-page-1[aria-current='page']")
+    assert has_element?(view, "#users-pagination-summary", "Showing 1 to 27 of 27 results")
+    refute has_element?(view, "#users-pagination-page-1")
+    refute has_element?(view, "#users-pagination-previous")
+    refute has_element?(view, "#users-pagination-next")
 
     {:ok, sort_view, _html} = live(signed_in, users_path(page: 2, perPage: 25))
     sort_view |> element("#users-sort-created") |> render_click()
@@ -340,7 +343,9 @@ defmodule BilimbiWeb.UserLiveTest do
     {:ok, out_of_range, _html} = live(signed_in, canonical_path)
     assert has_element?(out_of_range, "#users-pagination")
     assert has_element?(out_of_range, "#users-pagination-summary", "Showing 1 to 1 of 1 results")
-    assert has_element?(out_of_range, "#users-pagination-page-1[aria-current='page']")
+    refute has_element?(out_of_range, "#users-pagination-page-1")
+    refute has_element?(out_of_range, "#users-pagination-previous")
+    refute has_element?(out_of_range, "#users-pagination-next")
     assert has_element?(out_of_range, "#user-91", "Signed In")
   end
 

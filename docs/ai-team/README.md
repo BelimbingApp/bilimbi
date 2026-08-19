@@ -16,6 +16,11 @@ is canonical for business meaning and PostgreSQL schema — not for
 implementation. We do not translate Laravel into Elixir; we reproduce the
 durable contract behind a deep-module API.
 
+Note that Belimbing is not perfect: when we discover inconsistencies,
+mistakes, or entropy in the course of this project, we should not blindly build
+the entropy into Bilimbi. We should correct them in Bilimbi, and raise an issue
+in Belimbing so that it can benefit from our discovery.
+
 Read root [`AGENTS.md`](../../AGENTS.md) and [`DESIGN.md`](../../DESIGN.md)
 before touching code, then the
 [port map](https://github.com/BelimbingApp/bilimbi/discussions/73) of what is
