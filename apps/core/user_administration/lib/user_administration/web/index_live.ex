@@ -89,21 +89,32 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
         page_size: state.page_size
       )
 
-    socket
-    |> assign(:users_page, page)
-    |> assign(:index_state, state)
-    |> assign(
-      :filters_form,
-      to_form(
-        %{
-          "search" => state.search,
-          "roleIds" => Enum.map(state.role_ids, &Integer.to_string/1),
-          "perPage" => state.page_size
-        },
-        as: :filters
-      )
-    )
-    |> stream(:users, page.entries, reset: true)
+    cond do
+      page.total_pages > 0 and state.page > page.total_pages ->
+        clamped_state = %{state | page: page.total_pages}
+        push_patch(socket, to: users_path(clamped_state))
+
+      page.total_pages == 0 and state.page > 1 ->
+        clamped_state = %{state | page: 1}
+        push_patch(socket, to: users_path(clamped_state))
+
+      true ->
+        socket
+        |> assign(:users_page, page)
+        |> assign(:index_state, state)
+        |> assign(
+          :filters_form,
+          to_form(
+            %{
+              "search" => state.search,
+              "roleIds" => Enum.map(state.role_ids, &Integer.to_string/1),
+              "perPage" => state.page_size
+            },
+            as: :filters
+          )
+        )
+        |> stream(:users, page.entries, reset: true)
+    end
   end
 
   defp state_from_params(params) do

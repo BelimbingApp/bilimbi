@@ -328,12 +328,20 @@ defmodule BilimbiWeb.UserLiveTest do
     refute has_element?(empty, "#users-pagination-previous")
     refute has_element?(empty, "#users-pagination-next")
 
-    # When users exist but we are past the end, the pager stays and shows summary.
-    {:ok, out_of_range, _html} = live(signed_in, users_path(page: 2, perPage: 25))
-    assert has_element?(out_of_range, "#users-empty", "No users found")
+    # When users exist but request is out-of-range, LiveView canonicalizes to max valid page (page 1)
+    assert {:error, {:live_redirect, %{to: canonical_path}}} =
+             live(signed_in, users_path(page: 2, perPage: 25))
+
+    assert URI.parse(canonical_path).path == "/users"
+    params = URI.decode_query(URI.parse(canonical_path).query || "")
+    assert params["page"] == "1"
+    assert params["perPage"] == "25"
+
+    {:ok, out_of_range, _html} = live(signed_in, canonical_path)
     assert has_element?(out_of_range, "#users-pagination")
-    assert has_element?(out_of_range, "#users-pagination-summary", "Showing 26 to 1 of 1 results")
-    assert has_element?(out_of_range, "#users-pagination-page-1")
+    assert has_element?(out_of_range, "#users-pagination-summary", "Showing 1 to 1 of 1 results")
+    assert has_element?(out_of_range, "#users-pagination-page-1[aria-current='page']")
+    assert has_element?(out_of_range, "#user-91", "Signed In")
   end
 
   defp insert_user!(attributes) do
