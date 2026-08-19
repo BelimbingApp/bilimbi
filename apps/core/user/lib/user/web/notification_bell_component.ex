@@ -142,23 +142,19 @@ defmodule Bilimbi.Core.User.Web.NotificationBellComponent do
 
   defp load_data(scope, user_id) do
     if user_id > 0 and scope do
-      try do
-        unread =
-          case User.unread_notification_count(scope, user_id) do
-            {:ok, count} -> count
-            _ -> 0
-          end
+      unread =
+        case User.unread_notification_count(scope, user_id) do
+          {:ok, count} -> count
+          _ -> 0
+        end
 
-        recent =
-          case User.list_notifications(scope, user_id, limit: @recent_limit) do
-            {:ok, list} -> list
-            _ -> []
-          end
+      recent =
+        case User.list_notifications(scope, user_id, limit: @recent_limit) do
+          {:ok, list} -> list
+          _ -> []
+        end
 
-        {unread, recent}
-      rescue
-        _ -> {0, []}
-      end
+      {unread, recent}
     else
       {0, []}
     end

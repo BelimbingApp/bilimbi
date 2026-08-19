@@ -311,8 +311,6 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
 
       Bilimbi.Base.Audit.record_action(scope, audit_attrs)
     end
-  rescue
-    _ -> :ok
   end
 
   defp format_db_error(%{message: msg}), do: msg

@@ -8,7 +8,7 @@ defmodule Bilimbi.Base.Session.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE sessions (
+      CREATE TEMPORARY TABLE IF NOT EXISTS sessions (
         id varchar(255) PRIMARY KEY,
         user_id bigint,
         ip_address varchar(45),
@@ -20,11 +20,15 @@ defmodule Bilimbi.Base.Session.TestFixtures do
       []
     )
 
-    SQL.query!(Repo, "CREATE INDEX sessions_user_id_index ON sessions (user_id)", [])
+    SQL.query!(
+      Repo,
+      "CREATE INDEX IF NOT EXISTS sessions_user_id_index ON sessions (user_id)",
+      []
+    )
 
     SQL.query!(
       Repo,
-      "CREATE INDEX sessions_last_activity_index ON sessions (last_activity)",
+      "CREATE INDEX IF NOT EXISTS sessions_last_activity_index ON sessions (last_activity)",
       []
     )
   end

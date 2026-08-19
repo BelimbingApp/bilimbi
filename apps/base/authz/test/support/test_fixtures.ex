@@ -12,7 +12,7 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
   def create_authz_tables! do
     statements = [
       """
-      CREATE TEMPORARY TABLE base_authz_roles (
+      CREATE TEMPORARY TABLE IF NOT EXISTS base_authz_roles (
         id bigserial PRIMARY KEY,
         company_id bigint,
         name varchar(255) NOT NULL,
@@ -25,11 +25,11 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
       ) ON COMMIT DROP
       """,
       """
-      CREATE UNIQUE INDEX base_authz_roles_company_id_code_unique
+      CREATE UNIQUE INDEX IF NOT EXISTS base_authz_roles_company_id_code_unique
         ON base_authz_roles (company_id, code)
       """,
       """
-      CREATE TEMPORARY TABLE base_authz_role_capabilities (
+      CREATE TEMPORARY TABLE IF NOT EXISTS base_authz_role_capabilities (
         id bigserial PRIMARY KEY,
         role_id bigint NOT NULL REFERENCES base_authz_roles(id) ON DELETE CASCADE,
         capability_key varchar(255) NOT NULL,
@@ -38,11 +38,11 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
       ) ON COMMIT DROP
       """,
       """
-      CREATE UNIQUE INDEX base_authz_role_capabilities_role_id_capability_key_unique
+      CREATE UNIQUE INDEX IF NOT EXISTS base_authz_role_capabilities_role_id_capability_key_unique
         ON base_authz_role_capabilities (role_id, capability_key)
       """,
       """
-      CREATE TEMPORARY TABLE base_authz_principal_roles (
+      CREATE TEMPORARY TABLE IF NOT EXISTS base_authz_principal_roles (
         id bigserial PRIMARY KEY,
         company_id bigint,
         principal_type varchar(40) NOT NULL,
@@ -53,11 +53,11 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
       ) ON COMMIT DROP
       """,
       """
-      CREATE UNIQUE INDEX base_authz_principal_roles_unique
+      CREATE UNIQUE INDEX IF NOT EXISTS base_authz_principal_roles_unique
         ON base_authz_principal_roles (company_id, principal_type, principal_id, role_id)
       """,
       """
-      CREATE TEMPORARY TABLE base_authz_principal_capabilities (
+      CREATE TEMPORARY TABLE IF NOT EXISTS base_authz_principal_capabilities (
         id bigserial PRIMARY KEY,
         company_id bigint,
         principal_type varchar(40) NOT NULL,
@@ -69,13 +69,13 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
       ) ON COMMIT DROP
       """,
       """
-      CREATE UNIQUE INDEX base_authz_principal_caps_unique
+      CREATE UNIQUE INDEX IF NOT EXISTS base_authz_principal_caps_unique
         ON base_authz_principal_capabilities (
           company_id, principal_type, principal_id, capability_key
         )
       """,
       """
-      CREATE TEMPORARY TABLE base_authz_decision_logs (
+      CREATE TEMPORARY TABLE IF NOT EXISTS base_authz_decision_logs (
         id bigserial PRIMARY KEY,
         company_id bigint,
         actor_type varchar(40) NOT NULL,

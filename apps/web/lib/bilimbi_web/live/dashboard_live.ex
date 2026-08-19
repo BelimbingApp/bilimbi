@@ -44,7 +44,7 @@ defmodule BilimbiWeb.DashboardLive do
     visible = ordered_visible(authorized, layout)
     available = available_widgets(authorized, visible)
 
-    audit_entries = safe_audit_entries(scope)
+    audit_entries = audit_entries(scope)
 
     {:ok,
      socket
@@ -64,15 +64,13 @@ defmodule BilimbiWeb.DashboardLive do
      |> schedule_refresh(visible)}
   end
 
-  defp safe_audit_entries(scope) do
+  defp audit_entries(scope) do
     Audit.list_mutations(scope,
       page: 1,
       page_size: 5,
       sort_by: :occurred_at,
       sort_dir: :desc
     ).entries
-  rescue
-    _ -> []
   end
 
   defp widget_module(widget_id) do
@@ -122,8 +120,6 @@ defmodule BilimbiWeb.DashboardLive do
     else
       _ -> nil
     end
-  rescue
-    _ -> nil
   end
 
   defp persist_layout(current_scope, widget_ids) do
@@ -135,8 +131,6 @@ defmodule BilimbiWeb.DashboardLive do
       )
 
     Settings.put("ui.dashboard.layout", widget_ids, settings_scope)
-  rescue
-    _ -> :error
   end
 
   defp authorized_catalogue(catalogue, current_scope) do
@@ -248,7 +242,7 @@ defmodule BilimbiWeb.DashboardLive do
   def handle_info(:refresh_widgets, socket) do
     scope = socket.assigns.current_scope.scope
 
-    audit_entries = safe_audit_entries(scope)
+    audit_entries = audit_entries(scope)
 
     {:noreply,
      socket
