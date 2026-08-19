@@ -211,33 +211,38 @@ defmodule BilimbiWeb.EmployeeFormTest do
   end
 
   test "rejects linking a user from a different company in same tenant", %{conn: conn} do
-    CompanyFixtures.insert_company!(%{id: 74, tenant_id: 41})
-    UserFixtures.insert_user!(%{id: 99, company_id: 74, name: "Foreign Company User"})
+    CompanyFixtures.insert_company!(%{id: 74, tenant_id: 41, code: "foreign_corp"})
+
+    UserFixtures.insert_user!(%{
+      id: 99,
+      company_id: 74,
+      name: "Foreign Company User",
+      email: "foreign@example.com"
+    })
 
     grant_capabilities!(["admin.employee.create", "admin.employee.view"])
     {:ok, scope} = Tenancy.scope(41)
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/new")
 
-    view
-    |> form("#employee-form",
-      employee: %{
-        company_id: "73",
-        employee_number: "EMP-010",
-        full_name: "Test Employee",
-        employee_type: "full_time",
-        status: "active",
-        user_id: "99"
+    # Attacker crafts a raw save event bypassing client select options
+    render_submit(view, :save, %{
+      "employee" => %{
+        "company_id" => "73",
+        "employee_number" => "EMP-010",
+        "full_name" => "Test Employee",
+        "employee_type" => "full_time",
+        "status" => "active",
+        "user_id" => "99"
       }
-    )
-    |> render_submit()
+    })
 
     assert {:ok, user} = User.get_user(scope, 74, 99)
     assert is_nil(user.employee_id)
   end
 
-  test "retains original employee company on edit even if company_id is posted", %{conn: conn} do
-    CompanyFixtures.insert_company!(%{id: 74, tenant_id: 41})
+  test "locks company on edit and retains original employee company", %{conn: conn} do
+    CompanyFixtures.insert_company!(%{id: 74, tenant_id: 41, code: "target_corp"})
     {:ok, scope} = Tenancy.scope(41)
 
     {:ok, employee} =
@@ -252,10 +257,11 @@ defmodule BilimbiWeb.EmployeeFormTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}/edit")
 
+    assert has_element?(view, "#employee-company-id[disabled]")
+
     view
     |> form("#employee-form",
       employee: %{
-        company_id: "74",
         full_name: "John Richard Doe"
       }
     )

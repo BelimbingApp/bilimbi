@@ -140,6 +140,13 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
     scope = socket.assigns.current_scope.scope
     current_company_id = socket.assigns.company_id
 
+    params =
+      if socket.assigns.live_action == :edit && socket.assigns.employee do
+        Map.put_new(params, "company_id", socket.assigns.employee.company_id)
+      else
+        params
+      end
+
     new_company_id =
       if socket.assigns.live_action == :edit do
         current_company_id
@@ -197,6 +204,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
   defp save(socket, :edit, params) do
     scope = socket.assigns.current_scope.scope
     employee = socket.assigns.employee
+    params = Map.put(params, "company_id", employee.company_id)
     changeset = form_changeset(params)
 
     if changeset.valid? do
