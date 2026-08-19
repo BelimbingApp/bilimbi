@@ -253,7 +253,6 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   def handle_event("save_location", %{"location" => params}, socket) do
     if allowed?(socket.assigns.current_scope, "admin.address.update") do
       scope = socket.assigns.current_scope.scope
-
       attrs = %{
         "country_iso" => normalize_param(params["country_iso"]),
         "admin1_code" => normalize_param(params["admin1_code"]),
