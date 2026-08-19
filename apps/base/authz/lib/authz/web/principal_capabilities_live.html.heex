@@ -127,12 +127,7 @@
         class="flex items-center justify-between border-t border-line px-4 py-3 text-sm"
       >
         <p id="grants-pagination-summary" class="text-ink-subtle">
-          Page {@page.page} of {@page.total_pages} · {@page.total_entries} {if @page.total_entries ==
-                                                                                 1,
-                                                                               do:
-                                                                                 "direct capability",
-                                                                               else:
-                                                                                 "direct capabilities"}
+          Page {@page.page} of {@page.total_pages} · {@page.total_entries} {grant_noun(@page.total_entries)}
         </p>
         <div :if={@page.total_pages > 1} class="flex gap-2">
           <.button

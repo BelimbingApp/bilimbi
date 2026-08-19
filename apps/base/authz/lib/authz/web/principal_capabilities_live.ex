@@ -212,6 +212,12 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
   defp unknown_capability?(%{capability: capability}),
     do: not Authz.capability_known?(capability)
 
+  # Extracted so the summary line stays one readable line, as the sibling Roles
+  # and Decision Logs screens have it. Inline, the longer noun pushed the `if`
+  # past the formatter's width and it came back as six wrapped lines.
+  defp grant_noun(1), do: "direct capability"
+  defp grant_noun(_count), do: "direct capabilities"
+
   # The grants query is visibility-filtered to `company_ids/1`, and the
   # directory returns exactly that id set, so every row resolves. A company
   # archived between the two queries is not in the directory; its id is the
