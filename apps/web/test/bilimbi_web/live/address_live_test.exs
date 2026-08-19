@@ -192,13 +192,233 @@ defmodule BilimbiWeb.AddressLiveTest do
     grant_capabilities!("admin.address.list")
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses")
 
-    # With no rows there are no pages, and a paginator describing "Page 0 of 0"
-    # is describing a range that does not exist. /employees and /employee-types
-    # render nothing here, and so does Belimbing -- every pager sits inside
-    # `@if ($paginator->hasPages())` (#298).
-    # The empty slot carries no id, so assert the text it renders -- inventing
-    # `#addresses-empty` made this fail for the wrong reason first time round.
     assert render(view) =~ "No addresses found."
     refute has_element?(view, "#addresses-pagination")
+  end
+
+  test "requires admin.address.view capability to view address show page", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, address} = Address.create_address(scope, %{label: "HQ"})
+
+    assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/addresses/#{address.id}")
+
+    assert {:error, {:redirect, %{to: "/dashboard"}}} =
+             conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+
+    grant_capabilities!("admin.address.view")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+    assert has_element?(view, "#address-show-page")
+  end
+
+  test "redirects to addresses list when address does not exist or belongs to another tenant", %{
+    conn: conn,
+    other_scope: other_scope
+  } do
+    {:ok, foreign_address} = Address.create_address(other_scope, %{label: "Foreign HQ"})
+    grant_capabilities!("admin.address.view")
+
+    assert {:error,
+            {:live_redirect, %{to: "/addresses", flash: %{"error" => "Address not found."}}}} =
+             conn |> log_in_as() |> live(~p"/addresses/#{foreign_address.id}")
+
+    assert {:error,
+            {:live_redirect, %{to: "/addresses", flash: %{"error" => "Address not found."}}}} =
+             conn |> log_in_as() |> live(~p"/addresses/999999")
+  end
+
+  test "renders address details, location, provenance, linked entities, and company back link", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, address} =
+      Address.create_address(scope, %{
+        label: "Headquarters",
+        phone: "+60 3 1234 5678",
+        line1: "1 Platform Road",
+        line2: "Level 2",
+        line3: "Tower B",
+        locality: "Kuala Lumpur",
+        postcode: "50000",
+        country_iso: "MY",
+        admin1_code: "MY.14",
+        source: "manual_import",
+        source_ref: "REF-100",
+        parser_version: "v1.2",
+        parse_confidence: Decimal.new("0.9500"),
+        raw_input: "1 Platform Road, Level 2, 50000 Kuala Lumpur",
+        verification_status: "verified"
+      })
+
+    {:ok, :attached} =
+      Address.attach_to_company(scope, address.id, 73, %{
+        kind: ["billing", "shipping"],
+        is_primary: true,
+        priority: 1
+      })
+
+    grant_capabilities!(["admin.address.view", "admin.company.view"])
+
+    {:ok, view, _html} =
+      conn |> log_in_as() |> live(~p"/addresses/#{address.id}?company=73")
+
+    assert has_element?(view, "#address-show-page")
+    assert has_element?(view, "#address-back-company[href='/companies/73']")
+    assert has_element?(view, "#address-back-list[href='/addresses']")
+    assert has_element?(view, "#address-view-label", "Headquarters")
+    assert has_element?(view, "#address-view-phone", "+60 3 1234 5678")
+    assert has_element?(view, "#address-view-lines", "1 Platform Road")
+    assert has_element?(view, "#address-view-lines", "Level 2")
+    assert has_element?(view, "#address-view-lines", "Tower B")
+    assert has_element?(view, "#address-view-country", "Malaysia")
+    assert has_element?(view, "#address-view-admin1", "Kuala Lumpur")
+    assert has_element?(view, "#address-view-postcode", "50000")
+    assert has_element?(view, "#address-view-locality", "Kuala Lumpur")
+    assert has_element?(view, "#address-view-source", "manual_import")
+    assert has_element?(view, "#address-view-source-ref", "REF-100")
+    assert has_element?(view, "#address-view-parser-version", "v1.2")
+    assert has_element?(view, "#address-view-parse-confidence", "0.9500")
+    assert has_element?(view, "#address-view-raw-input")
+    assert has_element?(view, "#linked-company-73")
+    assert has_element?(view, "#address-linked-entities-table", "Billing")
+    assert has_element?(view, "#address-linked-entities-table", "Shipping")
+    assert has_element?(view, "#address-linked-entities-table", "Yes")
+  end
+
+  test "allows editing details, location, and provenance when authorized", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, address} =
+      Address.create_address(scope, %{
+        label: "Old Label",
+        phone: "+60 1",
+        line1: "Old Line 1",
+        verification_status: "unverified"
+      })
+
+    grant_capabilities!(["admin.address.view", "admin.address.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+
+    # 1. Edit Details
+    view |> element("#address-edit-details-button") |> render_click()
+    assert has_element?(view, "#address-details-form")
+
+    view
+    |> element("#address-details-form")
+    |> render_submit(%{
+      "details" => %{
+        "label" => "Updated HQ",
+        "phone" => "+60 12 3456789",
+        "verification_status" => "verified",
+        "line1" => "10 Innovation Blvd",
+        "line2" => "Suite 300",
+        "line3" => ""
+      }
+    })
+
+    assert render(view) =~ "Address details updated successfully."
+    assert has_element?(view, "#address-view-label", "Updated HQ")
+    assert has_element?(view, "#address-view-phone", "+60 12 3456789")
+    assert has_element?(view, "#address-view-lines", "10 Innovation Blvd")
+
+    # 2. Edit Location with Geonames
+    view |> element("#address-edit-location-button") |> render_click()
+    assert has_element?(view, "#address-location-form")
+
+    view
+    |> element("#address-location-form")
+    |> render_change(%{
+      "location" => %{
+        "country_iso" => "MY",
+        "admin1_code" => "",
+        "postcode" => "50000",
+        "locality" => ""
+      }
+    })
+
+    assert has_element?(view, "#address-location-admin1 option[value='MY.14'][selected]")
+    assert has_element?(view, "#address-location-locality[value='Kuala Lumpur']")
+
+    view
+    |> element("#address-location-form")
+    |> render_submit(%{
+      "location" => %{
+        "country_iso" => "MY",
+        "admin1_code" => "MY.14",
+        "postcode" => "50000",
+        "locality" => "Kuala Lumpur"
+      }
+    })
+
+    assert render(view) =~ "Address location updated successfully."
+    assert has_element?(view, "#address-view-locality", "Kuala Lumpur")
+
+    # 3. Edit Provenance
+    view |> element("#address-edit-provenance-button") |> render_click()
+    assert has_element?(view, "#address-provenance-form")
+
+    view
+    |> element("#address-provenance-form")
+    |> render_submit(%{
+      "provenance" => %{
+        "source" => "crm_sync",
+        "source_ref" => "CRM-888"
+      }
+    })
+
+    assert render(view) =~ "Provenance updated successfully."
+    assert has_element?(view, "#address-view-source", "crm_sync")
+    assert has_element?(view, "#address-view-source-ref", "CRM-888")
+  end
+
+  test "supports sorting linked entities column headers", %{conn: conn, scope: scope} do
+    {:ok, address} = Address.create_address(scope, %{label: "Shared Hub"})
+
+    CompanyFixtures.insert_company!(%{
+      id: 75,
+      tenant_id: 41,
+      name: "Zulu Corp",
+      code: "zulu"
+    })
+
+    {:ok, :attached} =
+      Address.attach_to_company(scope, address.id, 73, %{
+        kind: ["billing"],
+        is_primary: true,
+        priority: 1
+      })
+
+    {:ok, :attached} =
+      Address.attach_to_company(scope, address.id, 75, %{
+        kind: ["shipping"],
+        is_primary: false,
+        priority: 2
+      })
+
+    grant_capabilities!("admin.address.view")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+
+    assert has_element?(view, "#address-linked-entities-table")
+
+    # Click Sort by Name
+    view |> element("#sort-name") |> render_click()
+
+    assert_patch(
+      view,
+      ~p"/addresses/#{address.id}?#{%{linked_sort_by: "name", linked_sort_dir: "asc"}}"
+    )
+
+    # Click Sort by Priority
+    view |> element("#sort-priority") |> render_click()
+
+    assert_patch(
+      view,
+      ~p"/addresses/#{address.id}?#{%{linked_sort_by: "priority", linked_sort_dir: "asc"}}"
+    )
   end
 end
