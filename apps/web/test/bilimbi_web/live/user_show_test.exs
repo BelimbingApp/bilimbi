@@ -462,7 +462,7 @@ defmodule BilimbiWeb.UserShowTest do
     CompanyFixtures.insert_relationship!(1, 73, 73, 11)
 
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-    expires = NaiveDateTime.add(now, 86400, :second)
+    expires = NaiveDateTime.add(now, 86_400, :second)
 
     Ecto.Adapters.SQL.query!(
       Bilimbi.Base.Repo,
