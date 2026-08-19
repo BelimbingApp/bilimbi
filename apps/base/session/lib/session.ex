@@ -60,6 +60,19 @@ defmodule Bilimbi.Base.Session do
     |> Enum.map(&Summary.from_schema/1)
   end
 
+  @doc """
+  Counts stored durable sessions.
+
+  Platform-global by design, like `list_sessions/1`: the durable session store
+  is a compatibility surface with no tenant ownership, and the count answers
+  the operational question "how many sessions exist right now" — for example on
+  a dashboard widget. Payloads are neither read nor counted by content.
+  """
+  @spec count_sessions() :: non_neg_integer()
+  def count_sessions do
+    Repo.aggregate(Schema, :count)
+  end
+
   @spec delete_session(String.t()) :: :ok
   def delete_session(id) when is_binary(id) do
     Repo.delete_all(from(session in Schema, where: session.id == ^id))
