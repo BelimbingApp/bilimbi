@@ -834,19 +834,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 </dd>
               </div>
 
-              <div id="user-detail-email-verified">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Email Verified</dt>
-                <dd class="mt-0.5 text-sm text-ink">
-                  <.badge kind={if @user.email_verified_at, do: :success, else: :warning}>
-                    <%= if @user.email_verified_at do %>
-                      <.datetime id="user-email-verified-at" value={@user.email_verified_at} />
-                    <% else %>
-                      unverified
-                    <% end %>
-                  </.badge>
-                </dd>
-              </div>
-
               <div id="user-detail-email">
                 <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Email</dt>
                 <dd class="mt-0.5 text-sm text-ink">
@@ -862,14 +849,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <% else %>
                     <span>{@user.email}</span>
                   <% end %>
-                </dd>
-              </div>
-
-              <div id="user-detail-created">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Created</dt>
-                <dd class="mt-0.5 text-sm text-ink-muted tabular-nums">
-                  <.datetime id="user-created-at" :if={@user.created_at} value={@user.created_at} />
-                  <span :if={is_nil(@user.created_at)} class="text-ink-faint">—</span>
                 </dd>
               </div>
 
@@ -902,6 +881,27 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       <span class="text-ink-faint">None</span>
                     <% end %>
                   <% end %>
+                </dd>
+              </div>
+
+              <div id="user-detail-email-verified">
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Email Verified</dt>
+                <dd class="mt-0.5 text-sm text-ink">
+                  <.badge kind={if @user.email_verified_at, do: :success, else: :warning}>
+                    <%= if @user.email_verified_at do %>
+                      <.datetime id="user-email-verified-at" value={@user.email_verified_at} />
+                    <% else %>
+                      unverified
+                    <% end %>
+                  </.badge>
+                </dd>
+              </div>
+
+              <div id="user-detail-created">
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Created</dt>
+                <dd class="mt-0.5 text-sm text-ink-muted tabular-nums">
+                  <.datetime id="user-created-at" :if={@user.created_at} value={@user.created_at} />
+                  <span :if={is_nil(@user.created_at)} class="text-ink-faint">—</span>
                 </dd>
               </div>
 
