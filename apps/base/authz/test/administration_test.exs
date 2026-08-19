@@ -430,6 +430,63 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert %Page{entries: [], total_entries: 0} = Authz.list_decision_logs(scope(2))
   end
 
+  test "principal capabilities sort by supplied company_order across pages" do
+    tenant_scope = scope()
+
+    assert {:ok, :stored} =
+             Authz.put_principal_capability(
+               tenant_scope,
+               10,
+               :user,
+               1,
+               "admin.test.record.view",
+               true
+             )
+
+    assert {:ok, :stored} =
+             Authz.put_principal_capability(
+               tenant_scope,
+               11,
+               :user,
+               2,
+               "admin.test.record.view",
+               true
+             )
+
+    assert {:ok, :stored} =
+             Authz.put_principal_capability(
+               tenant_scope,
+               10,
+               :user,
+               3,
+               "admin.test.record.view",
+               true
+             )
+
+    # Numeric ids are 10 then 11; name order is handed in as 11 then 10.
+    page_one =
+      Authz.list_principal_capabilities(tenant_scope,
+        sort_by: :company_name,
+        sort_dir: :asc,
+        page: 1,
+        page_size: 1,
+        company_order: [11, 10]
+      )
+
+    page_two =
+      Authz.list_principal_capabilities(tenant_scope,
+        sort_by: :company_name,
+        sort_dir: :asc,
+        page: 2,
+        page_size: 1,
+        company_order: [11, 10]
+      )
+
+    assert page_one.total_entries == 3
+    assert [%PrincipalCapabilitySummary{company_id: 11}] = page_one.entries
+    assert [%PrincipalCapabilitySummary{company_id: 10, principal_id: 1}] = page_two.entries
+  end
+
   test "administration options reject unbounded or unknown input" do
     assert_raise ArgumentError, ~r/page_size/, fn ->
       Authz.list_decision_logs(scope(), page_size: 101)

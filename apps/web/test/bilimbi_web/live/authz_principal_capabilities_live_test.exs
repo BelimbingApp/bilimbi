@@ -212,6 +212,32 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
            )
   end
 
+  test "sorts the company column by display name, not company id", %{conn: conn, scope: scope} do
+    CompanyFixtures.insert_company!(%{
+      id: 74,
+      tenant_id: 41,
+      name: "Aurora Works",
+      code: "aurora_works"
+    })
+
+    {:ok, :stored} =
+      Authz.put_principal_capability(scope, 73, :user, 91, "admin.company.list", true)
+
+    {:ok, :stored} =
+      Authz.put_principal_capability(scope, 74, :user, 91, "admin.company.view", true)
+
+    grant_capabilities!("admin.authz.principal-capability.list")
+
+    {:ok, view, _html} =
+      conn |> log_in_as() |> live(~p"/authz/principal-capabilities?sort_by=company_name")
+
+    assert has_element?(view, "#principal-capabilities > tr:nth-child(1)", "Aurora Works")
+    assert has_element?(view, "#principal-capabilities > tr:nth-child(2)", "Bilimbi Industries")
+
+    view |> element("#grants-sort-company_name") |> render_click()
+    assert %{"sort_by" => "company_name", "sort_dir" => "desc"} = patched_params(view)
+  end
+
   test "a sort URL means what clicking that column means", %{conn: conn, scope: scope} do
     grant(scope, "admin.company.list", true)
     grant_capabilities!("admin.authz.principal-capability.list")

@@ -39,7 +39,8 @@ defmodule Bilimbi.Base.Authz.Administration do
     principal_id: :principal_id,
     capability: :capability_key,
     allowed: :is_allowed,
-    company_id: :company_id
+    company_id: :company_id,
+    company_name: :company_name
   }
 
   @spec list_roles(Scope.t(), keyword(), map()) :: Page.t(RoleSummary.t())
@@ -107,7 +108,8 @@ defmodule Bilimbi.Base.Authz.Administration do
         principal_type: nil,
         principal_id: nil,
         sort_by: :created_at,
-        sort_dir: :desc
+        sort_dir: :desc,
+        company_order: []
       )
 
     visibility = company_visibility(scope, company_ids(scope, registry))
@@ -302,10 +304,34 @@ defmodule Bilimbi.Base.Authz.Administration do
     )
   end
 
+  defp order_query(query, :company_name, opts, _fields) do
+    direction = sort_dir!(opts[:sort_dir])
+    ids = company_order!(opts[:company_order])
+
+    order_by(query, [grant], [
+      {^direction, fragment("array_position(?::bigint[], ?)", ^ids, grant.company_id)},
+      {^direction, grant.id}
+    ])
+  end
+
   defp order_query(query, sort_by, opts, fields) do
     direction = sort_dir!(opts[:sort_dir])
     field = Map.fetch!(fields, sort_by)
     order_by(query, ^[{direction, field}, {direction, :id}])
+  end
+
+  defp company_order!(ids) when is_list(ids) do
+    if Enum.all?(ids, &(is_integer(&1) and &1 > 0)) and length(ids) == length(Enum.uniq(ids)) do
+      ids
+    else
+      raise ArgumentError,
+            "company_order must be unique positive integer IDs, got: #{inspect(ids)}"
+    end
+  end
+
+  defp company_order!(value) do
+    raise ArgumentError,
+          "company_order must be a list of unique positive integer IDs, got: #{inspect(value)}"
   end
 
   defp search!(nil), do: nil
