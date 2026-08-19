@@ -1,0 +1,127 @@
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  active_nav="admin.system.menu-inspector"
+>
+  <.page id="menu-inspector-index">
+    <.header>
+      Menu Inspector
+      <:title_actions>
+        <button
+          type="button"
+          id="menu-inspector-pin"
+          data-nav-pin="nav-admin-system-menu-inspector"
+          title="Pin Menu Inspector to sidebar"
+          aria-label="Pin Menu Inspector to sidebar"
+          aria-pressed="false"
+          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        >
+          <.icon name="bilimbi-pin" class="size-3.5" />
+        </button>
+      </:title_actions>
+      <:subtitle>
+        Every registered menu item with parent, capability, route, and whether this actor may use it
+      </:subtitle>
+    </.header>
+
+    <.card id="menu-inspector-card" inner_class="p-0">
+      <.form
+        for={%{}}
+        as={:filters}
+        id="menu-inspector-filters"
+        phx-change="filter"
+        phx-submit="filter"
+        class="p-2 mb-2"
+      >
+        <div class="relative">
+          <.icon
+            name="hero-magnifying-glass"
+            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+          />
+          <.input
+            type="search"
+            id="menu-inspector-search"
+            name="search"
+            value={@state.search}
+            placeholder="Search id, label, capability, or route"
+            phx-debounce="300"
+            autocomplete="off"
+            label="Search menu items"
+            label_class="sr-only"
+            wrapper_class="mb-0"
+            class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+          />
+        </div>
+      </.form>
+
+      <.table
+        id="menu-inspector"
+        rows={@streams.items}
+        row_id={fn {dom_id, _item} -> dom_id end}
+        row_item={fn {_dom_id, item} -> item end}
+        framed={false}
+      >
+        <:col :let={item} label="ID">
+          <span class="font-mono text-xs text-ink">{item.id}</span>
+        </:col>
+        <:col :let={item} label="Label">
+          <span class="text-sm text-ink">{item.label}</span>
+        </:col>
+        <:col :let={item} label="Parent">
+          <span class="font-mono text-xs text-ink-muted">{item.parent || "—"}</span>
+        </:col>
+        <:col :let={item} label="Kind">
+          <.badge>{item.kind}</.badge>
+        </:col>
+        <:col :let={item} label="Capability">
+          <span class="font-mono text-xs text-ink-muted">{item.capability || "—"}</span>
+        </:col>
+        <:col :let={item} label="Route">
+          <span class="font-mono text-xs text-ink-muted">{item.route || "—"}</span>
+        </:col>
+        <:col :let={item} label="Served">
+          <.badge :if={is_nil(item.route)} kind={:neutral}>—</.badge>
+          <.badge :if={not is_nil(item.route) and item.served?} kind={:success}>yes</.badge>
+          <.badge :if={not is_nil(item.route) and not item.served?} kind={:danger}>no</.badge>
+        </:col>
+        <:col :let={item} label="Allowed">
+          <.badge :if={item.allowed?} kind={:success}>yes</.badge>
+          <.badge :if={not item.allowed?} kind={:danger}>no</.badge>
+        </:col>
+        <:empty :if={@total_entries == 0}>
+          {if @state.search == "",
+            do: "No menu items are registered.",
+            else: "No menu items match the current filters."}
+        </:empty>
+      </.table>
+
+      <div
+        :if={@total_pages > 0}
+        id="menu-inspector-pagination"
+        class="flex items-center justify-between border-t border-line px-4 py-3 text-sm"
+      >
+        <p id="menu-inspector-pagination-summary" class="text-ink-subtle">
+          Page {@state.page} of {@total_pages} · {@total_entries} {item_noun(@total_entries)}
+        </p>
+        <div :if={@total_pages > 1} class="flex gap-2">
+          <.button
+            :if={@state.page > 1}
+            id="menu-inspector-prev"
+            phx-click="page"
+            phx-value-page={@state.page - 1}
+          >
+            Previous
+          </.button>
+          <.button
+            :if={@state.page < @total_pages}
+            id="menu-inspector-next"
+            phx-click="page"
+            phx-value-page={@state.page + 1}
+          >
+            Next
+          </.button>
+        </div>
+      </div>
+    </.card>
+  </.page>
+</Layouts.app>
