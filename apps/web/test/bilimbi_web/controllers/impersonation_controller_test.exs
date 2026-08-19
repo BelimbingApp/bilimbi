@@ -44,6 +44,8 @@ defmodule BilimbiWeb.ImpersonationControllerTest do
     {:ok, view, html} = live(resp_conn, ~p"/dashboard")
     assert html =~ "Viewing as Target User"
     assert has_element?(view, "#app-impersonation-stop")
+    # Menu items requiring capabilities are hidden for Target User (who has no capabilities)
+    refute html =~ "Administration"
 
     # 4. Stop impersonation
     leave_conn = post(resp_conn, ~p"/admin/impersonate/leave")
@@ -55,6 +57,33 @@ defmodule BilimbiWeb.ImpersonationControllerTest do
     {:ok, admin_view, admin_html} = live(leave_conn, ~p"/dashboard")
     refute admin_html =~ "Viewing as"
     refute has_element?(admin_view, "#app-impersonation-stop")
+    assert admin_html =~ "Administration"
+  end
+
+  test "impersonating a user with no capabilities denies access to administration routes with access notice",
+       %{conn: conn} do
+    grant_capabilities!(["admin.user.list", "admin.user.impersonate"])
+
+    authed_conn = conn |> log_in_as(%{"user_id" => 91, "company_id" => 73})
+    resp_conn = post(authed_conn, ~p"/admin/impersonate/92")
+    assert redirected_to(resp_conn) == ~p"/dashboard"
+
+    # Target User (id 92) has no capabilities; direct navigation to /users is denied
+    assert {:error, {:redirect, %{to: "/dashboard", flash: flash}}} =
+             live(resp_conn, ~p"/users")
+
+    assert Map.get(flash, "error") =~ "You do not have access to that page"
+
+    # Direct navigation to /companies is also denied
+    assert {:error, {:redirect, %{to: "/dashboard", flash: flash}}} =
+             live(resp_conn, ~p"/companies")
+
+    assert Map.get(flash, "error") =~ "You do not have access to that page"
+
+    # Stop impersonation and verify admin can access /users again
+    leave_conn = post(resp_conn, ~p"/admin/impersonate/leave")
+    assert redirected_to(leave_conn) == ~p"/dashboard"
+    assert {:ok, _view, _html} = live(leave_conn, ~p"/users")
   end
 
   test "logging out during impersonation deletes durable session without leaving orphaned rows",
