@@ -3,13 +3,13 @@ defmodule BilimbiWeb.DashboardLive do
   The workspace landing screen after sign-in.
 
   Renders a widget grid whose catalogue is contributed by installed modules
-  through `Bilimbi.Base.Dashboard`. The widget catalogue determines which
-  widgets appear; this LiveView owns the rendering.
+  through `Bilimbi.Base.Dashboard`. Widgets are rendered by their contribution
+  id against known implementations of `Bilimbi.Base.Dashboard.Widget`.
 
-  Widget visibility is gated by capability. Widget ordering reads the
-  `ui.dashboard.layout` user setting when present and falls back to the
-  catalogue order. Adding, removing, and reordering widgets through the UI
-  is deferred to a subsequent delivery.
+  Widget visibility is gated by capability. Layout is persisted per-user in the
+  `ui.dashboard.layout` setting. Reorder buttons and add/remove controls allow
+  customising the grid. Widgets with a non-zero `refresh_interval` are
+  auto-refreshed through a `handle_info` timer.
   """
 
   use BilimbiWeb, :live_view
@@ -22,6 +22,13 @@ defmodule BilimbiWeb.DashboardLive do
   alias Bilimbi.Core.User
   alias BilimbiWeb.UserAuth
 
+  @widget_modules %{
+    "base-dashboard-company-stats" => BilimbiWeb.Dashboard.CompanyStatsWidget,
+    "base-dashboard-user-stats" => BilimbiWeb.Dashboard.UserStatsWidget,
+    "base-dashboard-session-stats" => BilimbiWeb.Dashboard.SessionStatsWidget,
+    "base-dashboard-recent-audit" => BilimbiWeb.Dashboard.RecentAuditWidget
+  }
+
   @impl true
   def mount(_params, _session, socket) do
     scope = socket.assigns.current_scope.scope
@@ -33,41 +40,67 @@ defmodule BilimbiWeb.DashboardLive do
       Enum.find(companies, &(&1.id == socket.assigns.current_scope.user["company_id"])) ||
         List.first(companies)
 
-    catalogue = Dashboard.widgets()
+    full_catalogue = Dashboard.widgets()
     layout = user_layout(socket.assigns.current_scope)
-    visible = ordered_visible(catalogue, layout, socket)
+    visible = ordered_visible(full_catalogue, layout, socket)
+    available = available_widgets(full_catalogue, visible)
 
-    session_count =
-      try do
-        length(Session.list_sessions(limit: 500))
-      rescue
-        _ -> 0
-      end
-
-    audit_page =
-      try do
-        Audit.list_mutations(scope,
-          page: 1,
-          page_size: 5,
-          sort_by: :occurred_at,
-          sort_dir: :desc
-        )
-      rescue
-        _ -> %{entries: []}
-      end
+    session_count = safe_session_count()
+    audit_entries = safe_audit_entries(scope)
 
     {:ok,
      socket
      |> assign(:page_title, "Dashboard")
      |> assign(:active_nav, nil)
      |> assign(:widgets, visible)
+     |> assign(:available_widgets, available)
+     |> assign(:full_catalogue, full_catalogue)
      |> assign(:company_count, length(companies))
      |> assign(:user_count, length(users))
      |> assign(:session_count, session_count)
-     |> assign(:audit_entries, audit_page.entries)
+     |> assign(:audit_entries, audit_entries)
      |> assign(:companies, companies)
      |> assign(:users, users)
-     |> assign(:current_company, current_company)}
+     |> assign(:current_company, current_company)
+     |> assign(:layout_editing, false)
+     |> schedule_refresh(visible)}
+  end
+
+  defp safe_session_count do
+    length(Session.list_sessions(limit: 500))
+  rescue
+    _ -> 0
+  end
+
+  defp safe_audit_entries(scope) do
+    Audit.list_mutations(scope,
+      page: 1,
+      page_size: 5,
+      sort_by: :occurred_at,
+      sort_dir: :desc
+    ).entries
+  rescue
+    _ -> []
+  end
+
+  defp widget_module(widget_id) do
+    Map.get(@widget_modules, widget_id)
+  end
+
+  defp schedule_refresh(socket, widgets) do
+    intervals =
+      widgets
+      |> Enum.map(&widget_module(&1.id))
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(& &1.widget_refresh_interval())
+      |> Enum.reject(&(&1 == 0))
+
+    if intervals != [] do
+      min_interval = Enum.min(intervals)
+      Process.send_after(self(), :refresh_widgets, min_interval)
+    end
+
+    socket
   end
 
   defp user_layout(current_scope) do
@@ -83,10 +116,20 @@ defmodule BilimbiWeb.DashboardLive do
       _ -> nil
     end
   rescue
-    _ ->
-      # The Settings table may not exist in test sandboxes or during
-      # early adoption; fall back to catalogue order.
-      nil
+    _ -> nil
+  end
+
+  defp persist_layout(current_scope, widget_ids) do
+    settings_scope =
+      Settings.Scope.user(
+        current_scope.user["user_id"],
+        current_scope.user["company_id"],
+        current_scope.scope.tenant.id
+      )
+
+    Settings.put("ui.dashboard.layout", widget_ids, settings_scope)
+  rescue
+    _ -> :error
   end
 
   defp ordered_visible(catalogue, layout, socket) do
@@ -108,6 +151,92 @@ defmodule BilimbiWeb.DashboardLive do
     end
   end
 
+  defp available_widgets(full_catalogue, visible) do
+    visible_ids = MapSet.new(visible, & &1.id)
+    Enum.reject(full_catalogue, &(&1.id in visible_ids))
+  end
+
+  @impl true
+  def handle_event("add-widget", %{"id" => id}, socket) do
+    widget = Enum.find(socket.assigns.full_catalogue, &(&1.id == id))
+    widgets = socket.assigns.widgets ++ [widget]
+    layout = Enum.map(widgets, & &1.id)
+    persist_layout(socket.assigns.current_scope, layout)
+
+    {:noreply,
+     socket
+     |> assign(:widgets, widgets)
+     |> assign(:available_widgets, Enum.reject(socket.assigns.available_widgets, &(&1.id == id)))
+     |> put_flash(:info, "#{widget.label} added to dashboard.")}
+  end
+
+  @impl true
+  def handle_event("remove-widget", %{"id" => id}, socket) do
+    {removed, kept} = Enum.split_with(socket.assigns.widgets, &(&1.id == id))
+    widget = List.first(removed)
+    widgets = kept
+    layout = Enum.map(widgets, & &1.id)
+    persist_layout(socket.assigns.current_scope, layout)
+
+    available =
+      if widget,
+        do: [widget | socket.assigns.available_widgets],
+        else: socket.assigns.available_widgets
+
+    {:noreply,
+     socket
+     |> assign(:widgets, widgets)
+     |> assign(:available_widgets, available)
+     |> put_flash(:info, "Widget removed.")}
+  end
+
+  @impl true
+  def handle_event("move-up", %{"id" => id}, socket) do
+    widgets = move_one(socket.assigns.widgets, id, -1)
+    layout = Enum.map(widgets, & &1.id)
+    persist_layout(socket.assigns.current_scope, layout)
+    {:noreply, assign(socket, :widgets, widgets)}
+  end
+
+  @impl true
+  def handle_event("move-down", %{"id" => id}, socket) do
+    widgets = move_one(socket.assigns.widgets, id, 1)
+    layout = Enum.map(widgets, & &1.id)
+    persist_layout(socket.assigns.current_scope, layout)
+    {:noreply, assign(socket, :widgets, widgets)}
+  end
+
+  @impl true
+  def handle_event("toggle-layout-edit", _params, socket) do
+    {:noreply, assign(socket, :layout_editing, !socket.assigns.layout_editing)}
+  end
+
+  defp move_one(widgets, id, direction) do
+    idx = Enum.find_index(widgets, &(&1.id == id))
+    target = idx + direction
+
+    if is_integer(idx) && target >= 0 && target < length(widgets) do
+      List.update_at(widgets, idx, fn _ -> Enum.at(widgets, target) end)
+      |> List.update_at(target, fn _ -> Enum.at(widgets, idx) end)
+    else
+      widgets
+    end
+  end
+
+  @impl true
+  def handle_info(:refresh_widgets, socket) do
+    scope = socket.assigns.current_scope.scope
+
+    session_count = safe_session_count()
+    audit_entries = safe_audit_entries(scope)
+
+    {:noreply,
+     socket
+     |> assign(:session_count, session_count)
+     |> assign(:audit_entries, audit_entries)
+     |> schedule_refresh(socket.assigns.widgets)}
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -118,7 +247,43 @@ defmodule BilimbiWeb.DashboardLive do
           <:subtitle>
             Signed in as {@current_scope.user["name"]} · {@current_scope.scope.tenant.name}
           </:subtitle>
+          <:actions>
+            <.button
+              :if={!@layout_editing}
+              id="edit-layout"
+              phx-click="toggle-layout-edit"
+              variant="primary"
+            >
+              Edit layout
+            </.button>
+            <.button
+              :if={@layout_editing}
+              id="done-layout"
+              phx-click="toggle-layout-edit"
+              variant="primary"
+            >
+              Done
+            </.button>
+          </:actions>
         </.header>
+
+        <div
+          :if={@layout_editing and @available_widgets != []}
+          id="add-widget-section"
+          class="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-xs"
+        >
+          <span class="text-xs font-semibold text-ink-muted">Add widget:</span>
+          <button
+            :for={w <- @available_widgets}
+            id={"add-widget-#{w.id}"}
+            type="button"
+            phx-click="add-widget"
+            phx-value-id={w.id}
+            class="rounded-md border border-line bg-surface-sunken px-2 py-1 text-xs font-medium text-ink transition hover:bg-surface hover:text-ink-strong"
+          >
+            + {w.label}
+          </button>
+        </div>
 
         <div
           :if={@widgets != []}
@@ -133,11 +298,19 @@ defmodule BilimbiWeb.DashboardLive do
             session_count={@session_count}
             audit_entries={@audit_entries}
             current_scope={@current_scope}
+            layout_editing={@layout_editing}
           />
         </div>
 
         <p :if={@widgets == []} class="mt-5 text-sm text-ink-subtle">
-          No widgets are visible for your capabilities.
+          No widgets configured.
+          <.link
+            phx-click="toggle-layout-edit"
+            class="font-medium text-ink underline underline-offset-2 hover:text-ink-strong"
+          >
+            Edit layout
+          </.link>
+          &nbsp;to add widgets.
         </p>
 
         <section
@@ -214,57 +387,89 @@ defmodule BilimbiWeb.DashboardLive do
     """
   end
 
-  # Each widget is rendered by its id against the known built-in catalogue.
-  # Domain and Extension widgets added through the contribution system are
-  # rendered as a placeholder card until their rendering adapters are delivered.
   defp render_widget(%{widget: widget} = assigns) do
     assigns = assign(assigns, :id, widget.id)
 
     ~H"""
-    <%= case @id do %>
-      <% "base-dashboard-company-stats" -> %>
-        <.company_stat_card
-          id="stat-companies"
-          count={@company_count}
-          navigate={
-            if UserAuth.allowed?(@current_scope, "admin.company.list"),
-              do: ~p"/companies"
-          }
-        />
-      <% "base-dashboard-user-stats" -> %>
-        <.user_stat_card
-          id="stat-users"
-          count={@user_count}
-          navigate={
-            if UserAuth.allowed?(@current_scope, "admin.user.list"),
-              do: ~p"/users"
-          }
-        />
-      <% "base-dashboard-session-stats" -> %>
-        <.session_stat_card
-          id="stat-sessions"
-          count={@session_count}
-          navigate={~p"/system/sessions"}
-        />
-      <% "base-dashboard-recent-audit" -> %>
-        <.audit_activity_card
-          id="stat-recent-audit"
-          entries={@audit_entries}
-          navigate={
-            if UserAuth.allowed?(@current_scope, "admin.audit.log.list"),
-              do: ~p"/audit/mutations"
-          }
-        />
-      <% other_id -> %>
-        <div
-          id={"dashboard-widget-#{other_id}"}
-          class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+    <div class="relative">
+      <div :if={@layout_editing} class="absolute right-1 top-1 z-10 flex gap-0.5">
+        <button
+          id={"move-up-#{@id}"}
+          type="button"
+          phx-click="move-up"
+          phx-value-id={@id}
+          title="Move up"
+          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
         >
-          <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-            {@widget.label}
-          </p>
-        </div>
-    <% end %>
+          <.icon name="hero-chevron-up" class="size-3" />
+        </button>
+        <button
+          id={"move-down-#{@id}"}
+          type="button"
+          phx-click="move-down"
+          phx-value-id={@id}
+          title="Move down"
+          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        >
+          <.icon name="hero-chevron-down" class="size-3" />
+        </button>
+        <button
+          id={"remove-#{@id}"}
+          type="button"
+          phx-click="remove-widget"
+          phx-value-id={@id}
+          title="Remove widget"
+          class="ml-1 grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        >
+          <.icon name="hero-x-mark" class="size-3" />
+        </button>
+      </div>
+
+      <%= case @id do %>
+        <% "base-dashboard-company-stats" -> %>
+          <.company_stat_card
+            id="stat-companies"
+            count={@company_count}
+            navigate={
+              if UserAuth.allowed?(@current_scope, "admin.company.list"),
+                do: ~p"/companies"
+            }
+          />
+        <% "base-dashboard-user-stats" -> %>
+          <.user_stat_card
+            id="stat-users"
+            count={@user_count}
+            navigate={
+              if UserAuth.allowed?(@current_scope, "admin.user.list"),
+                do: ~p"/users"
+            }
+          />
+        <% "base-dashboard-session-stats" -> %>
+          <.session_stat_card
+            id="stat-sessions"
+            count={@session_count}
+            navigate={~p"/system/sessions"}
+          />
+        <% "base-dashboard-recent-audit" -> %>
+          <.audit_activity_card
+            id="stat-recent-audit"
+            entries={@audit_entries}
+            navigate={
+              if UserAuth.allowed?(@current_scope, "admin.audit.log.list"),
+                do: ~p"/audit/mutations"
+            }
+          />
+        <% other_id -> %>
+          <div
+            id={"dashboard-widget-#{other_id}"}
+            class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+          >
+            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+              {@widget.label}
+            </p>
+          </div>
+      <% end %>
+    </div>
     """
   end
 

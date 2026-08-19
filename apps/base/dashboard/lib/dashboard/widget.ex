@@ -19,6 +19,19 @@ defmodule Bilimbi.Base.Dashboard.Widget do
 
   defstruct [:id, :label, size: :small, order: 0, capability: nil]
 
+  @doc "Display title for this widget."
+  @callback widget_title() :: String.t()
+
+  @doc "Grid size hint for this widget."
+  @callback widget_size() :: :small | :medium | :large
+
+  @doc """
+  Refresh interval in milliseconds. Return 0 to disable auto-refresh.
+  The dashboard LiveView will schedule a `handle_info(:refresh_widget, ...)`
+  message at this interval.
+  """
+  @callback widget_refresh_interval() :: non_neg_integer()
+
   @doc "The assign keys this widget needs from the dashboard LiveView."
   @callback widget_assigns() :: [atom()]
 
