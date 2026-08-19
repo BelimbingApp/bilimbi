@@ -61,7 +61,7 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
     assert has_element?(
              view,
              "#grants-pagination-summary",
-             "Page 1 of 1 · 1 direct capabilities"
+             "Page 1 of 1 · 1 direct capability"
            )
 
     refute has_element?(view, "#grants-prev")

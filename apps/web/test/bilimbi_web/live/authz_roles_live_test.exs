@@ -93,7 +93,7 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
 
       {:ok, view, _html} = open_index(conn)
 
-      assert has_element?(view, "#roles-pagination-summary", "Page 1 of 1 · 1 roles")
+      assert has_element?(view, "#roles-pagination-summary", "Page 1 of 1 · 1 role")
       refute has_element?(view, "#roles-prev")
       refute has_element?(view, "#roles-next")
     end
