@@ -89,6 +89,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         departments = Company.list_departments(scope, company_id) |> elem(1)
         relationships = Company.list_relationships(scope, company_id) |> elem(1)
         external_accesses = Company.list_external_accesses(scope, company_id) |> elem(1)
+        external_access_users = load_external_access_users(scope, external_accesses)
         users = list_company_users(scope, company_id)
         employees = list_company_employees(scope, company_id)
         attached_addresses = list_company_attached_addresses(scope, company_id)
@@ -109,6 +110,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:departments, departments)
          |> assign(:relationships, relationships)
          |> assign(:external_accesses, external_accesses)
+         |> assign(:external_access_users, external_access_users)
          |> assign(:users_count, length(users))
          |> assign(:employees_count, length(employees))
          |> assign(:attached_addresses, attached_addresses)
@@ -168,6 +170,38 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       end
     else
       []
+    end
+  end
+
+  defp load_external_access_users(scope, external_accesses) do
+    user_mod = Module.concat(["Bilimbi", "Core", "User"])
+
+    user_ids =
+      external_accesses
+      |> Enum.map(& &1.user_id)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    cond do
+      user_ids == [] ->
+        %{}
+
+      Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :get_tenant_users, 2) ->
+        case apply(user_mod, :get_tenant_users, [scope, user_ids]) do
+          {:ok, users_map} -> users_map
+          _ -> %{}
+        end
+
+      Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :get_tenant_user, 2) ->
+        Enum.reduce(user_ids, %{}, fn user_id, acc ->
+          case apply(user_mod, :get_tenant_user, [scope, user_id]) do
+            {:ok, user} -> Map.put(acc, user_id, user)
+            _ -> acc
+          end
+        end)
+
+      true ->
+        %{}
     end
   end
 
@@ -1609,8 +1643,14 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             row_item={fn access -> access end}
             caption="External Accesses"
           >
-            <:col :let={access} label="User ID">
-              <span class="font-mono text-xs text-ink">{access.user_id}</span>
+            <:col :let={access} label="User">
+              <%= if user = @external_access_users[access.user_id] do %>
+                <.link navigate={~p"/users/#{access.user_id}"} class="font-medium text-action hover:underline">
+                  {user.name}
+                </.link>
+              <% else %>
+                <span class="text-ink-subtle">—</span>
+              <% end %>
             </:col>
             <:col :let={access} label="Permissions">
               <div :if={is_list(access.permissions) and access.permissions != []} class="flex flex-wrap gap-1">
