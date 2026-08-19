@@ -818,8 +818,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">User Details</h3>
               </div>
 
-              <.list>
-                <:item title="Name">
+              <dl class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div id="user-detail-name">
+                  <dt class="text-xs text-ink-muted">Name</dt>
+                  <dd class="mt-0.5 text-sm text-ink">
                   <%= if @can_manage? do %>
                     <.inline_edit
                       id="user-name"
@@ -832,9 +834,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <% else %>
                     <span>{@user.name}</span>
                   <% end %>
-                </:item>
+                  </dd>
+                </div>
 
-                <:item title="Email">
+                <div id="user-detail-email">
+                  <dt class="text-xs text-ink-muted">Email</dt>
+                  <dd class="mt-0.5 text-sm text-ink">
                   <%= if @can_manage? do %>
                     <.inline_edit
                       id="user-email"
@@ -847,9 +852,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <% else %>
                     <span>{@user.email}</span>
                   <% end %>
-                </:item>
+                  </dd>
+                </div>
 
-                <:item title="Company">
+                <div id="user-detail-company">
+                  <dt class="text-xs text-ink-muted">Company</dt>
+                  <dd class="mt-0.5 text-sm text-ink">
                   <%= if @can_manage? do %>
                     <form phx-change="save_company" id="user-company-form" class="inline-block">
                       <select
@@ -876,24 +884,34 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       <span class="text-ink-faint">None</span>
                     <% end %>
                   <% end %>
-                </:item>
+                  </dd>
+                </div>
 
-                <:item title="Email Verified">
+                <div id="user-detail-email-verified">
+                  <dt class="text-xs text-ink-muted">Email Verified</dt>
+                  <dd class="mt-0.5 text-sm text-ink">
                   <.badge kind={if @user.email_verified_at, do: :success, else: :warning}>
                     {if @user.email_verified_at, do: "verified", else: "unverified"}
                   </.badge>
-                </:item>
+                  </dd>
+                </div>
 
-                <:item title="Created">
+                <div id="user-detail-created">
+                  <dt class="text-xs text-ink-muted">Created</dt>
+                  <dd class="mt-0.5 text-sm text-ink">
                   <.datetime id="user-created-at" :if={@user.created_at} value={@user.created_at} />
                   <span :if={is_nil(@user.created_at)} class="text-ink-faint">—</span>
-                </:item>
+                  </dd>
+                </div>
 
-                <:item title="Updated">
+                <div id="user-detail-updated">
+                  <dt class="text-xs text-ink-muted">Updated</dt>
+                  <dd class="mt-0.5 text-sm text-ink">
                   <.datetime id="user-updated-at" :if={@user.updated_at} value={@user.updated_at} />
                   <span :if={is_nil(@user.updated_at)} class="text-ink-faint">—</span>
-                </:item>
-              </.list>
+                  </dd>
+                </div>
+              </dl>
             </div>
           </.card>
 
@@ -916,6 +934,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   </.button>
                 </div>
               </div>
+
+              <p class="-mt-2 text-xs text-ink-muted">
+                Roles determine what this user can do. Each role grants a set of capabilities.
+                Effective permissions show the combined result of all assigned roles.
+              </p>
 
               <%= if is_nil(@user.company_id) do %>
                 <.alert kind={:info} id="roles-unaffiliated-alert">
@@ -1185,7 +1208,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     <span id="employees-count"><.badge kind={:neutral}>{length(@employees)}</.badge></span>
                   </div>
                   <p class="mt-0.5 text-xs text-ink-muted">
-                    Employment records linking this user to companies. A user can have multiple records across different companies.
+                    Employment records linking this user to companies. A user can have multiple records across different companies (e.g. contractors). Not all employees require a user account.
                   </p>
                 </div>
                 <div :if={@can_manage? and not is_nil(@user.company_id)}>
