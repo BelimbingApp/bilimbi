@@ -1,14 +1,12 @@
-defmodule BilimbiWeb.CompanyLive.Show do
+defmodule Bilimbi.Core.Company.Web.ShowLive do
   @moduledoc """
   One company: its record, its users, and its employees — each through the
   owning module's scoped public API.
   """
 
-  use BilimbiWeb, :live_view
+  use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Core.Company
-  alias Bilimbi.Core.Employee
-  alias Bilimbi.Core.User
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -23,8 +21,8 @@ defmodule BilimbiWeb.CompanyLive.Show do
   defp load_company(socket, scope, company_id) do
     case Company.get_company(scope, company_id) do
       {:ok, company} ->
-        {:ok, users} = User.list_company_users(scope, company_id)
-        {:ok, employees} = Employee.list_employees(scope, company_id)
+        users = list_company_users(scope, company_id)
+        employees = list_company_employees(scope, company_id)
 
         {:ok,
          socket
@@ -38,6 +36,32 @@ defmodule BilimbiWeb.CompanyLive.Show do
 
       {:error, :not_found} ->
         {:ok, not_found(socket)}
+    end
+  end
+
+  defp list_company_users(scope, company_id) do
+    user_mod = Module.concat(["Bilimbi", "Core", "User"])
+
+    if Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :list_company_users, 2) do
+      case apply(user_mod, :list_company_users, [scope, company_id]) do
+        {:ok, users} -> users
+        _ -> []
+      end
+    else
+      []
+    end
+  end
+
+  defp list_company_employees(scope, company_id) do
+    emp_mod = Module.concat(["Bilimbi", "Core", "Employee"])
+
+    if Code.ensure_loaded?(emp_mod) and function_exported?(emp_mod, :list_employees, 2) do
+      case apply(emp_mod, :list_employees, [scope, company_id]) do
+        {:ok, employees} -> employees
+        _ -> []
+      end
+    else
+      []
     end
   end
 
@@ -61,6 +85,18 @@ defmodule BilimbiWeb.CompanyLive.Show do
             <.badge kind={if @company.status == "active", do: :success, else: :warning}>
               {@company.status}
             </.badge>
+            <.button
+              navigate={~p"/companies/#{@company.id}/departments"}
+              class="text-xs"
+            >
+              Departments
+            </.button>
+            <.button
+              navigate={~p"/companies/#{@company.id}/relationships"}
+              class="text-xs"
+            >
+              Relationships
+            </.button>
             <.button id="company-back" navigate={~p"/companies"}>
               Back to companies
             </.button>

@@ -16,6 +16,9 @@ config :web, BilimbiWeb.Endpoint,
   pubsub_server: BilimbiWeb.PubSub,
   live_view: [signing_salt: "fXGTpqyR"]
 
+config :bilimbi_core_user,
+  pubsub_server: BilimbiWeb.PubSub
+
 config :phoenix_live_view,
   root_tag_attribute: "phx-r"
 

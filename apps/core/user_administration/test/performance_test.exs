@@ -75,9 +75,9 @@ defmodule Bilimbi.Core.UserAdministration.PerformanceTest do
       {:created_asc, [sort_by: :created_at, sort_dir: :asc]},
       {:created_desc, [sort_by: :created_at, sort_dir: :desc]},
       {:role_filter, [role_ids: [role_id]]},
-      {:combined, [search: "User %", role_ids: [role_id], page_size: 10]},
-      {:deep_page, [page: 4, page_size: 10]},
-      {:out_of_range, [page: 9, page_size: 10]}
+      {:combined, [search: "User %", role_ids: [role_id], page_size: 25]},
+      {:deep_page, [page: 4, page_size: 25]},
+      {:out_of_range, [page: 9, page_size: 25]}
     ]
 
     results = Enum.map(scenarios, fn {name, options} -> explain_scenario(name, options) end)

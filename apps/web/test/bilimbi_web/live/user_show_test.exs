@@ -173,6 +173,26 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(view, "#flash-group", "cannot delete your own account")
   end
 
+  test "shows impersonate action when actor has admin.user.impersonate", %{conn: conn} do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Admin"})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Target",
+      email: "target@example.com"
+    })
+
+    grant_capabilities!(["admin.user.view", "admin.user.impersonate"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+    assert has_element?(view, "#user-impersonate[href='/admin/impersonate/92']", "Impersonate")
+
+    # When viewing own profile, impersonate button is hidden
+    {:ok, own_view, _html} = conn |> log_in_as() |> live(~p"/users/91")
+    refute has_element?(own_view, "#user-impersonate")
+  end
+
   defp assert_redirected_with_flash(view, to) do
     assert {path, _flash} = assert_redirect(view)
     assert path == to

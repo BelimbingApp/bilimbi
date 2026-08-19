@@ -77,6 +77,20 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             <.button id="user-back" navigate={~p"/users"}>
               Back to users
             </.button>
+            <.link
+              :if={
+                allowed?(@current_scope, "admin.user.impersonate") and
+                  @user.id != @current_scope.user["user_id"] and
+                  is_nil(@current_scope.impersonator)
+              }
+              id="user-impersonate"
+              href={~p"/admin/impersonate/#{@user.id}"}
+              method="post"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-xs transition hover:bg-surface-sunken"
+            >
+              <.icon name="bilimbi-impersonate" class="size-4" />
+              <span>Impersonate</span>
+            </.link>
             <.button
               :if={allowed?(@current_scope, "admin.user.update")}
               id="user-edit"

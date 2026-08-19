@@ -131,7 +131,7 @@ defmodule Bilimbi.Core.UserAdministrationTest do
   end
 
   test "filters with OR role semantics before count and pagination and deduplicates summaries" do
-    Enum.each(1..12, fn id ->
+    Enum.each(1..27, fn id ->
       user!(
         id,
         10,
@@ -144,24 +144,24 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     assert {:ok, first} = custom_role!(10, "First", "first")
     assert {:ok, second} = custom_role!(10, "Second", "second")
 
-    Enum.each(1..6, fn id ->
+    Enum.each(1..15, fn id ->
       assert {:ok, :assigned} = Authz.assign_role(scope(), 10, :user, id, first.id)
     end)
 
-    Enum.each(6..12, fn id ->
+    Enum.each(15..27, fn id ->
       assert {:ok, :assigned} = Authz.assign_role(scope(), 10, :user, id, second.id)
     end)
 
-    assert %Page{entries: entries, total_entries: 12, total_pages: 2} =
+    assert %Page{entries: entries, total_entries: 27, total_pages: 2} =
              UserAdministration.list_users(scope(),
                role_ids: [first.id, second.id],
-               page_size: 10
+               page_size: 25
              )
 
-    assert length(entries) == 10
+    assert length(entries) == 25
 
     assert %Entry{roles: [%Role{id: first_id}, %Role{id: second_id}]} =
-             Enum.find(entries, &(&1.id == 6))
+             Enum.find(entries, &(&1.id == 15))
 
     assert [first_id, second_id] == [first.id, second.id]
 
@@ -235,12 +235,12 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     assert %Page{entries: [], page: 1, total_entries: 0, total_pages: 0} =
              UserAdministration.list_users(scope())
 
-    Enum.each(1..11, fn id ->
+    Enum.each(1..26, fn id ->
       user!(id, 10, "User #{id}", "u#{id}@example.com", nil)
     end)
 
-    assert %Page{entries: [], page: 3, page_size: 10, total_entries: 11, total_pages: 2} =
-             UserAdministration.list_users(scope(), page: 3, page_size: 10)
+    assert %Page{entries: [], page: 3, page_size: 25, total_entries: 26, total_pages: 2} =
+             UserAdministration.list_users(scope(), page: 3, page_size: 25)
   end
 
   test "a later page call truthfully observes a public Core User hard delete" do
@@ -256,7 +256,7 @@ defmodule Bilimbi.Core.UserAdministrationTest do
   test "rejects every malformed or unnormalized option without dynamic atoms" do
     max_page = Options.max_page()
     assert max_page == 1_000_000
-    assert (max_page - 1) * 100 < 9_223_372_036_854_775_807
+    assert (max_page - 1) * 300 < 9_223_372_036_854_775_807
 
     malformed = [
       %{},
@@ -275,6 +275,7 @@ defmodule Bilimbi.Core.UserAdministrationTest do
       [page: 0],
       [page: max_page + 1],
       [page_size: 1],
+      [page_size: 10],
       [page_size: 30],
       [page_size: 9_999]
     ]
@@ -284,6 +285,7 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     end)
 
     assert %Page{page: 1, page_size: 25} = UserAdministration.list_users(scope())
+    assert %Page{page: 1, page_size: 300} = UserAdministration.list_users(scope(), page_size: 300)
     user!(1, 10, "Ada", "ada@example.com", nil)
 
     assert %Page{
@@ -329,7 +331,7 @@ defmodule Bilimbi.Core.UserAdministrationTest do
     assert query =~ "$1"
 
     assert %Page{entries: [], total_entries: 1, total_pages: 1} =
-             UserAdministration.list_users(scope(), page: 2, page_size: 10)
+             UserAdministration.list_users(scope(), page: 2, page_size: 25)
 
     assert_receive {:repo_query, _, %{query: out_of_range_query}}, 1_000
     refute_receive {:repo_query, _, _}, 50

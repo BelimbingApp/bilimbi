@@ -29,6 +29,17 @@ defmodule Bilimbi.Base.Database.Contributions do
   @impl true
   def contributions do
     %{
+      menu: [
+        %{
+          id: "admin.system.database-query",
+          label: "Database Queries",
+          icon: "circle-stack",
+          parent: "admin.system.database",
+          route: "/admin/system/database-queries",
+          capability: "admin.system.database-table.list",
+          order: 30
+        }
+      ],
       authz: %{
         capabilities: @capabilities,
         roles: %{

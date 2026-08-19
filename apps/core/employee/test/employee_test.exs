@@ -218,7 +218,7 @@ defmodule Bilimbi.Core.EmployeeTest do
           [page: 0],
           [page: "1"],
           [page_size: 0],
-          [page_size: 101],
+          [page_size: 301],
           [search: :not_a_string],
           [type_filter: "agent"],
           [sort_by: "full_name"],
@@ -231,6 +231,8 @@ defmodule Bilimbi.Core.EmployeeTest do
 
     assert {:error, :company_not_found} = Employee.list_administration_page(owner, 0)
     assert {:error, :company_not_found} = Employee.list_administration_page(owner, 999)
+    assert {:ok, page_300} = Employee.list_administration_page(owner, 73, page_size: 300)
+    assert page_300.page_size == 300
   end
 
   test "administration pages prove a live company before querying its employees", %{

@@ -93,6 +93,7 @@ defmodule Bilimbi.Base.UI.Layouts do
   # `:string`, the honest answer was a compile warning, which would have
   # pushed the next author into inventing a menu id to satisfy the compiler.
   attr(:active_nav, :any, required: true)
+  slot(:topbar_actions)
   slot(:inner_block, required: true)
 
   def app(assigns) do
@@ -139,24 +140,28 @@ defmodule Bilimbi.Base.UI.Layouts do
             <span class="text-sm font-semibold tracking-tight text-ink-strong">Bilimbi</span>
           </.link>
 
-          <p
-            id="app-tenant"
-            class="flex min-w-0 max-w-[50%] items-center gap-1.5 text-xs text-ink-subtle"
-            title={"Every screen in this shell acts on tenant #{@current_scope.scope.tenant.name}"}
-          >
-            <.icon name="hero-identification" class="size-3.5 shrink-0" />
-            <span class="hidden sm:inline">Tenant</span>
-            <span class="truncate font-medium text-ink-muted">
-              {@current_scope.scope.tenant.name}
-            </span>
-            <span class="tabular-nums">#{@current_scope.scope.tenant.id}</span>
-            <span
-              :if={@current_scope.scope.tenant.is_platform_operator}
-              class="hidden text-ink-faint sm:inline"
+          <div class="flex items-center gap-3">
+            {render_slot(@topbar_actions)}
+
+            <p
+              id="app-tenant"
+              class="flex min-w-0 max-w-[50%] items-center gap-1.5 text-xs text-ink-subtle"
+              title={"Every screen in this shell acts on tenant #{@current_scope.scope.tenant.name}"}
             >
-              · platform operator
-            </span>
-          </p>
+              <.icon name="hero-identification" class="size-3.5 shrink-0" />
+              <span class="hidden sm:inline">Tenant</span>
+              <span class="truncate font-medium text-ink-muted">
+                {@current_scope.scope.tenant.name}
+              </span>
+              <span class="tabular-nums">#{@current_scope.scope.tenant.id}</span>
+              <span
+                :if={@current_scope.scope.tenant.is_platform_operator}
+                class="hidden text-ink-faint sm:inline"
+              >
+                · platform operator
+              </span>
+            </p>
+          </div>
         </div>
       </header>
 
@@ -262,6 +267,18 @@ defmodule Bilimbi.Base.UI.Layouts do
           >
             dev <span :if={@shell.listen_address} id="app-listen">{@shell.listen_address}</span>
           </span>
+
+          <.link
+            :if={@current_scope && Map.get(@current_scope, :impersonator)}
+            href={~p"/admin/impersonate/leave"}
+            method="post"
+            id="app-impersonation-stop"
+            class="inline-flex items-center gap-1 font-medium text-danger hover:underline"
+          >
+            <.icon name="hero-eye" class="size-3.5" />
+            <span>{gettext("Viewing as %{name}", name: @current_scope.user["name"])}</span>
+            <span class="font-semibold ml-1">{gettext("Stop")}</span>
+          </.link>
         </div>
         <span id="app-version" class="shrink-0 tabular-nums" title={"Bilimbi #{@shell.version}"}>
           v{@shell.version}
