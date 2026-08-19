@@ -437,7 +437,11 @@ defmodule Bilimbi.Core.CompanyTest do
              Company.create_company(scope, %{name: "Valid Country Co", jurisdiction: "MY"})
 
     assert Repo.get(Bilimbi.Core.Company.Schema, id).jurisdiction == "MY"
+  end
+
   test "updates a company within the scoped tenant" do
+    create_geonames_tables!()
+    insert_country!(%{iso: "MY", country: "Malaysia"})
     insert_tenant!()
     insert_company!(%{id: 73, name: "Initial Name", code: "initial_code"})
     insert_tenant!(%{id: 42, name: "Other tenant", is_platform_operator: false})
