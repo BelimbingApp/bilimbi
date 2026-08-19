@@ -15,7 +15,8 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
   @consumer_validators %{
     settings: Bilimbi.Base.Settings.ContributionValidator,
     authz: Bilimbi.Base.Authz.ContributionValidator,
-    menu: Bilimbi.Base.Menu.ContributionValidator
+    menu: Bilimbi.Base.Menu.ContributionValidator,
+    dashboard: Bilimbi.Base.Dashboard.ContributionValidator
   }
   @consumer_keys @consumer_validators |> Map.keys() |> Enum.sort()
 
