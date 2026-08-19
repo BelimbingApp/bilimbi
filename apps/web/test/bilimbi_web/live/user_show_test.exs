@@ -431,6 +431,19 @@ defmodule BilimbiWeb.UserShowTest do
     |> render_submit(%{"capability_keys" => ["admin.system.database-table.edit"]})
 
     assert has_element?(view, "#flash-group", "You cannot grant capabilities you do not hold.")
+
+    # Asserted at the database, not just on the flash. The refusal message is
+    # cosmetic: a handler that writes and *then* flashes the error passes every
+    # assertion above. The sibling role test already checks the store this way.
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    granted =
+      Bilimbi.Base.Authz.list_principal_capabilities(scope,
+        principal_type: :user,
+        principal_id: 92
+      )
+
+    refute Enum.any?(granted.entries, &(&1.capability == "admin.system.database-table.edit"))
   end
 
   test "changes user password as administrator with confirmation validation", %{conn: conn} do
