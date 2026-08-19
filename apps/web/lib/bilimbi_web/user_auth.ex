@@ -310,7 +310,7 @@ defmodule BilimbiWeb.UserAuth do
 
   @doc """
   Loads `conn.assigns.current_scope` from live identity. The assign is a map
-  `%{user: map, scope: Scope.t(), actor: Authz.Actor.t(), capabilities: [String.t()], impersonator: map | nil}`
+  `%{user: map, scope: Scope.t(), actor: Authz.Actor.t(), capabilities: [String.t()], impersonator: map | nil, operator_company_missing: boolean()}`
   or `nil`. Templates read `@current_scope.user["name"]`; module calls use
   `@current_scope.scope`.
 
@@ -509,7 +509,8 @@ defmodule BilimbiWeb.UserAuth do
         scope: scope,
         actor: actor,
         capabilities: allowed,
-        impersonator: extract_impersonator(impersonation)
+        impersonator: extract_impersonator(impersonation),
+        operator_company_missing: operator_company_missing?(scope)
       }
     else
       _ -> nil
@@ -517,6 +518,14 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   defp current_scope_from(_session_user, _impersonation), do: nil
+
+  # Belimbing's status bar warns only on the operator tenant when that tenant
+  # has no primary company. Failures other than "not provisioned" stay quiet:
+  # a missing fixture table must not paint a setup warning.
+  defp operator_company_missing?(%Scope{} = scope) do
+    Scope.platform_operator?(scope) and
+      Company.platform_operator_company() == {:error, :not_provisioned}
+  end
 
   defp extract_impersonator(%{
          "original_user_id" => id,
