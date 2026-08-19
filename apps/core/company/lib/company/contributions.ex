@@ -32,14 +32,16 @@ defmodule Bilimbi.Core.Company.Contributions do
           id: "admin.company.department-type",
           label: "Department Types",
           parent: "admin.company",
-          route: "/company/department-types",
+          route: "/companies/department-types",
+          capability: "admin.company.list",
           order: 10
         },
         %{
           id: "admin.company.legal-entity-type",
           label: "Legal Entity Types",
           parent: "admin.company",
-          route: "/company/legal-entity-types",
+          route: "/companies/legal-entity-types",
+          capability: "admin.company.list",
           order: 20
         }
       ],
