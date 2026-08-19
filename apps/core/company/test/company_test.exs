@@ -359,12 +359,66 @@ defmodule Bilimbi.Core.CompanyTest do
 
   test "rolls back operator creation when company validation fails" do
     assert {:error, changeset} =
-             Company.provision_platform_operator("Operator tenant", %{name: "Missing code"})
+             Company.provision_platform_operator("Operator tenant", %{name: ""})
 
-    assert {:code, {_message, [validation: :required]}} =
-             List.keyfind(changeset.errors, :code, 0)
+    assert {:name, {_message, [validation: :required]}} =
+             List.keyfind(changeset.errors, :name, 0)
 
     assert Tenancy.platform_operator() == nil
+  end
+
+  test "create_company slugs a blank code from the name" do
+    insert_tenant!()
+    {:ok, scope} = Tenancy.scope(41)
+
+    assert {:ok, %Summary{name: "Acme Trading", code: "acme_trading"}} =
+             Company.create_company(scope, %{name: "Acme Trading"})
+  end
+
+  test "create_company keeps an explicit code" do
+    insert_tenant!()
+    {:ok, scope} = Tenancy.scope(41)
+
+    assert {:ok, %Summary{code: "ACME"}} =
+             Company.create_company(scope, %{name: "Acme Trading", code: "ACME"})
+  end
+
+  test "slugging a blank code follows BlbStr::code, not a naive replace" do
+    insert_tenant!()
+    {:ok, scope} = Tenancy.scope(41)
+
+    # Each of these is a case where "replace every unwanted run with _" and
+    # Laravel's `Str::slug($name, "_")` disagree.
+    cases = [
+      # punctuation is removed, not turned into a separator
+      {"A&B Trading", "ab_trading"},
+      # dashes flip to the separator
+      {"Alpha-Beta", "alpha_beta"},
+      # "@" expands to a separated word
+      {"me@you", "me_at_you"},
+      # accents transliterate rather than vanishing into a separator
+      {"Café Ltd", "cafe_ltd"},
+      # runs of whitespace collapse, and edges are trimmed
+      {"  Spaced   Out  ", "spaced_out"}
+    ]
+
+    for {name, expected} <- cases do
+      assert {:ok, %Summary{code: ^expected}} = Company.create_company(scope, %{name: name})
+    end
+  end
+
+  test "create_company rejects an email that is not an address" do
+    insert_tenant!()
+    {:ok, scope} = Tenancy.scope(41)
+
+    assert {:error, changeset} =
+             Company.create_company(scope, %{name: "Bad Email Co", email: "not-an-address"})
+
+    assert {:email, {_message, [validation: :format]}} =
+             List.keyfind(changeset.errors, :email, 0)
+
+    assert {:ok, %Summary{}} =
+             Company.create_company(scope, %{name: "Good Email Co", email: "ops@example.test"})
   end
 
   defp opaque(value), do: :erlang.element(1, {value})

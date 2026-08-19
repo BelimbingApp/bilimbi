@@ -30,6 +30,12 @@
     capability: "admin.company.list"
   },
   %{
+    path: "/companies/create",
+    live: Bilimbi.Core.Company.Web.CreateLive,
+    session: :auth,
+    capability: "admin.company.create"
+  },
+  %{
     path: "/companies/:id",
     live: Bilimbi.Core.Company.Web.ShowLive,
     session: :auth,

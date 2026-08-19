@@ -29,22 +29,22 @@ defmodule Bilimbi.Core.Company.Schema do
         }
 
   schema "companies" do
-    field :parent_id, :id
-    field :tenant_id, :id
-    field :name, :string
-    field :code, :string
-    field :status, :string
-    field :legal_name, :string
-    field :registration_number, :string
-    field :tax_id, :string
-    field :legal_entity_type_id, :id
-    field :jurisdiction, :string
-    field :email, :string
-    field :website, :string
-    field :scope_activities, Bilimbi.Base.Database.Json
-    field :metadata, Bilimbi.Base.Database.Json
+    field(:parent_id, :id)
+    field(:tenant_id, :id)
+    field(:name, :string)
+    field(:code, :string)
+    field(:status, :string)
+    field(:legal_name, :string)
+    field(:registration_number, :string)
+    field(:tax_id, :string)
+    field(:legal_entity_type_id, :id)
+    field(:jurisdiction, :string)
+    field(:email, :string)
+    field(:website, :string)
+    field(:scope_activities, Bilimbi.Base.Database.Json)
+    field(:metadata, Bilimbi.Base.Database.Json)
     timestamps(type: :naive_datetime, inserted_at: :created_at)
-    field :deleted_at, :naive_datetime
+    field(:deleted_at, :naive_datetime)
   end
 
   @creation_fields [
@@ -63,19 +63,75 @@ defmodule Bilimbi.Core.Company.Schema do
     :metadata
   ]
 
+  @statuses ~w(active suspended pending archived)
+
   @spec creation_changeset(pos_integer(), map()) :: Ecto.Changeset.t()
   def creation_changeset(tenant_id, attributes) do
     %__MODULE__{status: "active"}
     |> cast(attributes, @creation_fields)
     |> put_change(:tenant_id, tenant_id)
-    |> update_change(:name, &String.trim/1)
-    |> update_change(:code, &String.trim/1)
+    |> update_change(:name, &trim_text/1)
+    |> maybe_put_code_from_name()
+    |> update_change(:code, &trim_text/1)
     |> validate_required([:tenant_id, :name, :code, :status])
     |> validate_length(:name, min: 1, max: 255)
     |> validate_length(:code, min: 1, max: 255)
-    |> validate_length(:status, min: 1, max: 255)
+    |> validate_inclusion(:status, @statuses)
+    |> validate_format(:email, ~r/^[^\s@]+@[^\s@]+$/, message: "must be an email address")
     |> unique_constraint(:code, name: :companies_code_unique)
     |> foreign_key_constraint(:tenant_id, name: :companies_tenant_foreign)
     |> foreign_key_constraint(:parent_id, name: :companies_parent_tenant_foreign)
   end
+
+  # Belimbing `Company::creating` slugs a blank code from the name
+  # (`BlbStr::code`). Keep that durable behaviour here, not in the LiveView.
+  defp maybe_put_code_from_name(changeset) do
+    case blank_text?(get_field(changeset, :code)) do
+      true ->
+        case slug_code(get_field(changeset, :name)) do
+          "" -> changeset
+          generated -> put_change(changeset, :code, generated)
+        end
+
+      false ->
+        changeset
+    end
+  end
+
+  # Mirrors `BlbStr::code/2`, which is `mb_strtolower(Str::slug($value, "_"))`.
+  # Laravel's slug has four steps that a plain "replace anything unwanted with
+  # the separator" does not reproduce, and each one changes a real name:
+  #
+  #   * dashes flip to the separator first        -- "A-B"        -> "a_b"
+  #   * "@" expands to the separated word "at"    -- "me@you"     -> "me_at_you"
+  #   * remaining punctuation is REMOVED, not     -- "A&B Trading"-> "ab_trading"
+  #     turned into a separator                                     (not "a_b_trading")
+  #   * the string is transliterated to ASCII     -- "Cafe\u0301 Ltd" -> "cafe_ltd"
+  #                                                                 (not "caf_ltd")
+  #
+  # Transliteration here is NFD plus combining-mark removal, which covers Latin
+  # accents; anything still non-ASCII is dropped by the character filter, as
+  # `Str::ascii/1` does. A name with no ASCII letters slugs to "", and the
+  # caller leaves the code unset so `validate_required/2` reports it.
+  defp slug_code(name) when is_binary(name) do
+    name
+    |> :unicode.characters_to_nfd_binary()
+    |> String.replace(~r/[\x{0300}-\x{036F}]/u, "")
+    |> String.replace("-", "_")
+    |> String.replace("@", "_at_")
+    |> String.downcase()
+    |> String.replace(~r/[^a-z0-9_\s]+/u, "")
+    |> String.replace(~r/[_\s]+/u, "_")
+    |> String.trim("_")
+    |> String.slice(0, 255)
+  end
+
+  defp slug_code(_name), do: ""
+
+  defp trim_text(value) when is_binary(value), do: String.trim(value)
+  defp trim_text(value), do: value
+
+  defp blank_text?(value) when is_binary(value), do: String.trim(value) == ""
+  defp blank_text?(nil), do: true
+  defp blank_text?(_value), do: false
 end
