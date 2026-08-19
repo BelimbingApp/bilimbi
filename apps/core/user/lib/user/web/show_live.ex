@@ -76,9 +76,19 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     assigned_role_ids = Enum.map(assigned_roles, & &1.role_id)
     has_grant_all? = Enum.any?(assigned_roles, & &1.role_grant_all)
 
-    # Available roles for assignment
+    # Acting administrator permissions for privilege escalation prevention (#352)
+    acting_grant_all? = acting_grant_all?(current_scope)
+    acting_allowed_caps = acting_allowed_capabilities(current_scope)
+    acting_allowed_set = MapSet.new(acting_allowed_caps)
+
+    # Available roles for assignment (restricted to roles grantable by the acting administrator)
     all_roles = Authz.list_roles(scope)
-    available_roles = Enum.reject(all_roles, &(&1.id in assigned_role_ids))
+    unassigned_roles = Enum.reject(all_roles, &(&1.id in assigned_role_ids))
+
+    available_roles =
+      Enum.filter(unassigned_roles, fn role ->
+        role_grantable?(scope, role.id, acting_grant_all?, acting_allowed_set)
+      end)
 
     # Direct principal capabilities
     direct_caps_page =
@@ -113,10 +123,22 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     denied_keys = Map.keys(direct_deny_ids) |> Enum.sort()
     grouped_denied_permissions = group_by_domain(denied_keys)
 
-    # Available capabilities (all registry capabilities minus effective minus denied)
+    # Available capabilities (all registry capabilities minus effective minus denied,
+    # restricted to capabilities held by the acting administrator)
     excluded_keys = MapSet.new(effective_keys ++ denied_keys)
     all_registered_caps = Authz.capabilities() |> Enum.sort()
-    available_caps = Enum.reject(all_registered_caps, &MapSet.member?(excluded_keys, &1))
+
+    available_caps =
+      all_registered_caps
+      |> Enum.reject(&MapSet.member?(excluded_keys, &1))
+      |> then(fn caps ->
+        if acting_grant_all? do
+          caps
+        else
+          Enum.filter(caps, &MapSet.member?(acting_allowed_set, &1))
+        end
+      end)
+
     grouped_available_capabilities = group_by_domain(available_caps)
 
     # Employees
@@ -350,6 +372,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     if socket.assigns.can_manage? do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
+      current_scope = socket.assigns.current_scope
 
       role_ids =
         case Map.get(params, "role_ids") do
@@ -357,23 +380,46 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           _ -> socket.assigns.selected_role_ids
         end
 
-      if user.company_id && role_ids != [] do
+      parsed_role_ids =
         for role_id_str <- role_ids,
-            {role_id, ""} <- [Integer.parse(role_id_str)] do
-          Authz.assign_role(scope, user.company_id, :user, user.id, role_id)
+            {role_id, ""} <- [Integer.parse(to_string(role_id_str))] do
+          role_id
         end
 
-        count = length(role_ids)
-        msg = if count == 1, do: "Assigned 1 role.", else: "Assigned #{count} roles."
+      acting_grant_all? = acting_grant_all?(current_scope)
+      acting_allowed_caps = acting_allowed_capabilities(current_scope)
+      acting_allowed_set = MapSet.new(acting_allowed_caps)
 
-        {:noreply,
-         socket
-         |> put_flash(:info, msg)
-         |> assign(:selected_role_ids, [])
-         |> assign(:show_assign_roles, false)
-         |> load_data(user)}
-      else
-        {:noreply, socket}
+      unauthorized_roles =
+        Enum.reject(
+          parsed_role_ids,
+          &role_grantable?(scope, &1, acting_grant_all?, acting_allowed_set)
+        )
+
+      cond do
+        user.company_id == nil ->
+          {:noreply, socket}
+
+        unauthorized_roles != [] ->
+          {:noreply, put_flash(socket, :error, "You cannot grant roles you do not hold.")}
+
+        parsed_role_ids != [] ->
+          for role_id <- parsed_role_ids do
+            Authz.assign_role(scope, user.company_id, :user, user.id, role_id)
+          end
+
+          count = length(parsed_role_ids)
+          msg = if count == 1, do: "Assigned 1 role.", else: "Assigned #{count} roles."
+
+          {:noreply,
+           socket
+           |> put_flash(:info, msg)
+           |> assign(:selected_role_ids, [])
+           |> assign(:show_assign_roles, false)
+           |> load_data(user)}
+
+        true ->
+          {:noreply, socket}
       end
     else
       {:noreply, put_flash(socket, :error, "You do not have permission to manage roles.")}
@@ -429,6 +475,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     if socket.assigns.can_manage? do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
+      current_scope = socket.assigns.current_scope
 
       cap_keys =
         case Map.get(params, "capability_keys") do
@@ -436,21 +483,40 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           _ -> socket.assigns.selected_capability_keys
         end
 
-      if user.company_id && cap_keys != [] do
-        for cap_key <- cap_keys do
-          Authz.put_principal_capability(scope, user.company_id, :user, user.id, cap_key, true)
+      acting_grant_all? = acting_grant_all?(current_scope)
+      acting_allowed_caps = acting_allowed_capabilities(current_scope)
+      acting_allowed_set = MapSet.new(acting_allowed_caps)
+
+      unauthorized_caps =
+        if acting_grant_all? do
+          []
+        else
+          Enum.reject(cap_keys, &MapSet.member?(acting_allowed_set, &1))
         end
 
-        count = length(cap_keys)
-        msg = if count == 1, do: "Granted 1 capability.", else: "Granted #{count} capabilities."
+      cond do
+        user.company_id == nil ->
+          {:noreply, socket}
 
-        {:noreply,
-         socket
-         |> put_flash(:info, msg)
-         |> assign(:selected_capability_keys, [])
-         |> load_data(user)}
-      else
-        {:noreply, socket}
+        unauthorized_caps != [] ->
+          {:noreply, put_flash(socket, :error, "You cannot grant capabilities you do not hold.")}
+
+        cap_keys != [] ->
+          for cap_key <- cap_keys do
+            Authz.put_principal_capability(scope, user.company_id, :user, user.id, cap_key, true)
+          end
+
+          count = length(cap_keys)
+          msg = if count == 1, do: "Granted 1 capability.", else: "Granted #{count} capabilities."
+
+          {:noreply,
+           socket
+           |> put_flash(:info, msg)
+           |> assign(:selected_capability_keys, [])
+           |> load_data(user)}
+
+        true ->
+          {:noreply, socket}
       end
     else
       {:noreply, put_flash(socket, :error, "You do not have permission to manage capabilities.")}
@@ -1743,5 +1809,42 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     socket
     |> put_flash(:error, "That user does not exist in this workspace.")
     |> push_navigate(to: ~p"/users")
+  end
+
+  defp acting_grant_all?(current_scope) do
+    case current_scope do
+      %{actor: %Authz.Actor{type: type, id: id}, scope: scope} ->
+        assignments = Authz.list_principal_role_assignments(scope, type, id, page_size: 100)
+        Enum.any?(assignments.entries, & &1.role_grant_all)
+
+      _ ->
+        false
+    end
+  end
+
+  defp acting_allowed_capabilities(current_scope) do
+    case current_scope do
+      %{actor: %Authz.Actor{} = actor} ->
+        Authz.effective_capabilities(actor).allowed
+
+      %{capabilities: caps} when is_list(caps) ->
+        caps
+
+      _ ->
+        []
+    end
+  end
+
+  defp role_grantable?(scope, role_id, acting_grant_all?, %MapSet{} = acting_allowed_set) do
+    case Authz.get_role(scope, role_id) do
+      {:ok, %{role: %{grant_all: true}}} ->
+        acting_grant_all?
+
+      {:ok, %{capabilities: caps}} ->
+        acting_grant_all? or Enum.all?(caps, &MapSet.member?(acting_allowed_set, &1))
+
+      _ ->
+        false
+    end
   end
 end
