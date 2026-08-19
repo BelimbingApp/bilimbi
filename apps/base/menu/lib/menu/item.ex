@@ -5,10 +5,11 @@ defmodule Bilimbi.Base.Menu.Item do
   Mirrors Belimbing's `Config/menu.php` item shape — `id`, `label`, `icon`,
   `route`, `permission`, `parent` — so the tree is portable between the two
   products. `capability` is the Bilimbi name for Belimbing's `permission`.
+  `source` records the contributing module descriptor id (e.g. `core/user`).
   """
 
   @enforce_keys [:id, :label]
-  defstruct [:id, :label, :icon, :route, :capability, :parent, order: 0]
+  defstruct [:id, :label, :icon, :route, :capability, :parent, :source, order: 0]
 
   @type t :: %__MODULE__{
           id: String.t(),
@@ -17,6 +18,7 @@ defmodule Bilimbi.Base.Menu.Item do
           route: String.t() | nil,
           capability: String.t() | nil,
           parent: String.t() | nil,
+          source: String.t() | nil,
           order: integer()
         }
 
@@ -26,11 +28,17 @@ defmodule Bilimbi.Base.Menu.Item do
   Builds an item from a plain map, raising on an invalid shape.
 
   Contributions cross a module boundary as plain terms, so the shape is
-  validated here rather than trusted.
+  validated here rather than trusted. An optional `source` (module descriptor id)
+  may be provided to record the contributing module.
   """
-  @spec new!(map()) :: t()
-  def new!(attrs) when is_map(attrs) do
+  @spec new!(map(), String.t() | nil) :: t()
+  def new!(attrs, source \\ nil) when is_map(attrs) do
     item = struct!(__MODULE__, attrs)
+
+    # The descriptor id always wins. `source` answers "which module contributed
+    # this", and a contribution that names its own source can answer it wrongly
+    # -- the one field on a provenance diagnostic that must not be self-reported.
+    item = if is_binary(source), do: %{item | source: source}, else: item
 
     validate_id!(item.id, "id")
     if item.parent, do: validate_id!(item.parent, "parent")
@@ -45,6 +53,10 @@ defmodule Bilimbi.Base.Menu.Item do
 
     unless is_nil(item.route) or is_binary(item.route) do
       raise ArgumentError, "menu item #{item.id} route must be a string or nil"
+    end
+
+    unless is_nil(item.source) or is_binary(item.source) do
+      raise ArgumentError, "menu item #{item.id} source must be a string or nil"
     end
 
     unless is_integer(item.order) do

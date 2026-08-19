@@ -23,7 +23,7 @@ defmodule BilimbiWeb.SystemMenuInspectorLiveTest do
              conn |> log_in_as() |> live(~p"/system/menu-inspector")
   end
 
-  test "lists contributed items and marks its nav row current", %{conn: conn} do
+  test "lists contributed items with source and marks its nav row current", %{conn: conn} do
     grant_capabilities!("admin.system.menu-inspector.view")
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/menu-inspector")
@@ -31,10 +31,11 @@ defmodule BilimbiWeb.SystemMenuInspectorLiveTest do
     assert has_element?(view, "h1", "Menu Inspector")
     assert has_element?(view, "#menu-inspector", "admin.system.info")
     assert has_element?(view, "#menu-inspector", "/system/info")
+    assert has_element?(view, "#menu-inspector", "base/system")
     assert has_element?(view, "#nav-admin-system-menu-inspector[aria-current='page']")
   end
 
-  test "search narrows by id", %{conn: conn} do
+  test "search narrows by id, label, or source", %{conn: conn} do
     grant_capabilities!("admin.system.menu-inspector.view")
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/menu-inspector")
@@ -42,6 +43,17 @@ defmodule BilimbiWeb.SystemMenuInspectorLiveTest do
     view |> form("#menu-inspector-filters", %{"search" => "menu-inspector"}) |> render_change()
 
     assert has_element?(view, "#menu-inspector", "admin.system.menu-inspector")
+    refute has_element?(view, "#menu-inspector", "admin.system.info")
+  end
+
+  test "source filter narrows by contributing module", %{conn: conn} do
+    grant_capabilities!("admin.system.menu-inspector.view")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/menu-inspector")
+
+    view |> form("#menu-inspector-filters", %{"source" => "base/authz"}) |> render_change()
+
+    assert has_element?(view, "#menu-inspector", "admin.authz")
     refute has_element?(view, "#menu-inspector", "admin.system.info")
   end
 end

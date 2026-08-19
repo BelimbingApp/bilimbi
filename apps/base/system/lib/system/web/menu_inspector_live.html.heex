@@ -20,7 +20,7 @@
         </button>
       </:title_actions>
       <:subtitle>
-        Every registered menu item with parent, capability, route, and whether this actor may use it
+        Every registered menu item with its source, parent, capability, route, and whether this actor may use it
       </:subtitle>
     </.header>
 
@@ -33,23 +33,37 @@
         phx-submit="filter"
         class="p-2 mb-2"
       >
-        <div class="relative">
-          <.icon
-            name="hero-magnifying-glass"
-            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-          />
+        <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
+          <div class="relative">
+            <.icon
+              name="hero-magnifying-glass"
+              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+            />
+            <.input
+              type="search"
+              id="menu-inspector-search"
+              name="search"
+              value={@state.search}
+              placeholder="Search id, label, capability, route, or source"
+              phx-debounce="300"
+              autocomplete="off"
+              label="Search menu items"
+              label_class="sr-only"
+              wrapper_class="mb-0"
+              class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+            />
+          </div>
           <.input
-            type="search"
-            id="menu-inspector-search"
-            name="search"
-            value={@state.search}
-            placeholder="Search id, label, capability, or route"
-            phx-debounce="300"
-            autocomplete="off"
-            label="Search menu items"
+            type="select"
+            id="menu-source-filter"
+            name="source"
+            value={@state.source}
+            label="Filter by source"
             label_class="sr-only"
             wrapper_class="mb-0"
-            class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+            prompt="All sources"
+            options={Enum.map(@sources, &{&1, &1})}
+            class="h-[2.125rem] w-full rounded-lg border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
           />
         </div>
       </.form>
@@ -84,12 +98,15 @@
           <.badge :if={not is_nil(item.route) and item.served?} kind={:success}>yes</.badge>
           <.badge :if={not is_nil(item.route) and not item.served?} kind={:danger}>no</.badge>
         </:col>
+        <:col :let={item} label="Source">
+          <span class="font-mono text-xs text-ink-muted">{item.source || "—"}</span>
+        </:col>
         <:col :let={item} label="Allowed">
           <.badge :if={item.allowed?} kind={:success}>yes</.badge>
           <.badge :if={not item.allowed?} kind={:danger}>no</.badge>
         </:col>
         <:empty :if={@total_entries == 0}>
-          {if @state.search == "",
+          {if @state.search == "" and (@state.source == "" or @state.source == "all"),
             do: "No menu items are registered.",
             else: "No menu items match the current filters."}
         </:empty>

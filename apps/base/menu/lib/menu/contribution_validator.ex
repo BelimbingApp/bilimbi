@@ -40,7 +40,7 @@ defmodule Bilimbi.Base.Menu.ContributionValidator do
         raise ArgumentError, "menu contribution from #{descriptor.id} must contain maps"
       end
 
-      {Item.new!(attrs), descriptor.id}
+      {Item.new!(attrs, descriptor.id), descriptor.id}
     end)
   end
 
