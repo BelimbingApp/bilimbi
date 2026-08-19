@@ -122,14 +122,12 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
       assert has_element?(view, "#stat-companies")
       assert has_element?(view, "#stat-users")
-      refute has_element?(view, "#stat-sessions")
       refute has_element?(view, "#stat-recent-audit")
 
       # Enter edit mode
       view |> element("#edit-layout") |> render_click()
 
       # Gated widgets are not in available list
-      refute has_element?(view, "#add-widget-base-dashboard-session-stats")
       refute has_element?(view, "#add-widget-base-dashboard-recent-audit")
     end
 
@@ -137,10 +135,10 @@ defmodule BilimbiWeb.DashboardLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
       # Attempt to add gated widget directly via event
-      render_click(view, "add-widget", %{"id" => "base-dashboard-session-stats"})
+      render_click(view, "add-widget", %{"id" => "base-dashboard-recent-audit"})
 
       # Widget must not be added
-      refute has_element?(view, "#stat-sessions")
+      refute has_element?(view, "#stat-recent-audit")
     end
 
     test "handles unknown/forged widget id safely without crashing", %{conn: conn} do
@@ -156,13 +154,12 @@ defmodule BilimbiWeb.DashboardLiveTest do
     end
 
     test "shows gated widgets when corresponding capabilities are granted", %{conn: conn} do
-      grant_capabilities!(["admin.system.session.list", "admin.audit.log.list"])
+      grant_capabilities!(["admin.audit.log.list"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
       assert has_element?(view, "#stat-companies")
       assert has_element?(view, "#stat-users")
-      assert has_element?(view, "#stat-sessions")
       assert has_element?(view, "#stat-recent-audit")
     end
   end
@@ -223,14 +220,14 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
   describe "auto-refresh" do
     test "handles :refresh_widgets message gracefully", %{conn: conn} do
-      grant_capabilities!(["admin.system.session.list", "admin.audit.log.list"])
+      grant_capabilities!(["admin.audit.log.list"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
       send(view.pid, :refresh_widgets)
 
       assert has_element?(view, "#stat-companies")
-      assert has_element?(view, "#stat-sessions")
+      assert has_element?(view, "#stat-recent-audit")
     end
   end
 end

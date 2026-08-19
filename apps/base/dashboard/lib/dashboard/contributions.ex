@@ -27,17 +27,10 @@ defmodule Bilimbi.Base.Dashboard.Contributions do
           order: 20
         },
         %{
-          id: "base-dashboard-session-stats",
-          label: "Active Sessions",
-          size: :small,
-          order: 30,
-          capability: "admin.system.session.list"
-        },
-        %{
           id: "base-dashboard-recent-audit",
           label: "Recent Activity",
           size: :medium,
-          order: 40,
+          order: 30,
           capability: "admin.audit.log.list"
         }
       ]

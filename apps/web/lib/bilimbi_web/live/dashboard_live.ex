@@ -16,7 +16,6 @@ defmodule BilimbiWeb.DashboardLive do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Dashboard
-  alias Bilimbi.Base.Session
   alias Bilimbi.Base.Settings
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
@@ -25,7 +24,6 @@ defmodule BilimbiWeb.DashboardLive do
   @widget_modules %{
     "base-dashboard-company-stats" => BilimbiWeb.Dashboard.CompanyStatsWidget,
     "base-dashboard-user-stats" => BilimbiWeb.Dashboard.UserStatsWidget,
-    "base-dashboard-session-stats" => BilimbiWeb.Dashboard.SessionStatsWidget,
     "base-dashboard-recent-audit" => BilimbiWeb.Dashboard.RecentAuditWidget
   }
 
@@ -46,7 +44,6 @@ defmodule BilimbiWeb.DashboardLive do
     visible = ordered_visible(authorized, layout)
     available = available_widgets(authorized, visible)
 
-    session_count = safe_session_count()
     audit_entries = safe_audit_entries(scope)
 
     {:ok,
@@ -58,7 +55,6 @@ defmodule BilimbiWeb.DashboardLive do
      |> assign(:full_catalogue, full_catalogue)
      |> assign(:company_count, length(companies))
      |> assign(:user_count, length(users))
-     |> assign(:session_count, session_count)
      |> assign(:audit_entries, audit_entries)
      |> assign(:companies, companies)
      |> assign(:users, users)
@@ -66,12 +62,6 @@ defmodule BilimbiWeb.DashboardLive do
      |> assign(:layout_editing, false)
      |> assign(:refresh_timer, nil)
      |> schedule_refresh(visible)}
-  end
-
-  defp safe_session_count do
-    length(Session.list_sessions(limit: 500))
-  rescue
-    _ -> 0
   end
 
   defp safe_audit_entries(scope) do
@@ -250,12 +240,10 @@ defmodule BilimbiWeb.DashboardLive do
   def handle_info(:refresh_widgets, socket) do
     scope = socket.assigns.current_scope.scope
 
-    session_count = safe_session_count()
     audit_entries = safe_audit_entries(scope)
 
     {:noreply,
      socket
-     |> assign(:session_count, session_count)
      |> assign(:audit_entries, audit_entries)
      |> assign(:refresh_timer, nil)
      |> schedule_refresh(socket.assigns.widgets)}
@@ -329,7 +317,6 @@ defmodule BilimbiWeb.DashboardLive do
             widget={widget}
             company_count={@company_count}
             user_count={@user_count}
-            session_count={@session_count}
             audit_entries={@audit_entries}
             current_scope={@current_scope}
             layout_editing={@layout_editing}
@@ -478,15 +465,6 @@ defmodule BilimbiWeb.DashboardLive do
                 do: ~p"/users"
             }
           />
-        <% "base-dashboard-session-stats" -> %>
-          <.session_stat_card
-            id="stat-sessions"
-            count={@session_count}
-            navigate={
-              if UserAuth.allowed?(@current_scope, "admin.system.session.list"),
-                do: ~p"/system/sessions"
-            }
-          />
         <% "base-dashboard-recent-audit" -> %>
           <.audit_activity_card
             id="stat-recent-audit"
@@ -578,33 +556,6 @@ defmodule BilimbiWeb.DashboardLive do
       <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
         {@count}
       </p>
-    </div>
-    """
-  end
-
-  attr :id, :string, required: true
-  attr :count, :integer, required: true
-  attr :navigate, :string, default: nil
-
-  defp session_stat_card(assigns) do
-    ~H"""
-    <div
-      id={@id}
-      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
-    >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-        Active Sessions
-      </p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
-      <.link
-        :if={@navigate}
-        navigate={@navigate}
-        class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
-      >
-        View all
-      </.link>
     </div>
     """
   end
