@@ -1,0 +1,136 @@
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  active_nav="admin.authz.capability"
+>
+  <.page id="capabilities-index">
+    <.header>
+      Capabilities
+      <:title_actions>
+        <button
+          type="button"
+          id="capabilities-pin"
+          data-nav-pin="nav-admin-authz-capability"
+          title="Pin Capabilities to sidebar"
+          aria-label="Pin Capabilities to sidebar"
+          aria-pressed="false"
+          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        >
+          <.icon name="bilimbi-pin" class="size-3.5" />
+        </button>
+      </:title_actions>
+      <:subtitle>
+        All registered capability keys and their source modules
+      </:subtitle>
+    </.header>
+
+    <.card id="capabilities-card" inner_class="p-0">
+      <.form
+        for={%{}}
+        as={:filters}
+        id="capabilities-filters"
+        phx-change="filter"
+        phx-submit="filter"
+        class="p-2 mb-2"
+      >
+        <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
+          <div class="relative">
+            <.icon
+              name="hero-magnifying-glass"
+              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+            />
+            <.input
+              type="search"
+              id="capabilities-search"
+              name="search"
+              value={@state.search}
+              placeholder="Search by capability or module..."
+              phx-debounce="300"
+              autocomplete="off"
+              label="Search capabilities"
+              label_class="sr-only"
+              wrapper_class="mb-0"
+              class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+            />
+          </div>
+          <.input
+            type="select"
+            id="filter-domain"
+            name="domain"
+            value={@state.domain}
+            label="Filter by domain"
+            label_class="sr-only"
+            wrapper_class="mb-0"
+            prompt="All Domains"
+            options={Enum.map(@domains, &{&1, &1})}
+            class="h-[2.125rem] w-full rounded-lg border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+          />
+        </div>
+      </.form>
+
+      <.table
+        id="capabilities-table"
+        rows={@streams.capabilities}
+        row_id={fn {dom_id, _cap} -> dom_id end}
+        row_item={fn {_dom_id, cap} -> cap end}
+        sort_by={@state.sort_by}
+        sort_dir={@state.sort_dir}
+        framed={false}
+      >
+        <:col :let={cap} label="Capability" sort="key" sort_id="capabilities-sort-key">
+          <span class="font-mono text-xs text-ink">{cap.key}</span>
+        </:col>
+
+        <:col :let={cap} label="Domain" sort="domain" sort_id="capabilities-sort-domain">
+          <span class="text-sm text-ink-muted">{cap.domain}</span>
+        </:col>
+
+        <:col :let={cap} label="Resource" sort="resource" sort_id="capabilities-sort-resource">
+          <span class="text-sm text-ink-muted">{cap.resource}</span>
+        </:col>
+
+        <:col :let={cap} label="Action" sort="action" sort_id="capabilities-sort-action">
+          <span class="text-sm text-ink-muted">{cap.action}</span>
+        </:col>
+
+        <:col :let={cap} label="Module" sort="module" sort_id="capabilities-sort-module">
+          <span class="text-sm text-ink-muted">{cap.module}</span>
+        </:col>
+
+        <:empty :if={@page.total_entries == 0}>
+          {if @state.search == "" and @state.domain == "",
+            do: "No capabilities found.",
+            else: "No capabilities match these filters."}
+        </:empty>
+      </.table>
+
+      <div
+        :if={@page.total_pages > 0}
+        id="capabilities-pagination"
+        class="flex items-center justify-between border-t border-line px-4 py-3 text-sm"
+      >
+        <p id="capabilities-pagination-summary" class="text-ink-subtle">
+          Page {@page.page} of {@page.total_pages} · {@page.total_entries} {capability_noun(@page.total_entries)}
+        </p>
+        <div :if={@page.total_pages > 1} class="flex gap-2">
+          <.button
+            :if={@page.page > 1}
+            id="capabilities-prev"
+            phx-click="page"
+            phx-value-page={@page.page - 1}
+          >
+            Previous
+          </.button>
+          <.button
+            :if={@page.page < @page.total_pages}
+            id="capabilities-next"
+            phx-click="page"
+            phx-value-page={@page.page + 1}
+          >
+            Next
+          </.button>
+        </div>
+      </div>
+    </.card>
+  </.page>
+</Layouts.app>
