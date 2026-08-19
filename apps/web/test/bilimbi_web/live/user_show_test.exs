@@ -394,18 +394,31 @@ defmodule BilimbiWeb.UserShowTest do
 
     grant_capabilities!(["admin.user.view", "admin.user.update"])
 
-    # Create an employee in company 73
+    # Create an employee in company 73 with department
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    CompanyFixtures.create_departments_table!()
+
+    Ecto.Adapters.SQL.query!(
+      Bilimbi.Base.Repo,
+      "INSERT INTO company_department_types (id, code, name, category, is_active) VALUES ($1, $2, $3, $4, true)",
+      [1, "eng", "Engineering", "operations"]
+    )
+
+    CompanyFixtures.insert_department!(1, 73, 1)
 
     {:ok, emp} =
       Bilimbi.Core.Employee.create_employee(scope, 73, %{
         full_name: "Grace Hopper",
         employee_number: "EMP-001",
         designation: "Rear Admiral",
-        status: "active"
+        status: "active",
+        department_id: 1
       })
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+
+    assert has_element?(view, "#user-employees-table-sort-department", "Department")
 
     # Toggle link employee
     view |> element("#toggle-link-employee-btn") |> render_click()
@@ -418,7 +431,12 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(view, "#flash-group", "Employee linked.")
     assert has_element?(view, "#employees-count", "1")
     assert has_element?(view, "#user-employees-table", "EMP-001")
+    assert has_element?(view, "#user-employees-table", "Engineering")
     assert has_element?(view, "#user-employees-table", "Rear Admiral")
+
+    # Sort employees by department
+    render_hook(view, "sort_employees", %{"sort_by" => "department"})
+    assert has_element?(view, "#user-employees-table", "Engineering")
 
     # Unlink employee
     view |> element("#unlink-employee-#{emp.id}") |> render_click()
