@@ -816,7 +816,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-4">User Details</h3>
 
             <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              <div id="user-detail-name">
                 <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Name</dt>
                 <dd class="mt-0.5 text-sm text-ink">
                   <%= if @can_manage? do %>
@@ -834,7 +834,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 </dd>
               </div>
 
-              <div>
+              <div id="user-detail-email-verified">
                 <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Email Verified</dt>
                 <dd class="mt-0.5 text-sm text-ink">
                   <.badge kind={if @user.email_verified_at, do: :success, else: :warning}>
@@ -847,7 +847,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 </dd>
               </div>
 
-              <div>
+              <div id="user-detail-email">
                 <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Email</dt>
                 <dd class="mt-0.5 text-sm text-ink">
                   <%= if @can_manage? do %>
@@ -865,7 +865,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 </dd>
               </div>
 
-              <div>
+              <div id="user-detail-created">
                 <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Created</dt>
                 <dd class="mt-0.5 text-sm text-ink-muted tabular-nums">
                   <.datetime id="user-created-at" :if={@user.created_at} value={@user.created_at} />
@@ -873,7 +873,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 </dd>
               </div>
 
-              <div>
+              <div id="user-detail-company">
                 <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Company</dt>
                 <dd class="mt-0.5 text-sm text-ink">
                   <%= if @can_manage? do %>
@@ -905,7 +905,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 </dd>
               </div>
 
-              <div>
+              <div id="user-detail-updated">
                 <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Updated</dt>
                 <dd class="mt-0.5 text-sm text-ink-muted tabular-nums">
                   <.datetime id="user-updated-at" :if={@user.updated_at} value={@user.updated_at} />
