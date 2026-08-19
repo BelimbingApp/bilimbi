@@ -70,7 +70,12 @@ defmodule BilimbiWeb.EmployeeFormTest do
       })
 
     # Create a second user to link
-    UserFixtures.insert_user!(%{id: 92, company_id: 73, name: "Grace Hopper", email: "grace@example.com"})
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/new")
 

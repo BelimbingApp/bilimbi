@@ -386,7 +386,8 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
       "email" => employee.email,
       "mobile_number" => employee.mobile_number,
       "status" => employee.status,
-      "employment_start" => employee.employment_start && Date.to_iso8601(employee.employment_start),
+      "employment_start" =>
+        employee.employment_start && Date.to_iso8601(employee.employment_start),
       "employment_end" => employee.employment_end && Date.to_iso8601(employee.employment_end),
       "user_id" => linked_user_id
     }
