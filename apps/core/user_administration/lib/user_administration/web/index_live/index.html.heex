@@ -189,6 +189,43 @@
               <.icon name="bilimbi-impersonate" class="size-4" />
               <span class="sr-only">{gettext("Impersonate")}</span>
             </button>
+            <button
+              :if={
+                allowed?(@current_scope, "admin.user.delete") and
+                  user.id != @current_scope.user["user_id"] and
+                  not user.company_archived
+              }
+              id={"user-#{user.id}-delete"}
+              type="button"
+              phx-click="delete"
+              phx-value-id={user.id}
+              data-confirm="Are you sure you want to delete this user?"
+              aria-label={gettext("Delete %{name}", name: user.name)}
+              title={gettext("Delete user")}
+              class="grid size-7 place-items-center rounded-md text-danger-ink transition hover:bg-danger-surface focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-danger/40"
+            >
+              <.icon name="hero-trash" class="size-4" />
+              <span class="sr-only">{gettext("Delete")}</span>
+            </button>
+            <button
+              :if={
+                allowed?(@current_scope, "admin.user.delete") and
+                  (user.id == @current_scope.user["user_id"] or user.company_archived)
+              }
+              id={"user-#{user.id}-delete"}
+              type="button"
+              disabled
+              aria-label={gettext("Delete %{name}", name: user.name)}
+              title={
+                if user.id == @current_scope.user["user_id"],
+                  do: gettext("You cannot delete your own account"),
+                  else: gettext("Archived-company users cannot be deleted from this list")
+              }
+              class="grid size-7 place-items-center rounded-md text-ink-muted opacity-40 cursor-not-allowed"
+            >
+              <.icon name="hero-trash" class="size-4" />
+              <span class="sr-only">{gettext("Delete")}</span>
+            </button>
           </div>
         </:action>
         <:empty :if={@users_page.entries == []}>

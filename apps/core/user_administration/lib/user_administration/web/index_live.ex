@@ -9,6 +9,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Core.User
   alias Bilimbi.Core.UserAdministration
   alias Bilimbi.Core.UserAdministration.Options
 
@@ -76,6 +77,55 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
       )
 
     {:noreply, push_patch(socket, to: users_path(state))}
+  end
+
+  def handle_event("delete", %{"id" => raw_id}, socket) do
+    scope = socket.assigns.current_scope.scope
+    actor_id = socket.assigns.current_scope.user["user_id"]
+
+    cond do
+      not allowed?(socket.assigns.current_scope, "admin.user.delete") ->
+        {:noreply, put_flash(socket, :error, "You do not have permission to delete users.")}
+
+      match?({id, ""} when id == actor_id, Integer.parse(to_string(raw_id))) ->
+        {:noreply, put_flash(socket, :error, "You cannot delete your own account.")}
+
+      true ->
+        with {user_id, ""} <- Integer.parse(to_string(raw_id)),
+             %{} = entry <- Enum.find(socket.assigns.users_page.entries, &(&1.id == user_id)),
+             :ok <- delete_listed_user(scope, entry) do
+          {:noreply,
+           socket
+           |> put_flash(:info, "User deleted successfully.")
+           |> load_page(socket.assigns.index_state)}
+        else
+          :error ->
+            {:noreply, put_flash(socket, :error, "That user could not be deleted.")}
+
+          nil ->
+            {:noreply,
+             socket
+             |> put_flash(:error, "That user no longer exists.")
+             |> load_page(socket.assigns.index_state)}
+
+          {:error, :company_not_found} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "That user cannot be deleted while their company is archived."
+             )}
+
+          {:error, _reason} ->
+            {:noreply, put_flash(socket, :error, "That user could not be deleted.")}
+        end
+    end
+  end
+
+  defp delete_listed_user(_scope, %{company_archived: true}), do: {:error, :company_not_found}
+
+  defp delete_listed_user(scope, entry) do
+    User.delete_user(scope, entry.company_id, entry.id)
   end
 
   defp load_page(socket, state) do
