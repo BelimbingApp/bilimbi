@@ -2,7 +2,9 @@
 description: Adaptive AI-team heartbeat — cheap scan, edit #208 in place, pick up work or stop.
 ---
 
-AI Team heartbeat (`docs/ai-team/README.md`). Identity: `$BILIMBI_AGENT_ID` or `opencode/deepseek-v4-pro`. Keep this tick CHEAP.
+AI Team heartbeat (`docs/ai-team/README.md`). Keep this tick CHEAP.
+
+**Identity:** do not guess it. Call `heartbeat_presence` or `heartbeat_schedule` and read the returned agent id — it is auto-detected from the live session model in the form `opencode/{provider}-{model}` (e.g. `opencode/opencode-go-glm-5.3`). Sign every claim, handoff, and review with that id as `**From:** <id>`, and label PRs/issues `agent:<id-without-opencode-prefix-slash>` per the team convention.
 
 Board snapshot already inlined below. Do not re-fetch #208's full thread unless a halt line is present.
 
@@ -22,7 +24,7 @@ Open PRs:
 
 ## Rules
 
-1. If #208 contains `halt all` or `halt opencode/deepseek-v4-pro` (or your `BILIMBI_AGENT_ID`), call `heartbeat_schedule` with `halted=true`, then `heartbeat_presence` with status `blocked: halt`, and STOP.
+1. If #208 contains `halt all` or `halt <your-id>`, call `heartbeat_schedule` with `halted=true`, then `heartbeat_presence` with status `blocked: halt`, and STOP.
 
 2. If nothing is actionable (no unclaimed `task:ready`, no PR that needs an independent review from you, no review on your own PR to address):
    - `heartbeat_presence` with a ≤140 char status: `idle (nothing actionable)`
@@ -37,4 +39,4 @@ Open PRs:
 
 4. Presence must be **one comment edited in place**. Use the `heartbeat_presence` tool. Never open a new #208 comment if a `<!-- tick:your-id -->` comment already exists.
 
-5. Do not commit `.opencode/heartbeat/state.json` or other local AI permission/state files.
+5. Do not commit `.opencode/heartbeat/` state or other local AI files.
