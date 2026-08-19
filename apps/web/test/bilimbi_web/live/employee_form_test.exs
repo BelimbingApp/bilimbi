@@ -148,6 +148,54 @@ defmodule BilimbiWeb.EmployeeFormTest do
     assert has_element?(view, "#employee-employment-end")
     assert has_element?(view, "#employee-supervisor-id")
     assert has_element?(view, "#employee-user-id")
+
+    # Belimbing renders Job Description only for agents (`create.blade.php:135`).
+    refute has_element?(view, "#employee-job-description")
+  end
+
+  test "job description appears only for agent employees, as in Belimbing", %{conn: conn} do
+    grant_capabilities!(["admin.employee.create", "admin.employee.view"])
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, supervisor} =
+      Employee.create_employee(scope, 73, %{
+        employee_number: "SUP-JD",
+        full_name: "Alan Turing",
+        employee_type: "full_time",
+        status: "active"
+      })
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/new")
+
+    refute has_element?(view, "#employee-job-description")
+
+    render_change(view, "validate", %{
+      "employee" => %{
+        "company_id" => "73",
+        "employee_number" => "EMP-JD",
+        "full_name" => "Helper Agent",
+        "employee_type" => "agent",
+        "status" => "active"
+      }
+    })
+
+    assert has_element?(view, "#employee-job-description")
+
+    render_submit(view, "save", %{
+      "employee" => %{
+        "company_id" => "73",
+        "employee_number" => "EMP-JD",
+        "full_name" => "Helper Agent",
+        "employee_type" => "agent",
+        "status" => "active",
+        "supervisor_id" => "#{supervisor.id}",
+        "job_description" => "Customer support Agent"
+      }
+    })
+
+    {:ok, employees} = Employee.list_employees(scope, 73)
+    created = Enum.find(employees, &(&1.employee_number == "EMP-JD"))
+    assert created.job_description == "Customer support Agent"
   end
 
   test "creates an employee with all 14 fields and links a user account", %{conn: conn} do

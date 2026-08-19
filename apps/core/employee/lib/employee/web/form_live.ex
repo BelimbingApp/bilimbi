@@ -29,6 +29,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
     status: :string,
     employment_start: :date,
     employment_end: :date,
+    job_description: :string,
     user_id: :integer
   }
 
@@ -55,7 +56,8 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
     "mobile_number",
     "status",
     "employment_start",
-    "employment_end"
+    "employment_end",
+    "job_description"
   ]
 
   @impl true
@@ -442,6 +444,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
       "employment_start" =>
         employee.employment_start && Date.to_iso8601(employee.employment_start),
       "employment_end" => employee.employment_end && Date.to_iso8601(employee.employment_end),
+      "job_description" => employee.job_description,
       "user_id" => linked_user_id
     }
   end
@@ -455,6 +458,13 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
     |> validate_employment_period()
     |> Map.put(:action, :validate)
   end
+
+  # Belimbing renders Job Description only for agent employees
+  # (`create.blade.php:135`), where it holds a short role label rather than a
+  # human's duties. The form re-renders on `phx-change`, so reading the current
+  # selection off the form is enough to follow the type select.
+  defp agent_type?(form),
+    do: to_string(Phoenix.HTML.Form.input_value(form, :employee_type)) == "agent"
 
   # Belimbing makes the supervisor mandatory for agent employees and optional
   # for everyone else (`Create.php:121`). An agent acts on someone's behalf, so
@@ -674,6 +684,18 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
                 type="date"
                 label="EMPLOYMENT END"
                 label_class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
+              />
+            </div>
+
+            <div :if={agent_type?(@form)} class="md:col-span-2">
+              <.input
+                field={@form[:job_description]}
+                id="employee-job-description"
+                type="textarea"
+                rows="3"
+                label="JOB DESCRIPTION"
+                label_class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
+                placeholder="Short role label, e.g. Customer support Agent"
               />
             </div>
 
