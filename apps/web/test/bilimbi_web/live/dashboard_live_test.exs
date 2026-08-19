@@ -4,6 +4,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Session
+  alias Bilimbi.Base.Settings
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -203,6 +204,41 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
       assert has_element?(view, "#stat-companies")
       assert has_element?(view, "#stat-users")
+    end
+
+    test "the layout setting answers with its declared empty default when nothing is stored",
+         %{conn: _conn} do
+      # The trap this whole group guards. `core/user` declares
+      # `ui.dashboard.layout` with `default: []`, so an unset layout reads back
+      # as an empty list, not as nil. Pin it: if this ever answers nil, the
+      # reader below can be simplified, and if it keeps answering [] the reader
+      # must not treat that as a user choice.
+      assert Settings.get("ui.dashboard.layout", Settings.Scope.user(91, 73, 41)) == []
+    end
+
+    test "an account that never customised its dashboard sees the whole catalogue",
+         %{conn: conn} do
+      # `ui.dashboard.layout` is declared with `default: []`, so reading the
+      # value cannot tell "never customised" apart from "emptied on purpose".
+      # This account has stored nothing.
+      refute Settings.overridden?("ui.dashboard.layout", Settings.Scope.user(91, 73, 41))
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(view, "#stat-companies")
+      assert has_element?(view, "#stat-users")
+      refute has_element?(view, "#dashboard-widgets-empty")
+    end
+
+    test "a stored empty layout stays empty rather than reverting to the catalogue",
+         %{conn: conn} do
+      Settings.put("ui.dashboard.layout", [], Settings.Scope.user(91, 73, 41))
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(view, "#dashboard-widgets-empty")
+      refute has_element?(view, "#stat-companies")
+      refute has_element?(view, "#stat-users")
     end
 
     test "displays empty state when all widgets are removed", %{conn: conn} do

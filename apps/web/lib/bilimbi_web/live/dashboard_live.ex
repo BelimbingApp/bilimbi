@@ -102,6 +102,12 @@ defmodule BilimbiWeb.DashboardLive do
     assign(socket, :refresh_timer, timer)
   end
 
+  # `ui.dashboard.layout` is declared with `default: []`, so `Settings.get/2`
+  # answers `[]` both for an account that has never customised its dashboard and
+  # for one that deliberately removed every widget. Reading the value alone
+  # collapses those two cases and leaves every new account with an empty
+  # dashboard (#359). `overridden?/2` asks the question the layout actually
+  # depends on: is there a stored row for this user?
   defp user_layout(current_scope) do
     settings_scope =
       Settings.Scope.user(
@@ -110,8 +116,10 @@ defmodule BilimbiWeb.DashboardLive do
         current_scope.scope.tenant.id
       )
 
-    case Settings.get("ui.dashboard.layout", settings_scope) do
-      value when is_list(value) -> value
+    with true <- Settings.overridden?("ui.dashboard.layout", settings_scope),
+         value when is_list(value) <- Settings.get("ui.dashboard.layout", settings_scope) do
+      value
+    else
       _ -> nil
     end
   rescue

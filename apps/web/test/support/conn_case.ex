@@ -43,16 +43,23 @@ defmodule BilimbiWeb.ConnCase do
 
     on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(owner) end)
 
-    create_session_and_authz_tables!()
+    create_session_authz_and_settings_tables!()
 
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 
   # Fixture modules are loaded from test_helper.exs after this file compiles.
   # Concatenate from strings so `alias Bilimbi.Base.Session` does not nest.
-  defp create_session_and_authz_tables! do
+  #
+  # `base_settings` belongs here for the same reason as the other two: without
+  # it every `Settings.get/2` and `Settings.put/3` reached from a web test
+  # raises `undefined_table`, and any caller that rescues broadly -- the
+  # dashboard's layout reader did -- silently takes its failure path while the
+  # test goes green. That is how #359 reached a live screen with CI green.
+  defp create_session_authz_and_settings_tables! do
     apply(Module.concat(["Bilimbi.Base.Session.TestFixtures"]), :create_sessions_table!, [])
     apply(Module.concat(["Bilimbi.Base.Authz.TestFixtures"]), :create_authz_tables!, [])
+    apply(Module.concat(["Bilimbi.Base.Settings.TestFixtures"]), :create_settings_table!, [])
   end
 
   @doc """
