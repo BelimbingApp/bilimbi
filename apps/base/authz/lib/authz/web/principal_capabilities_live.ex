@@ -16,10 +16,18 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
   together, so a type-only filter would raise. Sorting by principal type is
   supported and covers the same need.
 
-  Belimbing joins users and companies to show names. Bilimbi's read model
-  carries ids, because Base may not name a Core entity — see #183 and #185,
-  where that seam is being decided across all three Authz screens at once. This
-  is built id-based deliberately, and stays correct whichever way those land.
+  Belimbing joins users and companies to show names. The company half is
+  resolved through the `CompanyDirectory` seam (#183): every row on the page is
+  visibility-filtered to `company_ids/1`, so `Authz.companies_in_scope/1` can
+  name each one without Base querying Core. The principal half stays id-based
+  until #285 decides how Base may name a Core user or employee; decision-log
+  actor names stay ids deliberately (#185 — an audit row is evidence of the
+  moment, not a live view).
+
+  Belimbing sorts on the joined `companies.name`. A directory lookup cannot
+  express a database-level sort, and reordering the page in Elixir would break
+  pagination, so the column stays sortable on `company_id` — a deliberate
+  divergence, not an oversight.
   """
 
   use Bilimbi.Base.UI, :live_view
@@ -31,7 +39,19 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, page_title: "Principal Capabilities")}
+    # Resolved once here rather than inside `load/2`: the company set cannot
+    # change while the page is open, and `load/2` runs on every search, filter,
+    # sort and page change -- each of which was re-listing every company in the
+    # tenant to render a column that never changes.
+    company_names =
+      socket.assigns.current_scope.scope
+      |> Authz.companies_in_scope()
+      |> Map.new(&{&1.id, &1.name})
+
+    {:ok,
+     socket
+     |> assign(:page_title, "Principal Capabilities")
+     |> assign(:company_names, company_names)}
   end
 
   @impl true
@@ -192,4 +212,17 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
   # see that a grant has quietly become inert.
   defp unknown_capability?(%{capability: capability}),
     do: not Authz.capability_known?(capability)
+
+  # The grants query is visibility-filtered to `company_ids/1`, and the
+  # directory returns exactly that id set, so every row resolves. A company
+  # archived between the two queries is not in the directory; its id is the
+  # honest fallback, not a stale name.
+  defp company_name(_names, nil), do: "—"
+
+  defp company_name(names, company_id) do
+    case Map.fetch(names, company_id) do
+      {:ok, name} -> name
+      :error -> to_string(company_id)
+    end
+  end
 end

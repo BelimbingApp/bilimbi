@@ -55,6 +55,24 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
     assert has_element?(view, "#nav-admin-authz-principal-capability[aria-current='page']")
   end
 
+  test "names the owning company instead of rendering its id", %{conn: conn, scope: scope} do
+    # A second company in the tenant: the directory knows both names, but only
+    # the company owning the grant may appear.
+    CompanyFixtures.insert_company!(%{
+      id: 74,
+      tenant_id: 41,
+      name: "Aurora Works",
+      code: "aurora_works"
+    })
+
+    grant(scope, "admin.company.list", true)
+
+    {:ok, view, _html} = open(conn)
+
+    assert has_element?(view, "#principal-capabilities", "Bilimbi Industries")
+    refute has_element?(view, "#principal-capabilities", "Aurora Works")
+  end
+
   test "shows the count without dead page controls on a single page", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
