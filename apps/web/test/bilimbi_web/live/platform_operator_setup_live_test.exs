@@ -121,4 +121,23 @@ defmodule BilimbiWeb.PlatformOperatorSetupLiveTest do
     assert {:ok, %Company.Summary{name: "Operator Co", code: "operator_co"}} =
              Company.platform_operator_company()
   end
+
+  test "status bar warns on the operator tenant until a primary company exists", %{conn: conn} do
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+    assert has_element?(view, "#app-operator-company-missing[href='/setup/platform-operator']")
+
+    CompanyFixtures.assign_primary_company!(41, 73)
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+    refute has_element?(view, "#app-operator-company-missing")
+  end
+
+  test "status bar does not warn on a customer tenant", %{conn: conn} do
+    {:ok, view, _html} =
+      conn
+      |> log_in_as(session_user(%{"user_id" => 92, "company_id" => 75}))
+      |> live(~p"/dashboard")
+
+    refute has_element?(view, "#app-operator-company-missing")
+  end
 end
