@@ -97,6 +97,26 @@ defmodule BilimbiWeb.CompanyLiveTest do
                conn |> log_in_as() |> live(~p"/companies/73")
     end
 
+    test "always shows the external accesses card, with its empty state", %{conn: conn} do
+      # Belimbing renders this card unconditionally (`show.blade.php:259`), and
+      # only guards the Subsidiaries card above it (`:41`). A card that vanishes
+      # when empty reads as "not available here" rather than "none yet".
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      assert has_element?(view, "#company-external-accesses-card", "External Accesses")
+      assert has_element?(view, "#company-external-accesses-table-empty", "No external accesses.")
+      # `#company-external-accesses-table` is the tbody id, so the header row is
+      # a sibling of it, not a descendant -- assert against the card.
+      assert has_element?(view, "#company-external-accesses-card th", "Permissions")
+      assert has_element?(view, "#company-external-accesses-card th", "Expires At")
+
+      # The Subsidiaries card stays conditional, matching the source: this
+      # fixture gives company 73 a child, so it renders here.
+      assert has_element?(view, "#company-subsidiaries-card", "Subsidiaries")
+    end
+
     test "hides write controls and rejects direct write events without update capability",
          %{conn: conn} do
       # This route is gated on `admin.company.view` -- a read capability -- and

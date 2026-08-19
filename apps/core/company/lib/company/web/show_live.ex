@@ -1589,7 +1589,12 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         </.card>
 
         <%!-- Section 7: External Accesses --%>
-        <.card :if={@external_accesses != []} id="company-external-accesses-card" class="mt-6">
+        <%!-- Rendered unconditionally with an empty state, as Belimbing does
+             (`show.blade.php:259` has no `@if`, unlike the Subsidiaries card
+             above it at `:41`, which is guarded and matches here). A card that
+             disappears when empty reads as "this company cannot have external
+             access" rather than "it has none". --%>
+        <.card id="company-external-accesses-card" class="mt-6">
           <div class="flex items-center gap-2 mb-4">
             <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
               External Accesses
@@ -1607,6 +1612,14 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             <:col :let={access} label="User ID">
               <span class="font-mono text-xs text-ink">{access.user_id}</span>
             </:col>
+            <:col :let={access} label="Permissions">
+              <div :if={is_list(access.permissions) and access.permissions != []} class="flex flex-wrap gap-1">
+                <.badge :for={permission <- access.permissions}>{permission}</.badge>
+              </div>
+              <span :if={not (is_list(access.permissions) and access.permissions != [])} class="text-ink-subtle">
+                —
+              </span>
+            </:col>
             <:col :let={access} label="Status">
               <.badge kind={if access.is_active, do: :success, else: :danger}>
                 {if access.is_active, do: "Active", else: "Inactive"}
@@ -1618,6 +1631,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             <:col :let={access} label="Expires At">
               <span class="tabular-nums text-xs text-ink-subtle">{access.access_expires_at || "—"}</span>
             </:col>
+
+            <:empty :if={@external_accesses == []}>
+              No external accesses.
+            </:empty>
           </.table>
         </.card>
 
