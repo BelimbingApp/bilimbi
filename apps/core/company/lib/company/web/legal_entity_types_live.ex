@@ -19,7 +19,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
     {:ok,
      socket
      |> assign(:page_title, "Legal Entity Types")
-     |> assign(:active_nav, "admin.company")
+     |> assign(:active_nav, "admin.company.legal-entity-type")
      |> assign(:can_create?, allowed?(socket.assigns.current_scope, @create_capability))
      |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
      |> assign(:can_delete?, allowed?(socket.assigns.current_scope, @delete_capability))

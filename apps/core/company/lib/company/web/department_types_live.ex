@@ -19,7 +19,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
     {:ok,
      socket
      |> assign(:page_title, "Department Types")
-     |> assign(:active_nav, "admin.company")
+     |> assign(:active_nav, "admin.company.department-type")
      |> assign(:can_create?, allowed?(socket.assigns.current_scope, @create_capability))
      |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
      |> assign(:can_delete?, allowed?(socket.assigns.current_scope, @delete_capability))
