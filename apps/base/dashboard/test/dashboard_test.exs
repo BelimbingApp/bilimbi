@@ -51,6 +51,49 @@ defmodule Bilimbi.Base.DashboardTest do
       widget = Widget.new!(%{id: "test", label: "Test"})
       assert widget.order == 0
     end
+
+    test "raises on non-string id" do
+      assert_raise ArgumentError, ~r/widget id must be a string/, fn ->
+        Widget.new!(%{id: 123, label: "Test"})
+      end
+    end
+
+    test "raises on non-string label" do
+      assert_raise ArgumentError, ~r/widget label must be a string/, fn ->
+        Widget.new!(%{id: "test", label: :test})
+      end
+    end
+
+    test "raises on negative order" do
+      assert_raise ArgumentError, ~r/widget order must be a non-negative integer/, fn ->
+        Widget.new!(%{id: "test", label: "Test", order: -1})
+      end
+    end
+  end
+
+  defmodule DummyWidgetModule do
+    @behaviour Bilimbi.Base.Dashboard.Widget
+
+    @impl true
+    def widget_title, do: "Dummy"
+
+    @impl true
+    def widget_size, do: :medium
+
+    @impl true
+    def widget_refresh_interval, do: 60_000
+
+    @impl true
+    def widget_assigns, do: [:dummy_count]
+  end
+
+  describe "Widget behaviour" do
+    test "implements callbacks properly" do
+      assert DummyWidgetModule.widget_title() == "Dummy"
+      assert DummyWidgetModule.widget_size() == :medium
+      assert DummyWidgetModule.widget_refresh_interval() == 60_000
+      assert DummyWidgetModule.widget_assigns() == [:dummy_count]
+    end
   end
 
   describe "contribution validation" do

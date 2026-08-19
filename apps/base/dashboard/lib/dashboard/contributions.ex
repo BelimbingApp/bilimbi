@@ -31,7 +31,7 @@ defmodule Bilimbi.Base.Dashboard.Contributions do
           label: "Active Sessions",
           size: :small,
           order: 30,
-          capability: "admin.session.list"
+          capability: "admin.system.session.list"
         },
         %{
           id: "base-dashboard-recent-audit",

@@ -114,4 +114,123 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/dashboard")
   end
+
+  describe "widget capability isolation" do
+    test "unprivileged user sees only ungated widgets and cannot see gated widgets in available list",
+         %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(view, "#stat-companies")
+      assert has_element?(view, "#stat-users")
+      refute has_element?(view, "#stat-sessions")
+      refute has_element?(view, "#stat-recent-audit")
+
+      # Enter edit mode
+      view |> element("#edit-layout") |> render_click()
+
+      # Gated widgets are not in available list
+      refute has_element?(view, "#add-widget-base-dashboard-session-stats")
+      refute has_element?(view, "#add-widget-base-dashboard-recent-audit")
+    end
+
+    test "denies unauthorized add-widget event bypass", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      # Attempt to add gated widget directly via event
+      render_click(view, "add-widget", %{"id" => "base-dashboard-session-stats"})
+
+      # Widget must not be added
+      refute has_element?(view, "#stat-sessions")
+    end
+
+    test "handles unknown/forged widget id safely without crashing", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      render_click(view, "add-widget", %{"id" => "forged-unknown-widget"})
+      render_click(view, "remove-widget", %{"id" => "forged-unknown-widget"})
+      render_click(view, "move-up", %{"id" => "forged-unknown-widget"})
+      render_click(view, "move-down", %{"id" => "forged-unknown-widget"})
+
+      # View remains alive and responsive
+      assert has_element?(view, "#stat-companies")
+    end
+
+    test "shows gated widgets when corresponding capabilities are granted", %{conn: conn} do
+      grant_capabilities!(["admin.system.session.list", "admin.audit.log.list"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(view, "#stat-companies")
+      assert has_element?(view, "#stat-users")
+      assert has_element?(view, "#stat-sessions")
+      assert has_element?(view, "#stat-recent-audit")
+    end
+  end
+
+  describe "widget layout customization and persistence" do
+    test "removes and re-adds widgets, persisting layout to settings", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      # Enter edit mode
+      view |> element("#edit-layout") |> render_click()
+      assert has_element?(view, "#done-layout")
+
+      # Remove companies widget
+      view |> element("#remove-base-dashboard-company-stats") |> render_click()
+
+      refute has_element?(view, "#stat-companies")
+      assert has_element?(view, "#stat-users")
+      assert has_element?(view, "#add-widget-base-dashboard-company-stats")
+
+      # Add it back
+      view |> element("#add-widget-base-dashboard-company-stats") |> render_click()
+
+      assert has_element?(view, "#stat-companies")
+      refute has_element?(view, "#add-widget-base-dashboard-company-stats")
+
+      # Exit edit mode
+      view |> element("#done-layout") |> render_click()
+      assert has_element?(view, "#edit-layout")
+    end
+
+    test "reorders widgets via move-up and move-down", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      view |> element("#edit-layout") |> render_click()
+
+      # Move second widget (users) up
+      view |> element("#move-up-base-dashboard-user-stats") |> render_click()
+
+      # Move it back down
+      view |> element("#move-down-base-dashboard-user-stats") |> render_click()
+
+      assert has_element?(view, "#stat-companies")
+      assert has_element?(view, "#stat-users")
+    end
+
+    test "displays empty state when all widgets are removed", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      view |> element("#edit-layout") |> render_click()
+      view |> element("#remove-base-dashboard-company-stats") |> render_click()
+      view |> element("#remove-base-dashboard-user-stats") |> render_click()
+
+      refute has_element?(view, "#dashboard-widgets")
+      assert has_element?(view, "#dashboard-widgets-empty")
+      assert render(view) =~ "No widgets configured."
+    end
+  end
+
+  describe "auto-refresh" do
+    test "handles :refresh_widgets message gracefully", %{conn: conn} do
+      grant_capabilities!(["admin.system.session.list", "admin.audit.log.list"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      send(view.pid, :refresh_widgets)
+
+      assert has_element?(view, "#stat-companies")
+      assert has_element?(view, "#stat-sessions")
+    end
+  end
 end

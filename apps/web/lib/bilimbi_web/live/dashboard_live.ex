@@ -41,9 +41,10 @@ defmodule BilimbiWeb.DashboardLive do
         List.first(companies)
 
     full_catalogue = Dashboard.widgets()
+    authorized = authorized_catalogue(full_catalogue, socket.assigns.current_scope)
     layout = user_layout(socket.assigns.current_scope)
-    visible = ordered_visible(full_catalogue, layout, socket)
-    available = available_widgets(full_catalogue, visible)
+    visible = ordered_visible(authorized, layout)
+    available = available_widgets(authorized, visible)
 
     session_count = safe_session_count()
     audit_entries = safe_audit_entries(scope)
@@ -63,6 +64,7 @@ defmodule BilimbiWeb.DashboardLive do
      |> assign(:users, users)
      |> assign(:current_company, current_company)
      |> assign(:layout_editing, false)
+     |> assign(:refresh_timer, nil)
      |> schedule_refresh(visible)}
   end
 
@@ -88,6 +90,10 @@ defmodule BilimbiWeb.DashboardLive do
   end
 
   defp schedule_refresh(socket, widgets) do
+    if timer = socket.assigns[:refresh_timer] do
+      Process.cancel_timer(timer)
+    end
+
     intervals =
       widgets
       |> Enum.map(&widget_module(&1.id))
@@ -95,12 +101,15 @@ defmodule BilimbiWeb.DashboardLive do
       |> Enum.map(& &1.widget_refresh_interval())
       |> Enum.reject(&(&1 == 0))
 
-    if intervals != [] do
-      min_interval = Enum.min(intervals)
-      Process.send_after(self(), :refresh_widgets, min_interval)
-    end
+    timer =
+      if intervals != [] do
+        min_interval = Enum.min(intervals)
+        Process.send_after(self(), :refresh_widgets, min_interval)
+      else
+        nil
+      end
 
-    socket
+    assign(socket, :refresh_timer, timer)
   end
 
   defp user_layout(current_scope) do
@@ -132,69 +141,78 @@ defmodule BilimbiWeb.DashboardLive do
     _ -> :error
   end
 
-  defp ordered_visible(catalogue, layout, socket) do
-    scope = socket.assigns.current_scope
+  defp authorized_catalogue(catalogue, current_scope) do
+    Enum.filter(catalogue, fn widget ->
+      is_nil(widget.capability) or UserAuth.allowed?(current_scope, widget.capability)
+    end)
+  end
 
-    visible =
-      catalogue
-      |> Enum.filter(fn widget ->
-        is_nil(widget.capability) or UserAuth.allowed?(scope, widget.capability)
-      end)
-
+  defp ordered_visible(authorized_catalogue, layout) do
     case layout do
       nil ->
-        visible
+        authorized_catalogue
 
       layout_ids when is_list(layout_ids) ->
-        by_id = Map.new(visible, &{&1.id, &1})
+        by_id = Map.new(authorized_catalogue, &{&1.id, &1})
         Enum.flat_map(layout_ids, fn id -> if by_id[id], do: [by_id[id]], else: [] end)
     end
   end
 
-  defp available_widgets(full_catalogue, visible) do
+  defp available_widgets(authorized_catalogue, visible) do
     visible_ids = MapSet.new(visible, & &1.id)
-    Enum.reject(full_catalogue, &(&1.id in visible_ids))
+    Enum.reject(authorized_catalogue, &(&1.id in visible_ids))
   end
 
   @impl true
   def handle_event("add-widget", %{"id" => id}, socket) do
-    widget = Enum.find(socket.assigns.full_catalogue, &(&1.id == id))
-    widgets = socket.assigns.widgets ++ [widget]
-    layout = Enum.map(widgets, & &1.id)
-    persist_layout(socket.assigns.current_scope, layout)
+    case Enum.find(socket.assigns.available_widgets, &(&1.id == id)) do
+      nil ->
+        {:noreply, socket}
 
-    {:noreply,
-     socket
-     |> assign(:widgets, widgets)
-     |> assign(:available_widgets, Enum.reject(socket.assigns.available_widgets, &(&1.id == id)))
-     |> put_flash(:info, "#{widget.label} added to dashboard.")}
+      widget ->
+        widgets = socket.assigns.widgets ++ [widget]
+        available = Enum.reject(socket.assigns.available_widgets, &(&1.id == id))
+        layout = Enum.map(widgets, & &1.id)
+        _ = persist_layout(socket.assigns.current_scope, layout)
+
+        {:noreply,
+         socket
+         |> assign(:widgets, widgets)
+         |> assign(:available_widgets, available)
+         |> schedule_refresh(widgets)
+         |> put_flash(:info, "#{widget.label} added to dashboard.")}
+    end
   end
 
   @impl true
   def handle_event("remove-widget", %{"id" => id}, socket) do
-    {removed, kept} = Enum.split_with(socket.assigns.widgets, &(&1.id == id))
-    widget = List.first(removed)
-    widgets = kept
-    layout = Enum.map(widgets, & &1.id)
-    persist_layout(socket.assigns.current_scope, layout)
+    case Enum.split_with(socket.assigns.widgets, &(&1.id == id)) do
+      {[widget], kept} ->
+        widgets = kept
 
-    available =
-      if widget,
-        do: [widget | socket.assigns.available_widgets],
-        else: socket.assigns.available_widgets
+        available =
+          [widget | socket.assigns.available_widgets] |> Enum.sort_by(&{&1.order, &1.id})
 
-    {:noreply,
-     socket
-     |> assign(:widgets, widgets)
-     |> assign(:available_widgets, available)
-     |> put_flash(:info, "Widget removed.")}
+        layout = Enum.map(widgets, & &1.id)
+        _ = persist_layout(socket.assigns.current_scope, layout)
+
+        {:noreply,
+         socket
+         |> assign(:widgets, widgets)
+         |> assign(:available_widgets, available)
+         |> schedule_refresh(widgets)
+         |> put_flash(:info, "Widget removed.")}
+
+      {[], _} ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
   def handle_event("move-up", %{"id" => id}, socket) do
     widgets = move_one(socket.assigns.widgets, id, -1)
     layout = Enum.map(widgets, & &1.id)
-    persist_layout(socket.assigns.current_scope, layout)
+    _ = persist_layout(socket.assigns.current_scope, layout)
     {:noreply, assign(socket, :widgets, widgets)}
   end
 
@@ -202,7 +220,7 @@ defmodule BilimbiWeb.DashboardLive do
   def handle_event("move-down", %{"id" => id}, socket) do
     widgets = move_one(socket.assigns.widgets, id, 1)
     layout = Enum.map(widgets, & &1.id)
-    persist_layout(socket.assigns.current_scope, layout)
+    _ = persist_layout(socket.assigns.current_scope, layout)
     {:noreply, assign(socket, :widgets, widgets)}
   end
 
@@ -239,6 +257,7 @@ defmodule BilimbiWeb.DashboardLive do
      socket
      |> assign(:session_count, session_count)
      |> assign(:audit_entries, audit_entries)
+     |> assign(:refresh_timer, nil)
      |> schedule_refresh(socket.assigns.widgets)}
   end
 
@@ -317,7 +336,7 @@ defmodule BilimbiWeb.DashboardLive do
           />
         </div>
 
-        <p :if={@widgets == []} class="mt-5 text-sm text-ink-subtle">
+        <p :if={@widgets == []} id="dashboard-widgets-empty" class="mt-5 text-sm text-ink-subtle">
           No widgets configured.
           <.link
             phx-click="toggle-layout-edit"
@@ -463,7 +482,10 @@ defmodule BilimbiWeb.DashboardLive do
           <.session_stat_card
             id="stat-sessions"
             count={@session_count}
-            navigate={~p"/system/sessions"}
+            navigate={
+              if UserAuth.allowed?(@current_scope, "admin.system.session.list"),
+                do: ~p"/system/sessions"
+            }
           />
         <% "base-dashboard-recent-audit" -> %>
           <.audit_activity_card
