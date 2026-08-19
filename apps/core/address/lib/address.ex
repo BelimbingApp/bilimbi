@@ -14,6 +14,7 @@ defmodule Bilimbi.Core.Address do
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Address.Addressable
+  alias Bilimbi.Core.Address.AttachedAddress
   alias Bilimbi.Core.Address.Detail
   alias Bilimbi.Core.Address.LinkedOwner
   alias Bilimbi.Core.Address.Page
@@ -38,6 +39,10 @@ defmodule Bilimbi.Core.Address do
   @doc "Address kinds supported by compatible Company attachments."
   @spec company_attachment_kinds() :: [String.t()]
   def company_attachment_kinds, do: Addressable.company_kinds()
+
+  @doc "Address kinds supported by compatible Employee attachments."
+  @spec employee_attachment_kinds() :: [String.t()]
+  def employee_attachment_kinds, do: Addressable.company_kinds()
 
   @spec list_addresses(Scope.t()) :: {:ok, [Summary.t()]}
   def list_addresses(%Scope{} = scope) do
@@ -339,6 +344,133 @@ defmodule Bilimbi.Core.Address do
     end
   end
 
+  @doc "Lists attached addresses for an employee."
+  @spec list_employee_attached_addresses(Scope.t(), pos_integer()) ::
+          {:ok, [AttachedAddress.t()]} | {:error, :employee_not_found}
+  def list_employee_attached_addresses(%Scope{} = scope, employee_id) do
+    with {:ok, _employee} <- Employee.get_employee(scope, employee_id) do
+      employee_addressable_identity = Employee.addressable_identity()
+
+      attached =
+        from(address in Tenancy.scope_query(Schema, scope),
+          join: attachment in Addressable,
+          on:
+            attachment.address_id == address.id and
+              attachment.addressable_type == ^employee_addressable_identity and
+              attachment.addressable_id == ^employee_id,
+          where: is_nil(address.deleted_at),
+          order_by: [asc: attachment.priority, asc: address.id],
+          select: {address, attachment}
+        )
+        |> Repo.all()
+        |> Enum.map(fn {address, attachment} ->
+          AttachedAddress.from_schema(address, attachment)
+        end)
+
+      {:ok, attached}
+    end
+  end
+
+  @doc "Lists live tenant addresses not yet linked to the selected employee."
+  @spec list_available_employee_addresses(Scope.t(), pos_integer()) ::
+          {:ok, [Summary.t()]} | {:error, :employee_not_found}
+  def list_available_employee_addresses(%Scope{} = scope, employee_id) do
+    with {:ok, _employee} <- Employee.get_employee(scope, employee_id) do
+      employee_addressable_identity = Employee.addressable_identity()
+
+      addresses =
+        from(address in Tenancy.scope_query(Schema, scope),
+          where: is_nil(address.deleted_at),
+          where:
+            not exists(
+              from(attachment in Addressable,
+                where:
+                  attachment.address_id == parent_as(:scoped).id and
+                    attachment.addressable_type == ^employee_addressable_identity and
+                    attachment.addressable_id == ^employee_id
+              )
+            ),
+          order_by: [asc_nulls_last: address.label, asc: address.id]
+        )
+        |> Repo.all()
+        |> Enum.map(&Summary.from_schema/1)
+
+      {:ok, addresses}
+    end
+  end
+
+  @doc "Attaches an existing address to an employee."
+  @spec attach_to_employee(Scope.t(), pos_integer(), pos_integer(), map()) ::
+          {:ok, :attached}
+          | {:error, :address_not_found | :employee_not_found | Ecto.Changeset.t()}
+  def attach_to_employee(%Scope{} = scope, address_id, employee_id, attributes \\ %{}) do
+    Repo.transaction(fn ->
+      address = lock_address!(scope, address_id)
+      _employee = require_employee!(scope, employee_id)
+
+      case address.id
+           |> Addressable.company_changeset(
+             employee_id,
+             Employee.addressable_identity(),
+             attributes
+           )
+           |> Repo.insert() do
+        {:ok, _attachment} -> :attached
+        {:error, changeset} -> Repo.rollback(changeset)
+      end
+    end)
+    |> case do
+      {:ok, :attached} -> {:ok, :attached}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc "Removes one Employee's link to an address without deleting the address."
+  @spec detach_from_employee(Scope.t(), pos_integer(), pos_integer()) ::
+          :ok | {:error, :address_not_found | :attachment_not_found | :employee_not_found}
+  def detach_from_employee(%Scope{} = scope, address_id, employee_id) do
+    Repo.transaction(fn ->
+      address = lock_address!(scope, address_id)
+      _employee = require_employee!(scope, employee_id)
+
+      case Repo.delete_all(employee_attachments_query(address.id, employee_id)) do
+        {0, nil} -> Repo.rollback(:attachment_not_found)
+        {_deleted_count, nil} -> :ok
+      end
+    end)
+    |> case do
+      {:ok, :ok} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc "Updates the pivot metadata for one Employee attachment."
+  @spec update_employee_attachment(Scope.t(), pos_integer(), pos_integer(), map()) ::
+          {:ok, :updated}
+          | {:error,
+             :address_not_found | :attachment_not_found | :employee_not_found | Ecto.Changeset.t()}
+  def update_employee_attachment(%Scope{} = scope, address_id, employee_id, attributes)
+      when is_map(attributes) do
+    Repo.transaction(fn ->
+      address = lock_address!(scope, address_id)
+      _employee = require_employee!(scope, employee_id)
+      attachments = lock_employee_attachments!(address.id, employee_id)
+
+      Enum.each(attachments, fn attachment ->
+        case attachment |> Addressable.update_changeset(attributes) |> Repo.update() do
+          {:ok, _attachment} -> :ok
+          {:error, changeset} -> Repo.rollback(changeset)
+        end
+      end)
+
+      :updated
+    end)
+    |> case do
+      {:ok, :updated} -> {:ok, :updated}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp get_schema(%Scope{} = scope, address_id) do
     Repo.one(
       from(address in Tenancy.scope_query(Schema, scope),
@@ -385,6 +517,35 @@ defmodule Bilimbi.Core.Address do
         attachment.address_id == ^address_id and
           attachment.addressable_type == ^Company.addressable_identity() and
           attachment.addressable_id == ^company_id
+    )
+  end
+
+  defp require_employee!(%Scope{} = scope, employee_id) do
+    case Employee.get_employee(scope, employee_id) do
+      {:ok, employee} -> employee
+      {:error, :employee_not_found} -> Repo.rollback(:employee_not_found)
+    end
+  end
+
+  defp lock_employee_attachments!(address_id, employee_id) do
+    attachments =
+      address_id
+      |> employee_attachments_query(employee_id)
+      |> lock("FOR UPDATE")
+      |> Repo.all()
+
+    case attachments do
+      [] -> Repo.rollback(:attachment_not_found)
+      attachments -> attachments
+    end
+  end
+
+  defp employee_attachments_query(address_id, employee_id) do
+    from(attachment in Addressable,
+      where:
+        attachment.address_id == ^address_id and
+          attachment.addressable_type == ^Employee.addressable_identity() and
+          attachment.addressable_id == ^employee_id
     )
   end
 

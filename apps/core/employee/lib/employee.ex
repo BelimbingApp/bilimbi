@@ -131,6 +131,97 @@ defmodule Bilimbi.Core.Employee do
     end
   end
 
+  @doc "Lists direct subordinates assigned to a supervisor in the given company."
+  @spec list_subordinates(Scope.t(), pos_integer(), pos_integer()) ::
+          {:ok, [Summary.t()]} | {:error, lookup_error()}
+  def list_subordinates(%Scope{} = scope, company_id, supervisor_id) do
+    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+         %Schema{} = _supervisor <- employee_schema(company_id, supervisor_id) do
+      subordinates =
+        from(employee in Schema,
+          where: employee.company_id == ^company_id and employee.supervisor_id == ^supervisor_id,
+          order_by: [asc: employee.full_name, asc: employee.id]
+        )
+        |> Repo.all()
+        |> Enum.map(&Summary.from_schema/1)
+
+      {:ok, subordinates}
+    else
+      {:error, :company_not_found} = error -> error
+      nil -> {:error, :employee_not_found}
+    end
+  end
+
+  @doc "Lists eligible employees to become direct subordinates of a supervisor in the company."
+  @spec list_available_subordinates(Scope.t(), pos_integer(), pos_integer()) ::
+          {:ok, [Summary.t()]} | {:error, lookup_error()}
+  def list_available_subordinates(%Scope{} = scope, company_id, supervisor_id) do
+    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+         %Schema{} = _supervisor <- employee_schema(company_id, supervisor_id) do
+      employees =
+        from(employee in Schema,
+          where:
+            employee.company_id == ^company_id and
+              employee.id != ^supervisor_id and
+              (is_nil(employee.supervisor_id) or employee.supervisor_id != ^supervisor_id),
+          order_by: [asc: employee.full_name, asc: employee.id]
+        )
+        |> Repo.all()
+        |> Enum.map(&Summary.from_schema/1)
+
+      {:ok, employees}
+    else
+      {:error, :company_not_found} = error -> error
+      nil -> {:error, :employee_not_found}
+    end
+  end
+
+  @doc "Assigns an employee as direct subordinate to a supervisor."
+  @spec assign_subordinate(Scope.t(), pos_integer(), pos_integer(), pos_integer()) ::
+          {:ok, Summary.t()} | {:error, lookup_error() | Changeset.t()}
+  def assign_subordinate(%Scope{} = scope, company_id, supervisor_id, subordinate_id) do
+    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+         %Schema{} = _supervisor <- employee_schema(company_id, supervisor_id),
+         %Schema{} = subordinate <- employee_schema(company_id, subordinate_id) do
+      if subordinate.id == supervisor_id do
+        {:error, :invariant_violation}
+      else
+        subordinate
+        |> Schema.update_changeset(%{supervisor_id: supervisor_id})
+        |> protect_platform_orchestrator_identity(subordinate)
+        |> reject_reserved_orchestrator_number(subordinate)
+        |> validate_references(scope, company_id, subordinate.id)
+        |> persist_update()
+      end
+    else
+      {:error, :company_not_found} = error -> error
+      nil -> {:error, :employee_not_found}
+    end
+  end
+
+  @doc "Removes subordinate relationship by clearing supervisor_id."
+  @spec remove_subordinate(Scope.t(), pos_integer(), pos_integer(), pos_integer()) ::
+          {:ok, Summary.t()} | {:error, lookup_error() | Changeset.t()}
+  def remove_subordinate(%Scope{} = scope, company_id, supervisor_id, subordinate_id) do
+    with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
+         %Schema{} = _supervisor <- employee_schema(company_id, supervisor_id),
+         %Schema{} = subordinate <- employee_schema(company_id, subordinate_id) do
+      if subordinate.supervisor_id == supervisor_id do
+        subordinate
+        |> Schema.update_changeset(%{supervisor_id: nil})
+        |> protect_platform_orchestrator_identity(subordinate)
+        |> reject_reserved_orchestrator_number(subordinate)
+        |> validate_references(scope, company_id, subordinate.id)
+        |> persist_update()
+      else
+        {:ok, Summary.from_schema(subordinate)}
+      end
+    else
+      {:error, :company_not_found} = error -> error
+      nil -> {:error, :employee_not_found}
+    end
+  end
+
   @doc """
   Locks and proves one employee's affiliation with a live scoped company.
 
