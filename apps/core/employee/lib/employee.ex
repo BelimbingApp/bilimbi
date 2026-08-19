@@ -266,6 +266,22 @@ defmodule Bilimbi.Core.Employee do
         |> Repo.all()
         |> Enum.map(&TypeSummary.from_schema/1)
 
+      types =
+        if types == [] do
+          _ = ensure_system_types()
+
+          from(type in EmployeeType,
+            where:
+              (type.is_system == true and is_nil(type.company_id)) or
+                type.company_id == ^company_id,
+            order_by: [desc: type.is_system, asc: type.label, asc: type.code]
+          )
+          |> Repo.all()
+          |> Enum.map(&TypeSummary.from_schema/1)
+        else
+          types
+        end
+
       {:ok, types}
     end
   end
@@ -457,14 +473,15 @@ defmodule Bilimbi.Core.Employee do
         changeset
 
       code ->
-        if Repo.exists?(
-             from(type in EmployeeType,
-               where:
-                 type.code == ^code and
-                   ((type.is_system == true and is_nil(type.company_id)) or
-                      type.company_id == ^company_id)
-             )
-           ) do
+        if code in @system_type_codes or
+             Repo.exists?(
+               from(type in EmployeeType,
+                 where:
+                   type.code == ^code and
+                     ((type.is_system == true and is_nil(type.company_id)) or
+                        type.company_id == ^company_id)
+               )
+             ) do
           changeset
         else
           Changeset.add_error(changeset, :employee_type, "is not available to the company")
