@@ -36,6 +36,12 @@
     capability: "admin.company.create"
   },
   %{
+    path: "/setup/platform-operator",
+    live: Bilimbi.Core.Company.Web.PlatformOperatorSetupLive,
+    session: :auth,
+    capability: "admin.company.update"
+  },
+  %{
     path: "/companies/:id",
     live: Bilimbi.Core.Company.Web.ShowLive,
     session: :auth,
