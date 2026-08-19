@@ -676,7 +676,7 @@ defmodule Bilimbi.Base.UI.Components do
   """
   attr :id, :string, required: true
   attr :page, :any, required: true
-  attr :page_sizes, :list, default: [10, 25, 50, 100]
+  attr :page_sizes, :list, default: [25, 50, 100, 300]
   attr :filters_form, :any, required: true
 
   def pagination(assigns) do

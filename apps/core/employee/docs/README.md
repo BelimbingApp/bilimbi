@@ -19,7 +19,7 @@ execution, and User linkage, remain later slices.
 `list_administration_page/3` is the bounded Employee-owned read model for an
 administration index. It requires a tenancy scope and one live company proven
 through the public Core Company facade before it queries employees. It accepts
-only validated keyword options for page, page size (default 15, maximum 100),
+only validated keyword options for page, page size (default 25, maximum 300),
 literal case-insensitive search, human/agent filtering, and the Employee-owned
 name/type/status sorts. Its entries expose only safe summary facts and it
 returns deterministic ID-descending ties plus complete pagination metadata.
