@@ -812,16 +812,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
         <div class="mt-6 space-y-6">
           <!-- Card 1: User Details with In-place Editing -->
-          <.card id="user-details-card">
-            <div class="p-4 space-y-4">
-              <div class="border-b border-line pb-2">
-                <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">User Details</h3>
-              </div>
+          <.card id="user-details-card" inner_class="p-5 sm:p-6">
+            <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-4">User Details</h3>
 
-              <dl class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div id="user-detail-name">
-                  <dt class="text-xs text-ink-muted">Name</dt>
-                  <dd class="mt-0.5 text-sm text-ink">
+            <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div id="user-detail-name">
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Name</dt>
+                <dd class="mt-0.5 text-sm text-ink">
                   <%= if @can_manage? do %>
                     <.inline_edit
                       id="user-name"
@@ -834,12 +831,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <% else %>
                     <span>{@user.name}</span>
                   <% end %>
-                  </dd>
-                </div>
+                </dd>
+              </div>
 
-                <div id="user-detail-email">
-                  <dt class="text-xs text-ink-muted">Email</dt>
-                  <dd class="mt-0.5 text-sm text-ink">
+              <div id="user-detail-email">
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Email</dt>
+                <dd class="mt-0.5 text-sm text-ink">
                   <%= if @can_manage? do %>
                     <.inline_edit
                       id="user-email"
@@ -852,12 +849,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <% else %>
                     <span>{@user.email}</span>
                   <% end %>
-                  </dd>
-                </div>
+                </dd>
+              </div>
 
-                <div id="user-detail-company">
-                  <dt class="text-xs text-ink-muted">Company</dt>
-                  <dd class="mt-0.5 text-sm text-ink">
+              <div id="user-detail-company">
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Company</dt>
+                <dd class="mt-0.5 text-sm text-ink">
                   <%= if @can_manage? do %>
                     <form phx-change="save_company" id="user-company-form" class="inline-block">
                       <select
@@ -877,489 +874,567 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     </form>
                   <% else %>
                     <%= if @company_name do %>
-                      <.link navigate={~p"/companies/#{@user.company_id}"} class="text-ink-muted hover:text-ink hover:underline">
+                      <.link navigate={~p"/companies/#{@user.company_id}"} class="text-action hover:underline">
                         {@company_name}
                       </.link>
                     <% else %>
                       <span class="text-ink-faint">None</span>
                     <% end %>
                   <% end %>
-                  </dd>
-                </div>
+                </dd>
+              </div>
 
-                <div id="user-detail-email-verified">
-                  <dt class="text-xs text-ink-muted">Email Verified</dt>
-                  <dd class="mt-0.5 text-sm text-ink">
+              <div id="user-detail-email-verified">
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Email Verified</dt>
+                <dd class="mt-0.5 text-sm text-ink">
                   <.badge kind={if @user.email_verified_at, do: :success, else: :warning}>
-                    {if @user.email_verified_at, do: "verified", else: "unverified"}
+                    <%= if @user.email_verified_at do %>
+                      <.datetime id="user-email-verified-at" value={@user.email_verified_at} />
+                    <% else %>
+                      unverified
+                    <% end %>
                   </.badge>
-                  </dd>
-                </div>
+                </dd>
+              </div>
 
-                <div id="user-detail-created">
-                  <dt class="text-xs text-ink-muted">Created</dt>
-                  <dd class="mt-0.5 text-sm text-ink">
+              <div id="user-detail-created">
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Created</dt>
+                <dd class="mt-0.5 text-sm text-ink-muted tabular-nums">
                   <.datetime id="user-created-at" :if={@user.created_at} value={@user.created_at} />
                   <span :if={is_nil(@user.created_at)} class="text-ink-faint">—</span>
-                  </dd>
-                </div>
+                </dd>
+              </div>
 
-                <div id="user-detail-updated">
-                  <dt class="text-xs text-ink-muted">Updated</dt>
-                  <dd class="mt-0.5 text-sm text-ink">
+              <div id="user-detail-updated">
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Updated</dt>
+                <dd class="mt-0.5 text-sm text-ink-muted tabular-nums">
                   <.datetime id="user-updated-at" :if={@user.updated_at} value={@user.updated_at} />
                   <span :if={is_nil(@user.updated_at)} class="text-ink-faint">—</span>
-                  </dd>
-                </div>
-              </dl>
-            </div>
+                </dd>
+              </div>
+            </dl>
           </.card>
 
           <!-- Card 2: Roles & Permissions -->
-          <.card id="user-roles-card">
-            <div class="p-4 space-y-4">
-              <div class="flex items-center justify-between border-b border-line pb-2">
-                <div class="flex items-center gap-2">
-                  <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">Roles & Permissions</h3>
-                  <span id="assigned-roles-count"><.badge kind={:neutral}>{length(@assigned_roles)}</.badge></span>
-                </div>
-                <div :if={@can_manage? and not is_nil(@user.company_id) and @available_roles != []}>
+          <.card id="user-roles-card" inner_class="p-5 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between mb-1">
+              <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
+                Roles & Permissions
+                <span id="assigned-roles-count" class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink">
+                  {length(@assigned_roles)}
+                </span>
+              </h3>
+            </div>
+            <p class="text-xs text-ink-muted mt-0.5 mb-4">
+              Roles determine what this user can do. Each role grants a set of capabilities. Effective permissions show the combined result of all assigned roles.
+            </p>
+
+            <%= if is_nil(@user.company_id) do %>
+              <.alert kind={:info} id="roles-unaffiliated-alert" class="mb-4">
+                Assign a company in User Details before roles or capabilities can be managed. Permissions are evaluated in a company scope.
+              </.alert>
+            <% end %>
+
+            <!-- Assigned Roles -->
+            <dl class="mb-4" id="assigned-roles-container">
+              <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">Roles</dt>
+              <dd>
+                <%= if @assigned_roles == [] do %>
+                  <span class="text-sm text-ink-muted" id="no-roles-msg">No roles assigned.</span>
+                <% else %>
+                  <div class="flex flex-wrap gap-2" id="assigned-roles-list">
+                    <span
+                      :for={assignment <- @assigned_roles}
+                      id={"assigned-role-#{assignment.id}"}
+                      class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
+                    >
+                      <span>{assignment.role_name}</span>
+                      <button
+                        :if={@can_manage?}
+                        type="button"
+                        id={"remove-role-#{assignment.id}"}
+                        phx-click="remove_role"
+                        phx-value-assignment-id={assignment.id}
+                        phx-value-role-id={assignment.role_id}
+                        class="ml-0.5 text-ink-muted hover:text-danger transition-colors cursor-pointer"
+                        title="Remove role"
+                        aria-label="Remove role"
+                      >
+                        <.icon name="hero-x-mark" class="size-3" />
+                      </button>
+                    </span>
+                  </div>
+                <% end %>
+              </dd>
+            </dl>
+
+            <!-- Assign Roles Form (Expandable) -->
+            <%= if @can_manage? and not is_nil(@user.company_id) and @available_roles != [] and not @has_grant_all? do %>
+              <div class="mb-6">
+                <div :if={not @show_assign_roles}>
                   <.button
                     type="button"
                     id="toggle-assign-roles-btn"
                     phx-click="toggle_assign_roles"
-                    class="text-xs"
+                    class="text-xs font-medium"
                   >
-                    {if @show_assign_roles, do: "Close Roles", else: "+ Roles"}
+                    <.icon name="hero-plus" class="size-3.5" />
+                    <span>Roles</span>
                   </.button>
                 </div>
-              </div>
-
-              <p class="-mt-2 text-xs text-ink-muted">
-                Roles determine what this user can do. Each role grants a set of capabilities.
-                Effective permissions show the combined result of all assigned roles.
-              </p>
-
-              <%= if is_nil(@user.company_id) do %>
-                <.alert kind={:info} id="roles-unaffiliated-alert">
-                  User must be assigned to a company before roles and permissions can be managed.
-                </.alert>
-              <% else %>
-                <!-- Assigned Roles Chips -->
-                <div id="assigned-roles-container">
-                  <div class="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle mb-2">Assigned Roles</div>
-                  <%= if @assigned_roles == [] do %>
-                    <p class="text-xs text-ink-muted" id="no-roles-msg">No roles assigned.</p>
-                  <% else %>
-                    <div class="flex flex-wrap gap-1.5" id="assigned-roles-list">
-                      <span
-                        :for={assignment <- @assigned_roles}
-                        id={"assigned-role-#{assignment.id}"}
-                        class="inline-flex items-center gap-1 rounded-full border border-line bg-surface-muted px-2.5 py-0.5 text-xs font-medium text-ink"
-                      >
-                        <span>{assignment.role_name}</span>
-                        <button
-                          :if={@can_manage?}
-                          type="button"
-                          id={"remove-role-#{assignment.id}"}
-                          phx-click="remove_role"
-                          phx-value-assignment-id={assignment.id}
-                          phx-value-role-id={assignment.role_id}
-                          class="text-ink-muted hover:text-danger ml-0.5"
-                          title="Remove role"
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    </div>
-                  <% end %>
-                </div>
-
-                <!-- Assign Roles Form (Expandable) -->
                 <div
-                  :if={@show_assign_roles and @can_manage?}
+                  :if={@show_assign_roles}
                   id="assign-roles-picker"
-                  class="mt-3 rounded-lg border border-line bg-surface-sunken p-3 space-y-3"
+                  class="rounded-xl border border-line bg-surface p-3 space-y-3 shadow-xs"
                 >
-                  <div class="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle">Assign Roles</div>
-                  <input
-                    type="text"
-                    id="role-search-input"
-                    phx-input="search_roles"
-                    placeholder="Search roles..."
-                    value={@role_search}
-                    class="w-full rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none"
-                  />
+                  <div>
+                    <input
+                      type="text"
+                      id="role-search-input"
+                      phx-input="search_roles"
+                      placeholder="Search roles..."
+                      value={@role_search}
+                      class="w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none"
+                    />
+                  </div>
                   <form phx-change="select_roles" phx-submit="assign_selected_roles" id="assign-roles-form">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 max-h-48 overflow-y-auto" id="available-roles-list">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 max-h-48 overflow-y-auto" id="available-roles-list">
                       <label
                         :for={role <- @filtered_available_roles}
                         id={"available-role-label-#{role.id}"}
-                        class="flex items-center gap-2 rounded px-2 py-1 text-xs hover:bg-surface cursor-pointer text-ink"
+                        class="flex items-center gap-2 px-2 py-1 rounded text-sm hover:bg-surface-sunken cursor-pointer text-ink"
                       >
                         <input
                           type="checkbox"
                           name="role_ids[]"
                           value={role.id}
                           checked={to_string(role.id) in @selected_role_ids}
-                          class="rounded border-line text-action focus:ring-action"
+                          class="rounded border-line-strong accent-action focus:ring-action"
                         />
-                        <span class="truncate">{role.name}</span>
+                        <span class="truncate" title={role.name}>{role.name}</span>
                       </label>
                     </div>
-                    <div :if={@selected_role_ids != []} class="mt-3 flex items-center gap-2">
-                      <.button type="submit" variant="primary" id="confirm-assign-roles-btn" class="text-xs">
+                    <div class="flex items-center gap-2 mt-2">
+                      <.button
+                        :if={@selected_role_ids != []}
+                        type="submit"
+                        variant="primary"
+                        id="confirm-assign-roles-btn"
+                        class="text-xs"
+                      >
                         Assign ({length(@selected_role_ids)})
+                      </.button>
+                      <.button
+                        type="button"
+                        phx-click="toggle_assign_roles"
+                        class="text-xs"
+                      >
+                        Cancel
                       </.button>
                     </div>
                   </form>
                 </div>
+              </div>
+            <% end %>
 
-                <!-- Effective Permissions Disclosure -->
-                <div id="effective-permissions-section" class="border-t border-line pt-3">
-                  <button
-                    type="button"
-                    id="toggle-permissions-btn"
-                    phx-click="toggle_effective_permissions"
-                    class="flex w-full items-center justify-between text-left text-xs font-semibold uppercase tracking-wider text-ink-subtle hover:text-ink"
-                  >
-                    <span>Effective Permissions</span>
-                    <.icon name={if @show_effective_permissions, do: "hero-chevron-up", else: "hero-chevron-down"} class="size-4" />
-                  </button>
+            <!-- Effective Permissions Disclosure -->
+            <div id="effective-permissions-section" class="border-t border-line pt-4">
+              <button
+                type="button"
+                id="toggle-permissions-btn"
+                phx-click="toggle_effective_permissions"
+                class="flex items-center gap-2 w-full text-left group cursor-pointer focus:outline-none"
+              >
+                <span class="shrink-0 text-ink-muted w-3 grid place-items-center" aria-hidden="true">
+                  <.icon name={if @show_effective_permissions, do: "hero-chevron-down", else: "hero-chevron-right"} class="size-3" />
+                </span>
+                <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
+                  Effective Permissions
+                  <span class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink">
+                    {length(@effective_keys)}
+                  </span>
+                </h3>
+              </button>
 
-                  <div :if={@show_effective_permissions} id="effective-permissions-content" class="mt-3 space-y-4">
-                    <!-- Allowed Capabilities Grouped by Domain -->
-                    <div :for={{domain, caps} <- @grouped_effective_permissions} id={"permissions-domain-#{domain}"} class="space-y-1.5">
-                      <h4 class="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{domain}</h4>
-                      <div class="flex flex-wrap gap-1.5">
-                        <%= for cap <- caps do %>
-                          <% is_direct = Map.has_key?(@direct_grant_ids, cap) %>
-                          <span
-                            id={"cap-badge-#{String.replace(cap, ".", "-")}"}
-                            class={[
-                              "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium",
-                              if(is_direct, do: "bg-info-surface text-info-ink border border-info-line", else: "bg-success-surface text-success-ink border border-success-line")
-                            ]}
-                          >
-                            <span>{cap}</span>
-                            <%= if @can_manage? do %>
-                              <%= if is_direct do %>
-                                <button
-                                  type="button"
-                                  id={"remove-direct-cap-#{String.replace(cap, ".", "-")}"}
-                                  phx-click="remove_capability"
-                                  phx-value-grant-id={@direct_grant_ids[cap]}
-                                  class="hover:opacity-70 ml-0.5 text-info-ink"
-                                  title="Remove direct grant"
-                                >
-                                  ✕
-                                </button>
-                              <% else %>
+              <div :if={@show_effective_permissions} id="effective-permissions-content" class="mt-3">
+                <p class="text-xs text-ink-muted mb-3">
+                  Green = from roles. Blue = direct grant. Red = denied. Click ✕ to remove or deny.
+                </p>
+
+                <%= if @grouped_effective_permissions == %{} do %>
+                  <p class="text-sm text-ink-muted">No permissions.</p>
+                <% else %>
+                  <dl :for={{domain, caps} <- @grouped_effective_permissions} id={"permissions-domain-#{domain}"} class="mb-3">
+                    <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-1">{domain}</dt>
+                    <dd class="flex flex-wrap gap-1">
+                      <%= for cap <- caps do %>
+                        <% is_direct = Map.has_key?(@direct_grant_ids, cap) %>
+                        <span
+                          id={"cap-badge-#{String.replace(cap, ".", "-")}"}
+                          class={[
+                            "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border",
+                            if(is_direct,
+                              do: "bg-info-surface text-info-ink border-info-line",
+                              else: "bg-success-surface text-success-ink border-success-line"
+                            )
+                          ]}
+                        >
+                          <span>{cap}</span>
+                          <%= if @can_manage? do %>
+                            <%= if is_direct do %>
+                              <button
+                                type="button"
+                                id={"remove-direct-cap-#{String.replace(cap, ".", "-")}"}
+                                phx-click="remove_capability"
+                                phx-value-grant-id={@direct_grant_ids[cap]}
+                                class="ml-1 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                                title="Remove direct grant"
+                                aria-label="Remove direct grant"
+                              >
+                                <.icon name="hero-x-mark" class="size-3.5 stroke-[2.5]" />
+                              </button>
+                            <% else %>
+                              <%= if not is_nil(@user.company_id) do %>
                                 <button
                                   type="button"
                                   id={"deny-cap-#{String.replace(cap, ".", "-")}"}
                                   phx-click="deny_capability"
                                   phx-value-capability-key={cap}
-                                  class="hover:opacity-70 ml-0.5 text-success-ink"
-                                  title="Deny capability"
+                                  class="ml-1 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                                  title="Deny this capability"
+                                  aria-label="Deny this capability"
                                 >
-                                  ✕
+                                  <.icon name="hero-x-mark" class="size-3.5 stroke-[2.5]" />
                                 </button>
                               <% end %>
                             <% end %>
-                          </span>
-                        <% end %>
-                      </div>
-                    </div>
-
-                    <!-- Denied Capabilities Grouped by Domain (Red) -->
-                    <div :if={@grouped_denied_permissions != %{}} id="denied-permissions-section" class="space-y-2 border-t border-line pt-2">
-                      <div class="text-[11px] font-semibold uppercase tracking-wider text-danger-ink">Denied Capabilities</div>
-                      <div :for={{domain, caps} <- @grouped_denied_permissions} id={"denied-domain-#{domain}"} class="space-y-1.5">
-                        <h4 class="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{domain}</h4>
-                        <div class="flex flex-wrap gap-1.5">
-                          <span
-                            :for={cap <- caps}
-                            id={"denied-cap-badge-#{String.replace(cap, ".", "-")}"}
-                            class="inline-flex items-center gap-1 rounded-full border border-danger-line bg-danger-surface px-2.5 py-0.5 text-xs font-medium text-danger-ink"
-                          >
-                            <span>{cap}</span>
-                            <button
-                              :if={@can_manage?}
-                              type="button"
-                              id={"remove-denial-#{String.replace(cap, ".", "-")}"}
-                              phx-click="remove_capability"
-                              phx-value-grant-id={@direct_deny_ids[cap]}
-                              class="hover:opacity-70 ml-0.5 text-danger-ink"
-                              title="Remove denial"
-                            >
-                              ✕
-                            </button>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Add Capabilities Picker -->
-                    <div :if={@can_manage? and @grouped_available_capabilities != %{}} id="add-capabilities-section" class="border-t border-line pt-3">
-                      <div class="text-[11px] font-semibold uppercase tracking-wider text-ink-subtle mb-2">Add Capabilities</div>
-                      <input
-                        type="text"
-                        id="capability-search-input"
-                        phx-input="search_capabilities"
-                        placeholder="Search capabilities..."
-                        value={@capability_search}
-                        class="w-full rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none mb-2"
-                      />
-                      <form phx-change="select_capabilities" phx-submit="add_selected_capabilities" id="add-capabilities-form">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 max-h-48 overflow-y-auto" id="available-capabilities-list">
-                          <%= for {_domain, caps} <- @grouped_available_capabilities, cap <- caps, String.contains?(String.downcase(cap), String.downcase(@capability_search)) do %>
-                            <label
-                              id={"available-cap-label-#{String.replace(cap, ".", "-")}"}
-                              class="flex items-center gap-2 rounded px-2 py-1 text-xs hover:bg-surface cursor-pointer text-ink"
-                            >
-                              <input
-                                type="checkbox"
-                                name="capability_keys[]"
-                                value={cap}
-                                checked={cap in @selected_capability_keys}
-                                class="rounded border-line text-action focus:ring-action"
-                              />
-                              <span class="truncate" title={cap}>{cap}</span>
-                            </label>
                           <% end %>
-                        </div>
-                        <div :if={@selected_capability_keys != []} class="mt-2">
-                          <.button type="submit" variant="primary" id="confirm-add-capabilities-btn" class="text-xs">
-                            Add ({length(@selected_capability_keys)})
-                          </.button>
-                        </div>
-                      </form>
+                        </span>
+                      <% end %>
+                    </dd>
+                  </dl>
+                <% end %>
+
+                <!-- Denied Capabilities Grouped by Domain (Red) -->
+                <div :if={@grouped_denied_permissions != %{}} id="denied-permissions-section" class="mt-4 pt-4 border-t border-line">
+                  <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">Denied</div>
+                  <div :for={{domain, caps} <- @grouped_denied_permissions} id={"denied-domain-#{domain}"} class="mb-3">
+                    <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-1">{domain}</div>
+                    <div class="flex flex-wrap gap-1">
+                      <span
+                        :for={cap <- caps}
+                        id={"denied-cap-badge-#{String.replace(cap, ".", "-")}"}
+                        class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border border-danger-line bg-danger-surface text-danger-ink"
+                      >
+                        <span>{cap}</span>
+                        <button
+                          :if={@can_manage?}
+                          type="button"
+                          id={"remove-denial-#{String.replace(cap, ".", "-")}"}
+                          phx-click="remove_capability"
+                          phx-value-grant-id={@direct_deny_ids[cap]}
+                          class="ml-1 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                          title="Remove deny"
+                          aria-label="Remove deny"
+                        >
+                          <.icon name="hero-x-mark" class="size-3.5 stroke-[2.5]" />
+                        </button>
+                      </span>
                     </div>
                   </div>
                 </div>
-              <% end %>
-            </div>
-          </.card>
 
-          <!-- Card 3: Change Password -->
-          <.card id="user-password-card">
-            <div class="p-4">
-              <button
-                type="button"
-                id="toggle-change-password-btn"
-                phx-click="toggle_change_password"
-                class="flex w-full items-center justify-between text-left text-xs font-semibold uppercase tracking-wider text-ink-subtle hover:text-ink"
-              >
-                <span>Change Password</span>
-                <.icon name={if @show_change_password, do: "hero-chevron-up", else: "hero-chevron-down"} class="size-4" />
-              </button>
-
-              <div :if={@show_change_password} id="change-password-form-container" class="mt-4 max-w-md">
-                <.form
-                  for={@password_form}
-                  id="user-password-form"
-                  phx-submit="update_password"
-                  class="space-y-4"
+                <!-- Add Capabilities Picker -->
+                <div
+                  :if={@can_manage? and not is_nil(@user.company_id) and @grouped_available_capabilities != %{}}
+                  id="add-capabilities-section"
+                  class="mt-4 pt-4 border-t border-line"
                 >
-                  <div>
-                    <label for="user-new-password" class="block text-xs font-medium text-ink">New Password</label>
-                    <input
-                      type="password"
-                      name="password"
-                      id="user-new-password"
-                      required
-                      autocomplete="new-password"
-                      placeholder="Enter new password"
-                      class="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
-                    />
-                    <p :if={@password_errors[:password]} class="mt-1 text-xs text-danger-ink">{@password_errors[:password]}</p>
-                  </div>
-
-                  <div>
-                    <label for="user-new-password-confirmation" class="block text-xs font-medium text-ink">Confirm New Password</label>
-                    <input
-                      type="password"
-                      name="password_confirmation"
-                      id="user-new-password-confirmation"
-                      required
-                      autocomplete="new-password"
-                      placeholder="Confirm new password"
-                      class="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
-                    />
-                    <p :if={@password_errors[:password_confirmation]} class="mt-1 text-xs text-danger-ink">{@password_errors[:password_confirmation]}</p>
-                  </div>
-
-                  <.button type="submit" variant="primary" id="update-password-btn" class="text-xs">
-                    Update Password
-                  </.button>
-                </.form>
-              </div>
-            </div>
-          </.card>
-
-          <!-- Card 4: Employee Records -->
-          <.card id="user-employees-card">
-            <div class="p-4 space-y-4">
-              <div class="flex items-center justify-between border-b border-line pb-2">
-                <div>
-                  <div class="flex items-center gap-2">
-                    <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">Employee Records</h3>
-                    <span id="employees-count"><.badge kind={:neutral}>{length(@employees)}</.badge></span>
-                  </div>
-                  <p class="mt-0.5 text-xs text-ink-muted">
-                    Employment records linking this user to companies. A user can have multiple records across different companies (e.g. contractors). Not all employees require a user account.
-                  </p>
-                </div>
-                <div :if={@can_manage? and not is_nil(@user.company_id)}>
-                  <.button
-                    type="button"
-                    id="open-add-employee-modal-btn"
-                    phx-click="open_add_employee_modal"
-                    variant="primary"
-                    class="text-xs"
-                  >
-                    + Add Employee
-                  </.button>
-                </div>
-              </div>
-
-              <.table
-                id="user-employees-table"
-                rows={@sorted_employees}
-                sort_by={@employees_sort_by}
-                sort_dir={@employees_sort_dir}
-                sort_event="sort_employees"
-              >
-                <:col :let={emp} label="Employee No." sort="employee_number">
-                  <.link navigate={~p"/employees/#{emp.id}"} class="text-action hover:underline font-medium">
-                    {emp.employee_number || "—"}
-                  </.link>
-                </:col>
-                <:col :let={emp} label="Company" sort="company">
-                  {Map.get(@company_names, emp.company_id, "—")}
-                </:col>
-                <:col :let={emp} label="Designation" sort="designation">
-                  {emp.designation || "—"}
-                </:col>
-                <:col :let={emp} label="Status" sort="status">
-                  <.badge kind={employee_status_kind(emp.status)}>
-                    {emp.status || "active"}
-                  </.badge>
-                </:col>
-                <:col :let={emp} label="Employment Start" sort="employment_start">
-                  <.datetime id={"employee-start-#{emp.id}"} :if={emp.employment_start} value={emp.employment_start} />
-                  <span :if={is_nil(emp.employment_start)} class="text-ink-faint">—</span>
-                </:col>
-                <:action :let={emp}>
-                  <.button
-                    :if={@can_manage?}
-                    type="button"
-                    id={"unlink-employee-#{emp.id}"}
-                    phx-click="unlink_employee"
-                    phx-value-employee-id={emp.id}
-                    data-confirm="Unlink this employee record from the user?"
-                    class="text-xs text-danger-ink hover:text-danger"
-                  >
-                    Unlink
-                  </.button>
-                </:action>
-                <:empty :if={@employees == []}>
-                  No employee records.
-                </:empty>
-              </.table>
-
-              <!-- Link Existing Employee Form -->
-              <div :if={@can_manage? and @unlinkable_employees != []} id="link-employee-section" class="border-t border-line pt-3">
-                <div :if={not @show_link_employee}>
-                  <.button
-                    type="button"
-                    id="toggle-link-employee-btn"
-                    phx-click="toggle_link_employee"
-                    class="text-xs"
-                  >
-                    + Link Employee
-                  </.button>
-                </div>
-                <div :if={@show_link_employee} class="flex items-center gap-2" id="link-employee-form-container">
-                  <form phx-submit="link_employee" id="link-employee-form" class="flex items-center gap-2">
-                    <select
-                      name="employee_id"
-                      id="link-employee-select"
-                      class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none"
-                    >
-                      <option value="">Select an employee...</option>
-                      <option
-                        :for={emp <- @unlinkable_employees}
-                        value={emp.id}
-                      >
-                        {emp.full_name} ({emp.employee_number})
-                      </option>
-                    </select>
-                    <.button type="submit" variant="primary" id="confirm-link-employee-btn" class="text-xs">
-                      Link
-                    </.button>
-                    <.button type="button" phx-click="toggle_link_employee" class="text-xs">
-                      Cancel
-                    </.button>
+                  <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">Add Capabilities</div>
+                  <input
+                    type="text"
+                    id="capability-search-input"
+                    phx-input="search_capabilities"
+                    placeholder="Search capabilities..."
+                    value={@capability_search}
+                    class="w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none mb-2"
+                  />
+                  <form phx-change="select_capabilities" phx-submit="add_selected_capabilities" id="add-capabilities-form">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 max-h-48 overflow-y-auto" id="available-capabilities-list">
+                      <%= for {_domain, caps} <- @grouped_available_capabilities, cap <- caps, String.contains?(String.downcase(cap), String.downcase(@capability_search)) do %>
+                        <label
+                          id={"available-cap-label-#{String.replace(cap, ".", "-")}"}
+                          class="flex items-center gap-2 px-2 py-1 rounded text-sm hover:bg-surface-sunken cursor-pointer text-ink"
+                        >
+                          <input
+                            type="checkbox"
+                            name="capability_keys[]"
+                            value={cap}
+                            checked={cap in @selected_capability_keys}
+                            class="rounded border-line-strong accent-action focus:ring-action"
+                          />
+                          <span class="truncate" title={cap}>{cap}</span>
+                        </label>
+                      <% end %>
+                    </div>
+                    <div :if={@selected_capability_keys != []} class="mt-2">
+                      <.button type="submit" variant="primary" id="confirm-add-capabilities-btn" class="text-xs">
+                        Add ({length(@selected_capability_keys)})
+                      </.button>
+                    </div>
                   </form>
                 </div>
               </div>
             </div>
           </.card>
 
-          <!-- Card 5: External Accesses -->
-          <.card id="user-external-accesses-card">
-            <div class="p-4 space-y-4">
-              <div class="border-b border-line pb-2">
-                <div class="flex items-center gap-2">
-                  <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">External Accesses</h3>
-                  <span id="external-accesses-count"><.badge kind={:neutral}>{length(@external_accesses)}</.badge></span>
-                </div>
-                <p class="mt-0.5 text-xs text-ink-muted">
-                  Portal access granted to this user by other companies. Allows customers or suppliers to view shared data.
-                </p>
-              </div>
+          <!-- Card 3: Change Password -->
+          <.card id="user-password-card" inner_class="p-5 sm:p-6">
+            <button
+              type="button"
+              id="toggle-change-password-btn"
+              phx-click="toggle_change_password"
+              class="flex items-center gap-2 w-full text-left group cursor-pointer focus:outline-none"
+            >
+              <span class="shrink-0 text-ink-muted w-3 grid place-items-center" aria-hidden="true">
+                <.icon name={if @show_change_password, do: "hero-chevron-down", else: "hero-chevron-right"} class="size-3" />
+              </span>
+              <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
+                Change Password
+              </h3>
+            </button>
 
-              <.table
-                id="user-external-accesses-table"
-                rows={@sorted_external_accesses}
-                sort_by={@external_accesses_sort_by}
-                sort_dir={@external_accesses_sort_dir}
-                sort_event="sort_external_accesses"
+            <div :if={@show_change_password} id="change-password-form-container" class="mt-4 max-w-md">
+              <.form
+                for={@password_form}
+                id="user-password-form"
+                phx-submit="update_password"
+                class="space-y-4"
               >
-                <:col :let={access} label="Granting Company" sort="company">
-                  {Map.get(@company_names, access.company_id, "—")}
-                </:col>
-                <:col :let={access} label="Permissions" sort="permissions">
-                  <%= if is_list(access.permissions) and access.permissions != [] do %>
-                    <div class="flex flex-wrap gap-1">
-                      <span :for={p <- access.permissions} class="inline-flex rounded bg-surface-muted px-1.5 py-0.5 text-[11px] text-ink">
-                        {p}
-                      </span>
-                    </div>
-                  <% else %>
-                    <span class="text-ink-faint">—</span>
-                  <% end %>
-                </:col>
-                <:col :let={access} label="Status" sort="access_status">
-                  <.badge kind={external_access_status_kind(access)}>
-                    {external_access_status_label(access)}
-                  </.badge>
-                </:col>
-                <:col :let={access} label="Granted At" sort="granted_at">
+                <div>
+                  <label for="user-new-password" class="mb-1.5 block text-sm font-medium text-ink">New Password</label>
+                  <input
+                    type="password"
+                    name="password"
+                    id="user-new-password"
+                    required
+                    autocomplete="new-password"
+                    placeholder="Enter new password"
+                    class="block w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/20"
+                  />
+                  <p :if={@password_errors[:password]} class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink">
+                    <.icon name="hero-exclamation-circle" class="size-4 shrink-0 text-danger" />
+                    {@password_errors[:password]}
+                  </p>
+                </div>
+
+                <div>
+                  <label for="user-new-password-confirmation" class="mb-1.5 block text-sm font-medium text-ink">Confirm New Password</label>
+                  <input
+                    type="password"
+                    name="password_confirmation"
+                    id="user-new-password-confirmation"
+                    required
+                    autocomplete="new-password"
+                    placeholder="Confirm new password"
+                    class="block w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/20"
+                  />
+                  <p :if={@password_errors[:password_confirmation]} class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink">
+                    <.icon name="hero-exclamation-circle" class="size-4 shrink-0 text-danger" />
+                    {@password_errors[:password_confirmation]}
+                  </p>
+                </div>
+
+                <.button type="submit" variant="primary" id="update-password-btn" class="text-sm">
+                  Update Password
+                </.button>
+              </.form>
+            </div>
+          </.card>
+
+          <!-- Card 4: Employee Records -->
+          <.card id="user-employees-card" inner_class="p-5 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
+                Employee Records
+                <span id="employees-count" class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink">
+                  {length(@employees)}
+                </span>
+              </h3>
+              <div :if={@can_manage? and not is_nil(@user.company_id)}>
+                <.button
+                  type="button"
+                  id="open-add-employee-modal-btn"
+                  phx-click="open_add_employee_modal"
+                  variant="primary"
+                  class="text-xs"
+                >
+                  <.icon name="hero-plus" class="size-3.5" />
+                  <span>Add Employee</span>
+                </.button>
+              </div>
+            </div>
+            <p class="text-xs text-ink-muted mt-0.5">
+              Employment records linking this user to companies. A user can have multiple records across different companies (e.g. contractors). Not all employees require a user account.
+            </p>
+
+            <.table
+              id="user-employees-table"
+              rows={@sorted_employees}
+              sort_by={@employees_sort_by}
+              sort_dir={@employees_sort_dir}
+              sort_event="sort_employees"
+              framed={false}
+            >
+              <:col :let={emp} label="Employee No." sort="employee_number">
+                <.link navigate={~p"/employees/#{emp.id}"} class="text-action hover:underline font-medium">
+                  {emp.employee_number || "—"}
+                </.link>
+              </:col>
+              <:col :let={emp} label="Company" sort="company">
+                <%= if Map.get(@company_names, emp.company_id) do %>
+                  <.link navigate={~p"/companies/#{emp.company_id}"} class="text-action hover:underline">
+                    {Map.get(@company_names, emp.company_id)}
+                  </.link>
+                <% else %>
+                  <span class="text-ink-faint">—</span>
+                <% end %>
+              </:col>
+              <:col :let={emp} label="Designation" sort="designation">
+                <span class="text-ink-muted">{emp.designation || "—"}</span>
+              </:col>
+              <:col :let={emp} label="Status" sort="status">
+                <.badge kind={employee_status_kind(emp.status)}>
+                  {String.capitalize(emp.status || "active")}
+                </.badge>
+              </:col>
+              <:col :let={emp} label="Employment Start" sort="employment_start">
+                <span class="text-ink-muted tabular-nums">
+                  <.datetime id={"employee-start-#{emp.id}"} :if={emp.employment_start} value={emp.employment_start} />
+                  <span :if={is_nil(emp.employment_start)} class="text-ink-faint">—</span>
+                </span>
+              </:col>
+              <:action :let={emp}>
+                <.button
+                  :if={@can_manage?}
+                  type="button"
+                  id={"unlink-employee-#{emp.id}"}
+                  phx-click="unlink_employee"
+                  phx-value-employee-id={emp.id}
+                  data-confirm="Unlink this employee record from the user?"
+                  class="text-xs text-danger-ink hover:text-danger cursor-pointer"
+                >
+                  <.icon name="hero-link-slash" class="size-3.5" />
+                  <span>Unlink</span>
+                </.button>
+              </:action>
+              <:empty :if={@employees == []}>
+                No employee records.
+              </:empty>
+            </.table>
+
+            <!-- Link Existing Employee Form -->
+            <div :if={@can_manage? and @unlinkable_employees != []} id="link-employee-section" class="mt-4 pt-4 border-t border-line">
+              <div :if={not @show_link_employee}>
+                <.button
+                  type="button"
+                  id="toggle-link-employee-btn"
+                  phx-click="toggle_link_employee"
+                  class="text-xs"
+                >
+                  <.icon name="hero-plus" class="size-3.5" />
+                  <span>Link Employee</span>
+                </.button>
+              </div>
+              <div :if={@show_link_employee} class="flex items-center gap-2" id="link-employee-form-container">
+                <form phx-submit="link_employee" id="link-employee-form" class="flex items-center gap-2">
+                  <select
+                    name="employee_id"
+                    id="link-employee-select"
+                    class="w-64 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                  >
+                    <option value="">Search employee...</option>
+                    <option
+                      :for={emp <- @unlinkable_employees}
+                      value={emp.id}
+                    >
+                      {emp.full_name} ({emp.employee_number})
+                    </option>
+                  </select>
+                  <.button type="submit" variant="primary" id="confirm-link-employee-btn" class="text-xs">
+                    Link
+                  </.button>
+                  <.button type="button" phx-click="toggle_link_employee" class="text-xs">
+                    Cancel
+                  </.button>
+                </form>
+              </div>
+            </div>
+          </.card>
+
+          <!-- Card 5: External Accesses -->
+          <.card id="user-external-accesses-card" inner_class="p-5 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
+                External Accesses
+                <span id="external-accesses-count" class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink">
+                  {length(@external_accesses)}
+                </span>
+              </h3>
+            </div>
+            <p class="text-xs text-ink-muted mt-0.5">
+              Portal access granted to this user by other companies. Allows customers or suppliers to view orders, invoices, and other shared data.
+            </p>
+
+            <.table
+              id="user-external-accesses-table"
+              rows={@sorted_external_accesses}
+              sort_by={@external_accesses_sort_by}
+              sort_dir={@external_accesses_sort_dir}
+              sort_event="sort_external_accesses"
+              framed={false}
+            >
+              <:col :let={access} label="Granting Company" sort="company">
+                <%= if Map.get(@company_names, access.company_id) do %>
+                  <.link navigate={~p"/companies/#{access.company_id}"} class="text-action hover:underline font-medium">
+                    {Map.get(@company_names, access.company_id)}
+                  </.link>
+                <% else %>
+                  <span class="text-ink-faint">—</span>
+                <% end %>
+              </:col>
+              <:col :let={access} label="Permissions" sort="permissions">
+                <%= if is_list(access.permissions) and access.permissions != [] do %>
+                  <div class="flex flex-wrap gap-1">
+                    <span :for={p <- access.permissions} class="inline-flex rounded bg-surface-muted px-1.5 py-0.5 text-[11px] text-ink">
+                      {p}
+                    </span>
+                  </div>
+                <% else %>
+                  <span class="text-ink-faint">—</span>
+                <% end %>
+              </:col>
+              <:col :let={access} label="Status" sort="access_status">
+                <.badge kind={external_access_status_kind(access)}>
+                  {external_access_status_label(access)}
+                </.badge>
+              </:col>
+              <:col :let={access} label="Granted At" sort="granted_at">
+                <span class="text-ink-muted tabular-nums">
                   <.datetime id={"access-granted-#{access.id}"} :if={access.access_granted_at} value={access.access_granted_at} />
                   <span :if={is_nil(access.access_granted_at)} class="text-ink-faint">—</span>
-                </:col>
-                <:col :let={access} label="Expires At" sort="expires_at">
+                </span>
+              </:col>
+              <:col :let={access} label="Expires At" sort="expires_at">
+                <span class="text-ink-muted tabular-nums">
                   <.datetime id={"access-expires-#{access.id}"} :if={access.access_expires_at} value={access.access_expires_at} />
                   <span :if={is_nil(access.access_expires_at)} class="text-ink-faint">—</span>
-                </:col>
-                <:empty :if={@external_accesses == []}>
-                  No external accesses.
-                </:empty>
-              </.table>
-            </div>
+                </span>
+              </:col>
+              <:empty :if={@external_accesses == []}>
+                No external accesses.
+              </:empty>
+            </.table>
           </.card>
 
           <!-- Card 6: Danger Zone (Delete Account) -->
@@ -1382,11 +1457,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           id="add-employee-modal"
           class="fixed inset-0 z-40 flex items-start justify-center bg-ink/40 p-6"
         >
-          <div class="mt-16 w-full max-w-lg rounded-xl border border-line bg-surface p-6 shadow-sm">
-            <h2 class="text-lg font-medium tracking-tight text-ink-strong">
+          <div class="mt-16 w-full max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-lg space-y-4">
+            <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
               Add Employee Record
-            </h2>
-            <p class="mt-1 text-xs text-ink-subtle">
+            </h3>
+            <p class="mt-1 text-xs text-ink-muted">
               Create a new employee record and link it to this user.
             </p>
 
@@ -1402,7 +1477,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   name="company_id"
                   id="new-emp-company"
                   required
-                  class="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                  class="mt-1 block w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
                 >
                   <option
                     :for={company <- @companies}
@@ -1424,7 +1499,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     id="new-emp-number"
                     required
                     value={@new_employee_form[:employee_number].value}
-                    class="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                    class="mt-1 block w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
                   />
                   <p :if={@new_employee_errors[:employee_number]} class="mt-1 text-xs text-danger-ink">{@new_employee_errors[:employee_number]}</p>
                 </div>
@@ -1436,7 +1511,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     id="new-emp-name"
                     required
                     value={@new_employee_form[:full_name].value}
-                    class="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                    class="mt-1 block w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
                   />
                   <p :if={@new_employee_errors[:full_name]} class="mt-1 text-xs text-danger-ink">{@new_employee_errors[:full_name]}</p>
                 </div>
@@ -1451,7 +1526,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     id="new-emp-designation"
                     placeholder="Job title"
                     value={@new_employee_form[:designation].value}
-                    class="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                    class="mt-1 block w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1461,7 +1536,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     name="employment_start"
                     id="new-emp-start"
                     value={@new_employee_form[:employment_start].value}
-                    class="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                    class="mt-1 block w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
                   />
                 </div>
               </div>
