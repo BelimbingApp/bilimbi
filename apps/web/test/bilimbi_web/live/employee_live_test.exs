@@ -4,14 +4,22 @@ defmodule BilimbiWeb.EmployeeLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Core.Address
+  alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
+  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   setup do
     UserFixtures.create_user_tables!()
+    GeonamesFixtures.create_geonames_tables!()
+    AddressFixtures.create_address_tables!()
+    GeonamesFixtures.insert_country!()
+    GeonamesFixtures.insert_admin1!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41, name: "Acme Corp", code: "acme"})
+    CompanyFixtures.assign_primary_company!(41, 73)
 
     UserFixtures.insert_user!(%{
       id: 91,
@@ -367,5 +375,312 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
     assert has_element?(view, "h1", "John Doe")
     assert has_element?(view, "#employee-edit")
+  end
+
+  describe "employee show page parity with Belimbing" do
+    setup %{scope: scope} do
+      CompanyFixtures.insert_department!(101, 73)
+
+      {:ok, subordinate} =
+        Employee.create_employee(scope, 73, %{
+          employee_number: "EMP-002",
+          full_name: "Subordinate Sam",
+          designation: "Junior Dev",
+          status: "probation"
+        })
+
+      {:ok, peer} =
+        Employee.create_employee(scope, 73, %{
+          employee_number: "EMP-003",
+          full_name: "Peer Pete",
+          designation: "Staff Dev",
+          status: "active"
+        })
+
+      {:ok, address} =
+        Address.create_address(scope, %{
+          label: "Office Address",
+          line1: "123 Tech Park",
+          locality: "Cyberjaya",
+          postcode: "63000",
+          country_iso: "MY"
+        })
+
+      %{subordinate: subordinate, peer: peer, address: address}
+    end
+
+    test "renders full details page with all sections and cards", %{
+      conn: conn,
+      employee: employee
+    } do
+      grant_capabilities!([
+        "admin.employee.view",
+        "admin.employee.update",
+        "admin.employee.delete"
+      ])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+      assert has_element?(view, "#employee-details-card")
+      assert has_element?(view, "#employment-info-card")
+      assert has_element?(view, "#subordinates-card")
+      assert has_element?(view, "#addresses-card")
+      assert has_element?(view, "#employee-danger")
+
+      assert has_element?(view, "#employee-full-name", "John Doe")
+      assert has_element?(view, "#employee-number", "EMP-001")
+      assert has_element?(view, "#employee-designation", "Software Engineer")
+      assert has_element?(view, "#employee-email", "john@example.test")
+    end
+
+    test "supports inline editing of employee text fields", %{
+      conn: conn,
+      scope: scope,
+      employee: employee
+    } do
+      grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+      render_hook(view, "save_field", %{
+        "field" => "designation",
+        "value" => "Principal Architect"
+      })
+
+      assert render(view) =~ "Designation updated successfully."
+      assert has_element?(view, "#employee-designation", "Principal Architect")
+
+      {:ok, updated} = Employee.get_employee(scope, 73, employee.id)
+      assert updated.designation == "Principal Architect"
+    end
+
+    test "updates employee status and employee type via selects", %{
+      conn: conn,
+      scope: scope,
+      employee: employee
+    } do
+      grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+      # Change status to probation
+      view
+      |> form("#employee-status-form")
+      |> render_change(%{"status" => "probation"})
+
+      assert render(view) =~ "Status updated."
+      {:ok, updated} = Employee.get_employee(scope, 73, employee.id)
+      assert updated.status == "probation"
+
+      # Change employee type to part_time
+      view
+      |> form("#employee-type-form")
+      |> render_change(%{"employee_type" => "part_time"})
+
+      assert render(view) =~ "Employee type updated."
+      {:ok, updated2} = Employee.get_employee(scope, 73, employee.id)
+      assert updated2.employee_type == "part_time"
+    end
+
+    test "updates department and supervisor assignments", %{
+      conn: conn,
+      scope: scope,
+      employee: employee,
+      peer: peer
+    } do
+      grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+      # Assign department
+      view
+      |> form("#employee-department-form")
+      |> render_change(%{"department_id" => "101"})
+
+      assert render(view) =~ "Department assignment saved."
+      {:ok, updated} = Employee.get_employee(scope, 73, employee.id)
+      assert updated.department_id == 101
+
+      # Assign supervisor
+      view
+      |> form("#employee-supervisor-form")
+      |> render_change(%{"supervisor_id" => to_string(peer.id)})
+
+      assert render(view) =~ "Supervisor assignment saved."
+      {:ok, updated2} = Employee.get_employee(scope, 73, employee.id)
+      assert updated2.supervisor_id == peer.id
+    end
+
+    test "links and unlinks user account", %{
+      conn: conn,
+      employee: employee
+    } do
+      grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+      # Link user 91 to this employee
+      view
+      |> form("#employee-user-form")
+      |> render_change(%{"user_id" => "91"})
+
+      assert render(view) =~ "User link updated."
+
+      # Unlink user
+      view
+      |> form("#employee-user-form")
+      |> render_change(%{"user_id" => ""})
+
+      assert render(view) =~ "User link updated."
+    end
+
+    test "manages direct subordinates with add, sort, and remove", %{
+      conn: conn,
+      scope: scope,
+      employee: employee,
+      subordinate: subordinate
+    } do
+      grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+      # Toggle add subordinate form
+      view |> element("#btn-toggle-add-subordinate") |> render_click()
+      assert has_element?(view, "#add-subordinate-form")
+
+      # Assign subordinate
+      view
+      |> form("#add-subordinate-form")
+      |> render_submit(%{"subordinate_id" => to_string(subordinate.id)})
+
+      assert render(view) =~ "Subordinate assigned."
+      assert has_element?(view, "#subordinate-row-#{subordinate.id}", "Subordinate Sam")
+
+      # Verify in domain
+      {:ok, subs} = Employee.list_subordinates(scope, 73, employee.id)
+      assert length(subs) == 1
+
+      # Sort subordinates by status
+      view
+      |> element("button[phx-click='sort_subordinates'][phx-value-sort_by='status']")
+      |> render_click()
+
+      assert has_element?(view, "#subordinates-table")
+
+      # Remove subordinate
+      view
+      |> element("#remove-subordinate-#{subordinate.id}")
+      |> render_click()
+
+      assert render(view) =~ "Subordinate removed."
+      refute has_element?(view, "#subordinate-row-#{subordinate.id}")
+
+      {:ok, subs_after} = Employee.list_subordinates(scope, 73, employee.id)
+      assert subs_after == []
+    end
+
+    test "manages address attachments, kinds, priority, primary toggle, and detach", %{
+      conn: conn,
+      scope: scope,
+      employee: employee,
+      address: address
+    } do
+      grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+      # Open modal
+      view |> element("#btn-open-attach-address") |> render_click()
+      assert has_element?(view, "#attach-address-modal")
+
+      # Attach address with shipping kind and priority 5
+      view
+      |> form("#attach-address-modal-form")
+      |> render_submit(%{
+        "address" => %{
+          "address_id" => to_string(address.id),
+          "kinds" => ["shipping"],
+          "is_primary" => "true",
+          "priority" => "5"
+        }
+      })
+
+      assert render(view) =~ "Address attached."
+      refute has_element?(view, "#attach-address-modal")
+      assert has_element?(view, "#address-row-#{address.id}")
+      assert has_element?(view, "#address-row-#{address.id}", "Shipping")
+      assert has_element?(view, "#address-row-#{address.id}", "5")
+
+      # Toggle primary
+      view |> element("#toggle-primary-#{address.id}") |> render_click()
+      assert render(view) =~ "Address setting updated."
+
+      # Edit priority
+      render_click(view, "edit_address_priority", %{"id" => to_string(address.id)})
+
+      assert has_element?(view, "#priority-form-#{address.id}")
+
+      view
+      |> form("#priority-form-#{address.id}")
+      |> render_submit(%{"address_id" => to_string(address.id), "priority" => "10"})
+
+      assert render(view) =~ "Address setting updated."
+      assert has_element?(view, "#address-row-#{address.id}", "10")
+
+      # Edit kinds
+      render_click(view, "edit_address_kinds", %{"id" => to_string(address.id)})
+      render_click(view, "toggle_edit_kind", %{"kind" => "billing"})
+
+      view
+      |> element("#save-kinds-#{address.id}")
+      |> render_click(%{"address_id" => to_string(address.id)})
+
+      assert render(view) =~ "Address kinds updated."
+
+      # Sort addresses by priority
+      view
+      |> element("button[phx-click='sort_addresses'][phx-value-sort_by='priority']")
+      |> render_click()
+
+      # Detach address
+      view |> element("#unlink-address-#{address.id}") |> render_click()
+      assert render(view) =~ "Address unlinked."
+      refute has_element?(view, "#address-row-#{address.id}")
+
+      {:ok, attached} = Address.list_employee_attached_addresses(scope, employee.id)
+      assert attached == []
+    end
+
+    test "deletes regular employee from details page and navigates back to list", %{
+      conn: conn,
+      scope: scope,
+      subordinate: subordinate
+    } do
+      grant_capabilities!(["admin.employee.view", "admin.employee.delete"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{subordinate.id}")
+
+      assert has_element?(view, "#employee-delete")
+
+      view |> element("#employee-delete") |> render_click()
+
+      assert_redirect(view, ~p"/employees")
+      assert {:error, :employee_not_found} = Employee.get_employee(scope, 73, subordinate.id)
+    end
+
+    test "refuses deletion of platform orchestrator with flash error", %{
+      conn: conn,
+      scope: scope
+    } do
+      {:ok, orchestrator, _} = Employee.ensure_platform_orchestrator()
+      grant_capabilities!(["admin.employee.view", "admin.employee.delete"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{orchestrator.id}")
+
+      view |> element("#employee-delete") |> render_click()
+
+      assert render(view) =~ "The platform orchestrator cannot be deleted."
+      assert {:ok, _still_exists} = Employee.get_employee(scope, 73, orchestrator.id)
+    end
   end
 end
