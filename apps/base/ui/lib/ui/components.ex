@@ -670,9 +670,11 @@ defmodule Bilimbi.Base.UI.Components do
   @doc """
   Renders pagination controls matching Belimbing design parity.
 
-  Follows Belimbing's `resources/core/views/components/ui/pagination.blade.php`:
-  the nav renders when `$hasPages || $hasSelector`, the summary is gated on
-  `$summary && $hasPages`, and the page links are gated on `$hasPages` alone.
+  Follows Belimbing's pagination contract with single-page optimization:
+  the summary count is rendered whenever there are results (`total_pages > 0`),
+  the rows-per-page selector is always available, and the page navigation
+  controls (previous, numbers, next) are rendered only when there are multiple
+  pages (`total_pages > 1`).
   """
   attr :id, :string, required: true
   attr :page, :any, required: true
@@ -710,7 +712,7 @@ defmodule Bilimbi.Base.UI.Components do
         </.form>
       </div>
       <div
-        :if={@page.total_pages > 0}
+        :if={@page.total_pages > 1}
         class="flex items-center gap-1"
         role="list"
         aria-label="Page navigation"
