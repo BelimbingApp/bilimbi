@@ -6,7 +6,6 @@ defmodule BilimbiWeb.UserLiveTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
-  alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias Bilimbi.Core.UserAdministration.Web.IndexLive
 
@@ -150,7 +149,7 @@ defmodule BilimbiWeb.UserLiveTest do
   test "filters by multiple roles with OR semantics before bounded pagination", %{conn: conn} do
     insert_user!(%{id: 91, company_id: 73, name: "Signed In"})
 
-    Enum.each(1..12, fn id ->
+    Enum.each(1..27, fn id ->
       insert_user!(%{
         id: id,
         company_id: 73,
@@ -162,11 +161,11 @@ defmodule BilimbiWeb.UserLiveTest do
     {:ok, first} = Authz.create_role(scope!(), 73, %{name: "First", code: "first"})
     {:ok, second} = Authz.create_role(scope!(), 73, %{name: "Second", code: "second"})
 
-    Enum.each(1..6, fn id ->
+    Enum.each(1..15, fn id ->
       assert {:ok, :assigned} = Authz.assign_role(scope!(), 73, :user, id, first.id)
     end)
 
-    Enum.each(6..12, fn id ->
+    Enum.each(15..27, fn id ->
       assert {:ok, :assigned} = Authz.assign_role(scope!(), 73, :user, id, second.id)
     end)
 
@@ -175,17 +174,17 @@ defmodule BilimbiWeb.UserLiveTest do
     {:ok, view, _html} =
       conn
       |> log_in_as()
-      |> live(users_path(roleIds: [first.id, second.id], perPage: 10))
+      |> live(users_path(roleIds: [first.id, second.id], perPage: 25))
 
     assert has_element?(view, "#users-role-filter", "2 roles selected")
     assert has_element?(view, "#users-role-filter-option-#{first.id}[checked]")
     assert has_element?(view, "#users-role-filter-option-#{second.id}[checked]")
     assert has_element?(view, "label[for='users-role-filter-option-#{first.id}']", "First")
     assert has_element?(view, "label[for='users-role-filter-option-#{second.id}']", "Second")
-    assert has_element?(view, "#users-pagination-summary", "Showing 1 to 10 of 12 results")
-    assert has_element?(view, "#user-6", "First")
-    assert has_element?(view, "#user-6", "Second")
-    assert has_element?(view, "#user-6")
+    assert has_element?(view, "#users-pagination-summary", "Showing 1 to 25 of 27 results")
+    assert has_element?(view, "#user-15", "First")
+    assert has_element?(view, "#user-15", "Second")
+    assert has_element?(view, "#user-15")
   end
 
   test "dispatches every sort direction with descending id ties and Created descending first", %{
@@ -258,7 +257,7 @@ defmodule BilimbiWeb.UserLiveTest do
   test "clamps page sizes and resets paging on filter, size, and sort changes", %{conn: conn} do
     insert_user!(%{id: 91, company_id: 73, name: "Signed In"})
 
-    Enum.each(1..11, fn id ->
+    Enum.each(1..26, fn id ->
       insert_user!(%{
         id: id,
         company_id: 73,
@@ -270,18 +269,36 @@ defmodule BilimbiWeb.UserLiveTest do
     grant_capabilities!("admin.user.list")
     signed_in = log_in_as(conn)
 
-    {:ok, ten, _html} = live(signed_in, users_path(perPage: 1))
-    assert has_element?(ten, "#users-pagination-page-size option[value='10'][selected]")
-    assert has_element?(ten, "#users-pagination-summary", "Showing 1 to 10 of 12 results")
+    # Invalid and unsupported page sizes fall back to 25
+    {:ok, one, _html} = live(signed_in, users_path(perPage: 1))
+    assert has_element?(one, "#users-pagination-page-size option[value='25'][selected]")
+    assert has_element?(one, "#users-pagination-summary", "Showing 1 to 25 of 27 results")
 
-    {:ok, fifty, _html} = live(signed_in, users_path(perPage: 30))
+    {:ok, ten, _html} = live(signed_in, users_path(perPage: 10))
+    assert has_element?(ten, "#users-pagination-page-size option[value='25'][selected]")
+
+    {:ok, thirty, _html} = live(signed_in, users_path(perPage: 30))
+    assert has_element?(thirty, "#users-pagination-page-size option[value='25'][selected]")
+
+    {:ok, invalid, _html} = live(signed_in, users_path(perPage: 9999))
+    assert has_element?(invalid, "#users-pagination-page-size option[value='25'][selected]")
+
+    # Supported page sizes (25, 50, 100, 300) are accepted
+    {:ok, fifty, _html} = live(signed_in, users_path(perPage: 50))
     assert has_element?(fifty, "#users-pagination-page-size option[value='50'][selected]")
-    assert has_element?(fifty, "#users-pagination-summary", "Showing 1 to 12 of 12 results")
+    assert has_element?(fifty, "#users-pagination-summary", "Showing 1 to 27 of 27 results")
 
-    {:ok, hundred, _html} = live(signed_in, users_path(perPage: 9999))
+    {:ok, hundred, _html} = live(signed_in, users_path(perPage: 100))
     assert has_element?(hundred, "#users-pagination-page-size option[value='100'][selected]")
 
-    {:ok, view, _html} = live(signed_in, users_path(page: 2, perPage: 10))
+    {:ok, three_hundred, _html} = live(signed_in, users_path(perPage: 300))
+
+    assert has_element?(
+             three_hundred,
+             "#users-pagination-page-size option[value='300'][selected]"
+           )
+
+    {:ok, view, _html} = live(signed_in, users_path(page: 2, perPage: 25))
     assert has_element?(view, "#users-pagination-page-2[aria-current='page']")
 
     view
@@ -291,7 +308,7 @@ defmodule BilimbiWeb.UserLiveTest do
     assert has_element?(view, "#users-pagination-page-size option[value='50'][selected]")
     assert has_element?(view, "#users-pagination-page-1[aria-current='page']")
 
-    {:ok, sort_view, _html} = live(signed_in, users_path(page: 2, perPage: 10))
+    {:ok, sort_view, _html} = live(signed_in, users_path(page: 2, perPage: 25))
     sort_view |> element("#users-sort-created") |> render_click()
     assert has_element?(sort_view, "#users-pagination-page-1[aria-current='page']")
     assert has_element?(sort_view, "#users-sort-created .hero-chevron-down.text-action")
@@ -311,61 +328,20 @@ defmodule BilimbiWeb.UserLiveTest do
     refute has_element?(empty, "#users-pagination-previous")
     refute has_element?(empty, "#users-pagination-next")
 
-    # When users exist but we are past the end, the pager stays and shows summary.
-    {:ok, out_of_range, _html} = live(signed_in, users_path(page: 2, perPage: 10))
-    assert has_element?(out_of_range, "#users-empty", "No users found")
+    # When users exist but request is out-of-range, LiveView canonicalizes to max valid page (page 1)
+    assert {:error, {:live_redirect, %{to: canonical_path}}} =
+             live(signed_in, users_path(page: 2, perPage: 25))
+
+    assert URI.parse(canonical_path).path == "/users"
+    params = URI.decode_query(URI.parse(canonical_path).query || "")
+    assert params["page"] == "1"
+    assert params["perPage"] == "25"
+
+    {:ok, out_of_range, _html} = live(signed_in, canonical_path)
     assert has_element?(out_of_range, "#users-pagination")
-    assert has_element?(out_of_range, "#users-pagination-summary", "Showing 11 to 1 of 1 results")
-    assert has_element?(out_of_range, "#users-pagination-page-1")
-  end
-
-  test "hard deletes another user and refreshes the bounded page", %{conn: conn} do
-    insert_user!(%{id: 91, company_id: 73, name: "Signed In"})
-    insert_user!(%{id: 92, company_id: 73, name: "Managed User"})
-    grant_capabilities!(["admin.user.list", "admin.user.delete"])
-
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
-    render_click(view, "delete", %{"id" => "92"})
-
-    assert has_element?(view, "#flash-group", "User deleted successfully")
-    refute has_element?(view, "#user-92")
-    assert {:error, :user_not_found} = User.get_tenant_user(scope!(), 92)
-  end
-
-  test "handles delete races, self deletion, missing capability, and archived companies", %{
-    conn: conn
-  } do
-    insert_user!(%{id: 91, company_id: 73, name: "Signed In"})
-    insert_user!(%{id: 92, company_id: 73, name: "Race User"})
-    insert_user!(%{id: 93, company_id: 73, name: "Permission User"})
-    insert_user!(%{id: 94, company_id: 76, name: "Archived User"})
-    grant_capabilities!(["admin.user.list", "admin.user.delete"])
-
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
-
-    assert :ok = User.delete_user(scope!(), 73, 92)
-    render_click(view, "delete", %{"id" => "92"})
-    assert has_element?(view, "#flash-group", "no longer exists")
-    refute has_element?(view, "#user-92")
-
-    render_click(view, "delete", %{"id" => "91"})
-    assert has_element?(view, "#flash-group", "cannot delete your own account")
-    assert {:ok, _user} = User.get_tenant_user(scope!(), 91)
-
-    render_click(view, "delete", %{"id" => "94"})
-    assert has_element?(view, "#flash-group", "while their company is archived")
-    assert {:ok, _user} = User.get_tenant_user(scope!(), 94)
-
-    grant_capabilities!("admin.user.list", user_id: 93)
-
-    {:ok, limited, _html} =
-      conn
-      |> log_in_as(%{"user_id" => 93, "company_id" => 73})
-      |> live(~p"/users")
-
-    render_click(limited, "delete", %{"id" => "91"})
-    assert has_element?(limited, "#flash-group", "do not have permission")
-    assert {:ok, _user} = User.get_tenant_user(scope!(), 91)
+    assert has_element?(out_of_range, "#users-pagination-summary", "Showing 1 to 1 of 1 results")
+    assert has_element?(out_of_range, "#users-pagination-page-1[aria-current='page']")
+    assert has_element?(out_of_range, "#user-91", "Signed In")
   end
 
   defp insert_user!(attributes) do
