@@ -3,8 +3,10 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -14,7 +16,8 @@ defmodule BilimbiWeb.DashboardLiveTest do
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     CompanyFixtures.assign_primary_company!(41, 73)
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
-    :ok
+    {:ok, scope} = Tenancy.scope(41)
+    {:ok, scope: scope}
   end
 
   test "requires authentication", %{conn: conn} do
@@ -162,6 +165,33 @@ defmodule BilimbiWeb.DashboardLiveTest do
       assert has_element?(view, "#stat-companies")
       assert has_element?(view, "#stat-users")
       assert has_element?(view, "#stat-recent-audit")
+      assert render(view) =~ "No recent activity."
+    end
+
+    test "renders live audit mutation entries in recent activity widget", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!(["admin.audit.log.list"])
+
+      {:ok, mutation} =
+        Audit.record_mutation(scope, %{
+          actor_type: "user",
+          actor_id: 91,
+          auditable_type: "Company",
+          auditable_id: "73",
+          event: "created",
+          source: "listener",
+          occurred_at: NaiveDateTime.utc_now()
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(view, "#stat-recent-audit")
+      refute render(view) =~ "No recent activity."
+      assert has_element?(view, "#audit-entry-#{mutation.id}")
+      assert render(view) =~ "created"
+      assert render(view) =~ "Company"
     end
   end
 
@@ -255,15 +285,37 @@ defmodule BilimbiWeb.DashboardLiveTest do
   end
 
   describe "auto-refresh" do
-    test "handles :refresh_widgets message gracefully", %{conn: conn} do
+    test "handles :refresh_widgets message and updates live audit entries", %{
+      conn: conn,
+      scope: scope
+    } do
       grant_capabilities!(["admin.audit.log.list"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(view, "#stat-companies")
+      assert has_element?(view, "#stat-recent-audit")
+      assert render(view) =~ "No recent activity."
+
+      {:ok, mutation} =
+        Audit.record_mutation(scope, %{
+          actor_type: "user",
+          actor_id: 91,
+          auditable_type: "User",
+          auditable_id: "91",
+          event: "updated",
+          source: "listener",
+          occurred_at: NaiveDateTime.utc_now()
+        })
 
       send(view.pid, :refresh_widgets)
 
       assert has_element?(view, "#stat-companies")
       assert has_element?(view, "#stat-recent-audit")
+      refute render(view) =~ "No recent activity."
+      assert has_element?(view, "#audit-entry-#{mutation.id}")
+      assert render(view) =~ "updated"
+      assert render(view) =~ "User"
     end
   end
 end

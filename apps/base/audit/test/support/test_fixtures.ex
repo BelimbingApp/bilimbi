@@ -8,7 +8,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE base_audit_mutations (
+      CREATE TEMPORARY TABLE IF NOT EXISTS base_audit_mutations (
         id bigserial PRIMARY KEY,
         company_id bigint,
         tenant_id bigint,
@@ -37,7 +37,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_mutations_company_id_index
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_company_id_index
         ON base_audit_mutations (company_id)
       """,
       []
@@ -46,7 +46,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_mutations_tenant_id_index
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_tenant_id_index
         ON base_audit_mutations (tenant_id)
       """,
       []
@@ -55,7 +55,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_mutations_actor_type_index
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_actor_type_index
         ON base_audit_mutations (actor_type)
       """,
       []
@@ -64,7 +64,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_mutations_actor_id_index
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_actor_id_index
         ON base_audit_mutations (actor_id)
       """,
       []
@@ -73,7 +73,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_mutations_auditable_type_index
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_auditable_type_index
         ON base_audit_mutations (auditable_type)
       """,
       []
@@ -82,7 +82,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_mutations_auditable_id_index
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_auditable_id_index
         ON base_audit_mutations (auditable_id)
       """,
       []
@@ -91,7 +91,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_mutations_source_index
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_source_index
         ON base_audit_mutations (source)
       """,
       []
@@ -100,7 +100,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_mutations_event_index
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_event_index
         ON base_audit_mutations (event)
       """,
       []
@@ -109,7 +109,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_mutations_trace_id_index
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_trace_id_index
         ON base_audit_mutations (trace_id)
       """,
       []
@@ -118,7 +118,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_mutations_occurred_at_index
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_occurred_at_index
         ON base_audit_mutations (occurred_at)
       """,
       []
@@ -127,7 +127,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_mutations_auditable_occurred_index
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_auditable_occurred_index
         ON base_audit_mutations (auditable_type, auditable_id, occurred_at)
       """,
       []
@@ -136,7 +136,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_mutations_actor_type_actor_id_occurred_at_index
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_actor_type_actor_id_occurred_at_index
         ON base_audit_mutations (actor_type, actor_id, occurred_at)
       """,
       []
@@ -145,7 +145,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_mutations_subject_idx
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_subject_idx
         ON base_audit_mutations (subject_name, subject_id, subject_identifier, occurred_at)
         WHERE subject_name IS NOT NULL
       """,
@@ -155,7 +155,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE base_audit_actions (
+      CREATE TEMPORARY TABLE IF NOT EXISTS base_audit_actions (
         id bigserial PRIMARY KEY,
         company_id bigint,
         tenant_id bigint,
@@ -178,7 +178,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_actions_company_id_index
+      CREATE INDEX IF NOT EXISTS base_audit_actions_company_id_index
         ON base_audit_actions (company_id)
       """,
       []
@@ -187,7 +187,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_actions_tenant_id_index
+      CREATE INDEX IF NOT EXISTS base_audit_actions_tenant_id_index
         ON base_audit_actions (tenant_id)
       """,
       []
@@ -196,7 +196,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_actions_actor_type_index
+      CREATE INDEX IF NOT EXISTS base_audit_actions_actor_type_index
         ON base_audit_actions (actor_type)
       """,
       []
@@ -205,7 +205,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_actions_actor_id_index
+      CREATE INDEX IF NOT EXISTS base_audit_actions_actor_id_index
         ON base_audit_actions (actor_id)
       """,
       []
@@ -214,7 +214,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_actions_event_index
+      CREATE INDEX IF NOT EXISTS base_audit_actions_event_index
         ON base_audit_actions (event)
       """,
       []
@@ -223,7 +223,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_actions_trace_id_index
+      CREATE INDEX IF NOT EXISTS base_audit_actions_trace_id_index
         ON base_audit_actions (trace_id)
       """,
       []
@@ -232,7 +232,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_actions_occurred_at_index
+      CREATE INDEX IF NOT EXISTS base_audit_actions_occurred_at_index
         ON base_audit_actions (occurred_at)
       """,
       []
@@ -241,7 +241,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_actions_event_occurred_at_index
+      CREATE INDEX IF NOT EXISTS base_audit_actions_event_occurred_at_index
         ON base_audit_actions (event, occurred_at)
       """,
       []
@@ -250,7 +250,7 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE INDEX base_audit_actions_actor_type_actor_id_occurred_at_index
+      CREATE INDEX IF NOT EXISTS base_audit_actions_actor_type_actor_id_occurred_at_index
         ON base_audit_actions (actor_type, actor_id, occurred_at)
       """,
       []
