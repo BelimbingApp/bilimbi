@@ -18,6 +18,12 @@ defmodule Bilimbi.Core.CapabilityReferenceIntegrityTest do
   @workspace_root Path.expand("../../../..", __DIR__)
   @segment ~S"[a-z][a-z0-9]*(?:-[a-z0-9]+)*"
   @capability "#{@segment}(?:\\.#{@segment}){2,}"
+  @source_globs [
+    "apps/*/lib/**/*.{ex,heex}",
+    "apps/*/priv/**/*.exs",
+    "apps/*/*/lib/**/*.{ex,heex}",
+    "apps/*/*/priv/**/*.exs"
+  ]
   @source_patterns [
     Regex.compile!(~S'\bcapability:\s*"(?<capability>' <> @capability <> ~S')"'),
     Regex.compile!(
@@ -64,13 +70,26 @@ defmodule Bilimbi.Core.CapabilityReferenceIntegrityTest do
            ]
   end
 
-  defp source_references do
-    ["apps/*/*/lib/**/*.{ex,heex}", "apps/*/*/priv/**/*.exs"]
+  test "the source scan covers direct applications and nested module packages" do
+    paths = source_paths()
+
+    assert "apps/web/lib/bilimbi_web/controllers/impersonation_controller.ex" in paths
+    assert "apps/base/authz/lib/authz.ex" in paths
+    assert paths == Enum.uniq(paths)
+  end
+
+  defp source_paths do
+    @source_globs
     |> Enum.flat_map(&Path.wildcard(Path.join(@workspace_root, &1)))
     |> Enum.sort()
+    |> Enum.uniq()
+    |> Enum.map(&Path.relative_to(&1, @workspace_root))
+  end
+
+  defp source_references do
+    source_paths()
     |> Enum.flat_map(fn path ->
-      relative = Path.relative_to(path, @workspace_root)
-      references_in_source(relative, File.read!(path))
+      references_in_source(path, File.read!(Path.join(@workspace_root, path)))
     end)
   end
 
