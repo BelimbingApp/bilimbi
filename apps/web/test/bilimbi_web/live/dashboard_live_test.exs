@@ -4,6 +4,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Session
+  alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
@@ -205,6 +206,33 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
       assert has_element?(view, "#stat-companies")
       assert has_element?(view, "#stat-users")
+    end
+
+    test "the layout setting answers with its declared empty default when nothing is stored",
+         %{conn: _conn} do
+      assert Settings.get("ui.dashboard.layout", Settings.Scope.user(91, 73, 41)) == []
+    end
+
+    test "an account that never customised its dashboard sees the whole catalogue",
+         %{conn: conn} do
+      refute Settings.overridden?("ui.dashboard.layout", Settings.Scope.user(91, 73, 41))
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(view, "#stat-companies")
+      assert has_element?(view, "#stat-users")
+      refute has_element?(view, "#dashboard-widgets-empty")
+    end
+
+    test "a stored empty layout stays empty rather than reverting to the catalogue",
+         %{conn: conn} do
+      Settings.put("ui.dashboard.layout", [], Settings.Scope.user(91, 73, 41))
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(view, "#dashboard-widgets-empty")
+      refute has_element?(view, "#stat-companies")
+      refute has_element?(view, "#stat-users")
     end
 
     test "displays empty state when all widgets are removed", %{conn: conn} do
