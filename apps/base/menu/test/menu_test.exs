@@ -30,6 +30,19 @@ defmodule Bilimbi.Base.MenuTest do
       assert Enum.map(items, & &1.id) == ["admin.company", "admin.user"]
     end
 
+    test "retains the contributing module descriptor id as source" do
+      items =
+        Validator.validate_contributions!([
+          entry("core/user", [%{id: "admin.user", label: "Users", route: "/users"}]),
+          entry("core/company", [%{id: "admin.company", label: "Companies", route: "/companies"}])
+        ])
+
+      assert [
+               %Item{id: "admin.company", source: "core/company"},
+               %Item{id: "admin.user", source: "core/user"}
+             ] = items
+    end
+
     test "resolves a parent contributed by a different module" do
       items =
         Validator.validate_contributions!([
