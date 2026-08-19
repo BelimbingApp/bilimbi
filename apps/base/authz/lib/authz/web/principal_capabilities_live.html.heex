@@ -98,7 +98,9 @@
         </:col>
 
         <:col :let={grant} label="Company" sort="company_id" sort_id="grants-sort-company_id">
-          <span class="tabular-nums text-ink-muted">{grant.company_id || "—"}</span>
+          <span class="whitespace-nowrap text-ink-muted">
+            {company_name(@company_names, grant.company_id)}
+          </span>
         </:col>
 
         <:col :let={grant} label="Granted" sort="created_at" sort_id="grants-sort-created_at">
