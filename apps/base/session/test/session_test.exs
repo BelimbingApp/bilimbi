@@ -73,6 +73,15 @@ defmodule Bilimbi.Base.SessionTest do
     end
   end
 
+  test "counts stored sessions without reading payloads" do
+    assert Session.count_sessions() == 0
+
+    put_session!("older", 100, "10.0.0.1", "Firefox")
+    put_session!("newer", 300, "10.0.0.2", "Phoenix mobile")
+
+    assert Session.count_sessions() == 2
+  end
+
   test "termination protects the current session and is otherwise idempotent" do
     put_session!("current", 100)
     put_session!("other", 100)
