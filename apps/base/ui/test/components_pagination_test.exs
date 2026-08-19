@@ -82,4 +82,35 @@ defmodule Bilimbi.Base.UI.ComponentsPaginationTest do
     assert html =~ ~s(id="test-pagination-page-10")
     assert html =~ ~s(id="test-pagination-page-20")
   end
+
+  test "renders summary count and page size selector on a single page, but hides page navigation buttons" do
+    html =
+      render_component(&pagination_fixture/1,
+        page: %{page: 1, page_size: 25, total_pages: 1, total_entries: 2},
+        page_sizes: [25, 50, 100, 300]
+      )
+
+    assert html =~ ~s(id="test-pagination")
+    assert html =~ ~s(id="test-pagination-summary")
+    assert html =~ "Showing 1 to 2 of 2 results"
+    assert html =~ ~s(id="test-pagination-page-size")
+    refute html =~ ~s(id="test-pagination-previous")
+    refute html =~ ~s(id="test-pagination-page-1")
+    refute html =~ ~s(id="test-pagination-next")
+  end
+
+  test "renders page size selector on empty results, but hides summary count and page navigation buttons" do
+    html =
+      render_component(&pagination_fixture/1,
+        page: %{page: 1, page_size: 25, total_pages: 0, total_entries: 0},
+        page_sizes: [25, 50, 100, 300]
+      )
+
+    assert html =~ ~s(id="test-pagination")
+    refute html =~ ~s(id="test-pagination-summary")
+    assert html =~ ~s(id="test-pagination-page-size")
+    refute html =~ ~s(id="test-pagination-previous")
+    refute html =~ ~s(id="test-pagination-page-1")
+    refute html =~ ~s(id="test-pagination-next")
+  end
 end

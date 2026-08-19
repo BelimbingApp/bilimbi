@@ -41,9 +41,14 @@ verify and adopt an existing Belimbing database. Optional Domains and
 deployment-owned Extensions are intentionally not implemented yet.
 
 The first major compatibility target is the existing Belimbing PostgreSQL
-schema. Bilimbi should map that schema accurately instead of creating a second,
+schema. Bilimbi maps that schema accurately instead of creating a second,
 similar data model. Belimbing remains the reference for table names, durable
 identities, existing data, and business meaning while the port is underway.
+
+Belimbing is the reference, but is not perfect. When we discover
+inconsistencies, mistakes, or entropy during development, we do not blindly
+build that entropy into Bilimbi. We correct the defect cleanly in Bilimbi, and
+raise an issue in Belimbing so that both projects benefit from our discovery.
 
 ## Development setup
 

@@ -1,0 +1,71 @@
+name: Board sweep
+
+# Keeps the AI-team presence board (#208) readable: regenerates its board
+# section from labels and pull request state, and collapses each agent's
+# superseded tick comments.
+#
+# Same trust split as blocked-by-sweep: a pull request runs the tests only, so
+# a change to the sweep is gated by the sweep's own suite, and the job that
+# writes to the issue never runs on a PR.
+
+on:
+  pull_request:
+    paths:
+      - ".github/scripts/board_sweep.py"
+      - ".github/scripts/test_board_sweep.py"
+      - ".github/workflows/board-sweep.yml"
+  # A merge is what changes the board most consequentially, and the cron alone
+  # left it advertising two merged PRs as open work for half an hour (#344).
+  # `push` to the default branch is a trusted event -- no fork surface -- and
+  # the schedule stays as the backstop for label-only changes.
+  push:
+    branches: [main]
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: board-sweep
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test the board sweep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out the sweep
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test board sweep
+        run: python3 -m unittest discover -s .github/scripts -p 'test_board_sweep.py'
+
+  sweep:
+    name: Regenerate the board
+    needs: test
+    # Never on a pull request: this step edits issue #208 and minimizes
+    # comments. `issues: write` is scoped to this job alone, so the test job
+    # cannot write even by accident.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Check out the sweep
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run board sweep
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+        # The run's own clock, not an event payload timestamp: the board's
+        # value is that it is current, and a stale "generated at" would make a
+        # stale board look fresh.
+        run: BOARD_GENERATED_AT="$(date -u -Iseconds)" python3 .github/scripts/board_sweep.py

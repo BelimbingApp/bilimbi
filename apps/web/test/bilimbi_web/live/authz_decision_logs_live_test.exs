@@ -55,6 +55,15 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     assert has_element?(view, "#nav-admin-authz-decision-log[aria-current='page']")
   end
 
+  test "shows the count without dead page controls on a single page", %{conn: conn} do
+    {:ok, view, _html} = open(conn)
+
+    summary = view |> element("#logs-pagination-summary") |> render()
+    assert summary =~ ~r/Page 1 of 1 · [1-9]\d* decisions/
+    refute has_element?(view, "#logs-prev")
+    refute has_element?(view, "#logs-next")
+  end
+
   test "filters to denials, which is what this screen is opened for", %{
     conn: conn,
     scope: scope

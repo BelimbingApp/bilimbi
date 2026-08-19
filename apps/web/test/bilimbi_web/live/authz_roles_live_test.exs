@@ -85,6 +85,19 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       assert has_element?(view, "#nav-admin-authz-role[aria-current='page']")
     end
 
+    test "shows the count without dead page controls on a single page", %{
+      conn: conn,
+      ours: ours
+    } do
+      {:ok, _} = Authz.create_role(ours, 73, %{name: "Auditor", code: "auditor"})
+
+      {:ok, view, _html} = open_index(conn)
+
+      assert has_element?(view, "#roles-pagination-summary", "Page 1 of 1 · 1 role")
+      refute has_element?(view, "#roles-prev")
+      refute has_element?(view, "#roles-next")
+    end
+
     test "does not show another tenant's custom role", %{conn: conn, ours: ours, theirs: theirs} do
       {:ok, _} = Authz.create_role(ours, 73, %{name: "Ours", code: "ours"})
       {:ok, _} = Authz.create_role(theirs, 74, %{name: "Theirs", code: "theirs"})

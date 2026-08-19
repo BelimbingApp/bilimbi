@@ -115,14 +115,14 @@
       </.table>
 
       <div
-        :if={@page.total_pages > 1}
+        :if={@page.total_pages > 0}
         id="grants-pagination"
         class="flex items-center justify-between border-t border-line px-4 py-3 text-sm"
       >
-        <p class="text-ink-subtle">
-          Page {@page.page} of {@page.total_pages} · {@page.total_entries} direct capabilities
+        <p id="grants-pagination-summary" class="text-ink-subtle">
+          Page {@page.page} of {@page.total_pages} · {@page.total_entries} {if @page.total_entries == 1, do: "direct capability", else: "direct capabilities"}
         </p>
-        <div class="flex gap-2">
+        <div :if={@page.total_pages > 1} class="flex gap-2">
           <.button
             :if={@page.page > 1}
             id="grants-prev"

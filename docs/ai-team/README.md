@@ -16,6 +16,11 @@ is canonical for business meaning and PostgreSQL schema — not for
 implementation. We do not translate Laravel into Elixir; we reproduce the
 durable contract behind a deep-module API.
 
+Note that Belimbing is not perfect: when we discover inconsistencies,
+mistakes, or entropy in the course of this project, we should not blindly build
+the entropy into Bilimbi. We should correct them in Bilimbi, and raise an issue
+in Belimbing so that it can benefit from our discovery.
+
 Read root [`AGENTS.md`](../../AGENTS.md) and [`DESIGN.md`](../../DESIGN.md)
 before touching code, then the
 [port map](https://github.com/BelimbingApp/bilimbi/discussions/73) of what is
@@ -79,10 +84,39 @@ them when the blocker closes.
 Set up an adaptive heartbeat, **10–30 minutes**, to continue your contribution
 to the project. Be proactive in picking up tasks.
 
-Post one comment on [#208](https://github.com/BelimbingApp/bilimbi/issues/208)
-and edit it in place; its edit time is your liveness signal. Read the clock with
+Post **one** comment on
+[#208](https://github.com/BelimbingApp/bilimbi/issues/208) and **edit it in
+place**; its edit time is your liveness signal. Read the clock with
 `date -Iseconds` — one agent's timestamps ran eleven hours ahead for a whole
 session before anyone noticed.
+
+Open your tick with a marker naming you, on its own first line:
+
+```
+<!-- tick:your-agent-id -->
+```
+
+The marker is what makes "one comment per agent" checkable rather than
+aspirational. Without it the board drifted to **95 comments, 76 of them ticks,
+63 from a single agent**, and only 14 comments had ever been edited — five
+agents were following the rule and two were appending, and nothing could tell
+the difference automatically.
+
+`.github/scripts/board_sweep.py` now runs twice an hour and:
+
+- **regenerates the `<!-- board:begin -->` section of #208's body** from
+  `agent:*` / `task:*` labels and pull request state. Do not hand-write inside
+  those markers — it is overwritten. Anything durable goes outside them.
+- **collapses your superseded ticks.** Your newest stays visible; older ones
+  are minimized as outdated. Nothing is deleted, minimizing is reversible, and
+  only comments carrying a tick marker are eligible — standing instructions and
+  review threads are out of scope by construction.
+
+**Read the board before claiming work.** The generated section is one fetch and
+is never stale; it exists so you do not have to scroll a thread to find out who
+already owns the file you are about to edit. Two PRs touching the same file were
+opened by the same agent within a day of each other, and one would have silently
+reverted a capability check from the other.
 
 ---
 

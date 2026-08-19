@@ -160,11 +160,11 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     {:ok, postcodes, _html} = conn |> log_in_as() |> live(~p"/geonames/postcodes")
 
-    # Asserted while rows exist so the refutations below cannot pass against
-    # selectors that never rendered in the first place.
+    # On a single page, summary count and selector are present, while page buttons are hidden
     assert has_element?(postcodes, "#postcodes-pagination-summary")
-    assert has_element?(postcodes, "#postcodes-pagination-previous")
-    assert has_element?(postcodes, "#postcodes-pagination-next")
+    assert has_element?(postcodes, "#postcodes-pagination-page-size")
+    refute has_element?(postcodes, "#postcodes-pagination-previous")
+    refute has_element?(postcodes, "#postcodes-pagination-next")
 
     postcodes
     |> element("#postcodes-filters")
