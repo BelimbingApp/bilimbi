@@ -70,28 +70,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     {:ok, companies} = Company.list_companies(scope)
     company_names = Map.new(companies, &{&1.id, Company.Summary.display_name(&1)})
 
-    department_names =
-      try do
-        companies
-        |> Enum.flat_map(fn company ->
-          case Company.list_departments(scope, company.id) do
-            {:ok, depts} ->
-              Enum.flat_map(depts, fn dept ->
-                case dept.type do
-                  %{name: name} when is_binary(name) and name != "" -> [{dept.id, name}]
-                  _ -> []
-                end
-              end)
-
-            _ ->
-              []
-          end
-        end)
-        |> Map.new()
-      rescue
-        _ -> %{}
-      end
-
     # Assigned roles
     role_page = Authz.list_principal_role_assignments(scope, :user, user.id, page_size: 100)
     assigned_roles = role_page.entries
@@ -175,6 +153,29 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
     # External accesses
     {:ok, external_accesses} = Company.list_external_accesses_for_user(scope, user.id)
+
+    relevant_company_ids =
+      [user.company_id | Enum.map(linked_employees, & &1.company_id)]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    department_names =
+      relevant_company_ids
+      |> Enum.flat_map(fn comp_id ->
+        case Company.list_departments(scope, comp_id) do
+          {:ok, depts} ->
+            Enum.flat_map(depts, fn dept ->
+              case dept.type do
+                %{name: name} when is_binary(name) and name != "" -> [{dept.id, name}]
+                _ -> []
+              end
+            end)
+
+          {:error, _} ->
+            []
+        end
+      end)
+      |> Map.new()
 
     socket
     |> assign(:user, user)
@@ -1330,11 +1331,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <span class="text-ink-faint">—</span>
                 <% end %>
               </:col>
-              <:col :let={emp} label="Designation" sort="designation">
-                <span class="text-ink-muted">{emp.designation || "—"}</span>
-              </:col>
               <:col :let={emp} label="Department" sort="department">
                 <span class="text-ink-muted">{Map.get(@department_names, emp.department_id) || "—"}</span>
+              </:col>
+              <:col :let={emp} label="Designation" sort="designation">
+                <span class="text-ink-muted">{emp.designation || "—"}</span>
               </:col>
               <:col :let={emp} label="Status" sort="status">
                 <.badge kind={employee_status_kind(emp.status)}>
