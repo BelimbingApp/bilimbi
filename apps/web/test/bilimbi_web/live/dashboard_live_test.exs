@@ -4,10 +4,12 @@ defmodule BilimbiWeb.DashboardLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Session
+  alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   setup do
+    SettingsFixtures.create_settings_table!()
     UserFixtures.create_user_tables!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})

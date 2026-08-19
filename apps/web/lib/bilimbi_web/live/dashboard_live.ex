@@ -110,9 +110,13 @@ defmodule BilimbiWeb.DashboardLive do
         current_scope.scope.tenant.id
       )
 
-    case Settings.get("ui.dashboard.layout", settings_scope) do
-      value when is_list(value) -> value
-      _ -> nil
+    if Settings.overridden?("ui.dashboard.layout", settings_scope) do
+      case Settings.get("ui.dashboard.layout", settings_scope) do
+        value when is_list(value) -> value
+        _ -> nil
+      end
+    else
+      nil
     end
   rescue
     _ -> nil

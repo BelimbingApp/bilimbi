@@ -171,9 +171,26 @@ defmodule Bilimbi.Core.User.TestFixtures do
         }
       ])
 
+    dashboard =
+      if Code.ensure_loaded?(Bilimbi.Base.Dashboard.Contributions) and
+           Code.ensure_loaded?(Bilimbi.Base.Dashboard.ContributionValidator) and
+           function_exported?(Bilimbi.Base.Dashboard.Contributions, :contributions, 0) and
+           function_exported?(Bilimbi.Base.Dashboard.ContributionValidator, :validate_contributions!, 1) do
+        apply(Bilimbi.Base.Dashboard.ContributionValidator, :validate_contributions!, [
+          [
+            %{
+              descriptor: %{id: "base/dashboard", otp_app: :bilimbi_base_dashboard},
+              payload: apply(Bilimbi.Base.Dashboard.Contributions, :contributions, [])[:dashboard]
+            }
+          ]
+        ])
+      else
+        []
+      end
+
     ContributionRegistry.put_snapshot_for_test!(%{
       graph_fingerprint: "user-test",
-      consumers: %{settings: [], authz: authz, menu: []}
+      consumers: %{settings: [], authz: authz, menu: [], dashboard: dashboard}
     })
   end
 
