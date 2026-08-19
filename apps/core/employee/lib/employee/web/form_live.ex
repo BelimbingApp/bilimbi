@@ -429,12 +429,9 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
     assign(socket, :form, to_form(changeset, as: :employee))
   end
 
-  defp department_name(dept) do
-    cond do
-      is_map(dept.type) and not is_nil(dept.type.name) -> dept.type.name
-      true -> "Department #{dept.id}"
-    end
-  end
+  defp department_name(%{type: %{name: name}}) when is_binary(name) and name != "", do: name
+  defp department_name(%{id: id}), do: "Department #{id}"
+  defp department_name(_), do: "Department"
 
   defp status_label("active"), do: "Active"
   defp status_label("pending"), do: "Pending"
