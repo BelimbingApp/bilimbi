@@ -24,17 +24,17 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
   actor names stay ids deliberately (#185 — an audit row is evidence of the
   moment, not a live view).
 
-  Belimbing sorts on the joined `companies.name`. A directory lookup cannot
-  express a database-level sort, and reordering the page in Elixir would break
-  pagination, so the column stays sortable on `company_id` — a deliberate
-  divergence, not an oversight.
+  Belimbing sorts on the joined `companies.name`. The LiveView passes the
+  directory's id order (`company_order`) into the administration query, which
+  orders with `array_position` so pagination stays correct without Base joining
+  a Core table.
   """
 
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
 
-  @sortable ~w(created_at principal_type principal_id capability allowed company_id)
+  @sortable ~w(created_at principal_type principal_id capability allowed company_id company_name)
   @results ~w(allowed denied)
 
   @impl true
@@ -43,15 +43,13 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
     # change while the page is open, and `load/2` runs on every search, filter,
     # sort and page change -- each of which was re-listing every company in the
     # tenant to render a column that never changes.
-    company_names =
-      socket.assigns.current_scope.scope
-      |> Authz.companies_in_scope()
-      |> Map.new(&{&1.id, &1.name})
+    companies = Authz.companies_in_scope(socket.assigns.current_scope.scope)
 
     {:ok,
      socket
      |> assign(:page_title, "Principal Capabilities")
-     |> assign(:company_names, company_names)}
+     |> assign(:company_names, Map.new(companies, &{&1.id, &1.name}))
+     |> assign(:company_order, Enum.map(companies, & &1.id))}
   end
 
   @impl true
@@ -113,7 +111,8 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
         sort_by: state.sort_by,
         sort_dir: state.sort_dir,
         page: state.page,
-        page_size: 25
+        page_size: 25,
+        company_order: socket.assigns.company_order
       )
 
     # `Page.page` echoes what was asked for, so an out-of-range page comes back
@@ -212,6 +211,12 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
   # see that a grant has quietly become inert.
   defp unknown_capability?(%{capability: capability}),
     do: not Authz.capability_known?(capability)
+
+  # Extracted so the summary line stays one readable line, as the sibling Roles
+  # and Decision Logs screens have it. Inline, the longer noun pushed the `if`
+  # past the formatter's width and it came back as six wrapped lines.
+  defp grant_noun(1), do: "direct capability"
+  defp grant_noun(_count), do: "direct capabilities"
 
   # The grants query is visibility-filtered to `company_ids/1`, and the
   # directory returns exactly that id set, so every row resolves. A company

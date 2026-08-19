@@ -119,7 +119,19 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
             framed={false}
           >
             <:col :let={address} label="Label" sort="label" sort_id="addresses-sort-label">
-              <span class="whitespace-nowrap font-medium text-ink">{address.label || "Unlabeled"}</span>
+              <.link
+                :if={allowed?(@current_scope, "admin.address.view")}
+                navigate={~p"/addresses/#{address.id}"}
+                class="whitespace-nowrap font-medium text-action hover:underline"
+              >
+                {address.label || "Unlabeled"}
+              </.link>
+              <span
+                :if={not allowed?(@current_scope, "admin.address.view")}
+                class="whitespace-nowrap font-medium text-ink"
+              >
+                {address.label || "Unlabeled"}
+              </span>
             </:col>
             <:col :let={address} label="Address">
               <div class="min-w-56 text-ink-muted">

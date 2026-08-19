@@ -7,15 +7,18 @@ defmodule BilimbiWeb.DashboardLive do
   id against known implementations of `Bilimbi.Base.Dashboard.Widget`.
 
   Widget visibility is gated by capability. Layout is persisted per-user in the
-  `ui.dashboard.layout` setting. Reorder buttons and add/remove controls allow
-  customising the grid. Widgets with a non-zero `refresh_interval` are
-  auto-refreshed through a `handle_info` timer.
+  `ui.dashboard.layout` setting. While editing, widgets can be reordered by
+  drag (a `DashboardSort` hook pushes the new order; the server validates it is
+  a permutation of the current ids before persisting) or by the keyboard move
+  buttons Belimbing pairs with its own drag handles. Widgets with a non-zero
+  `refresh_interval` are auto-refreshed through a `handle_info` timer.
   """
 
   use BilimbiWeb, :live_view
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Dashboard
+  alias Bilimbi.Base.Session
   alias Bilimbi.Base.Settings
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
@@ -24,7 +27,8 @@ defmodule BilimbiWeb.DashboardLive do
   @widget_modules %{
     "base-dashboard-company-stats" => BilimbiWeb.Dashboard.CompanyStatsWidget,
     "base-dashboard-user-stats" => BilimbiWeb.Dashboard.UserStatsWidget,
-    "base-dashboard-recent-audit" => BilimbiWeb.Dashboard.RecentAuditWidget
+    "base-dashboard-recent-audit" => BilimbiWeb.Dashboard.RecentAuditWidget,
+    "base-dashboard-session-stats" => BilimbiWeb.Dashboard.SessionStatsWidget
   }
 
   @impl true
@@ -45,6 +49,7 @@ defmodule BilimbiWeb.DashboardLive do
     available = available_widgets(authorized, visible)
 
     audit_entries = audit_entries(scope)
+    session_count = session_count(visible)
 
     {:ok,
      socket
@@ -55,6 +60,7 @@ defmodule BilimbiWeb.DashboardLive do
      |> assign(:full_catalogue, full_catalogue)
      |> assign(:company_count, length(companies))
      |> assign(:user_count, length(users))
+     |> assign(:session_count, session_count)
      |> assign(:audit_entries, audit_entries)
      |> assign(:companies, companies)
      |> assign(:users, users)
@@ -62,6 +68,16 @@ defmodule BilimbiWeb.DashboardLive do
      |> assign(:layout_editing, false)
      |> assign(:refresh_timer, nil)
      |> schedule_refresh(visible)}
+  end
+
+  # The count backs a widget gated by `admin.system.session.list`; skip the
+  # query entirely when the viewer cannot see it.
+  defp session_count(visible_widgets) do
+    if Enum.any?(visible_widgets, &(&1.id == "base-dashboard-session-stats")) do
+      Session.count_sessions()
+    else
+      nil
+    end
   end
 
   defp audit_entries(scope) do
@@ -216,9 +232,38 @@ defmodule BilimbiWeb.DashboardLive do
     {:noreply, assign(socket, :widgets, widgets)}
   end
 
+  # The drag hook pushes the DOM order after a drop. The browser is not the
+  # source of truth: an order that is not exactly a permutation of the current
+  # widget ids (stale patch, forged push) is ignored, never persisted.
+  @impl true
+  def handle_event("reorder-widgets", %{"ids" => ids}, socket) when is_list(ids) do
+    widgets = reordered(socket.assigns.widgets, ids)
+
+    if widgets == socket.assigns.widgets do
+      {:noreply, socket}
+    else
+      layout = Enum.map(widgets, & &1.id)
+      _ = persist_layout(socket.assigns.current_scope, layout)
+      {:noreply, assign(socket, :widgets, widgets)}
+    end
+  end
+
+  def handle_event("reorder-widgets", _params, socket), do: {:noreply, socket}
+
   @impl true
   def handle_event("toggle-layout-edit", _params, socket) do
     {:noreply, assign(socket, :layout_editing, !socket.assigns.layout_editing)}
+  end
+
+  defp reordered(widgets, ids) do
+    current_ids = Enum.map(widgets, & &1.id)
+
+    if length(ids) == length(current_ids) and MapSet.new(ids) == MapSet.new(current_ids) do
+      by_id = Map.new(widgets, &{&1.id, &1})
+      Enum.map(ids, &Map.fetch!(by_id, &1))
+    else
+      widgets
+    end
   end
 
   defp move_one(widgets, id, direction) do
@@ -247,6 +292,7 @@ defmodule BilimbiWeb.DashboardLive do
     {:noreply,
      socket
      |> assign(:audit_entries, audit_entries)
+     |> assign(:session_count, session_count(socket.assigns.widgets))
      |> assign(:refresh_timer, nil)
      |> schedule_refresh(socket.assigns.widgets)}
   end
@@ -312,6 +358,8 @@ defmodule BilimbiWeb.DashboardLive do
         <div
           :if={@widgets != []}
           id="dashboard-widgets"
+          phx-hook="DashboardSort"
+          data-sort-enabled={if @layout_editing, do: "true", else: "false"}
           class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3"
         >
           <.render_widget
@@ -319,6 +367,7 @@ defmodule BilimbiWeb.DashboardLive do
             widget={widget}
             company_count={@company_count}
             user_count={@user_count}
+            session_count={@session_count}
             audit_entries={@audit_entries}
             current_scope={@current_scope}
             layout_editing={@layout_editing}
@@ -414,8 +463,19 @@ defmodule BilimbiWeb.DashboardLive do
     assigns = assign(assigns, :id, widget.id)
 
     ~H"""
-    <div class="relative">
+    <div class="relative" id={"widget-#{@id}"} data-widget-id={@id}>
       <div :if={@layout_editing} class="absolute right-1 top-1 z-10 flex gap-0.5">
+        <button
+          id={"drag-#{@id}"}
+          type="button"
+          draggable="true"
+          data-role="drag-handle"
+          title="Drag to reorder. Use the move buttons for keyboard access."
+          aria-label={"Drag to reorder #{@widget.label}"}
+          class="grid size-5 cursor-grab touch-none place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong active:cursor-grabbing"
+        >
+          <.icon name="hero-bars-3" class="size-3" />
+        </button>
         <button
           id={"move-up-#{@id}"}
           type="button"
@@ -465,6 +525,15 @@ defmodule BilimbiWeb.DashboardLive do
             navigate={
               if UserAuth.allowed?(@current_scope, "admin.user.list"),
                 do: ~p"/users"
+            }
+          />
+        <% "base-dashboard-session-stats" -> %>
+          <.session_stat_card
+            id="stat-sessions"
+            count={@session_count}
+            navigate={
+              if UserAuth.allowed?(@current_scope, "admin.system.session.list"),
+                do: "/system/sessions"
             }
           />
         <% "base-dashboard-recent-audit" -> %>
@@ -555,6 +624,48 @@ defmodule BilimbiWeb.DashboardLive do
       class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
     >
       <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Users</p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+        {@count}
+      </p>
+    </div>
+    """
+  end
+
+  attr :id, :string, required: true
+  attr :count, :integer, required: true
+  attr :navigate, :string, default: nil
+
+  # The sessions screen is contributed by Base Session and injected through
+  # discovered routes, so its href is a plain string rather than a `~p` route.
+  defp session_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
+    ~H"""
+    <.link
+      navigate={@navigate}
+      id={@id}
+      class="group rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
+    >
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+        Sessions
+      </p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+        {@count}
+      </p>
+      <span class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 group-hover:text-ink">
+        View all
+      </span>
+    </.link>
+    """
+  end
+
+  defp session_stat_card(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+    >
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+        Sessions
+      </p>
       <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
         {@count}
       </p>

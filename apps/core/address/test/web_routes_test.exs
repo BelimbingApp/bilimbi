@@ -17,6 +17,12 @@ defmodule Bilimbi.Core.Address.WebRoutesTest do
                live: Bilimbi.Core.Address.Web.CreateLive,
                session: :auth,
                capability: "admin.address.create"
+             },
+             %{
+               path: "/addresses/:id",
+               live: Bilimbi.Core.Address.Web.ShowLive,
+               session: :auth,
+               capability: "admin.address.view"
              }
            ]
   end

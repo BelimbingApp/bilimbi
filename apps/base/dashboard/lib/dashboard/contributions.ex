@@ -32,6 +32,13 @@ defmodule Bilimbi.Base.Dashboard.Contributions do
           size: :medium,
           order: 30,
           capability: "admin.audit.log.list"
+        },
+        %{
+          id: "base-dashboard-session-stats",
+          label: "Sessions",
+          size: :small,
+          order: 40,
+          capability: "admin.system.session.list"
         }
       ]
     }

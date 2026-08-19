@@ -193,6 +193,41 @@ defmodule BilimbiWeb.DashboardLiveTest do
       assert render(view) =~ "created"
       assert render(view) =~ "Company"
     end
+
+    test "session widget stays hidden without admin.system.session.list", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      refute has_element?(view, "#stat-sessions")
+
+      # Not offered for adding either.
+      view |> element("#edit-layout") |> render_click()
+      refute has_element?(view, "#add-widget-base-dashboard-session-stats")
+    end
+
+    test "session widget counts durable sessions behind its capability", %{conn: conn} do
+      grant_capabilities!(["admin.system.session.list"])
+
+      # The viewer's own durable session already contributes at least one row;
+      # add two more so the count is unambiguous.
+      Session.put_session("dash-extra-a", "opaque", %{
+        user_id: 91,
+        ip_address: "127.0.0.1",
+        user_agent: "Bilimbi test",
+        last_activity: 100
+      })
+
+      Session.put_session("dash-extra-b", "opaque", %{
+        user_id: 91,
+        ip_address: "127.0.0.2",
+        user_agent: "Bilimbi test",
+        last_activity: 200
+      })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(view, "#stat-sessions")
+      assert has_element?(view, "#stat-sessions", "3")
+    end
   end
 
   describe "widget layout customization and persistence" do
@@ -234,6 +269,86 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
       assert has_element?(view, "#stat-companies")
       assert has_element?(view, "#stat-users")
+    end
+
+    test "drag hook order applies and persists as a layout", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert widget_order(view) == [
+               "base-dashboard-company-stats",
+               "base-dashboard-user-stats"
+             ]
+
+      # What the DashboardSort hook pushes after a drop: the DOM order.
+      render_click(view, "reorder-widgets", %{
+        "ids" => ["base-dashboard-user-stats", "base-dashboard-company-stats"]
+      })
+
+      assert widget_order(view) == [
+               "base-dashboard-user-stats",
+               "base-dashboard-company-stats"
+             ]
+
+      assert Settings.get("ui.dashboard.layout", Settings.Scope.user(91, 73, 41)) == [
+               "base-dashboard-user-stats",
+               "base-dashboard-company-stats"
+             ]
+    end
+
+    test "a drag order that is not a permutation of the widgets changes nothing", %{
+      conn: conn
+    } do
+      # A fresh user: the suite is async: false and shares one sandbox, so an
+      # earlier persistence test must not count as this user's baseline. The
+      # login path validates the user row, so the fixture must exist too.
+      UserFixtures.insert_user!(%{
+        id: 92,
+        company_id: 73,
+        name: "Grace Hopper",
+        email: "grace@example.com"
+      })
+
+      conn = log_in_as(conn, session_user(%{"user_id" => 92}))
+
+      {:ok, view, _html} = conn |> live(~p"/dashboard")
+
+      # Stale patch: the ids no longer match the live widgets.
+      render_click(view, "reorder-widgets", %{
+        "ids" => ["base-dashboard-user-stats", "base-dashboard-recent-audit"]
+      })
+
+      # Dropped id.
+      render_click(view, "reorder-widgets", %{"ids" => ["base-dashboard-user-stats"]})
+
+      # Duplicated id.
+      render_click(view, "reorder-widgets", %{
+        "ids" => [
+          "base-dashboard-company-stats",
+          "base-dashboard-company-stats"
+        ]
+      })
+
+      # Forged id.
+      render_click(view, "reorder-widgets", %{"ids" => ["forged-widget"]})
+
+      assert widget_order(view) == [
+               "base-dashboard-company-stats",
+               "base-dashboard-user-stats"
+             ]
+
+      refute Settings.overridden?("ui.dashboard.layout", Settings.Scope.user(92, 73, 41))
+    end
+
+    test "drag handles appear only while editing", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      refute has_element?(view, "#drag-base-dashboard-company-stats")
+
+      view |> element("#edit-layout") |> render_click()
+
+      assert has_element?(view, "#drag-base-dashboard-company-stats")
+      assert has_element?(view, "#drag-base-dashboard-company-stats")
+      assert has_element?(view, "#dashboard-widgets[data-sort-enabled='true']")
     end
 
     test "the layout setting answers with its declared empty default when nothing is stored",
@@ -317,5 +432,34 @@ defmodule BilimbiWeb.DashboardLiveTest do
       assert render(view) =~ "updated"
       assert render(view) =~ "User"
     end
+
+    test "refresh recomputes the session count", %{conn: conn} do
+      grant_capabilities!(["admin.system.session.list"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(view, "#stat-sessions", "1")
+
+      Session.put_session("dash-refreshed", "opaque", %{
+        user_id: 91,
+        ip_address: "127.0.0.3",
+        user_agent: "Bilimbi test",
+        last_activity: 300
+      })
+
+      send(view.pid, :refresh_widgets)
+
+      assert has_element?(view, "#stat-sessions", "2")
+    end
+  end
+
+  # The drag hook pushes DOM order, so order is what the test must observe:
+  # the position of each widget wrapper's id within the rendered grid.
+  defp widget_order(view) do
+    html = render(view)
+
+    ~r{id="widget-([^"]+)"}
+    |> Regex.scan(html)
+    |> Enum.map(fn [_match, id] -> id end)
   end
 end

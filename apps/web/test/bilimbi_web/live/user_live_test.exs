@@ -114,6 +114,25 @@ defmodule BilimbiWeb.UserLiveTest do
     assert has_element?(allowed, "#user-92-show[href='/users/92']")
     assert has_element?(allowed, "#user-92-impersonate[href='/admin/impersonate/92']")
     assert has_element?(allowed, "#user-91-impersonate[disabled]")
+    refute has_element?(allowed, "#user-92-delete")
+  end
+
+  test "deletes another tenant user from the index and refuses self-delete", %{conn: conn} do
+    insert_user!(%{id: 91, company_id: 73, name: "Signed In"})
+    insert_user!(%{id: 92, company_id: 73, name: "Managed User"})
+    insert_user!(%{id: 93, company_id: 76, name: "Archived User"})
+
+    grant_capabilities!(["admin.user.list", "admin.user.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
+
+    assert has_element?(view, "#user-91-delete[disabled]")
+    assert has_element?(view, "#user-93-delete[disabled]")
+    assert has_element?(view, "#user-92-delete")
+
+    view |> element("#user-92-delete") |> render_click()
+    refute has_element?(view, "#user-92")
+    assert render(view) =~ "User deleted successfully."
   end
 
   test "preserves PostgreSQL LIKE contains, case, wildcard, and PHP-falsey search behavior", %{
