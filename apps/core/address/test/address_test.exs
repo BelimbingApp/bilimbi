@@ -432,6 +432,14 @@ defmodule Bilimbi.Core.AddressTest do
     assert {:ok, [attached]} = Address.list_company_addresses(context.operator, 73)
     assert attached.id == address.id
 
+    assert {:ok, [attached_detail]} =
+             Address.list_company_attached_addresses(context.operator, 73)
+
+    assert attached_detail.id == address.id
+    assert attached_detail.kind == ["headquarters", "billing"]
+    assert attached_detail.is_primary == true
+    assert attached_detail.priority == 1
+
     assert [["App\\Core\\Company\\Models\\Company", ["headquarters", "billing"], true, 1]] =
              Ecto.Adapters.SQL.query!(
                Bilimbi.Base.Repo,

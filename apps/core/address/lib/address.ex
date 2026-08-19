@@ -316,6 +316,33 @@ defmodule Bilimbi.Core.Address do
     end
   end
 
+  @doc "Lists live tenant addresses attached to a Company with attachment metadata."
+  @spec list_company_attached_addresses(Scope.t(), pos_integer()) ::
+          {:ok, [AttachedAddress.t()]} | {:error, :company_not_found}
+  def list_company_attached_addresses(%Scope{} = scope, company_id) do
+    with {:ok, _company} <- normalize_company_result(Company.get_company(scope, company_id)) do
+      company_addressable_identity = Company.addressable_identity()
+
+      attached =
+        from(address in Tenancy.scope_query(Schema, scope),
+          join: attachment in Addressable,
+          on:
+            attachment.address_id == address.id and
+              attachment.addressable_type == ^company_addressable_identity and
+              attachment.addressable_id == ^company_id,
+          where: is_nil(address.deleted_at),
+          order_by: [desc: attachment.is_primary, asc: attachment.priority, asc: address.id],
+          select: {address, attachment}
+        )
+        |> Repo.all()
+        |> Enum.map(fn {address, attachment} ->
+          AttachedAddress.from_schema(address, attachment)
+        end)
+
+      {:ok, attached}
+    end
+  end
+
   @doc "Lists live tenant addresses not yet linked to the selected live Company."
   @spec list_available_company_addresses(Scope.t(), pos_integer()) ::
           {:ok, [Summary.t()]} | {:error, :company_not_found}
