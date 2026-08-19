@@ -10,7 +10,8 @@
     "base/database",
     "base/module_registry",
     "base/tenancy",
-    "base/ui"
+    "base/ui",
+    "core/geonames"
   ],
   migrations: "priv/repo/migrations",
   migration_dispositions: %{

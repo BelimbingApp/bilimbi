@@ -421,5 +421,23 @@ defmodule Bilimbi.Core.CompanyTest do
              Company.create_company(scope, %{name: "Good Email Co", email: "ops@example.test"})
   end
 
+  test "create_company validates jurisdiction against known geonames countries" do
+    create_geonames_tables!()
+    insert_country!(%{iso: "MY", country: "Malaysia"})
+    insert_tenant!()
+    {:ok, scope} = Tenancy.scope(41)
+
+    assert {:error, changeset} =
+             Company.create_company(scope, %{name: "Bad Country Co", jurisdiction: "XX"})
+
+    assert {:jurisdiction, {"must be a valid country ISO code", []}} =
+             List.keyfind(changeset.errors, :jurisdiction, 0)
+
+    assert {:ok, %Summary{id: id}} =
+             Company.create_company(scope, %{name: "Valid Country Co", jurisdiction: "MY"})
+
+    assert Repo.get(Bilimbi.Core.Company.Schema, id).jurisdiction == "MY"
+  end
+
   defp opaque(value), do: :erlang.element(1, {value})
 end

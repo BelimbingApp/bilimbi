@@ -19,9 +19,9 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              "base/tenancy",
              "base/audit",
              "base/authz",
+             "core/geonames",
              "core/company",
              "core/employee",
-             "core/geonames",
              "core/address",
              "core/user"
            ]

@@ -8,10 +8,20 @@ defmodule Bilimbi.Core.Company.TestFixtures do
 
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.TestFixtures, as: TenancyFixtures
+  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesTestFixtures
   alias Ecto.Adapters.SQL
+
+  def create_geonames_tables! do
+    apply(GeonamesTestFixtures, :create_geonames_tables!, [])
+  end
+
+  def insert_country!(attributes \\ %{}) do
+    apply(GeonamesTestFixtures, :insert_country!, [attributes])
+  end
 
   def create_company_identity_tables! do
     apply(TenancyFixtures, :create_tenants_table!, [])
+    create_geonames_tables!()
 
     SQL.query!(
       Repo,
