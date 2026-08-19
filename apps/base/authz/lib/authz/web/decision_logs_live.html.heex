@@ -111,14 +111,14 @@
       </.table>
 
       <div
-        :if={@page.total_pages > 1}
+        :if={@page.total_pages > 0}
         id="logs-pagination"
         class="flex items-center justify-between border-t border-line px-4 py-3 text-sm"
       >
-        <p class="text-ink-subtle">
-          Page {@page.page} of {@page.total_pages} · {@page.total_entries} decisions
+        <p id="logs-pagination-summary" class="text-ink-subtle">
+          Page {@page.page} of {@page.total_pages} · {@page.total_entries} {if @page.total_entries == 1, do: "decision", else: "decisions"}
         </p>
-        <div class="flex gap-2">
+        <div :if={@page.total_pages > 1} class="flex gap-2">
           <.button :if={@page.page > 1} id="logs-prev" phx-click="page" phx-value-page={@page.page - 1}>
             Previous
           </.button>
