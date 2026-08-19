@@ -165,6 +165,18 @@ defmodule Bilimbi.Base.Authz do
     RoleService.unassign_role(scope, role_id, assignment_id, registry!())
   end
 
+  @doc """
+  Lists scoped principal-role assignments through a bounded page.
+
+  This is the tenant-wide Principal Roles index. For one principal's assignments
+  on a role or user screen, use `list_principal_role_assignments/4`.
+  """
+  @spec list_principal_roles(Scope.t(), keyword()) ::
+          Bilimbi.Base.Authz.Page.t(Bilimbi.Base.Authz.PrincipalRoleSummary.t())
+  def list_principal_roles(%Scope{} = scope, opts \\ []) when is_list(opts) do
+    Administration.list_principal_roles(scope, opts, registry!())
+  end
+
   @doc "Lists one principal's visible role assignments through a bounded page."
   @spec list_principal_role_assignments(Scope.t(), :user | :agent, pos_integer(), keyword()) ::
           Bilimbi.Base.Authz.Page.t(Bilimbi.Base.Authz.PrincipalRoleSummary.t())

@@ -133,6 +133,53 @@ defmodule Bilimbi.Base.Authz.Administration do
     )
   end
 
+  @principal_role_sort_fields %{
+    created_at: :created_at,
+    principal_type: :principal_type,
+    principal_id: :principal_id,
+    role_name: :role_name,
+    company_id: :company_id,
+    company_name: :company_name
+  }
+
+  @spec list_principal_roles(Scope.t(), keyword(), map()) :: Page.t(PrincipalRoleSummary.t())
+  def list_principal_roles(%Scope{} = scope, opts, registry) when is_list(opts) do
+    opts =
+      page_options!(opts,
+        search: nil,
+        sort_by: :created_at,
+        sort_dir: :desc,
+        company_order: []
+      )
+
+    visibility = company_visibility(scope, company_ids(scope, registry))
+    sort_by = sort_by!(opts[:sort_by], @principal_role_sort_fields)
+
+    query =
+      from(assignment in PrincipalRole,
+        join: role in Role,
+        on: role.id == assignment.role_id,
+        where: ^visibility
+      )
+      |> maybe_search_principal_roles(search!(opts[:search]))
+
+    ordered_query =
+      query
+      |> order_principal_roles(sort_by, opts)
+      |> select([assignment, role], %{assignment: assignment, role: role})
+
+    page_query(
+      query,
+      ordered_query,
+      opts,
+      fn rows ->
+        Enum.map(rows, fn %{assignment: assignment, role: role} ->
+          PrincipalRoleSummary.from_schema(assignment, role)
+        end)
+      end
+    )
+  end
+
   @spec list_principal_role_assignments(
           Scope.t(),
           :user | :agent,
@@ -271,6 +318,48 @@ defmodule Bilimbi.Base.Authz.Administration do
           ilike(log.resource_type, ^pattern) or ilike(log.resource_id, ^pattern) or
           ilike(log.actor_type, ^pattern) or ilike(log.trace_id, ^pattern)
     )
+  end
+
+  defp maybe_search_principal_roles(query, nil), do: query
+
+  defp maybe_search_principal_roles(query, search) do
+    pattern = "%#{search}%"
+
+    from([assignment, role] in query,
+      where:
+        ilike(role.name, ^pattern) or ilike(role.code, ^pattern) or
+          ilike(assignment.principal_type, ^pattern) or
+          fragment("CAST(? AS TEXT) ILIKE ?", assignment.principal_id, ^pattern)
+    )
+  end
+
+  defp order_principal_roles(query, :company_name, opts) do
+    direction = sort_dir!(opts[:sort_dir])
+    ids = company_order!(opts[:company_order])
+
+    order_by(query, [assignment, _role], [
+      {^direction, fragment("array_position(?::bigint[], ?)", ^ids, assignment.company_id)},
+      {^direction, assignment.id}
+    ])
+  end
+
+  defp order_principal_roles(query, :role_name, opts) do
+    direction = sort_dir!(opts[:sort_dir])
+
+    order_by(query, [assignment, role], [
+      {^direction, role.name},
+      {^direction, assignment.id}
+    ])
+  end
+
+  defp order_principal_roles(query, sort_by, opts) do
+    direction = sort_dir!(opts[:sort_dir])
+    field = Map.fetch!(@principal_role_sort_fields, sort_by)
+
+    order_by(query, [assignment, _role], [
+      {^direction, field(assignment, ^field)},
+      {^direction, assignment.id}
+    ])
   end
 
   defp maybe_search_principal_capabilities(query, nil), do: query

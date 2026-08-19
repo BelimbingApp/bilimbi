@@ -1,0 +1,164 @@
+<Layouts.app
+  flash={@flash}
+  current_scope={@current_scope}
+  active_nav="admin.authz.principal-role"
+>
+  <.page id="principal-roles-index">
+    <.header>
+      Principal Roles
+      <:title_actions>
+        <button
+          type="button"
+          id="principal-roles-pin"
+          data-nav-pin="nav-admin-authz-principal-role"
+          title="Pin Principal Roles to sidebar"
+          aria-label="Pin Principal Roles to sidebar"
+          aria-pressed="false"
+          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        >
+          <.icon name="bilimbi-pin" class="size-3.5" />
+        </button>
+      </:title_actions>
+      <:subtitle>
+        User and principal role assignments
+      </:subtitle>
+    </.header>
+
+    <.card id="principal-roles-card" inner_class="p-0">
+      <.form
+        for={%{}}
+        as={:filters}
+        id="assignments-filters"
+        phx-change="filter"
+        phx-submit="filter"
+        class="p-2 mb-2"
+      >
+        <div class="relative">
+          <.icon
+            name="hero-magnifying-glass"
+            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+          />
+          <.input
+            type="search"
+            id="assignments-search"
+            name="search"
+            value={@state.search}
+            placeholder="Search by role name, type, or principal id"
+            phx-debounce="300"
+            autocomplete="off"
+            label="Search assignments"
+            label_class="sr-only"
+            wrapper_class="mb-0"
+            class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+          />
+        </div>
+      </.form>
+
+      <.table
+        id="principal-roles"
+        rows={@streams.assignments}
+        row_id={fn {dom_id, _assignment} -> dom_id end}
+        row_item={fn {_dom_id, assignment} -> assignment end}
+        sort_by={@state.sort_by}
+        sort_dir={@state.sort_dir}
+        framed={false}
+      >
+        <:col
+          :let={assignment}
+          label="Principal"
+          sort="principal_id"
+          sort_id="assignments-sort-principal_id"
+        >
+          <span class="whitespace-nowrap tabular-nums">
+            <.link
+              :if={assignment.principal_type == "user"}
+              navigate={~p"/users/#{assignment.principal_id}"}
+              class="text-sm font-medium text-action hover:underline"
+            >
+              {assignment.principal_id}
+            </.link>
+            <span :if={assignment.principal_type != "user"} class="text-sm text-ink">
+              {assignment.principal_id}
+            </span>
+          </span>
+        </:col>
+
+        <:col
+          :let={assignment}
+          label="Type"
+          sort="principal_type"
+          sort_id="assignments-sort-principal_type"
+        >
+          <.badge>{principal_label(assignment)}</.badge>
+        </:col>
+
+        <:col :let={assignment} label="Role" sort="role_name" sort_id="assignments-sort-role_name">
+          <.link
+            navigate={~p"/authz/roles/#{assignment.role_id}"}
+            class="text-sm font-medium text-action hover:underline"
+          >
+            {assignment.role_name}
+          </.link>
+        </:col>
+
+        <:col
+          :let={assignment}
+          label="Company"
+          sort="company_name"
+          sort_id="assignments-sort-company_name"
+        >
+          <span class="whitespace-nowrap text-ink-muted">
+            {company_name(@company_names, assignment.company_id)}
+          </span>
+        </:col>
+
+        <:col
+          :let={assignment}
+          label="Assigned At"
+          sort="created_at"
+          sort_id="assignments-sort-created_at"
+        >
+          <span class="whitespace-nowrap tabular-nums text-ink-muted">
+            {created_at(assignment)}
+          </span>
+        </:col>
+
+        <:empty :if={@page.total_entries == 0}>
+          {if @state.search == "",
+            do: "No principal role assignments found.",
+            else: "No principal role assignments match these filters."}
+        </:empty>
+      </.table>
+
+      <div
+        :if={@page.total_pages > 0}
+        id="assignments-pagination"
+        class="flex items-center justify-between border-t border-line px-4 py-3 text-sm"
+      >
+        <p id="assignments-pagination-summary" class="text-ink-subtle">
+          Page {@page.page} of {@page.total_pages} · {@page.total_entries} {assignment_noun(
+            @page.total_entries
+          )}
+        </p>
+        <div :if={@page.total_pages > 1} class="flex gap-2">
+          <.button
+            :if={@page.page > 1}
+            id="assignments-prev"
+            phx-click="page"
+            phx-value-page={@page.page - 1}
+          >
+            Previous
+          </.button>
+          <.button
+            :if={@page.page < @page.total_pages}
+            id="assignments-next"
+            phx-click="page"
+            phx-value-page={@page.page + 1}
+          >
+            Next
+          </.button>
+        </div>
+      </div>
+    </.card>
+  </.page>
+</Layouts.app>
