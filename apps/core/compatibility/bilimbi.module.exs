@@ -6,6 +6,7 @@
   otp_app: :bilimbi_core_compatibility,
   namespace: Bilimbi.Core.Compatibility,
   dependencies: [
+    "base/dashboard",
     "base/database",
     "base/menu",
     "base/ui",
