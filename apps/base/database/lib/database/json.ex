@@ -13,10 +13,26 @@ defmodule Bilimbi.Base.Database.Json do
 
   @impl Ecto.Type
   def cast(value) when is_map(value) or is_list(value), do: {:ok, value}
+
+  def cast(value) when is_binary(value) do
+    case Jason.decode(value) do
+      {:ok, decoded} when is_map(decoded) or is_list(decoded) -> {:ok, decoded}
+      _ -> :error
+    end
+  end
+
   def cast(_value), do: :error
 
   @impl Ecto.Type
   def load(value) when is_map(value) or is_list(value), do: {:ok, value}
+
+  def load(value) when is_binary(value) do
+    case Jason.decode(value) do
+      {:ok, decoded} when is_map(decoded) or is_list(decoded) -> {:ok, decoded}
+      _ -> :error
+    end
+  end
+
   def load(_value), do: :error
 
   @impl Ecto.Type

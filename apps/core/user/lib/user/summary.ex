@@ -7,7 +7,16 @@ defmodule Bilimbi.Core.User.Summary do
   """
 
   @enforce_keys [:id, :name, :email]
-  defstruct [:id, :company_id, :employee_id, :name, :email, :email_verified_at]
+  defstruct [
+    :id,
+    :company_id,
+    :employee_id,
+    :name,
+    :email,
+    :email_verified_at,
+    :created_at,
+    :updated_at
+  ]
 
   @type t :: %__MODULE__{
           id: pos_integer(),
@@ -15,7 +24,9 @@ defmodule Bilimbi.Core.User.Summary do
           employee_id: pos_integer() | nil,
           name: String.t(),
           email: String.t(),
-          email_verified_at: NaiveDateTime.t() | nil
+          email_verified_at: NaiveDateTime.t() | nil,
+          created_at: NaiveDateTime.t() | nil,
+          updated_at: NaiveDateTime.t() | nil
         }
 
   @doc false
@@ -26,7 +37,9 @@ defmodule Bilimbi.Core.User.Summary do
       employee_id: user.employee_id,
       name: user.name,
       email: user.email,
-      email_verified_at: user.email_verified_at
+      email_verified_at: user.email_verified_at,
+      created_at: Map.get(user, :created_at),
+      updated_at: Map.get(user, :updated_at)
     }
   end
 end
