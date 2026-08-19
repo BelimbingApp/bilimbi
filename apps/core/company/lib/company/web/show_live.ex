@@ -149,11 +149,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   end
 
   defp get_company_timezone(company) do
-    try do
-      Settings.get("localization.timezone", SettingsScope.company(company.id, company.tenant_id))
-    rescue
-      _ -> nil
-    end
+    Settings.get("localization.timezone", SettingsScope.company(company.id, company.tenant_id))
+  rescue
+    _ -> nil
   end
 
   # ============================================================================
@@ -471,40 +469,38 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     scope = socket.assigns.current_scope.scope
     company = socket.assigns.company
 
-    cond do
-      trimmed == "" ->
-        case Company.update_company(scope, company.id, %{metadata: nil}) do
-          {:ok, updated} ->
-            {:noreply,
-             socket
-             |> put_flash(:info, "Metadata cleared.")
-             |> assign(:company, updated)
-             |> assign(:editing_metadata?, false)
-             |> assign(:metadata_input, "")}
+    if trimmed == "" do
+      case Company.update_company(scope, company.id, %{metadata: nil}) do
+        {:ok, updated} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, "Metadata cleared.")
+           |> assign(:company, updated)
+           |> assign(:editing_metadata?, false)
+           |> assign(:metadata_input, "")}
 
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, "Failed to clear metadata.")}
-        end
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to clear metadata.")}
+      end
+    else
+      case Jason.decode(trimmed) do
+        {:ok, decoded} when is_map(decoded) ->
+          case Company.update_company(scope, company.id, %{metadata: decoded}) do
+            {:ok, updated} ->
+              {:noreply,
+               socket
+               |> put_flash(:info, "Metadata saved.")
+               |> assign(:company, updated)
+               |> assign(:editing_metadata?, false)
+               |> assign(:metadata_input, format_metadata(updated.metadata))}
 
-      true ->
-        case Jason.decode(trimmed) do
-          {:ok, decoded} when is_map(decoded) ->
-            case Company.update_company(scope, company.id, %{metadata: decoded}) do
-              {:ok, updated} ->
-                {:noreply,
-                 socket
-                 |> put_flash(:info, "Metadata saved.")
-                 |> assign(:company, updated)
-                 |> assign(:editing_metadata?, false)
-                 |> assign(:metadata_input, format_metadata(updated.metadata))}
+            {:error, _} ->
+              {:noreply, put_flash(socket, :error, "Failed to save metadata.")}
+          end
 
-              {:error, _} ->
-                {:noreply, put_flash(socket, :error, "Failed to save metadata.")}
-            end
-
-          _ ->
-            {:noreply, put_flash(socket, :error, "Metadata was not saved. Enter valid JSON.")}
-        end
+        _ ->
+          {:noreply, put_flash(socket, :error, "Metadata was not saved. Enter valid JSON.")}
+      end
     end
   end
 
