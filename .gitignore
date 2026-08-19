@@ -60,3 +60,6 @@ npm-debug.log
 # Python bytecode from .github/scripts tests
 __pycache__
 *.pyc
+
+# Heartbeat runtime state (plugin writes this; never commit)
+/.opencode/heartbeat/
