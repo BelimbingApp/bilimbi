@@ -500,17 +500,28 @@ defmodule Bilimbi.Core.Compatibility.PlatformBaselineFailureDiagnosticsTest do
   end
 
   defp temporary_dir(name) do
-    Path.join(
-      System.tmp_dir!(),
-      "bilimbi-platform-baseline-diagnostics-#{name}-#{System.unique_integer([:positive])}"
-    )
+    dir = Path.join(System.tmp_dir!(), "bilimbi-platform-baseline-diagnostics-#{run_token(name)}")
+
+    # `/tmp` outlives the run, so without this the directory is still there for
+    # the next one to collide with -- and it is what made this suite flaky.
+    on_exit(fn -> File.rm_rf!(dir) end)
+
+    dir
   end
 
   defp unique_local_output_dir(name) do
-    Path.join(
-      @local_diagnostics_root,
-      "#{name}-#{System.unique_integer([:positive])}"
-    )
+    Path.join(@local_diagnostics_root, run_token(name))
+  end
+
+  # `System.unique_integer/1` restarts with every VM, so on its own it names a
+  # directory that a *later* run can pick again -- and these directories are not
+  # removed, so the collision is with a real, non-empty one. Tests that assert
+  # "exactly one diagnostic file" then read the previous run's file too.
+  #
+  # The timestamp is what makes this unique across runs rather than only within
+  # one; the E2E suite already names its databases this way for the same reason.
+  defp run_token(name) do
+    "#{name}-#{System.system_time(:microsecond)}-#{System.unique_integer([:positive])}"
   end
 
   defp configure_local_output(path) do
