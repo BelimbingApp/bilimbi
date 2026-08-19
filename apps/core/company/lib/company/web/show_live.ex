@@ -333,7 +333,145 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # Handlers: Company Details Edit Modal
   # ============================================================================
 
+  defp toggle_address_primary(socket, address_id, _params) do
+    scope = socket.assigns.current_scope.scope
+    company = socket.assigns.company
+
+    attached = socket.assigns.attached_addresses
+    current = Enum.find(attached, &(&1.id == address_id))
+
+    new_primary = if current, do: not current.is_primary, else: true
+
+    case update_company_address_attachment(scope, address_id, company.id, %{
+           is_primary: new_primary
+         }) do
+      {:ok, :updated} ->
+        updated_attached = list_company_attached_addresses(scope, company.id)
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "Address setting updated.")
+         |> assign(:attached_addresses, updated_attached)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to update address setting.")}
+    end
+  end
+
+  defp unlink_address(socket, address_id, _params) do
+    scope = socket.assigns.current_scope.scope
+    company = socket.assigns.company
+
+    case detach_address_from_company(scope, address_id, company.id) do
+      :ok ->
+        updated_attached = list_company_attached_addresses(scope, company.id)
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "Address unlinked.")
+         |> assign(:attached_addresses, updated_attached)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to unlink address.")}
+    end
+  end
+
+  defp save_address_priority(socket, address_id, priority_str) do
+    priority = parse_id(priority_str) || 0
+    scope = socket.assigns.current_scope.scope
+    company = socket.assigns.company
+
+    case update_company_address_attachment(scope, address_id, company.id, %{priority: priority}) do
+      {:ok, :updated} ->
+        updated_attached = list_company_attached_addresses(scope, company.id)
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "Address setting updated.")
+         |> assign(:attached_addresses, updated_attached)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to update address setting.")}
+    end
+  end
+
+  defp remove_activity_at(socket, scope, company, current, index) do
+    new_activities =
+      current
+      |> List.delete_at(index)
+      |> case do
+        [] -> nil
+        list -> list
+      end
+
+    case Company.update_company(scope, company.id, %{scope_activities: new_activities}) do
+      {:ok, updated} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Activity removed.")
+         |> assign(:company, updated)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to remove activity.")}
+    end
+  end
+
+  defp write_forbidden(socket) do
+    {:noreply,
+     put_flash(
+       socket,
+       :error,
+       "You do not have permission to change company administration data."
+     )}
+  end
+
+  # `String.to_integer/1` raises on anything non-numeric, so a forged id crashed
+  # the LiveView rather than being refused. Returns nil for junk; callers treat
+  # a nil id as "no such address", which is what a forged id is.
+  defp parse_id(value) when is_integer(value) and value > 0, do: value
+
+  defp parse_id(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {id, ""} when id > 0 -> id
+      _ -> nil
+    end
+  end
+
+  defp parse_id(_value), do: nil
+
+  # An activity index, so 0 is valid -- and it must be inside the list, or
+  # `List.delete_at/2` silently no-ops and the flash claims a removal.
+  defp parse_index(value, length) do
+    case Integer.parse(to_string(value)) do
+      {index, ""} when index >= 0 and index < length -> index
+      _ -> nil
+    end
+  end
+
+  # Same shape as `DepartmentsLive`, `RelationshipsLive` and
+  # `DepartmentTypesLive`: one clause ahead of the rest, so a write event cannot
+  # be added later without deciding whether it belongs on this list. `:if=
+  # {@can_update?}` in the template hides the controls, but a hidden control is
+  # not a guard -- this route is gated on `admin.company.view`, a read
+  # capability, so every one of these was reachable by forging the event.
+  @write_events ~w(
+    save_details
+    add_activity
+    remove_activity
+    save_metadata
+    save_timezone
+    save_attach
+    save_create_address
+    toggle_address_primary
+    save_address_priority
+    unlink_address
+  )
+
   @impl true
+  def handle_event(event, _params, %{assigns: %{can_update?: false}} = socket)
+      when event in @write_events,
+      do: write_forbidden(socket)
+
   def handle_event("edit_details", _params, socket) do
     company = socket.assigns.company
 
@@ -401,6 +539,17 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   end
 
   # ============================================================================
+  # Handlers: Metadata JSON
+  # ============================================================================
+
+  def handle_event("edit_metadata", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:editing_metadata?, true)
+     |> assign(:metadata_input, format_metadata(socket.assigns.company.metadata))}
+  end
+
+  # ============================================================================
   # Handlers: Activities (Tags)
   # ============================================================================
 
@@ -417,40 +566,14 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   end
 
   def handle_event("remove_activity", %{"index" => index_str}, socket) do
-    index = String.to_integer(index_str)
     scope = socket.assigns.current_scope.scope
     company = socket.assigns.company
     current = company.scope_activities || []
 
-    new_activities =
-      current
-      |> List.delete_at(index)
-      |> case do
-        [] -> nil
-        list -> list
-      end
-
-    case Company.update_company(scope, company.id, %{scope_activities: new_activities}) do
-      {:ok, updated} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Activity removed.")
-         |> assign(:company, updated)}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to remove activity.")}
+    case parse_index(index_str, length(current)) do
+      nil -> {:noreply, socket}
+      index -> remove_activity_at(socket, scope, company, current, index)
     end
-  end
-
-  # ============================================================================
-  # Handlers: Metadata JSON
-  # ============================================================================
-
-  def handle_event("edit_metadata", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:editing_metadata?, true)
-     |> assign(:metadata_input, format_metadata(socket.assigns.company.metadata))}
   end
 
   def handle_event("cancel_edit_metadata", _params, socket) do
@@ -554,7 +677,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       case Map.get(params, "address_id") do
         nil -> nil
         "" -> nil
-        val -> String.to_integer(val)
+        val -> parse_id(val)
       end
 
     kinds = Map.get(params, "kinds") || []
@@ -582,7 +705,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       case Map.get(params, "address_id") do
         nil -> 0
         "" -> 0
-        val -> String.to_integer(val)
+        val -> parse_id(val) || 0
       end
 
     if address_id == 0 do
@@ -729,29 +852,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # Handlers: Address Row Inline Mutations (Primary, Priority, Kinds, Unlink)
   # ============================================================================
 
-  def handle_event("toggle_address_primary", %{"id" => address_id_str}, socket) do
-    address_id = String.to_integer(address_id_str)
-    scope = socket.assigns.current_scope.scope
-    company = socket.assigns.company
-
-    attached = socket.assigns.attached_addresses
-    current = Enum.find(attached, &(&1.id == address_id))
-
-    new_primary = if current, do: not current.is_primary, else: true
-
-    case update_company_address_attachment(scope, address_id, company.id, %{
-           is_primary: new_primary
-         }) do
-      {:ok, :updated} ->
-        updated_attached = list_company_attached_addresses(scope, company.id)
-
-        {:noreply,
-         socket
-         |> put_flash(:info, "Address setting updated.")
-         |> assign(:attached_addresses, updated_attached)}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to update address setting.")}
+  def handle_event("toggle_address_primary", %{"id" => address_id_str} = params, socket) do
+    case parse_id(address_id_str) do
+      nil -> {:noreply, socket}
+      address_id -> toggle_address_primary(socket, address_id, params)
     end
   end
 
@@ -760,41 +864,16 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         %{"id" => address_id_str, "priority" => priority_str},
         socket
       ) do
-    address_id = String.to_integer(address_id_str)
-    priority = String.to_integer(priority_str)
-    scope = socket.assigns.current_scope.scope
-    company = socket.assigns.company
-
-    case update_company_address_attachment(scope, address_id, company.id, %{priority: priority}) do
-      {:ok, :updated} ->
-        updated_attached = list_company_attached_addresses(scope, company.id)
-
-        {:noreply,
-         socket
-         |> put_flash(:info, "Address setting updated.")
-         |> assign(:attached_addresses, updated_attached)}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to update address setting.")}
+    case parse_id(address_id_str) do
+      nil -> {:noreply, socket}
+      address_id -> save_address_priority(socket, address_id, priority_str)
     end
   end
 
-  def handle_event("unlink_address", %{"id" => address_id_str}, socket) do
-    address_id = String.to_integer(address_id_str)
-    scope = socket.assigns.current_scope.scope
-    company = socket.assigns.company
-
-    case detach_address_from_company(scope, address_id, company.id) do
-      :ok ->
-        updated_attached = list_company_attached_addresses(scope, company.id)
-
-        {:noreply,
-         socket
-         |> put_flash(:info, "Address unlinked.")
-         |> assign(:attached_addresses, updated_attached)}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to unlink address.")}
+  def handle_event("unlink_address", %{"id" => address_id_str} = params, socket) do
+    case parse_id(address_id_str) do
+      nil -> {:noreply, socket}
+      address_id -> unlink_address(socket, address_id, params)
     end
   end
 

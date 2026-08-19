@@ -97,6 +97,61 @@ defmodule BilimbiWeb.CompanyLiveTest do
                conn |> log_in_as() |> live(~p"/companies/73")
     end
 
+    test "hides write controls and rejects direct write events without update capability",
+         %{conn: conn} do
+      # This route is gated on `admin.company.view` -- a read capability -- and
+      # `:if={@can_update?}` only hides the controls. The Departments,
+      # Relationships and Department Types screens each have this test; the
+      # Show screen did not, and every write handler was reachable by forging
+      # the event.
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      refute has_element?(view, "#company-edit-details")
+
+      render_submit(view, "save_details", %{
+        "company" => %{"name" => "Forged Name", "status" => "archived"}
+      })
+
+      render_click(view, "add_activity", %{"activity" => "forged"})
+      render_click(view, "remove_activity", %{"index" => "0"})
+      render_submit(view, "save_metadata", %{"metadata" => ~s({"forged":true})})
+      render_click(view, "save_timezone", %{"timezone" => "Etc/UTC"})
+      render_click(view, "unlink_address", %{"id" => "1"})
+      render_click(view, "toggle_address_primary", %{"id" => "1"})
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "You do not have permission to change company administration data."
+             )
+
+      stored = Repo.get!(Bilimbi.Core.Company.Schema, 73)
+      assert stored.name == "Bilimbi Industries"
+      assert stored.status == "active"
+      assert stored.scope_activities in [nil, []]
+      assert stored.metadata in [nil, %{}]
+    end
+
+    test "a forged non-numeric id is refused rather than crashing the view", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # `String.to_integer/1` raised on each of these, taking the LiveView down.
+      render_click(view, "toggle_address_primary", %{"id" => "not-a-number"})
+      render_click(view, "unlink_address", %{"id" => "../../etc"})
+      render_click(view, "remove_activity", %{"index" => "abc"})
+
+      render_submit(view, "save_address_priority", %{
+        "id" => "oops",
+        "priority" => "also-oops"
+      })
+
+      assert render(view) =~ "Bilimbi Industries"
+    end
+
     test "renders the company with its users and back button", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view"])
 
