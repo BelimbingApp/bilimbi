@@ -77,7 +77,12 @@
         sort_dir={@state.sort_dir}
         framed={false}
       >
-        <:col :let={grant} label="Principal" sort="principal_type" sort_id="grants-sort-principal_type">
+        <:col
+          :let={grant}
+          label="Principal"
+          sort="principal_type"
+          sort_id="grants-sort-principal_type"
+        >
           <span class="whitespace-nowrap text-ink-muted">
             <.badge>{principal_label(grant)}</.badge>
             <span class="ml-1 tabular-nums">{grant.principal_id}</span>
@@ -97,7 +102,7 @@
           </.badge>
         </:col>
 
-        <:col :let={grant} label="Company" sort="company_id" sort_id="grants-sort-company_id">
+        <:col :let={grant} label="Company" sort="company_name" sort_id="grants-sort-company_name">
           <span class="whitespace-nowrap text-ink-muted">
             {company_name(@company_names, grant.company_id)}
           </span>
@@ -122,7 +127,12 @@
         class="flex items-center justify-between border-t border-line px-4 py-3 text-sm"
       >
         <p id="grants-pagination-summary" class="text-ink-subtle">
-          Page {@page.page} of {@page.total_pages} · {@page.total_entries} {if @page.total_entries == 1, do: "direct capability", else: "direct capabilities"}
+          Page {@page.page} of {@page.total_pages} · {@page.total_entries} {if @page.total_entries ==
+                                                                                 1,
+                                                                               do:
+                                                                                 "direct capability",
+                                                                               else:
+                                                                                 "direct capabilities"}
         </p>
         <div :if={@page.total_pages > 1} class="flex gap-2">
           <.button
