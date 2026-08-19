@@ -324,6 +324,180 @@ defmodule Bilimbi.Core.Employee.EmployeeTypeTest do
     end
   end
 
+  describe "list_type_administration_page/3" do
+    test "returns bounded page with system types and company-owned custom types", %{
+      scope_1: scope_1
+    } do
+      assert {:ok, created} =
+               Employee.create_employee_type(scope_1, 81, %{
+                 code: "specialist",
+                 label: "Specialist"
+               })
+
+      assert {:ok, page} = Employee.list_type_administration_page(scope_1, 81)
+      assert %Employee.TypeAdministrationPage{} = page
+      assert page.page == 1
+      assert page.page_size == 25
+      assert page.total_entries >= 6
+      assert page.total_pages == 1
+      refute page.has_prev?
+      refute page.has_next?
+
+      assert Enum.any?(page.entries, fn entry ->
+               %Employee.TypeAdministrationEntry{} = entry
+
+               entry.id == created.id and entry.code == "specialist" and
+                 entry.label == "Specialist" and
+                 entry.is_system == false and entry.company_id == 81 and
+                 entry.employees_count == 0
+             end)
+
+      assert Enum.any?(page.entries, fn entry ->
+               entry.code == "full_time" and entry.is_system == true and is_nil(entry.company_id)
+             end)
+    end
+
+    test "calculates employees_count per company accurately", %{
+      scope_1: scope_1,
+      scope_2: scope_2
+    } do
+      assert {:ok, _} =
+               Employee.create_employee(scope_1, 81, %{
+                 employee_number: "EMP-FT-1",
+                 full_name: "FT 1",
+                 employee_type: "full_time"
+               })
+
+      assert {:ok, _} =
+               Employee.create_employee(scope_1, 81, %{
+                 employee_number: "EMP-FT-2",
+                 full_name: "FT 2",
+                 employee_type: "full_time"
+               })
+
+      assert {:ok, _} =
+               Employee.create_employee(scope_2, 82, %{
+                 employee_number: "EMP-FT-C2",
+                 full_name: "FT C2",
+                 employee_type: "full_time"
+               })
+
+      assert {:ok, page_1} = Employee.list_type_administration_page(scope_1, 81)
+      ft_entry_1 = Enum.find(page_1.entries, &(&1.code == "full_time"))
+      assert ft_entry_1.employees_count == 2
+
+      assert {:ok, page_2} = Employee.list_type_administration_page(scope_2, 82)
+      ft_entry_2 = Enum.find(page_2.entries, &(&1.code == "full_time"))
+      assert ft_entry_2.employees_count == 1
+    end
+
+    test "filters by search substring across code and label with LIKE escaping", %{
+      scope_1: scope_1
+    } do
+      assert {:ok, _} =
+               Employee.create_employee_type(scope_1, 81, %{
+                 code: "seasonal_literal",
+                 label: "Seasonal (100%_Match)"
+               })
+
+      assert {:ok, _} =
+               Employee.create_employee_type(scope_1, 81, %{
+                 code: "seasonal_broad",
+                 label: "Seasonal (100xx Match)"
+               })
+
+      assert {:ok, page} =
+               Employee.list_type_administration_page(scope_1, 81, search: "100%_")
+
+      assert length(page.entries) == 1
+      assert hd(page.entries).code == "seasonal_literal"
+
+      assert {:ok, label_page} =
+               Employee.list_type_administration_page(scope_1, 81, search: "part time")
+
+      assert length(label_page.entries) == 1
+      assert hd(label_page.entries).code == "part_time"
+    end
+
+    test "sorts by code, label, is_system, and employees_count deterministically", %{
+      scope_1: scope_1
+    } do
+      assert {:ok, _} =
+               Employee.create_employee(scope_1, 81, %{
+                 employee_number: "EMP-PT",
+                 full_name: "PT Emp",
+                 employee_type: "part_time"
+               })
+
+      assert {:ok, sort_code_asc} =
+               Employee.list_type_administration_page(scope_1, 81, sort_by: :code, sort_dir: :asc)
+
+      codes_asc = Enum.map(sort_code_asc.entries, & &1.code)
+      assert codes_asc == Enum.sort(codes_asc)
+
+      assert {:ok, sort_code_desc} =
+               Employee.list_type_administration_page(scope_1, 81,
+                 sort_by: :code,
+                 sort_dir: :desc
+               )
+
+      codes_desc = Enum.map(sort_code_desc.entries, & &1.code)
+      assert codes_desc == Enum.reverse(Enum.sort(codes_desc))
+
+      assert {:ok, sort_emp_desc} =
+               Employee.list_type_administration_page(scope_1, 81,
+                 sort_by: :employees_count,
+                 sort_dir: :desc
+               )
+
+      assert hd(sort_emp_desc.entries).code == "part_time"
+      assert hd(sort_emp_desc.entries).employees_count == 1
+    end
+
+    test "paginates results across pages", %{scope_1: scope_1} do
+      assert {:ok, page_1} =
+               Employee.list_type_administration_page(scope_1, 81, page: 1, page_size: 2)
+
+      assert {:ok, page_2} =
+               Employee.list_type_administration_page(scope_1, 81, page: 2, page_size: 2)
+
+      assert length(page_1.entries) == 2
+      assert length(page_2.entries) == 2
+      assert page_1.has_next?
+      refute page_1.has_prev?
+      assert page_2.has_prev?
+      assert page_1.total_entries >= 5
+
+      assert {:ok, page_past} =
+               Employee.list_type_administration_page(scope_1, 81, page: 99, page_size: 25)
+
+      assert page_past.entries == []
+      assert page_past.has_prev?
+      refute page_past.has_next?
+    end
+
+    test "rejects invalid options and validates company presence", %{
+      scope_1: scope_1
+    } do
+      for invalid_opts <- [
+            [page: 0],
+            [page: "1"],
+            [page_size: 0],
+            [page_size: 301],
+            [search: 123],
+            [sort_by: :invalid_column],
+            [sort_dir: :invalid_dir],
+            [unknown_key: "value"]
+          ] do
+        assert {:error, :invalid_options} =
+                 Employee.list_type_administration_page(scope_1, 81, invalid_opts)
+      end
+
+      assert {:error, :company_not_found} = Employee.list_type_administration_page(scope_1, 999)
+      assert {:error, :company_not_found} = Employee.list_type_administration_page(scope_1, 82)
+    end
+  end
+
   describe "database integrity and check constraint" do
     test "rejects company-owned system type (company_id IS NOT NULL and is_system = true)" do
       assert_raise Postgrex.Error, ~r/employee_types_system_company_check/, fn ->
@@ -397,6 +571,10 @@ defmodule Bilimbi.Core.Employee.EmployeeTypeTest do
       for not_a_scope <- [51, nil, "51", scope_1.tenant] do
         assert_raise FunctionClauseError, fn ->
           Employee.list_employee_types(opaque(not_a_scope), 81)
+        end
+
+        assert_raise FunctionClauseError, fn ->
+          Employee.list_type_administration_page(opaque(not_a_scope), 81)
         end
 
         assert_raise FunctionClauseError, fn ->

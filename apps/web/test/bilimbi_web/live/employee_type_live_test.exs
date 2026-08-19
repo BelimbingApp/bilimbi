@@ -113,7 +113,7 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     grant_capabilities!(["admin.employee-type.list", "admin.employee-type.delete"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
-    assert has_element?(view, "#employee-type-delete-#{type.id}")
+    assert has_element?(view, "#employee-type-delete-#{type.id}[phx-disable-with='Deleting…']")
 
     view
     |> element("#employee-type-delete-#{type.id}")
@@ -180,6 +180,164 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
     assert has_element?(view, "#employee-types-empty", "No employee types found.")
+  end
+
+  test "filters employee types by search query", %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, _type} =
+      Employee.create_employee_type(scope, 73, %{
+        code: "temporary_contractor",
+        label: "Specialist Consultant"
+      })
+
+    grant_capabilities!(["admin.employee-type.list"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+
+    assert has_element?(view, "#employee-types td", "Specialist Consultant")
+    assert has_element?(view, "#employee-types td", "Full Time")
+
+    view
+    |> form("#employee-types-filters", filters: %{search: "Specialist"})
+    |> render_change()
+
+    assert_patched(view, ~p"/employee-types?search=Specialist")
+    assert has_element?(view, "#employee-types td", "Specialist Consultant")
+    refute has_element?(view, "#employee-types td", "Full Time")
+
+    # Direct URL navigation
+    {:ok, search_view, _html} =
+      conn |> log_in_as() |> live(~p"/employee-types?search=temporary")
+
+    assert has_element?(search_view, "#employee-types td", "Specialist Consultant")
+    refute has_element?(search_view, "#employee-types td", "Full Time")
+  end
+
+  test "sorts employee types by column headers with aria-sort", %{conn: conn} do
+    grant_capabilities!(["admin.employee-type.list"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+
+    # Default sort is is_system desc
+    assert has_element?(view, "th[aria-sort='descending']", "Kind")
+
+    # Sort by code
+    view |> element("#employee-types-sort-code") |> render_click()
+    assert_patched(view, ~p"/employee-types?sort=code")
+    assert has_element?(view, "th[aria-sort='ascending']", "Code")
+
+    # Toggle code desc
+    view |> element("#employee-types-sort-code") |> render_click()
+    assert_patched(view, ~p"/employee-types?dir=desc&sort=code")
+    assert has_element?(view, "th[aria-sort='descending']", "Code")
+
+    # Sort by label
+    view |> element("#employee-types-sort-label") |> render_click()
+    assert_patched(view, ~p"/employee-types?sort=label")
+    assert has_element?(view, "th[aria-sort='ascending']", "Label")
+
+    # Sort by employees count
+    view |> element("#employee-types-sort-employees") |> render_click()
+    assert_patched(view, ~p"/employee-types?sort=employees_count")
+    assert has_element?(view, "th[aria-sort='descending']", "Employees")
+  end
+
+  test "paginates employee types and normalizes invalid query parameters", %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+
+    for i <- 1..25 do
+      code = "type_#{String.pad_leading("#{i}", 2, "0")}"
+      label = "Custom Type #{String.pad_leading("#{i}", 2, "0")}"
+
+      {:ok, _} =
+        Employee.create_employee_type(scope, 73, %{
+          code: code,
+          label: label
+        })
+    end
+
+    grant_capabilities!(["admin.employee-type.list"])
+
+    # 5 system types + 25 custom types = 30 total types
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+
+    assert has_element?(
+             view,
+             "#employee-types-pagination-summary",
+             "Showing 1 to 25 of 30 results"
+           )
+
+    # Change per_page to 50
+    view
+    |> form("#employee-types-pagination-page-size-form", filters: %{perPage: "50"})
+    |> render_change()
+
+    assert_patched(view, ~p"/employee-types?per_page=50")
+
+    assert has_element?(
+             view,
+             "#employee-types-pagination-summary",
+             "Showing 1 to 30 of 30 results"
+           )
+
+    # Invalid per_page falls back to 25
+    {:ok, invalid_view, _html} =
+      conn |> log_in_as() |> live(~p"/employee-types?per_page=12")
+
+    assert has_element?(
+             invalid_view,
+             "#employee-types-pagination-summary",
+             "Showing 1 to 25 of 30 results"
+           )
+  end
+
+  test "clamps page when deleting the last item on page", %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+
+    for i <- 1..20 do
+      code = "type_#{String.pad_leading("#{i}", 2, "0")}"
+      label = "Custom Type #{String.pad_leading("#{i}", 2, "0")}"
+
+      {:ok, _} =
+        Employee.create_employee_type(scope, 73, %{
+          code: code,
+          label: label
+        })
+    end
+
+    {:ok, to_delete} =
+      Employee.create_employee_type(scope, 73, %{
+        code: "type_last_page",
+        label: "Last Page Type"
+      })
+
+    grant_capabilities!(["admin.employee-type.list", "admin.employee-type.delete"])
+
+    # 5 system types + 21 custom = 26 total types -> page 2 has 1 item (item 26 of 26)
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types?page=2")
+
+    assert has_element?(view, "#employee-type-delete-#{to_delete.id}")
+
+    assert has_element?(
+             view,
+             "#employee-types-pagination-summary",
+             "Showing 26 to 26 of 26 results"
+           )
+
+    view |> element("#employee-type-delete-#{to_delete.id}") |> render_click()
+
+    assert render(view) =~ "Employee type deleted."
+    refute has_element?(view, "#employee-types td", "Last Page Type")
+
+    # Clamped back to page 1
+    assert_patched(view, ~p"/employee-types")
+
+    assert has_element?(
+             view,
+             "#employee-types-pagination-summary",
+             "Showing 1 to 25 of 25 results"
+           )
   end
 
   test "the heading matches the nav label that leads here", %{conn: conn} do
