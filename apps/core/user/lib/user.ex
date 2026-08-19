@@ -169,6 +169,33 @@ defmodule Bilimbi.Core.User do
     end
   end
 
+  @doc """
+  Reads multiple users by ID under the scope's tenant-wide visibility.
+
+  Returns `{:ok, map}` where keys are user IDs and values are `Summary` structs.
+  Non-existent IDs and users outside the tenant's visible companies are omitted.
+  """
+  @spec get_tenant_users(Scope.t(), [pos_integer()]) :: {:ok, %{pos_integer() => Summary.t()}}
+  def get_tenant_users(%Scope{} = scope, user_ids) when is_list(user_ids) do
+    {:ok, company_ids} = Company.list_tenant_company_ids(scope)
+
+    case company_ids do
+      [] ->
+        {:ok, %{}}
+
+      ids ->
+        users =
+          from(user in Schema,
+            where: user.id in ^user_ids and user.company_id in ^ids
+          )
+          |> Repo.all()
+          |> Enum.map(&Summary.from_schema/1)
+          |> Map.new(&{&1.id, &1})
+
+        {:ok, users}
+    end
+  end
+
   @doc "Creates an unverified account; Web must not expose this as public self-registration."
   @spec create_user(Scope.t(), pos_integer(), map()) ::
           {:ok, Summary.t()} | {:error, :company_not_found | Changeset.t()}

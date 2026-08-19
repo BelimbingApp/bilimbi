@@ -109,12 +109,54 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#company-external-accesses-table-empty", "No external accesses.")
       # `#company-external-accesses-table` is the tbody id, so the header row is
       # a sibling of it, not a descendant -- assert against the card.
+      assert has_element?(view, "#company-external-accesses-card th", "User")
+      refute has_element?(view, "#company-external-accesses-card th", "User ID")
       assert has_element?(view, "#company-external-accesses-card th", "Permissions")
       assert has_element?(view, "#company-external-accesses-card th", "Expires At")
 
       # The Subsidiaries card stays conditional, matching the source: this
       # fixture gives company 73 a child, so it renders here.
       assert has_element?(view, "#company-subsidiaries-card", "Subsidiaries")
+    end
+
+    test "renders external accesses with user name linked to user profile, or fallback for deleted/unknown user",
+         %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+      {:ok, scope} = Tenancy.scope(41)
+
+      CompanyFixtures.insert_relationship_type!(11)
+      CompanyFixtures.insert_relationship!(21, 73, 74)
+      CompanyFixtures.insert_relationship!(22, 73, 74)
+
+      {:ok, access1} =
+        Company.create_external_access(scope, 73, %{
+          relationship_id: 21,
+          user_id: 91,
+          permissions: ["view_orders"]
+        })
+
+      {:ok, access2} =
+        Company.create_external_access(scope, 73, %{
+          relationship_id: 22,
+          user_id: 9999,
+          permissions: ["manage_invoices"]
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # Linked user name for Ada Lovelace (user 91)
+      assert has_element?(
+               view,
+               "#company-external-accesses-table tr#access-#{access1.id} a[href='/users/91']",
+               "Ada Lovelace"
+             )
+
+      # Fallback dash for unknown/deleted user 9999
+      assert has_element?(
+               view,
+               "#company-external-accesses-table tr#access-#{access2.id} td",
+               "—"
+             )
     end
 
     test "hides write controls and rejects direct write events without update capability",

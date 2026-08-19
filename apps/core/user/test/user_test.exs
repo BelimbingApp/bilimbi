@@ -142,6 +142,18 @@ defmodule Bilimbi.Core.UserTest do
     end
   end
 
+  describe "get_tenant_users/2" do
+    test "reads multiple users by id under tenant visibility", %{scope_a: scope_a} do
+      insert_user!(%{id: 91, company_id: 73, name: "Alice", email: "alice@example.com"})
+      insert_user!(%{id: 92, company_id: 74, name: "Bob", email: "bob@example.com"})
+      insert_user!(%{id: 93, company_id: nil, name: "Orphan", email: "orphan@example.com"})
+
+      assert {:ok, users_map} = User.get_tenant_users(scope_a, [91, 92, 93, 99])
+      assert Map.keys(users_map) == [91]
+      assert %Summary{id: 91, name: "Alice"} = users_map[91]
+    end
+  end
+
   describe "credentials" do
     test "registers with an Argon2id hash and normalizes the email", %{scope_a: scope_a} do
       assert {:ok, %Summary{id: id}} = User.create_user(scope_a, 73, valid_attributes())

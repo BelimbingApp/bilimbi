@@ -280,4 +280,44 @@ defmodule Bilimbi.Core.Company.TestFixtures do
       [id, company_id, related_company_id, type_id]
     )
   end
+
+  def insert_external_access!(attributes \\ %{}) do
+    attributes =
+      Map.merge(
+        %{
+          id: 1,
+          company_id: 73,
+          relationship_id: 1,
+          user_id: nil,
+          permissions: "[\"portal.view\"]",
+          is_active: true,
+          access_granted_at: nil,
+          access_expires_at: nil,
+          metadata: nil
+        },
+        attributes
+      )
+
+    SQL.query!(
+      Repo,
+      """
+      INSERT INTO company_external_accesses (
+        id, company_id, relationship_id, user_id, permissions, is_active,
+        access_granted_at, access_expires_at, metadata
+      )
+      VALUES ($1, $2, $3, $4, $5::json, $6, $7, $8, $9::json)
+      """,
+      [
+        attributes.id,
+        attributes.company_id,
+        attributes.relationship_id,
+        attributes.user_id,
+        attributes.permissions,
+        attributes.is_active,
+        attributes.access_granted_at,
+        attributes.access_expires_at,
+        attributes.metadata
+      ]
+    )
+  end
 end
