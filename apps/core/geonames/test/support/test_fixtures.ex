@@ -8,7 +8,7 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE geonames_countries (
+      CREATE TEMPORARY TABLE IF NOT EXISTS geonames_countries (
         id bigserial PRIMARY KEY,
         iso varchar(2) NOT NULL UNIQUE,
         iso3 varchar(3) NOT NULL UNIQUE,
@@ -36,7 +36,7 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE geonames_admin1 (
+      CREATE TEMPORARY TABLE IF NOT EXISTS geonames_admin1 (
         id bigserial PRIMARY KEY,
         code varchar(20) NOT NULL UNIQUE,
         name varchar(255) NOT NULL,
@@ -52,7 +52,7 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE geonames_postcodes (
+      CREATE TEMPORARY TABLE IF NOT EXISTS geonames_postcodes (
         id bigserial PRIMARY KEY,
         country_iso varchar(2) NOT NULL,
         postcode varchar(20) NOT NULL,
@@ -80,7 +80,7 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE geonames_cities (
+      CREATE TEMPORARY TABLE IF NOT EXISTS geonames_cities (
         id bigserial PRIMARY KEY,
         geoname_id integer NOT NULL UNIQUE,
         name varchar(200) NOT NULL,
@@ -126,32 +126,80 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
         attributes
       )
 
-    SQL.query!(
-      Repo,
-      """
-      INSERT INTO geonames_countries (
-        iso, iso3, iso_numeric, country, capital, area, population,
-        continent, phone, currency_code, currency_name, geoname_id, created_at, updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-      """,
-      [
-        attributes.iso,
-        attributes.iso3,
-        attributes.iso_numeric,
-        attributes.country,
-        attributes.capital,
-        attributes.area,
-        attributes.population,
-        attributes.continent,
-        attributes.phone,
-        attributes.currency_code,
-        attributes.currency_name,
-        attributes.geoname_id,
-        attributes.created_at,
-        attributes.updated_at
-      ]
-    )
+    existing_rows =
+      SQL.query!(
+        Repo,
+        "SELECT id FROM geonames_countries WHERE iso = $1",
+        [attributes.iso]
+      ).rows
+
+    case existing_rows do
+      [[id]] ->
+        SQL.query!(
+          Repo,
+          """
+          UPDATE geonames_countries SET
+            iso3 = $1,
+            iso_numeric = $2,
+            country = $3,
+            capital = $4,
+            area = $5,
+            population = $6,
+            continent = $7,
+            phone = $8,
+            currency_code = $9,
+            currency_name = $10,
+            geoname_id = $11,
+            created_at = $12,
+            updated_at = $13
+          WHERE id = $14
+          """,
+          [
+            attributes.iso3,
+            attributes.iso_numeric,
+            attributes.country,
+            attributes.capital,
+            attributes.area,
+            attributes.population,
+            attributes.continent,
+            attributes.phone,
+            attributes.currency_code,
+            attributes.currency_name,
+            attributes.geoname_id,
+            attributes.created_at,
+            attributes.updated_at,
+            id
+          ]
+        )
+
+      [] ->
+        SQL.query!(
+          Repo,
+          """
+          INSERT INTO geonames_countries (
+            iso, iso3, iso_numeric, country, capital, area, population,
+            continent, phone, currency_code, currency_name, geoname_id, created_at, updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          """,
+          [
+            attributes.iso,
+            attributes.iso3,
+            attributes.iso_numeric,
+            attributes.country,
+            attributes.capital,
+            attributes.area,
+            attributes.population,
+            attributes.continent,
+            attributes.phone,
+            attributes.currency_code,
+            attributes.currency_name,
+            attributes.geoname_id,
+            attributes.created_at,
+            attributes.updated_at
+          ]
+        )
+    end
   end
 
   def insert_admin1!(attributes \\ %{}) do

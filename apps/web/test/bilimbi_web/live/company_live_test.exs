@@ -8,10 +8,13 @@ defmodule BilimbiWeb.CompanyLiveTest do
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.{Department, DepartmentType, LegalEntityType, Relationship}
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
+  alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   setup do
     UserFixtures.create_user_tables!()
+    GeonamesFixtures.create_geonames_tables!()
+    GeonamesFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
     CompanyFixtures.create_legal_entity_types_table!()
     CompanyFixtures.create_external_access_tables!()
 
@@ -163,6 +166,47 @@ defmodule BilimbiWeb.CompanyLiveTest do
       {:ok, scope} = Tenancy.scope(41)
       {:ok, companies} = Company.list_companies(scope)
       refute Enum.any?(companies, &(&1.name == "Broken JSON Co"))
+    end
+
+    test "renders jurisdiction country select and persists valid country", %{conn: conn} do
+      grant_capabilities!(["admin.company.create", "admin.company.list", "admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+
+      assert has_element?(view, "#company-jurisdiction")
+      assert has_element?(view, "#company-jurisdiction option[value='MY']", "Malaysia (MY)")
+
+      view
+      |> form("#company-form",
+        company: %{name: "MY Branch", status: "active", jurisdiction: "MY"}
+      )
+      |> render_submit()
+
+      {path, _flash} = assert_redirect(view)
+      assert path == "/companies"
+
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, companies} = Company.list_companies(scope)
+      created = Enum.find(companies, &(&1.name == "MY Branch"))
+      assert Repo.get!(Bilimbi.Core.Company.Schema, created.id).jurisdiction == "MY"
+    end
+
+    test "rejects forged invalid country ISO without persisting", %{conn: conn} do
+      grant_capabilities!(["admin.company.create"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+
+      html =
+        view
+        |> element("#company-form")
+        |> render_submit(%{
+          "company" => %{"name" => "Fake Co", "status" => "active", "jurisdiction" => "XX"}
+        })
+
+      assert html =~ "must be a valid country ISO code"
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, companies} = Company.list_companies(scope)
+      refute Enum.any?(companies, &(&1.name == "Fake Co"))
     end
   end
 

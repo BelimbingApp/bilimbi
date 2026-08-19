@@ -8,6 +8,7 @@ defmodule Bilimbi.Core.User.DevSeedTaskTest do
 
   setup do
     create_user_tables!()
+    Bilimbi.Core.Company.TestFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
 
     previous_env = Mix.env()
     previous_shell = Mix.shell()

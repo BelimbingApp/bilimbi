@@ -78,9 +78,28 @@ defmodule Bilimbi.Core.Company.Schema do
     |> validate_length(:code, min: 1, max: 255)
     |> validate_inclusion(:status, @statuses)
     |> validate_format(:email, ~r/^[^\s@]+@[^\s@]+$/, message: "must be an email address")
+    |> validate_jurisdiction()
     |> unique_constraint(:code, name: :companies_code_unique)
     |> foreign_key_constraint(:tenant_id, name: :companies_tenant_foreign)
     |> foreign_key_constraint(:parent_id, name: :companies_parent_tenant_foreign)
+  end
+
+  defp validate_jurisdiction(changeset) do
+    validate_change(changeset, :jurisdiction, fn :jurisdiction, value ->
+      case value do
+        nil ->
+          []
+
+        iso when is_binary(iso) ->
+          case Bilimbi.Core.Geonames.get_country(iso) do
+            %Bilimbi.Core.Geonames.CountrySummary{} -> []
+            nil -> [jurisdiction: "must be a valid country ISO code"]
+          end
+
+        _ ->
+          [jurisdiction: "is invalid"]
+      end
+    end)
   end
 
   # Belimbing `Company::creating` slugs a blank code from the name
