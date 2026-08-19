@@ -20,6 +20,12 @@
     capability: "admin.authz.role.view"
   },
   %{
+    path: "/authz/principal-roles",
+    live: Bilimbi.Base.Authz.Web.PrincipalRolesLive,
+    session: :auth,
+    capability: "admin.authz.principal-role.list"
+  },
+  %{
     path: "/authz/principal-capabilities",
     live: Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive,
     session: :auth,
