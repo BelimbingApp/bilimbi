@@ -14,6 +14,12 @@ on:
       - ".github/scripts/board_sweep.py"
       - ".github/scripts/test_board_sweep.py"
       - ".github/workflows/board-sweep.yml"
+  # A merge is what changes the board most consequentially, and the cron alone
+  # left it advertising two merged PRs as open work for half an hour (#344).
+  # `push` to the default branch is a trusted event -- no fork surface -- and
+  # the schedule stays as the backstop for label-only changes.
+  push:
+    branches: [main]
   schedule:
     - cron: "7,37 * * * *"
   workflow_dispatch:
