@@ -70,6 +70,28 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     {:ok, companies} = Company.list_companies(scope)
     company_names = Map.new(companies, &{&1.id, Company.Summary.display_name(&1)})
 
+    department_names =
+      try do
+        companies
+        |> Enum.flat_map(fn company ->
+          case Company.list_departments(scope, company.id) do
+            {:ok, depts} ->
+              Enum.flat_map(depts, fn dept ->
+                case dept.type do
+                  %{name: name} when is_binary(name) and name != "" -> [{dept.id, name}]
+                  _ -> []
+                end
+              end)
+
+            _ ->
+              []
+          end
+        end)
+        |> Map.new()
+      rescue
+        _ -> %{}
+      end
+
     # Assigned roles
     role_page = Authz.list_principal_role_assignments(scope, :user, user.id, page_size: 100)
     assigned_roles = role_page.entries
@@ -160,6 +182,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     |> assign(:companies, companies)
     |> assign(:company_names, company_names)
     |> assign(:company_name, Map.get(company_names, user.company_id))
+    |> assign(:department_names, department_names)
     |> assign(:assigned_roles, assigned_roles)
     |> assign(:assigned_role_ids, assigned_role_ids)
     |> assign(:has_grant_all?, has_grant_all?)
@@ -181,7 +204,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         linked_employees,
         socket.assigns[:employees_sort_by] || "employee_number",
         socket.assigns[:employees_sort_dir] || "asc",
-        company_names
+        company_names,
+        department_names
       )
     )
     |> assign(:unlinkable_employees, unlinkable_employees)
@@ -694,7 +718,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       end
 
     sorted =
-      sort_employees(socket.assigns.employees, sort_col, new_dir, socket.assigns.company_names)
+      sort_employees(
+        socket.assigns.employees,
+        sort_col,
+        new_dir,
+        socket.assigns.company_names,
+        socket.assigns.department_names
+      )
 
     {:noreply,
      socket
@@ -1303,6 +1333,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               <:col :let={emp} label="Designation" sort="designation">
                 <span class="text-ink-muted">{emp.designation || "—"}</span>
               </:col>
+              <:col :let={emp} label="Department" sort="department">
+                <span class="text-ink-muted">{Map.get(@department_names, emp.department_id) || "—"}</span>
+              </:col>
               <:col :let={emp} label="Status" sort="status">
                 <.badge kind={employee_status_kind(emp.status)}>
                   {String.capitalize(emp.status || "active")}
@@ -1671,13 +1704,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     end
   end
 
-  defp sort_employees(employees, column, dir, company_names) do
+  defp sort_employees(employees, column, dir, company_names, department_names) do
     employees
     |> Enum.sort_by(
       fn emp ->
         case column do
           "company" -> Map.get(company_names, emp.company_id, "")
-          "department" -> emp.department_id || 0
+          "department" -> Map.get(department_names, emp.department_id, "")
           "designation" -> emp.designation || ""
           "status" -> emp.status || ""
           "employment_start" -> emp.employment_start || ~D[1900-01-01]
