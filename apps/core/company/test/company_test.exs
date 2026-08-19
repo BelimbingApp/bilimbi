@@ -359,12 +359,28 @@ defmodule Bilimbi.Core.CompanyTest do
 
   test "rolls back operator creation when company validation fails" do
     assert {:error, changeset} =
-             Company.provision_platform_operator("Operator tenant", %{name: "Missing code"})
+             Company.provision_platform_operator("Operator tenant", %{name: ""})
 
-    assert {:code, {_message, [validation: :required]}} =
-             List.keyfind(changeset.errors, :code, 0)
+    assert {:name, {_message, [validation: :required]}} =
+             List.keyfind(changeset.errors, :name, 0)
 
     assert Tenancy.platform_operator() == nil
+  end
+
+  test "create_company slugs a blank code from the name" do
+    insert_tenant!()
+    {:ok, scope} = Tenancy.scope(41)
+
+    assert {:ok, %Summary{name: "Acme Trading", code: "acme_trading"}} =
+             Company.create_company(scope, %{name: "Acme Trading"})
+  end
+
+  test "create_company keeps an explicit code" do
+    insert_tenant!()
+    {:ok, scope} = Tenancy.scope(41)
+
+    assert {:ok, %Summary{code: "ACME"}} =
+             Company.create_company(scope, %{name: "Acme Trading", code: "ACME"})
   end
 
   defp opaque(value), do: :erlang.element(1, {value})

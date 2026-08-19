@@ -60,6 +60,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(view, "#companies td", "Bilimbi Industries")
       refute has_element?(view, "#companies td", "Elsewhere")
+      refute has_element?(view, "#companies-add")
       assert has_element?(view, "#nav-admin-company[aria-current='page']")
       assert has_element?(view, "#nav-branch-admin[data-nav-default-expanded='true']")
       assert has_element?(view, "#nav-toggle-admin[aria-expanded='true']")
@@ -101,6 +102,67 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert {:error, {:live_redirect, %{to: "/companies"}}} =
                conn |> log_in_as() |> live(~p"/companies/9999")
+    end
+  end
+
+  describe "Create" do
+    test "requires authentication", %{conn: conn} do
+      assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/companies/create")
+    end
+
+    test "redirects away when the actor lacks admin.company.create", %{conn: conn} do
+      grant_capabilities!(["admin.company.list"])
+
+      assert {:error, {:redirect, %{to: "/dashboard"}}} =
+               conn |> log_in_as() |> live(~p"/companies/create")
+    end
+
+    test "shows the add control on the index when the actor can create", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.create"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies")
+
+      assert has_element?(view, "#companies-add[href='/companies/create']")
+    end
+
+    test "creates a company through the domain API and slugs a blank code", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.create", "admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+
+      view
+      |> form("#company-form", company: %{name: "North Branch", status: "active"})
+      |> render_submit()
+
+      {path, flash} = assert_redirect(view)
+      assert path == "/companies"
+      assert flash["info"] == "Company created successfully."
+
+      {:ok, index, _html} = conn |> log_in_as() |> live(path)
+      assert has_element?(index, "#companies td", "North Branch")
+
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, companies} = Company.list_companies(scope)
+      created = Enum.find(companies, &(&1.name == "North Branch"))
+      assert created.code == "north_branch"
+    end
+
+    test "rejects invalid JSON payloads without inserting", %{conn: conn} do
+      grant_capabilities!(["admin.company.create"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+
+      html =
+        view
+        |> form("#company-form",
+          company: %{name: "Broken JSON Co", status: "active", metadata_json: "{not json"}
+        )
+        |> render_submit()
+
+      assert html =~ "must be valid JSON"
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, companies} = Company.list_companies(scope)
+      refute Enum.any?(companies, &(&1.name == "Broken JSON Co"))
     end
   end
 
