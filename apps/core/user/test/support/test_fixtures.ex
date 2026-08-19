@@ -36,6 +36,7 @@ defmodule Bilimbi.Core.User.TestFixtures do
 
   def create_user_tables! do
     apply(EmployeeFixtures, :create_employee_tables!, [])
+    apply(Bilimbi.Core.Company.TestFixtures, :create_external_access_tables!, [])
 
     SQL.query!(
       Repo,
