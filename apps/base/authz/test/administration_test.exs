@@ -487,6 +487,50 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert [%PrincipalCapabilitySummary{company_id: 10, principal_id: 1}] = page_two.entries
   end
 
+  test "principal roles list searches role name and pages by company_order" do
+    tenant_scope = scope()
+
+    assert {:ok, alpha} =
+             Authz.create_role(tenant_scope, 10, %{name: "Alpha clerks", code: "alpha_clerks"})
+
+    assert {:ok, bravo} =
+             Authz.create_role(tenant_scope, 11, %{name: "Bravo clerks", code: "bravo_clerks"})
+
+    assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 10, :user, 1, alpha.id)
+    assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 11, :user, 2, bravo.id)
+    assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 10, :agent, 9, alpha.id)
+
+    assert %Page{entries: [hit], total_entries: 1} =
+             Authz.list_principal_roles(tenant_scope, search: "bravo")
+
+    assert hit.role_name == "Bravo clerks"
+    assert hit.company_id == 11
+
+    page_one =
+      Authz.list_principal_roles(tenant_scope,
+        sort_by: :company_name,
+        sort_dir: :asc,
+        page: 1,
+        page_size: 1,
+        company_order: [11, 10]
+      )
+
+    page_two =
+      Authz.list_principal_roles(tenant_scope,
+        sort_by: :company_name,
+        sort_dir: :asc,
+        page: 2,
+        page_size: 1,
+        company_order: [11, 10]
+      )
+
+    assert page_one.total_entries == 3
+    assert [%{company_id: 11}] = page_one.entries
+    assert [%{company_id: 10}] = page_two.entries
+
+    assert %Page{entries: []} = Authz.list_principal_roles(scope(2))
+  end
+
   test "administration options reject unbounded or unknown input" do
     assert_raise ArgumentError, ~r/page_size/, fn ->
       Authz.list_decision_logs(scope(), page_size: 101)

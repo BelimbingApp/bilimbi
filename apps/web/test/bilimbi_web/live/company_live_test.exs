@@ -85,6 +85,17 @@ defmodule BilimbiWeb.CompanyLiveTest do
       refute has_element?(view, "#companies td", "Elsewhere")
       refute has_element?(view, "#companies-add")
       assert has_element?(view, "#nav-admin-company[aria-current='page']")
+
+      assert has_element?(
+               view,
+               "#nav-admin-company-department-type[href='/companies/department-types']"
+             )
+
+      assert has_element?(
+               view,
+               "#nav-admin-company-legal-entity-type[href='/companies/legal-entity-types']"
+             )
+
       assert has_element?(view, "#nav-branch-admin[data-nav-default-expanded='true']")
       assert has_element?(view, "#nav-toggle-admin[aria-expanded='true']")
       assert has_element?(view, "#nav-children-admin:not([hidden])")
@@ -641,6 +652,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/legal-entity-types")
 
       assert has_element?(view, "h1", "Legal Entity Types")
+      assert has_element?(view, "#nav-admin-company-legal-entity-type[aria-current='page']")
       assert has_element?(view, "#legal-entity-types-empty", "No legal entity types defined yet.")
 
       # Open new modal
@@ -756,6 +768,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/department-types")
 
       assert has_element?(view, "h1", "Department Types")
+      assert has_element?(view, "#nav-admin-company-department-type[aria-current='page']")
 
       # Create Operational Type
       view |> element("#new-department-type-btn") |> render_click()
