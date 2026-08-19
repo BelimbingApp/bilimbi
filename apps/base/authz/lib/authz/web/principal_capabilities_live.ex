@@ -39,7 +39,19 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, page_title: "Principal Capabilities")}
+    # Resolved once here rather than inside `load/2`: the company set cannot
+    # change while the page is open, and `load/2` runs on every search, filter,
+    # sort and page change -- each of which was re-listing every company in the
+    # tenant to render a column that never changes.
+    company_names =
+      socket.assigns.current_scope.scope
+      |> Authz.companies_in_scope()
+      |> Map.new(&{&1.id, &1.name})
+
+    {:ok,
+     socket
+     |> assign(:page_title, "Principal Capabilities")
+     |> assign(:company_names, company_names)}
   end
 
   @impl true
@@ -112,13 +124,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
     if beyond_last_page?(page) do
       load(socket, %{state | page: page.total_pages})
     else
-      company_names =
-        socket.assigns.current_scope.scope
-        |> Authz.companies_in_scope()
-        |> Map.new(&{&1.id, &1.name})
-
       socket
-      |> assign(:company_names, company_names)
       |> assign(:state, state)
       |> assign(:page, page)
       |> stream(:grants, page.entries, reset: true)
