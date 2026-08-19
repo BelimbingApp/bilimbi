@@ -241,6 +241,72 @@ defmodule Bilimbi.Core.Company do
     |> unwrap_mutation()
   end
 
+  @doc """
+  Updates a live Company record scoped to the caller's tenant.
+  """
+  @spec update_company(Scope.t(), pos_integer(), map()) ::
+          {:ok, Summary.t()} | {:error, :not_found | Ecto.Changeset.t()}
+  def update_company(%Scope{} = scope, company_id, attributes)
+      when is_integer(company_id) and company_id > 0 and is_map(attributes) do
+    query =
+      from(company in Tenancy.scope_query(Schema, scope),
+        where: company.id == ^company_id and is_nil(company.deleted_at)
+      )
+
+    case Repo.one(query) do
+      nil ->
+        {:error, :not_found}
+
+      company ->
+        company
+        |> Schema.update_changeset(attributes)
+        |> Repo.update()
+        |> case do
+          {:ok, updated} -> {:ok, Summary.from_schema(updated)}
+          {:error, changeset} -> {:error, changeset}
+        end
+    end
+  end
+
+  def update_company(%Scope{}, _company_id, _attributes), do: {:error, :not_found}
+
+  @doc """
+  Lists live direct child companies (subsidiaries) for a given parent company in the caller's tenant.
+  """
+  @spec list_child_companies(Scope.t(), pos_integer()) :: {:ok, [Summary.t()]}
+  def list_child_companies(%Scope{} = scope, company_id)
+      when is_integer(company_id) and company_id > 0 do
+    companies =
+      from(company in Tenancy.scope_query(Schema, scope),
+        where: company.parent_id == ^company_id and is_nil(company.deleted_at),
+        order_by: company.id
+      )
+      |> Repo.all()
+      |> Enum.map(&Summary.from_schema/1)
+
+    {:ok, companies}
+  end
+
+  def list_child_companies(%Scope{}, _company_id), do: {:ok, []}
+
+  @doc """
+  Returns whether the company is designated as the primary company for the scope's tenant.
+  """
+  @spec primary_company?(Scope.t(), pos_integer()) :: boolean()
+  def primary_company?(%Scope{} = scope, company_id)
+      when is_integer(company_id) and company_id > 0 do
+    tenant_id = Scope.tenant_id(scope)
+
+    from(primary in "tenant_primary_companies",
+      where: primary.tenant_id == ^tenant_id and primary.company_id == ^company_id,
+      select: count(primary.company_id)
+    )
+    |> Repo.one()
+    |> Kernel.>(0)
+  end
+
+  def primary_company?(%Scope{}, _company_id), do: false
+
   # ============================================================================
   # Legal Entity Types
   # ============================================================================

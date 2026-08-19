@@ -72,10 +72,19 @@ defmodule Bilimbi.Core.Company.TestFixtures do
         %{
           id: 73,
           tenant_id: 41,
+          parent_id: nil,
           name: "Bilimbi Industries",
           code: "bilimbi_industries",
           status: "active",
           legal_name: nil,
+          registration_number: nil,
+          tax_id: nil,
+          legal_entity_type_id: nil,
+          jurisdiction: nil,
+          email: nil,
+          website: nil,
+          scope_activities: nil,
+          metadata: nil,
           deleted_at: nil
         },
         attributes
@@ -84,16 +93,29 @@ defmodule Bilimbi.Core.Company.TestFixtures do
     SQL.query!(
       Repo,
       """
-      INSERT INTO companies (id, tenant_id, name, code, status, legal_name, deleted_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO companies (
+        id, tenant_id, parent_id, name, code, status, legal_name,
+        registration_number, tax_id, legal_entity_type_id, jurisdiction,
+        email, website, scope_activities, metadata, deleted_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       """,
       [
         attributes.id,
         attributes.tenant_id,
+        attributes.parent_id,
         attributes.name,
         attributes.code,
         attributes.status,
         attributes.legal_name,
+        attributes.registration_number,
+        attributes.tax_id,
+        attributes.legal_entity_type_id,
+        attributes.jurisdiction,
+        attributes.email,
+        attributes.website,
+        attributes.scope_activities,
+        attributes.metadata,
         attributes.deleted_at
       ]
     )

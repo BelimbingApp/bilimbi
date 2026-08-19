@@ -63,7 +63,11 @@ defmodule Bilimbi.Core.Company.Schema do
     :metadata
   ]
 
+  @update_fields @creation_fields
   @statuses ~w(active suspended pending archived)
+
+  @spec statuses() :: [String.t()]
+  def statuses, do: @statuses
 
   @spec creation_changeset(pos_integer(), map()) :: Ecto.Changeset.t()
   def creation_changeset(tenant_id, attributes) do
@@ -81,6 +85,29 @@ defmodule Bilimbi.Core.Company.Schema do
     |> validate_jurisdiction()
     |> unique_constraint(:code, name: :companies_code_unique)
     |> foreign_key_constraint(:tenant_id, name: :companies_tenant_foreign)
+    |> foreign_key_constraint(:parent_id, name: :companies_parent_tenant_foreign)
+  end
+
+  @spec update_changeset(t(), map()) :: Ecto.Changeset.t()
+  def update_changeset(%__MODULE__{} = company, attributes) do
+    company
+    |> cast(attributes, @update_fields)
+    |> update_change(:name, &trim_text/1)
+    |> update_change(:code, &trim_text/1)
+    |> validate_required([:name, :code, :status])
+    |> validate_length(:name, min: 1, max: 255)
+    |> validate_length(:code, min: 1, max: 255)
+    |> validate_inclusion(:status, @statuses)
+    |> validate_length(:legal_name, max: 255)
+    |> validate_length(:registration_number, max: 255)
+    |> validate_length(:tax_id, max: 255)
+    |> validate_length(:jurisdiction, max: 2)
+    |> validate_jurisdiction()
+    |> validate_length(:email, max: 255)
+    |> validate_format(:email, ~r/^[^\s@]+@[^\s@]+$/, message: "must be an email address")
+    |> validate_length(:website, max: 255)
+    |> check_parent_not_self()
+    |> unique_constraint(:code, name: :companies_code_unique)
     |> foreign_key_constraint(:parent_id, name: :companies_parent_tenant_foreign)
   end
 
@@ -153,4 +180,18 @@ defmodule Bilimbi.Core.Company.Schema do
   defp blank_text?(value) when is_binary(value), do: String.trim(value) == ""
   defp blank_text?(nil), do: true
   defp blank_text?(_value), do: false
+
+  defp check_parent_not_self(changeset) do
+    case get_change(changeset, :parent_id) do
+      nil ->
+        changeset
+
+      parent_id ->
+        if parent_id == changeset.data.id do
+          add_error(changeset, :parent_id, "cannot be set to itself")
+        else
+          changeset
+        end
+    end
+  end
 end

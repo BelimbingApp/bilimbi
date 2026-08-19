@@ -1,5 +1,5 @@
 defmodule Bilimbi.Core.EmployeeTest do
-  use Bilimbi.Base.Database.DataCase, async: true
+  use Bilimbi.Base.Database.DataCase, async: false
 
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company

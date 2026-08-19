@@ -437,6 +437,68 @@ defmodule Bilimbi.Core.CompanyTest do
              Company.create_company(scope, %{name: "Valid Country Co", jurisdiction: "MY"})
 
     assert Repo.get(Bilimbi.Core.Company.Schema, id).jurisdiction == "MY"
+  test "updates a company within the scoped tenant" do
+    insert_tenant!()
+    insert_company!(%{id: 73, name: "Initial Name", code: "initial_code"})
+    insert_tenant!(%{id: 42, name: "Other tenant", is_platform_operator: false})
+    insert_company!(%{id: 74, tenant_id: 42, name: "Other Co", code: "other_co"})
+
+    {:ok, owner} = Tenancy.scope(41)
+    {:ok, other} = Tenancy.scope(42)
+
+    assert {:ok, updated} =
+             Company.update_company(owner, 73, %{
+               name: "Updated Name",
+               legal_name: "Updated Legal Name Sdn. Bhd.",
+               status: "suspended",
+               jurisdiction: "MY",
+               email: "info@updated.com",
+               website: "https://updated.com",
+               scope_activities: ["manufacturing", "distribution"],
+               metadata: %{"notes" => "verified"}
+             })
+
+    assert updated.id == 73
+    assert updated.name == "Updated Name"
+    assert updated.legal_name == "Updated Legal Name Sdn. Bhd."
+    assert updated.status == "suspended"
+    assert updated.jurisdiction == "MY"
+    assert updated.email == "info@updated.com"
+    assert updated.website == "https://updated.com"
+    assert updated.scope_activities == ["manufacturing", "distribution"]
+    assert updated.metadata == %{"notes" => "verified"}
+
+    assert {:error, :not_found} = Company.update_company(other, 73, %{name: "Hacked"})
+    assert {:error, :not_found} = Company.update_company(owner, 9999, %{name: "Nonexistent"})
+
+    # Validation errors
+    assert {:error, changeset} = Company.update_company(owner, 73, %{status: "invalid_status"})
+    assert {:status, _} = List.keyfind(changeset.errors, :status, 0)
+  end
+
+  test "lists child companies and checks primary designation" do
+    insert_tenant!()
+    insert_company!(%{id: 73, name: "Parent Co", code: "parent_co"})
+    insert_company!(%{id: 74, parent_id: 73, name: "Child Co 1", code: "child_co_1"})
+    insert_company!(%{id: 75, parent_id: 73, name: "Child Co 2", code: "child_co_2"})
+
+    insert_company!(%{
+      id: 76,
+      parent_id: 73,
+      name: "Deleted Child",
+      code: "deleted_child",
+      deleted_at: ~N[2026-08-11 12:00:00]
+    })
+
+    assign_primary_company!()
+
+    {:ok, owner} = Tenancy.scope(41)
+
+    assert {:ok, children} = Company.list_child_companies(owner, 73)
+    assert Enum.map(children, & &1.id) == [74, 75]
+
+    assert Company.primary_company?(owner, 73) == true
+    assert Company.primary_company?(owner, 74) == false
   end
 
   defp opaque(value), do: :erlang.element(1, {value})

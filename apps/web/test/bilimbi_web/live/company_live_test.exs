@@ -5,6 +5,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.{Department, DepartmentType, LegalEntityType, Relationship}
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
@@ -17,6 +18,24 @@ defmodule BilimbiWeb.CompanyLiveTest do
     GeonamesFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
     CompanyFixtures.create_legal_entity_types_table!()
     CompanyFixtures.create_external_access_tables!()
+    AddressFixtures.create_geonames_tables!()
+    AddressFixtures.create_address_tables!()
+    AddressFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
+
+    AddressFixtures.insert_country!(%{
+      iso: "SG",
+      iso3: "SGP",
+      iso_numeric: "702",
+      country: "Singapore",
+      geoname_id: 1_880_251
+    })
+
+    AddressFixtures.insert_admin1!(%{
+      code: "MY.14",
+      name: "Kuala Lumpur",
+      country_iso: "MY",
+      admin1_code: "14"
+    })
 
     CompanyFixtures.insert_tenant!(%{id: 41, is_platform_operator: true})
     CompanyFixtures.insert_tenant!(%{id: 42, name: "Other tenant", is_platform_operator: false})
@@ -32,7 +51,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
       id: 74,
       tenant_id: 41,
       name: "Bilimbi Subsidiary",
-      code: "bilimbi_subsidiary"
+      code: "bilimbi_subsidiary",
+      parent_id: 73
     })
 
     CompanyFixtures.insert_company!(%{
@@ -91,6 +111,270 @@ defmodule BilimbiWeb.CompanyLiveTest do
                "#company-employees-table-empty",
                "No employees found for this company."
              )
+    end
+
+    test "renders complete company show page with all cards and sections", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, type} =
+        Company.create_legal_entity_type(%{
+          code: "SDN_BHD",
+          name: "Sdn Bhd",
+          is_active: true
+        })
+
+      {:ok, _updated} =
+        Company.update_company(scope, 73, %{
+          legal_name: "Bilimbi Industries Sdn Bhd",
+          legal_entity_type_id: type.id,
+          registration_number: "REG-12345",
+          tax_id: "TAX-98765",
+          jurisdiction: "MY",
+          email: "hq@bilimbi.test",
+          website: "https://bilimbi.test",
+          scope_activities: ["Software Development", "Cloud Infrastructure"],
+          metadata: %{"employees_count" => 50}
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # Details card
+      assert has_element?(view, "#detail-name", "Bilimbi Industries")
+      assert has_element?(view, "#detail-legal-name", "Bilimbi Industries Sdn Bhd")
+      assert has_element?(view, "#detail-legal-entity-type", "Sdn Bhd")
+      assert has_element?(view, "#detail-registration-number", "REG-12345")
+      assert has_element?(view, "#detail-tax-id", "TAX-98765")
+      assert has_element?(view, "#detail-jurisdiction", "Malaysia (MY)")
+      assert has_element?(view, "#detail-email", "hq@bilimbi.test")
+      assert has_element?(view, "#detail-website a", "https://bilimbi.test")
+
+      # Activities
+      assert has_element?(view, "#company-details-card", "Software Development")
+      assert has_element?(view, "#company-details-card", "Cloud Infrastructure")
+
+      # Metadata
+      assert has_element?(view, "#company-metadata-display", "employees_count")
+
+      # Subsidiaries
+      assert has_element?(view, "#company-subsidiaries-card")
+      assert has_element?(view, "#company-subsidiaries-table td", "Bilimbi Subsidiary")
+
+      # Other cards
+      assert has_element?(view, "#company-addresses-card")
+      assert has_element?(view, "#company-timezone-card")
+      assert has_element?(view, "#company-departments-card")
+      assert has_element?(view, "#company-relationships-card")
+    end
+
+    test "edits company details via modal and validates fields", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # Open modal
+      view |> element("#edit-company-details-btn") |> render_click()
+      assert has_element?(view, "#company-details-modal")
+
+      # Validate blank name error
+      view
+      |> form("#company-details-form", %{"company" => %{"name" => ""}})
+      |> render_change()
+
+      assert has_element?(view, "#company-name-input + p", "can't be blank")
+
+      # Save valid update
+      view
+      |> form("#company-details-form", %{
+        "company" => %{
+          "name" => "Bilimbi Global",
+          "legal_name" => "Bilimbi Global Inc",
+          "registration_number" => "REG-9999",
+          "email" => "contact@bilimbi.global"
+        }
+      })
+      |> render_submit()
+
+      refute has_element?(view, "#company-details-modal")
+      assert has_element?(view, "h1", "Bilimbi Global")
+      assert has_element?(view, "#detail-name", "Bilimbi Global")
+      assert has_element?(view, "#detail-legal-name", "Bilimbi Global Inc")
+      assert has_element?(view, "#detail-registration-number", "REG-9999")
+    end
+
+    test "adds and removes business activities", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # Add activity
+      view
+      |> form("#add-activity-form", %{"activity" => "consulting"})
+      |> render_submit()
+
+      assert has_element?(view, "#company-details-card", "consulting")
+
+      # Add another activity
+      view
+      |> form("#add-activity-form", %{"activity" => "training"})
+      |> render_submit()
+
+      assert has_element?(view, "#company-details-card", "training")
+
+      # Remove first activity
+      view
+      |> element("button[phx-click='remove_activity'][phx-value-index='0']")
+      |> render_click()
+
+      refute has_element?(view, "#company-details-card", "consulting")
+      assert has_element?(view, "#company-details-card", "training")
+    end
+
+    test "edits, validates, and clears metadata JSON", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # Open edit metadata
+      view |> element("#edit-metadata-btn") |> render_click()
+      assert has_element?(view, "#metadata-form")
+
+      # Save invalid JSON
+      view
+      |> form("#metadata-form", %{"metadata" => "invalid-json-text"})
+      |> render_submit()
+
+      assert has_element?(view, "#flash-error", "Metadata was not saved. Enter valid JSON.")
+
+      # Save valid JSON
+      view
+      |> form("#metadata-form", %{"metadata" => ~s({"founded": 2020, "tier": "enterprise"})})
+      |> render_submit()
+
+      refute has_element?(view, "#metadata-form")
+      assert has_element?(view, "#company-metadata-display", "enterprise")
+
+      # Clear metadata by submitting empty
+      view |> element("#edit-metadata-btn") |> render_click()
+      view |> form("#metadata-form", %{"metadata" => ""}) |> render_submit()
+      refute has_element?(view, "#company-metadata-display")
+    end
+
+    test "updates and clears company default timezone", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # Select timezone
+      view
+      |> form("#company-timezone-form", %{"timezone" => "Asia/Kuala_Lumpur"})
+      |> render_change()
+
+      assert has_element?(view, "#flash-info", "Timezone saved: Asia/Kuala_Lumpur")
+
+      # Clear timezone
+      view
+      |> form("#company-timezone-form", %{"timezone" => ""})
+      |> render_change()
+
+      assert has_element?(view, "#flash-info", "Timezone cleared.")
+    end
+
+    test "attaches an existing address, toggles primary, changes priority, and unlinks it", %{
+      conn: conn
+    } do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, address} =
+        Bilimbi.Core.Address.create_address(scope, %{
+          "label" => "Main HQ",
+          "line1" => "456 Corporate Ave",
+          "locality" => "Kuala Lumpur",
+          "country_iso" => "MY"
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # Open attach modal
+      view |> element("#attach-existing-address-btn") |> render_click()
+      assert has_element?(view, "#company-attach-modal")
+
+      # Submit attachment
+      view
+      |> form("#company-attach-address-form", %{
+        "attach" => %{
+          "address_id" => to_string(address.id),
+          "kinds" => ["headquarters", "billing"],
+          "is_primary" => "true",
+          "priority" => "1"
+        }
+      })
+      |> render_submit()
+
+      refute has_element?(view, "#company-attach-modal")
+      assert has_element?(view, "#attached-address-#{address.id} td", "Main HQ")
+      assert has_element?(view, "#attached-address-#{address.id} span", "Headquarters")
+      assert has_element?(view, "#attached-address-#{address.id} span", "Billing")
+      assert has_element?(view, "#attached-address-#{address.id} span", "Yes")
+
+      # Toggle primary
+      view |> element("#toggle-primary-#{address.id}") |> render_click()
+      assert has_element?(view, "#attached-address-#{address.id} span", "No")
+
+      # Change priority
+      render_click(view, "save_address_priority", %{
+        "id" => to_string(address.id),
+        "priority" => "5"
+      })
+
+      assert has_element?(view, "#attached-address-#{address.id} td", "5")
+
+      # Unlink address
+      view |> element("#unlink-address-#{address.id}") |> render_click()
+      assert has_element?(view, "#company-addresses-table-empty", "No addresses linked.")
+    end
+
+    test "creates and attaches a new address with geonames integration", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # Open create & attach modal
+      view |> element("#create-attach-address-btn") |> render_click()
+      assert has_element?(view, "#company-create-address-modal")
+
+      # Submit create & attach form
+      view
+      |> form("#create-attach-address-form", %{
+        "address" => %{
+          "label" => "Branch Office",
+          "line1" => "789 Tech Hub",
+          "locality" => "Kuala Lumpur",
+          "country_iso" => "MY",
+          "kinds" => ["branch"],
+          "priority" => "2"
+        }
+      })
+      |> render_submit()
+
+      refute has_element?(view, "#company-create-address-modal")
+      assert has_element?(view, "#company-addresses-table td", "Branch Office")
+      assert has_element?(view, "#company-addresses-table span", "Branch")
+    end
+
+    test "hides write controls when actor lacks admin.company.update", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      refute has_element?(view, "#edit-company-details-btn")
+      refute has_element?(view, "#add-activity-form")
+      refute has_element?(view, "#edit-metadata-btn")
+      refute has_element?(view, "#create-attach-address-btn")
+      refute has_element?(view, "#attach-existing-address-btn")
     end
 
     test "redirects away for another tenant's company", %{conn: conn} do
