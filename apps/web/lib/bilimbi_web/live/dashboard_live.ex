@@ -212,14 +212,19 @@ defmodule BilimbiWeb.DashboardLive do
   end
 
   defp move_one(widgets, id, direction) do
-    idx = Enum.find_index(widgets, &(&1.id == id))
-    target = idx + direction
+    case Enum.find_index(widgets, &(&1.id == id)) do
+      nil ->
+        widgets
 
-    if is_integer(idx) && target >= 0 && target < length(widgets) do
-      List.update_at(widgets, idx, fn _ -> Enum.at(widgets, target) end)
-      |> List.update_at(target, fn _ -> Enum.at(widgets, idx) end)
-    else
-      widgets
+      idx ->
+        target = idx + direction
+
+        if target >= 0 && target < length(widgets) do
+          List.update_at(widgets, idx, fn _ -> Enum.at(widgets, target) end)
+          |> List.update_at(target, fn _ -> Enum.at(widgets, idx) end)
+        else
+          widgets
+        end
     end
   end
 
@@ -235,6 +240,16 @@ defmodule BilimbiWeb.DashboardLive do
      |> assign(:session_count, session_count)
      |> assign(:audit_entries, audit_entries)
      |> schedule_refresh(socket.assigns.widgets)}
+  end
+
+  @impl true
+  def handle_info({:notification_event, _payload}, socket) do
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info(_msg, socket) do
+    {:noreply, socket}
   end
 
   @impl true
