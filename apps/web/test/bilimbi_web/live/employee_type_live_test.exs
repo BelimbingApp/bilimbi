@@ -113,7 +113,7 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     grant_capabilities!(["admin.employee-type.list", "admin.employee-type.delete"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
-    assert has_element?(view, "#employee-type-delete-#{type.id}")
+    assert has_element?(view, "#employee-type-delete-#{type.id}[phx-disable-with='Deleting…']")
 
     view
     |> element("#employee-type-delete-#{type.id}")

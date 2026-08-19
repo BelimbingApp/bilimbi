@@ -420,9 +420,10 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
                   type="button"
                   phx-click="delete"
                   phx-value-id={type.id}
+                  phx-disable-with="Deleting…"
                   data-confirm={"Are you sure you want to delete #{type.label}?"}
                   title="Delete employee type"
-                  class="rounded-md border border-danger-line bg-danger-surface px-2.5 py-1.5 text-xs font-semibold text-danger-ink transition hover:bg-danger"
+                  class="rounded-md border border-danger-line bg-danger-surface px-2.5 py-1.5 text-xs font-semibold text-danger-ink transition hover:bg-danger disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Delete
                 </button>
