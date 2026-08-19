@@ -43,6 +43,17 @@ defmodule Bilimbi.Base.MenuTest do
              ] = items
     end
 
+    test "a contribution cannot name a source other than its own module" do
+      items =
+        Validator.validate_contributions!([
+          entry("base/system", [
+            %{id: "admin.spoof", label: "Spoof", route: "/spoof", source: "core/user"}
+          ])
+        ])
+
+      assert [%Item{id: "admin.spoof", source: "base/system"}] = items
+    end
+
     test "resolves a parent contributed by a different module" do
       items =
         Validator.validate_contributions!([

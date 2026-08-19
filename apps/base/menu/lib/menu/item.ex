@@ -34,7 +34,11 @@ defmodule Bilimbi.Base.Menu.Item do
   @spec new!(map(), String.t() | nil) :: t()
   def new!(attrs, source \\ nil) when is_map(attrs) do
     item = struct!(__MODULE__, attrs)
-    item = if is_binary(source) and is_nil(item.source), do: %{item | source: source}, else: item
+
+    # The descriptor id always wins. `source` answers "which module contributed
+    # this", and a contribution that names its own source can answer it wrongly
+    # -- the one field on a provenance diagnostic that must not be self-reported.
+    item = if is_binary(source), do: %{item | source: source}, else: item
 
     validate_id!(item.id, "id")
     if item.parent, do: validate_id!(item.parent, "parent")
