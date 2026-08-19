@@ -175,7 +175,11 @@ defmodule Bilimbi.Core.User.TestFixtures do
       if Code.ensure_loaded?(Bilimbi.Base.Dashboard.Contributions) and
            Code.ensure_loaded?(Bilimbi.Base.Dashboard.ContributionValidator) and
            function_exported?(Bilimbi.Base.Dashboard.Contributions, :contributions, 0) and
-           function_exported?(Bilimbi.Base.Dashboard.ContributionValidator, :validate_contributions!, 1) do
+           function_exported?(
+             Bilimbi.Base.Dashboard.ContributionValidator,
+             :validate_contributions!,
+             1
+           ) do
         apply(Bilimbi.Base.Dashboard.ContributionValidator, :validate_contributions!, [
           [
             %{
