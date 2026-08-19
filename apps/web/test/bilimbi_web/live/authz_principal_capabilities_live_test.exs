@@ -55,6 +55,19 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
     assert has_element?(view, "#nav-admin-authz-principal-capability[aria-current='page']")
   end
 
+  test "shows the count without dead page controls on a single page", %{conn: conn} do
+    {:ok, view, _html} = open(conn)
+
+    assert has_element?(
+             view,
+             "#grants-pagination-summary",
+             "Page 1 of 1 · 1 direct capabilities"
+           )
+
+    refute has_element?(view, "#grants-prev")
+    refute has_element?(view, "#grants-next")
+  end
+
   test "filters to denials, which outrank a role's grant", %{conn: conn, scope: scope} do
     grant(scope, "admin.company.list", true)
     grant(scope, "admin.company.view", false)
