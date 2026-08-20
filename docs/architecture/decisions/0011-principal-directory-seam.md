@@ -1,4 +1,4 @@
-# ADR 0010: Principal directory seam and its query boundary
+# ADR 0011: Principal directory seam and its query boundary
 
 **Document Type:** Architecture Decision Record
 **Status:** Proposed
@@ -6,6 +6,8 @@
 **Scope:** Ownership, module placement, and the query boundary for naming Core
 principals on Base-owned screens
 **Last Updated:** 2026-08-20
+**Supersedes:** nothing. `0010` is reserved by
+`docs/architecture/0010_composition-model.md` and must not be reused for an ADR.
 
 ## Context
 
@@ -63,7 +65,7 @@ This adds a fifth contribution consumer, changing the four-consumer model in
 `Bilimbi.Base.ModuleRegistry.ContributionRegistry`. That model is a decision, not
 a constraint to route around.
 
-## Decision 2: the directory supplies ids and an order; it does not own a page
+## Decision 2: the directory ranks the principals a screen actually references
 
 ### Why "the directory owns the paginated read" is not available
 
@@ -77,60 +79,74 @@ because in neither case is the page a page of principals:
 - `/system/sessions` pages session rows.
 
 A page of grants sorted by principal name is a join the directory cannot perform,
-because Base owns the grants and Core owns the names. Nothing about placing the
-contract better changes that.
+because Base owns the grants and Core owns the names. No placement changes that.
 
-### What is available
+### Principal identity is composite
 
-The existing `CompanyDirectory` already solves the identical problem for
-companies, and its mechanism transfers:
+An Authz principal is `{principal_type, principal_id}`. A user with id 5 and an
+agent with id 5 are different principals, and `principal_capabilities` stores
+both kinds in one table. **Every part of this contract is keyed on the pair**:
+directory arguments, the returned name map, the database filter, and the
+ordering rank. An id-only array would decorate or rank the wrong kind, silently,
+and only for installations where both id spaces overlap — which is to say,
+eventually.
 
-```elixir
-# administration.ex:465-473
-order_by(query, [grant], [
-  {^direction, fragment("array_position(?::bigint[], ?)", ^ids, grant.company_id)},
-  {^direction, grant.id}
-])
+Ties break deterministically on normalised name, then type, then id, so two
+principals with the same display name order the same way on every page and every
+run.
+
+### The consumer names its candidates first
+
+The directory is **not** asked for every principal in the tenant. Base owns the
+grants, so Base can compute exactly which principals its visible dataset
+references, before pagination:
+
+```
+SELECT DISTINCT principal_type, principal_id
+FROM <the already visibility-filtered, already-filtered query>
 ```
 
-The LiveView loads the complete in-scope company set in `mount/3` and passes
-every id as `company_order`. Ordering therefore happens **in the database, before
-`offset`/`limit`**, which is what ADR 0007 requires and what #439 got wrong.
+That set is passed to the directory, which scopes it to the actor's tenant,
+resolves names, applies any name search, and returns the ranked survivors. Base
+then filters and orders its own query by that rank — the existing
+`array_position` mechanism (`administration.ex:465-473`) — and only then applies
+`offset`/`limit`.
 
-So the contract is:
+The set is therefore bounded by **what the screen references**, not by tenant
+size. A tenant with fifty thousand users and a Roles screen showing grants for
+six principals resolves six. Fetching the whole tenant would have degraded that
+screen for no reason, which is what an earlier draft of this ADR specified.
 
-- `principals_in_scope(scope, kind)` — every in-scope principal of that kind, id
-  and name, ordered by the name being displayed, case-insensitively.
-- `names(scope, ids)` — a bounded map for decorating rows already selected.
+Ordering still happens in the database before limiting, which is what ADR 0007
+requires and what #439 got wrong.
 
-`names/2` alone is insufficient and must never be the only callback: it can only
-decorate a page some other ordering chose. It exists because a screen that does
-not sort by name should not pay for the full set.
+### The ceiling, and what happens above it
 
-### The bound, stated rather than assumed
+A ceiling still exists, because a screen with no filters can reference many
+principals. It applies to the **referenced candidate set**, not the tenant.
 
-`principals_in_scope/2` is proportional to principals per tenant. Companies get
-away with this because a tenant has few; users and agents do not have that
-property, and pretending otherwise is how this contract would fail in
-production rather than in review.
+Above it, and when no provider is installed, the affected principals render as
+their durable type and id — the #285 out-of-scope presentation, which already
+exists and already reads correctly.
 
-Therefore:
+### Fallback must not silently change the query
 
-- The implementation **must** be tenant-scoped by construction, as
-  `Core.User.get_tenant_users/2` already is.
-- The contract carries an explicit ceiling. Above it the implementation returns
-  `{:error, :too_many_principals}` and the consumer falls back to id ordering
-  with the durable type and id — the #285 out-of-scope presentation, which
-  already exists and already reads correctly.
-- The ceiling is a stated number, not a silent truncation. Belimbing's schedule
-  board fetches at most 500 rows and filters in memory; #442 correctly refused to
-  copy that. Truncating a name index would be the same defect: a sort that
-  silently covers part of the set is worse than no sort, because it looks like
-  one.
+Falling back to ids while a name sort or name search is active would answer a
+different question than the one asked. So:
 
-Name **search** uses the same set: the directory returns matching in-scope ids
-and the consumer filters `principal_id in ^ids` before paginating. It is bounded
-by matches rather than by tenant size, and it shares the ceiling.
+- **Name search cannot degrade.** If candidates cannot be resolved, the search
+  fails visibly rather than returning unfiltered rows; a search that silently
+  matches nothing and a search that silently matches everything are both lies.
+- **Name sort degrades to the durable order** (`id`), and the screen shows a
+  notice saying names are unavailable and the sort is by id. URL state is
+  normalised to the sort actually applied, so a reload does not silently reapply
+  a sort that is not in effect and a shared link shows what its sender saw.
+- **Totals stay exact.** The count query is Base's own and does not depend on the
+  directory; degradation changes ordering and naming, never membership — except
+  under name search, which is refused rather than approximated.
+- **Archived, deleted and cross-tenant principals** resolve to no name and take
+  the durable presentation. They are not errors and must not remove the row: a
+  grant to a deleted principal is exactly what an operator needs to see.
 
 ## Consequences
 
@@ -140,10 +156,11 @@ by matches rather than by tenant size, and it shares the ceiling.
   `rm -rf _build` and a full rebuild.
 - Two Core implementations, validated the way `CompanyDirectory`'s is: the module
   loads, declares the behaviour, and belongs to the contributing OTP app.
-- Screens that sort by principal name pay for the in-scope set on mount. Screens
-  that only display names pay for a bounded `names/2` call.
-- A tenant above the ceiling keeps working, with ids instead of names, visibly
-  and by contract rather than by accident.
+- Screens pay for the principals they reference, not for the tenant. A screen
+  showing six principals resolves six.
+- Above the ceiling, or with no provider installed, screens keep working with
+  ids instead of names — visibly, by contract, and with the sort they actually
+  got reflected in the URL.
 
 ## Alternatives rejected
 
@@ -152,6 +169,14 @@ hides an upward edge rather than removing it.
 
 **Contract in `base/ui`.** Too narrow an owner for tenant isolation and query
 semantics, and forces an opaque scope type.
+
+**Resolving every principal in the tenant.** Specified in the first draft of this
+ADR and rejected on review: it degrades a screen referencing a handful of
+principals because some other part of the tenant is large. The consumer knows its
+candidates and should say so.
+
+**Id-only directory arguments.** Conflates a user and an agent that share a
+numeric id.
 
 **Bare `tenant_id` across the seam.** Nameable by every module, and unvalidated —
 it moves the privacy guarantee from the type onto every call site.
