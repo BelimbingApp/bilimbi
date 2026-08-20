@@ -1,4 +1,6 @@
 defmodule Bilimbi.Base.Queue.TestWorkers.Success do
+  @moduledoc false
+
   use Bilimbi.Base.Queue.Worker,
     id: "test/success",
     max_attempts: 3
@@ -12,6 +14,8 @@ defmodule Bilimbi.Base.Queue.TestWorkers.Success do
 end
 
 defmodule Bilimbi.Base.Queue.TestWorkers.Retry do
+  @moduledoc false
+
   use Bilimbi.Base.Queue.Worker,
     id: "test/retry",
     max_attempts: 2
@@ -28,6 +32,8 @@ defmodule Bilimbi.Base.Queue.TestWorkers.Retry do
 end
 
 defmodule Bilimbi.Base.Queue.TestWorkers.Unique do
+  @moduledoc false
+
   use Bilimbi.Base.Queue.Worker,
     id: "test/unique",
     max_attempts: 3,

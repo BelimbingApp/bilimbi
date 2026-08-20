@@ -4,7 +4,7 @@ defmodule Bilimbi.Base.Queue.ApplicationTest do
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Queue.Application, as: QueueApplication
 
-  test "production configuration is explicit and valid" do
+  test "production configuration defines a validated graceful shutdown policy" do
     config = Queue.oban_config() |> Keyword.delete(:testing)
 
     assert config[:repo] == Bilimbi.Base.Repo

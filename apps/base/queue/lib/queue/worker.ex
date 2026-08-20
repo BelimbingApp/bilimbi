@@ -76,16 +76,20 @@ defmodule Bilimbi.Base.Queue.Worker do
       queue: job.queue
     }
 
-    with {:ok, normalized_args} <- worker.validate_args(job.args) do
-      case worker.handle_job(normalized_args, execution) do
-        :ok -> :ok
-        {:retry, code} when is_atom(code) or is_binary(code) -> {:error, code}
-        {:cancel, code} when is_atom(code) or is_binary(code) -> {:cancel, code}
-        _invalid -> {:error, :invalid_worker_result}
-      end
-    else
-      {:error, code} when is_atom(code) or is_binary(code) -> {:cancel, code}
-      _invalid -> {:cancel, :invalid_worker_args}
+    case worker.validate_args(job.args) do
+      {:ok, normalized_args} ->
+        case worker.handle_job(normalized_args, execution) do
+          :ok -> :ok
+          {:retry, code} when is_atom(code) or is_binary(code) -> {:error, code}
+          {:cancel, code} when is_atom(code) or is_binary(code) -> {:cancel, code}
+          _invalid -> {:error, :invalid_worker_result}
+        end
+
+      {:error, code} when is_atom(code) or is_binary(code) ->
+        {:cancel, code}
+
+      _invalid ->
+        {:cancel, :invalid_worker_args}
     end
   end
 end

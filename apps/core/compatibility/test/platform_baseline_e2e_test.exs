@@ -137,6 +137,7 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       )
 
       SQL.query!(PlatformBaselineTestRepo, "DROP TABLE bilimbi_schema_migrations", [])
+      install_legacy_queue_sentinels!()
       assert_runtime_start_fails!(env)
       assert relation("oban_jobs") == nil
 
@@ -154,6 +155,7 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       assert recorded_versions() == Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
       assert relation("oban_jobs") == "oban_jobs"
       assert oban_migrated_version() == 14
+      assert_legacy_queue_sentinels_unchanged!()
       run_mix!("app.start", [], env)
     end)
   end
@@ -263,5 +265,34 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
 
   defp oban_migrated_version do
     Oban.Migrations.Postgres.migrated_version(repo: PlatformBaselineTestRepo)
+  end
+
+  defp install_legacy_queue_sentinels! do
+    for table <- ~w(jobs job_batches failed_jobs) do
+      SQL.query!(
+        PlatformBaselineTestRepo,
+        "CREATE TABLE #{table} (id bigint PRIMARY KEY, payload text NOT NULL)",
+        []
+      )
+
+      SQL.query!(
+        PlatformBaselineTestRepo,
+        "INSERT INTO #{table} (id, payload) VALUES (1, $1)",
+        ["legacy-#{table}-payload"]
+      )
+    end
+  end
+
+  defp assert_legacy_queue_sentinels_unchanged! do
+    for table <- ~w(jobs job_batches failed_jobs) do
+      expected_payload = "legacy-#{table}-payload"
+
+      assert [[1, ^expected_payload]] =
+               SQL.query!(
+                 PlatformBaselineTestRepo,
+                 "SELECT id, payload FROM #{table}",
+                 []
+               ).rows
+    end
   end
 end
