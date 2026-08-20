@@ -2,7 +2,7 @@
   <.settings_layout
     current_page={:appearance}
     heading="Appearance Settings"
-    subheading="Update the theme and visual appearance of your interface."
+    subheading="Choose how Bilimbi looks and formats content for your account."
   >
     <form
       id="appearance-form"
@@ -78,6 +78,18 @@
           </div>
         </label>
       </fieldset>
+
+      <.input
+        id="appearance-locale"
+        name="appearance[locale]"
+        type="select"
+        value={@locale}
+        label="Language and region"
+        prompt={"Use installation default (#{@installation_locale})"}
+        options={@locale_options}
+        hint="Sets your preferred language and region for this account."
+        wrapper_class="mb-0"
+      />
     </form>
   </.settings_layout>
 </Layouts.app>
