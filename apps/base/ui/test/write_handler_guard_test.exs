@@ -4,27 +4,45 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
   write capability. Hiding the button in the template is not a guard: #376
   found ten write handlers on the company show page reachable by any actor
   holding only `admin.company.view`, because `{@can_update?}` hid the controls
-  and nothing else refused the event. There is no reason to think that page
-  was special, and review demonstrably did not catch it.
+  and nothing else refused the event.
 
   ## What counts as covered
 
-  A **deny clause**: a `handle_event/3` clause whose socket pattern matches
-  `%{assigns: %{can_*?: false}}`. Two shapes are in use and both are read:
+  All three guard idioms in production use, each mechanically detected:
 
-      # per-event (company department types)
+      # 1. deny clause — refusal in the socket pattern
       def handle_event("delete", _params, %{assigns: %{can_delete?: false}} = socket),
         do: write_forbidden(socket)
 
-      # catch-all over a declared list (company show)
       @write_events ~w(save_details unlink_address ...)
       def handle_event(event, _params, %{assigns: %{can_update?: false}} = socket)
           when event in @write_events,
           do: write_forbidden(socket)
 
-  The attribute is resolved from the module's own literal `~w`/list definition,
-  so adding a write event without adding it to `@write_events` leaves it
-  uncovered — that is the point.
+      # 2. inline branch on a can_*? assign in the clause body
+      def handle_event("save_department", params, socket) do
+        if socket.assigns.can_manage? do ... else {:noreply, flash_forbidden} end
+      end
+
+      # 3. capability check in the clause body
+      def handle_event("delete", params, socket) do
+        cond do
+          not allowed?(socket.assigns.current_scope, "admin.user.delete") -> ...
+      end
+
+  Idioms 2 and 3 check that a guard is *present*, not that it is correct —
+  the same approximation idiom 1 makes. All three are guards; the deny clause
+  is a house style, not a security property, and a test that enforced one
+  style while claiming to enforce authorization would be argued with and then
+  ignored (review of #415).
+
+  Plus **route gating, read from the data that declares it**: each module
+  ships `priv/web_routes.exs` mapping a LiveView to the capability its route
+  requires. A LiveView every one of whose routes mounts under a
+  write-suffixed capability (`create`, `update`, `delete`, `manage`, `write`,
+  `import`, `restore`, `terminate`, `designate`) is covered — there is no
+  weaker capability to refuse. A read capability (`list`, `view`) covers
+  nothing.
 
   ## The opt-out
 
@@ -32,33 +50,36 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
       @write_guard_opt_out ~w(sort_subordinates)
 
   `@write_guard_opt_out` is for events that are write-shaped **by name only**
-  (sort/filter/UI-state toggles) and for screens whose route mounts under the
-  write capability itself, so there is no weaker capability to refuse. Every
-  entry needs a reason comment next to the attribute; a lie here is greppable
-  and review's job, not the test's.
+  — sort/filter/UI-state toggles — and for self-service actions on the
+  actor's own account, where no admin capability applies. Every entry needs a
+  reason comment next to the attribute; a lie here is greppable and review's
+  job, not the test's.
 
   ## Derived, not a fixture
 
   The file set is discovered by content (`handle_event/3` definitions under
   `web/` trees and `apps/web`), the event names come from the parsed AST, and
-  coverage comes from the module's own clauses and attributes. Nothing here
-  mirrors a hand-written list of modules — `workspace_boundary_test.exs` is
-  the cautionary case: it mirrored what it checked, caught nothing, and
-  serialised every new module through one file.
+  coverage comes from the module's own clauses, attributes, and route
+  declarations. Nothing here mirrors a hand-written list of modules —
+  `workspace_boundary_test.exs` is the cautionary case: it mirrored what it
+  checked, caught nothing, and serialised every new module through one file.
 
   `@tracked` is acknowledged debt, not endorsement: each entry is an
   unguarded write-shaped event that existed when this test landed. Fixing a
-  module — guard clause or opt-out — **fails the test until its entry is
-  deleted**, which is what keeps the list from becoming wallpaper.
+  module — guard, route, or opt-out — **fails the test until its entry is
+  deleted**, which is what keeps the list from becoming wallpaper. That
+  mechanism already forced the truth once: the first cut of this test
+  recognised only the deny clause, counted 76 "unguarded" events, and review
+  walked every clause body to find 38 of them guarded inline (#415). The
+  remaining list is short enough to read, which is the whole point.
 
   ## What this does not check
 
-  Route-level gating is invisible here: a screen mounted only under its write
-  capability is covered in truth, and its events still appear as offenders —
-  that is what the opt-out with a reason is for. `validate`/`change` form-input
-  events are not write-shaped and are not checked. The assign name must start
-  with `can_` and end with `?`; a differently named deny assign fails this test
-  and either gets renamed or the convention grows deliberately.
+  Whether an inline guard is *right* — right capability, right branch — is
+  review's question. `validate`/`change` form-input events are not
+  write-shaped and are not checked. The assign name must start with `can_`
+  and end with `?`; a differently named deny assign fails this test and either
+  gets renamed or the convention grows deliberately.
   """
 
   use ExUnit.Case, async: true
@@ -93,82 +114,38 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
   # Write-shaped in full: bare verbs and one-off write names in use.
   @exact_writes ~w(save delete create duplicate terminate designate)
 
+  # A route capability whose final segment is one of these authorizes writes:
+  # mounting under it is coverage. Everything else (list, view, read) is a
+  # read capability and covers nothing.
+  @write_capability_suffixes ~w(create update delete manage write import restore terminate designate)
+
   @opt_out_attribute :write_guard_opt_out
 
   # Acknowledged debt from when this test landed. Each {module_path, event}
   # is an unguarded write-shaped handler. Delete the entry in the same change
   # that guards or opts out the event.
   @tracked [
-    {"apps/base/audit/lib/audit/web/actions_live.ex", "toggle_retain"},
-    {"apps/base/authz/lib/authz/web/role_create_live.ex", "save"},
     {"apps/base/session/lib/session/web/live/index_live.ex", "terminate"},
-    {"apps/base/settings/lib/settings/web/group_live.ex", "restore_defaults"},
-    {"apps/base/settings/lib/settings/web/group_live.ex", "save"},
     {"apps/base/tenancy/lib/tenancy/web/live/tenants_live.ex", "create"},
-    {"apps/core/address/lib/address/web/create_live.ex", "save"},
-    {"apps/core/address/lib/address/web/index_live.ex", "delete"},
-    {"apps/core/address/lib/address/web/show_live.ex", "save_details"},
-    {"apps/core/address/lib/address/web/show_live.ex", "save_location"},
-    {"apps/core/address/lib/address/web/show_live.ex", "save_provenance"},
-    {"apps/core/company/lib/company/web/create_live.ex", "save"},
-    {"apps/core/company/lib/company/web/platform_operator_setup_live.ex", "create"},
-    {"apps/core/company/lib/company/web/platform_operator_setup_live.ex", "designate"},
     {"apps/core/company/lib/company/web/show_live.ex", "update_metadata_input"},
     {"apps/core/company/lib/company/web/show_live.ex", "update_new_activity"},
-    {"apps/core/employee/lib/employee/web/form_live.ex", "save"},
-    {"apps/core/employee/lib/employee/web/index_live.ex", "delete"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "add_subordinate"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "attach_address"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "delete"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "detach_address"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "remove_subordinate"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "save_address_kinds"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "save_address_priority"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "save_department"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "save_employee_type"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "save_field"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "save_status"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "save_supervisor"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "save_user"},
     {"apps/core/employee/lib/employee/web/show_live.ex", "toggle_add_subordinate"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "toggle_address_primary"},
     {"apps/core/employee/lib/employee/web/show_live.ex", "toggle_edit_kind"},
-    {"apps/core/employee/lib/employee/web/type_form_live.ex", "save"},
-    {"apps/core/employee/lib/employee/web/type_index_live.ex", "delete"},
     {"apps/core/geonames/lib/geonames/web/admin1_live.ex", "save-admin1-name"},
     {"apps/core/geonames/lib/geonames/web/countries_live.ex", "save-country-name"},
     {"apps/core/geonames/lib/geonames/web/countries_live.ex", "update-countries"},
     {"apps/core/user/lib/user/web/appearance_live.ex", "save"},
-    {"apps/core/user/lib/user/web/database_queries_live/index.ex", "delete"},
-    {"apps/core/user/lib/user/web/database_queries_live/index.ex", "duplicate"},
-    {"apps/core/user/lib/user/web/database_queries_live/show.ex", "delete"},
-    {"apps/core/user/lib/user/web/database_queries_live/show.ex", "duplicate"},
     {"apps/core/user/lib/user/web/database_queries_live/show.ex", "run_query"},
-    {"apps/core/user/lib/user/web/database_queries_live/show.ex", "save"},
-    {"apps/core/user/lib/user/web/form_live.ex", "save"},
     {"apps/core/user/lib/user/web/notification_bell_component.ex", "mark_all_read"},
     {"apps/core/user/lib/user/web/notification_bell_component.ex", "toggle_dropdown"},
     {"apps/core/user/lib/user/web/notifications_live.ex", "mark_all_read"},
     {"apps/core/user/lib/user/web/notifications_live.ex", "mark_read"},
     {"apps/core/user/lib/user/web/password_live.ex", "save"},
     {"apps/core/user/lib/user/web/profile_live.ex", "save"},
-    {"apps/core/user/lib/user/web/show_live.ex", "add_selected_capabilities"},
-    {"apps/core/user/lib/user/web/show_live.ex", "assign_selected_roles"},
-    {"apps/core/user/lib/user/web/show_live.ex", "delete"},
-    {"apps/core/user/lib/user/web/show_live.ex", "deny_capability"},
-    {"apps/core/user/lib/user/web/show_live.ex", "link_employee"},
-    {"apps/core/user/lib/user/web/show_live.ex", "remove_capability"},
-    {"apps/core/user/lib/user/web/show_live.ex", "remove_role"},
-    {"apps/core/user/lib/user/web/show_live.ex", "save_company"},
-    {"apps/core/user/lib/user/web/show_live.ex", "save_field"},
-    {"apps/core/user/lib/user/web/show_live.ex", "save_new_employee"},
     {"apps/core/user/lib/user/web/show_live.ex", "toggle_assign_roles"},
     {"apps/core/user/lib/user/web/show_live.ex", "toggle_change_password"},
     {"apps/core/user/lib/user/web/show_live.ex", "toggle_effective_permissions"},
     {"apps/core/user/lib/user/web/show_live.ex", "toggle_link_employee"},
-    {"apps/core/user/lib/user/web/show_live.ex", "unlink_employee"},
-    {"apps/core/user/lib/user/web/show_live.ex", "update_password"},
-    {"apps/core/user_administration/lib/user_administration/web/index_live.ex", "delete"},
     {"apps/web/lib/bilimbi_web/live/dashboard_live.ex", "add-widget"},
     {"apps/web/lib/bilimbi_web/live/dashboard_live.ex", "move-down"},
     {"apps/web/lib/bilimbi_web/live/dashboard_live.ex", "move-up"},
@@ -178,10 +155,12 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
   ]
 
   test "every write-shaped handle_event is capability-guarded or explicitly opted out" do
+    route_write_modules = route_write_modules()
+
     offenders =
       @workspace_root
       |> scanned_files()
-      |> Enum.flat_map(&offenders/1)
+      |> Enum.flat_map(&offenders(&1, route_write_modules))
       |> Enum.sort()
       |> Enum.uniq()
 
@@ -190,27 +169,23 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
 
     assert new == [],
            """
-           These write-shaped handle_event/3 clauses are not covered by any
-           deny clause and not opted out:
+           These write-shaped handle_event/3 clauses have no guard (deny
+           clause, inline can_*? branch, allowed?/2 check, or a route mounted
+           under a write capability) and no opt-out:
 
            #{format_entries(new)}
 
-           A hidden control is not a guard (#376). Either refuse the event when
-           the actor lacks the capability:
-
-               def handle_event(event, _params, %{assigns: %{can_update?: false}} = socket)
-                   when event in @write_events,
-                 do: write_forbidden(socket)
-
-           or, if the name is write-shaped only (sort/filter/UI state) or the
-           route already mounts under the write capability, list it under
+           A hidden control is not a guard (#376). Refuse the event when the
+           actor lacks the capability, or — if the name is write-shaped only,
+           or the action is self-service on the actor's own account, or the
+           route already mounts under the write capability — list it under
            @write_guard_opt_out with a reason comment.
            """
 
     assert fixed == [],
            """
            These are listed as tracked debt but no longer offend — the module
-           gained a guard or opt-out:
+           gained a guard, a gating route, or an opt-out:
 
            #{format_entries(fixed)}
 
@@ -249,13 +224,21 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
     found?
   end
 
-  defp offenders({path, ast}) do
+  defp offenders({path, ast}, route_write_modules) do
     attributes = literal_attributes(ast)
+
+    route_covered? =
+      case module_name(ast) do
+        nil -> false
+        name -> Map.get(route_write_modules, name, false)
+      end
 
     clauses = handle_event_clauses(ast, attributes)
 
     covered =
-      clauses |> Enum.filter(& &1.deny?) |> Enum.flat_map(& &1.covered_events)
+      clauses
+      |> Enum.filter(& &1.guarded?)
+      |> Enum.flat_map(& &1.covered_events)
 
     opt_out = Map.get(attributes, @opt_out_attribute, [])
 
@@ -264,17 +247,18 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
     |> Enum.uniq()
     |> Enum.map(&{path, &1})
     |> Enum.filter(fn {_path, event} ->
-      write_shaped?(event) and event not in covered and event not in opt_out
+      write_shaped?(event) and event not in covered and event not in opt_out and
+        not route_covered?
     end)
   end
 
-  # Returns clause facts: the literal event names it handles, whether it is a
-  # deny clause, and which events that deny clause covers.
+  # Returns clause facts: the literal event names it handles, whether it is
+  # guarded, and which events that guard covers.
   defp handle_event_clauses(ast, attributes) do
     {_, clauses} =
       Macro.prewalk(ast, [], fn
-        {:def, _, [head, _body]} = node, acc ->
-          case handle_event_head(head, attributes) do
+        {:def, _, [head, [do: body]]} = node, acc ->
+          case handle_event_head(head, attributes, body) do
             nil -> {node, acc}
             facts -> {node, [facts | acc]}
           end
@@ -289,29 +273,35 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
   # def handle_event(name, params, socket_pattern) [when guard]
   defp handle_event_head(
          {:when, _, [{:handle_event, _, [event, _params, socket]}, guard]},
-         attributes
+         attributes,
+         body
        ) do
-    clause_facts(event, socket, guard, attributes)
+    clause_facts(event, socket, guard, attributes, body)
   end
 
-  defp handle_event_head({:handle_event, _, [event, _params, socket]}, attributes) do
-    clause_facts(event, socket, nil, attributes)
+  defp handle_event_head({:handle_event, _, [event, _params, socket]}, attributes, body) do
+    clause_facts(event, socket, nil, attributes, body)
   end
 
-  defp handle_event_head(_head, _attributes), do: nil
+  defp handle_event_head(_head, _attributes, _body), do: nil
 
-  defp clause_facts(event, socket_pattern, guard, attributes) do
+  defp clause_facts(event, socket_pattern, guard, attributes, body) do
     deny? = deny_pattern?(socket_pattern)
+    guarded? = deny? or body_guarded?(body)
 
     %{
       event_names: if(is_binary(event), do: [event], else: []),
-      deny?: deny?,
-      covered_events: if(deny?, do: covered_events(event, guard, attributes), else: [])
+      guarded?: guarded?,
+      covered_events:
+        if deny? do
+          covered_events(event, guard, attributes)
+        else
+          if(is_binary(event), do: [event], else: [])
+        end
     }
   end
 
-  # A deny clause refuses the event when the actor lacks a capability assign:
-  # the socket pattern matches %{assigns: %{can_*?: false}}.
+  # Idiom 1: the socket pattern matches %{assigns: %{can_*?: false}}.
   defp deny_pattern?(socket_pattern) do
     {_, deny?} =
       Macro.prewalk(socket_pattern, false, fn
@@ -324,6 +314,31 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
       end)
 
     deny?
+  end
+
+  # Idioms 2 and 3: the clause body branches on a can_*? assign read through
+  # `.assigns` (`socket.assigns.can_manage?`), or calls allowed?/2 in any
+  # form.
+  defp body_guarded?(body) do
+    {_, guarded?} =
+      Macro.prewalk(body, false, fn
+        # socket.assigns.can_manage? — the .assigns access is itself a call
+        # node inside the outer field access.
+        {{:., _, [{{:., _, [_, :assigns]}, _, _}, assign]}, _, _} = node, guarded?
+        when is_atom(assign) ->
+          name = Atom.to_string(assign)
+
+          {node, guarded? or (String.starts_with?(name, "can_") and String.ends_with?(name, "?"))}
+
+        # allowed?(...) or Some.Alias.allowed?(...)
+        {:allowed?, _, _} = node, _guarded? ->
+          {node, true}
+
+        node, guarded? ->
+          {node, guarded?}
+      end)
+
+    guarded?
   end
 
   # Which events a deny clause covers: the literal event name in its head, or
@@ -349,6 +364,84 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
       end)
 
     covered
+  end
+
+  # The module name of a scanned file: its first defmodule, as a string.
+  defp module_name(ast) do
+    {_, name} =
+      Macro.prewalk(ast, nil, fn
+        {:defmodule, _, [{:__aliases__, _, parts}, _]} = node, nil ->
+          {node, Enum.map_join(parts, ".", &to_string/1)}
+
+        node, name ->
+          {node, name}
+      end)
+
+    name
+  end
+
+  # LiveViews every one of whose routes mounts under a write-suffixed
+  # capability. Read from `priv/web_routes.exs` — the data that actually
+  # gates the route — not from a hand-written list.
+  defp route_write_modules do
+    route_modules =
+      @workspace_root
+      |> Path.join("apps/*/*/priv/web_routes.exs")
+      |> Path.wildcard()
+      |> Enum.flat_map(fn path ->
+        with {:ok, source} <- File.read(path),
+             {:ok, ast} <- Code.string_to_quoted(source) do
+          route_entries(ast)
+        else
+          _ -> []
+        end
+      end)
+      |> Enum.group_by(fn {module, _capability} -> module end, fn {_module, capability} ->
+        capability
+      end)
+
+    for {module, capabilities} <- route_modules,
+        Enum.all?(capabilities, &write_capability?/1),
+        into: %{},
+        do: {module, true}
+  end
+
+  # [{module_name, capability}] from the list-of-maps route manifest. Each
+  # map carries one :live and one :capability among other keys, so pair each
+  # capability with the nearest preceding :live rather than assuming order.
+  # Keyword pairs in a map AST are plain {key, value} tuples.
+  defp route_entries(ast) do
+    {_, entries} =
+      Macro.prewalk(ast, [], fn
+        {key, value} = node, acc when key in [:live, :capability] ->
+          case route_value(value) do
+            nil -> {node, acc}
+            parsed -> {node, [{key, parsed} | acc]}
+          end
+
+        node, acc ->
+          {node, acc}
+      end)
+
+    {_, pairs} =
+      Enum.reverse(entries)
+      |> Enum.reduce({nil, []}, fn
+        {:live, module}, {_live, pairs} -> {module, pairs}
+        {:capability, capability}, {live, pairs} -> {live, [{live, capability} | pairs]}
+      end)
+
+    Enum.reject(pairs, fn {live, _} -> is_nil(live) end)
+  end
+
+  defp route_value({:__aliases__, _, parts}), do: Enum.map_join(parts, ".", &to_string/1)
+
+  defp route_value(value) when is_binary(value), do: value
+
+  defp route_value(_), do: nil
+
+  defp write_capability?(capability) do
+    suffix = capability |> String.split(".") |> List.last()
+    suffix in @write_capability_suffixes
   end
 
   # Module attributes whose value is a literal ~w sigil or list of strings.
