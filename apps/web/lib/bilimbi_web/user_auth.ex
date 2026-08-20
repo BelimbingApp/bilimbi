@@ -434,7 +434,17 @@ defmodule BilimbiWeb.UserAuth do
       user_id = current_scope.actor.id
 
       if Phoenix.LiveView.connected?(socket) do
-        User.subscribe_notifications(current_scope.scope, user_id)
+        case User.subscribe_notifications(current_scope.scope, user_id) do
+          :ok ->
+            :ok
+
+          {:error, reason} ->
+            require Logger
+
+            Logger.warning(
+              "UserAuth: failed to subscribe to user notifications topic for user #{user_id}: #{inspect(reason)}"
+            )
+        end
       end
 
       socket =

@@ -252,5 +252,33 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       assert render(view) =~ "Realtime PubSub Alert"
       refute has_element?(view, "#notifications-empty")
     end
+
+    test "surfaces flash and logs warning when notification subscription fails", %{conn: conn} do
+      name = :failing_pubsub_test
+      start_supervised!({Registry, keys: :unique, name: name})
+      Registry.register(name, "user_notifications:41:91", nil)
+
+      orig = Application.get_env(:bilimbi_core_user, :pubsub_server)
+
+      try do
+        Application.put_env(:bilimbi_core_user, :pubsub_server, name)
+
+        log =
+          ExUnit.CaptureLog.capture_log(fn ->
+            {:ok, view, _html} = open(conn)
+
+            assert has_element?(
+                     view,
+                     "#flash-error",
+                     "Real-time notifications are currently unavailable."
+                   )
+          end)
+
+        assert log =~ "UserAuth: failed to subscribe to user notifications topic"
+        assert log =~ "NotificationsLive: failed to subscribe to user notifications topic"
+      after
+        Application.put_env(:bilimbi_core_user, :pubsub_server, orig)
+      end
+    end
   end
 end
