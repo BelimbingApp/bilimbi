@@ -11,6 +11,7 @@ defmodule Bilimbi.Base.PrincipalDirectoryContractTest do
 
   use ExUnit.Case, async: true
 
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.PrincipalDirectory
   alias Bilimbi.Base.PrincipalDirectory.TestAgentProvider
   alias Bilimbi.Base.PrincipalDirectory.TestUserProvider
@@ -70,6 +71,18 @@ defmodule Bilimbi.Base.PrincipalDirectoryContractTest do
       )
 
     assert Enum.map(ranked, &{&1.kind, &1.id}) == [{:user, 1}]
+  end
+
+  # Every other test in this file hands `rank/3` a provider map it built. That
+  # is precisely the shape the registry was not producing: with nothing
+  # contributed it answered `[]` without ever asking this package's validator,
+  # which reduces into `%{}` and would have given the right answer. Taking the
+  # value from the registry is what makes this test able to fail (#496).
+  test "an uncontributed directory is an empty map, so a consumer degrades", %{scope: scope} do
+    providers = ContributionRegistry.build!([]).consumers.principal_directory
+
+    assert providers == %{}
+    assert {:ok, []} = PrincipalDirectory.rank(scope, [{:user, 91}], providers: providers)
   end
 
   test "over the ceiling is an error, not a truncation", %{scope: scope, providers: p} do
