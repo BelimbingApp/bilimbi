@@ -97,10 +97,13 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
 
       assert recorded_versions() == Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
 
-      latest_versions =
+      recovery_entries =
         Compatibility.migration_entries()
-        |> Enum.take(-2)
-        |> Enum.map(&elem(&1, 0))
+        |> Enum.drop_while(fn {_version, module, _disposition} ->
+          module != Bilimbi.Core.Employee.Migrations.BroadenGlobalIndexAndAddSystemCompanyCheck
+        end)
+
+      recovery_versions = Enum.map(recovery_entries, &elem(&1, 0))
 
       SQL.query!(
         PlatformBaselineTestRepo,
@@ -109,10 +112,16 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       )
 
       assert_runtime_start_fails!(env, :employee)
-      run_mix!("bilimbi.rollback", ["--step", "2", "--quiet"], env)
-      Enum.each(latest_versions, &refute(&1 in recorded_versions()))
+
+      run_mix!(
+        "bilimbi.rollback",
+        ["--step", to_string(length(recovery_entries)), "--quiet"],
+        env
+      )
+
+      Enum.each(recovery_versions, &refute(&1 in recorded_versions()))
       run_mix!("bilimbi.migrate", ["--quiet"], env)
-      Enum.each(latest_versions, &assert(&1 in recorded_versions()))
+      Enum.each(recovery_versions, &assert(&1 in recorded_versions()))
       run_mix!("app.start", [], env)
 
       assert run_mix!(
@@ -157,6 +166,47 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       assert oban_migrated_version() == 14
       assert_legacy_queue_sentinels_unchanged!()
       run_mix!("app.start", [], env)
+    end)
+  end
+
+  test "rollback refuses to discard active postcode override provenance", %{env: env} = context do
+    PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->
+      run_mix!("bilimbi.migrate", ["--quiet"], env)
+
+      SQL.query!(
+        PlatformBaselineTestRepo,
+        """
+        INSERT INTO geonames_countries
+          (iso, iso3, iso_numeric, country, population, continent)
+        VALUES ('MY', 'MYS', '458', 'Malaysia', 0, 'AS')
+        """,
+        []
+      )
+
+      SQL.query!(
+        PlatformBaselineTestRepo,
+        """
+        WITH materialized AS (
+          INSERT INTO geonames_postcodes (country_iso, postcode, place_name)
+          VALUES ('MY', '50000', 'Local correction')
+          RETURNING id
+        )
+        INSERT INTO geonames_postcode_overrides
+          (applied_postcode_id, country_iso, postcode, place_name, lock_version,
+           created_at, updated_at)
+        SELECT id, 'MY', '50000', 'Local correction', 1,
+               timezone('UTC', now()), timezone('UTC', now())
+        FROM materialized
+        """,
+        []
+      )
+
+      {output, status} = run_mix("bilimbi.rollback", ["--step", "1", "--quiet"], env)
+
+      assert status != 0
+      assert output =~ "cannot roll back postcode overrides while operator corrections exist"
+      assert relation("geonames_postcode_overrides") == "geonames_postcode_overrides"
+      assert 20_260_820_143_500 in recorded_versions()
     end)
   end
 
