@@ -239,15 +239,24 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       employee = socket.assigns.employee
       type = params["employee_type"] || params["value"] || ""
 
-      # If switching to agent, unlink any linked user account
-      if type == "agent" and not is_nil(socket.assigns.linked_user) do
-        _ =
+      # An agent holds no user account, so switching to agent unlinks one. If that
+      # unlink fails the type change must not proceed — it is what makes the
+      # invariant true.
+      unlink =
+        if type == "agent" and not is_nil(socket.assigns.linked_user) do
           update_user_employee_id(scope, employee.company_id, socket.assigns.linked_user.id, nil)
-      end
+        else
+          {:ok, nil}
+        end
 
-      case Employee.update_employee(scope, employee.company_id, employee.id, %{
-             employee_type: type
-           }) do
+      result =
+        with {:ok, _} <- unlink do
+          Employee.update_employee(scope, employee.company_id, employee.id, %{
+            employee_type: type
+          })
+        end
+
+      case result do
         {:ok, updated_employee} ->
           {:noreply,
            socket
@@ -340,17 +349,22 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
           _ -> nil
         end
 
-      # Unlink current user if target is different or nil
-      if current_linked && current_linked.id != target_user_id do
-        _ = update_user_employee_id(scope, employee.company_id, current_linked.id, nil)
-      end
-
-      # Link target user if provided
-      result =
-        if target_user_id do
-          update_user_employee_id(scope, employee.company_id, target_user_id, employee.id)
+      # Unlink the current user first. A failure here has to stop the link:
+      # carrying on would leave two users pointing at this employee.
+      unlink =
+        if current_linked && current_linked.id != target_user_id do
+          update_user_employee_id(scope, employee.company_id, current_linked.id, nil)
         else
           {:ok, nil}
+        end
+
+      result =
+        with {:ok, _} <- unlink do
+          if target_user_id do
+            update_user_employee_id(scope, employee.company_id, target_user_id, employee.id)
+          else
+            {:ok, nil}
+          end
         end
 
       case result do
@@ -771,16 +785,23 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     end
   end
 
+  # These helpers reach Core.User and Core.Address without a declared dependency,
+  # so `Code.ensure_loaded?/1` and `function_exported?/3` answer "is the module
+  # installed" and the `else` branch is the honest answer when it is not.
+  #
+  # There is deliberately no `rescue` around the `apply/3`. Once those two guards
+  # pass the function exists, so a raise can only come from inside the callee — a
+  # missing table, a constraint, a bug — and that is precisely what must reach the
+  # caller. A `rescue _ -> {:ok, nil}` here reported a failed write as a
+  # successful one (#409), and a `rescue _ -> []` renders a broken section as an
+  # empty one, which is how #359 stayed green in CI.
+
   defp list_company_users(scope, company_id) do
     user_mod = Bilimbi.Core.User
 
     if Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :list_company_users, 2) do
-      try do
-        case apply(user_mod, :list_company_users, [scope, company_id]) do
-          {:ok, users} -> users
-          _ -> []
-        end
-      rescue
+      case apply(user_mod, :list_company_users, [scope, company_id]) do
+        {:ok, users} -> users
         _ -> []
       end
     else
@@ -792,13 +813,9 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     user_mod = Bilimbi.Core.User
 
     if Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :update_user, 4) do
-      try do
-        apply(user_mod, :update_user, [scope, company_id, user_id, %{employee_id: employee_id}])
-      rescue
-        _ -> {:ok, nil}
-      end
+      apply(user_mod, :update_user, [scope, company_id, user_id, %{employee_id: employee_id}])
     else
-      {:ok, nil}
+      {:error, :not_available}
     end
   end
 
@@ -807,12 +824,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
     if Code.ensure_loaded?(addr_mod) and
          function_exported?(addr_mod, :list_employee_attached_addresses, 2) do
-      try do
-        case apply(addr_mod, :list_employee_attached_addresses, [scope, employee_id]) do
-          {:ok, addrs} -> addrs
-          _ -> []
-        end
-      rescue
+      case apply(addr_mod, :list_employee_attached_addresses, [scope, employee_id]) do
+        {:ok, addrs} -> addrs
         _ -> []
       end
     else
@@ -825,12 +838,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
     if Code.ensure_loaded?(addr_mod) and
          function_exported?(addr_mod, :list_available_employee_addresses, 2) do
-      try do
-        case apply(addr_mod, :list_available_employee_addresses, [scope, employee_id]) do
-          {:ok, addrs} -> addrs
-          _ -> []
-        end
-      rescue
+      case apply(addr_mod, :list_available_employee_addresses, [scope, employee_id]) do
+        {:ok, addrs} -> addrs
         _ -> []
       end
     else
@@ -842,11 +851,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     addr_mod = Bilimbi.Core.Address
 
     if Code.ensure_loaded?(addr_mod) and function_exported?(addr_mod, :attach_to_employee, 4) do
-      try do
-        apply(addr_mod, :attach_to_employee, [scope, address_id, employee_id, attrs])
-      rescue
-        _ -> {:error, :not_available}
-      end
+      apply(addr_mod, :attach_to_employee, [scope, address_id, employee_id, attrs])
     else
       {:error, :not_available}
     end
@@ -856,11 +861,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     addr_mod = Bilimbi.Core.Address
 
     if Code.ensure_loaded?(addr_mod) and function_exported?(addr_mod, :detach_from_employee, 3) do
-      try do
-        apply(addr_mod, :detach_from_employee, [scope, address_id, employee_id])
-      rescue
-        _ -> {:error, :not_available}
-      end
+      apply(addr_mod, :detach_from_employee, [scope, address_id, employee_id])
     else
       {:error, :not_available}
     end
@@ -871,11 +872,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
     if Code.ensure_loaded?(addr_mod) and
          function_exported?(addr_mod, :update_employee_attachment, 4) do
-      try do
-        apply(addr_mod, :update_employee_attachment, [scope, address_id, employee_id, attrs])
-      rescue
-        _ -> {:error, :not_available}
-      end
+      apply(addr_mod, :update_employee_attachment, [scope, address_id, employee_id, attrs])
     else
       {:error, :not_available}
     end
