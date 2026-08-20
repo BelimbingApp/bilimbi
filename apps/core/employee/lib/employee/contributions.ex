@@ -64,6 +64,7 @@ defmodule Bilimbi.Core.Employee.Contributions do
           order: 10
         }
       ],
+      principal_directory: Bilimbi.Core.Employee.PrincipalDirectoryProvider,
       authz: %{
         capabilities: @owned_capabilities,
         roles: %{
