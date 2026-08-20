@@ -34,6 +34,11 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
   ordered here with `array_position` over an id order resolved before
   pagination, so a page boundary never splits a name ordering without Base
   joining a Core table.
+
+  Principal and Type are separate columns, as they are in Belimbing's blade,
+  because they sort on different things: `principal_name` reads through the
+  directory and `principal_type` is a column on the row. They were one column
+  only while there was no name to put in it.
   """
 
   use Bilimbi.Base.UI, :live_view
