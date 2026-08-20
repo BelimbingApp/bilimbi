@@ -20,7 +20,9 @@ Ports Belimbing's `app/Base/System/Livewire/Info/Index.php` and
   If Bilimbi grows a required writable directory, the card comes back with real paths.
 - **Database gains a live connection check**, which #319 asks for and the source
   does not do. Configuration being present says nothing about reachability.
-- **The queue row reports unavailable.** #131 (Base Queue on Oban) is unstarted.
+- **The queue row is a live, redacted Base Queue probe.** It reports runtime
+  availability plus bounded pending/retryable/discarded counts. It never reads
+  or renders arguments, error text, stack traces, or transport configuration.
 
 ## Authorization
 

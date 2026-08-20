@@ -40,11 +40,12 @@ defmodule Bilimbi.Base.SystemTest do
       assert facts["Processes"] =~ ~r/^\d+ of \d+$/
     end
 
-    test "the queue reports unavailable rather than inventing a status" do
+    test "the queue reports the real isolated-test availability" do
       health = Map.new(SystemInfo.health(), &{&1.label, &1.value})
 
-      # #131 (Base Queue on Oban) is unstarted. A green tick here would be the
-      # one genuinely dangerous thing this screen could render.
+      # Base Queue intentionally starts no consumers in an isolated package
+      # test. The real probe must therefore report unavailable, not a stubbed
+      # healthy value.
       assert health["Queue"] == :unavailable
     end
 

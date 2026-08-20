@@ -89,12 +89,18 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       run_mix!("bilimbi.migrate", ["--quiet"], env)
       run_mix!("app.start", [], env)
 
+      assert relation("oban_jobs") == "oban_jobs"
+      assert oban_migrated_version() == 14
+
       assert run_mix!("bilimbi.schema.verify", [], env) =~
                "Bilimbi compatibility schema verified."
 
       assert recorded_versions() == Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
 
-      latest_version = Compatibility.migration_entries() |> List.last() |> elem(0)
+      latest_versions =
+        Compatibility.migration_entries()
+        |> Enum.take(-2)
+        |> Enum.map(&elem(&1, 0))
 
       SQL.query!(
         PlatformBaselineTestRepo,
@@ -103,10 +109,10 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       )
 
       assert_runtime_start_fails!(env)
-      run_mix!("bilimbi.rollback", ["--step", "1", "--quiet"], env)
-      refute latest_version in recorded_versions()
+      run_mix!("bilimbi.rollback", ["--step", "2", "--quiet"], env)
+      Enum.each(latest_versions, &refute(&1 in recorded_versions()))
       run_mix!("bilimbi.migrate", ["--quiet"], env)
-      assert latest_version in recorded_versions()
+      Enum.each(latest_versions, &assert(&1 in recorded_versions()))
       run_mix!("app.start", [], env)
 
       assert run_mix!(
@@ -132,6 +138,7 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
 
       SQL.query!(PlatformBaselineTestRepo, "DROP TABLE bilimbi_schema_migrations", [])
       assert_runtime_start_fails!(env)
+      assert relation("oban_jobs") == nil
 
       assert run_mix!("bilimbi.schema.verify", [], env) =~
                "Bilimbi compatibility schema verified."
@@ -145,6 +152,8 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       run_mix!("bilimbi.migrate", ["--quiet"], env)
 
       assert recorded_versions() == Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
+      assert relation("oban_jobs") == "oban_jobs"
+      assert oban_migrated_version() == 14
       run_mix!("app.start", [], env)
     end)
   end
@@ -250,5 +259,9 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       SQL.query!(PlatformBaselineTestRepo, "SELECT to_regclass($1)::text", [table]).rows
 
     relation
+  end
+
+  defp oban_migrated_version do
+    Oban.Migrations.Postgres.migrated_version(repo: PlatformBaselineTestRepo)
   end
 end
