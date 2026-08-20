@@ -4,7 +4,7 @@ defmodule Mix.Tasks.Bilimbi.Rollback do
   use Mix.Task
 
   @shortdoc "Rolls back installed Bilimbi module migrations"
-  @requirements ["app.start"]
+  @requirements ["app.config"]
 
   @impl Mix.Task
   def run(args) do

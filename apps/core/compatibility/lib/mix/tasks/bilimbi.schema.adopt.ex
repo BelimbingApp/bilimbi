@@ -12,7 +12,7 @@ defmodule Mix.Tasks.Bilimbi.Schema.Adopt do
   use Mix.Task
 
   @shortdoc "Verifies and adopts an existing Belimbing schema"
-  @requirements ["app.start"]
+  @requirements ["app.config"]
 
   @impl Mix.Task
   def run(args) do
@@ -22,7 +22,11 @@ defmodule Mix.Tasks.Bilimbi.Schema.Adopt do
       Mix.raise("unexpected arguments: #{Enum.join(remaining, " ")}")
     end
 
-    case Bilimbi.Core.Compatibility.adopt(Bilimbi.Base.Repo, opts) do
+    with_repo!(Bilimbi.Base.Repo, fn repo -> adopt!(repo, opts) end)
+  end
+
+  defp adopt!(repo, opts) do
+    case Bilimbi.Core.Compatibility.adopt(repo, opts) do
       {:ok, :adopted} ->
         Mix.shell().info("Existing Belimbing schema verified and adopted by Bilimbi.")
 
@@ -40,6 +44,16 @@ defmodule Mix.Tasks.Bilimbi.Schema.Adopt do
         Mix.raise(
           "Schema adoption refused because the Bilimbi ledger contains #{inspect(versions)}"
         )
+    end
+  end
+
+  defp with_repo!(repo, operation) do
+    case Ecto.Migrator.with_repo(repo, operation, mode: :temporary) do
+      {:ok, result, _started_apps} ->
+        result
+
+      {:error, error} ->
+        Mix.raise("Could not start repo #{inspect(repo)}, error: #{inspect(error)}")
     end
   end
 end
