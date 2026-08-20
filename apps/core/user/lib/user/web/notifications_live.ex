@@ -19,10 +19,6 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
     user_id = session_user_id(socket)
     scope = socket.assigns.current_scope.scope
 
-    if connected?(socket) and user_id > 0 and scope do
-      User.subscribe_notifications(scope, user_id)
-    end
-
     unread_count =
       case User.unread_notification_count(scope, user_id) do
         {:ok, count} -> count

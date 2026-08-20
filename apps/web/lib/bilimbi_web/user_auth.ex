@@ -37,6 +37,8 @@ defmodule BilimbiWeb.UserAuth do
   import Plug.Conn
   import Phoenix.Controller
 
+  require Logger
+
   use BilimbiWeb, :verified_routes
 
   alias Bilimbi.Base.Authz
@@ -434,7 +436,15 @@ defmodule BilimbiWeb.UserAuth do
       user_id = current_scope.actor.id
 
       if Phoenix.LiveView.connected?(socket) do
-        User.subscribe_notifications(current_scope.scope, user_id)
+        case User.subscribe_notifications(current_scope.scope, user_id) do
+          :ok ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning(
+              "UserAuth: failed to subscribe to user notifications topic for user #{user_id}: #{inspect(reason)}"
+            )
+        end
       end
 
       socket =

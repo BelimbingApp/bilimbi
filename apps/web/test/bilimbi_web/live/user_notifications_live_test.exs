@@ -235,13 +235,14 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       assert element(view, "#app-notifications-unread-badge") |> render() =~ "1"
     end
 
-    test "live PubSub update refreshes mounted notifications LiveView when notification is sent",
+    test "mounts through UserAuth without false error flash and receives real-time updates",
          %{
            conn: conn,
            scope: scope
          } do
       {:ok, view, _html} = open(conn)
 
+      refute has_element?(view, "#flash-error")
       assert has_element?(view, "#notifications-empty")
 
       # Send a new notification to the signed-in user while view is connected
@@ -251,6 +252,28 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       assert has_element?(view, "#notifications-list [id$='#{note.id}']")
       assert render(view) =~ "Realtime PubSub Alert"
       refute has_element?(view, "#notifications-empty")
+      refute has_element?(view, "#flash-error")
+    end
+
+    test "logs warning when notification subscription fails in UserAuth", %{conn: conn} do
+      name = :failing_pubsub_test
+      start_supervised!({Registry, keys: :unique, name: name})
+      Registry.register(name, "user_notifications:41:91", nil)
+
+      orig = Application.get_env(:bilimbi_core_user, :pubsub_server)
+
+      try do
+        Application.put_env(:bilimbi_core_user, :pubsub_server, name)
+
+        log =
+          ExUnit.CaptureLog.capture_log(fn ->
+            {:ok, _view, _html} = open(conn)
+          end)
+
+        assert log =~ "UserAuth: failed to subscribe to user notifications topic"
+      after
+        Application.put_env(:bilimbi_core_user, :pubsub_server, orig)
+      end
     end
   end
 end

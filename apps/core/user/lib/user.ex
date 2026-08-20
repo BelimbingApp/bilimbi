@@ -510,7 +510,11 @@ defmodule Bilimbi.Core.User do
   def subscribe_notifications(%Scope{tenant: %{id: tenant_id}}, user_id)
       when is_integer(user_id) do
     if server = pubsub_server() do
-      Phoenix.PubSub.subscribe(server, notification_topic(tenant_id, user_id))
+      case Phoenix.PubSub.subscribe(server, notification_topic(tenant_id, user_id)) do
+        :ok -> :ok
+        {:error, {:already_registered, pid}} when pid == self() -> :ok
+        {:error, reason} -> {:error, reason}
+      end
     else
       :ok
     end

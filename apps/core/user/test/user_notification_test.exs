@@ -286,5 +286,11 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
         Application.put_env(:bilimbi_core_user, :pubsub_server, orig)
       end
     end
+
+    test "subscribing multiple times from the same process succeeds idempotently", %{scope: scope} do
+      user_id = 42
+      assert :ok = User.subscribe_notifications(scope, user_id)
+      assert :ok = User.subscribe_notifications(scope, user_id)
+    end
   end
 end
