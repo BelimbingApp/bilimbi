@@ -3,11 +3,11 @@ defmodule Bilimbi.Base.Queue.PrefixTest do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Queue.JobPage
   alias Bilimbi.Base.Queue.Migrations.CreateObanRuntime
   alias Bilimbi.Base.Queue.TestWorkers.Success
-  alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.Repo
   alias Ecto.Adapters.SQL
 

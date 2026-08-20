@@ -1,11 +1,11 @@
 defmodule Bilimbi.Base.Queue.ApplicationTest do
   use ExUnit.Case, async: false
 
+  alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Queue.Application, as: QueueApplication
   alias Bilimbi.Base.Queue.Migrations.CreateObanRuntime
   alias Bilimbi.Base.Queue.TestWorkers.Blocking
-  alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.Repo
   alias Ecto.Adapters.SQL
 
