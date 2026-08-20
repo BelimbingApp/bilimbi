@@ -19,29 +19,6 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
     user_id = session_user_id(socket)
     scope = socket.assigns.current_scope.scope
 
-    socket =
-      if connected?(socket) and user_id > 0 and scope do
-        case User.subscribe_notifications(scope, user_id) do
-          :ok ->
-            socket
-
-          {:error, reason} ->
-            require Logger
-
-            Logger.warning(
-              "NotificationsLive: failed to subscribe to user notifications topic for user #{user_id}: #{inspect(reason)}"
-            )
-
-            put_flash(
-              socket,
-              :error,
-              "Real-time notifications are currently unavailable."
-            )
-        end
-      else
-        socket
-      end
-
     unread_count =
       case User.unread_notification_count(scope, user_id) do
         {:ok, count} -> count

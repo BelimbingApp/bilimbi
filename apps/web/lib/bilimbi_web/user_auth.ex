@@ -37,6 +37,8 @@ defmodule BilimbiWeb.UserAuth do
   import Plug.Conn
   import Phoenix.Controller
 
+  require Logger
+
   use BilimbiWeb, :verified_routes
 
   alias Bilimbi.Base.Authz
@@ -439,8 +441,6 @@ defmodule BilimbiWeb.UserAuth do
             :ok
 
           {:error, reason} ->
-            require Logger
-
             Logger.warning(
               "UserAuth: failed to subscribe to user notifications topic for user #{user_id}: #{inspect(reason)}"
             )
