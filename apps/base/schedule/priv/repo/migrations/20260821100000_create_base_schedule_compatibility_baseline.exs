@@ -14,7 +14,7 @@ defmodule Bilimbi.Base.Schedule.Migrations.CreateCompatibilityBaseline do
       add :exit_code, :integer
       add :runtime_ms, :integer
       add :output_excerpt, :text
-      timestamps()
+      timestamps(type: :naive_datetime, null: true, inserted_at: :created_at)
     end
 
     create index(:base_schedule_runs, [:source])
@@ -32,7 +32,7 @@ defmodule Bilimbi.Base.Schedule.Migrations.CreateCompatibilityBaseline do
       add :source, :string, size: 40, null: false, default: "scheduler"
       add :key, :string, size: 255, null: false
       add :name, :string, size: 255, null: false
-      timestamps()
+      timestamps(type: :naive_datetime, null: true, inserted_at: :created_at)
     end
 
     create unique_index(:base_schedule_suppressions, [:source, :key],

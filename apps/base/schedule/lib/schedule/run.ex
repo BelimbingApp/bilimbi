@@ -15,6 +15,6 @@ defmodule Bilimbi.Base.Schedule.Run do
     field :exit_code, :integer
     field :runtime_ms, :integer
     field :output_excerpt, :string
-    timestamps()
+    timestamps(type: :naive_datetime, inserted_at: :created_at)
   end
 end

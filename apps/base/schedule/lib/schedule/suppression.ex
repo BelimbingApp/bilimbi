@@ -8,6 +8,6 @@ defmodule Bilimbi.Base.Schedule.Suppression do
     field :source, :string, default: "scheduler"
     field :key, :string
     field :name, :string
-    timestamps()
+    timestamps(type: :naive_datetime, inserted_at: :created_at)
   end
 end

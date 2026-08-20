@@ -180,6 +180,9 @@ defmodule Bilimbi.Base.Schedule do
     multi =
       Multi.new()
       |> Multi.run(:availability, fn _repo, _changes -> availability(definition) end)
+      |> Multi.run(:claimable, fn _repo, _changes ->
+        claimable(definition, intended_at, trigger, overlap_key)
+      end)
       |> Multi.insert(
         :occurrence,
         Occurrence.claim_changeset(%{
@@ -208,11 +211,34 @@ defmodule Bilimbi.Base.Schedule do
       end)
 
     case Repo.transaction(multi) do
-      {:ok, %{job: job}} -> {:ok, job}
-      {:error, :availability, reason, _changes} -> {:error, reason}
-      {:error, :occurrence, changeset, _changes} -> occurrence_error(changeset)
-      {:error, :job, reason, _changes} -> {:error, reason}
-      {:error, _operation, _reason, _changes} -> {:error, :unavailable}
+      {:ok, %{job: job}} ->
+        {:ok, job}
+
+      {:error, :availability, reason, _changes} ->
+        {:error, reason}
+
+      {:error, :claimable, :overlap, _changes} ->
+        best_effort_record_overlap(definition, intended_at, trigger)
+        {:error, :overlap}
+
+      {:error, :claimable, reason, _changes} ->
+        {:error, reason}
+
+      {:error, :occurrence, changeset, _changes} ->
+        case occurrence_error(changeset) do
+          {:error, :overlap} = error ->
+            best_effort_record_overlap(definition, intended_at, trigger)
+            error
+
+          error ->
+            error
+        end
+
+      {:error, :job, reason, _changes} ->
+        {:error, reason}
+
+      {:error, _operation, _reason, _changes} ->
+        {:error, :unavailable}
     end
   rescue
     _error -> {:error, :unavailable}
@@ -257,8 +283,53 @@ defmodule Bilimbi.Base.Schedule do
     end
   end
 
+  defp claimable(definition, intended_at, trigger, overlap_key) do
+    intended? =
+      Repo.exists?(
+        from(item in Occurrence,
+          where:
+            item.source == @source and item.key == ^definition.key and
+              item.intended_at == ^intended_at and item.trigger == ^Atom.to_string(trigger)
+        )
+      )
+
+    overlap? =
+      overlap_key &&
+        Repo.exists?(
+          from(item in Occurrence,
+            where: item.overlap_key == ^overlap_key and is_nil(item.finished_at)
+          )
+        )
+
+    cond do
+      intended? -> {:error, :already_claimed}
+      overlap? -> {:error, :overlap}
+      true -> {:ok, :claimable}
+    end
+  end
+
+  defp best_effort_record_overlap(definition, intended_at, trigger) do
+    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+    Repo.insert!(%Bilimbi.Base.Schedule.Run{
+      source: @source,
+      key: definition.key,
+      name: definition.task_name,
+      expression: if(trigger == :scheduled, do: definition.expression),
+      status: "skipped",
+      started_at: DateTime.to_naive(intended_at) |> NaiveDateTime.truncate(:second),
+      finished_at: now,
+      runtime_ms: 0,
+      output_excerpt: "overlap"
+    })
+  rescue
+    _error -> :ok
+  catch
+    :exit, _reason -> :ok
+  end
+
   defp lock_key!(source, key) do
-    SQL.query!(Repo, "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+    SQL.query!(Repo.get_dynamic_repo(), "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
       source <> ":" <> key
     ])
 

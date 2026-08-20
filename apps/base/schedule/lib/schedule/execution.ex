@@ -14,6 +14,14 @@ defmodule Bilimbi.Base.Schedule.Execution do
   @terminal_statuses ["failed", "skipped", "succeeded"]
 
   def run(worker, %{"__bilimbi_schedule__" => metadata} = args, %QueueExecution{} = execution) do
+    case authorize_occurrence(metadata, execution) do
+      {:ok, _occurrence} -> execute(worker, args, metadata, execution)
+      {:error, :not_found} -> {:cancel, :invalid_schedule_occurrence}
+      {:error, :unavailable} -> {:retry, :schedule_state_unavailable}
+    end
+  end
+
+  defp execute(worker, args, metadata, execution) do
     business_args = Map.delete(args, "__bilimbi_schedule__")
     started = System.monotonic_time(:millisecond)
     run = best_effort_start(metadata)
@@ -25,39 +33,53 @@ defmodule Bilimbi.Base.Schedule.Execution do
       result
     rescue
       error ->
-        best_effort_exception(metadata, run, started)
+        best_effort_exception(metadata, run, execution, started)
         reraise error, __STACKTRACE__
     catch
       kind, reason ->
-        best_effort_exception(metadata, run, started)
+        best_effort_exception(metadata, run, execution, started)
         :erlang.raise(kind, reason, __STACKTRACE__)
     end
   end
 
-  defp best_effort_start(metadata) do
+  defp authorize_occurrence(metadata, execution) do
+    intended_at = parse_time!(metadata["intended_at"])
     now = DateTime.utc_now()
 
-    with %Occurrence{} = occurrence <- verified_occurrence(metadata),
-         {_count, _rows} <-
-           Repo.update_all(
-             from(item in Occurrence,
-               where: item.id == ^occurrence.id and is_nil(item.finished_at)
-             ),
-             set: [state: "running", started_at: now]
-           ) do
-      Repo.insert!(%Run{
-        source: metadata["source"],
-        key: metadata["key"],
-        name: metadata["name"],
-        expression: metadata["expression"],
-        status: "running",
-        started_at: naive_now()
-      })
-    else
-      _invalid ->
-        diagnostic(:start_unavailable, metadata)
-        nil
+    query =
+      from(item in Occurrence,
+        where:
+          item.id == ^metadata["occurrence_id"] and item.source == ^metadata["source"] and
+            item.key == ^metadata["key"] and item.intended_at == ^intended_at and
+            item.trigger == ^metadata["trigger"] and item.job_id == ^execution.job_id and
+            is_nil(item.finished_at)
+      )
+
+    case Repo.one(query) do
+      %Occurrence{} = occurrence ->
+        case Repo.update_all(query, set: [state: "running", started_at: now]) do
+          {1, _rows} -> {:ok, occurrence}
+          _not_updated -> {:error, :not_found}
+        end
+
+      nil ->
+        {:error, :not_found}
     end
+  rescue
+    _error -> {:error, :unavailable}
+  catch
+    :exit, _reason -> {:error, :unavailable}
+  end
+
+  defp best_effort_start(metadata) do
+    Repo.insert!(%Run{
+      source: metadata["source"],
+      key: metadata["key"],
+      name: metadata["name"],
+      expression: metadata["expression"],
+      status: "running",
+      started_at: naive_now()
+    })
   rescue
     _error ->
       diagnostic(:start_unavailable, metadata)
@@ -94,12 +116,12 @@ defmodule Bilimbi.Base.Schedule.Execution do
     :exit, _reason -> diagnostic(:finish_unavailable, metadata)
   end
 
-  defp best_effort_exception(metadata, run, started) do
+  defp best_effort_exception(metadata, run, execution, started) do
     best_effort_finish(
       metadata,
       run,
-      {:cancel, :worker_exception},
-      %QueueExecution{job_id: 0, attempt: 1, max_attempts: 1, queue: "default"},
+      {:retry, :worker_exception},
+      execution,
       started
     )
   end
@@ -123,18 +145,6 @@ defmodule Bilimbi.Base.Schedule.Execution do
             item.key == ^metadata["key"] and is_nil(item.finished_at)
       ),
       set: [state: status, finished_at: now, overlap_key: nil]
-    )
-  end
-
-  defp verified_occurrence(metadata) do
-    Repo.one(
-      from(item in Occurrence,
-        where:
-          item.id == ^metadata["occurrence_id"] and item.source == ^metadata["source"] and
-            item.key == ^metadata["key"] and
-            item.intended_at == ^parse_time!(metadata["intended_at"]) and
-            item.trigger == ^metadata["trigger"] and is_nil(item.finished_at)
-      )
     )
   end
 
