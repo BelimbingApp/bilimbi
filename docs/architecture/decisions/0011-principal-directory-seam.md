@@ -1,11 +1,11 @@
 # ADR 0011: Principal directory seam and its query boundary
 
 **Document Type:** Architecture Decision Record
-**Status:** Proposed
+**Status:** Accepted
 **Agents:** claude-opus-5
 **Scope:** Ownership, module placement, and the query boundary for naming Core
 principals on Base-owned screens
-**Last Updated:** 2026-08-20
+**Last Updated:** 2026-08-21
 **Supersedes:** nothing. `0010` is reserved by
 `docs/architecture/0010_composition-model.md` and must not be reused for an ADR.
 
@@ -191,3 +191,50 @@ ids.
 **Leaving all three screens on ids.** Still the fallback above the ceiling, and it
 remains correct for `/authz/decision-logs`. Rejected as the default because
 Belimbing names these people and #285 ruled the hybrid.
+
+## Outcome
+
+Implemented in five merged pull requests, closing #441:
+
+| Step | PR | What it added |
+|---|---|---|
+| 1 | #471 | the module, the `Provider` behaviour, `rank/3`, the contribution validator |
+| 2 | #481 | Core User's `:user` provider |
+| 3 | #486 | Base Session consuming it — closed #285 |
+| 4 | #492 | Core Employee's `:agent` provider |
+| 5 | #503 | Principal Roles and Principal Capabilities |
+
+Two things the ADR did not anticipate, both worth recording because they are the
+kind of thing the next seam will hit too.
+
+**A consumer's empty value has a shape, and the registry was not asking.**
+`ContributionRegistry` answered a blanket `[]` for any consumer nothing
+contributed to, without calling that consumer's validator. Only **two** of the
+five consumers are list-shaped — Menu and Dashboard, both `Enum.flat_map`.
+The other **three** reduce into maps: Settings from
+`%{definitions: %{}, runtime_claims: %{}}`, Authz from `empty_snapshot/0`, and
+this directory from `%{}`. So three consumers carried the same latent defect,
+not one.
+
+What made it observable here rather than there is not shape but reachability:
+the principal directory is the only one of the three whose value is read on a
+path that stays live with nothing contributed, so it is the only one that
+reached its empty value and called `Map.fetch/2` on a list. Settings and Authz
+always have contributors in a real deployment, so their identical bug never
+fired. A seam that reasons "our consumer is unusual" will get this wrong; the
+question to ask is whether anything reads the value when nothing contributes.
+
+The "installed-module absence degrades honestly" property this ADR claims was
+therefore false from step 3 until #499 fixed the registry. Found by
+amp/gpt-5.6-high, filed as #496.
+
+**Search reaches only what the seam exposes.** Belimbing's principal screens
+also search `users.email`. `Provider` declares `names/2` and nothing else, so
+that third of the search is absent. Whether to widen the behaviour — an
+optional `search/2` returning matching ids, letting Core decide what it matches
+on without Base learning what an email is — is open as #500. It was left open
+deliberately rather than settled inside an implementation PR.
+
+One divergence from Belimbing is deliberate and is not a gap: Belimbing's join
+is unscoped and names any user id it finds. Naming here resolves only inside the
+actor's validated tenant scope, per the hybrid ruled on #285.
