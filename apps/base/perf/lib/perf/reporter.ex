@@ -17,20 +17,19 @@ defmodule Bilimbi.Base.Perf.Reporter do
     GenServer.start_link(__MODULE__, options, name: __MODULE__)
   end
 
-  @spec submit(map()) :: :ok
+  @spec submit(map()) :: :ok | {:error, :saturated | :unavailable}
   def submit(attributes) when is_map(attributes) do
     with pid when is_pid(pid) <- Process.whereis(__MODULE__),
          true <- reserve_slot(max_pending()) do
       GenServer.cast(pid, {:record, attributes})
     else
-      _unavailable -> :ok
+      false -> {:error, :saturated}
+      nil -> {:error, :unavailable}
     end
-
-    :ok
   rescue
-    _error -> :ok
+    ArgumentError -> {:error, :unavailable}
   catch
-    _kind, _reason -> :ok
+    :exit, _reason -> {:error, :unavailable}
   end
 
   @doc false
@@ -100,7 +99,7 @@ defmodule Bilimbi.Base.Perf.Reporter do
     :ets.update_counter(@counter_table, @counter_key, {2, -1, 0, 0})
     :ok
   rescue
-    _error -> :ok
+    ArgumentError -> {:error, :unavailable}
   end
 
   defp max_pending do
