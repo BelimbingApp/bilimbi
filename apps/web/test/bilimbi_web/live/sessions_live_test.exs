@@ -3,6 +3,7 @@ defmodule BilimbiWeb.SessionsLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Session
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
@@ -90,6 +91,31 @@ defmodule BilimbiWeb.SessionsLiveTest do
 
     assert has_element?(view, "#sessions td", "User 92")
     refute has_element?(view, "#sessions td", "Grace Hopper")
+  end
+
+  # Base Session is the first consumer of the directory, so it is where an
+  # uninstalled provider first becomes visible. The empty value is taken from
+  # the registry rather than written as `%{}` here on purpose: the registry
+  # used to answer `[]` for a consumer nothing contributed to, and a literal
+  # `%{}` would assert the fix against itself and pass either way (#496).
+  test "survives a deployment where nothing contributes a user provider", %{conn: conn} do
+    grant_capabilities!("admin.system.session.list")
+
+    installed = ContributionRegistry.snapshot!()
+    uncontributed = ContributionRegistry.build!([]).consumers.principal_directory
+    on_exit(fn -> ContributionRegistry.put_snapshot_for_test!(installed) end)
+
+    ContributionRegistry.put_snapshot_for_test!(
+      put_in(installed.consumers.principal_directory, uncontributed)
+    )
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/sessions")
+
+    # The page mounts. Before the fix this raised BadMapError inside mount/3,
+    # where #429's handle_event/3 recovery cannot turn it into a flash.
+    assert has_element?(view, "h1", "Sessions")
+    assert has_element?(view, "#sessions td", "User 91")
+    refute has_element?(view, "#sessions td", "Ada Lovelace")
   end
 
   test "renders singular units at one minute, one hour and one day", %{conn: conn} do
