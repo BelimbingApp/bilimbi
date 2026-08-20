@@ -66,11 +66,16 @@ defmodule Bilimbi.Base.QueueTest do
 
   test "cancel, retry, and invalid IDs return bounded outcomes" do
     assert {:error, :invalid_job_id} = Queue.cancel(0)
+    assert {:error, :invalid_job_id} = Queue.job_state(0)
     assert {:error, :invalid_job_id} = Queue.retry("1")
     assert {:error, :not_found} = Queue.cancel(9_999_999)
+    assert {:error, :not_found} = Queue.job_state(9_999_999)
 
     assert {:ok, %JobRef{id: id}} = Queue.enqueue(Success, %{"value" => 1})
+    assert {:ok, :available} = Queue.job_state(id)
     assert :ok = Queue.cancel(id)
+    assert {:ok, :cancelled} = Queue.job_state(id)
     assert :ok = Queue.retry(id)
+    assert {:ok, :available} = Queue.job_state(id)
   end
 end

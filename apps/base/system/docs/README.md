@@ -1,6 +1,32 @@
 # base/system
 
-Read-only facts about the running instance, rendered at `/system/info`.
+Operator surfaces about the running instance:
+
+- read-only runtime facts at `/system/info`;
+- installation language and region management at `/system/localization`;
+- the resolved menu contribution inspector at `/system/menu-inspector`.
+
+The first two port Belimbing's Base System Info and Localization screens. Base
+System owns their routes, capabilities, and presentation. Base Locale remains
+the owner of the supported catalogue, normalization, global persistence, and
+provenance rules; the localization screen uses only that public API.
+
+## Localization
+
+`/system/localization` is gated on `admin.system.localization.manage`. It offers
+only Base Locale's declared supported catalogue. A manual selection writes the
+global locale through `Bilimbi.Base.Locale`, which records `manual` provenance
+and clears stale inferred-country state. The page shows the effective language,
+source, inferred country, and the shared-UI message catalogues currently
+installed. Regional formatting support is stated separately from translated
+product copy.
+
+There is deliberately no reset-to-inference action: pinned Belimbing exposes
+manual override only, while bootstrap inference runs automatically when there
+is no valid stored global locale. Company timezone belongs to the later Base
+DateTime capability and is not implemented here.
+
+## System Info
 
 Ports Belimbing's `app/Base/System/Livewire/Info/Index.php` and
 `resources/core/views/livewire/admin/system/info/index.blade.php`.
