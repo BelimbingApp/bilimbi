@@ -40,6 +40,10 @@ defmodule Bilimbi.Base.UI do
       use Phoenix.LiveComponent
       use Bilimbi.Base.UI.ActionFailureRecovery, :live_component
 
+      # Same registration as `:live_view` — opt-out is documented for both
+      # adapter shapes (#437).
+      Module.register_attribute(__MODULE__, :write_guard_opt_out, persist: true)
+
       unquote(html_helpers())
     end
   end
