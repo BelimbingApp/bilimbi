@@ -9,6 +9,7 @@ defmodule Bilimbi.Base.ScheduleTest do
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Schedule
   alias Bilimbi.Base.Schedule.Definition
+  alias Bilimbi.Base.Schedule.FinalizeFailureTestWorker
   alias Bilimbi.Base.Schedule.Occurrence
   alias Bilimbi.Base.Schedule.RetryOnceTestWorker
   alias Bilimbi.Base.Schedule.Run
@@ -43,6 +44,7 @@ defmodule Bilimbi.Base.ScheduleTest do
     })
 
     on_exit(&ContributionRegistry.clear_for_test!/0)
+    on_exit(fn -> Application.delete_env(:bilimbi_base_schedule, :test_recipient) end)
     %{definition: definition}
   end
 
@@ -62,6 +64,73 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert Repo.exists?(from row in Suppression, where: row.key == ^definition.key)
     assert {:error, :suppressed} = Schedule.run_now(definition.key)
     assert :ok = Schedule.resume(definition.key)
+    assert {:ok, %JobRef{}} = Schedule.run_now(definition.key)
+  end
+
+  test "suppression after enqueue cancels the queued occurrence before business execution", %{
+    definition: definition
+  } do
+    Application.put_env(:bilimbi_base_schedule, :test_recipient, self())
+    assert :ok = Schedule.review_definition(definition.key, true)
+    assert {:ok, %JobRef{}} = Schedule.run_now(definition.key)
+    assert :ok = Schedule.suppress(definition.key)
+
+    assert %{cancelled: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+    refute_received {:schedule_business_effect, _value}
+
+    assert Repo.exists?(
+             from occurrence in Occurrence,
+               where:
+                 occurrence.key == ^definition.key and occurrence.state == "failed" and
+                   not is_nil(occurrence.finished_at) and is_nil(occurrence.overlap_key)
+           )
+  end
+
+  test "a changed definition cannot execute a job claimed under its old fingerprint", %{
+    definition: definition
+  } do
+    Application.put_env(:bilimbi_base_schedule, :test_recipient, self())
+    assert :ok = Schedule.review_definition(definition.key, true)
+    assert {:ok, %JobRef{}} = Schedule.run_now(definition.key)
+
+    changed = %{definition | args: %{"value" => 8}}
+    put_definitions([changed])
+    assert :ok = Schedule.review_definition(changed.key, true)
+
+    assert %{cancelled: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+    refute_received {:schedule_business_effect, _value}
+  end
+
+  test "disabling a definition after enqueue cancels it before business execution", %{
+    definition: definition
+  } do
+    Application.put_env(:bilimbi_base_schedule, :test_recipient, self())
+    assert :ok = Schedule.review_definition(definition.key, true)
+    assert {:ok, %JobRef{}} = Schedule.run_now(definition.key)
+    assert :ok = Schedule.review_definition(definition.key, false)
+
+    assert %{cancelled: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+    refute_received {:schedule_business_effect, _value}
+  end
+
+  test "terminal Queue cancellation and unavailable-worker discard release overlap on reconcile",
+       %{
+         definition: definition
+       } do
+    assert :ok = Schedule.review_definition(definition.key, true)
+    assert {:ok, %JobRef{id: cancelled_id}} = Schedule.run_now(definition.key)
+    assert :ok = Queue.cancel(cancelled_id)
+    assert {:ok, %JobRef{}} = Schedule.run_now(definition.key)
+
+    assert %{success: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+    assert {:ok, %JobRef{id: unavailable_id}} = Schedule.run_now(definition.key)
+
+    Repo.update_all(
+      from(job in Oban.Job, where: job.id == ^unavailable_id),
+      set: [worker: "Bilimbi.MissingScheduleWorker", max_attempts: 1]
+    )
+
+    assert %{discard: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
     assert {:ok, %JobRef{}} = Schedule.run_now(definition.key)
   end
 
@@ -121,6 +190,36 @@ defmodule Bilimbi.Base.ScheduleTest do
                where:
                  row.key == ^definition.key and row.state == "succeeded" and
                    not is_nil(row.finished_at)
+           )
+  end
+
+  test "occurrence-finalization failure does not repeat business work and later reconciles", %{
+    definition: definition
+  } do
+    Application.put_env(:bilimbi_base_schedule, :test_recipient, self())
+    failing = %{definition | worker: FinalizeFailureTestWorker, args: %{}}
+    put_definitions([failing])
+    assert :ok = Schedule.review_definition(failing.key, true)
+    assert {:ok, %JobRef{}} = Schedule.run_now(failing.key)
+
+    drain_result =
+      try do
+        Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+      after
+        restore_occurrence_table()
+      end
+
+    assert %{success: 1} = drain_result
+    assert_received :schedule_business_committed
+    refute_received :schedule_business_committed
+
+    assert {:ok, %JobRef{}} = Schedule.run_now(failing.key)
+
+    assert Repo.exists?(
+             from occurrence in Occurrence,
+               where:
+                 occurrence.key == ^failing.key and occurrence.state == "succeeded" and
+                   not is_nil(occurrence.finished_at)
            )
   end
 
@@ -199,6 +298,11 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert DateTime.compare(intended, ~U[2026-11-01 06:30:00Z]) == :eq
   end
 
+  test "run-now fails closed when the contribution snapshot is unavailable" do
+    ContributionRegistry.clear_for_test!()
+    assert {:error, :unavailable} = Schedule.run_now("test.schedule")
+  end
+
   defp definition do
     {:ok, cron} = Parser.parse("30 1 * * *", false, [:prior, :subsequent])
 
@@ -224,5 +328,23 @@ defmodule Bilimbi.Base.ScheduleTest do
     ContributionRegistry.put_snapshot_for_test!(
       put_in(snapshot, [:consumers, :schedule], schedule)
     )
+  end
+
+  defp restore_occurrence_table do
+    case Ecto.Adapters.SQL.query!(
+           Repo,
+           "SELECT to_regclass('unavailable_occurrences')::text",
+           []
+         ).rows do
+      [["unavailable_occurrences"]] ->
+        Ecto.Adapters.SQL.query!(
+          Repo,
+          "ALTER TABLE unavailable_occurrences RENAME TO base_schedule_occurrences",
+          []
+        )
+
+      [[nil]] ->
+        :ok
+    end
   end
 end

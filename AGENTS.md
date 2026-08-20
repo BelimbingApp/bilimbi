@@ -311,7 +311,8 @@ migration path, optional compatibility contract, and optional contribution
 provider. Every descriptor carries `contribution_provider`; use `nil` when the
 module contributes nothing. A non-nil provider implements the ModuleRegistry
 behavior and returns immutable plain terms below only `:settings`, `:authz`,
-`:menu`, and `:dashboard`, as decided by ADR 0004 and ADR 0009. Its `mix.exs` derives local module path
+`:menu`, `:dashboard`, `:principal_directory`, and `:schedule`, as decided by
+ADR 0004, ADR 0009, ADR 0011, and ADR 0012. Its `mix.exs` derives local module path
 dependencies and application metadata from that descriptor; do not repeat
 module dependency names manually.
 

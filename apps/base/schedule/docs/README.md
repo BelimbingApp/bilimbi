@@ -22,7 +22,10 @@ nonexistent spring-forward times do not. After downtime only the latest missed
 occurrence is considered. A unique Bilimbi-only occurrence row and its Oban
 job commit in one transaction, so competing nodes cannot enqueue the same UTC
 intended occurrence twice. `:forbid` overlap also holds one active database
-lease until the worker succeeds, is cancelled, or exhausts retries.
+lease until the worker succeeds, is cancelled, or exhausts retries. Schedule
+reconciles that lease from Queue's bounded terminal state before a new claim
+and on every recurrence poll, including direct cancellation,
+unavailable-worker discard, and a Queue row pruned after terminal completion.
 
 Queue remains at-least-once. Schedule's occurrence claim prevents duplicate
 enqueue, not duplicate business effects after worker failure. Workers must
@@ -35,6 +38,10 @@ disabled until explicitly reviewed. This is deliberate for both fresh and
 adopted installations: an unmatched historical suppression or renamed key can
 never silently enable work. A suppression row continues to mean paused, and
 deleting it means resumed. Suppression/review read uncertainty fails closed.
+The exact reviewed fingerprint and suppression state are checked again when a
+queued job starts. Pausing, disabling, removing, or materially changing a
+definition therefore cancels work that has not begun; work already executing
+remains subject to its capability-owned idempotency and cancellation policy.
 
 ## Compatibility and history
 

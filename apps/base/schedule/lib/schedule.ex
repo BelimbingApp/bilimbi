@@ -8,6 +8,7 @@ defmodule Bilimbi.Base.Schedule do
   """
 
   import Ecto.Query
+  require Logger
 
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Queue
@@ -20,6 +21,8 @@ defmodule Bilimbi.Base.Schedule do
   alias Ecto.Multi
 
   @source "scheduler"
+  @active_job_states [:available, :executing, :retryable, :scheduled]
+  @reconcile_batch_size 300
 
   @spec definitions() :: [Definition.t()]
   def definitions do
@@ -126,6 +129,10 @@ defmodule Bilimbi.Base.Schedule do
     else
       nil -> {:error, :not_found}
     end
+  rescue
+    _error -> {:error, :unavailable}
+  catch
+    :exit, _reason -> {:error, :unavailable}
   end
 
   def run_now(_key), do: {:error, :not_found}
@@ -149,6 +156,40 @@ defmodule Bilimbi.Base.Schedule do
     _error -> nil
   catch
     :exit, _reason -> nil
+  end
+
+  @doc false
+  def authorize_execution(metadata, job_id)
+      when is_map(metadata) and is_integer(job_id) and job_id > 0 do
+    current_definition = definition(metadata["key"])
+
+    case Repo.transaction(fn ->
+           lock_key!(metadata["source"], metadata["key"])
+           authorize_execution_locked(current_definition, metadata, job_id)
+         end) do
+      {:ok, result} -> result
+      {:error, _reason} -> {:error, :unavailable}
+    end
+  rescue
+    _error -> {:error, :unavailable}
+  catch
+    :exit, _reason -> {:error, :unavailable}
+  end
+
+  @doc false
+  def reconcile_terminal_occurrences do
+    from(item in Occurrence,
+      where: is_nil(item.finished_at) and not is_nil(item.job_id),
+      order_by: [asc: item.claimed_at, asc: item.id],
+      limit: @reconcile_batch_size,
+      select: {item.id, item.job_id}
+    )
+    |> Repo.all()
+    |> reconcile_occurrences()
+  rescue
+    _error -> {:error, :unavailable}
+  catch
+    :exit, _reason -> {:error, :unavailable}
   end
 
   @doc false
@@ -202,6 +243,7 @@ defmodule Bilimbi.Base.Schedule do
           "key" => definition.key,
           "name" => definition.task_name,
           "expression" => if(trigger == :scheduled, do: definition.expression),
+          "fingerprint" => fingerprint(definition),
           "intended_at" => DateTime.to_iso8601(intended_at),
           "trigger" => Atom.to_string(trigger)
         })
@@ -248,7 +290,10 @@ defmodule Bilimbi.Base.Schedule do
 
   defp availability(definition) do
     lock_key!(@source, definition.key)
+    availability_after_lock(definition)
+  end
 
+  defp availability_after_lock(definition) do
     review =
       Repo.one(
         from(item in DefinitionReview,
@@ -273,6 +318,66 @@ defmodule Bilimbi.Base.Schedule do
     end
   end
 
+  defp authorize_execution_locked(nil, metadata, job_id) do
+    cancel_execution_occurrence(metadata, job_id, :not_found)
+  end
+
+  defp authorize_execution_locked(definition, metadata, job_id) do
+    cond do
+      fingerprint(definition) != metadata["fingerprint"] ->
+        cancel_execution_occurrence(metadata, job_id, :changed)
+
+      true ->
+        case availability_after_lock(definition) do
+          {:ok, :available} -> claim_execution_occurrence(metadata, job_id)
+          {:error, reason} -> cancel_execution_occurrence(metadata, job_id, reason)
+        end
+    end
+  end
+
+  defp claim_execution_occurrence(metadata, job_id) do
+    query = execution_occurrence_query(metadata, job_id)
+
+    case Repo.one(query) do
+      %Occurrence{} = occurrence ->
+        case Repo.update_all(query, set: [state: "running", started_at: DateTime.utc_now()]) do
+          {1, _rows} -> {:ok, occurrence}
+          _not_updated -> {:error, :not_found}
+        end
+
+      nil ->
+        {:error, :not_found}
+    end
+  end
+
+  defp cancel_execution_occurrence(metadata, job_id, reason) do
+    case Repo.update_all(execution_occurrence_query(metadata, job_id),
+           set: [state: "failed", finished_at: DateTime.utc_now(), overlap_key: nil]
+         ) do
+      {1, _rows} -> {:error, {:cancel, unavailable_code(reason)}}
+      _not_updated -> {:error, :not_found}
+    end
+  end
+
+  defp execution_occurrence_query(metadata, job_id) do
+    {:ok, intended_at, 0} = DateTime.from_iso8601(metadata["intended_at"])
+
+    from(item in Occurrence,
+      where:
+        item.id == ^metadata["occurrence_id"] and item.source == ^metadata["source"] and
+          item.key == ^metadata["key"] and item.intended_at == ^intended_at and
+          item.trigger == ^metadata["trigger"] and item.job_id == ^job_id and
+          is_nil(item.finished_at)
+    )
+  end
+
+  defp unavailable_code(:disabled), do: :schedule_disabled
+  defp unavailable_code(:suppressed), do: :schedule_suppressed
+  defp unavailable_code(:unreviewed), do: :schedule_unreviewed
+  defp unavailable_code(:changed), do: :schedule_changed
+  defp unavailable_code(:not_found), do: :schedule_removed
+  defp unavailable_code(_reason), do: :schedule_unavailable
+
   defp occurrence_error(changeset) do
     names = Enum.map(changeset.constraints, & &1.constraint)
 
@@ -284,28 +389,74 @@ defmodule Bilimbi.Base.Schedule do
   end
 
   defp claimable(definition, intended_at, trigger, overlap_key) do
-    intended? =
-      Repo.exists?(
-        from(item in Occurrence,
-          where:
-            item.source == @source and item.key == ^definition.key and
-              item.intended_at == ^intended_at and item.trigger == ^Atom.to_string(trigger)
-        )
-      )
-
-    overlap? =
-      overlap_key &&
+    with :ok <- reconcile_key(definition.key) do
+      intended? =
         Repo.exists?(
           from(item in Occurrence,
-            where: item.overlap_key == ^overlap_key and is_nil(item.finished_at)
+            where:
+              item.source == @source and item.key == ^definition.key and
+                item.intended_at == ^intended_at and item.trigger == ^Atom.to_string(trigger)
           )
         )
 
-    cond do
-      intended? -> {:error, :already_claimed}
-      overlap? -> {:error, :overlap}
-      true -> {:ok, :claimable}
+      overlap? =
+        overlap_key &&
+          Repo.exists?(
+            from(item in Occurrence,
+              where: item.overlap_key == ^overlap_key and is_nil(item.finished_at)
+            )
+          )
+
+      cond do
+        intended? -> {:error, :already_claimed}
+        overlap? -> {:error, :overlap}
+        true -> {:ok, :claimable}
+      end
     end
+  end
+
+  defp reconcile_key(key) do
+    from(item in Occurrence,
+      where:
+        item.source == @source and item.key == ^key and is_nil(item.finished_at) and
+          not is_nil(item.job_id),
+      order_by: [asc: item.claimed_at, asc: item.id],
+      limit: @reconcile_batch_size,
+      select: {item.id, item.job_id}
+    )
+    |> Repo.all()
+    |> reconcile_occurrences()
+  end
+
+  defp reconcile_occurrences(occurrences) do
+    Enum.reduce_while(occurrences, :ok, fn {occurrence_id, job_id}, :ok ->
+      case Queue.job_state(job_id) do
+        {:ok, state} when state in @active_job_states ->
+          {:cont, :ok}
+
+        {:ok, :completed} ->
+          reconcile_occurrence(occurrence_id, "succeeded")
+          {:cont, :ok}
+
+        {:ok, state} when state in [:cancelled, :discarded] ->
+          reconcile_occurrence(occurrence_id, "failed")
+          {:cont, :ok}
+
+        {:error, :not_found} ->
+          reconcile_occurrence(occurrence_id, "failed")
+          {:cont, :ok}
+
+        _unavailable ->
+          {:halt, {:error, :unavailable}}
+      end
+    end)
+  end
+
+  defp reconcile_occurrence(occurrence_id, state) do
+    Repo.update_all(
+      from(item in Occurrence, where: item.id == ^occurrence_id and is_nil(item.finished_at)),
+      set: [state: state, finished_at: DateTime.utc_now(), overlap_key: nil]
+    )
   end
 
   defp best_effort_record_overlap(definition, intended_at, trigger) do
@@ -323,9 +474,18 @@ defmodule Bilimbi.Base.Schedule do
       output_excerpt: "overlap"
     })
   rescue
-    _error -> :ok
+    _error -> overlap_recording_failed(definition)
   catch
-    :exit, _reason -> :ok
+    :exit, _reason -> overlap_recording_failed(definition)
+  end
+
+  defp overlap_recording_failed(definition) do
+    Logger.warning("schedule overlap history recording unavailable",
+      schedule_source: @source,
+      schedule_key: definition.key
+    )
+
+    {:error, :recording_unavailable}
   end
 
   defp lock_key!(source, key) do

@@ -91,6 +91,22 @@ defmodule Bilimbi.Base.Queue do
 
   def cancel(_job_id), do: {:error, :invalid_job_id}
 
+  @doc "Returns one job's bounded transport state for capability-owned reconciliation."
+  @spec job_state(term()) ::
+          {:ok, atom()} | {:error, :not_found | :invalid_job_id | :unavailable}
+  def job_state(job_id) when is_integer(job_id) and job_id > 0 do
+    case Repo.one(from(job in jobs_query(), where: job.id == ^job_id, select: job.state)) do
+      nil -> {:error, :not_found}
+      state -> {:ok, state_atom(state)}
+    end
+  rescue
+    _error -> {:error, :unavailable}
+  catch
+    :exit, _reason -> {:error, :unavailable}
+  end
+
+  def job_state(_job_id), do: {:error, :invalid_job_id}
+
   @doc "Retries a positive inactive job ID without returning transport state."
   @spec retry(term()) :: :ok | {:error, :not_found | :invalid_job_id | :unavailable}
   def retry(job_id) when is_integer(job_id) and job_id > 0 do

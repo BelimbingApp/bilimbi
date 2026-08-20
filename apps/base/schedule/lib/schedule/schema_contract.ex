@@ -6,7 +6,7 @@ defmodule Bilimbi.Base.Schedule.SchemaContract do
   alias Bilimbi.Base.Database.SchemaVerifier
   alias Ecto.Adapters.SQL
 
-  @migration_version 20_260_821_100_000
+  @migration_version 20_260_813_114_301
   @statuses ~w(failed running skipped succeeded)
 
   def migration_version, do: @migration_version

@@ -20,7 +20,7 @@ defmodule Bilimbi.Base.Schedule.DescriptorTest do
            ]
 
     assert descriptor[:migration_dispositions] == %{
-             20_260_821_100_000 => :compatible_baseline,
+             20_260_813_114_301 => :compatible_baseline,
              20_260_821_100_001 => :bilimbi_only
            }
 

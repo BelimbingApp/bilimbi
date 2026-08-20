@@ -55,6 +55,7 @@ defmodule Bilimbi.Base.Schedule.Worker do
          "key" => key,
          "name" => name,
          "expression" => expression,
+         "fingerprint" => fingerprint,
          "intended_at" => intended_at,
          "trigger" => trigger
        })
@@ -62,6 +63,7 @@ defmodule Bilimbi.Base.Schedule.Worker do
               byte_size(source) in 1..40 and is_binary(key) and byte_size(key) in 1..255 and
               is_binary(name) and byte_size(name) in 1..255 and
               (is_nil(expression) or (is_binary(expression) and byte_size(expression) <= 64)) and
+              is_binary(fingerprint) and byte_size(fingerprint) == 64 and
               trigger in ["manual", "scheduled"] do
     case DateTime.from_iso8601(intended_at) do
       {:ok, datetime, 0} ->
@@ -72,6 +74,7 @@ defmodule Bilimbi.Base.Schedule.Worker do
            "key" => key,
            "name" => name,
            "expression" => expression,
+           "fingerprint" => fingerprint,
            "intended_at" => DateTime.to_iso8601(datetime),
            "trigger" => trigger
          }}

@@ -30,6 +30,7 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
 
   @doc false
   def poll(now \\ DateTime.utc_now()) do
+    Schedule.reconcile_terminal_occurrences()
     Enum.each(Schedule.definitions(), &enqueue_latest_due(&1, now))
     :ok
   rescue

@@ -1,4 +1,5 @@
 defmodule Bilimbi.Base.Schedule.Migrations.CreateCompatibilityBaseline do
+  # Compatible baselines precede every Bilimbi-only runtime migration.
   use Ecto.Migration
 
   def up do

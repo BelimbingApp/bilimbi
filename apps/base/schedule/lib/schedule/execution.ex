@@ -7,6 +7,7 @@ defmodule Bilimbi.Base.Schedule.Execution do
 
   alias Bilimbi.Base.Queue.Execution, as: QueueExecution
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Schedule
   alias Bilimbi.Base.Schedule.Occurrence
   alias Bilimbi.Base.Schedule.Run
   alias Bilimbi.Base.Settings
@@ -16,6 +17,7 @@ defmodule Bilimbi.Base.Schedule.Execution do
   def run(worker, %{"__bilimbi_schedule__" => metadata} = args, %QueueExecution{} = execution) do
     case authorize_occurrence(metadata, execution) do
       {:ok, _occurrence} -> execute(worker, args, metadata, execution)
+      {:error, {:cancel, code}} -> {:cancel, code}
       {:error, :not_found} -> {:cancel, :invalid_schedule_occurrence}
       {:error, :unavailable} -> {:retry, :schedule_state_unavailable}
     end
@@ -43,32 +45,7 @@ defmodule Bilimbi.Base.Schedule.Execution do
   end
 
   defp authorize_occurrence(metadata, execution) do
-    intended_at = parse_time!(metadata["intended_at"])
-    now = DateTime.utc_now()
-
-    query =
-      from(item in Occurrence,
-        where:
-          item.id == ^metadata["occurrence_id"] and item.source == ^metadata["source"] and
-            item.key == ^metadata["key"] and item.intended_at == ^intended_at and
-            item.trigger == ^metadata["trigger"] and item.job_id == ^execution.job_id and
-            is_nil(item.finished_at)
-      )
-
-    case Repo.one(query) do
-      %Occurrence{} = occurrence ->
-        case Repo.update_all(query, set: [state: "running", started_at: now]) do
-          {1, _rows} -> {:ok, occurrence}
-          _not_updated -> {:error, :not_found}
-        end
-
-      nil ->
-        {:error, :not_found}
-    end
-  rescue
-    _error -> {:error, :unavailable}
-  catch
-    :exit, _reason -> {:error, :unavailable}
+    Schedule.authorize_execution(metadata, execution.job_id)
   end
 
   defp best_effort_start(metadata) do
@@ -94,26 +71,38 @@ defmodule Bilimbi.Base.Schedule.Execution do
     {status, terminal?, excerpt} = result_status(result, execution)
     now = DateTime.utc_now()
 
-    if run do
-      Repo.update_all(
-        from(item in Run, where: item.id == ^run.id),
-        set: [
-          status: status,
-          finished_at: DateTime.to_naive(now) |> NaiveDateTime.truncate(:second),
-          runtime_ms: max(System.monotonic_time(:millisecond) - started, 0),
-          output_excerpt: excerpt,
-          updated_at: DateTime.to_naive(now) |> NaiveDateTime.truncate(:second)
-        ]
-      )
-    end
+    best_effort_finish_run(run, status, excerpt, now, started, metadata)
 
     if terminal? do
-      finish_occurrence(metadata, status, now)
+      best_effort_finish_occurrence(metadata, status, now)
     end
+  end
+
+  defp best_effort_finish_run(nil, _status, _excerpt, _now, _started, _metadata), do: :ok
+
+  defp best_effort_finish_run(run, status, excerpt, now, started, metadata) do
+    Repo.update_all(
+      from(item in Run, where: item.id == ^run.id),
+      set: [
+        status: status,
+        finished_at: DateTime.to_naive(now) |> NaiveDateTime.truncate(:second),
+        runtime_ms: max(System.monotonic_time(:millisecond) - started, 0),
+        output_excerpt: excerpt,
+        updated_at: DateTime.to_naive(now) |> NaiveDateTime.truncate(:second)
+      ]
+    )
   rescue
-    _error -> diagnostic(:finish_unavailable, metadata)
+    _error -> diagnostic(:run_finish_unavailable, metadata)
   catch
-    :exit, _reason -> diagnostic(:finish_unavailable, metadata)
+    :exit, _reason -> diagnostic(:run_finish_unavailable, metadata)
+  end
+
+  defp best_effort_finish_occurrence(metadata, status, now) do
+    finish_occurrence(metadata, status, now)
+  rescue
+    _error -> diagnostic(:occurrence_finish_unavailable, metadata)
+  catch
+    :exit, _reason -> diagnostic(:occurrence_finish_unavailable, metadata)
   end
 
   defp best_effort_exception(metadata, run, execution, started) do
@@ -173,11 +162,6 @@ defmodule Bilimbi.Base.Schedule.Execution do
     _error -> Logger.warning("schedule history pruning unavailable")
   catch
     :exit, _reason -> Logger.warning("schedule history pruning unavailable")
-  end
-
-  defp parse_time!(value) do
-    {:ok, datetime, 0} = DateTime.from_iso8601(value)
-    datetime
   end
 
   defp naive_now, do: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)

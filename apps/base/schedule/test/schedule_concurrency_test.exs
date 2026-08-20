@@ -76,7 +76,7 @@ defmodule Bilimbi.Base.ScheduleConcurrencyTest do
       dynamic_repo: repos.observer
     )
 
-    Ecto.Migrator.up(Repo, 20_260_821_100_000, CreateScheduleBaseline,
+    Ecto.Migrator.up(Repo, 20_260_813_114_301, CreateScheduleBaseline,
       log: false,
       dynamic_repo: repos.observer
     )
@@ -209,7 +209,7 @@ defmodule Bilimbi.Base.ScheduleConcurrencyTest do
     assert_raise Postgrex.Error,
                  ~r/cannot roll back Base Schedule while run history or suppressions exist/,
                  fn ->
-                   Ecto.Migrator.down(Repo, 20_260_821_100_000, CreateScheduleBaseline,
+                   Ecto.Migrator.down(Repo, 20_260_813_114_301, CreateScheduleBaseline,
                      log: false,
                      dynamic_repo: repos.observer
                    )
@@ -241,7 +241,7 @@ defmodule Bilimbi.Base.ScheduleConcurrencyTest do
     for path <- [
           "../../settings/priv/repo/migrations/20260811093952_create_base_settings_compatibility_baseline.exs",
           "../../queue/priv/repo/migrations/20260820130000_create_base_queue_oban_runtime.exs",
-          "../priv/repo/migrations/20260821100000_create_base_schedule_compatibility_baseline.exs",
+          "../priv/repo/migrations/20260813114301_create_base_schedule_compatibility_baseline.exs",
           "../priv/repo/migrations/20260821100001_create_base_schedule_occurrence_runtime.exs"
         ] do
       Code.require_file(Path.expand(path, __DIR__))
