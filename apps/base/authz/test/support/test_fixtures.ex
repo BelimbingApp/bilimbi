@@ -132,6 +132,24 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
     })
   end
 
+  @doc """
+  Installs the principal-naming doubles on top of the current snapshot.
+
+  Separate from `install_registry!/0` on purpose: most of this suite must keep
+  running with **no** directory installed, which is the deployment where a
+  principal keeps its durable id.
+  """
+  def install_principal_directory! do
+    snapshot = ContributionRegistry.snapshot!()
+
+    ContributionRegistry.put_snapshot_for_test!(
+      put_in(snapshot.consumers.principal_directory, %{
+        user: Bilimbi.Base.Authz.TestUserDirectory,
+        agent: Bilimbi.Base.Authz.TestAgentDirectory
+      })
+    )
+  end
+
   def scope(tenant_id \\ 1) do
     Scope.for_tenant(%Identity{
       id: tenant_id,
