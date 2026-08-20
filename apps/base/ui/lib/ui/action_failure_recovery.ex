@@ -39,17 +39,15 @@ defmodule Bilimbi.Base.UI.ActionFailureRecovery do
         defoverridable handle_event: 3
 
         def handle_event(event, params, socket) do
-          try do
-            super(event, params, socket)
-          rescue
-            exception ->
-              Bilimbi.Base.UI.ActionFailureRecovery.recover(
-                exception,
-                __STACKTRACE__,
-                socket,
-                unquote(kind)
-              )
-          end
+          super(event, params, socket)
+        rescue
+          exception ->
+            Bilimbi.Base.UI.ActionFailureRecovery.recover(
+              exception,
+              __STACKTRACE__,
+              socket,
+              unquote(kind)
+            )
         end
       end
     else
