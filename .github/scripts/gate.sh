@@ -129,6 +129,17 @@ if [ "$state" = "OPEN" ]; then
   esac
 fi
 
+# 6. Something to merge at all. Our claim protocol is an empty draft PR, so every
+#    claim starts as exactly this shape; #450 was taken out of draft and labelled
+#    task:review, and every other check passed it (#453). Zero changed files is
+#    the unambiguous case -- a mode-only or rename change still reports files.
+files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq 'length' 2>/dev/null | paste -sd+ - | bc 2>/dev/null)
+if [ "${files:-0}" -eq 0 ] 2>/dev/null; then
+  say_bad "no changed files — an empty PR is a claim, not a deliverable"
+else
+  say_ok "$files changed file(s)"
+fi
+
 # 6. Conflicts. mergeStateStatus is permanently BLOCKED for us and carries no
 #    information; mergeable does.
 mergeable=$(printf '%s' "$pr" | jq -r .mergeable)
