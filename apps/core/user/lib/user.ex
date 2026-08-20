@@ -71,6 +71,7 @@ defmodule Bilimbi.Core.User do
 
   @password_reset_max_age 3_600
   @password_reset_throttle 60
+  @notification_delivery_failure_event [:bilimbi, :core, :user, :notification_delivery, :failed]
 
   @doc """
   Lists the users affiliated with one company inside the scope's tenant.
@@ -506,26 +507,37 @@ defmodule Bilimbi.Core.User do
   end
 
   @doc "Subscribes the calling process to notifications for the given user in tenant scope."
-  @spec subscribe_notifications(Scope.t(), pos_integer()) :: :ok | {:error, term()}
+  @spec subscribe_notifications(Scope.t(), pos_integer()) :: :ok | {:error, :pubsub_unavailable}
   def subscribe_notifications(%Scope{tenant: %{id: tenant_id}}, user_id)
       when is_integer(user_id) do
     if server = pubsub_server() do
-      Phoenix.PubSub.subscribe(server, notification_topic(tenant_id, user_id))
+      notification_pubsub(:subscribe, fn ->
+        Phoenix.PubSub.subscribe(server, notification_topic(tenant_id, user_id))
+      end)
     else
       :ok
     end
   end
 
-  @doc "Broadcasts a notification change event to subscribers."
-  @spec broadcast_notification(Scope.t(), pos_integer(), term()) :: :ok | {:error, term()}
+  @doc """
+  Broadcasts a notification change event to subscribers.
+
+  A configured unavailable PubSub transport returns a bounded error and emits a
+  redacted telemetry event. Notification mutations that have already committed
+  preserve their successful result when that delivery fails.
+  """
+  @spec broadcast_notification(Scope.t(), pos_integer(), term()) ::
+          :ok | {:error, :pubsub_unavailable}
   def broadcast_notification(%Scope{tenant: %{id: tenant_id}}, user_id, event)
       when is_integer(user_id) do
     if server = pubsub_server() do
-      Phoenix.PubSub.broadcast(
-        server,
-        notification_topic(tenant_id, user_id),
-        {:notification_event, event}
-      )
+      notification_pubsub(:broadcast, fn ->
+        Phoenix.PubSub.broadcast(
+          server,
+          notification_topic(tenant_id, user_id),
+          {:notification_event, event}
+        )
+      end)
     else
       :ok
     end
@@ -736,6 +748,20 @@ defmodule Bilimbi.Core.User do
           {:error, changeset}
       end
     end
+  end
+
+  defp notification_pubsub(operation, delivery) do
+    case delivery.() do
+      :ok -> :ok
+      {:error, _reason} -> notification_delivery_failed(operation)
+    end
+  rescue
+    _exception in ArgumentError -> notification_delivery_failed(operation)
+  end
+
+  defp notification_delivery_failed(operation) do
+    :telemetry.execute(@notification_delivery_failure_event, %{count: 1}, %{operation: operation})
+    {:error, :pubsub_unavailable}
   end
 
   @spec update_user(Scope.t(), pos_integer(), pos_integer(), map()) ::
