@@ -169,6 +169,15 @@ defmodule Bilimbi.Base.Settings.FormTest do
       refute Settings.overridden?("tests.retention", nil)
     end
 
+    test "refuses a numeric value outside the definition's inclusive bounds" do
+      fields = Form.fields(["operator"], @user)
+
+      assert {:error, "tests.retention", "must be within the configured range"} =
+               Form.save(%{"tests.retention" => "3651"}, fields, @user)
+
+      refute Settings.overridden?("tests.retention", nil)
+    end
+
     test "an invalid field leaves every other field in the submission unwritten" do
       # The defect this replaces: save mutated as it went, so a later bad value
       # aborted a loop that had already committed the earlier ones -- reporting
@@ -335,6 +344,8 @@ defmodule Bilimbi.Base.Settings.FormTest do
                 type: :integer,
                 scopes: [:global],
                 default: 90,
+                minimum: 0,
+                maximum: 3650,
                 label: "Retention",
                 help: "Days to retain decision logs.",
                 editable: "operator"
