@@ -1,5 +1,7 @@
 import Config
 
+config :elixir, :time_zone_database, TimeZoneInfo.TimeZoneDatabase
+
 config :bilimbi_base_database,
   ecto_repos: [Bilimbi.Base.Repo],
   generators: [timestamp_type: :utc_datetime]

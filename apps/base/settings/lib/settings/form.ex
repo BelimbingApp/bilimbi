@@ -309,16 +309,16 @@ defmodule Bilimbi.Base.Settings.Form do
   defp trim(value) when is_binary(value), do: String.trim(value)
   defp trim(value), do: value
 
-  defp convert(value, %Definition{type: :integer}) when is_binary(value) do
+  defp convert(value, %Definition{type: :integer} = definition) when is_binary(value) do
     case Integer.parse(value) do
-      {integer, ""} -> {:ok, integer}
+      {integer, ""} -> validate_converted(integer, definition)
       _ -> {:error, "must be a whole number"}
     end
   end
 
-  defp convert(value, %Definition{type: :float}) when is_binary(value) do
+  defp convert(value, %Definition{type: :float} = definition) when is_binary(value) do
     case Float.parse(value) do
-      {float, ""} -> {:ok, float}
+      {float, ""} -> validate_converted(float, definition)
       _ -> {:error, "must be a number"}
     end
   end
@@ -339,6 +339,14 @@ defmodule Bilimbi.Base.Settings.Form do
       {:ok, value}
     else
       {:error, "must be #{definition.type}"}
+    end
+  end
+
+  defp validate_converted(value, definition) do
+    if Definition.accepts?(definition, value) do
+      {:ok, value}
+    else
+      {:error, "must be within the configured range"}
     end
   end
 
