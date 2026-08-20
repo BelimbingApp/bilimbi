@@ -61,6 +61,7 @@ defmodule Bilimbi.Core.User.Contributions do
         }
       ],
       settings: %{definitions: @settings, runtime_claims: []},
+      principal_directory: Bilimbi.Core.User.PrincipalDirectoryProvider,
       authz: %{
         capabilities: @read_capabilities ++ @write_capabilities ++ @unaffiliated_capabilities,
         roles: %{
