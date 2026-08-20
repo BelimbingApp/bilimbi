@@ -9,6 +9,7 @@ defmodule Bilimbi.Base.SystemTest do
   # Aliased, not imported as `System`: an `alias Bilimbi.Base.System` shadows
   # Elixir's own `System`, and these assertions compare against it.
   alias Bilimbi.Base.System, as: SystemInfo
+  alias Bilimbi.Base.System.Contributions
 
   describe "fact sections" do
     test "every section returns labelled facts and nothing raises" do
@@ -58,5 +59,18 @@ defmodule Bilimbi.Base.SystemTest do
       names = Enum.map(applications, & &1.name)
       assert "elixir" in names
     end
+  end
+
+  test "publishes one capability-gated localization destination" do
+    contributions = Contributions.contributions()
+
+    assert %{
+             route: "/system/localization",
+             capability: "admin.system.localization.manage"
+           } = Enum.find(contributions.menu, &(&1.id == "admin.system.localization"))
+
+    assert "admin.system.localization.manage" in contributions.authz.capabilities
+
+    refute "admin.system.localization.manage" in contributions.authz.roles["system_viewer"].capabilities
   end
 end
