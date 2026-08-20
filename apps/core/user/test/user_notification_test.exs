@@ -287,10 +287,12 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
       end
     end
 
-    test "subscribing multiple times from the same process succeeds idempotently", %{scope: scope} do
+    test "delivers notification events exactly once to single-subscribed caller", %{scope: scope} do
       user_id = 42
       assert :ok = User.subscribe_notifications(scope, user_id)
-      assert :ok = User.subscribe_notifications(scope, user_id)
+      assert :ok = User.broadcast_notification(scope, user_id, :single_delivery_check)
+      assert_receive {:notification_event, :single_delivery_check}
+      refute_receive {:notification_event, _}
     end
   end
 end

@@ -235,7 +235,7 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       assert element(view, "#app-notifications-unread-badge") |> render() =~ "1"
     end
 
-    test "mounts through UserAuth without false error flash and receives real-time updates",
+    test "mounts through UserAuth without false error flash and receives real-time updates exactly once",
          %{
            conn: conn,
            scope: scope
@@ -248,9 +248,10 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       # Send a new notification to the signed-in user while view is connected
       {:ok, note} = User.send_notification(scope, 91, %{title: "Realtime PubSub Alert"})
 
-      # The LiveView receives the PubSub broadcast and updates its assigns/stream
+      # The LiveView receives the PubSub broadcast and updates its assigns/stream exactly once
       assert has_element?(view, "#notifications-list [id$='#{note.id}']")
-      assert render(view) =~ "Realtime PubSub Alert"
+      rendered = render(view)
+      assert [_single_match] = Regex.scan(~r/Realtime PubSub Alert/, rendered)
       refute has_element?(view, "#notifications-empty")
       refute has_element?(view, "#flash-error")
     end
