@@ -16,6 +16,17 @@ defmodule Bilimbi.Core.CompanyTest do
     :ok
   end
 
+  test "tenant_owner receives tenant-wide company reach without grant_all" do
+    authz = Bilimbi.Core.Company.Contributions.contributions().authz
+    tenant_owner = authz.roles["tenant_owner"]
+
+    assert "admin.company.tenant-wide.manage" in authz.capabilities
+    assert "admin.company.tenant-wide.manage" in tenant_owner.capabilities
+    assert "admin.company.create" in tenant_owner.capabilities
+    assert "admin.company.delete" in tenant_owner.capabilities
+    refute Map.get(tenant_owner, :grant_all, false)
+  end
+
   test "returns the explicit platform-operator primary company through a stable read model" do
     insert_tenant!()
     insert_company!(%{legal_name: "Bilimbi Industries Sdn. Bhd."})

@@ -13,6 +13,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
   alias Ecto.Changeset
 
   @statuses ~w(active suspended pending archived)
+  @create_capability "admin.company.create"
 
   @field_types %{
     parent_id: :id,
@@ -32,28 +33,47 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    scope = socket.assigns.current_scope.scope
-    {:ok, companies} = Company.list_companies(scope)
-    {:ok, types} = Company.list_legal_entity_types()
-    countries = Bilimbi.Core.Geonames.list_countries()
+    actor = socket.assigns.current_scope.actor
 
-    {:ok,
-     socket
-     |> assign(:page_title, "Create Company")
-     |> assign(:active_nav, "admin.company")
-     |> assign(:parent_companies, companies)
-     |> assign(:legal_entity_types, Enum.filter(types, & &1.is_active))
-     |> assign(:countries, countries)
-     |> assign_form(form_changeset(%{"status" => "active"}))}
+    case Company.list_selectable_companies(actor, @create_capability) do
+      {:ok, companies} ->
+        {:ok, types} = Company.list_legal_entity_types()
+        countries = Bilimbi.Core.Geonames.list_countries()
+
+        {:ok,
+         socket
+         |> assign(:page_title, "Create Company")
+         |> assign(:active_nav, "admin.company")
+         |> assign(:parent_companies, companies)
+         |> assign(:legal_entity_types, Enum.filter(types, & &1.is_active))
+         |> assign(:countries, countries)
+         |> assign_form(form_changeset(%{"status" => "active"}))}
+
+      {:error, :unauthorized} ->
+        {:ok,
+         socket
+         |> put_flash(:error, "You do not have permission to create companies.")
+         |> push_navigate(to: ~p"/dashboard")}
+    end
   end
 
   @impl true
   def handle_event("validate", %{"company" => params}, socket) do
-    {:noreply, assign_form(socket, form_changeset(params))}
+    changeset =
+      params
+      |> form_changeset()
+      |> authorize_parent(socket)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign_form(socket, changeset)}
   end
 
   def handle_event("save", %{"company" => params}, socket) do
-    changeset = form_changeset(params) |> Map.put(:action, :insert)
+    changeset =
+      params
+      |> form_changeset()
+      |> authorize_parent(socket)
+      |> Map.put(:action, :insert)
 
     with true <- changeset.valid?,
          {:ok, attrs} <- domain_attrs(changeset) do
@@ -244,6 +264,24 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
 
       _other ->
         changeset
+    end
+  end
+
+  defp authorize_parent(changeset, socket) do
+    actor = socket.assigns.current_scope.actor
+
+    case get_field(changeset, :parent_id) do
+      nil ->
+        case Company.list_selectable_companies(actor, @create_capability) do
+          {:ok, _companies} -> changeset
+          {:error, :unauthorized} -> add_error(changeset, :parent_id, "is not available")
+        end
+
+      parent_id ->
+        case Company.authorize_company_target(actor, parent_id, @create_capability) do
+          {:ok, _company} -> changeset
+          {:error, _reason} -> add_error(changeset, :parent_id, "is not available")
+        end
     end
   end
 

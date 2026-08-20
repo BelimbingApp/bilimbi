@@ -391,6 +391,141 @@ defmodule BilimbiWeb.EmployeeFormTest do
     assert is_nil(user.employee_id)
   end
 
+  test "company-scoped actor sees only their company and a forged sibling company writes nothing",
+       %{conn: conn} do
+    CompanyFixtures.insert_company!(%{id: 74, tenant_id: 41, code: "sibling_corp"})
+    grant_capabilities!(["admin.employee.create", "admin.employee.view"])
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/new")
+
+    assert has_element?(view, "#employee-company-id option[value='73']")
+    refute has_element?(view, "#employee-company-id option[value='74']")
+
+    html =
+      render_submit(view, "save", %{
+        "employee" => %{
+          "company_id" => "74",
+          "employee_number" => "FORGED-SIBLING",
+          "full_name" => "Forged Sibling",
+          "employee_type" => "full_time",
+          "status" => "active"
+        }
+      })
+
+    assert html =~ "is not available"
+    assert {:ok, []} = Employee.list_employees(scope, 74)
+  end
+
+  test "forged non-positive company ids fail closed without a write", %{conn: conn} do
+    grant_capabilities!(["admin.employee.create", "admin.employee.view"])
+    {:ok, scope} = Tenancy.scope(41)
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/new")
+
+    html =
+      render_submit(view, "save", %{
+        "employee" => %{
+          "company_id" => "-1",
+          "employee_number" => "FORGED-NEGATIVE",
+          "full_name" => "Forged Negative",
+          "employee_type" => "full_time",
+          "status" => "active"
+        }
+      })
+
+    assert html =~ "is not available"
+    assert {:ok, employees} = Employee.list_employees(scope, 73)
+    refute Enum.any?(employees, &(&1.employee_number == "FORGED-NEGATIVE"))
+  end
+
+  test "tenant-wide company authority reaches sibling companies but never another tenant",
+       %{conn: conn} do
+    CompanyFixtures.insert_company!(%{id: 74, tenant_id: 41, code: "sibling_corp"})
+
+    CompanyFixtures.insert_tenant!(%{
+      id: 42,
+      name: "Other tenant",
+      is_platform_operator: false
+    })
+
+    CompanyFixtures.insert_company!(%{id: 75, tenant_id: 42, code: "other_tenant_corp"})
+
+    grant_capabilities!([
+      "admin.employee.create",
+      "admin.employee.view",
+      "admin.company.tenant-wide.manage"
+    ])
+
+    {:ok, scope} = Tenancy.scope(41)
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/new")
+
+    assert has_element?(view, "#employee-company-id option[value='73']")
+    assert has_element?(view, "#employee-company-id option[value='74']")
+    refute has_element?(view, "#employee-company-id option[value='75']")
+
+    view
+    |> form("#employee-form",
+      employee: %{
+        company_id: "74",
+        employee_number: "TENANT-WIDE",
+        full_name: "Tenant Wide",
+        employee_type: "full_time",
+        status: "active"
+      }
+    )
+    |> render_submit()
+
+    assert {:ok, employees} = Employee.list_employees(scope, 74)
+    assert Enum.any?(employees, &(&1.employee_number == "TENANT-WIDE"))
+
+    {:ok, forged, _html} = conn |> log_in_as() |> live(~p"/employees/new")
+
+    html =
+      render_submit(forged, "save", %{
+        "employee" => %{
+          "company_id" => "75",
+          "employee_number" => "CROSS-TENANT",
+          "full_name" => "Cross Tenant",
+          "employee_type" => "full_time",
+          "status" => "active"
+        }
+      })
+
+    assert html =~ "is not available"
+    {:ok, other_scope} = Tenancy.scope(42)
+    assert {:ok, []} = Employee.list_employees(other_scope, 75)
+  end
+
+  test "editing a sibling employee requires tenant-wide company authority", %{conn: conn} do
+    CompanyFixtures.insert_company!(%{id: 74, tenant_id: 41, code: "sibling_corp"})
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, employee} =
+      Employee.create_employee(scope, 74, %{
+        employee_number: "SIBLING-EDIT",
+        full_name: "Sibling Employee",
+        employee_type: "full_time",
+        status: "active"
+      })
+
+    grant_capabilities!(["admin.employee.update", "admin.employee.view"])
+
+    assert {:error, {:live_redirect, %{to: "/employees"}}} =
+             conn |> log_in_as() |> live(~p"/employees/#{employee.id}/edit")
+
+    grant_capabilities!(["admin.company.tenant-wide.manage"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}/edit")
+    assert has_element?(view, "#employee-company-id option[value='74'][selected]")
+
+    view
+    |> form("#employee-form", employee: %{full_name: "Authorized Sibling Employee"})
+    |> render_submit()
+
+    assert {:ok, updated} = Employee.get_employee(scope, 74, employee.id)
+    assert updated.full_name == "Authorized Sibling Employee"
+  end
+
   test "locks company on edit and retains original employee company", %{conn: conn} do
     CompanyFixtures.insert_company!(%{id: 74, tenant_id: 41, code: "target_corp"})
     {:ok, scope} = Tenancy.scope(41)
