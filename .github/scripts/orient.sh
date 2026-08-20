@@ -124,8 +124,21 @@ gh issue list --repo "$REPO" --state open --limit 100 --json number,title,labels
         |.[]|"  #\(.number) carries two task:* labels — \(.title[0:56])"' 2>/dev/null
 
 echo
-echo "== installed modules, in resolved order =="
-grep -h 'id:' apps/*/*/bilimbi.module.exs 2>/dev/null | sed 's/^ *//' | sed 's/^/  /'
+echo "== installed modules on origin/main =="
+# Read the descriptors out of origin/main, not the working tree. This used to
+# grep `apps/*/*/bilimbi.module.exs` on disk, which silently reports whatever
+# branch -- or whatever stale checkout -- the script happens to run from. It
+# listed a main that was missing two merged modules, and nothing said so.
+descriptors=$(git ls-tree -r --name-only origin/main 2>/dev/null | grep '/bilimbi\.module\.exs$')
+
+for descriptor in $descriptors; do
+  git show "origin/main:$descriptor" 2>/dev/null | grep -m1 'id:' | sed 's/^ */  /'
+done
+
+if [ -n "$descriptors" ] && ! git diff --quiet origin/main -- $descriptors 2>/dev/null; then
+  echo
+  echo "  NOTE  your working tree's module descriptors differ from origin/main."
+fi
 
 cat <<'TXT'
 
