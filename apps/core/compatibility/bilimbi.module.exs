@@ -8,6 +8,7 @@
   dependencies: [
     "base/dashboard",
     "base/database",
+    "base/locale",
     "base/menu",
     "base/queue",
     "base/ui",
