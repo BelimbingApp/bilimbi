@@ -19,13 +19,15 @@ defmodule BilimbiWeb.PerfTelemetry do
   def init(_options) do
     :telemetry.detach(@handler_id)
 
-    :ok =
-      :telemetry.attach_many(
-        @handler_id,
-        @events,
-        &Bilimbi.Base.Perf.handle_event/4,
-        make_ref()
-      )
+    if instrumentation_enabled?() do
+      :ok =
+        :telemetry.attach_many(
+          @handler_id,
+          @events,
+          &Bilimbi.Base.Perf.handle_event/4,
+          make_ref()
+        )
+    end
 
     {:ok, %{}}
   end
@@ -34,5 +36,9 @@ defmodule BilimbiWeb.PerfTelemetry do
   def terminate(_reason, _state) do
     :telemetry.detach(@handler_id)
     :ok
+  end
+
+  defp instrumentation_enabled? do
+    Application.get_env(:bilimbi_base_perf, :instrumentation_enabled, true)
   end
 end

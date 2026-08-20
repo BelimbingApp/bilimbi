@@ -42,10 +42,12 @@ defmodule BilimbiWeb.PerfLiveTest do
 
     view
     |> form("#performance-filters", %{
-      "kind" => "job",
-      "identity" => "base/report-export",
-      "outcome" => "error",
-      "page_size" => "50"
+      "filters" => %{
+        "kind" => "job",
+        "identity" => "base/report-export",
+        "outcome" => "error",
+        "page_size" => "50"
+      }
     })
     |> render_change()
 

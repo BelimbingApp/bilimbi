@@ -48,7 +48,7 @@ defmodule Bilimbi.Base.Perf.Reporter do
     :ets.new(@counter_table, [:named_table, :public, :set, read_concurrency: true])
     :ets.insert(@counter_table, {@counter_key, 0})
     :ets.insert(@counter_table, {@dropped_key, 0})
-    :ok = Perf.attach_handlers()
+    if instrumentation_enabled?(), do: Perf.attach_handlers()
     {:ok, %{accepted: 0}}
   end
 
@@ -107,6 +107,10 @@ defmodule Bilimbi.Base.Perf.Reporter do
       value when is_integer(value) and value > 0 -> value
       _invalid -> @default_max_pending
     end
+  end
+
+  defp instrumentation_enabled? do
+    Application.get_env(:bilimbi_base_perf, :instrumentation_enabled, true)
   end
 
   defp counter(key), do: :ets.lookup_element(@counter_table, key, 2)

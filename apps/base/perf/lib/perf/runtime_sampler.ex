@@ -12,14 +12,14 @@ defmodule Bilimbi.Base.Perf.RuntimeSampler do
   end
 
   @doc false
-  @spec sample_now() :: :ok
+  @spec sample_now() :: :ok | {:error, :saturated | :unavailable}
   def sample_now do
     Reporter.submit(sample())
   end
 
   @impl true
   def init(_options) do
-    schedule_sample()
+    if instrumentation_enabled?(), do: schedule_sample()
     {:ok, %{}}
   end
 
@@ -53,5 +53,9 @@ defmodule Bilimbi.Base.Perf.RuntimeSampler do
       value when is_integer(value) and value > 0 -> value
       _invalid -> @default_interval
     end
+  end
+
+  defp instrumentation_enabled? do
+    Application.get_env(:bilimbi_base_perf, :instrumentation_enabled, true)
   end
 end
