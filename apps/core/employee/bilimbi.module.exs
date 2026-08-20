@@ -8,6 +8,7 @@
   dependencies: [
     "base/database",
     "base/module_registry",
+    "base/principal_directory",
     "base/tenancy",
     "base/ui",
     "core/company"
