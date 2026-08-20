@@ -32,6 +32,23 @@ for fixture in "$here"/*.json; do
   fi
 done
 
+# The fixtures above prove the gate returns the right exit status. They cannot
+# see whether the workflow honours it -- and it did not. The step piped the gate
+# into `tee`, and a `run:` block with no explicit `shell:` runs under
+# `bash -e {0}`, which has no `pipefail`, so the pipeline reported `tee`'s
+# status. #499, #503 and #505 all merged with zero reviews and a green
+# "Independent review present" (#516). This asserts the half no fixture covers.
+workflow="$here/../../../.github/workflows/review-gate.yml"
+
+if [[ -f "$workflow" ]]; then
+  if grep -Eq 'review_gate\.sh".*\|' "$workflow" && ! grep -q 'set -o pipefail' "$workflow"; then
+    printf 'FAIL wiring (review-gate.yml pipes the gate without pipefail; the verdict cannot fail the check)\n' >&2
+    failures=$((failures + 1))
+  else
+    printf 'ok   wiring (review-gate.yml cannot swallow the gate verdict)\n'
+  fi
+fi
+
 if [[ $failures -gt 0 ]]; then
   echo "$failures fixture(s) failed" >&2
   exit 1
