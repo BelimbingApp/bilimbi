@@ -9,6 +9,7 @@
     "base/audit",
     "base/authz",
     "base/database",
+    "base/locale",
     "base/module_registry",
     "base/principal_directory",
     "base/session",
