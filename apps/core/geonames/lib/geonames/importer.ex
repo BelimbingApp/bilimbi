@@ -53,6 +53,7 @@ defmodule Bilimbi.Core.Geonames.Importer do
       true ->
         repo.transaction(
           fn ->
+            :ok = PostcodeOverrides.lock_country(iso, repo)
             repo.delete_all(from(entry in Postcode, where: entry.country_iso == ^iso))
 
             case stream_import(path, &parse_postcode(&1, iso), &insert_postcodes(&1, opts)) do

@@ -1,7 +1,7 @@
 defmodule Bilimbi.Core.Geonames.Migrations.CreatePostcodeOverrides do
   use Ecto.Migration
 
-  def change do
+  def up do
     create table(:geonames_postcode_overrides, primary_key: false) do
       add(:id, :bigserial, primary_key: true)
       add(:applied_postcode_id, :bigint, null: false)
@@ -63,5 +63,34 @@ defmodule Bilimbi.Core.Geonames.Migrations.CreatePostcodeOverrides do
         name: :geonames_postcode_overrides_country_iso_postcode_index
       )
     )
+  end
+
+  def down do
+    override_table = qualified_table("geonames_postcode_overrides")
+
+    execute("""
+    DO $$
+    BEGIN
+      IF EXISTS (SELECT 1 FROM #{override_table} LIMIT 1) THEN
+        RAISE EXCEPTION
+          'cannot roll back postcode overrides while operator corrections exist';
+      END IF;
+    END
+    $$
+    """)
+
+    drop(table(:geonames_postcode_overrides))
+  end
+
+  defp qualified_table(table_name) do
+    case prefix() do
+      nil -> quote_identifier(table_name)
+      prefix -> "#{quote_identifier(prefix)}.#{quote_identifier(table_name)}"
+    end
+  end
+
+  defp quote_identifier(identifier) do
+    escaped = String.replace(identifier, "\"", "\"\"")
+    "\"#{escaped}\""
   end
 end

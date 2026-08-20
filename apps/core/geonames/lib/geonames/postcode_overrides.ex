@@ -70,35 +70,34 @@ defmodule Bilimbi.Core.Geonames.PostcodeOverrides do
   end
 
   @doc false
+  def lock_country(country_iso, repo \\ Repo) do
+    country_overrides_query(country_iso)
+    |> repo.all()
+
+    :ok
+  end
+
+  @doc false
   def reapply_country(country_iso, repo \\ Repo) do
-    overrides =
-      repo.all(
-        from(override in PostcodeOverride,
-          where:
-            override.country_iso == ^country_iso or
-              override.source_country_iso == ^country_iso,
-          order_by: [asc: override.id],
-          lock: "FOR UPDATE"
-        )
-      )
+    overrides = repo.all(country_overrides_query(country_iso))
 
     Enum.each(overrides, &reapply(&1, repo))
     :ok
   end
 
   defp update_locked(id, expected_revision, attrs) do
+    override =
+      Repo.one(
+        from(override in PostcodeOverride,
+          where: override.applied_postcode_id == ^id,
+          lock: "FOR UPDATE"
+        )
+      )
+
     postcode =
       Repo.one(from(postcode in Postcode, where: postcode.id == ^id, lock: "FOR UPDATE"))
 
     if postcode do
-      override =
-        Repo.one(
-          from(override in PostcodeOverride,
-            where: override.applied_postcode_id == ^id,
-            lock: "FOR UPDATE"
-          )
-        )
-
       if revision_matches?(postcode, override, expected_revision) do
         persist_update(postcode, override, attrs)
       else
@@ -294,6 +293,16 @@ defmodule Bilimbi.Core.Geonames.PostcodeOverrides do
 
     repo.one(
       from(postcode in Postcode, where: ^predicate, order_by: [asc: postcode.id], limit: 1)
+    )
+  end
+
+  defp country_overrides_query(country_iso) do
+    from(override in PostcodeOverride,
+      where:
+        override.country_iso == ^country_iso or
+          override.source_country_iso == ^country_iso,
+      order_by: [asc: override.id],
+      lock: "FOR UPDATE"
     )
   end
 
