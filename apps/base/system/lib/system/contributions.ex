@@ -5,6 +5,7 @@ defmodule Bilimbi.Base.System.Contributions do
 
   @view "admin.system.info.view"
   @inspector "admin.system.menu-inspector.view"
+  @localization "admin.system.localization.manage"
 
   @impl true
   def contributions do
@@ -21,6 +22,15 @@ defmodule Bilimbi.Base.System.Contributions do
           order: 5
         },
         %{
+          id: "admin.system.localization",
+          label: "Localization",
+          icon: "globe-alt",
+          parent: "admin.system",
+          route: "/system/localization",
+          capability: @localization,
+          order: 10
+        },
+        %{
           id: "admin.system.menu-inspector",
           label: "Menu Inspector",
           icon: "magnifying-glass",
@@ -31,7 +41,7 @@ defmodule Bilimbi.Base.System.Contributions do
         }
       ],
       authz: %{
-        capabilities: [@view, @inspector],
+        capabilities: [@view, @inspector, @localization],
         roles: %{
           "system_viewer" => %{capabilities: [@view, @inspector]}
         }
