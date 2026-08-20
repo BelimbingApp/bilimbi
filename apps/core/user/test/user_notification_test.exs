@@ -260,7 +260,7 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
       scope: scope
     } do
       user_id = 42
-      User.subscribe_notifications(scope, user_id)
+      assert :ok = User.subscribe_notifications(scope, user_id)
 
       {:ok, note} = User.send_notification(scope, user_id, %{title: "Broadcast Note"})
       assert_receive {:notification_event, {:created, %Notification{id: id}}} when id == note.id
@@ -273,6 +273,24 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
 
       {:ok, _del} = User.delete_notification(scope, user_id, note.id)
       assert_receive {:notification_event, {:deleted, %Notification{id: id}}} when id == note.id
+    end
+
+    test "returns :ok when pubsub_server is nil", %{scope: scope} do
+      orig = Application.get_env(:bilimbi_core_user, :pubsub_server)
+
+      try do
+        Application.put_env(:bilimbi_core_user, :pubsub_server, nil)
+        assert :ok = User.subscribe_notifications(scope, 42)
+        assert :ok = User.broadcast_notification(scope, 42, :test_event)
+      after
+        Application.put_env(:bilimbi_core_user, :pubsub_server, orig)
+      end
+    end
+
+    test "subscribing multiple times from the same process succeeds idempotently", %{scope: scope} do
+      user_id = 42
+      assert :ok = User.subscribe_notifications(scope, user_id)
+      assert :ok = User.subscribe_notifications(scope, user_id)
     end
   end
 end

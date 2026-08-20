@@ -34,13 +34,9 @@ defmodule Bilimbi.Base.UI.RescueSuccessGuardTest do
 
   @workspace_root Path.expand("../../../..", __DIR__)
 
-  # Tracked debt, not endorsement: both are `rescue _ -> :ok` around Phoenix
-  # PubSub in Core User, and both are #413. Fixing that issue makes this test
-  # fail until the entry is deleted, which is the point of listing them.
-  @tracked [
-    "apps/core/user/lib/user.ex:518",
-    "apps/core/user/lib/user.ex:535"
-  ]
+  # Tracked debt, not endorsement. An exemption listed here makes the test fail
+  # once its defect is resolved, so exemptions cannot outlive their fix (#413).
+  @tracked []
 
   @success_body ~r/rescue\s*\n(\s*[^\n]*->\s*(?:\{:ok\b|:ok\b|true\b)[^\n]*)/
 
