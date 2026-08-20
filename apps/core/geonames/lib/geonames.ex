@@ -23,6 +23,7 @@ defmodule Bilimbi.Core.Geonames do
   alias Bilimbi.Core.Geonames.Postcode
   alias Bilimbi.Core.Geonames.PostcodeCountrySummary
   alias Bilimbi.Core.Geonames.PostcodeIndex
+  alias Bilimbi.Core.Geonames.PostcodeOverrides
   alias Bilimbi.Core.Geonames.PostcodeSummary
   alias Bilimbi.Core.Geonames.ReferenceData
 
@@ -318,6 +319,30 @@ defmodule Bilimbi.Core.Geonames do
     |> sort_postcode_country_summaries(options)
   end
 
+  @doc "Returns a changeset for an operator-managed postcode form."
+  @spec change_postcode(map()) :: Ecto.Changeset.t()
+  def change_postcode(attrs \\ %{}), do: PostcodeOverrides.changeset(attrs)
+
+  @doc "Creates an operator-managed postcode that survives reference-data refreshes."
+  @spec create_postcode(map()) ::
+          {:ok, PostcodeIndex.t()} | {:error, Ecto.Changeset.t()}
+  def create_postcode(attrs) do
+    case PostcodeOverrides.create(attrs) do
+      {:ok, {postcode, override}} -> {:ok, postcode_index(postcode, override)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc "Updates a postcode using the revision returned by `page_postcodes/1`."
+  @spec update_postcode(term(), term(), map()) ::
+          {:ok, PostcodeIndex.t()} | {:error, :not_found | :stale | Ecto.Changeset.t()}
+  def update_postcode(id, expected_revision, attrs) do
+    case PostcodeOverrides.update(id, expected_revision, attrs) do
+      {:ok, {postcode, override}} -> {:ok, postcode_index(postcode, override)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   @doc """
   Returns distinct postcode values for an Address form's country and prefix.
 
@@ -443,18 +468,34 @@ defmodule Bilimbi.Core.Geonames do
   defp postcode_page(query, options) do
     total_entries = Repo.aggregate(query, :count, :id)
 
-    entries =
+    rows =
       query
       |> order_postcodes(options.sort_by, options.sort_dir)
       |> offset(^((options.page - 1) * options.page_size))
       |> limit(^options.page_size)
       |> select([postcode, country], {postcode, country.country})
       |> Repo.all()
-      |> Enum.map(fn {postcode, country_name} ->
-        PostcodeIndex.from_schema(postcode, country_name)
+
+    overrides = rows |> Enum.map(&elem(&1, 0)) |> PostcodeOverrides.provenance_for()
+
+    entries =
+      Enum.map(rows, fn {postcode, country_name} ->
+        PostcodeIndex.from_schema(postcode, country_name, Map.get(overrides, postcode.id))
       end)
 
     page(entries, options, total_entries)
+  end
+
+  defp postcode_index(postcode, override) do
+    country_name =
+      Repo.one(
+        from(country in Country,
+          where: country.iso == ^postcode.country_iso,
+          select: country.country
+        )
+      )
+
+    PostcodeIndex.from_schema(postcode, country_name, override)
   end
 
   defp page(entries, options, total_entries) do

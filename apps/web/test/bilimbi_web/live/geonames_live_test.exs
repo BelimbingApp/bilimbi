@@ -3,6 +3,8 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Geonames
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
@@ -322,6 +324,135 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     assert render(admin1) =~ "You do not have permission to update Admin1 divisions."
     assert Enum.find(Geonames.list_admin1("MY"), &(&1.id == 1)).name == "Kuala Lumpur"
+  end
+
+  test "creates and edits operator postcodes through stable controls", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list", "admin.geonames.update"])
+
+    {:ok, postcodes, _html} = conn |> log_in_as() |> live(~p"/geonames/postcodes")
+    source = hd(Geonames.page_postcodes(%{search: "50000"}).entries)
+
+    assert has_element?(postcodes, "#postcodes-new", "New Postcode")
+    assert has_element?(postcodes, "#postcode-#{source.id}-place-name")
+    assert has_element?(postcodes, "#postcode-#{source.id}-edit", "Edit details")
+
+    postcodes
+    |> element("#postcode-#{source.id}-place-name")
+    |> render_hook("save-postcode-place", %{
+      "id" => "#{source.id}|#{source.revision}",
+      "place_name" => "Kuala Lumpur City"
+    })
+
+    assert has_element?(
+             postcodes,
+             "#postcode-#{source.id}-place-name [data-role='text']",
+             "Kuala Lumpur City"
+           )
+
+    postcodes |> element("#postcode-#{source.id}-edit") |> render_click()
+    assert has_element?(postcodes, "#postcode-modal")
+    assert has_element?(postcodes, "#postcode-place-name[value='Kuala Lumpur City']")
+
+    postcodes
+    |> form("#postcode-form",
+      postcode: %{
+        country_iso: "MY",
+        postcode: "50001",
+        place_name: "Kuala Lumpur Centre",
+        admin1_code: "MY.14",
+        latitude: "3.139",
+        longitude: "101.6869",
+        accuracy: "4"
+      }
+    )
+    |> render_submit()
+
+    assert Geonames.lookup_postcode("MY", "50000") == []
+
+    assert [%{place_name: "Kuala Lumpur Centre"}] =
+             Geonames.lookup_postcode("MY", "50001")
+
+    postcodes |> element("#postcodes-new") |> render_click()
+    assert has_element?(postcodes, "#postcode-modal")
+    assert has_element?(postcodes, "#postcode-country option[value='MY']")
+    assert has_element?(postcodes, "#postcode-admin1 option[value='MY.14']")
+
+    postcodes
+    |> form("#postcode-form",
+      postcode: %{
+        country_iso: "MY",
+        postcode: "63000",
+        place_name: "Cyberjaya",
+        admin1_code: "MY.14",
+        latitude: "2.9213",
+        longitude: "101.6559",
+        accuracy: "4"
+      }
+    )
+    |> render_submit()
+
+    assert has_element?(postcodes, "#postcodes-table", "Cyberjaya")
+    assert has_element?(postcodes, "#postcodes-table", "Local")
+    assert [%{place_name: "Cyberjaya"}] = Geonames.lookup_postcode("MY", "63000")
+  end
+
+  test "forged postcode writes fail closed without the update capability", %{conn: conn} do
+    grant_capabilities!("admin.geonames.list")
+
+    {:ok, postcodes, _html} = conn |> log_in_as() |> live(~p"/geonames/postcodes")
+    source = hd(Geonames.page_postcodes(%{search: "50000"}).entries)
+
+    refute has_element?(postcodes, "#postcodes-new")
+    refute has_element?(postcodes, "#postcode-#{source.id}-place-name")
+
+    render_hook(postcodes, "save-postcode-place", %{
+      "id" => "#{source.id}|#{source.revision}",
+      "place_name" => "Forged locality"
+    })
+
+    render_hook(postcodes, "save-postcode", %{
+      "postcode" => %{
+        "country_iso" => "MY",
+        "postcode" => "99999",
+        "place_name" => "Forged creation"
+      }
+    })
+
+    assert render(postcodes) =~ "You do not have permission to update postcodes."
+    assert [%{place_name: "Kuala Lumpur"}] = Geonames.lookup_postcode("MY", "50000")
+    assert Geonames.lookup_postcode("MY", "99999") == []
+  end
+
+  test "rechecks a revoked capability before saving an already mounted form", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list", "admin.geonames.update"])
+
+    {:ok, postcodes, _html} = conn |> log_in_as() |> live(~p"/geonames/postcodes")
+    source = hd(Geonames.page_postcodes(%{search: "50000"}).entries)
+    assert has_element?(postcodes, "#postcode-#{source.id}-place-name")
+
+    {:ok, scope} = Tenancy.scope(41)
+
+    grant =
+      scope
+      |> Authz.list_principal_capabilities(
+        principal_type: :user,
+        principal_id: 91,
+        page_size: 100
+      )
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.geonames.update"))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
+
+    postcodes
+    |> element("#postcode-#{source.id}-place-name")
+    |> render_hook("save-postcode-place", %{
+      "id" => "#{source.id}|#{source.revision}",
+      "place_name" => "Revocation bypass"
+    })
+
+    assert render(postcodes) =~ "You do not have permission to update postcodes."
+    assert [%{place_name: "Kuala Lumpur"}] = Geonames.lookup_postcode("MY", "50000")
   end
 
   test "ignores a country update while one is already in progress" do

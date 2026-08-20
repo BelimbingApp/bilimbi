@@ -97,10 +97,13 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
 
       assert recorded_versions() == Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
 
-      latest_versions =
+      recovery_entries =
         Compatibility.migration_entries()
-        |> Enum.take(-2)
-        |> Enum.map(&elem(&1, 0))
+        |> Enum.drop_while(fn {_version, module, _disposition} ->
+          module != Bilimbi.Core.Employee.Migrations.BroadenGlobalIndexAndAddSystemCompanyCheck
+        end)
+
+      recovery_versions = Enum.map(recovery_entries, &elem(&1, 0))
 
       SQL.query!(
         PlatformBaselineTestRepo,
@@ -109,10 +112,16 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       )
 
       assert_runtime_start_fails!(env, :employee)
-      run_mix!("bilimbi.rollback", ["--step", "2", "--quiet"], env)
-      Enum.each(latest_versions, &refute(&1 in recorded_versions()))
+
+      run_mix!(
+        "bilimbi.rollback",
+        ["--step", to_string(length(recovery_entries)), "--quiet"],
+        env
+      )
+
+      Enum.each(recovery_versions, &refute(&1 in recorded_versions()))
       run_mix!("bilimbi.migrate", ["--quiet"], env)
-      Enum.each(latest_versions, &assert(&1 in recorded_versions()))
+      Enum.each(recovery_versions, &assert(&1 in recorded_versions()))
       run_mix!("app.start", [], env)
 
       assert run_mix!(

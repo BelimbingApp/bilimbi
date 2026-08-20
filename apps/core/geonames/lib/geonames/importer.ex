@@ -17,6 +17,7 @@ defmodule Bilimbi.Core.Geonames.Importer do
   alias Bilimbi.Core.Geonames.City
   alias Bilimbi.Core.Geonames.Country
   alias Bilimbi.Core.Geonames.Postcode
+  alias Bilimbi.Core.Geonames.PostcodeOverrides
 
   @chunk_size 500
 
@@ -55,9 +56,15 @@ defmodule Bilimbi.Core.Geonames.Importer do
             repo.delete_all(from(entry in Postcode, where: entry.country_iso == ^iso))
 
             case stream_import(path, &parse_postcode(&1, iso), &insert_postcodes(&1, opts)) do
-              {:ok, %{imported: 0}} -> repo.rollback(:no_valid_rows)
-              {:ok, result} -> result
-              {:error, reason} -> repo.rollback(reason)
+              {:ok, %{imported: 0}} ->
+                repo.rollback(:no_valid_rows)
+
+              {:ok, result} ->
+                :ok = PostcodeOverrides.reapply_country(iso, repo)
+                result
+
+              {:error, reason} ->
+                repo.rollback(reason)
             end
           end,
           timeout: :infinity
