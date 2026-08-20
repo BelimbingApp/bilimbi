@@ -510,11 +510,14 @@ defmodule Bilimbi.Core.User do
   def subscribe_notifications(%Scope{tenant: %{id: tenant_id}}, user_id)
       when is_integer(user_id) do
     if server = pubsub_server() do
-      case Phoenix.PubSub.subscribe(server, notification_topic(tenant_id, user_id)) do
-        :ok -> :ok
-        {:error, {:already_registered, pid}} when pid == self() -> :ok
-        {:error, reason} -> {:error, reason}
-      end
+      # No special case for a second subscribe from the same process.
+      # `Phoenix.PubSub.subscribe/3` is `Registry.register/3` against a registry
+      # declared `keys: :duplicate` (phoenix_pubsub supervisor.ex:31), which is
+      # how many processes share one topic — it never answers
+      # `{:already_registered, _}`. A process that subscribes twice is
+      # registered twice and receives every event twice, which is what #425
+      # guards against at the mount path where it can actually happen.
+      Phoenix.PubSub.subscribe(server, notification_topic(tenant_id, user_id))
     else
       :ok
     end

@@ -235,6 +235,36 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       assert element(view, "#app-notifications-unread-badge") |> render() =~ "1"
     end
 
+    # The regression #424 fixed: NotificationsLive subscribed in its own `mount/3`
+    # while `UserAuth.on_mount(:require_authenticated)` had already subscribed the
+    # same process to the same topic, so every event was delivered twice.
+    #
+    # Asserted against the registry rather than by counting messages, because a
+    # duplicate registration is the defect itself — counting deliveries would make
+    # this a timing test, and a second subscriber would still be there when it
+    # happened to pass.
+    test "the LiveView process is registered on its notification topic exactly once",
+         %{conn: conn} do
+      {:ok, view, _html} = open(conn)
+
+      topic = User.notification_topic(41, 91)
+
+      own_registrations =
+        BilimbiWeb.PubSub
+        |> Registry.lookup(topic)
+        |> Enum.filter(fn {pid, _meta} -> pid == view.pid end)
+
+      assert length(own_registrations) == 1,
+             """
+             Expected the notifications LiveView to hold exactly one subscription
+             to #{topic}, found #{length(own_registrations)}.
+
+             More than one means something subscribed in `mount/3` on top of
+             `UserAuth.on_mount(:require_authenticated)`, and every notification
+             will be delivered once per registration.
+             """
+    end
+
     test "mounts through UserAuth without false error flash and receives real-time updates",
          %{
            conn: conn,
