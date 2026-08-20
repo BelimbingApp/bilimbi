@@ -11,7 +11,10 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, stream_configure(socket, :admin1, dom_id: &"admin1-#{&1.id}")}
+    {:ok,
+     socket
+     |> assign(:can_update?, allowed?(socket.assigns.current_scope, "admin.geonames.update"))
+     |> stream_configure(:admin1, dom_id: &"admin1-#{&1.id}")}
   end
 
   @impl true
@@ -44,6 +47,11 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
       Map.put(socket.assigns.index_state, :page, bounded_page(page, socket.assigns.admin1_page))
 
     {:noreply, push_patch(socket, to: admin1_path(state))}
+  end
+
+  def handle_event("save-admin1-name", _params, %{assigns: %{can_update?: false}} = socket) do
+    {:noreply,
+     put_flash(socket, :error, "You do not have permission to update Admin1 divisions.")}
   end
 
   def handle_event("save-admin1-name", %{"id" => id, "name" => name}, socket) do
@@ -146,6 +154,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
             </:col>
             <:col :let={admin1} label="Name" sort="name" sort_id="admin1-sort-name">
               <.inline_edit
+                :if={@can_update?}
                 id={"admin1-#{admin1.id}-name"}
                 value={admin1.name}
                 id_value={admin1.id}
@@ -153,6 +162,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
                 name="name"
                 label="Admin1 division name"
               />
+              <span :if={not @can_update?} class="text-ink">{admin1.name}</span>
             </:col>
             <:col :let={admin1} label="Alt Name" sort="alt_name" sort_id="admin1-sort-alt-name">
               <span class="whitespace-nowrap text-ink-muted">{admin1.alt_name || "—"}</span>
