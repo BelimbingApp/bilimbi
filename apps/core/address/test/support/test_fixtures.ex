@@ -40,7 +40,7 @@ defmodule Bilimbi.Core.Address.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE addresses (
+      CREATE TEMPORARY TABLE IF NOT EXISTS addresses (
         id bigserial PRIMARY KEY,
         label varchar(255),
         phone varchar(255),
@@ -79,7 +79,7 @@ defmodule Bilimbi.Core.Address.TestFixtures do
     SQL.query!(
       Repo,
       """
-      CREATE TEMPORARY TABLE addressables (
+      CREATE TEMPORARY TABLE IF NOT EXISTS addressables (
         id bigserial PRIMARY KEY,
         address_id bigint NOT NULL,
         addressable_type varchar(255) NOT NULL,
