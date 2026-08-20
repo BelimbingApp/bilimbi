@@ -71,17 +71,31 @@ else
 fi
 
 # 3. Checks on the REVIEWED sha, not on the PR, not on the branch.
-runs=$(gh api "repos/$REPO/commits/$REVIEWED/check-runs" 2>/dev/null)
-n=$(printf '%s' "$runs" | jq -r '.check_runs|length' 2>/dev/null || echo 0)
-bad=$(printf '%s' "$runs" | jq -r \
-      '[.check_runs[]|select(.conclusion!="success" and .conclusion!="skipped")]|length' 2>/dev/null || echo 1)
+# Judge the LATEST run of each check NAME, not every run on the SHA. A
+# superseded run stays on the commit forever: `concurrency: cancel-in-progress`
+# leaves a `cancelled` entry behind whenever a PR is force-pushed or pushed
+# twice quickly, and counting it blocked #432 while all four of those checks had
+# already passed on the same SHA (#433). `neutral` is likewise not a failure --
+# CodeQL reports it transiently before settling.
+runs=$(gh api "repos/$REPO/commits/$REVIEWED/check-runs" --paginate 2>/dev/null)
+
+latest=$(printf '%s' "$runs" | jq -c '
+  [.check_runs[]]
+  | group_by(.name)
+  | map(sort_by(.started_at, .completed_at) | last)' 2>/dev/null)
+
+n=$(printf '%s' "$latest" | jq -r 'length' 2>/dev/null || echo 0)
+bad=$(printf '%s' "$latest" | jq -r \
+      '[.[]|select(.status!="completed" or (.conclusion|IN("success","skipped","neutral")|not))]|length' \
+      2>/dev/null || echo 1)
 min=${GATE_MIN_CHECKS:-6}
 if [ "${n:-0}" -lt "$min" ] || [ "${bad:-1}" != "0" ]; then
-  say_bad "check-runs on ${REVIEWED:0:8}: $n total, $bad not successful (need >=$min, 0 bad)"
-  printf '%s' "$runs" | jq -r \
-    '.check_runs[]|select(.conclusion!="success" and .conclusion!="skipped")|"            \(.name): \(.status)/\(.conclusion // "pending")"'
+  say_bad "checks on ${REVIEWED:0:8}: $n distinct, $bad not passing (need >=$min, 0 bad)"
+  printf '%s' "$latest" | jq -r \
+    '.[]|select(.status!="completed" or (.conclusion|IN("success","skipped","neutral")|not))
+        |"            \(.name): \(.status)/\(.conclusion // "pending")"'
 else
-  say_ok "$n check-runs on ${REVIEWED:0:8}, all successful or skipped"
+  say_ok "$n distinct checks on ${REVIEWED:0:8}, latest run of each passing"
 fi
 
 # 4. Holds. hold:author is the author mid-fix; hold:review is a reviewer with an
