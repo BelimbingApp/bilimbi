@@ -31,13 +31,14 @@ defmodule Bilimbi.Base.Perf.Sample do
     :observed_at
   ]
   @route_pattern ~r|^/[A-Za-z0-9_/:.*-]{0,254}$|
+  @live_view_pattern ~r|^liveview:Elixir\.[A-Za-z0-9_.]{1,230}$|
   @worker_pattern ~r|^[a-z0-9][a-z0-9_/-]{0,127}$|
 
   def changeset(sample, attrs) do
     sample
     |> cast(attrs, @fields)
     |> validate_required([:kind, :identity, :outcome, :duration_ms, :observed_at])
-    |> validate_inclusion(:kind, ~w(request job runtime))
+    |> validate_inclusion(:kind, ~w(request liveview job runtime))
     |> validate_inclusion(:outcome, ~w(ok error cancelled discarded))
     |> validate_inclusion(:response_size_class, ~w(under_1k 1k_10k 10k_100k over_100k))
     |> validate_length(:identity, min: 1, max: 255)
@@ -55,6 +56,9 @@ defmodule Bilimbi.Base.Perf.Sample do
         case get_field(changeset, :kind) do
           "request" ->
             Regex.match?(@route_pattern, identity) and not String.contains?(identity, "?")
+
+          "liveview" ->
+            Regex.match?(@live_view_pattern, identity)
 
           "job" ->
             Regex.match?(@worker_pattern, identity)

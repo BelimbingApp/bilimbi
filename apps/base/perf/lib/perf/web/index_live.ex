@@ -13,6 +13,7 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
      socket
      |> assign(:page_title, "Performance")
      |> assign(:diagnostics, Perf.diagnostics())
+     |> assign(:regressions, recent_regressions())
      |> assign(:filters, default_filters())
      |> assign(:total, 0)
      |> assign(:page_count, 1)
@@ -31,6 +32,7 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
          |> assign(:total, page.total)
          |> assign(:page_count, max(ceil(page.total / filters.page_size), 1))
          |> assign(:diagnostics, Perf.diagnostics())
+         |> assign(:regressions, recent_regressions())
          |> stream(:samples, page.entries, reset: true)}
 
       {:error, _reason} ->
@@ -65,7 +67,7 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
 
   defp parse_filters(params) do
     %{
-      kind: enum(params["kind"], ~w(request job runtime)),
+      kind: enum(params["kind"], ~w(request liveview job runtime)),
       outcome: enum(params["outcome"], ~w(ok error cancelled discarded)),
       identity: bounded(params["identity"], 255),
       page: positive_integer(params["page"], 1),
@@ -119,8 +121,25 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
     if size in @page_sizes, do: size, else: 25
   end
 
+  defp recent_regressions do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    case Perf.regressions(
+           baseline_from: DateTime.add(now, -2, :hour),
+           baseline_to: DateTime.add(now, -1, :hour),
+           current_from: DateTime.add(now, -1, :hour),
+           current_to: now,
+           min_samples: 5,
+           limit: 10
+         ) do
+      {:ok, rows} -> rows
+      {:error, _reason} -> []
+    end
+  end
+
   defp human_status(:available), do: "Available"
   defp human_status(:unavailable), do: "Unavailable"
+  defp human_status(:degraded), do: "Degraded"
   defp human_status(:enabled), do: "Enabled"
   defp human_status(:disabled), do: "Disabled"
   defp human_status(_status), do: "Unknown"

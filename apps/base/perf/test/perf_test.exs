@@ -6,6 +6,7 @@ defmodule Bilimbi.Base.PerfTest do
   alias Bilimbi.Base.Perf.Reporter
   alias Bilimbi.Base.Perf.RuntimeSampler
   alias Bilimbi.Base.Perf.Sample
+  alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings.Definition
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
@@ -31,7 +32,7 @@ defmodule Bilimbi.Base.PerfTest do
     )
 
     Perf.handle_event(
-      [:bilimbi, :repo, :query],
+      [:bilimbi, :base, :repo, :query],
       %{total_time: System.convert_time_unit(7, :millisecond, :native)},
       %{query: "SELECT secret", params: ["credential"]},
       nil
@@ -155,6 +156,24 @@ defmodule Bilimbi.Base.PerfTest do
              Repo.one!(Sample)
   end
 
+  test "classifies a real exhausted Oban job as discarded" do
+    :ok = Perf.attach_handlers()
+    on_exit(&Perf.detach_handlers/0)
+
+    assert {:ok, _job} =
+             %{"worker" => "missing"}
+             |> Oban.Job.new(
+               worker: "Bilimbi.MissingPerfWorker",
+               max_attempts: 1,
+               meta: %{"bilimbi_worker_id" => "base/exhausted"}
+             )
+             |> then(&Oban.insert(Queue.Oban, &1))
+
+    assert %{discard: 1} = Oban.drain_queue(Queue.Oban, queue: :default)
+    synchronize_reporter()
+    assert %Sample{identity: "base/exhausted", outcome: "discarded"} = Repo.one!(Sample)
+  end
+
   test "handler generation change cancels stale observations after reporter restart" do
     previous = make_ref()
     current = make_ref()
@@ -218,6 +237,7 @@ defmodule Bilimbi.Base.PerfTest do
 
     assert %{pending: 1, dropped: dropped} = Reporter.stats()
     assert dropped - dropped_before == 49
+    assert Perf.diagnostics().recorder == :degraded
 
     :sys.resume(Reporter)
     synchronize_reporter()
@@ -357,6 +377,55 @@ defmodule Bilimbi.Base.PerfTest do
                current_to: current_to,
                min_samples: 5
              )
+  end
+
+  test "regression diagnostics bound high-cardinality candidates in SQL" do
+    baseline_from = ~U[2026-08-20 01:00:00Z]
+    baseline_to = ~U[2026-08-20 02:00:00Z]
+    current_from = ~U[2026-08-20 03:00:00Z]
+    current_to = ~U[2026-08-20 04:00:00Z]
+    handler = "perf-regression-query-#{System.unique_integer([:positive])}"
+
+    Enum.each(1..30, fn index ->
+      Enum.each(1..5, fn sample ->
+        insert_sample!(
+          "/candidate/#{index}",
+          DateTime.add(baseline_from, index * 10 + sample, :second),
+          100
+        )
+
+        insert_sample!(
+          "/candidate/#{index}",
+          DateTime.add(current_from, index * 10 + sample, :second),
+          2_000
+        )
+      end)
+    end)
+
+    :telemetry.attach(
+      handler,
+      [:bilimbi, :base, :repo, :query],
+      fn _event, _measurements, metadata, target ->
+        send(target, {:regression_query, metadata.query})
+      end,
+      self()
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    assert {:ok, rows} =
+             Perf.regressions(
+               baseline_from: baseline_from,
+               baseline_to: baseline_to,
+               current_from: current_from,
+               current_to: current_to,
+               min_samples: 5,
+               limit: 3
+             )
+
+    assert length(rows) == 3
+    assert_receive {:regression_query, query}
+    assert query =~ "LIMIT"
   end
 
   defp synchronize_reporter, do: :sys.get_state(Reporter)

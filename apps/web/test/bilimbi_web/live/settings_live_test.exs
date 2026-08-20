@@ -30,8 +30,21 @@ defmodule BilimbiWeb.SettingsLiveTest do
   end
 
   defp open(conn) do
-    grant_capabilities!("base.settings.global.manage")
+    grant_capabilities!(["base.settings.global.manage", "admin.authz.decision-log.list"])
     conn |> log_in_as() |> live(~p"/system/settings")
+  end
+
+  test "definition capabilities hide and reject unauthorized settings", %{conn: conn} do
+    grant_capabilities!("base.settings.global.manage")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/settings")
+
+    refute has_element?(view, "#setting-perf-enabled")
+    view |> render_submit("save", %{"settings" => %{"perf.enabled" => "false"}})
+    refute Settings.overridden?("perf.enabled")
+
+    grant_capabilities!("admin.system.perf.manage")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/settings")
+    assert has_element?(view, "#setting-perf-enabled")
   end
 
   test "requires authentication", %{conn: conn} do

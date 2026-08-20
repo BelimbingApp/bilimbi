@@ -18,7 +18,7 @@ defmodule Bilimbi.Base.Perf.Migrations.CreateSamples do
 
     create(
       constraint(:base_perf_samples, :base_perf_samples_kind_check,
-        check: "kind IN ('request', 'job', 'runtime')"
+        check: "kind IN ('request', 'liveview', 'job', 'runtime')"
       )
     )
 
@@ -33,6 +33,7 @@ defmodule Bilimbi.Base.Perf.Migrations.CreateSamples do
         check:
           "(kind = 'request' AND identity ~ '^/[A-Za-z0-9_/:.*-]{0,254}$' " <>
             "AND position('?' in identity) = 0) OR " <>
+            "(kind = 'liveview' AND identity ~ '^liveview:Elixir\\.[A-Za-z0-9_.]{1,230}$') OR " <>
             "(kind = 'job' AND identity ~ '^[a-z0-9][a-z0-9_/-]{0,127}$') OR " <>
             "(kind = 'runtime' AND identity = 'beam')"
       )

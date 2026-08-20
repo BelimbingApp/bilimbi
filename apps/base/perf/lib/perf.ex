@@ -18,6 +18,7 @@ defmodule Bilimbi.Base.Perf do
   @handler_id "bilimbi-base-perf"
   @request_key {__MODULE__, :request_observation}
   @job_key {__MODULE__, :job_observation}
+  @live_view_key {__MODULE__, :live_view_observation}
   @events [
     [:oban, :job, :start],
     [:oban, :job, :stop],
@@ -25,6 +26,7 @@ defmodule Bilimbi.Base.Perf do
   ]
   @page_sizes [25, 50, 100, 300]
   @route_pattern ~r|^/[A-Za-z0-9_/:.*-]{0,254}$|
+  @live_view_pattern ~r|^liveview:Elixir\.[A-Za-z0-9_.]{1,230}$|
   @worker_pattern ~r|^[a-z0-9][a-z0-9_/-]{0,127}$|
 
   @spec attach_handlers() :: :ok
@@ -64,7 +66,29 @@ defmodule Bilimbi.Base.Perf do
     finish_observation(@job_key, "job", terminal, measurements, metadata, generation)
   end
 
-  def handle_event([:bilimbi, :repo, :query], measurements, _metadata, _generation) do
+  def handle_event([:phoenix, :live_view, phase, :start], measurements, metadata, generation)
+      when phase in [:handle_event, :handle_params] do
+    key = {@live_view_key, phase}
+
+    case live_view_identity(metadata) do
+      {:ok, identity} -> start_observation(key, identity, measurements, generation)
+      :error -> clear_observation(key)
+    end
+  end
+
+  def handle_event([:phoenix, :live_view, phase, terminal], measurements, metadata, generation)
+      when phase in [:handle_event, :handle_params] and terminal in [:stop, :exception] do
+    finish_observation(
+      {@live_view_key, phase},
+      "liveview",
+      terminal,
+      measurements,
+      metadata,
+      generation
+    )
+  end
+
+  def handle_event([:bilimbi, :base, :repo, :query], measurements, _metadata, _generation) do
     duration = native_milliseconds(Map.get(measurements, :total_time, 0))
     accumulate_query(@request_key, duration)
     accumulate_query(@job_key, duration)
@@ -130,13 +154,14 @@ defmodule Bilimbi.Base.Perf do
     reporter_stats = Reporter.stats()
 
     %{
-      recorder: if(reporter?, do: :available, else: :unavailable),
+      recorder: recorder_status(reporter?, reporter_stats),
       store: :available,
       recording: if(recording_enabled?(), do: :enabled, else: :disabled),
       samples: count,
       last_observed_at: latest,
       pending: reporter_stats.pending,
-      dropped: reporter_stats.dropped
+      dropped: reporter_stats.dropped,
+      max_pending: reporter_stats.max_pending
     }
   rescue
     _error ->
@@ -147,7 +172,8 @@ defmodule Bilimbi.Base.Perf do
         samples: nil,
         last_observed_at: nil,
         pending: nil,
-        dropped: nil
+        dropped: nil,
+        max_pending: nil
       }
   catch
     :exit, _reason ->
@@ -158,8 +184,22 @@ defmodule Bilimbi.Base.Perf do
         samples: nil,
         last_observed_at: nil,
         pending: nil,
-        dropped: nil
+        dropped: nil,
+        max_pending: nil
       }
+  end
+
+  @doc "Returns one redacted status string for System diagnostics."
+  @spec health_status() :: String.t()
+  def health_status do
+    case diagnostics() do
+      %{recorder: recorder, store: :available, pending: pending, dropped: dropped}
+      when recorder in [:available, :degraded] and is_integer(pending) and is_integer(dropped) ->
+        "#{status_label(recorder)} (#{pending} pending, #{dropped} dropped)"
+
+      _unavailable ->
+        "Unavailable"
+    end
   end
 
   @doc "Compares route/job latency across two explicit, non-overlapping windows."
@@ -167,25 +207,7 @@ defmodule Bilimbi.Base.Perf do
   def regressions(options) when is_list(options) do
     with {:ok, windows} <- validate_regression_options(options),
          {:ok, threshold} <- slow_threshold() do
-      baseline = window_stats(windows.baseline_from, windows.baseline_to, windows.min_samples)
-      current = window_stats(windows.current_from, windows.current_to, windows.min_samples)
-
-      rows =
-        current
-        |> Enum.flat_map(fn {identity, current_stats} ->
-          case Map.fetch(baseline, identity) do
-            {:ok, baseline_stats} ->
-              [regression_row(identity, baseline_stats, current_stats, threshold)]
-
-            :error ->
-              []
-          end
-        end)
-        |> Enum.filter(&(&1.current_p95_ms >= threshold))
-        |> Enum.sort_by(&{-&1.delta_percent, &1.kind, &1.identity})
-        |> Enum.take(windows.limit)
-
-      {:ok, rows}
+      {:ok, regression_rows(windows, threshold)}
     end
   rescue
     _error -> {:error, :unavailable}
@@ -194,6 +216,15 @@ defmodule Bilimbi.Base.Perf do
   end
 
   def regressions(_options), do: {:error, :invalid_options}
+
+  defp recorder_status(false, _stats), do: :unavailable
+
+  defp recorder_status(true, %{pending: pending, dropped: dropped, max_pending: maximum}) do
+    if dropped > 0 or pending >= maximum, do: :degraded, else: :available
+  end
+
+  defp status_label(:available), do: "Available"
+  defp status_label(:degraded), do: "Degraded"
 
   @doc "Deletes expired history and rows beyond the configured global cap."
   @spec prune() :: {:ok, non_neg_integer()} | {:error, :unavailable}
@@ -300,6 +331,18 @@ defmodule Bilimbi.Base.Perf do
 
   defp worker_identity(_metadata), do: :error
 
+  defp live_view_identity(%{socket: %{view: view}}) when is_atom(view) do
+    identity = "liveview:" <> Atom.to_string(view)
+
+    if byte_size(identity) <= 255 and Regex.match?(@live_view_pattern, identity) do
+      {:ok, identity}
+    else
+      :error
+    end
+  end
+
+  defp live_view_identity(_metadata), do: :error
+
   defp observation_duration(observation, measurements) do
     case Map.get(measurements, :duration) do
       duration when is_integer(duration) and duration >= 0 -> native_milliseconds(duration)
@@ -317,9 +360,16 @@ defmodule Bilimbi.Base.Perf do
        when is_integer(status) and status < 400,
        do: "ok"
 
+  defp outcome("liveview", :stop, %{socket: %{view: view}}) when is_atom(view), do: "ok"
+  defp outcome("liveview", :stop, _metadata), do: "error"
+  defp outcome("liveview", :exception, _metadata), do: "error"
+
   defp outcome("request", :stop, _metadata), do: "error"
   defp outcome("request", :exception, _metadata), do: "error"
-  defp outcome("job", :exception, %{state: :exhausted}), do: "discarded"
+
+  defp outcome("job", :exception, %{state: state}) when state in [:discard, :discarded],
+    do: "discarded"
+
   defp outcome("job", :exception, _metadata), do: "error"
   defp outcome("job", :stop, %{state: state}) when state in [:cancel, :cancelled], do: "cancelled"
 
@@ -368,7 +418,7 @@ defmodule Bilimbi.Base.Perf do
 
     if Keyword.keyword?(options) and Enum.all?(Keyword.keys(options), &(&1 in allowed)) and
          is_integer(page) and page > 0 and page_size in @page_sizes and
-         (is_nil(kind) or kind in ~w(request job runtime)) and
+         (is_nil(kind) or kind in ~w(request liveview job runtime)) and
          (is_nil(identity) or valid_identity_filter?(identity)) and
          (is_nil(outcome) or outcome in ~w(ok error cancelled discarded)) and
          (is_nil(from) or match?(%DateTime{}, from)) and (is_nil(to) or match?(%DateTime{}, to)) do
@@ -446,42 +496,74 @@ defmodule Bilimbi.Base.Perf do
     end
   end
 
-  defp window_stats(from, to, minimum) do
+  defp window_stats_query(from, to, minimum) do
     from(sample in Sample,
       where: sample.observed_at >= ^from and sample.observed_at < ^to,
       group_by: [sample.kind, sample.identity],
       having: count(sample.id) >= ^minimum,
-      select: {
-        {sample.kind, sample.identity},
-        %{
-          samples: count(sample.id),
-          average: avg(sample.duration_ms),
-          p95: fragment("percentile_cont(0.95) WITHIN GROUP (ORDER BY ?)", sample.duration_ms)
-        }
+      select: %{
+        kind: sample.kind,
+        identity: sample.identity,
+        samples: count(sample.id),
+        average: avg(sample.duration_ms),
+        p95: fragment("percentile_cont(0.95) WITHIN GROUP (ORDER BY ?)", sample.duration_ms)
       }
     )
-    |> Repo.all()
-    |> Map.new()
   end
 
-  defp regression_row({kind, identity}, baseline, current, threshold) do
-    baseline_average = numeric_float(baseline.average)
-    current_average = numeric_float(current.average)
+  defp regression_rows(windows, threshold) do
+    baseline =
+      window_stats_query(windows.baseline_from, windows.baseline_to, windows.min_samples)
+
+    current =
+      window_stats_query(windows.current_from, windows.current_to, windows.min_samples)
 
     delta =
-      if baseline_average == 0, do: 0.0, else: (current_average / baseline_average - 1) * 100
+      dynamic(
+        [current, baseline],
+        fragment(
+          "CASE WHEN ? = 0 THEN 0.0 ELSE ((? / ?) - 1) * 100 END",
+          baseline.average,
+          current.average,
+          baseline.average
+        )
+      )
 
-    %{
-      kind: kind,
-      identity: identity,
-      baseline_samples: baseline.samples,
-      current_samples: current.samples,
-      baseline_average_ms: baseline_average,
-      current_average_ms: current_average,
-      current_p95_ms: numeric_float(current.p95),
-      delta_percent: Float.round(delta, 1),
-      slow?: numeric_float(current.p95) >= threshold
-    }
+    from(current in subquery(current),
+      join: baseline in subquery(baseline),
+      on: baseline.kind == current.kind and baseline.identity == current.identity,
+      where: current.p95 >= ^threshold,
+      limit: ^windows.limit,
+      select: %{
+        kind: current.kind,
+        identity: current.identity,
+        baseline_samples: baseline.samples,
+        current_samples: current.samples,
+        baseline_average_ms: baseline.average,
+        current_average_ms: current.average,
+        current_p95_ms: current.p95,
+        delta_percent:
+          fragment(
+            "CASE WHEN ? = 0 THEN 0.0 ELSE ((? / ?) - 1) * 100 END",
+            baseline.average,
+            current.average,
+            baseline.average
+          )
+      }
+    )
+    |> order_by(^[desc: delta])
+    |> order_by([current, _baseline], asc: current.kind, asc: current.identity)
+    |> Repo.all()
+    |> Enum.map(&normalize_regression(&1, threshold))
+  end
+
+  defp normalize_regression(row, threshold) do
+    row
+    |> Map.update!(:baseline_average_ms, &numeric_float/1)
+    |> Map.update!(:current_average_ms, &numeric_float/1)
+    |> Map.update!(:current_p95_ms, &numeric_float/1)
+    |> Map.update!(:delta_percent, &(numeric_float(&1) |> Float.round(1)))
+    |> Map.put(:slow?, numeric_float(row.current_p95_ms) >= threshold)
   end
 
   defp numeric_float(%Decimal{} = value), do: Decimal.to_float(value)

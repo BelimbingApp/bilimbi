@@ -21,6 +21,7 @@ defmodule Bilimbi.Base.System do
   """
 
   alias Bilimbi.Base.Queue
+  alias Bilimbi.Base.Perf
   alias Bilimbi.Base.Repo
 
   @typedoc "A single labelled fact. `value` is `:unavailable` when it could not be read."
@@ -103,7 +104,8 @@ defmodule Bilimbi.Base.System do
     [
       fact("Database", connection_status()),
       fact("Cache", "In-memory (ETS)"),
-      fact("Queue", Queue.health_status())
+      fact("Queue", Queue.health_status()),
+      fact("Performance", Perf.health_status())
     ]
   end
 

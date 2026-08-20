@@ -56,14 +56,7 @@ defmodule Bilimbi.Base.Perf.Reporter do
   def handle_cast({:record, attributes}, state) do
     accepted =
       try do
-        if Perf.recording_enabled?() and Perf.keep_sample?(attributes) do
-          case %Sample{} |> Sample.changeset(attributes) |> Repo.insert() do
-            {:ok, _sample} -> 1
-            {:error, _changeset} -> 0
-          end
-        else
-          0
-        end
+        with_dynamic_repo(fn -> record(attributes) end)
       rescue
         _error -> 0
       catch
@@ -111,6 +104,34 @@ defmodule Bilimbi.Base.Perf.Reporter do
 
   defp instrumentation_enabled? do
     Application.get_env(:bilimbi_base_perf, :instrumentation_enabled, true)
+  end
+
+  defp record(attributes) do
+    if Perf.recording_enabled?() and Perf.keep_sample?(attributes) do
+      case %Sample{} |> Sample.changeset(attributes) |> Repo.insert() do
+        {:ok, _sample} -> 1
+        {:error, _changeset} -> 0
+      end
+    else
+      0
+    end
+  end
+
+  defp with_dynamic_repo(function) do
+    previous = Repo.put_dynamic_repo(dynamic_repo())
+
+    try do
+      function.()
+    after
+      Repo.put_dynamic_repo(previous)
+    end
+  end
+
+  defp dynamic_repo do
+    case Application.get_env(:bilimbi_base_perf, :get_dynamic_repo) do
+      resolver when is_function(resolver, 0) -> resolver.()
+      _default -> Repo
+    end
   end
 
   defp counter(key), do: :ets.lookup_element(@counter_table, key, 2)

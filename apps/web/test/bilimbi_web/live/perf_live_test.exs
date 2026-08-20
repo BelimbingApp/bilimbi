@@ -7,6 +7,7 @@ defmodule BilimbiWeb.PerfLiveTest do
   alias Bilimbi.Base.Perf.Reporter
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
+  alias BilimbiWeb.PerfTelemetry
 
   setup do
     UserFixtures.create_user_tables!()
@@ -38,6 +39,9 @@ defmodule BilimbiWeb.PerfLiveTest do
     assert has_element?(view, "#nav-admin-system-performance[aria-current='page']")
     assert has_element?(view, "#performance-sample-table td", "/reports/:id")
     assert has_element?(view, "#performance-recorder", "Available")
+    assert has_element?(view, "#performance-pending", "0")
+    assert has_element?(view, "#performance-dropped", "0")
+    assert has_element?(view, "#performance-regression-table")
     refute render(view) =~ "credential"
 
     view
@@ -65,6 +69,55 @@ defmodule BilimbiWeb.PerfLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
     assert has_element?(view, "#stat-performance[href='/system/performance']", "Available")
+  end
+
+  test "real LiveView telemetry records successive interactions without leaking state", %{
+    conn: conn
+  } do
+    :ok = PerfTelemetry.attach_handlers()
+    on_exit(&PerfTelemetry.detach_handlers/0)
+    grant_capabilities!("admin.system.perf.view")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/performance")
+
+    view
+    |> form("#performance-filters", %{
+      "filters" => %{"kind" => "request", "identity" => "", "outcome" => ""}
+    })
+    |> render_change()
+
+    :sys.get_state(Reporter)
+
+    assert {:ok, %{total: total}} =
+             Perf.list_samples(
+               identity: "liveview:Elixir.Bilimbi.Base.Perf.Web.IndexLive",
+               page_size: 25
+             )
+
+    assert total >= 2
+
+    before_restart = total
+
+    :telemetry.execute(
+      [:phoenix, :live_view, :handle_event, :start],
+      %{monotonic_time: System.monotonic_time()},
+      %{socket: %{view: Bilimbi.Base.Perf.Web.IndexLive}, event: "filter", params: %{}}
+    )
+
+    :ok = PerfTelemetry.attach_handlers()
+
+    :telemetry.execute(
+      [:phoenix, :live_view, :handle_event, :stop],
+      %{duration: System.convert_time_unit(250, :millisecond, :native)},
+      %{socket: %{view: Bilimbi.Base.Perf.Web.IndexLive}, event: "filter", params: %{}}
+    )
+
+    :sys.get_state(Reporter)
+
+    assert {:ok, %{total: ^before_restart}} =
+             Perf.list_samples(
+               identity: "liveview:Elixir.Bilimbi.Base.Perf.Web.IndexLive",
+               page_size: 25
+             )
   end
 
   defp record_request(route) do
