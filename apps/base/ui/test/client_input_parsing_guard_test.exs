@@ -67,12 +67,31 @@ defmodule Bilimbi.Base.UI.ClientInputParsingGuardTest do
     end
     """
 
+    sample_clean_heex = ~S"""
+    <%!-- <%!-- String.to_integer/1 in comment --%> --%>
+    <div>
+      <span>{@name}</span> # a trailing comment mentioning String.to_atom
+    </div>
+    """
+
+    sample_violator_heex = ~S"""
+    <div id={"row-#{String.to_integer(@x)}"}>
+      <.link phx-value-type={String.to_atom(@type)} />
+    </div>
+    """
+
     assert scan_source(sample_clean, "clean.ex") == []
+    assert scan_source(sample_clean_heex, "clean.html.heex") == []
 
     violations = scan_source(sample_violator, "violator.ex")
     assert length(violations) == 2
     assert Enum.any?(violations, &(&1 =~ "violator.ex:3 (String.to_integer)"))
     assert Enum.any?(violations, &(&1 =~ "violator.ex:4 (String.to_atom)"))
+
+    heex_violations = scan_source(sample_violator_heex, "violator.html.heex")
+    assert length(heex_violations) == 2
+    assert Enum.any?(heex_violations, &(&1 == "violator.html.heex:1"))
+    assert Enum.any?(heex_violations, &(&1 == "violator.html.heex:2"))
   end
 
   defp exempt?(path) do
@@ -144,6 +163,6 @@ defmodule Bilimbi.Base.UI.ClientInputParsingGuardTest do
   defp strip_comments(line) do
     line
     |> String.replace(~r/<%!--.*?--%>/, "")
-    |> String.replace(~r/#.*$/, "")
+    |> String.replace(~r/#(?!\{).*$/, "")
   end
 end
