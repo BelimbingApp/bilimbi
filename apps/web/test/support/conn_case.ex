@@ -54,13 +54,22 @@ defmodule BilimbiWeb.ConnCase do
   # Session, authz, settings, audit, and notification tables belong here so
   # that common web components (such as dashboard widgets, topbars, bell
   # notifications, and navigation) never raise `undefined_table` (42P01)
-  # and get silently masked by fallbacks (#359, #365).
+  # and get silently masked by fallbacks (#359, #365, #409).
   defp create_required_web_tables! do
     apply(Module.concat(["Bilimbi.Base.Session.TestFixtures"]), :create_sessions_table!, [])
     apply(Module.concat(["Bilimbi.Base.Authz.TestFixtures"]), :create_authz_tables!, [])
     apply(Module.concat(["Bilimbi.Base.Settings.TestFixtures"]), :create_settings_table!, [])
     apply(Module.concat(["Bilimbi.Base.Audit.TestFixtures"]), :create_audit_tables!, [])
     apply(Module.concat(["Bilimbi.Core.User.TestFixtures"]), :create_notifications_table!, [])
+
+    # Employee Show loads attached addresses on mount, and both the show suite
+    # and the form suite (which redirects into it) reach them. Until #409 the
+    # 42P01 raised here was caught by a `rescue _ -> []`, so every one of those
+    # tests rendered an employee with no addresses and none of them knew.
+    # `addresses` has foreign keys into both geonames tables, so those go first.
+    address_fixtures = Module.concat(["Bilimbi.Core.Address.TestFixtures"])
+    apply(address_fixtures, :create_geonames_tables!, [])
+    apply(address_fixtures, :create_address_tables!, [])
   end
 
   @doc """
