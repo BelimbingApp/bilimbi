@@ -562,6 +562,118 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert created.code == "north_branch"
     end
 
+    test "company-scoped actor sees only their company as parent and cannot forge a sibling",
+         %{conn: conn} do
+      grant_capabilities!(["admin.company.create"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+
+      assert has_element?(view, "#company-parent option[value='73']")
+      refute has_element?(view, "#company-parent option[value='74']")
+      refute has_element?(view, "#company-parent option[value='75']")
+
+      html =
+        render_submit(view, "save", %{
+          "company" => %{
+            "parent_id" => "74",
+            "name" => "Forged Child",
+            "status" => "active"
+          }
+        })
+
+      assert html =~ "is not available"
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, companies} = Company.list_companies(scope)
+      refute Enum.any?(companies, &(&1.name == "Forged Child"))
+    end
+
+    test "forged non-positive parent ids fail closed without a write", %{conn: conn} do
+      grant_capabilities!(["admin.company.create"])
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+
+      html =
+        render_submit(view, "save", %{
+          "company" => %{
+            "parent_id" => "-1",
+            "name" => "Invalid Parent Child",
+            "status" => "active"
+          }
+        })
+
+      assert html =~ "is not available"
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, companies} = Company.list_companies(scope)
+      refute Enum.any?(companies, &(&1.name == "Invalid Parent Child"))
+    end
+
+    test "revoking create capability after mount prevents a parentless write", %{conn: conn} do
+      grant_capabilities!(["admin.company.create"])
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+      {:ok, scope} = Tenancy.scope(41)
+
+      assert {:ok, :stored} =
+               Bilimbi.Base.Authz.put_principal_capability(
+                 scope,
+                 73,
+                 :user,
+                 91,
+                 "admin.company.create",
+                 false
+               )
+
+      html =
+        render_submit(view, "save", %{
+          "company" => %{
+            "parent_id" => "",
+            "name" => "Revoked Create",
+            "status" => "active"
+          }
+        })
+
+      assert html =~ "is not available"
+      {:ok, companies} = Company.list_companies(scope)
+      refute Enum.any?(companies, &(&1.name == "Revoked Create"))
+    end
+
+    test "tenant-wide company authority exposes sibling parents but not another tenant",
+         %{conn: conn} do
+      grant_capabilities!([
+        "admin.company.create",
+        "admin.company.tenant-wide.manage"
+      ])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+
+      assert has_element?(view, "#company-parent option[value='73']")
+      assert has_element?(view, "#company-parent option[value='74']")
+      refute has_element?(view, "#company-parent option[value='75']")
+
+      view
+      |> form("#company-form",
+        company: %{parent_id: "74", name: "Authorized Child", status: "active"}
+      )
+      |> render_submit()
+
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, companies} = Company.list_companies(scope)
+      assert Enum.any?(companies, &(&1.name == "Authorized Child" and &1.parent_id == 74))
+
+      {:ok, forged, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+
+      html =
+        render_submit(forged, "save", %{
+          "company" => %{
+            "parent_id" => "75",
+            "name" => "Cross Tenant Child",
+            "status" => "active"
+          }
+        })
+
+      assert html =~ "is not available"
+      {:ok, companies} = Company.list_companies(scope)
+      refute Enum.any?(companies, &(&1.name == "Cross Tenant Child"))
+    end
+
     test "rejects invalid JSON payloads without inserting", %{conn: conn} do
       grant_capabilities!(["admin.company.create"])
 

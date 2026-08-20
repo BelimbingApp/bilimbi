@@ -23,6 +23,21 @@ must use that API instead of duplicating the persisted string.
 Core User's tenant-wide list consumes `list_tenant_company_ids/1` so it never
 queries `companies` directly (BLB-S1-010 option a).
 
+## Authorized company reach
+
+`list_selectable_companies/2` and `authorize_company_target/3` combine an
+actor's operation capability with its permitted company reach. An actor may
+always target its own company for an allowed operation. Targeting a sibling
+company additionally requires `admin.company.tenant-wide.manage`, which the
+configured `tenant_owner` role receives. The reach capability never authorizes
+an operation by itself.
+
+Both APIs start from the actor's validated tenant scope, so a company in a
+different tenant remains unavailable even to `tenant_owner` and `core_admin`.
+Callers use these APIs for selector options and repeat the target check on
+submit; they do not inspect role codes or infer authority from the platform-
+operator tenant marker.
+
 ## Transactional live-company proof
 
 `lock_live_company/2` is the Company collaboration seam for a sibling workflow

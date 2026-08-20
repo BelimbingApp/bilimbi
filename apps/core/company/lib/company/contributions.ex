@@ -53,14 +53,18 @@ defmodule Bilimbi.Core.Company.Contributions do
           "admin.company.list",
           "admin.company.create",
           "admin.company.update",
-          "admin.company.delete"
+          "admin.company.delete",
+          "admin.company.tenant-wide.manage"
         ],
         roles: %{
           "tenant_owner" => %{
             capabilities: [
               "admin.company.view",
               "admin.company.list",
-              "admin.company.update"
+              "admin.company.create",
+              "admin.company.update",
+              "admin.company.delete",
+              "admin.company.tenant-wide.manage"
             ]
           }
         },
