@@ -514,12 +514,10 @@ defmodule Bilimbi.Core.User do
     else
       :ok
     end
-  rescue
-    _ -> :ok
   end
 
   @doc "Broadcasts a notification change event to subscribers."
-  @spec broadcast_notification(Scope.t(), pos_integer(), term()) :: :ok
+  @spec broadcast_notification(Scope.t(), pos_integer(), term()) :: :ok | {:error, term()}
   def broadcast_notification(%Scope{tenant: %{id: tenant_id}}, user_id, event)
       when is_integer(user_id) do
     if server = pubsub_server() do
@@ -531,8 +529,6 @@ defmodule Bilimbi.Core.User do
     else
       :ok
     end
-  rescue
-    _ -> :ok
   end
 
   @doc """
