@@ -30,8 +30,13 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
           not allowed?(socket.assigns.current_scope, "admin.user.delete") -> ...
       end
 
-  Idioms 2 and 3 check that a guard is *present*, not that it is correct —
-  the same approximation idiom 1 makes. All three are guards; the deny clause
+      # 4. a local predicate rather than an assign access (base/session)
+      def handle_event("terminate", %{"id" => id}, socket) do
+        if can_manage?(socket) do ... else {:noreply, flash_forbidden} end
+      end
+
+  Idioms 2, 3 and 4 check that a guard is *present*, not that it is correct
+  — the same approximation idiom 1 makes. All four are guards; the deny clause
   is a house style, not a security property, and a test that enforced one
   style while claiming to enforce authorization would be argued with and then
   ignored (review of #415).
@@ -125,8 +130,6 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
   # is an unguarded write-shaped handler. Delete the entry in the same change
   # that guards or opts out the event.
   @tracked [
-    {"apps/base/session/lib/session/web/live/index_live.ex", "terminate"},
-    {"apps/base/tenancy/lib/tenancy/web/live/tenants_live.ex", "create"},
     {"apps/core/company/lib/company/web/show_live.ex", "update_metadata_input"},
     {"apps/core/company/lib/company/web/show_live.ex", "update_new_activity"},
     {"apps/core/employee/lib/employee/web/show_live.ex", "toggle_add_subordinate"},
@@ -135,7 +138,6 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
     {"apps/core/geonames/lib/geonames/web/countries_live.ex", "save-country-name"},
     {"apps/core/geonames/lib/geonames/web/countries_live.ex", "update-countries"},
     {"apps/core/user/lib/user/web/appearance_live.ex", "save"},
-    {"apps/core/user/lib/user/web/database_queries_live/show.ex", "run_query"},
     {"apps/core/user/lib/user/web/notification_bell_component.ex", "mark_all_read"},
     {"apps/core/user/lib/user/web/notification_bell_component.ex", "toggle_dropdown"},
     {"apps/core/user/lib/user/web/notifications_live.ex", "mark_all_read"},
@@ -316,9 +318,9 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
     deny?
   end
 
-  # Idioms 2 and 3: the clause body branches on a can_*? assign read through
-  # `.assigns` (`socket.assigns.can_manage?`), or calls allowed?/2 in any
-  # form.
+  # Idioms 2, 3 and 4: the clause body branches on a can_*? assign read through
+  # `.assigns` (`socket.assigns.can_manage?`), calls allowed?/2 in any form, or
+  # calls a local can_*? predicate (`can_manage?(socket)`).
   defp body_guarded?(body) do
     {_, guarded?} =
       Macro.prewalk(body, false, fn
@@ -333,6 +335,19 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
         # allowed?(...) or Some.Alias.allowed?(...)
         {:allowed?, _, _} = node, _guarded? ->
           {node, true}
+
+        # Idiom 4: a local predicate — `if can_manage?(socket)`. There is no
+        # `.assigns` access to anchor on, so the function name is the only
+        # signal. `is_list(args)` is what separates a call from a variable of
+        # the same name, whose third element is the context atom.
+        #
+        # This clause must stay below the allowed?/2 one: allowed? does not
+        # start with `can_`, so matching it here first would drop idiom 3.
+        {name, _, args} = node, guarded? when is_atom(name) and is_list(args) ->
+          local = Atom.to_string(name)
+
+          {node,
+           guarded? or (String.starts_with?(local, "can_") and String.ends_with?(local, "?"))}
 
         node, guarded? ->
           {node, guarded?}
