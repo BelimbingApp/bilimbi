@@ -4,6 +4,7 @@ defmodule Bilimbi.Base.PerfTest do
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Perf
   alias Bilimbi.Base.Perf.Reporter
+  alias Bilimbi.Base.Perf.RuntimeSampler
   alias Bilimbi.Base.Perf.Sample
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings.Definition
@@ -120,6 +121,129 @@ defmodule Bilimbi.Base.PerfTest do
 
     synchronize_reporter()
     refute Repo.exists?(Sample)
+
+    Reporter.submit(%{valid_attributes("/safe") | identity: "credential=secret"})
+    synchronize_reporter()
+    refute Repo.exists?(Sample)
+  end
+
+  test "records Queue outcomes by stable worker ID without arguments or errors" do
+    generation = make_ref()
+
+    Perf.handle_event(
+      [:oban, :job, :start],
+      %{system_time: System.system_time()},
+      %{
+        job: %{
+          meta: %{"bilimbi_worker_id" => "base/report-export"},
+          args: %{"credential" => "secret"}
+        }
+      },
+      generation
+    )
+
+    Perf.handle_event(
+      [:oban, :job, :stop],
+      %{duration: System.convert_time_unit(300, :millisecond, :native)},
+      %{state: :cancelled, result: {:cancel, RuntimeError.exception("secret")}},
+      generation
+    )
+
+    synchronize_reporter()
+
+    assert %Sample{kind: "job", identity: "base/report-export", outcome: "cancelled"} =
+             Repo.one!(Sample)
+  end
+
+  test "handler generation change cancels stale observations after reporter restart" do
+    previous = make_ref()
+    current = make_ref()
+
+    Perf.handle_event(
+      [:phoenix, :router_dispatch, :start],
+      %{monotonic_time: System.monotonic_time()},
+      %{route: "/stale"},
+      previous
+    )
+
+    Perf.handle_event(
+      [:phoenix, :router_dispatch, :stop],
+      %{duration: System.convert_time_unit(200, :millisecond, :native)},
+      %{conn: %{status: 200}},
+      current
+    )
+
+    synchronize_reporter()
+    refute Repo.exists?(Sample)
+
+    submit_request("/fresh")
+    synchronize_reporter()
+    assert %Sample{identity: "/fresh"} = Repo.one!(Sample)
+  end
+
+  test "runtime pressure samples are eligible even below request duration threshold" do
+    put_settings(%{"perf.minimum_duration_ms" => 60_000})
+    assert :ok = RuntimeSampler.sample_now()
+    synchronize_reporter()
+
+    assert %Sample{
+             kind: "runtime",
+             identity: "beam",
+             duration_ms: 0,
+             memory_bytes: memory,
+             run_queue: run_queue
+           } = Repo.one!(Sample)
+
+    assert memory > 0
+    assert run_queue >= 0
+  end
+
+  test "telemetry storms reserve only the configured bounded queue" do
+    previous_max = Application.get_env(:bilimbi_base_perf, :max_pending)
+    Application.put_env(:bilimbi_base_perf, :max_pending, 1)
+    :sys.suspend(Reporter)
+
+    on_exit(fn ->
+      if Process.whereis(Reporter), do: :sys.resume(Reporter)
+
+      if is_nil(previous_max) do
+        Application.delete_env(:bilimbi_base_perf, :max_pending)
+      else
+        Application.put_env(:bilimbi_base_perf, :max_pending, previous_max)
+      end
+    end)
+
+    dropped_before = Reporter.stats().dropped
+    Enum.each(1..50, fn index -> Reporter.submit(valid_attributes("/storm/#{index}")) end)
+
+    assert %{pending: 1, dropped: dropped} = Reporter.stats()
+    assert dropped - dropped_before == 49
+
+    :sys.resume(Reporter)
+    synchronize_reporter()
+    assert Repo.aggregate(Sample, :count) == 1
+  end
+
+  test "store failure drops telemetry without terminating the reporter or caller" do
+    accepted_before = :sys.get_state(Reporter).accepted
+
+    Ecto.Adapters.SQL.query!(
+      Repo,
+      "ALTER TABLE base_perf_samples RENAME TO unavailable_perf_samples",
+      []
+    )
+
+    try do
+      assert :ok = Reporter.submit(valid_attributes("/business-completed"))
+      assert %{accepted: ^accepted_before} = :sys.get_state(Reporter)
+      assert Process.whereis(Reporter)
+    after
+      Ecto.Adapters.SQL.query!(
+        Repo,
+        "ALTER TABLE unavailable_perf_samples RENAME TO base_perf_samples",
+        []
+      )
+    end
   end
 
   test "disabled and unavailable settings fail closed without raising" do
@@ -155,6 +279,32 @@ defmodule Bilimbi.Base.PerfTest do
              )
   end
 
+  test "concurrent node-equivalent writers and pruners converge on the global row cap" do
+    put_settings(%{"perf.history.keep_days" => 10, "perf.history.max_rows" => 10})
+    observed_at = DateTime.utc_now()
+
+    1..120
+    |> Task.async_stream(
+      fn index ->
+        insert_sample!("/concurrent/#{index}", DateTime.add(observed_at, index, :microsecond))
+      end,
+      max_concurrency: 8,
+      timeout: :infinity,
+      ordered: false
+    )
+    |> Enum.each(fn result -> assert {:ok, %Sample{}} = result end)
+
+    1..4
+    |> Task.async_stream(fn _index -> Perf.prune() end,
+      max_concurrency: 4,
+      timeout: :infinity,
+      ordered: false
+    )
+    |> Enum.each(fn result -> assert {:ok, {:ok, _deleted}} = result end)
+
+    assert Repo.aggregate(Sample, :count) == 10
+  end
+
   test "list is stably paginated and validates filters before querying" do
     observed_at = DateTime.utc_now()
     first = insert_sample!("/same", observed_at)
@@ -167,6 +317,46 @@ defmodule Bilimbi.Base.PerfTest do
     assert older.id == first.id
     assert {:error, :invalid_options} = Perf.list_samples(page_size: 10)
     assert {:error, :invalid_options} = Perf.list_samples(identity: String.duplicate("x", 256))
+  end
+
+  test "regression diagnostics require explicit disjoint windows and deterministic sample floors" do
+    baseline_from = ~U[2026-08-20 01:00:00Z]
+    baseline_to = ~U[2026-08-20 02:00:00Z]
+    current_from = ~U[2026-08-20 03:00:00Z]
+    current_to = ~U[2026-08-20 04:00:00Z]
+
+    Enum.each(1..5, fn second ->
+      insert_sample!("/reports", DateTime.add(baseline_from, second, :second), 100)
+      insert_sample!("/reports", DateTime.add(current_from, second, :second), 2_000)
+    end)
+
+    assert {:ok,
+            [
+              %{
+                identity: "/reports",
+                baseline_samples: 5,
+                current_samples: 5,
+                current_p95_ms: 2_000.0,
+                delta_percent: 1_900.0,
+                slow?: true
+              }
+            ]} =
+             Perf.regressions(
+               baseline_from: baseline_from,
+               baseline_to: baseline_to,
+               current_from: current_from,
+               current_to: current_to,
+               min_samples: 5
+             )
+
+    assert {:error, :invalid_options} =
+             Perf.regressions(
+               baseline_from: baseline_from,
+               baseline_to: current_to,
+               current_from: current_from,
+               current_to: current_to,
+               min_samples: 5
+             )
   end
 
   defp synchronize_reporter, do: :sys.get_state(Reporter)
@@ -187,9 +377,9 @@ defmodule Bilimbi.Base.PerfTest do
     )
   end
 
-  defp insert_sample!(identity, observed_at) do
+  defp insert_sample!(identity, observed_at, duration \\ 250) do
     %Sample{}
-    |> Sample.changeset(valid_attributes(identity, observed_at))
+    |> Sample.changeset(%{valid_attributes(identity, observed_at) | duration_ms: duration})
     |> Repo.insert!()
   end
 

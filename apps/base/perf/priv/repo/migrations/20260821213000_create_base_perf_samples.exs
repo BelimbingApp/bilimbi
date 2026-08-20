@@ -29,6 +29,16 @@ defmodule Bilimbi.Base.Perf.Migrations.CreateSamples do
     )
 
     create(
+      constraint(:base_perf_samples, :base_perf_samples_identity_check,
+        check:
+          "(kind = 'request' AND identity ~ '^/[A-Za-z0-9_/:.*-]{0,254}$' " <>
+            "AND position('?' in identity) = 0) OR " <>
+            "(kind = 'job' AND identity ~ '^[a-z0-9][a-z0-9_/-]{0,127}$') OR " <>
+            "(kind = 'runtime' AND identity = 'beam')"
+      )
+    )
+
+    create(
       constraint(:base_perf_samples, :base_perf_samples_nonnegative_check,
         check:
           "duration_ms >= 0 AND db_duration_ms >= 0 AND db_count >= 0 " <>

@@ -28,7 +28,15 @@ defmodule Bilimbi.Base.Perf.Contributions do
           order: 20
         }
       ],
-      dashboard: [],
+      dashboard: [
+        %{
+          id: "base-perf-health",
+          label: "Performance health",
+          size: :small,
+          order: 50,
+          capability: @view
+        }
+      ],
       schedule: %{
         definitions: [
           %{

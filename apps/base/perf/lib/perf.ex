@@ -19,10 +19,6 @@ defmodule Bilimbi.Base.Perf do
   @request_key {__MODULE__, :request_observation}
   @job_key {__MODULE__, :job_observation}
   @events [
-    [:phoenix, :router_dispatch, :start],
-    [:phoenix, :router_dispatch, :stop],
-    [:phoenix, :router_dispatch, :exception],
-    [:bilimbi, :repo, :query],
     [:oban, :job, :start],
     [:oban, :job, :stop],
     [:oban, :job, :exception]
@@ -34,7 +30,7 @@ defmodule Bilimbi.Base.Perf do
   @spec attach_handlers() :: :ok
   def attach_handlers do
     detach_handlers()
-    :telemetry.attach_many(@handler_id, @events, &__MODULE__.handle_event/4, nil)
+    :telemetry.attach_many(@handler_id, @events, &__MODULE__.handle_event/4, make_ref())
   end
 
   @spec detach_handlers() :: :ok
@@ -44,31 +40,31 @@ defmodule Bilimbi.Base.Perf do
   end
 
   @doc false
-  def handle_event([:phoenix, :router_dispatch, :start], measurements, metadata, _config) do
+  def handle_event([:phoenix, :router_dispatch, :start], measurements, metadata, generation) do
     case route_identity(metadata) do
-      {:ok, identity} -> start_observation(@request_key, identity, measurements)
+      {:ok, identity} -> start_observation(@request_key, identity, measurements, generation)
       :error -> clear_observation(@request_key)
     end
   end
 
-  def handle_event([:phoenix, :router_dispatch, terminal], measurements, metadata, _config)
+  def handle_event([:phoenix, :router_dispatch, terminal], measurements, metadata, generation)
       when terminal in [:stop, :exception] do
-    finish_observation(@request_key, "request", terminal, measurements, metadata)
+    finish_observation(@request_key, "request", terminal, measurements, metadata, generation)
   end
 
-  def handle_event([:oban, :job, :start], measurements, metadata, _config) do
+  def handle_event([:oban, :job, :start], measurements, metadata, generation) do
     case worker_identity(metadata) do
-      {:ok, identity} -> start_observation(@job_key, identity, measurements)
+      {:ok, identity} -> start_observation(@job_key, identity, measurements, generation)
       :error -> clear_observation(@job_key)
     end
   end
 
-  def handle_event([:oban, :job, terminal], measurements, metadata, _config)
+  def handle_event([:oban, :job, terminal], measurements, metadata, generation)
       when terminal in [:stop, :exception] do
-    finish_observation(@job_key, "job", terminal, measurements, metadata)
+    finish_observation(@job_key, "job", terminal, measurements, metadata, generation)
   end
 
-  def handle_event([:bilimbi, :repo, :query], measurements, _metadata, _config) do
+  def handle_event([:bilimbi, :repo, :query], measurements, _metadata, _generation) do
     duration = native_milliseconds(Map.get(measurements, :total_time, 0))
     accumulate_query(@request_key, duration)
     accumulate_query(@job_key, duration)
@@ -88,11 +84,10 @@ defmodule Bilimbi.Base.Perf do
   @doc false
   def keep_sample?(attributes) do
     duration = Map.fetch!(attributes, :duration_ms)
-    minimum = Settings.get("perf.minimum_duration_ms")
     rate = Settings.get("perf.sample_rate")
 
-    valid_number?(duration) and is_integer(minimum) and minimum >= 0 and
-      valid_rate?(rate) and duration >= minimum and sampled?(rate)
+    valid_number?(duration) and valid_rate?(rate) and
+      eligible_duration?(attributes, duration) and sampled?(rate)
   rescue
     _error -> false
   catch
@@ -132,12 +127,16 @@ defmodule Bilimbi.Base.Perf do
     latest = Repo.one(from(sample in Sample, select: max(sample.observed_at)))
     count = Repo.aggregate(Sample, :count, :id)
 
+    reporter_stats = Reporter.stats()
+
     %{
       recorder: if(reporter?, do: :available, else: :unavailable),
       store: :available,
       recording: if(recording_enabled?(), do: :enabled, else: :disabled),
       samples: count,
-      last_observed_at: latest
+      last_observed_at: latest,
+      pending: reporter_stats.pending,
+      dropped: reporter_stats.dropped
     }
   rescue
     _error ->
@@ -146,7 +145,9 @@ defmodule Bilimbi.Base.Perf do
         store: :unavailable,
         recording: :unknown,
         samples: nil,
-        last_observed_at: nil
+        last_observed_at: nil,
+        pending: nil,
+        dropped: nil
       }
   catch
     :exit, _reason ->
@@ -155,7 +156,9 @@ defmodule Bilimbi.Base.Perf do
         store: :unavailable,
         recording: :unknown,
         samples: nil,
-        last_observed_at: nil
+        last_observed_at: nil,
+        pending: nil,
+        dropped: nil
       }
   end
 
@@ -222,12 +225,13 @@ defmodule Bilimbi.Base.Perf do
     :exit, _reason -> {:error, :unavailable}
   end
 
-  defp start_observation(key, identity, measurements) do
+  defp start_observation(key, identity, measurements, generation) do
     clear_observation(key)
 
     Process.put(key, %{
       identity: identity,
       started_at: Map.get(measurements, :monotonic_time, System.monotonic_time()),
+      generation: generation,
       db_count: 0,
       db_duration_ms: 0
     })
@@ -235,9 +239,9 @@ defmodule Bilimbi.Base.Perf do
     :ok
   end
 
-  defp finish_observation(key, kind, terminal, measurements, metadata) do
+  defp finish_observation(key, kind, terminal, measurements, metadata, generation) do
     case Process.delete(key) do
-      %{identity: identity} = observation ->
+      %{identity: identity, generation: ^generation} = observation ->
         Reporter.submit(%{
           kind: kind,
           identity: identity,
@@ -310,11 +314,12 @@ defmodule Bilimbi.Base.Perf do
   defp native_milliseconds(_value), do: 0
 
   defp outcome("request", :stop, %{conn: %{status: status}})
-       when is_integer(status) and status < 500,
+       when is_integer(status) and status < 400,
        do: "ok"
 
   defp outcome("request", :stop, _metadata), do: "error"
   defp outcome("request", :exception, _metadata), do: "error"
+  defp outcome("job", :exception, %{state: :exhausted}), do: "discarded"
   defp outcome("job", :exception, _metadata), do: "error"
   defp outcome("job", :stop, %{state: state}) when state in [:cancel, :cancelled], do: "cancelled"
 
@@ -337,6 +342,15 @@ defmodule Bilimbi.Base.Perf do
 
   defp valid_number?(value), do: is_integer(value) and value >= 0
   defp valid_rate?(value), do: is_number(value) and value >= 0 and value <= 1
+  defp eligible_duration?(%{kind: "runtime"}, _duration), do: true
+
+  defp eligible_duration?(_attributes, duration) do
+    case Settings.get("perf.minimum_duration_ms") do
+      minimum when is_integer(minimum) and minimum >= 0 -> duration >= minimum
+      _invalid -> false
+    end
+  end
+
   defp sampled?(1), do: true
   defp sampled?(1.0), do: true
   defp sampled?(rate) when rate == 0, do: false

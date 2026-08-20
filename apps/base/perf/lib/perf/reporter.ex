@@ -9,7 +9,9 @@ defmodule Bilimbi.Base.Perf.Reporter do
 
   @counter_table :bilimbi_base_perf_reporter
   @counter_key :pending
+  @dropped_key :dropped
   @default_max_pending 1_000
+  @prune_every 100
 
   def start_link(options) do
     GenServer.start_link(__MODULE__, options, name: __MODULE__)
@@ -31,31 +33,49 @@ defmodule Bilimbi.Base.Perf.Reporter do
     _kind, _reason -> :ok
   end
 
+  @doc false
+  def stats do
+    %{
+      pending: counter(@counter_key),
+      dropped: counter(@dropped_key),
+      max_pending: max_pending()
+    }
+  rescue
+    _error -> %{pending: 0, dropped: 0, max_pending: max_pending()}
+  end
+
   @impl true
   def init(_options) do
     :ets.new(@counter_table, [:named_table, :public, :set, read_concurrency: true])
     :ets.insert(@counter_table, {@counter_key, 0})
+    :ets.insert(@counter_table, {@dropped_key, 0})
     :ok = Perf.attach_handlers()
-    {:ok, %{}}
+    {:ok, %{accepted: 0}}
   end
 
   @impl true
   def handle_cast({:record, attributes}, state) do
-    try do
-      if Perf.recording_enabled?() and Perf.keep_sample?(attributes) do
-        %Sample{}
-        |> Sample.changeset(attributes)
-        |> Repo.insert()
+    accepted =
+      try do
+        if Perf.recording_enabled?() and Perf.keep_sample?(attributes) do
+          case %Sample{} |> Sample.changeset(attributes) |> Repo.insert() do
+            {:ok, _sample} -> 1
+            {:error, _changeset} -> 0
+          end
+        else
+          0
+        end
+      rescue
+        _error -> 0
+      catch
+        _kind, _reason -> 0
+      after
+        release_slot()
       end
-    rescue
-      _error -> :ok
-    catch
-      _kind, _reason -> :ok
-    after
-      release_slot()
-    end
 
-    {:noreply, state}
+    accepted = state.accepted + accepted
+    if accepted > 0 and rem(accepted, @prune_every) == 0, do: Perf.prune()
+    {:noreply, %{state | accepted: accepted}}
   end
 
   @impl true
@@ -71,6 +91,7 @@ defmodule Bilimbi.Base.Perf.Reporter do
       true
     else
       release_slot()
+      :ets.update_counter(@counter_table, @dropped_key, {2, 1})
       false
     end
   end
@@ -83,6 +104,11 @@ defmodule Bilimbi.Base.Perf.Reporter do
   end
 
   defp max_pending do
-    Application.get_env(:bilimbi_base_perf, :max_pending, @default_max_pending)
+    case Application.get_env(:bilimbi_base_perf, :max_pending, @default_max_pending) do
+      value when is_integer(value) and value > 0 -> value
+      _invalid -> @default_max_pending
+    end
   end
+
+  defp counter(key), do: :ets.lookup_element(@counter_table, key, 2)
 end
