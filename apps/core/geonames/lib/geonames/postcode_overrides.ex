@@ -86,18 +86,18 @@ defmodule Bilimbi.Core.Geonames.PostcodeOverrides do
   end
 
   defp update_locked(id, expected_revision, attrs) do
-    override =
-      Repo.one(
-        from(override in PostcodeOverride,
-          where: override.applied_postcode_id == ^id,
-          lock: "FOR UPDATE"
-        )
-      )
+    override = lock_override(id)
 
     postcode =
       Repo.one(from(postcode in Postcode, where: postcode.id == ^id, lock: "FOR UPDATE"))
 
     if postcode do
+      # A concurrent first editor can create the sidecar while this transaction
+      # waits for the postcode. Recheck after acquiring that lock so the loser
+      # compares against the override revision and returns :stale rather than
+      # violating the applied-postcode unique index.
+      override = override || lock_override(id)
+
       if revision_matches?(postcode, override, expected_revision) do
         persist_update(postcode, override, attrs)
       else
@@ -303,6 +303,15 @@ defmodule Bilimbi.Core.Geonames.PostcodeOverrides do
           override.source_country_iso == ^country_iso,
       order_by: [asc: override.id],
       lock: "FOR UPDATE"
+    )
+  end
+
+  defp lock_override(postcode_id) do
+    Repo.one(
+      from(override in PostcodeOverride,
+        where: override.applied_postcode_id == ^postcode_id,
+        lock: "FOR UPDATE"
+      )
     )
   end
 
