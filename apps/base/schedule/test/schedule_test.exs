@@ -16,9 +16,11 @@ defmodule Bilimbi.Base.ScheduleTest do
   alias Bilimbi.Base.Schedule.Scheduler
   alias Bilimbi.Base.Schedule.Suppression
   alias Bilimbi.Base.Schedule.TestWorker
+  alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Crontab.CronExpression.Parser
 
   setup do
+    SettingsFixtures.create_settings_table!()
     definition = definition()
 
     ContributionRegistry.put_snapshot_for_test!(%{
