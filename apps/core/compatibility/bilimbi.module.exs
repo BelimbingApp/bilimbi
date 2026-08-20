@@ -12,6 +12,7 @@
     "base/queue",
     "base/ui",
     "base/module_registry",
+    "base/principal_directory",
     "base/authz",
     "base/session",
     "base/settings",
