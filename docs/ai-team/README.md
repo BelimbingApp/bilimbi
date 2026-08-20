@@ -1,11 +1,11 @@
 # Bilimbi AI Team — onboarding
 
 **Document Type:** Onboarding
-**Last Updated:** 2026-08-17
+**Last Updated:** 2026-08-20
 
-Read once. Everything after that happens on Issues, PRs and the
-[presence board](https://github.com/BelimbingApp/bilimbi/issues/208) — not in
-this directory.
+Read once. Everything after that happens on Issues and PRs — not in this
+directory. Where a rule can be a script, it is a script; run those rather than
+remembering this page.
 
 ---
 
@@ -30,12 +30,17 @@ around an error; others plan from it.
 ### The canonical source is a specific checkout
 
 ```
-/home/kiat/repo/laravel/blb    at merge commit e70b4d33c0b10790e681f4c2b5095d85a53bc918
+/home/kiat/repo/laravel/blb    pinned at e70b4d33c0b10790e681f4c2b5095d85a53bc918
 ```
 
 `/home/kiat/repo/Belimbing` is **planning material with no `app/` tree**. If
 you cite "Belimbing", cite a `laravel/blb` path or you are citing the wrong
 thing. This mistake has been made.
+
+That checkout moves, and a pin written on this page cannot notice.
+`.github/scripts/orient.sh` reports where it actually is, whether the pinned
+commit is still an ancestor, and which `app/` files changed after it — it found
+the tree three commits ahead the first time it ran.
 
 ---
 
@@ -60,9 +65,15 @@ claimant followed the rule: a PR opening is the *end* of the work, so a comment
 written at claim time cannot reach someone already building.
 
 **Coordinate with each other, not through the user.** Blocked by a teammate's
-path, a missing token, a permission gap? Say so on
-[#208](https://github.com/BelimbingApp/bilimbi/issues/208), tag whoever can clear
-it, and settle it between you. Nobody is monitoring the board on your behalf.
+path, a missing token, a permission gap? Say so **on the issue or PR that the
+decision belongs to**, tag whoever can clear it, and settle it between you.
+Nobody is monitoring anything on your behalf.
+
+Put it there rather than in a shared thread because that is where the next
+person to hit the same question will look. We ran a central presence board for
+three rounds; it produced about one comment per delivery event, 89% of them
+superseded within the hour, and the rulings written on it became unfindable.
+Both are retired: #352's ruling is useful precisely because it lives on #352.
 
 **One writer per path.** If someone holds it, take something else or agree a
 split with them directly.
@@ -82,41 +93,71 @@ them when the blocker closes.
 ## Heartbeat
 
 Set up an adaptive heartbeat, **10–30 minutes**, to continue your contribution
-to the project. Be proactive in picking up tasks.
-
-Post **one** comment on
-[#208](https://github.com/BelimbingApp/bilimbi/issues/208) and **edit it in
-place**; its edit time is your liveness signal. Read the clock with
+to the project. Be proactive in picking up tasks. Read the clock with
 `date -Iseconds` — one agent's timestamps ran eleven hours ahead for a whole
 session before anyone noticed.
 
-Open your tick with a marker naming you, on its own first line:
+**Before you claim, look at what is already claimed.** One command, always
+current:
 
+```bash
+gh pr list --repo BelimbingApp/bilimbi --state open \
+  --json number,title,isDraft,labels,headRefName
 ```
-<!-- tick:your-agent-id -->
+
+Two PRs touching the same file were opened by the same agent within a day of
+each other, and one would have silently reverted a capability check from the
+other.
+
+If the queue is empty and nothing is unblocked, **say so and idle**. An honest
+idle tick costs a few hundred tokens; manufactured work costs a review.
+
+---
+
+## Mechanisms, not rules
+
+Everything in this section is enforced by something that can say no. Prefer it
+to anything you remember from this page.
+
+**Merge through the gate.** Run it as its own command and chain the merge to it:
+
+```bash
+.github/scripts/gate.sh <pr> <the-sha-you-reviewed> \
+  && gh api -X PUT repos/BelimbingApp/bilimbi/pulls/<pr>/merge -f merge_method=merge
 ```
 
-The marker is what makes "one comment per agent" checkable rather than
-aspirational. Without it the board drifted to **95 comments, 76 of them ticks,
-63 from a single agent**, and only 14 comments had ever been edited — five
-agents were following the rule and two were appending, and nothing could tell
-the difference automatically.
+It checks the branch contains `main`, that every check-run is green **on the SHA
+you reviewed**, that no hold is set, that the head has not moved under you, and
+that the PR is neither a draft nor conflicting. Pass the reviewed SHA — omit it
+and you are gating whatever was pushed since.
 
-`.github/scripts/board_sweep.py` now runs twice an hour and:
+Never write the checks and the merge as one command where the merge can still
+run. #382 reached `main` **behind** it that way: the warning printed and the
+merge went ahead on the next line.
 
-- **regenerates the `<!-- board:begin -->` section of #208's body** from
-  `agent:*` / `task:*` labels and pull request state. Do not hand-write inside
-  those markers — it is overwritten. Anything durable goes outside them.
-- **collapses your superseded ticks.** Your newest stays visible; older ones
-  are minimized as outdated. Nothing is deleted, minimizing is reversible, and
-  only comments carrying a tick marker are eligible — standing instructions and
-  review threads are out of scope by construction.
+**`gh pr merge` is not the gate and never merges anything here.** It refuses
+every PR client-side because `mergeStateStatus` is permanently `BLOCKED`, so its
+verdict carries no information in either direction. Use the REST call above.
 
-**Read the board before claiming work.** The generated section is one fetch and
-is never stale; it exists so you do not have to scroll a thread to find out who
-already owns the file you are about to edit. Two PRs touching the same file were
-opened by the same agent within a day of each other, and one would have silently
-reverted a capability check from the other.
+**Branch protection will not save you.** The "Protect main" ruleset sets
+`strict_required_status_checks_policy`, which would have refused that #382
+merge — but it also lists both shared accounts as bypass actors with
+`bypass_mode: always`, and those accounts are every agent we have. Read it with
+`gh api repos/BelimbingApp/bilimbi/rulesets`; the old branch-protection API
+returns 404. Until agents have distinct identities, the script is the only
+enforcement that exists.
+
+**Holds are labels, never prose.** A hold written as a PR comment was ignored
+five times in one session; the label has never been.
+
+| Label | Set by | Cleared by | Means |
+|---|---|---|---|
+| `hold:author` | the author | the author | mid-fix — do not merge yet |
+| `hold:review` | a reviewer | that reviewer | an open finding — do not merge yet |
+
+Add it the moment you have something you intend to fix, and remove it when the
+fix is pushed. Neither is an ACK: nobody waits on anybody, and no reply is owed.
+Anyone may merge a green, reviewed PR they did not author unless a hold is on it.
 
 ---
 
@@ -144,7 +185,8 @@ re-reading the corpus.
 | Port map — what is done, what remains | [Discussion #73](https://github.com/BelimbingApp/bilimbi/discussions/73) |
 | Claims, handoffs, blockers, review findings | Comments on that issue or PR |
 | Owner and state | `agent:<id>` and `task:*` labels |
-| Presence and heartbeat | [Issue #208](https://github.com/BelimbingApp/bilimbi/issues/208) |
+| Merge holds | `hold:author`, `hold:review` |
+| Gates and sweeps you can run | `.github/scripts/` |
 | RFCs and open questions | [Discussions](https://github.com/BelimbingApp/bilimbi/discussions) |
 | Durable architecture decisions | `docs/architecture/decisions/` |
 | Stage order and exit gates | [`PORTING_STAGES.md`](./PORTING_STAGES.md) |
@@ -180,22 +222,10 @@ reachable only by typing its URL, and the button that fixed it was a second PR
 against the same file the same hour — everything in it could have been a commit
 on the first.
 
-**Before merging someone else's PR, check the branch ref, not just the PR
-head.** `gh api repos/:owner/:repo/git/refs/heads/<branch> --jq .object.sha`
-against the PR's `headRefOid`. GitHub's PR head lags a push by minutes, so a
-merge on green reviews can silently drop the commit the author just pushed.
-That is how a known defect reached `main` while its fix sat on the branch.
-A **404 from that endpoint on a PR whose state is already `MERGED`** means the
-branch was deleted on merge, not that anything diverged — check the state
-before reading a missing ref as a problem.
-
-**`hold:author` stops the merge; the author sets it and the author clears
-it.** Add the label the moment you find something you intend to fix on the PR,
-remove it when the fix is pushed. Anyone may merge a green, reviewed PR they
-did not author *unless* it carries that label. This is not an ACK — nobody
-waits on anybody, and no reply is owed. It exists because the rule above
-assumes a finding is visible when the merge lands, and an author mid-fix is
-the one case where it is not.
+**Review after the merge when you did not get there first.** Teammates merge
+within minutes and that is working as intended — a post-hoc review is a normal
+step here, not a failure. It is how the escalation test in #393 was caught
+asserting a flash where it should have asserted the store.
 
 **A review of a PR opened under your own account silently degrades to
 `COMMENTED`.** GitHub blocks self-approval and we share two accounts, so the
@@ -209,6 +239,13 @@ quiet.
 
 Each of these shipped a defect or wasted hours. They are here so you do not
 rediscover them.
+
+**A rule that is not a mechanism is a rule you will break.** Everything in
+this file that stayed prose was violated at least once — including by the agent
+who wrote it. Everything that became a label or a script held. When you find
+yourself writing guidance, ask what would have to exit non-zero for it to be
+unnecessary, and write that instead. Then delete the prose: this page is read
+cold by every agent that starts, so its length is a tax on all of us.
 
 **Verify against source at the moment you write.** Every wrong claim in this
 project came from forming a thesis on one read, then writing it up from memory
@@ -272,30 +309,18 @@ the triggers in a Bilimbi contract would leave verification permanently red.
 
 ---
 
-## Fast orientation commands
+## Fast orientation
 
 ```bash
-# What is installed, and in what resolved order
-grep -r 'id:' apps/*/*/bilimbi.module.exs
-
-# Run one module's tests (works without root deps)
-cd apps/core/user && mix test
-
-# The real gate: migrate + verify against PostgreSQL
-cd apps/core/compatibility && mix test
-
-# Find a Belimbing table's owner
-grep -rl "create('<table>'" /home/kiat/repo/laravel/blb/app/*/*/Database/Migrations/
-
-# Raw palette classes outside @theme are defects
-grep -rnE '\b(bg|text|border)-(slate|gray|red|green|blue)-[0-9]+' apps/*/lib
-
-# Serve YOUR branch to look at it (PORT is overridable, default 4000)
-cd apps/web && PORT=4002 mix phx.server
+.github/scripts/orient.sh
 ```
 
-**Never judge a screen from the long-lived dev server on :4000.** It is
-somebody else's checkout, and its contribution snapshot is built once at boot:
-a capability contributed after that boot renders as `Unknown` and a merged fix
-is simply absent. Twice in one day that staleness was mistaken for a defect and
-nearly filed as one. Serve the code under test, then look.
+Where the canonical checkout really is, what `main` is at, every open PR and who
+holds it, unclaimed `task:ready` issues, what is blocked, issues whose labels
+make them invisible to those queries, the installed modules in resolved order,
+and the three commands worth knowing.
+
+Run it instead of reading this file again. Orientation is our largest repeated
+cost — every agent pays it on every start — so it belongs in something that
+answers with the current state rather than with what was true when this
+paragraph was written.
