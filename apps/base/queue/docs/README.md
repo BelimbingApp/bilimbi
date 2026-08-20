@@ -8,9 +8,24 @@ Capability modules own their worker logic, business idempotency records, and
 durable business outcomes. They use `Bilimbi.Base.Queue.Worker` with a stable
 lowercase worker ID on the supported `default` queue. Enqueue validates and
 normalizes arguments through the worker before insertion, then rechecks the
-bounded JSON shape. IDs and plain facts are appropriate arguments; credentials,
+bounded JSON shape.
+
+The framework's argument validation limits JSON shape, depth, member count, and
+encoded size; it does not know which worker fields are expected or sensitive.
+Every worker's `validate_args/1` is therefore its persistence allowlist. Match
+the accepted input and return a newly narrowed map:
+
+```elixir
+def validate_args(%{"value" => value}) when is_integer(value),
+  do: {:ok, %{"value" => value}}
+
+def validate_args(_args), do: {:error, :invalid_value}
+```
+
+Returning the input map unchanged persists every structurally valid field in
+`oban_jobs.args`. IDs and plain facts are appropriate arguments; credentials,
 password hashes, schemas, PIDs, functions, unexpected fields, and other
-process-local values are rejected or removed before persistence.
+process-local values must be rejected or removed before persistence.
 
 ## Delivery semantics
 
@@ -38,9 +53,13 @@ They never return arguments, metadata beyond the stable ID, error text, stack
 traces, database URLs, or legacy Laravel payloads.
 
 Completed, cancelled, and discarded jobs are retained for seven days by the
-Pruner plugin. The normal shutdown grace period is 15 seconds: fetching stops,
-in-flight execution receives the grace window, and unfinished work remains
-eligible for retry after restart.
+Pruner plugin. This is deliberately fixed transport retention, not an operator
+setting: it keeps the Queue diagnostic and recovery window bounded and
+consistent across installations. Capability modules that need longer,
+auditable, or operator-configurable history own durable business records and
+their retention policy; Oban job rows are not that ledger. The normal shutdown
+grace period is 15 seconds: fetching stops, in-flight execution receives the
+grace window, and unfinished work remains eligible for retry after restart.
 
 ## Migration, cutover, and rollback
 

@@ -131,6 +131,47 @@ defmodule Bilimbi.Core.Employee do
     end
   end
 
+  @doc """
+  Reads multiple employees by ID under the scope's tenant-wide visibility.
+
+  Returns `{:ok, map}` keyed by employee ID. Non-existent IDs and employees
+  outside the tenant are omitted rather than reported — the caller keeps its row
+  and shows the durable id (ADR 0011).
+
+  Scoped through `Company.list_tenant_company_ids/1`, which **includes
+  soft-deleted companies**, deliberately and for the same reason
+  `Core.User.get_tenant_users/2` does: a durable grant to an employee survives
+  their company being archived, and an operator looking at that grant needs to
+  know whose it is in order to revoke it. Archiving a company does not unmake
+  the grant, so it must not hide the name.
+
+  That differs from `get_employee/2`, which uses `Company.list_companies/1` and
+  sees live companies only. The difference is intended: that function answers
+  "may this actor work with this employee", this one answers "who is this
+  principal a grant already names".
+  """
+  @spec get_tenant_employees(Scope.t(), [pos_integer()]) ::
+          {:ok, %{pos_integer() => Summary.t()}}
+  def get_tenant_employees(%Scope{} = scope, employee_ids) when is_list(employee_ids) do
+    {:ok, company_ids} = Company.list_tenant_company_ids(scope)
+
+    case company_ids do
+      [] ->
+        {:ok, %{}}
+
+      ids ->
+        employees =
+          from(employee in Schema,
+            where: employee.id in ^employee_ids and employee.company_id in ^ids
+          )
+          |> Repo.all()
+          |> Enum.map(&Summary.from_schema/1)
+          |> Map.new(&{&1.id, &1})
+
+        {:ok, employees}
+    end
+  end
+
   @doc "Lists direct subordinates assigned to a supervisor in the given company."
   @spec list_subordinates(Scope.t(), pos_integer(), pos_integer()) ::
           {:ok, [Summary.t()]} | {:error, lookup_error()}
