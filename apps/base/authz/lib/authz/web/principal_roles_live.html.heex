@@ -43,7 +43,7 @@
             id="assignments-search"
             name="search"
             value={@state.search}
-            placeholder="Search by role name, type, or principal id"
+            placeholder="Search by role, principal name, type, or principal id"
             phx-debounce="300"
             autocomplete="off"
             label="Search assignments"
@@ -66,19 +66,19 @@
         <:col
           :let={assignment}
           label="Principal"
-          sort="principal_id"
-          sort_id="assignments-sort-principal_id"
+          sort="principal_name"
+          sort_id="assignments-sort-principal_name"
         >
-          <span class="whitespace-nowrap tabular-nums">
+          <span class={["whitespace-nowrap", !assignment.principal_name && "tabular-nums"]}>
             <.link
               :if={assignment.principal_type == "user"}
               navigate={~p"/users/#{assignment.principal_id}"}
               class="text-sm font-medium text-action hover:underline"
             >
-              {assignment.principal_id}
+              {principal_identity(assignment)}
             </.link>
             <span :if={assignment.principal_type != "user"} class="text-sm text-ink">
-              {assignment.principal_id}
+              {principal_identity(assignment)}
             </span>
           </span>
         </:col>

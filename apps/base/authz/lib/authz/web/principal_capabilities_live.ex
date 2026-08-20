@@ -16,25 +16,36 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
   together, so a type-only filter would raise. Sorting by principal type is
   supported and covers the same need.
 
-  Belimbing joins users and companies to show names. The company half is
-  resolved through the `CompanyDirectory` seam (#183): every row on the page is
+  Belimbing joins users and companies to show names. Bilimbi resolves both
+  halves through seams instead, because Base may not query Core. The company
+  half uses the `CompanyDirectory` seam (#183): every row on the page is
   visibility-filtered to `company_ids/1`, so `Authz.companies_in_scope/1` can
-  name each one without Base querying Core. The principal half stays id-based
-  until #285 decides how Base may name a Core user or employee; decision-log
-  actor names stay ids deliberately (#185 — an audit row is evidence of the
-  moment, not a live view).
+  name each one. The principal half uses the `PrincipalDirectory` seam (#441,
+  ADR 0011) — Core User answers for `user`, Core Employee for `agent`.
 
-  Belimbing sorts on the joined `companies.name`. The LiveView passes the
-  directory's id order (`company_order`) into the administration query, which
-  orders with `array_position` so pagination stays correct without Base joining
-  a Core table.
+  Naming follows the hybrid #285 settled on: a principal inside the actor's
+  tenant is named, one outside keeps its durable id, and nothing crosses the
+  tenant boundary. Belimbing's own join is unscoped and names any user id it
+  finds; that is the entropy this does not port. Decision-log actor names stay
+  ids deliberately (#185 — an audit row is evidence of the moment, not a live
+  view).
+
+  Belimbing sorts on the joined `companies.name` and `users.name`. Both are
+  ordered here with `array_position` over an id order resolved before
+  pagination, so a page boundary never splits a name ordering without Base
+  joining a Core table.
+
+  Principal and Type are separate columns, as they are in Belimbing's blade,
+  because they sort on different things: `principal_name` reads through the
+  directory and `principal_type` is a column on the row. They were one column
+  only while there was no name to put in it.
   """
 
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
 
-  @sortable ~w(created_at principal_type principal_id capability allowed company_id company_name)
+  @sortable ~w(created_at principal_type principal_id principal_name capability allowed company_id company_name)
   @results ~w(allowed denied)
 
   @impl true
@@ -199,6 +210,12 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
   defp principal_label(%{principal_type: "agent"}), do: "Employee"
   defp principal_label(%{principal_type: "user"}), do: "User"
   defp principal_label(%{principal_type: other}), do: to_string(other)
+
+  # The badge already says which kind this is, so the second half carries the
+  # name when the directory resolved one and the durable id when it did not.
+  # An unresolved principal is not an error and must not read like one.
+  defp principal_identity(%{principal_name: name}) when is_binary(name) and name != "", do: name
+  defp principal_identity(%{principal_id: id}), do: to_string(id)
 
   defp created_at(%{created_at: nil}), do: "—"
   defp created_at(%{created_at: at}), do: Calendar.strftime(at, "%Y-%m-%d %H:%M")
