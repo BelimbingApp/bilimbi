@@ -99,6 +99,76 @@ defmodule Bilimbi.Base.SettingsTest do
     assert Settings.get("tests.personal", Scope.user(10)) == "system"
   end
 
+  test "numeric definitions enforce inclusive bounds without changing unbounded settings" do
+    bounded_integer =
+      Definition.new!("tests.bounded_integer", "tests/settings", %{
+        type: :integer,
+        scopes: [:global],
+        default: 5,
+        minimum: 0,
+        maximum: 10
+      })
+
+    assert Definition.accepts?(bounded_integer, 0)
+    assert Definition.accepts?(bounded_integer, 10)
+    refute Definition.accepts?(bounded_integer, -1)
+    refute Definition.accepts?(bounded_integer, 11)
+
+    bounded_float =
+      Definition.new!("tests.bounded_float", "tests/settings", %{
+        type: :float,
+        scopes: [:global],
+        default: 0.0,
+        minimum: -1.5,
+        maximum: 2
+      })
+
+    assert Definition.accepts?(bounded_float, -1.5)
+    assert Definition.accepts?(bounded_float, 2.0)
+    refute Definition.accepts?(bounded_float, -1.6)
+    refute Definition.accepts?(bounded_float, 2.1)
+
+    unbounded_integer =
+      Definition.new!("tests.unbounded_integer", "tests/settings", %{
+        type: :integer,
+        scopes: [:global],
+        default: 0
+      })
+
+    assert Definition.accepts?(unbounded_integer, -1_000_000)
+    assert Definition.accepts?(unbounded_integer, 1_000_000)
+  end
+
+  test "definition validation rejects inverted, non-numeric, and wrong-type bounds" do
+    assert_raise ArgumentError, ~r/minimum must not exceed maximum/, fn ->
+      Definition.new!("tests.inverted", "tests/settings", %{
+        type: :integer,
+        scopes: [:global],
+        default: 5,
+        minimum: 10,
+        maximum: 0
+      })
+    end
+
+    assert_raise ArgumentError, ~r/minimum is supported only for numeric settings/, fn ->
+      Definition.new!("tests.bounded_string", "tests/settings", %{
+        type: :string,
+        scopes: [:global],
+        default: "ok",
+        minimum: 1
+      })
+    end
+
+    assert_raise ArgumentError, ~r/maximum must match integer/, fn ->
+      Definition.new!("tests.wrong_bound_type", "tests/settings", %{
+        type: :integer,
+        scopes: [:global],
+        default: 1,
+        maximum: 1.5
+      })
+    end
+  end
+
   test "claimed runtime state has no default and supports wildcard ownership" do
     assert Settings.get("tests.jobs.last_run") == nil
 

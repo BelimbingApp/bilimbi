@@ -15,6 +15,8 @@ defmodule Bilimbi.Base.Settings.Definition do
     :help,
     :editable,
     :capability,
+    :minimum,
+    :maximum,
     scopes: [],
     nullable: false,
     encrypted: false
@@ -56,8 +58,14 @@ defmodule Bilimbi.Base.Settings.Definition do
       label: optional_string!(Map.get(attributes, :label), key, :label),
       help: optional_string!(Map.get(attributes, :help), key, :help),
       editable: optional_string!(Map.get(attributes, :editable), key, :editable),
-      capability: optional_string!(Map.get(attributes, :capability), key, :capability)
+      capability: optional_string!(Map.get(attributes, :capability), key, :capability),
+      minimum: optional_bound!(Map.get(attributes, :minimum), type, key, :minimum),
+      maximum: optional_bound!(Map.get(attributes, :maximum), type, key, :maximum)
     }
+
+    if definition.minimum && definition.maximum && definition.minimum > definition.maximum do
+      invalid!(key, "minimum must not exceed maximum")
+    end
 
     if definition.editable && (is_nil(definition.label) or is_nil(definition.help)) do
       invalid!(key, "editable definitions must declare label and help")
@@ -78,8 +86,16 @@ defmodule Bilimbi.Base.Settings.Definition do
   def accepts?(%__MODULE__{nullable: nullable}, nil), do: nullable
   def accepts?(%__MODULE__{type: :array}, value), do: is_list(value) or is_map(value)
   def accepts?(%__MODULE__{type: :boolean}, value), do: is_boolean(value)
-  def accepts?(%__MODULE__{type: :float}, value), do: is_float(value)
-  def accepts?(%__MODULE__{type: :integer}, value), do: is_integer(value)
+
+  def accepts?(%__MODULE__{type: :float} = definition, value) when is_float(value),
+    do: within_bounds?(definition, value)
+
+  def accepts?(%__MODULE__{type: :float}, _value), do: false
+
+  def accepts?(%__MODULE__{type: :integer} = definition, value) when is_integer(value),
+    do: within_bounds?(definition, value)
+
+  def accepts?(%__MODULE__{type: :integer}, _value), do: false
   def accepts?(%__MODULE__{type: :string}, value), do: is_binary(value)
   def accepts?(%__MODULE__{type: :mixed}, _value), do: true
 
@@ -121,6 +137,21 @@ defmodule Bilimbi.Base.Settings.Definition do
     do: value
 
   defp optional_string!(_value, key, field), do: invalid!(key, "#{field} must be non-empty")
+
+  defp optional_bound!(nil, _type, _key, _field), do: nil
+  defp optional_bound!(value, :integer, _key, _field) when is_integer(value), do: value
+  defp optional_bound!(value, :float, _key, _field) when is_number(value), do: value
+
+  defp optional_bound!(_value, type, key, field) when type in [:integer, :float],
+    do: invalid!(key, "#{field} must match #{type}")
+
+  defp optional_bound!(_value, _type, key, field),
+    do: invalid!(key, "#{field} is supported only for numeric settings")
+
+  defp within_bounds?(definition, value) do
+    (is_nil(definition.minimum) or value >= definition.minimum) and
+      (is_nil(definition.maximum) or value <= definition.maximum)
+  end
 
   # The storage limit, enforced where every other malformed definition is
   # caught. Without this a module can declare an over-long key, have it
