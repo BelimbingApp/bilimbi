@@ -15,6 +15,7 @@ defmodule Bilimbi.Base.Authz.Administration do
   alias Bilimbi.Base.Authz.Role
   alias Bilimbi.Base.Authz.RoleCapability
   alias Bilimbi.Base.Authz.RoleSummary
+  alias Bilimbi.Base.PrincipalDirectory
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Scope
 
@@ -42,10 +43,13 @@ defmodule Bilimbi.Base.Authz.Administration do
     actor_type: :actor_type,
     actor_id: :actor_id
   }
+  @principal_kinds %{"user" => :user, "agent" => :agent}
+
   @principal_capability_sort_fields %{
     created_at: :created_at,
     principal_type: :principal_type,
     principal_id: :principal_id,
+    principal_name: :principal_name,
     capability: :capability_key,
     allowed: :is_allowed,
     company_id: :company_id,
@@ -182,12 +186,30 @@ defmodule Bilimbi.Base.Authz.Administration do
       )
 
     visibility = company_visibility(scope, company_ids(scope, registry))
+    search = search!(opts[:search])
 
-    query =
+    # Everything except the free-text search. This is the set the directory
+    # ranks: the principals this screen references, not the tenant's roster.
+    # Search is excluded on purpose -- a row that matches on capability key
+    # still has to render its principal's name, so names are resolved for the
+    # whole visible set and the search narrows afterwards.
+    visible =
       from(grant in PrincipalCapability, where: ^visibility)
-      |> maybe_search_principal_capabilities(search!(opts[:search]))
       |> maybe_filter_principal_allowed(allowed!(opts[:allowed]))
       |> filter_principal(principal_filter!(opts[:principal_type], opts[:principal_id]))
+
+    candidates = principal_candidates(visible)
+    ranked = rank_principals(scope, candidates)
+
+    query =
+      maybe_search_principal_capabilities(
+        visible,
+        search,
+        principal_search_keys(scope, candidates, search)
+      )
+
+    opts = Keyword.put(opts, :principal_order, principal_order(ranked))
+    names = principal_names(ranked)
 
     page_query(
       query,
@@ -198,7 +220,7 @@ defmodule Bilimbi.Base.Authz.Administration do
         @principal_capability_sort_fields
       ),
       opts,
-      fn rows -> Enum.map(rows, &PrincipalCapabilitySummary.from_schema/1) end
+      fn rows -> Enum.map(rows, &PrincipalCapabilitySummary.from_schema(&1, names)) end
     )
   end
 
@@ -206,6 +228,7 @@ defmodule Bilimbi.Base.Authz.Administration do
     created_at: :created_at,
     principal_type: :principal_type,
     principal_id: :principal_id,
+    principal_name: :principal_name,
     role_name: :role_name,
     company_id: :company_id,
     company_name: :company_name
@@ -223,14 +246,27 @@ defmodule Bilimbi.Base.Authz.Administration do
 
     visibility = company_visibility(scope, company_ids(scope, registry))
     sort_by = sort_by!(opts[:sort_by], @principal_role_sort_fields)
+    search = search!(opts[:search])
 
-    query =
+    visible =
       from(assignment in PrincipalRole,
         join: role in Role,
         on: role.id == assignment.role_id,
         where: ^visibility
       )
-      |> maybe_search_principal_roles(search!(opts[:search]))
+
+    candidates = principal_candidates(visible)
+    ranked = rank_principals(scope, candidates)
+
+    query =
+      maybe_search_principal_roles(
+        visible,
+        search,
+        principal_search_keys(scope, candidates, search)
+      )
+
+    opts = Keyword.put(opts, :principal_order, principal_order(ranked))
+    names = principal_names(ranked)
 
     ordered_query =
       query
@@ -243,7 +279,7 @@ defmodule Bilimbi.Base.Authz.Administration do
       opts,
       fn rows ->
         Enum.map(rows, fn %{assignment: assignment, role: role} ->
-          PrincipalRoleSummary.from_schema(assignment, role)
+          PrincipalRoleSummary.from_schema(assignment, role, names)
         end)
       end
     )
@@ -292,6 +328,63 @@ defmodule Bilimbi.Base.Authz.Administration do
         end)
       end
     )
+  end
+
+  # The principals a screen references are a bounded set -- the distinct pairs
+  # in the visibility-filtered query -- so that is what the directory ranks.
+  # Selecting them before pagination is what makes name ordering and name
+  # search apply to the whole result instead of to one page (ADR 0011, #441).
+  defp principal_candidates(query) do
+    query
+    |> exclude(:order_by)
+    |> exclude(:select)
+    |> exclude(:preload)
+    |> distinct(true)
+    |> select([row], {row.principal_type, row.principal_id})
+    |> Repo.all()
+    |> Enum.flat_map(fn {type, id} ->
+      case Map.fetch(@principal_kinds, type) do
+        {:ok, kind} -> [{kind, id}]
+        # A stored type no directory kind answers for. It keeps its id.
+        :error -> []
+      end
+    end)
+  end
+
+  defp rank_principals(scope, candidates) do
+    case PrincipalDirectory.rank(scope, candidates) do
+      {:ok, ranked} ->
+        ranked
+
+      # Past the ceiling the screen keeps durable ids for every row rather than
+      # naming an arbitrary subset: a page where some principals are named and
+      # some are not is harder to read than one where none are.
+      # `:name_search_unavailable` cannot arrive here -- this call passes no
+      # `:search`.
+      {:error, :too_many_candidates} ->
+        []
+    end
+  end
+
+  defp principal_names(ranked), do: Map.new(ranked, &{{&1.kind, &1.id}, &1.name})
+
+  defp principal_order(ranked), do: Enum.map(ranked, &principal_key/1)
+
+  defp principal_key(%{kind: kind, id: id}), do: "#{kind}:#{id}"
+
+  # Belimbing searches the joined `users.name`. Bilimbi cannot join a Core
+  # table, so the same reach is had by asking the directory which of this
+  # screen's principals match, then matching those pairs in SQL. An empty list
+  # is a search that matches no principal, which is exactly what should happen
+  # when a kind has no installed provider.
+  defp principal_search_keys(_scope, _candidates, nil), do: []
+
+  defp principal_search_keys(scope, candidates, search) do
+    case PrincipalDirectory.rank(scope, candidates, search: search) do
+      {:ok, ranked} -> Enum.map(ranked, &principal_key/1)
+      {:error, :too_many_candidates} -> []
+      {:error, :name_search_unavailable} -> []
+    end
   end
 
   defp page_query(count_query, ordered_query, opts, mapper) do
@@ -389,17 +482,39 @@ defmodule Bilimbi.Base.Authz.Administration do
     )
   end
 
-  defp maybe_search_principal_roles(query, nil), do: query
+  defp maybe_search_principal_roles(query, nil, _keys), do: query
 
-  defp maybe_search_principal_roles(query, search) do
+  defp maybe_search_principal_roles(query, search, keys) do
     pattern = "%#{search}%"
 
     from([assignment, role] in query,
       where:
         ilike(role.name, ^pattern) or ilike(role.code, ^pattern) or
           ilike(assignment.principal_type, ^pattern) or
-          fragment("CAST(? AS TEXT) ILIKE ?", assignment.principal_id, ^pattern)
+          fragment("CAST(? AS TEXT) ILIKE ?", assignment.principal_id, ^pattern) or
+          fragment(
+            "(? || ':' || ?::text) = ANY(?::text[])",
+            assignment.principal_type,
+            assignment.principal_id,
+            ^keys
+          )
     )
+  end
+
+  defp order_principal_roles(query, :principal_name, opts) do
+    direction = sort_dir!(opts[:sort_dir])
+    keys = opts[:principal_order] || []
+
+    order_by(query, [assignment, _role], [
+      {^direction,
+       fragment(
+         "array_position(?::text[], ? || ':' || ?::text)",
+         ^keys,
+         assignment.principal_type,
+         assignment.principal_id
+       )},
+      {^direction, assignment.id}
+    ])
   end
 
   defp order_principal_roles(query, :company_name, opts) do
@@ -431,15 +546,21 @@ defmodule Bilimbi.Base.Authz.Administration do
     ])
   end
 
-  defp maybe_search_principal_capabilities(query, nil), do: query
+  defp maybe_search_principal_capabilities(query, nil, _keys), do: query
 
-  defp maybe_search_principal_capabilities(query, search) do
+  defp maybe_search_principal_capabilities(query, search, keys) do
     pattern = "%#{search}%"
 
     from(grant in query,
       where:
         ilike(grant.capability_key, ^pattern) or
-          ilike(grant.principal_type, ^pattern)
+          ilike(grant.principal_type, ^pattern) or
+          fragment(
+            "(? || ':' || ?::text) = ANY(?::text[])",
+            grant.principal_type,
+            grant.principal_id,
+            ^keys
+          )
     )
   end
 
@@ -460,6 +581,22 @@ defmodule Bilimbi.Base.Authz.Administration do
     from(grant in query,
       where: grant.principal_type == ^principal_type and grant.principal_id == ^principal_id
     )
+  end
+
+  defp order_query(query, :principal_name, opts, _fields) do
+    direction = sort_dir!(opts[:sort_dir])
+    keys = opts[:principal_order] || []
+
+    order_by(query, [grant], [
+      {^direction,
+       fragment(
+         "array_position(?::text[], ? || ':' || ?::text)",
+         ^keys,
+         grant.principal_type,
+         grant.principal_id
+       )},
+      {^direction, grant.id}
+    ])
   end
 
   defp order_query(query, :company_name, opts, _fields) do

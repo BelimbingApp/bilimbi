@@ -80,12 +80,14 @@
         <:col
           :let={grant}
           label="Principal"
-          sort="principal_type"
-          sort_id="grants-sort-principal_type"
+          sort="principal_name"
+          sort_id="grants-sort-principal_name"
         >
           <span class="whitespace-nowrap text-ink-muted">
             <.badge>{principal_label(grant)}</.badge>
-            <span class="ml-1 tabular-nums">{grant.principal_id}</span>
+            <span class={["ml-1", !grant.principal_name && "tabular-nums"]}>
+              {principal_identity(grant)}
+            </span>
           </span>
         </:col>
 
