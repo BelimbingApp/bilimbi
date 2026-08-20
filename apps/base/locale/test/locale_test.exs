@@ -190,6 +190,17 @@ defmodule Bilimbi.Base.LocaleTest do
            } = Locale.resolve(nil, %Bootstrap{country_iso: "DE", languages: "de"})
   end
 
+  test "database failures other than a missing Settings table remain visible" do
+    Ecto.Adapters.SQL.query!(Repo, "ALTER TABLE base_settings DROP COLUMN value", [])
+
+    error =
+      assert_raise Postgrex.Error, fn ->
+        Locale.resolve(nil, %Bootstrap{country_iso: "DE", languages: "de"})
+      end
+
+    assert error.postgres.code == :undefined_column
+  end
+
   test "bootstrap facts without a country do not infer or persist a locale" do
     assert %Resolved{locale: "en-MY", source: "declared_default"} =
              Locale.resolve(nil, %Bootstrap{country_iso: "", languages: "de"})

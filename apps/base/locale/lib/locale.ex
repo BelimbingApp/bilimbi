@@ -20,6 +20,11 @@ defmodule Bilimbi.Base.Locale do
   consumers. `language/1` separately returns the language code a Gettext
   adapter applies. No process-global locale is changed here, so concurrent and
   long-lived processes cannot inherit another caller's resolved state.
+
+  The foundation definition deliberately leaves `editable` and `capability`
+  unset. Belimbing's values name the not-yet-installed System localization UI
+  and its authorization capability; the later UI increment must contribute
+  those together rather than publishing an unknown capability or empty group.
   """
 
   alias Bilimbi.Base.Locale.Bootstrap
