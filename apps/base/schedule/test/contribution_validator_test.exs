@@ -11,6 +11,7 @@ defmodule Bilimbi.Base.Schedule.ContributionValidatorTest do
              ])
 
     assert definition.owner == "base/perf"
+    assert definition.owner_route == "/system/performance"
     assert definition.worker == TestWorker
     assert definition.misfire == :coalesce
   end
@@ -22,6 +23,10 @@ defmodule Bilimbi.Base.Schedule.ContributionValidatorTest do
 
     assert_raise ArgumentError, ~r/not an IANA timezone/, fn ->
       validate!(Map.put(attributes(), :timezone, "Mars/Olympus"))
+    end
+
+    assert_raise ArgumentError, ~r/internal absolute path/, fn ->
+      validate!(Map.put(attributes(), :owner_route, "https://example.test/performance"))
     end
 
     assert_raise ArgumentError, ~r/is owned by/, fn ->
@@ -48,6 +53,7 @@ defmodule Bilimbi.Base.Schedule.ContributionValidatorTest do
       expression: "15 1 * * *",
       timezone: "Etc/UTC",
       task_name: "Performance history prune",
+      owner_route: "/system/performance",
       worker: TestWorker,
       args: %{"value" => 1},
       overlap: :forbid,

@@ -1,0 +1,374 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} active_nav="admin.system.schedule">
+  <.page id="schedule-board">
+    <.header>
+      Schedule
+      <:subtitle>Everything scheduled to fire across the system, and how the last runs went.</:subtitle>
+    </.header>
+
+    <section id="schedule-diagnostics" aria-labelledby="schedule-diagnostics-title" class="mt-2">
+      <h2 id="schedule-diagnostics-title" class="sr-only">Schedule diagnostics</h2>
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <.card id="schedule-diagnostic-scheduler" inner_class="px-3 py-2">
+          <p class="text-xs font-medium text-ink-muted">Scheduler</p>
+          <.badge kind={status_kind(@diagnostics.scheduler)} class="mt-1">
+            {status_label(@diagnostics.scheduler)}
+          </.badge>
+        </.card>
+        <.card id="schedule-diagnostic-queue" inner_class="px-3 py-2">
+          <p class="text-xs font-medium text-ink-muted">Queue</p>
+          <.badge kind={status_kind(@diagnostics.queue)} class="mt-1">
+            {status_label(@diagnostics.queue)}
+          </.badge>
+        </.card>
+        <.card id="schedule-diagnostic-recorder" inner_class="px-3 py-2">
+          <p class="text-xs font-medium text-ink-muted">Run recorder</p>
+          <.badge kind={status_kind(@diagnostics.recorder)} class="mt-1">
+            {status_label(@diagnostics.recorder)}
+          </.badge>
+        </.card>
+        <.card id="schedule-diagnostic-due-work" inner_class="px-3 py-2">
+          <p class="text-xs font-medium text-ink-muted">Due work</p>
+          <.badge kind={status_kind(@diagnostics.due_work)} class="mt-1">
+            {due_label(@diagnostics.due_work)}
+          </.badge>
+        </.card>
+      </div>
+    </section>
+
+    <nav id="schedule-tabs" class="mt-5 flex gap-1 border-b border-line" aria-label="Schedule views">
+      <.link
+        :for={{tab, label} <- [{"tasks", "Tasks"}, {"history", "History"}, {"settings", "Settings"}]}
+        id={"schedule-tab-#{tab}"}
+        patch={tab_path(@state, tab)}
+        aria-current={@state.tab == tab && "page"}
+        class={[
+          "-mb-px border-b-2 px-3 py-2 text-sm transition",
+          @state.tab == tab && "border-brand-strong font-medium text-ink-strong",
+          @state.tab != tab && "border-transparent text-ink-muted hover:text-ink"
+        ]}
+      >
+        {label}
+      </.link>
+    </nav>
+
+    <section :if={@state.tab == "tasks"} id="schedule-tasks-panel" aria-labelledby="schedule-tab-tasks">
+      <.form
+        for={@task_form}
+        id="schedule-task-filters"
+        phx-change="filter_tasks"
+        phx-submit="filter_tasks"
+        class="mt-4 flex flex-wrap gap-3"
+      >
+        <div class="min-w-[240px] flex-1">
+          <.input
+            field={@task_form[:search]}
+            id="schedule-task-search"
+            type="search"
+            label="Search task name"
+            label_class="sr-only"
+            wrapper_class="mb-0"
+            placeholder="Search task name…"
+            maxlength="255"
+            phx-debounce="300"
+            autocomplete="off"
+            class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+          />
+        </div>
+        <div>
+          <.input
+            field={@task_form[:status]}
+            id="schedule-task-status"
+            type="select"
+            label="Filter task status"
+            label_class="sr-only"
+            wrapper_class="mb-0"
+            options={[
+              {"All task statuses", ""},
+              {"Never run", "never"},
+              {"Running", "running"},
+              {"Succeeded", "succeeded"},
+              {"Failed", "failed"},
+              {"Skipped", "skipped"},
+              {"Paused", "paused"},
+              {"Unreviewed", "unreviewed"},
+              {"Disabled", "disabled"}
+            ]}
+            class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-action focus:outline-none"
+          />
+        </div>
+      </.form>
+
+      <.alert :if={@task_state == :unavailable} id="schedule-tasks-unavailable" kind={:error} class="mt-4">
+        Task definitions or their database state are unavailable. No status has been inferred.
+      </.alert>
+
+      <div class="mt-4">
+        <.table
+          id="schedule-tasks"
+          rows={@streams.tasks}
+          row_item={fn {_dom_id, task} -> task end}
+          sort_by={@state.task_sort_by}
+          sort_dir={@state.task_sort_dir}
+          sort_event="sort_tasks"
+          caption="Scheduled tasks"
+        >
+          <:col :let={task} label="Name" sort="name" sort_id="schedule-tasks-sort-name">
+            <div class="min-w-[13rem]">
+              <p class="font-medium text-ink">{task.name}</p>
+              <p class="font-mono text-xs text-ink-muted">{task.key}</p>
+            </div>
+          </:col>
+          <:col :let={task} label="Source">
+            <.badge>{task.source}</.badge>
+            <div class="mt-1 text-xs text-ink-muted">
+              <.link
+                :if={task.owner_route}
+                navigate={task.owner_route}
+                class="font-mono text-action hover:underline"
+              >
+                {task.owner}
+              </.link>
+              <span :if={!task.owner_route} class="font-mono">{task.owner}</span>
+            </div>
+          </:col>
+          <:col :let={task} label="Cron schedule">
+            <code class="whitespace-nowrap text-xs text-ink">{task.expression}</code>
+            <p class="text-xs text-ink-muted">{task.timezone}</p>
+          </:col>
+          <:col :let={task} label="Next run" sort="next_due" sort_id="schedule-tasks-sort-next_due">
+            <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">
+              {format_datetime(task.next_due_at)}
+            </span>
+          </:col>
+          <:col :let={task} label="Status">
+            <.badge kind={task_status_kind(task)}>{task_status_label(task)}</.badge>
+            <p class="mt-1 text-xs text-ink-muted">
+              {task.overlap} overlap · {task.misfire} misfires
+            </p>
+          </:col>
+          <:col :let={task} label="Last run" sort="last_run" sort_id="schedule-tasks-sort-last_run">
+            <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">
+              {format_datetime(task.last_started_at)}
+            </span>
+          </:col>
+          <:col :let={task} label="Result">
+            <span class="text-xs text-ink">{status_label(task.last_status)}</span>
+            <p class="text-xs text-ink-muted">{duration(task.last_runtime_ms)}</p>
+          </:col>
+          <:action :let={task}>
+            <div class="flex min-w-max flex-wrap justify-end gap-1">
+              <.button
+                :if={@can_execute and task.review_state == :enabled and !task.suppressed?}
+                id={"#{task_dom_id(task)}-run"}
+                phx-click="run_now"
+                phx-value-key={task.key}
+                class="px-2 py-1 text-xs"
+              >
+                Run now
+              </.button>
+              <.button
+                :if={@can_manage and task.review_state != :enabled}
+                id={"#{task_dom_id(task)}-enable"}
+                phx-click="enable"
+                phx-value-key={task.key}
+                data-confirm="Review this exact definition fingerprint and enable it?"
+                class="px-2 py-1 text-xs"
+              >
+                Enable
+              </.button>
+              <.button
+                :if={@can_manage and task.review_state == :enabled and !task.suppressed?}
+                id={"#{task_dom_id(task)}-pause"}
+                phx-click="pause"
+                phx-value-key={task.key}
+                data-confirm="Pause this task and cancel queued work before it starts?"
+                class="px-2 py-1 text-xs"
+              >
+                Pause
+              </.button>
+              <.button
+                :if={@can_manage and task.review_state == :enabled and task.suppressed?}
+                id={"#{task_dom_id(task)}-resume"}
+                phx-click="resume"
+                phx-value-key={task.key}
+                data-confirm="Resume this task for future scheduler polls?"
+                class="px-2 py-1 text-xs"
+              >
+                Resume
+              </.button>
+              <.button
+                :if={@can_manage and task.review_state == :enabled}
+                id={"#{task_dom_id(task)}-disable"}
+                phx-click="disable"
+                phx-value-key={task.key}
+                data-confirm="Disable this exact definition fingerprint? Queued work will be cancelled before execution."
+                class="px-2 py-1 text-xs"
+              >
+                Disable
+              </.button>
+            </div>
+          </:action>
+          <:empty :if={@task_count == 0 and @task_state == :available}>
+            {if @state.task_search == "" and @state.task_status == "",
+              do: "Nothing is scheduled.",
+              else: "No tasks match the current filters."}
+          </:empty>
+        </.table>
+      </div>
+    </section>
+
+    <section :if={@state.tab == "history"} id="schedule-history-panel" aria-labelledby="schedule-tab-history">
+      <.form
+        for={@run_form}
+        id="schedule-history-filters"
+        phx-change="filter_runs"
+        phx-submit="filter_runs"
+        class="mt-4 grid gap-3 lg:grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto]"
+      >
+        <div>
+          <.input
+            field={@run_form[:search]}
+            id="schedule-run-search"
+            type="search"
+            label="Search run name"
+            label_class="sr-only"
+            wrapper_class="mb-0"
+            placeholder="Search run name…"
+            maxlength="255"
+            phx-debounce="300"
+            autocomplete="off"
+            class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-action focus:outline-none"
+          />
+        </div>
+        <div>
+          <.input
+            field={@run_form[:status]}
+            id="schedule-run-status"
+            type="select"
+            label="Filter run status"
+            label_class="sr-only"
+            wrapper_class="mb-0"
+            options={[
+              {"All run statuses", ""},
+              {"Running", "running"},
+              {"Succeeded", "succeeded"},
+              {"Failed", "failed"},
+              {"Skipped", "skipped"}
+            ]}
+            class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+          />
+        </div>
+        <div>
+          <.input field={@run_form[:start_date]} id="schedule-run-start-date" type="date" label="Start date" label_class="sr-only" wrapper_class="mb-0" class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink" />
+        </div>
+        <div>
+          <.input field={@run_form[:end_date]} id="schedule-run-end-date" type="date" label="End date" label_class="sr-only" wrapper_class="mb-0" class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink" />
+        </div>
+        <div>
+          <.input
+            field={@run_form[:page_size]}
+            id="schedule-run-page-size"
+            type="select"
+            label="Runs per page"
+            label_class="sr-only"
+            wrapper_class="mb-0"
+            options={[{"25 / page", 25}, {"50 / page", 50}, {"100 / page", 100}]}
+            class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+          />
+        </div>
+      </.form>
+
+      <.alert :if={@run_state == :invalid_filters} id="schedule-history-invalid" kind={:warning} class="mt-4">
+        The start date must not be after the end date.
+      </.alert>
+      <.alert :if={@run_state == :unavailable} id="schedule-history-unavailable" kind={:error} class="mt-4">
+        Run history is unavailable. No empty-history conclusion has been inferred.
+      </.alert>
+
+      <div class="mt-4">
+        <.table
+          id="schedule-runs"
+          rows={@streams.runs}
+          row_item={fn {_dom_id, run} -> run end}
+          sort_by={@state.run_sort_by}
+          sort_dir={@state.run_sort_dir}
+          sort_event="sort_runs"
+          caption="Schedule run history"
+        >
+          <:col :let={run} label="Started" sort="started_at" sort_id="schedule-runs-sort-started_at">
+            <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">{format_datetime(run.started_at)}</span>
+            <p class="text-xs text-ink-muted">{duration(run.runtime_ms)}</p>
+          </:col>
+          <:col :let={run} label="Name" sort="name" sort_id="schedule-runs-sort-name">
+            <p class="font-medium text-ink">{run.name}</p>
+            <p class="font-mono text-xs text-ink-muted">{run.key}</p>
+          </:col>
+          <:col :let={run} label="Source" sort="source" sort_id="schedule-runs-sort-source">
+            <.badge>{run.source}</.badge>
+          </:col>
+          <:col :let={run} label="Status" sort="status" sort_id="schedule-runs-sort-status">
+            <.badge kind={status_kind(run.status)}>{status_label(run.status)}</.badge>
+          </:col>
+          <:col :let={run} label="Detail">
+            <span class="text-xs text-ink">{run_result(run)}</span>
+          </:col>
+          <:empty :if={@run_page.total_entries == 0 and @run_state == :available}>
+            {if @state.run_search == "" and @state.run_status == "" and is_nil(@state.start_date) and is_nil(@state.end_date),
+              do: "No runs recorded yet.",
+              else: "No runs match the current filters."}
+          </:empty>
+        </.table>
+      </div>
+
+      <div
+        :if={@run_state == :available and @run_page.total_pages > 0}
+        id="schedule-history-pagination"
+        class="mt-3 flex items-center justify-between text-sm"
+      >
+        <p id="schedule-history-pagination-summary" class="text-ink-subtle">
+          Page {@run_page.page} of {@run_page.total_pages} · {@run_page.total_entries} runs
+        </p>
+        <div :if={@run_page.total_pages > 1} class="flex gap-2">
+          <.button :if={@run_page.page > 1} id="schedule-history-prev" phx-click="page" phx-value-page={@run_page.page - 1}>
+            Previous
+          </.button>
+          <.button :if={@run_page.page < @run_page.total_pages} id="schedule-history-next" phx-click="page" phx-value-page={@run_page.page + 1}>
+            Next
+          </.button>
+        </div>
+      </div>
+    </section>
+
+    <section :if={@state.tab == "settings"} id="schedule-settings-panel" aria-labelledby="schedule-tab-settings" class="mt-4">
+      <.card id="schedule-retention" title="Schedule history retention" inner_class="p-4">
+        <p class="text-sm text-ink-muted">
+          How long completed schedule runs stay in the History tab before the pruner deletes old rows. Set 0 to keep all recorded runs.
+        </p>
+        <p id="schedule-retention-current" class="mt-2 text-sm font-medium text-ink">
+          Current: {retention_label(@retention_days)}
+        </p>
+
+        <.form :if={@can_manage} for={@retention_form} id="schedule-retention-form" phx-submit="save_retention" class="mt-4 flex items-end gap-3">
+          <div>
+            <.input
+              field={@retention_form[:days]}
+              id="schedule-retention-days"
+              type="number"
+              label="Days"
+              wrapper_class="mb-0"
+              min="0"
+              max="3650"
+              required
+              class="mt-1 w-40 rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-action focus:outline-none"
+            />
+          </div>
+          <.button id="schedule-retention-save" type="submit" variant="primary">Save retention</.button>
+        </.form>
+
+        <p :if={!@can_manage} id="schedule-retention-read-only" class="mt-4 text-xs text-ink-muted">
+          Read-only. The schedule manage capability is required to change retention.
+        </p>
+      </.card>
+    </section>
+  </.page>
+</Layouts.app>

@@ -14,6 +14,7 @@ defmodule Bilimbi.Base.Schedule.ContributionValidator do
     :misfire,
     :name,
     :overlap,
+    :owner_route,
     :task_name,
     :timezone,
     :worker
@@ -99,7 +100,8 @@ defmodule Bilimbi.Base.Schedule.ContributionValidator do
       worker: worker,
       args: args,
       overlap: overlap,
-      misfire: misfire
+      misfire: misfire,
+      owner_route: owner_route!(descriptor.id, attributes)
     }
   end
 
@@ -152,6 +154,23 @@ defmodule Bilimbi.Base.Schedule.ContributionValidator do
         owner,
         "definition #{field} must be a non-empty string of at most #{maximum} characters"
       )
+    end
+  end
+
+  defp owner_route!(owner, attributes) do
+    case Map.get(attributes, :owner_route) do
+      nil ->
+        nil
+
+      route when is_binary(route) and byte_size(route) <= 255 ->
+        if String.starts_with?(route, "/") and not String.starts_with?(route, "//") do
+          route
+        else
+          invalid!(owner, "definition owner_route must be an internal absolute path")
+        end
+
+      _invalid ->
+        invalid!(owner, "definition owner_route must be an internal absolute path")
     end
   end
 

@@ -14,7 +14,7 @@ defmodule Bilimbi.Base.Schedule.Definition do
     :overlap,
     :misfire
   ]
-  defstruct @enforce_keys
+  defstruct @enforce_keys ++ [owner_route: nil]
 
   @type t :: %__MODULE__{
           key: String.t(),
@@ -27,6 +27,7 @@ defmodule Bilimbi.Base.Schedule.Definition do
           worker: module(),
           args: map(),
           overlap: :allow | :forbid,
-          misfire: :coalesce
+          misfire: :coalesce,
+          owner_route: String.t() | nil
         }
 end
