@@ -4,6 +4,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
+  alias Bilimbi.Core.Geonames
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
   alias Bilimbi.Core.Geonames.Web.CountriesLive
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
@@ -71,7 +72,8 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     assert has_element?(countries, "th.text-right #countries-sort-population")
     assert has_element?(countries, "#countries-pagination-page-size option[value='25'][selected]")
     assert has_element?(countries, "#countries-pin[data-nav-pin='nav-admin-geonames-country']")
-    assert has_element?(countries, "#countries-update[phx-click='update-countries']", "Update")
+    refute has_element?(countries, "#countries-update")
+    refute has_element?(countries, "#country-1-name")
 
     assert has_element?(
              countries,
@@ -252,10 +254,11 @@ defmodule BilimbiWeb.GeonamesLiveTest do
   end
 
   test "updates country and admin1 names via inline editing", %{conn: conn} do
-    grant_capabilities!(["admin.geonames.list"])
+    grant_capabilities!(["admin.geonames.list", "admin.geonames.update"])
 
     {:ok, countries, _html} = conn |> log_in_as() |> live(~p"/geonames/countries")
 
+    assert has_element?(countries, "#countries-update[phx-click='update-countries']", "Update")
     assert has_element?(countries, "#country-1-name")
 
     countries
@@ -286,6 +289,39 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     |> render_hook("save-admin1-name", %{"id" => 1, "name" => ""})
 
     assert render(admin1) =~ "Failed to save division name."
+  end
+
+  test "refuses write operations when user holds only admin.geonames.list", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list"])
+
+    {:ok, countries, _html} = conn |> log_in_as() |> live(~p"/geonames/countries")
+
+    refute has_element?(countries, "#countries-update")
+    refute has_element?(countries, "#country-1-name")
+
+    # Forging save-country-name is denied and does not mutate the country in the database
+    countries
+    |> render_hook("save-country-name", %{"id" => 1, "country" => "Hacked Name"})
+
+    assert render(countries) =~ "You do not have permission to update countries."
+    assert Geonames.get_country("MY").country == "Malaysia"
+
+    # Forging update-countries is denied
+    countries
+    |> render_hook("update-countries", %{})
+
+    assert render(countries) =~ "You do not have permission to update countries."
+
+    {:ok, admin1, _html} = conn |> log_in_as() |> live(~p"/geonames/admin1")
+
+    refute has_element?(admin1, "#admin1-1-name")
+
+    # Forging save-admin1-name is denied and does not mutate admin1 division in the database
+    admin1
+    |> render_hook("save-admin1-name", %{"id" => 1, "name" => "Hacked Division"})
+
+    assert render(admin1) =~ "You do not have permission to update Admin1 divisions."
+    assert Enum.find(Geonames.list_admin1("MY"), &(&1.id == 1)).name == "Kuala Lumpur"
   end
 
   test "ignores a country update while one is already in progress" do
