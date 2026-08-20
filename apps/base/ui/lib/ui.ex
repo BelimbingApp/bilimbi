@@ -22,6 +22,7 @@ defmodule Bilimbi.Base.UI do
   def live_view do
     quote do
       use Phoenix.LiveView
+      use Bilimbi.Base.UI.ActionFailureRecovery, :live_view
 
       unquote(html_helpers())
     end
@@ -30,6 +31,7 @@ defmodule Bilimbi.Base.UI do
   def live_component do
     quote do
       use Phoenix.LiveComponent
+      use Bilimbi.Base.UI.ActionFailureRecovery, :live_component
 
       unquote(html_helpers())
     end
