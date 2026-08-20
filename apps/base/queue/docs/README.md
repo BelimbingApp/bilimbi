@@ -6,9 +6,11 @@ private implementation details.
 
 Capability modules own their worker logic, business idempotency records, and
 durable business outcomes. They use `Bilimbi.Base.Queue.Worker` with a stable
-lowercase worker ID and enqueue only bounded JSON data. IDs and plain facts are
-appropriate arguments; credentials, password hashes, schemas, PIDs, functions,
-and other process-local values are rejected.
+lowercase worker ID on the supported `default` queue. Enqueue validates and
+normalizes arguments through the worker before insertion, then rechecks the
+bounded JSON shape. IDs and plain facts are appropriate arguments; credentials,
+password hashes, schemas, PIDs, functions, unexpected fields, and other
+process-local values are rejected or removed before persistence.
 
 ## Delivery semantics
 
@@ -24,6 +26,9 @@ facade never opens a separate transaction around that operation.
 Retryable failures exhaust `max_attempts` and become discarded. Explicit
 permanent failures become cancelled. Operators may cancel or retry a positive
 job ID, but Queue exposes no broad mutation query and no manual discard action.
+Worker failure codes are compile-time atoms with a bounded lowercase identifier
+shape; caller-derived strings are replaced with a generic code before Oban can
+persist or emit them.
 
 ## Operations and privacy
 
@@ -42,6 +47,10 @@ eligible for retry after restart.
 The Oban v14 schema is a Bilimbi-only migration. Existing Laravel `jobs`,
 `job_batches`, and `failed_jobs` relations remain inert and must never be read,
 translated, renamed, or repurposed.
+
+The configured PostgreSQL prefix is one Queue runtime fact shared by Oban and
+the Queue facade's direct diagnostic reads. A non-public prefix must be supplied
+to both migration and runtime configuration; splitting them is unsupported.
 
 Cutover sequence:
 

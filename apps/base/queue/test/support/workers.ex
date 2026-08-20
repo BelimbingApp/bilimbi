@@ -48,3 +48,44 @@ defmodule Bilimbi.Base.Queue.TestWorkers.Unique do
   @impl true
   def handle_job(_args, _execution), do: :ok
 end
+
+defmodule Bilimbi.Base.Queue.TestWorkers.UnsafeFailure do
+  @moduledoc false
+
+  use Bilimbi.Base.Queue.Worker,
+    id: "test/unsafe-failure",
+    max_attempts: 1
+
+  @impl true
+  def validate_args(%{"failure" => failure}) when is_binary(failure),
+    do: {:ok, %{"failure" => failure}}
+
+  def validate_args(_args), do: {:error, :invalid_failure}
+
+  @impl true
+  def handle_job(%{"failure" => failure}, _execution), do: {:retry, failure}
+end
+
+defmodule Bilimbi.Base.Queue.TestWorkers.Blocking do
+  @moduledoc false
+
+  use Bilimbi.Base.Queue.Worker,
+    id: "test/blocking",
+    max_attempts: 2
+
+  @impl true
+  def validate_args(%{"value" => value}) when is_integer(value),
+    do: {:ok, %{"value" => value}}
+
+  def validate_args(_args), do: {:error, :invalid_value}
+
+  @impl true
+  def handle_job(_args, _execution) do
+    listener = Process.whereis(Bilimbi.Base.Queue.ShutdownTestListener)
+    send(listener, {:queue_worker_started, self()})
+
+    receive do
+      :release_queue_worker -> :ok
+    end
+  end
+end

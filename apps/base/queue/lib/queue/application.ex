@@ -13,11 +13,5 @@ defmodule Bilimbi.Base.Queue.Application do
   end
 
   @doc false
-  def children(config) do
-    if Keyword.get(config, :testing) == :manual do
-      []
-    else
-      [{Oban, config}]
-    end
-  end
+  def children(config), do: [{Oban, config}]
 end

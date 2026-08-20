@@ -83,7 +83,7 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
   test "the operational fresh install verifies and supports the public identity APIs",
        %{env: env} = context do
     PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->
-      assert_runtime_start_fails!(env)
+      assert_runtime_start_fails!(env, :queue)
       assert run_mix!("bilimbi.migrations", [], env) =~ "down"
 
       run_mix!("bilimbi.migrate", ["--quiet"], env)
@@ -108,7 +108,7 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
         []
       )
 
-      assert_runtime_start_fails!(env)
+      assert_runtime_start_fails!(env, :employee)
       run_mix!("bilimbi.rollback", ["--step", "2", "--quiet"], env)
       Enum.each(latest_versions, &refute(&1 in recorded_versions()))
       run_mix!("bilimbi.migrate", ["--quiet"], env)
@@ -138,7 +138,7 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
 
       SQL.query!(PlatformBaselineTestRepo, "DROP TABLE bilimbi_schema_migrations", [])
       install_legacy_queue_sentinels!()
-      assert_runtime_start_fails!(env)
+      assert_runtime_start_fails!(env, :queue)
       assert relation("oban_jobs") == nil
 
       assert run_mix!("bilimbi.schema.verify", [], env) =~
@@ -240,11 +240,18 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
     {output, status}
   end
 
-  defp assert_runtime_start_fails!(env) do
+  defp assert_runtime_start_fails!(env, boundary) do
     {output, status} = run_mix("app.start", [], env)
 
     assert status != 0
-    assert output =~ "required runtime schema is missing: employee_types_system_company_check"
+
+    case boundary do
+      :queue ->
+        assert output =~ "Oban migrations have not been run"
+
+      :employee ->
+        assert output =~ "required runtime schema is missing: employee_types_system_company_check"
+    end
   end
 
   defp recorded_versions do

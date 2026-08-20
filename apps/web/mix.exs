@@ -67,7 +67,11 @@ defmodule Bilimbi.Web.MixProject do
   defp aliases do
     [
       setup: ["deps.get", "assets.setup", "assets.build"],
-      test: ["ecto.create --quiet -r Bilimbi.Base.Repo", "test"],
+      test: [
+        "ecto.create --quiet -r Bilimbi.Base.Repo",
+        "ecto.migrate --quiet -r Bilimbi.Base.Repo --migrations-path ../base/queue/priv/repo/migrations",
+        "test"
+      ],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind bilimbi_web", "esbuild bilimbi_web"],
       "assets.deploy": [

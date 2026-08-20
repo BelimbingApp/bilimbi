@@ -51,4 +51,19 @@ defmodule Bilimbi.Base.Queue.WorkerTest do
     assert adapter.__opts__()[:queue] == :default
     assert adapter.__opts__()[:max_attempts] == 3
   end
+
+  test "worker declarations reject queues the runtime does not consume" do
+    assert_raise ArgumentError, ~r/requires the :default queue/, fn ->
+      Code.compile_string("""
+      defmodule Bilimbi.Base.Queue.TestWorkers.UnsupportedQueue do
+        use Bilimbi.Base.Queue.Worker,
+          id: "test/unsupported-queue",
+          queue: :critical
+
+        def validate_args(args), do: {:ok, args}
+        def handle_job(_args, _execution), do: :ok
+      end
+      """)
+    end
+  end
 end

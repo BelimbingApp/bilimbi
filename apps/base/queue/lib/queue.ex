@@ -13,6 +13,7 @@ defmodule Bilimbi.Base.Queue do
   alias Bilimbi.Base.Queue.JobPage
   alias Bilimbi.Base.Queue.JobRef
   alias Bilimbi.Base.Queue.JobSummary
+  alias Bilimbi.Base.Queue.Worker
   alias Bilimbi.Base.Repo
   alias Ecto.Multi
   alias Oban.Job
@@ -29,13 +30,23 @@ defmodule Bilimbi.Base.Queue do
     defaults = [
       name: Bilimbi.Base.Queue.Oban,
       repo: Repo,
+      prefix: "public",
       queues: [default: 10],
       plugins: [{Oban.Plugins.Pruner, max_age: 604_800}],
       shutdown_grace_period: 15_000
     ]
 
     overrides =
-      for key <- [:name, :repo, :queues, :plugins, :shutdown_grace_period, :testing],
+      for key <- [
+            :name,
+            :repo,
+            :prefix,
+            :queues,
+            :plugins,
+            :shutdown_grace_period,
+            :testing,
+            :get_dynamic_repo
+          ],
           value = Application.get_env(@application, key),
           value != nil,
           do: {key, value}
@@ -47,8 +58,10 @@ defmodule Bilimbi.Base.Queue do
   @spec enqueue(module(), term()) :: {:ok, JobRef.t()} | {:error, atom()}
   def enqueue(worker, args) do
     with {:ok, worker_info} <- worker_info(worker),
-         {:ok, safe_args} <- Arguments.validate(args) do
-      insert_job(worker_info, safe_args)
+         {:ok, safe_args} <- Arguments.validate(args),
+         {:ok, normalized_args} <- Worker.normalize_args(worker, safe_args),
+         {:ok, normalized_args} <- Arguments.validate(normalized_args) do
+      insert_job(worker_info, normalized_args)
     end
   end
 
@@ -144,7 +157,9 @@ defmodule Bilimbi.Base.Queue do
   def diagnostics do
     if Oban.whereis(oban_name()) do
       counts =
-        from(job in Job, group_by: job.state, select: {job.state, count(job.id)})
+        jobs_query()
+        |> group_by([job], job.state)
+        |> select([job], {job.state, count(job.id)})
         |> Repo.all()
         |> Map.new()
 
@@ -226,7 +241,7 @@ defmodule Bilimbi.Base.Queue do
   end
 
   defp filtered_jobs(filters) do
-    Job
+    jobs_query()
     |> maybe_filter(:queue, filters.queue)
     |> maybe_filter(:state, filters.state)
   end
@@ -280,8 +295,10 @@ defmodule Bilimbi.Base.Queue do
   defp state_atom("discarded"), do: :discarded
   defp state_atom(_unknown), do: :unknown
 
-  defp job_exists?(job_id), do: Repo.exists?(from job in Job, where: job.id == ^job_id)
+  defp job_exists?(job_id), do: Repo.exists?(where(jobs_query(), [job], job.id == ^job_id))
+  defp jobs_query, do: Ecto.Query.put_query_prefix(Job, oban_prefix())
   defp oban_name, do: Keyword.fetch!(oban_config(), :name)
+  defp oban_prefix, do: Keyword.fetch!(oban_config(), :prefix)
 
   defp count_states(counts, states) do
     Enum.reduce(states, 0, &(&2 + Map.get(counts, &1, 0)))

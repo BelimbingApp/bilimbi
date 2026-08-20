@@ -26,12 +26,17 @@ defmodule Bilimbi.Base.QueueTest do
   end
 
   test "enqueue rejects unsupported workers and non-JSON-safe or oversized arguments" do
+    initial_count = Repo.aggregate(Oban.Job, :count, :id)
+
     assert {:error, :unsupported_worker} = Queue.enqueue(String, %{"value" => 1})
     assert {:error, :invalid_args} = Queue.enqueue(Success, %{value: 1})
     assert {:error, :invalid_args} = Queue.enqueue(Success, %{"value" => self()})
+    assert {:error, :invalid_args} = Queue.enqueue(Success, %{"wrong" => 1})
 
     assert {:error, :invalid_args} =
              Queue.enqueue(Success, %{"value" => String.duplicate("x", 16_385)})
+
+    assert Repo.aggregate(Oban.Job, :count, :id) == initial_count
   end
 
   test "transactional enqueue commits and rolls back with the caller's business operation" do

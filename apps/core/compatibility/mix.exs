@@ -52,6 +52,12 @@ defmodule Bilimbi.Core.Compatibility.MixProject do
   end
 
   defp aliases do
-    [test: ["ecto.create --quiet -r Bilimbi.Base.Repo", "test"]]
+    [
+      test: [
+        "ecto.create --quiet -r Bilimbi.Base.Repo",
+        "ecto.migrate --quiet -r Bilimbi.Base.Repo --migrations-path ../../base/queue/priv/repo/migrations",
+        "test"
+      ]
+    ]
   end
 end

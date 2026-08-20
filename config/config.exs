@@ -9,6 +9,7 @@ config :bilimbi_base_database, Bilimbi.Base.Repo, migration_source: "bilimbi_sch
 config :bilimbi_base_queue,
   name: Bilimbi.Base.Queue.Oban,
   repo: Bilimbi.Base.Repo,
+  prefix: "public",
   queues: [default: 10],
   plugins: [{Oban.Plugins.Pruner, max_age: 604_800}],
   shutdown_grace_period: 15_000

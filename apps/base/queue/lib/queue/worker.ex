@@ -8,7 +8,9 @@ defmodule Bilimbi.Base.Queue.Worker do
 
   alias Bilimbi.Base.Queue.Execution
 
-  @type failure_code :: atom() | String.t()
+  @failure_code_pattern ~r/^[a-z][a-z0-9_]{0,63}$/
+
+  @type failure_code :: atom()
   @type result :: :ok | {:retry, failure_code()} | {:cancel, failure_code()}
 
   @callback validate_args(map()) :: {:ok, map()} | {:error, failure_code()}
@@ -25,8 +27,8 @@ defmodule Bilimbi.Base.Queue.Worker do
       raise ArgumentError, "queue worker :id must be a stable lowercase identifier"
     end
 
-    unless is_atom(queue) and is_integer(max_attempts) and max_attempts > 0 do
-      raise ArgumentError, "queue worker requires an atom queue and positive max_attempts"
+    unless queue == :default and is_integer(max_attempts) and max_attempts > 0 do
+      raise ArgumentError, "queue worker requires the :default queue and positive max_attempts"
     end
 
     if unique_period != nil and
@@ -68,6 +70,19 @@ defmodule Bilimbi.Base.Queue.Worker do
   end
 
   @doc false
+  @spec normalize_args(module(), map()) :: {:ok, map()} | {:error, :invalid_args}
+  def normalize_args(worker, args) do
+    case worker.validate_args(args) do
+      {:ok, normalized_args} when is_map(normalized_args) -> {:ok, normalized_args}
+      _invalid -> {:error, :invalid_args}
+    end
+  rescue
+    _error -> {:error, :invalid_args}
+  catch
+    _kind, _reason -> {:error, :invalid_args}
+  end
+
+  @doc false
   def perform(worker, %Oban.Job{} = job) do
     execution = %Execution{
       job_id: job.id,
@@ -80,16 +95,34 @@ defmodule Bilimbi.Base.Queue.Worker do
       {:ok, normalized_args} ->
         case worker.handle_job(normalized_args, execution) do
           :ok -> :ok
-          {:retry, code} when is_atom(code) or is_binary(code) -> {:error, code}
-          {:cancel, code} when is_atom(code) or is_binary(code) -> {:cancel, code}
+          {:retry, code} -> retry_result(code)
+          {:cancel, code} -> cancel_result(code)
           _invalid -> {:error, :invalid_worker_result}
         end
 
-      {:error, code} when is_atom(code) or is_binary(code) ->
-        {:cancel, code}
+      {:error, code} ->
+        cancel_args_result(code)
 
       _invalid ->
         {:cancel, :invalid_worker_args}
     end
   end
+
+  defp retry_result(code) do
+    if valid_failure_code?(code), do: {:error, code}, else: {:error, :invalid_worker_result}
+  end
+
+  defp cancel_result(code) do
+    if valid_failure_code?(code), do: {:cancel, code}, else: {:error, :invalid_worker_result}
+  end
+
+  defp cancel_args_result(code) do
+    if valid_failure_code?(code), do: {:cancel, code}, else: {:cancel, :invalid_worker_args}
+  end
+
+  defp valid_failure_code?(code) when is_atom(code) do
+    Regex.match?(@failure_code_pattern, Atom.to_string(code))
+  end
+
+  defp valid_failure_code?(_code), do: false
 end

@@ -6,6 +6,8 @@ defmodule Bilimbi.Base.Queue.DiagnosticsTest do
   alias Bilimbi.Base.Queue.JobPage
   alias Bilimbi.Base.Queue.TestWorkers.Retry
   alias Bilimbi.Base.Queue.TestWorkers.Success
+  alias Bilimbi.Base.Queue.TestWorkers.UnsafeFailure
+  alias Bilimbi.Base.Repo
 
   test "diagnostics and pages expose fixed operational facts without payloads" do
     canary = "secret-canary-#{System.unique_integer([:positive])}"
@@ -18,8 +20,34 @@ defmodule Bilimbi.Base.Queue.DiagnosticsTest do
     assert {:ok, %JobPage{entries: [summary], total: 1, page_size: 25}} = Queue.list_jobs()
     assert summary.worker_id == "test/success"
     assert summary.available?
+    assert Repo.one(from job in Oban.Job, select: job.args) == %{"value" => 1}
     refute Map.has_key?(Map.from_struct(summary), :args)
     refute inspect(summary) =~ canary
+  end
+
+  test "retry execution becomes retryable, exhausts, and remains operator-recoverable" do
+    assert {:ok, reference} = Queue.enqueue(Retry, %{"outcome" => "retry"})
+
+    assert %{failure: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+    assert Repo.get!(Oban.Job, reference.id).state == "retryable"
+
+    assert :ok = Queue.retry(reference.id)
+    assert %{discard: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+    assert Repo.get!(Oban.Job, reference.id).state == "discarded"
+
+    assert :ok = Queue.retry(reference.id)
+    assert Repo.get!(Oban.Job, reference.id).state == "available"
+  end
+
+  test "caller-derived worker failure text is replaced before persistence" do
+    canary = "secret-failure-#{System.unique_integer([:positive])}"
+    assert {:ok, reference} = Queue.enqueue(UnsafeFailure, %{"failure" => canary})
+
+    assert %{discard: 1} = Oban.drain_queue(Bilimbi.Base.Queue.Oban, queue: :default)
+    job = Repo.get!(Oban.Job, reference.id)
+
+    refute inspect(job.errors) =~ canary
+    assert inspect(job.errors) =~ "invalid_worker_result"
   end
 
   test "list options are bounded and fail closed" do

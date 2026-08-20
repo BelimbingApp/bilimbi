@@ -23,11 +23,8 @@ Ecto.Migrator.run(
   log: false
 )
 
-{:ok, oban_pid} = Oban.start_link(Queue.oban_config())
-Process.unlink(oban_pid)
-
-ExUnit.after_suite(fn _result ->
-  if Process.alive?(oban_pid), do: Supervisor.stop(oban_pid)
-end)
+unless Oban.whereis(Queue.oban_config()[:name]) do
+  raise "the supervised Base Queue runtime did not start"
+end
 
 Ecto.Adapters.SQL.Sandbox.mode(Repo, :manual)
