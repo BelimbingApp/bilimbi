@@ -3,8 +3,8 @@ defmodule Bilimbi.Base.Schedule.ContributionValidator do
 
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionConsumer
 
-  alias Bilimbi.Base.Schedule.Definition
   alias Bilimbi.Base.Queue.Arguments
+  alias Bilimbi.Base.Schedule.Definition
   alias Crontab.CronExpression.Parser
 
   @definition_keys [

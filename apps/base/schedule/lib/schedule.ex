@@ -40,29 +40,31 @@ defmodule Bilimbi.Base.Schedule do
   @doc "Reviews the current definition fingerprint and explicitly enables or disables it."
   @spec review_definition(String.t(), boolean()) :: :ok | {:error, :not_found | :unavailable}
   def review_definition(key, enabled) when is_binary(key) and is_boolean(enabled) do
-    with %Definition{} = definition <- definition(key) do
-      Repo.transaction(fn ->
-        lock_key!(@source, key)
+    case definition(key) do
+      %Definition{} = definition ->
+        Repo.transaction(fn ->
+          lock_key!(@source, key)
 
-        attributes = %{
-          source: @source,
-          key: key,
-          fingerprint: fingerprint(definition),
-          enabled: enabled,
-          reviewed_at: DateTime.utc_now()
-        }
+          attributes = %{
+            source: @source,
+            key: key,
+            fingerprint: fingerprint(definition),
+            enabled: enabled,
+            reviewed_at: DateTime.utc_now()
+          }
 
-        %DefinitionReview{}
-        |> DefinitionReview.changeset(attributes)
-        |> Repo.insert!(
-          on_conflict: {:replace, [:fingerprint, :enabled, :reviewed_at]},
-          conflict_target: [:source, :key]
-        )
-      end)
+          %DefinitionReview{}
+          |> DefinitionReview.changeset(attributes)
+          |> Repo.insert!(
+            on_conflict: {:replace, [:fingerprint, :enabled, :reviewed_at]},
+            conflict_target: [:source, :key]
+          )
+        end)
 
-      :ok
-    else
-      nil -> {:error, :not_found}
+        :ok
+
+      nil ->
+        {:error, :not_found}
     end
   rescue
     _error -> {:error, :unavailable}
@@ -75,19 +77,21 @@ defmodule Bilimbi.Base.Schedule do
   @doc "Suppresses a reviewed definition. A suppression row always means paused."
   @spec suppress(String.t()) :: :ok | {:error, :not_found | :unavailable}
   def suppress(key) when is_binary(key) do
-    with %Definition{} = definition <- definition(key) do
-      Repo.transaction(fn ->
-        lock_key!(@source, key)
+    case definition(key) do
+      %Definition{} = definition ->
+        Repo.transaction(fn ->
+          lock_key!(@source, key)
 
-        Repo.insert!(%Suppression{source: @source, key: key, name: definition.task_name},
-          on_conflict: {:replace, [:name, :updated_at]},
-          conflict_target: [:source, :key]
-        )
-      end)
+          Repo.insert!(%Suppression{source: @source, key: key, name: definition.task_name},
+            on_conflict: {:replace, [:name, :updated_at]},
+            conflict_target: [:source, :key]
+          )
+        end)
 
-      :ok
-    else
-      nil -> {:error, :not_found}
+        :ok
+
+      nil ->
+        {:error, :not_found}
     end
   rescue
     _error -> {:error, :unavailable}
@@ -100,18 +104,20 @@ defmodule Bilimbi.Base.Schedule do
   @doc "Removes the suppression for a registered definition."
   @spec resume(String.t()) :: :ok | {:error, :not_found | :unavailable}
   def resume(key) when is_binary(key) do
-    with %Definition{} <- definition(key) do
-      Repo.transaction(fn ->
-        lock_key!(@source, key)
+    case definition(key) do
+      %Definition{} ->
+        Repo.transaction(fn ->
+          lock_key!(@source, key)
 
-        Repo.delete_all(
-          from(item in Suppression, where: item.source == @source and item.key == ^key)
-        )
-      end)
+          Repo.delete_all(
+            from(item in Suppression, where: item.source == @source and item.key == ^key)
+          )
+        end)
 
-      :ok
-    else
-      nil -> {:error, :not_found}
+        :ok
+
+      nil ->
+        {:error, :not_found}
     end
   rescue
     _error -> {:error, :unavailable}
@@ -124,9 +130,8 @@ defmodule Bilimbi.Base.Schedule do
   @doc "Queues one operator-requested occurrence; execution is never inline."
   @spec run_now(String.t()) :: {:ok, Queue.JobRef.t()} | {:error, atom()}
   def run_now(key) when is_binary(key) do
-    with %Definition{} = definition <- definition(key) do
-      enqueue_occurrence(definition, DateTime.utc_now(), :manual)
-    else
+    case definition(key) do
+      %Definition{} = definition -> enqueue_occurrence(definition, DateTime.utc_now(), :manual)
       nil -> {:error, :not_found}
     end
   rescue
@@ -323,15 +328,13 @@ defmodule Bilimbi.Base.Schedule do
   end
 
   defp authorize_execution_locked(definition, metadata, job_id) do
-    cond do
-      fingerprint(definition) != metadata["fingerprint"] ->
-        cancel_execution_occurrence(metadata, job_id, :changed)
-
-      true ->
-        case availability_after_lock(definition) do
-          {:ok, :available} -> claim_execution_occurrence(metadata, job_id)
-          {:error, reason} -> cancel_execution_occurrence(metadata, job_id, reason)
-        end
+    if fingerprint(definition) != metadata["fingerprint"] do
+      cancel_execution_occurrence(metadata, job_id, :changed)
+    else
+      case availability_after_lock(definition) do
+        {:ok, :available} -> claim_execution_occurrence(metadata, job_id)
+        {:error, reason} -> cancel_execution_occurrence(metadata, job_id, reason)
+      end
     end
   end
 

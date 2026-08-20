@@ -47,25 +47,29 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
   end
 
   defp enqueue_latest_due(%Definition{} = definition, now) do
-    with {:ok, local_intended} <- Recurrence.previous_occurrence(definition, now) do
-      intended_at = DateTime.shift_zone!(local_intended, "Etc/UTC", TimeZoneInfo.TimeZoneDatabase)
-      latest = Schedule.latest_scheduled_occurrence(definition)
+    case Recurrence.previous_occurrence(definition, now) do
+      {:ok, local_intended} ->
+        intended_at =
+          DateTime.shift_zone!(local_intended, "Etc/UTC", TimeZoneInfo.TimeZoneDatabase)
 
-      if is_nil(latest) or DateTime.before?(latest, intended_at) do
-        case Schedule.enqueue_due(definition, intended_at) do
-          {:ok, _job} ->
-            :ok
+        latest = Schedule.latest_scheduled_occurrence(definition)
 
-          {:error, reason}
-          when reason in [:already_claimed, :disabled, :overlap, :suppressed, :unreviewed] ->
-            :ok
+        if is_nil(latest) or DateTime.before?(latest, intended_at) do
+          case Schedule.enqueue_due(definition, intended_at) do
+            {:ok, _job} ->
+              :ok
 
-          {:error, reason} ->
-            diagnostic(definition, reason)
+            {:error, reason}
+            when reason in [:already_claimed, :disabled, :overlap, :suppressed, :unreviewed] ->
+              :ok
+
+            {:error, reason} ->
+              diagnostic(definition, reason)
+          end
         end
-      end
-    else
-      _error -> diagnostic(definition, :time_resolution_failed)
+
+      _error ->
+        diagnostic(definition, :time_resolution_failed)
     end
   end
 
