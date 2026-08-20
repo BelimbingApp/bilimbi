@@ -1,6 +1,8 @@
 defmodule Mix.Tasks.Bilimbi.MigrateTest do
   use ExUnit.Case, async: false
 
+  @package_root Path.expand("..", __DIR__)
+
   alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.Repo
   alias Bilimbi.Core.Compatibility
@@ -78,6 +80,27 @@ defmodule Mix.Tasks.Bilimbi.MigrateTest do
     assert_raise Mix.Error, ~r/unexpected arguments: extra/, fn ->
       Mix.Tasks.Bilimbi.Migrate.run(["extra"], MigrationTestRepo)
     end
+  end
+
+  test "schema lifecycle tasks load configuration without starting runtime applications" do
+    task_sources =
+      ~w(
+        bilimbi.migrate.ex
+        bilimbi.migrations.ex
+        bilimbi.rollback.ex
+        bilimbi.schema.verify.ex
+        bilimbi.schema.adopt.ex
+      )
+
+    Enum.each(task_sources, fn filename ->
+      source =
+        @package_root
+        |> Path.join("lib/mix/tasks/#{filename}")
+        |> File.read!()
+
+      assert source =~ ~s(@requirements ["app.config"]), filename
+      refute source =~ ~s(@requirements ["app.start"]), filename
+    end)
   end
 
   defp install_synthetic_migration! do

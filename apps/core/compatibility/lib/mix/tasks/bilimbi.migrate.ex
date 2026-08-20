@@ -4,11 +4,11 @@ defmodule Mix.Tasks.Bilimbi.Migrate do
   use Mix.Task
 
   @shortdoc "Runs installed Bilimbi module migrations"
-  @requirements ["app.start"]
+  @requirements ["app.config"]
 
   @impl Mix.Task
   def run(args) do
-    run(args, Bilimbi.Base.Repo)
+    with_repo!(Bilimbi.Base.Repo, &run(args, &1))
   end
 
   @doc false
@@ -30,5 +30,15 @@ defmodule Mix.Tasks.Bilimbi.Migrate do
       end)
 
     Bilimbi.Core.Compatibility.migrate(repo, opts)
+  end
+
+  defp with_repo!(repo, operation) do
+    case Ecto.Migrator.with_repo(repo, operation, mode: :temporary) do
+      {:ok, result, _started_apps} ->
+        result
+
+      {:error, error} ->
+        Mix.raise("Could not start repo #{inspect(repo)}, error: #{inspect(error)}")
+    end
   end
 end

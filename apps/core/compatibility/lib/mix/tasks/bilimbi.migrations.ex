@@ -4,7 +4,7 @@ defmodule Mix.Tasks.Bilimbi.Migrations do
   use Mix.Task
 
   @shortdoc "Lists installed Bilimbi module migrations"
-  @requirements ["app.start"]
+  @requirements ["app.config"]
 
   @impl Mix.Task
   def run(args) do

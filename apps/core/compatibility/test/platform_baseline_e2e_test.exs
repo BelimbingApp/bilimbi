@@ -1,6 +1,8 @@
 defmodule Bilimbi.Core.PlatformBaselineE2ETest do
   use ExUnit.Case, async: false
 
+  @moduletag timeout: 180_000
+
   alias Bilimbi.Base.Database
   alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.Repo
@@ -69,25 +71,81 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       start_supervised!(PlatformBaselineTestRepo)
       assert PlatformBaselineTestRepo.config()[:pool_size] == 1
 
-      %{env: [{"MIX_TEST_PARTITION", "_#{partition}"}]}
+      %{
+        env: [
+          {"MIX_TEST_PARTITION", "_#{partition}"},
+          {"BILIMBI_RUNTIME_SCHEMA_FIXTURE", "enabled"}
+        ]
+      }
     end)
   end
 
   test "the operational fresh install verifies and supports the public identity APIs",
        %{env: env} = context do
     PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->
+      assert_runtime_start_fails!(env)
+      assert run_mix!("bilimbi.migrations", [], env) =~ "down"
+
       run_mix!("bilimbi.migrate", ["--quiet"], env)
+      run_mix!("app.start", [], env)
 
       assert run_mix!("bilimbi.schema.verify", [], env) =~
                "Bilimbi compatibility schema verified."
 
       assert recorded_versions() == Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
 
+      latest_version = Compatibility.migration_entries() |> List.last() |> elem(0)
+
+      SQL.query!(
+        PlatformBaselineTestRepo,
+        "ALTER TABLE employee_types DROP CONSTRAINT employee_types_system_company_check",
+        []
+      )
+
+      assert_runtime_start_fails!(env)
+      run_mix!("bilimbi.rollback", ["--step", "1", "--quiet"], env)
+      refute latest_version in recorded_versions()
+      run_mix!("bilimbi.migrate", ["--quiet"], env)
+      assert latest_version in recorded_versions()
+      run_mix!("app.start", [], env)
+
       assert run_mix!(
                "run",
                ["-e", "Bilimbi.Core.Compatibility.PlatformBaselineSmoke.run()"],
                env
              ) =~ "Platform baseline public API smoke passed."
+    end)
+  end
+
+  test "operational commands adopt compatible structure before pending Bilimbi-only work",
+       %{env: env} = context do
+    PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->
+      latest_baseline_version = List.last(Compatibility.baseline_versions())
+
+      run_mix!("bilimbi.migrate", ["--quiet"], env)
+
+      run_mix!(
+        "bilimbi.rollback",
+        ["--to-exclusive", Integer.to_string(latest_baseline_version), "--quiet"],
+        env
+      )
+
+      SQL.query!(PlatformBaselineTestRepo, "DROP TABLE bilimbi_schema_migrations", [])
+      assert_runtime_start_fails!(env)
+
+      assert run_mix!("bilimbi.schema.verify", [], env) =~
+               "Bilimbi compatibility schema verified."
+
+      assert run_mix!("bilimbi.schema.adopt", [], env) =~
+               "Existing Belimbing schema verified and adopted by Bilimbi."
+
+      assert recorded_versions() == Compatibility.baseline_versions()
+
+      assert run_mix!("bilimbi.migrations", [], env) =~ "down"
+      run_mix!("bilimbi.migrate", ["--quiet"], env)
+
+      assert recorded_versions() == Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
+      run_mix!("app.start", [], env)
     end)
   end
 
@@ -169,6 +227,13 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
 
     PlatformBaselineFailureDiagnostics.record_nested_mix(task, args, status, output)
     {output, status}
+  end
+
+  defp assert_runtime_start_fails!(env) do
+    {output, status} = run_mix("app.start", [], env)
+
+    assert status != 0
+    assert output =~ "required runtime schema is missing: employee_types_system_company_check"
   end
 
   defp recorded_versions do

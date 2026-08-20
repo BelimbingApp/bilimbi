@@ -27,10 +27,20 @@ defmodule Bilimbi.Core.Compatibility.MixProject do
   end
 
   def application do
-    [
+    application = [
       extra_applications: [:logger],
       env: Bilimbi.Base.ModuleRegistry.MixDiscovery.application_env(__DIR__)
     ]
+
+    if Mix.env() == :test do
+      Keyword.put(
+        application,
+        :mod,
+        {Bilimbi.Core.Compatibility.RuntimeSchemaFixture, []}
+      )
+    else
+      application
+    end
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
