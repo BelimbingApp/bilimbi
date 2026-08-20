@@ -54,7 +54,7 @@
         row_item={fn {_id, session} -> session end}
         framed={false}
       >
-        <:col :let={session} label="User">{user_label(session)}</:col>
+        <:col :let={session} label="User">{user_label(session, @user_names)}</:col>
         <:col :let={session} label="IP Address">
           <span class="tabular-nums text-ink-muted">{session.ip_address || "—"}</span>
         </:col>

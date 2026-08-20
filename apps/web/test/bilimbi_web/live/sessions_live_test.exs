@@ -24,7 +24,7 @@ defmodule BilimbiWeb.SessionsLiveTest do
              conn |> log_in_as() |> live(~p"/system/sessions")
   end
 
-  test "lists sessions without joining Core User", %{conn: conn} do
+  test "names a user in the actor's tenant and keeps Guest for an anonymous row", %{conn: conn} do
     grant_capabilities!("admin.system.session.list")
 
     {:ok, _} =
@@ -44,13 +44,52 @@ defmodule BilimbiWeb.SessionsLiveTest do
     assert has_element?(view, "#nav-admin-system-session[aria-current='page']")
     assert has_element?(view, "#sessions")
     assert has_element?(view, "#sessions-search")
-    assert has_element?(view, "#sessions td", "User 91")
+    # User 91 is Ada Lovelace in company 73 of tenant 41 -- the actor's own
+    # tenant -- so the row carries her name rather than her id (#285).
+    assert has_element?(view, "#sessions td", "Ada Lovelace")
+    refute has_element?(view, "#sessions td", "User 91")
     assert has_element?(view, "#sessions td", "Guest")
     assert has_element?(view, "#sessions td", "10.0.0.9")
     refute has_element?(view, "#sessions-terminate-guest-row")
 
     view |> form("#sessions-search", %{q: "no-such-agent-xyz"}) |> render_change()
     assert has_element?(view, "#sessions-empty", "No sessions found.")
+  end
+
+  # The hybrid's other half. A join would name every row; the directory resolves
+  # only inside the actor's scope, so a foreign session keeps its id and no name
+  # crosses the tenant boundary.
+  test "keeps the id for a user outside the actor's tenant", %{conn: conn} do
+    grant_capabilities!("admin.system.session.list")
+
+    CompanyFixtures.insert_tenant!(%{id: 42, name: "Other Tenant"})
+
+    CompanyFixtures.insert_company!(%{
+      id: 74,
+      tenant_id: 42,
+      name: "Other Company",
+      code: "other_company"
+    })
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 74,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    {:ok, _} =
+      Session.put_session("foreign-row", "{}", %{
+        user_id: 92,
+        ip_address: "10.0.0.42",
+        user_agent: "ForeignAgent/1.0",
+        last_activity: System.system_time(:second)
+      })
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/sessions")
+
+    assert has_element?(view, "#sessions td", "User 92")
+    refute has_element?(view, "#sessions td", "Grace Hopper")
   end
 
   test "renders singular units at one minute, one hour and one day", %{conn: conn} do
