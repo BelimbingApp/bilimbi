@@ -15,10 +15,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok,
-     socket
-     |> assign(:can_update?, allowed?(socket.assigns.current_scope, "admin.geonames.update"))
-     |> stream_configure(:postcodes, dom_id: &"postcode-#{&1.id}")}
+    {:ok, stream_configure(socket, :postcodes, dom_id: &"postcode-#{&1.id}")}
   end
 
   @impl true
