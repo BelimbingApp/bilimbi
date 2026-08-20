@@ -2,12 +2,31 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
   @moduledoc """
   Operational session list.
 
-  User identity is shown as `Guest` or `User \#{id}` from the durable row.
-  This screen does not join Core User.
+  Names the signed-in user. Belimbing's screen left-joins `users` and shows
+  `user_name` (`resources/core/views/livewire/admin/system/sessions/index.blade.php:55`);
+  a session row here carries only `user_id`, and Base cannot query Core.
+
+  The name comes from `Bilimbi.Base.PrincipalDirectory`, the seam ADR 0011
+  specifies — a declared Base-to-Base dependency, not a reflective call into
+  Core. What each row shows, per the ruling on #285:
+
+  - `user_id` is nil → `Guest`, matching Belimbing's `?? __('Guest')`
+  - the user is in the actor's tenant → **their name**
+  - the user is outside it → `User \#{id}`
+
+  The third case is the reason this is not a join. `Core.User`'s provider
+  resolves only inside the actor's scope, so a session belonging to another
+  tenant returns no name and keeps its id rather than leaking one across the
+  boundary.
+
+  Sorting by name is deliberately absent: this screen has no sort on any column,
+  and ordering a page the activity clause already selected would not be one
+  (ADR 0007).
   """
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.PrincipalDirectory
   alias Bilimbi.Base.Session
 
   @list_limit 25
@@ -74,14 +93,44 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
 
     socket
     |> assign(:sessions_count, length(rows))
+    |> assign(:user_names, user_names(socket, rows))
     |> stream(:sessions, rows, reset: true)
+  end
+
+  # `rank/3` returns an order this screen does not need -- there is no sort
+  # here -- so it is collapsed to a lookup. It is still the right entry point:
+  # it owns provider resolution and the ceiling, and calling a provider directly
+  # would bypass both.
+  #
+  # Only `{:ok, _}` is matched on purpose. The page is limited to
+  # #{@list_limit} rows, so the candidate set cannot approach the directory's
+  # ceiling; an error here is a defect, and handling it would be dead code
+  # dressed as a fallback. #429's recovery turns a raise into a flash.
+  defp user_names(socket, rows) do
+    candidates =
+      rows
+      |> Enum.map(& &1.user_id)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+      |> Enum.map(&{:user, &1})
+
+    if candidates == [] do
+      %{}
+    else
+      {:ok, named} = PrincipalDirectory.rank(socket.assigns.current_scope.scope, candidates)
+
+      Map.new(named, &{&1.id, &1.name})
+    end
   end
 
   defp search_query(%{"q" => q}) when is_binary(q), do: String.trim(q)
   defp search_query(_params), do: ""
 
-  defp user_label(%{user_id: nil}), do: "Guest"
-  defp user_label(%{user_id: id}), do: "User #{id}"
+  defp user_label(%{user_id: nil}, _names), do: "Guest"
+
+  defp user_label(%{user_id: id}, names) do
+    Map.get(names, id, "User #{id}")
+  end
 
   defp truncate_ua(nil), do: "—"
 
