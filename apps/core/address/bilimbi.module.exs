@@ -7,6 +7,7 @@
   namespace: Bilimbi.Core.Address,
   dependencies: [
     "base/database",
+    "base/locale",
     "base/module_registry",
     "base/tenancy",
     "base/ui",
