@@ -9,6 +9,7 @@
     "base/dashboard",
     "base/database",
     "base/menu",
+    "base/queue",
     "base/ui",
     "base/module_registry",
     "base/principal_directory",

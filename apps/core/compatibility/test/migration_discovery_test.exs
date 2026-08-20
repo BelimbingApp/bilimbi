@@ -14,6 +14,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
     # base/session's tier. Safe to reorder: neither reads the other's tables,
     # and the ascending-order assertion below is the real invariant.
     assert Enum.map(migration_modules, & &1.id) == [
+             "base/queue",
              "base/session",
              "base/settings",
              "base/tenancy",
@@ -58,7 +59,8 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Core.User.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Base.Audit.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Core.Employee.Migrations.AdaptEmployeeTypesTenancyIndexes,
-             Bilimbi.Core.Employee.Migrations.BroadenGlobalIndexAndAddSystemCompanyCheck
+             Bilimbi.Core.Employee.Migrations.BroadenGlobalIndexAndAddSystemCompanyCheck,
+             Bilimbi.Base.Queue.Migrations.CreateObanRuntime
            ]
 
     assert Enum.map(entries, &elem(&1, 2)) == [
@@ -73,6 +75,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              :compatible_baseline,
              :compatible_baseline,
              :compatible_baseline,
+             :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only
            ]

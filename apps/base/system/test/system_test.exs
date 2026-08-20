@@ -40,12 +40,12 @@ defmodule Bilimbi.Base.SystemTest do
       assert facts["Processes"] =~ ~r/^\d+ of \d+$/
     end
 
-    test "the queue reports unavailable rather than inventing a status" do
+    test "the queue reports the real supervised manual-test availability" do
       health = Map.new(SystemInfo.health(), &{&1.label, &1.value})
 
-      # #131 (Base Queue on Oban) is unstarted. A green tick here would be the
-      # one genuinely dangerous thing this screen could render.
-      assert health["Queue"] == :unavailable
+      # Manual mode starts no consumers, but it does supervise the migrated
+      # runtime and keeps the operational probe truthful.
+      assert health["Queue"] == "Available (0 pending, 0 retryable, 0 discarded)"
     end
 
     test "loaded applications carry versions and are sorted" do

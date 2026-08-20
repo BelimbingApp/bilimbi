@@ -48,14 +48,18 @@ defmodule BilimbiWeb.SystemInfoLiveTest do
     assert has_element?(view, "#system-info-database-connection", "Connected")
   end
 
-  test "reports the queue as unavailable rather than inventing a status", %{conn: conn} do
+  test "reports the supervised queue's real empty-backlog status", %{conn: conn} do
     grant_capabilities!("admin.system.info.view")
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/info")
 
-    # #131 (Base Queue on Oban) is unstarted. A green tick here would be the one
-    # genuinely dangerous thing this screen could render.
-    assert has_element?(view, "#system-info-health-queue", "Unavailable")
+    # Manual test mode has no consumers, but the migrated Queue runtime is
+    # supervised and the health row must report its real bounded counts.
+    assert has_element?(
+             view,
+             "#system-info-health-queue",
+             "Available (0 pending, 0 retryable, 0 discarded)"
+           )
 
     # The sibling rows must NOT read Unavailable, or "everything is unavailable"
     # would satisfy the assertion above.

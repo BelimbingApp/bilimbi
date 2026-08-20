@@ -83,18 +83,24 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
   test "the operational fresh install verifies and supports the public identity APIs",
        %{env: env} = context do
     PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->
-      assert_runtime_start_fails!(env)
+      assert_runtime_start_fails!(env, :queue)
       assert run_mix!("bilimbi.migrations", [], env) =~ "down"
 
       run_mix!("bilimbi.migrate", ["--quiet"], env)
       run_mix!("app.start", [], env)
+
+      assert relation("oban_jobs") == "oban_jobs"
+      assert oban_migrated_version() == 14
 
       assert run_mix!("bilimbi.schema.verify", [], env) =~
                "Bilimbi compatibility schema verified."
 
       assert recorded_versions() == Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
 
-      latest_version = Compatibility.migration_entries() |> List.last() |> elem(0)
+      latest_versions =
+        Compatibility.migration_entries()
+        |> Enum.take(-2)
+        |> Enum.map(&elem(&1, 0))
 
       SQL.query!(
         PlatformBaselineTestRepo,
@@ -102,11 +108,11 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
         []
       )
 
-      assert_runtime_start_fails!(env)
-      run_mix!("bilimbi.rollback", ["--step", "1", "--quiet"], env)
-      refute latest_version in recorded_versions()
+      assert_runtime_start_fails!(env, :employee)
+      run_mix!("bilimbi.rollback", ["--step", "2", "--quiet"], env)
+      Enum.each(latest_versions, &refute(&1 in recorded_versions()))
       run_mix!("bilimbi.migrate", ["--quiet"], env)
-      assert latest_version in recorded_versions()
+      Enum.each(latest_versions, &assert(&1 in recorded_versions()))
       run_mix!("app.start", [], env)
 
       assert run_mix!(
@@ -131,7 +137,9 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       )
 
       SQL.query!(PlatformBaselineTestRepo, "DROP TABLE bilimbi_schema_migrations", [])
-      assert_runtime_start_fails!(env)
+      install_legacy_queue_sentinels!()
+      assert_runtime_start_fails!(env, :queue)
+      assert relation("oban_jobs") == nil
 
       assert run_mix!("bilimbi.schema.verify", [], env) =~
                "Bilimbi compatibility schema verified."
@@ -145,6 +153,9 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       run_mix!("bilimbi.migrate", ["--quiet"], env)
 
       assert recorded_versions() == Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
+      assert relation("oban_jobs") == "oban_jobs"
+      assert oban_migrated_version() == 14
+      assert_legacy_queue_sentinels_unchanged!()
       run_mix!("app.start", [], env)
     end)
   end
@@ -229,11 +240,18 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
     {output, status}
   end
 
-  defp assert_runtime_start_fails!(env) do
+  defp assert_runtime_start_fails!(env, boundary) do
     {output, status} = run_mix("app.start", [], env)
 
     assert status != 0
-    assert output =~ "required runtime schema is missing: employee_types_system_company_check"
+
+    case boundary do
+      :queue ->
+        assert output =~ "Oban migrations have not been run"
+
+      :employee ->
+        assert output =~ "required runtime schema is missing: employee_types_system_company_check"
+    end
   end
 
   defp recorded_versions do
@@ -250,5 +268,38 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       SQL.query!(PlatformBaselineTestRepo, "SELECT to_regclass($1)::text", [table]).rows
 
     relation
+  end
+
+  defp oban_migrated_version do
+    Oban.Migrations.Postgres.migrated_version(repo: PlatformBaselineTestRepo)
+  end
+
+  defp install_legacy_queue_sentinels! do
+    for table <- ~w(jobs job_batches failed_jobs) do
+      SQL.query!(
+        PlatformBaselineTestRepo,
+        "CREATE TABLE #{table} (id bigint PRIMARY KEY, payload text NOT NULL)",
+        []
+      )
+
+      SQL.query!(
+        PlatformBaselineTestRepo,
+        "INSERT INTO #{table} (id, payload) VALUES (1, $1)",
+        ["legacy-#{table}-payload"]
+      )
+    end
+  end
+
+  defp assert_legacy_queue_sentinels_unchanged! do
+    for table <- ~w(jobs job_batches failed_jobs) do
+      expected_payload = "legacy-#{table}-payload"
+
+      assert [[1, ^expected_payload]] =
+               SQL.query!(
+                 PlatformBaselineTestRepo,
+                 "SELECT id, payload FROM #{table}",
+                 []
+               ).rows
+    end
   end
 end

@@ -20,6 +20,7 @@ defmodule Bilimbi.Base.System do
   it could not read a disk is worse than one that says it could not read a disk.
   """
 
+  alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Repo
 
   @typedoc "A single labelled fact. `value` is `:unavailable` when it could not be read."
@@ -94,17 +95,15 @@ defmodule Bilimbi.Base.System do
   @doc """
   Subsystems whose health the screen reports.
 
-  The queue row is `:unavailable` on purpose: #131 (Base Queue on Oban) is
-  unstarted, so there is no queue to report on. Rendering a green tick for a
-  subsystem that does not exist would be the one genuinely dangerous thing this
-  screen could do.
+  Queue health comes from Base Queue's redacted diagnostic boundary. It never
+  includes job arguments, failure text, stack traces, or transport schemas.
   """
   @spec health() :: [fact()]
   def health do
     [
       fact("Database", connection_status()),
       fact("Cache", "In-memory (ETS)"),
-      fact("Queue", :unavailable)
+      fact("Queue", Queue.health_status())
     ]
   end
 

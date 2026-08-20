@@ -3,14 +3,14 @@
 
 Code.require_file(discovery_file)
 
-defmodule Bilimbi.Base.System.MixProject do
+defmodule Bilimbi.Base.Queue.MixProject do
   use Mix.Project
 
   @workspace_root Path.expand("../../..", __DIR__)
 
   def project do
     [
-      app: :bilimbi_base_system,
+      app: :bilimbi_base_queue,
       version: "0.1.0",
       build_path: Path.join(@workspace_root, "_build"),
       config_path: Path.join(@workspace_root, "config/config.exs"),
@@ -28,11 +28,8 @@ defmodule Bilimbi.Base.System.MixProject do
 
   def application do
     [
-      # `:os_mon` supplies `:disksup`, which is the only source of the disk rows
-      # Belimbing shows. Without it both read "Unavailable", which is honest but
-      # useless. It is scoped to this module's OTP app rather than the whole
-      # release, and its default poll is every 30 minutes.
-      extra_applications: [:logger, :os_mon],
+      mod: {Bilimbi.Base.Queue.Application, []},
+      extra_applications: [:logger],
       env: Bilimbi.Base.ModuleRegistry.MixDiscovery.application_env(__DIR__)
     ]
   end
@@ -41,7 +38,7 @@ defmodule Bilimbi.Base.System.MixProject do
   defp elixirc_paths(_env), do: ["lib"]
 
   defp deps do
-    [{:ecto_sql, "~> 3.14"}] ++
+    [{:oban, "~> 2.23.1"}] ++
       Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 
@@ -49,7 +46,7 @@ defmodule Bilimbi.Base.System.MixProject do
     [
       test: [
         "ecto.create --quiet -r Bilimbi.Base.Repo",
-        "ecto.migrate --quiet -r Bilimbi.Base.Repo --migrations-path ../queue/priv/repo/migrations",
+        "ecto.migrate --quiet -r Bilimbi.Base.Repo --migrations-path priv/repo/migrations",
         "test"
       ]
     ]

@@ -48,7 +48,7 @@ and lifecycle contracts; they do not replace deep Module APIs.
 ## 2. Current scope
 
 The initial Bilimbi implementation contains the Platform Baseline and its web
-host. Base Session, Base Settings, Base Tenancy, Base Authz, Base Audit, Core
+host. Base Session, Base Settings, Base Tenancy, Base Authz, Base Audit, Base Queue, Core
 Company, Core Geonames, Core Address, Core Employee, and Core User are active
 foundation slices:
 
@@ -59,6 +59,7 @@ apps/base/settings/
 apps/base/tenancy/
 apps/base/authz/
 apps/base/audit/
+apps/base/queue/
 apps/core/company/
 apps/core/geonames/
 apps/core/address/
@@ -212,6 +213,7 @@ apps/base/settings/priv/repo/migrations/
 apps/base/tenancy/priv/repo/migrations/
 apps/base/authz/priv/repo/migrations/
 apps/base/audit/priv/repo/migrations/
+apps/base/queue/priv/repo/migrations/
 apps/core/company/priv/repo/migrations/
 apps/core/geonames/priv/repo/migrations/
 apps/core/address/priv/repo/migrations/
