@@ -12,6 +12,13 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   alias Bilimbi.Base.Database
   alias Bilimbi.Core.User
 
+  # `run` is a write verb, so the write-handler guard treats `run_query` as
+  # write-shaped. It is not: it calls `Database.execute_readonly/3`, which is
+  # where read-only is enforced, and the route requires
+  # `admin.system.database-table.list` — a read capability, correctly matched to
+  # a read. There is no weaker capability for this handler to refuse.
+  @write_guard_opt_out ~w(run_query)
+
   @impl true
   def mount(_params, _session, socket) do
     {:ok,

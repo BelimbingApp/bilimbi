@@ -24,6 +24,13 @@ defmodule Bilimbi.Base.UI do
       use Phoenix.LiveView
       use Bilimbi.Base.UI.ActionFailureRecovery, :live_view
 
+      # `@write_guard_opt_out` is read from source by
+      # apps/base/ui/test/write_handler_guard_test.exs, so nothing in the
+      # compiled module ever reads it and Elixir warns "set but never used" --
+      # which fails CI's `mix compile --warnings-as-errors`. Registering it
+      # marks it as used and makes the documented opt-out usable at all (#437).
+      Module.register_attribute(__MODULE__, :write_guard_opt_out, persist: true)
+
       unquote(html_helpers())
     end
   end
@@ -32,6 +39,10 @@ defmodule Bilimbi.Base.UI do
     quote do
       use Phoenix.LiveComponent
       use Bilimbi.Base.UI.ActionFailureRecovery, :live_component
+
+      # Same registration as `:live_view` — opt-out is documented for both
+      # adapter shapes (#437).
+      Module.register_attribute(__MODULE__, :write_guard_opt_out, persist: true)
 
       unquote(html_helpers())
     end
