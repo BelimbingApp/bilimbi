@@ -125,8 +125,29 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
 
     ContributionRegistry.put_snapshot_for_test!(%{
       graph_fingerprint: "authz-test",
-      consumers: %{settings: [], authz: authz, menu: []}
+      # Merged over the registry's own empty snapshot rather than written out
+      # by hand: a consumer added later gets its correct empty shape here for
+      # free, instead of this fixture raising KeyError on the new key (#496).
+      consumers: Map.merge(ContributionRegistry.build!([]).consumers, %{authz: authz})
     })
+  end
+
+  @doc """
+  Installs the principal-naming doubles on top of the current snapshot.
+
+  Separate from `install_registry!/0` on purpose: most of this suite must keep
+  running with **no** directory installed, which is the deployment where a
+  principal keeps its durable id.
+  """
+  def install_principal_directory! do
+    snapshot = ContributionRegistry.snapshot!()
+
+    ContributionRegistry.put_snapshot_for_test!(
+      put_in(snapshot.consumers.principal_directory, %{
+        user: Bilimbi.Base.Authz.TestUserDirectory,
+        agent: Bilimbi.Base.Authz.TestAgentDirectory
+      })
+    )
   end
 
   def scope(tenant_id \\ 1) do

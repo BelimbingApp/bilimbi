@@ -44,7 +44,7 @@
               id="grants-search"
               name="search"
               value={@state.search}
-              placeholder="Search capability key"
+              placeholder="Search by capability key or principal name"
               phx-debounce="300"
               autocomplete="off"
               label="Search capabilities"
@@ -80,13 +80,21 @@
         <:col
           :let={grant}
           label="Principal"
+          sort="principal_name"
+          sort_id="grants-sort-principal_name"
+        >
+          <span class={["whitespace-nowrap text-ink", !grant.principal_name && "tabular-nums"]}>
+            {principal_identity(grant)}
+          </span>
+        </:col>
+
+        <:col
+          :let={grant}
+          label="Type"
           sort="principal_type"
           sort_id="grants-sort-principal_type"
         >
-          <span class="whitespace-nowrap text-ink-muted">
-            <.badge>{principal_label(grant)}</.badge>
-            <span class="ml-1 tabular-nums">{grant.principal_id}</span>
-          </span>
+          <.badge>{principal_label(grant)}</.badge>
         </:col>
 
         <:col :let={grant} label="Capability" sort="capability" sort_id="grants-sort-capability">
