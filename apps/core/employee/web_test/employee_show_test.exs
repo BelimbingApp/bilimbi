@@ -137,6 +137,8 @@ defmodule BilimbiWeb.EmployeeShowTest do
     {:ok, scope} = Tenancy.scope(41)
     assert {:ok, %{employee_id: _linked}} = User.get_user(scope, 73, 91)
 
+    view |> element("#employee-employee_type-display") |> render_click()
+
     view
     |> element("#employee-type-form")
     |> render_change(%{"employee_type" => "agent"})
