@@ -114,7 +114,7 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
           sort="employee_type"
           sort_id="company-employees-sort-employee-type"
         >
-          {employee.employee_type}
+          {employee.employee_type_label || employee.employee_type}
         </:col>
         <:col :let={employee} label="Status" sort="status" sort_id="company-employees-sort-status">
           <.badge kind={if employee.status == "active", do: :success, else: :neutral}>
@@ -186,6 +186,7 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
       employee.short_name,
       employee.employee_number,
       employee.employee_type,
+      employee.employee_type_label,
       employee.designation,
       employee.email,
       employee.status
@@ -200,7 +201,10 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
 
   defp sort_value(employee, "full_name"), do: sort_string(employee.full_name)
   defp sort_value(employee, "employee_number"), do: sort_string(employee.employee_number)
-  defp sort_value(employee, "employee_type"), do: sort_string(employee.employee_type)
+
+  defp sort_value(employee, "employee_type"),
+    do: sort_string(employee.employee_type_label || employee.employee_type)
+
   defp sort_value(employee, "status"), do: sort_string(employee.status)
   defp sort_value(employee, _sort), do: sort_value(employee, "full_name")
 

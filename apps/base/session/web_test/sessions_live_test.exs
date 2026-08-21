@@ -16,6 +16,10 @@ defmodule BilimbiWeb.SessionsLiveTest do
     :ok
   end
 
+  defp patched_params(view) do
+    assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+  end
+
   test "requires authentication", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/system/sessions")
   end
@@ -53,8 +57,40 @@ defmodule BilimbiWeb.SessionsLiveTest do
     assert has_element?(view, "#sessions td", "10.0.0.9")
     refute has_element?(view, "#sessions-terminate-guest-row")
 
-    view |> form("#sessions-search", %{q: "no-such-agent-xyz"}) |> render_change()
+    view
+    |> form("#sessions-search", filters: %{search: "no-such-agent-xyz"})
+    |> render_change()
+
     assert has_element?(view, "#sessions-empty", "No sessions found.")
+  end
+
+  test "keeps sorting and pagination in URL state", %{conn: conn} do
+    grant_capabilities!("admin.system.session.list")
+    now = System.system_time(:second)
+
+    for index <- 1..30 do
+      id = "paged-#{String.pad_leading(Integer.to_string(index), 2, "0")}"
+
+      {:ok, _} =
+        Session.put_session(id, "{}", %{
+          ip_address: "10.0.0.#{String.pad_leading(Integer.to_string(index), 3, "0")}",
+          user_agent: "PagedAgent/#{String.pad_leading(Integer.to_string(index), 2, "0")}",
+          last_activity: now - index
+        })
+    end
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/system/sessions?sort=ip_address&dir=asc&page=2&per_page=25")
+
+    assert has_element?(view, "th:has(#sessions-sort-ip_address)[aria-sort='ascending']")
+    assert has_element?(view, "#sessions-pagination-summary", "Showing 26 to 31 of 31 results")
+    assert has_element?(view, "#sessions td", "PagedAgent/27")
+    refute has_element?(view, "#sessions td", "PagedAgent/01")
+
+    view |> element("#sessions-sort-ip_address") |> render_click()
+    assert %{"sort" => "ip_address", "dir" => "desc"} = patched_params(view)
   end
 
   # The hybrid's other half. A join would name every row; the directory resolves

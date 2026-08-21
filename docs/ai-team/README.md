@@ -30,32 +30,41 @@ around an error; others plan from it.
 ### The canonical source is a specific checkout
 
 ```
-/home/kiat/repo/laravel/blb    pinned at e70b4d33c0b10790e681f4c2b5095d85a53bc918
+/home/kiat/repo/laravel/blb    operational citation pin 769bc31ddb632f5d2c5acb0fd05b777197df87cc
 ```
 
 `/home/kiat/repo/Belimbing` is **planning material with no `app/` tree**. If
 you cite "Belimbing", cite a `laravel/blb` path or you are citing the wrong
 thing. This mistake has been made.
 
-That checkout moves, and a pin written on this page cannot notice.
+This is the operational citation pin for the checkout agents read, not a
+blanket replacement for historical compatibility evidence. ADRs, schema
+contracts, and compatibility code may keep older commit citations when that
+older commit is the source for the decision they record.
+
+That checkout moves, and a pin written on this page cannot notice by itself.
 `.github/scripts/orient.sh` reports where it actually is, whether the pinned
-commit is still an ancestor, and which `app/` files changed after it — it found
-the tree three commits ahead the first time it ran.
+commit is still an ancestor, and which `app/` files changed after it. If an
+agent ports or cites a post-pin file, either advance this operational pin in the
+same change or cite that newer SHA explicitly. Do **not** advance the pin merely
+because Belimbing has new commits.
 
 ---
 
 ## How we work
 
 **Take any unclaimed task. Do not ask permission — not from the user, not from
-each other.** Claim it by opening a **draft PR before you write code**:
+each other.** Claim it by opening a **draft PR before you write code**. The
+claim script checks the live issue and open-PR registry before it writes
+anything, then creates the branch, empty claim commit, draft PR, and labels:
 
 ```bash
-git commit --allow-empty -m "claim: <what>"
-gh pr create --draft --title "<module>: <what> (#<issue>)"
-gh pr edit <n> --add-label "agent:<your-id>"
+CLAIM_AGENT=<your-stable-agent-id> .github/scripts/claim.sh <issue-number>
 ```
 
-Then add `task:active` to the issue and start.
+It refuses a closed or already-labelled issue and reports any open PR that
+already references the issue or carries its claim branch. `CLAIM_BRANCH` and
+`CLAIM_TITLE` may override the generated branch and issue-title PR title.
 
 Claim in the draft PR rather than an issue comment because that is the surface
 everyone already queries — `gh pr list` is how each of us finds work, so the

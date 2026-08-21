@@ -12,11 +12,13 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
     {:ok,
      socket
      |> assign(:page_title, "Performance")
+     |> assign(:page_sizes, @page_sizes)
      |> assign(:diagnostics, Perf.diagnostics())
      |> assign(:regressions, recent_regressions())
      |> assign(:filters, default_filters())
+     |> assign(:filters_form, filters_form(default_filters()))
+     |> assign(:samples_page, empty_page())
      |> assign(:total, 0)
-     |> assign(:page_count, 1)
      |> stream(:samples, [])}
   end
 
@@ -26,21 +28,34 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
 
     case Perf.list_samples(list_options(filters)) do
       {:ok, page} ->
-        {:noreply,
-         socket
-         |> assign(:filters, filters)
-         |> assign(:total, page.total)
-         |> assign(:page_count, max(ceil(page.total / filters.page_size), 1))
-         |> assign(:diagnostics, Perf.diagnostics())
-         |> assign(:regressions, recent_regressions())
-         |> stream(:samples, page.entries, reset: true)}
+        total_pages = total_pages(page.total, filters.page_size)
+
+        cond do
+          total_pages > 0 and filters.page > total_pages ->
+            {:noreply, push_patch(socket, to: filter_path(%{filters | page: total_pages}))}
+
+          total_pages == 0 and filters.page > 1 ->
+            {:noreply, push_patch(socket, to: filter_path(%{filters | page: 1}))}
+
+          true ->
+            {:noreply,
+             socket
+             |> assign(:filters, filters)
+             |> assign(:filters_form, filters_form(filters))
+             |> assign(:samples_page, samples_page(page, total_pages))
+             |> assign(:total, page.total)
+             |> assign(:diagnostics, Perf.diagnostics())
+             |> assign(:regressions, recent_regressions())
+             |> stream(:samples, page.entries, reset: true)}
+        end
 
       {:error, _reason} ->
         {:noreply,
          socket
          |> assign(:filters, filters)
+         |> assign(:filters_form, filters_form(filters))
+         |> assign(:samples_page, empty_page())
          |> assign(:total, 0)
-         |> assign(:page_count, 1)
          |> put_flash(:error, "Performance history is unavailable.")
          |> stream(:samples, [], reset: true)}
     end
@@ -48,19 +63,13 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
 
   @impl true
   def handle_event("filter", %{"filters" => params}, socket) do
-    filters = parse_filters(params)
+    filters = socket.assigns.filters |> merge_filter_params(params) |> parse_filters()
     {:noreply, push_patch(socket, to: filter_path(%{filters | page: 1}))}
   end
 
-  def handle_event("previous", _params, socket) do
+  def handle_event("page", %{"page" => page}, socket) do
     filters = socket.assigns.filters
-    {:noreply, push_patch(socket, to: filter_path(%{filters | page: max(filters.page - 1, 1)}))}
-  end
-
-  def handle_event("next", _params, socket) do
-    filters = socket.assigns.filters
-    page = min(filters.page + 1, socket.assigns.page_count)
-    {:noreply, push_patch(socket, to: filter_path(%{filters | page: page}))}
+    {:noreply, push_patch(socket, to: filter_path(%{filters | page: positive_integer(page, 1)}))}
   end
 
   defp default_filters, do: %{kind: "", outcome: "", identity: "", page: 1, page_size: 25}
@@ -71,7 +80,17 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
       outcome: enum(params["outcome"], ~w(ok error cancelled discarded)),
       identity: bounded(params["identity"], 255),
       page: positive_integer(params["page"], 1),
-      page_size: page_size(params["page_size"])
+      page_size: page_size(params["page_size"] || params["perPage"])
+    }
+  end
+
+  defp merge_filter_params(filters, params) do
+    %{
+      "kind" => Map.get(params, "kind", filters.kind),
+      "outcome" => Map.get(params, "outcome", filters.outcome),
+      "identity" => Map.get(params, "identity", filters.identity),
+      "page" => Map.get(params, "page", filters.page),
+      "page_size" => Map.get(params, "page_size") || Map.get(params, "perPage", filters.page_size)
     }
   end
 
@@ -107,6 +126,8 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
 
   defp bounded(_value, _maximum), do: ""
 
+  defp positive_integer(value, _fallback) when is_integer(value) and value > 0, do: value
+
   defp positive_integer(value, fallback) when is_binary(value) do
     case Integer.parse(value) do
       {integer, ""} when integer > 0 -> integer
@@ -119,6 +140,35 @@ defmodule Bilimbi.Base.Perf.Web.IndexLive do
   defp page_size(value) do
     size = positive_integer(value, 25)
     if size in @page_sizes, do: size, else: 25
+  end
+
+  defp total_pages(0, _page_size), do: 0
+  defp total_pages(total, page_size), do: ceil(total / page_size)
+
+  defp samples_page(page, total_pages) do
+    %{
+      entries: page.entries,
+      page: page.page,
+      page_size: page.page_size,
+      total_entries: page.total,
+      total_pages: total_pages
+    }
+  end
+
+  defp empty_page do
+    %{entries: [], page: 1, page_size: 25, total_entries: 0, total_pages: 0}
+  end
+
+  defp filters_form(filters) do
+    to_form(
+      %{
+        "kind" => filters.kind,
+        "outcome" => filters.outcome,
+        "identity" => filters.identity,
+        "perPage" => filters.page_size
+      },
+      as: :filters
+    )
   end
 
   defp recent_regressions do
