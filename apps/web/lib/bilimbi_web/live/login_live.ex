@@ -192,6 +192,7 @@ defmodule BilimbiWeb.LoginLive do
             label="Email address"
             placeholder="email@example.com"
             autocomplete="email"
+            phx-debounce="blur"
             required
             autofocus
           />
