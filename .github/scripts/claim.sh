@@ -77,7 +77,7 @@ prs=$(gh pr list --repo "$repo" --state open --limit 100 \
 # PR has an owner label, so an unrelated branch cannot block the queue.
 matches=$(jq -c --argjson issue "$issue" '
   def agent_labels: [.labels[].name | select(startswith("agent:"))];
-  def issue_reference: "\\(#" + ($issue | tostring) + ")";
+  def issue_reference: "(#" + ($issue | tostring) + ")";
   def claim_branch:
     .headRefName | test("(^|[-_/])issue-?" + ($issue | tostring) + "($|[-_/])");
   [.[]
