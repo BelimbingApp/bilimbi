@@ -10,6 +10,7 @@ defmodule Bilimbi.Core.Address do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Locale.Bootstrap
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Scope
@@ -342,6 +343,67 @@ defmodule Bilimbi.Core.Address do
       {:ok, attached}
     end
   end
+
+  @doc """
+  Resolves the primary address attached to a company, or the first address by priority.
+  """
+  @spec primary_company_address(Scope.t(), pos_integer()) ::
+          {:ok, AttachedAddress.t()} | {:error, :not_found | :company_not_found}
+  def primary_company_address(%Scope{} = scope, company_id) do
+    case list_company_attached_addresses(scope, company_id) do
+      {:ok, [primary | _]} -> {:ok, primary}
+      {:ok, []} -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Resolves the platform operator's primary company address and Geonames country facts
+  for one-time installation-locale inference.
+
+  Returns `%Bilimbi.Base.Locale.Bootstrap{}` when the platform operator is
+  provisioned, has a primary company, and that company has an attached address with
+  a valid country ISO code. Returns `nil` if any required entity or value is absent.
+  """
+  @spec platform_operator_locale_bootstrap() :: Bootstrap.t() | nil
+  def platform_operator_locale_bootstrap do
+    with %Tenancy.Identity{} = operator_tenant <- Tenancy.platform_operator(),
+         scope <- Scope.for_tenant(operator_tenant),
+         {:ok, company} <- Company.platform_operator_company(),
+         {:ok, address} <- primary_company_address(scope, company.id),
+         country_iso when is_binary(country_iso) and country_iso != "" <-
+           normalize_bootstrap_country(address.country_iso) do
+      country = Geonames.get_country(country_iso)
+
+      %Bootstrap{
+        country_iso: country_iso,
+        country_name: country && country.country,
+        languages: country && country.languages,
+        currency_code: country && country.currency_code
+      }
+    else
+      _ -> nil
+    end
+  rescue
+    _ in [
+      Tenancy.InvariantError,
+      Tenancy.NotProvisionedError,
+      Company.PrimaryCompanyInvariantError,
+      Company.PrimaryCompanyNotProvisionedError
+    ] ->
+      nil
+  end
+
+  defp normalize_bootstrap_country(nil), do: nil
+
+  defp normalize_bootstrap_country(iso) when is_binary(iso) do
+    case String.upcase(String.trim(iso)) do
+      "" -> nil
+      normalized -> normalized
+    end
+  end
+
+  defp normalize_bootstrap_country(_), do: nil
 
   @doc "Lists live tenant addresses not yet linked to the selected live Company."
   @spec list_available_company_addresses(Scope.t(), pos_integer()) ::

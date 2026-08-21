@@ -5,10 +5,13 @@
 polymorphic attachment compatibility, migrations, and tests remain inside this
 directory.
 
-The module depends on Base Database, Base Tenancy, Core Geonames, and the public
+The module depends on Base Database, Base Locale, Base Tenancy, Core Geonames, and the public
 Core Company API. It owns the two Address-to-Geonames normalization foreign
 keys and preserves Belimbing's persisted camel-cased columns and morph
-identities behind a tenant-explicit, snake-cased Elixir interface.
+identities behind a tenant-explicit, snake-cased Elixir interface. It supplies
+the bounded `%Bilimbi.Base.Locale.Bootstrap{}` facts for the platform
+operator's primary company address to support one-time installation-locale
+inference.
 
 ## Administration web adapter
 
