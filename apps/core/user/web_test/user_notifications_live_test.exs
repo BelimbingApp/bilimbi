@@ -48,7 +48,8 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
     assert has_element?(view, "#notifications-empty")
     assert html =~ "No notifications"
-    assert html =~ "You&#39;re all caught up."
+    # The label alone carries the empty state; no consumer-voice second line (#653).
+    refute html =~ "all caught up"
   end
 
   test "renders notification items with title, body, and unread indicator", %{
