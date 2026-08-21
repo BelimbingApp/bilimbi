@@ -557,13 +557,19 @@ another module's page renders inline without naming the providing module:
 ```
 
 An embed entry carries exactly `:embed` (a workspace-unique string key),
-`:live_component`, and optional `:capability`; discovery rejects route keys
-mixed into an embed entry, host-declared embeds, and duplicate keys across
-modules. Base UI's `<.discovered_panel key=... id=... current_scope=... opts=...>`
+`:live_component`, optional `:capability`, and optional `:operation_handler`.
+The handler is a module atom that receives operations through
+`DiscoveredPanels.dispatch/3` when an embedding page needs one declared
+cross-module workflow in addition to rendering the panel. Discovery rejects
+route keys mixed into an embed entry, host-declared embeds, and duplicate keys
+across modules. Base UI's `<.discovered_panel key=... id=... current_scope=... opts=...>`
 resolves the key from the same compile-time manifest `RouteContract` reads:
 a missing provider renders a visible not-installed notice, a declared
 capability the scope lacks hides the panel the way menu entries hide, and the
-panel component re-authorizes every write it handles itself.
+panel component re-authorizes every write it handles itself. Dispatch returns
+`:not_installed` for a missing key and `:operation_not_supported` when a panel
+does not declare a handler; it authorizes nothing. Both the caller and the
+handler remain responsible for authorization.
 
 This exists for pages whose canonical workflow composes another module's
 reads *and writes* inline while the declared dependency runs in the other
