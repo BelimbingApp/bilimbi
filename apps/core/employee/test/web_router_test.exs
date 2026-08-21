@@ -4,7 +4,12 @@ defmodule Bilimbi.Core.Employee.Web.RouterTest do
   alias Bilimbi.Core.Employee.Web.Router
 
   test "declares company-scoped employee and type screens" do
-    by_path = Map.new(Router.routes(), &{&1.path, &1})
+    # Embed entries (module-contributed panels) carry no `:path`; this test is
+    # about the path-routed screens, so filter them out before keying by path.
+    by_path =
+      Router.routes()
+      |> Enum.filter(&Map.has_key?(&1, :path))
+      |> Map.new(&{&1.path, &1})
 
     assert by_path["/employees"].live == Bilimbi.Core.Employee.Web.IndexLive
     assert by_path["/employees"].capability == "admin.employee.list"
