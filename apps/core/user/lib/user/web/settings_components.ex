@@ -13,10 +13,14 @@ defmodule Bilimbi.Core.User.Web.SettingsComponents do
   def settings_layout(assigns) do
     ~H"""
     <div class="w-full">
-      <div class="relative mb-6 w-full">
-        <h1 class="text-2xl font-semibold tracking-tight text-ink">Settings</h1>
-        <p class="text-sm text-muted">Manage your profile and account settings</p>
-        <hr class="mt-4 border-line" />
+      <div class="relative mb-2 w-full">
+        <%!-- The shared <.header> (text-lg text-action) keeps this shell on
+             the same heading system as every other screen (#653). --%>
+        <.header>
+          Settings
+          <:subtitle>Manage your profile and account settings</:subtitle>
+        </.header>
+        <hr class="border-line" />
       </div>
 
       <div class="flex items-start max-md:flex-col">

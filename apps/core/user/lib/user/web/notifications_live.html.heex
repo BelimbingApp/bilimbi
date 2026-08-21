@@ -73,25 +73,6 @@
         </.link>
       </div>
 
-      <div class="flex items-center gap-2 text-xs text-ink-subtle">
-        <label for="per-page-select" class="text-xs">Per page:</label>
-        <div class="flex items-center gap-1">
-          <.link
-            :for={size <- [25, 50, 100, 300]}
-            patch={~p"/notifications?filter=#{@current_filter}&page=1&per_page=#{size}"}
-            id={"per-page-#{size}"}
-            class={[
-              "rounded px-1.5 py-0.5 text-xs font-medium transition",
-              if(@per_page == size,
-                do: "bg-surface-sunken text-ink font-semibold",
-                else: "text-ink-subtle hover:text-ink hover:bg-surface-subtle"
-              )
-            ]}
-          >
-            {size}
-          </.link>
-        </div>
-      </div>
     </div>
 
     <div
@@ -99,9 +80,10 @@
       id="notifications-empty"
       class="mt-4 rounded-xl border border-line bg-surface p-12 text-center"
     >
+      <%!-- The label alone says it; a cheerful second line is the consumer
+           register DESIGN's operational voice avoids (#653). --%>
       <.icon name="hero-bell-slash" class="mx-auto size-8 text-ink-faint" />
       <p class="mt-2 text-sm font-medium text-ink">No notifications</p>
-      <p class="mt-1 text-xs text-ink-subtle">You're all caught up.</p>
     </div>
 
     <div
@@ -193,54 +175,12 @@
       </div>
     </div>
 
-    <div
-      :if={@total_count > 0}
-      id="notifications-pagination"
-      class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-ink-subtle"
-    >
-      <p id="pagination-summary">
-        Showing <span class="font-medium text-ink">{min((@page - 1) * @per_page + 1, @total_count)}</span> to{" "}
-        <span class="font-medium text-ink">{min(@page * @per_page, @total_count)}</span> of{" "}
-        <span class="font-medium text-ink">{@total_count}</span> notifications
-      </p>
-
-      <div class="flex items-center gap-2">
-        <.link
-          :if={@page > 1}
-          patch={~p"/notifications?filter=#{@current_filter}&page=#{@page - 1}&per_page=#{@per_page}"}
-          id="pagination-prev"
-          class="rounded border border-line bg-surface px-2.5 py-1 text-ink transition hover:bg-surface-sunken"
-        >
-          Previous
-        </.link>
-        <span
-          :if={@page <= 1}
-          id="pagination-prev-disabled"
-          class="rounded border border-line bg-surface-subtle/50 px-2.5 py-1 text-ink-faint cursor-not-allowed"
-        >
-          Previous
-        </span>
-
-        <span class="px-1 tabular-nums font-medium text-ink">
-          Page {@page} of {@total_pages}
-        </span>
-
-        <.link
-          :if={@page < @total_pages}
-          patch={~p"/notifications?filter=#{@current_filter}&page=#{@page + 1}&per_page=#{@per_page}"}
-          id="pagination-next"
-          class="rounded border border-line bg-surface px-2.5 py-1 text-ink transition hover:bg-surface-sunken"
-        >
-          Next
-        </.link>
-        <span
-          :if={@page >= @total_pages}
-          id="pagination-next-disabled"
-          class="rounded border border-line bg-surface-subtle/50 px-2.5 py-1 text-ink-faint cursor-not-allowed"
-        >
-          Next
-        </span>
-      </div>
+    <div class="mt-4">
+      <.pagination
+        id="notifications-pagination"
+        page={@pagination_page}
+        filters_form={@filters_form}
+      />
     </div>
   </.page>
 </Layouts.app>

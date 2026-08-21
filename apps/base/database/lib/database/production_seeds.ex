@@ -17,17 +17,22 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
     table = qualified_table(prefix)
     ordered = order!(seeds, ModuleRegistry.installed_modules!())
 
-    repo.checkout(fn ->
-      lock!(repo, prefix)
+    # Seeding is infrastructure, not an actor's mutation — the source skips
+    # its listener while seeding, and ADR 0013 ports that as the capture
+    # kill switch.
+    Bilimbi.Base.Database.WriteCapture.without_capture(fn ->
+      repo.checkout(fn ->
+        lock!(repo, prefix)
 
-      try do
-        ensure_ledger!(repo, table)
-        recover_interrupted!(repo, table)
-        register!(repo, table, ordered)
-        execute(repo, table, ordered)
-      after
-        unlock!(repo, prefix)
-      end
+        try do
+          ensure_ledger!(repo, table)
+          recover_interrupted!(repo, table)
+          register!(repo, table, ordered)
+          execute(repo, table, ordered)
+        after
+          unlock!(repo, prefix)
+        end
+      end)
     end)
   end
 
