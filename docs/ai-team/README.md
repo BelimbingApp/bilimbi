@@ -30,17 +30,24 @@ around an error; others plan from it.
 ### The canonical source is a specific checkout
 
 ```
-/home/kiat/repo/laravel/blb    pinned at e70b4d33c0b10790e681f4c2b5095d85a53bc918
+/home/kiat/repo/laravel/blb    operational citation pin 769bc31ddb632f5d2c5acb0fd05b777197df87cc
 ```
 
 `/home/kiat/repo/Belimbing` is **planning material with no `app/` tree**. If
 you cite "Belimbing", cite a `laravel/blb` path or you are citing the wrong
 thing. This mistake has been made.
 
-That checkout moves, and a pin written on this page cannot notice.
+This is the operational citation pin for the checkout agents read, not a
+blanket replacement for historical compatibility evidence. ADRs, schema
+contracts, and compatibility code may keep older commit citations when that
+older commit is the source for the decision they record.
+
+That checkout moves, and a pin written on this page cannot notice by itself.
 `.github/scripts/orient.sh` reports where it actually is, whether the pinned
-commit is still an ancestor, and which `app/` files changed after it — it found
-the tree three commits ahead the first time it ran.
+commit is still an ancestor, and which `app/` files changed after it. If an
+agent ports or cites a post-pin file, either advance this operational pin in the
+same change or cite that newer SHA explicitly. Do **not** advance the pin merely
+because Belimbing has new commits.
 
 ---
 
