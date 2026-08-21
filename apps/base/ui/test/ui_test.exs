@@ -42,4 +42,55 @@ defmodule Bilimbi.Base.UITest do
       refute Bilimbi.Base.UI.allowed?(scope, 123)
     end
   end
+
+  describe "current_user_id/1" do
+    test "returns the id from the shape UserAuth.presentation_user/2 builds" do
+      scope = %{
+        user: %{
+          "user_id" => 91,
+          "name" => "Ada Lovelace",
+          "email" => "ada@example.com",
+          "company_id" => 73,
+          "company_name" => "Bilimbi Industries"
+        }
+      }
+
+      assert Bilimbi.Base.UI.current_user_id(scope) == 91
+    end
+
+    # Three adapters used to answer 0 for every one of these, which scoped
+    # reads to a user that does not exist and made a broken scope look like an
+    # account with no data. Each must now say so instead (#545).
+    test "raises rather than defaulting when the scope carries no user id" do
+      for scope <- [
+            %{user: %{}},
+            %{user: %{"name" => "Ada Lovelace"}},
+            %{user: nil},
+            %{},
+            nil
+          ] do
+        assert_raise ArgumentError, ~r/no "user_id"/, fn ->
+          Bilimbi.Base.UI.current_user_id(scope)
+        end
+      end
+    end
+
+    # The atom and string `id` keys the old cond arms probed for never occur --
+    # they were dead branches. They must not quietly become live ones.
+    test "does not accept an :id or \"id\" key as a substitute" do
+      for scope <- [%{user: %{id: 91}}, %{user: %{"id" => 91}}] do
+        assert_raise ArgumentError, fn -> Bilimbi.Base.UI.current_user_id(scope) end
+      end
+    end
+
+    test "refuses a non-positive or non-integer id" do
+      for scope <- [
+            %{user: %{"user_id" => 0}},
+            %{user: %{"user_id" => -1}},
+            %{user: %{"user_id" => "91"}}
+          ] do
+        assert_raise ArgumentError, fn -> Bilimbi.Base.UI.current_user_id(scope) end
+      end
+    end
+  end
 end

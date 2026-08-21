@@ -79,6 +79,9 @@ jobs:
           mix credo --strict "apps/**/*.{ex,exs}"
           --ignore-checks AliasUsage,Apply,CyclomaticComplexity,LineEndings,Nesting
 
+      - name: Enforce greppable AGENTS.md mandates
+        run: .github/scripts/mandates.sh
+
       - name: Audit known dependency vulnerabilities
         run: mix deps.audit
 
@@ -92,6 +95,9 @@ jobs:
 
       - name: Scan Phoenix security
         run: mix sobelow --root apps/web --private --exit medium
+
+      - name: Scan module-owned web adapters
+        run: .github/scripts/sobelow_modules.sh
 
   types:
     name: Elixir types

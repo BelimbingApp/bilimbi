@@ -129,10 +129,15 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
     # Find all named parameters in order of appearance
     named_params = extract_named_parameters(sql)
 
+    # Param names are parsed out of user-authored SQL, so they must never
+    # become atoms. Normalizing the caller's keys once lets atom- and
+    # string-keyed maps read identically through a plain string lookup, and
+    # preserves false/nil values that a `||` chain would skip.
+    lookup = Map.new(params, fn {key, value} -> {to_string(key), value} end)
+
     {final_sql, bound_values, _} =
       Enum.reduce(named_params, {sql, [], 1}, fn param_name, {curr_sql, values, index} ->
-        # Lookup value by atom or string key
-        value = Map.get(params, param_name) || Map.get(params, String.to_atom(param_name))
+        value = Map.get(lookup, param_name)
         regex = Regex.compile!(":#{param_name}\\b")
         replaced = Regex.replace(regex, curr_sql, "$#{index}")
         {replaced, values ++ [value], index + 1}
