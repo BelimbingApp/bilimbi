@@ -11,7 +11,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   use Bilimbi.Base.UI, :live_view
 
-alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
 
