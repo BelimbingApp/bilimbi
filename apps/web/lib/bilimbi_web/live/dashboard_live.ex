@@ -293,6 +293,18 @@ defmodule BilimbiWeb.DashboardLive do
   end
 
   @impl true
+  def handle_event("move-section-up", %{"id" => id}, socket) do
+    sections = move_one(socket.assigns.visible_sections, id, -1)
+    {:noreply, assign(socket, :visible_sections, sections)}
+  end
+
+  @impl true
+  def handle_event("move-section-down", %{"id" => id}, socket) do
+    sections = move_one(socket.assigns.visible_sections, id, 1)
+    {:noreply, assign(socket, :visible_sections, sections)}
+  end
+
+  @impl true
   def handle_event("move-up", %{"id" => id}, socket) do
     widgets = move_one(socket.assigns.widgets, id, -1)
     layout = Enum.map(widgets, & &1.id)
@@ -342,8 +354,11 @@ defmodule BilimbiWeb.DashboardLive do
     end
   end
 
+  defp item_id(%{id: id}), do: id
+  defp item_id(id) when is_binary(id), do: id
+
   defp move_one(widgets, id, direction) do
-    case Enum.find_index(widgets, &(&1.id == id)) do
+    case Enum.find_index(widgets, &(item_id(&1) == id)) do
       nil ->
         widgets
 
@@ -476,97 +491,144 @@ defmodule BilimbiWeb.DashboardLive do
           &nbsp;to add widgets.
         </p>
 
-        <section
-          :if={@current_company && "current-company" in @visible_sections}
-          id="dashboard-current-company"
-          data-company-id={@current_company.id}
-          class="mt-6 overflow-hidden rounded-xl border border-line bg-surface shadow-xs shadow-ink/[0.03]"
-        >
-          <div class="h-0.5 bg-brand" aria-hidden="true"></div>
-          <div class="flex items-center justify-between gap-4 px-5 py-4">
-            <div class="min-w-0">
-              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-                Your company
-              </p>
-              <h2
-                id="dashboard-company-name"
-                class="mt-1 truncate text-base font-semibold text-ink-strong"
+        <%= for section_id <- @visible_sections do %>
+          <%= case section_id do %>
+            <% "current-company" -> %>
+              <section
+                :if={@current_company}
+                id="dashboard-current-company"
+                data-company-id={@current_company.id}
+                class="mt-6 overflow-hidden rounded-xl border border-line bg-surface shadow-xs shadow-ink/[0.03]"
               >
-                {Company.Summary.display_name(@current_company)}
-              </h2>
-              <p class="mt-0.5 text-xs text-ink-subtle">
-                <code class="font-medium">{@current_company.code}</code>
-              </p>
-            </div>
-            <div class="flex shrink-0 flex-col items-end gap-2">
-              <.badge kind={if @current_company.status == "active", do: :success, else: :warning}>
-                {@current_company.status}
-              </.badge>
-              <.link
-                :if={!@layout_editing and UserAuth.allowed?(@current_scope, "admin.company.view")}
-                navigate={~p"/companies/#{@current_company.id}"}
-                id="dashboard-company-open"
-                class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
-              >
-                Open company
-              </.link>
-              <button
-                :if={@layout_editing}
-                id="remove-section-current-company"
-                type="button"
-                phx-click="remove-section"
-                phx-value-id="current-company"
-                class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-                title="Remove section"
-              >
-                <.icon name="hero-x-mark" class="size-3" />
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section :if={"recent-users" in @visible_sections} id="dashboard-recent-users" class="mt-6">
-          <div class="mb-2 flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-ink-strong">People in this workspace</h2>
-            <.link
-              :if={!@layout_editing and UserAuth.allowed?(@current_scope, "admin.user.list")}
-              navigate={~p"/users"}
-              class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
-            >
-              All users
-            </.link>
-            <button
-              :if={@layout_editing}
-              id="remove-section-recent-users"
-              type="button"
-              phx-click="remove-section"
-              phx-value-id="recent-users"
-              class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-              title="Remove section"
-            >
-              <.icon name="hero-x-mark" class="size-3" />
-            </button>
-          </div>
-          <.table
-            id="dashboard-users"
-            rows={Enum.take(@users, 5)}
-            row_id={&"dashboard-user-#{&1.id}"}
-            caption="People in this workspace"
-          >
-            <:col :let={user} label="Name">
-              <span class="font-medium">{user.name}</span>
-            </:col>
-            <:col :let={user} label="Email">{user.email}</:col>
-            <:col :let={user} label="Email verified">
-              <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
-                {if user.email_verified_at, do: "verified", else: "unverified"}
-              </.badge>
-            </:col>
-            <:empty :if={@users == []}>
-              No users are affiliated with a company in this tenant yet.
-            </:empty>
-          </.table>
-        </section>
+                <div class="h-0.5 bg-brand" aria-hidden="true"></div>
+                <div class="flex items-center justify-between gap-4 px-5 py-4">
+                  <div class="min-w-0">
+                    <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                      Your company
+                    </p>
+                    <h2
+                      id="dashboard-company-name"
+                      class="mt-1 truncate text-base font-semibold text-ink-strong"
+                    >
+                      {Company.Summary.display_name(@current_company)}
+                    </h2>
+                    <p class="mt-0.5 text-xs text-ink-subtle">
+                      <code class="font-medium">{@current_company.code}</code>
+                    </p>
+                  </div>
+                  <div class="flex shrink-0 flex-col items-end gap-2">
+                    <.badge kind={if @current_company.status == "active", do: :success, else: :warning}>
+                      {@current_company.status}
+                    </.badge>
+                    <.link
+                      :if={!@layout_editing and UserAuth.allowed?(@current_scope, "admin.company.view")}
+                      navigate={~p"/companies/#{@current_company.id}"}
+                      id="dashboard-company-open"
+                      class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
+                    >
+                      Open company
+                    </.link>
+                    <div :if={@layout_editing} class="flex gap-0.5">
+                      <button
+                        id="move-section-up-current-company"
+                        type="button"
+                        phx-click="move-section-up"
+                        phx-value-id="current-company"
+                        title="Move up"
+                        class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                      >
+                        <.icon name="hero-chevron-up" class="size-3" />
+                      </button>
+                      <button
+                        id="move-section-down-current-company"
+                        type="button"
+                        phx-click="move-section-down"
+                        phx-value-id="current-company"
+                        title="Move down"
+                        class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                      >
+                        <.icon name="hero-chevron-down" class="size-3" />
+                      </button>
+                      <button
+                        id="remove-section-current-company"
+                        type="button"
+                        phx-click="remove-section"
+                        phx-value-id="current-company"
+                        class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                        title="Remove section"
+                      >
+                        <.icon name="hero-x-mark" class="size-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            <% "recent-users" -> %>
+              <section id="dashboard-recent-users" class="mt-6">
+                <div class="mb-2 flex items-center justify-between">
+                  <h2 class="text-sm font-semibold text-ink-strong">People in this workspace</h2>
+                  <.link
+                    :if={!@layout_editing and UserAuth.allowed?(@current_scope, "admin.user.list")}
+                    navigate={~p"/users"}
+                    class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
+                  >
+                    All users
+                  </.link>
+                  <div :if={@layout_editing} class="flex gap-0.5">
+                    <button
+                      id="move-section-up-recent-users"
+                      type="button"
+                      phx-click="move-section-up"
+                      phx-value-id="recent-users"
+                      title="Move up"
+                      class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                    >
+                      <.icon name="hero-chevron-up" class="size-3" />
+                    </button>
+                    <button
+                      id="move-section-down-recent-users"
+                      type="button"
+                      phx-click="move-section-down"
+                      phx-value-id="recent-users"
+                      title="Move down"
+                      class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                    >
+                      <.icon name="hero-chevron-down" class="size-3" />
+                    </button>
+                    <button
+                      id="remove-section-recent-users"
+                      type="button"
+                      phx-click="remove-section"
+                      phx-value-id="recent-users"
+                      class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                      title="Remove section"
+                    >
+                      <.icon name="hero-x-mark" class="size-3" />
+                    </button>
+                  </div>
+                </div>
+                <.table
+                  id="dashboard-users"
+                  rows={Enum.take(@users, 5)}
+                  row_id={&"dashboard-user-#{&1.id}"}
+                  caption="People in this workspace"
+                >
+                  <:col :let={user} label="Name">
+                    <span class="font-medium">{user.name}</span>
+                  </:col>
+                  <:col :let={user} label="Email">{user.email}</:col>
+                  <:col :let={user} label="Email verified">
+                    <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
+                      {if user.email_verified_at, do: "verified", else: "unverified"}
+                    </.badge>
+                  </:col>
+                  <:empty :if={@users == []}>
+                    No users are affiliated with a company in this tenant yet.
+                  </:empty>
+                </.table>
+              </section>
+          <% end %>
+        <% end %>
       </.page>
     </Layouts.app>
     """
