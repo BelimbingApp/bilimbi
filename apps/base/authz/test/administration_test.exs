@@ -430,6 +430,148 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert %Page{entries: [], total_entries: 0} = Authz.list_decision_logs(scope(2))
   end
 
+  # The directory doubles name users 5, 7 and 9 and agents 5 and 7, and refuse
+  # every other id. From Base's side a principal in another tenant and one that
+  # no longer exists are the same answer -- no name -- which is exactly the
+  # property that keeps a name from crossing a tenant boundary.
+  defp grant!(scope, type, id) do
+    assert {:ok, :stored} =
+             Authz.put_principal_capability(
+               scope,
+               10,
+               type,
+               id,
+               "admin.test.record.view",
+               true
+             )
+  end
+
+  defp principal_ids(%Page{entries: entries}), do: Enum.map(entries, & &1.principal_id)
+
+  test "the directory names a principal, keyed on the pair, and stays silent otherwise" do
+    tenant_scope = scope()
+    install_principal_directory!()
+
+    grant!(tenant_scope, :user, 7)
+    grant!(tenant_scope, :agent, 7)
+    grant!(tenant_scope, :user, 88)
+
+    page = Authz.list_principal_capabilities(tenant_scope)
+
+    named =
+      Map.new(page.entries, &{{&1.principal_type, &1.principal_id}, &1.principal_name})
+
+    # Same id, two kinds, two different names. Keyed on the id alone one of
+    # these principals would wear the other's name.
+    assert named[{"user", 7}] == "Zulu Facility"
+    assert named[{"agent", 7}] == "Delivery Bot"
+
+    # The provider was asked about 88 and returned nothing. Absence is not an
+    # error and must not become one: the row keeps its durable id.
+    assert named[{"user", 88}] == nil
+  end
+
+  test "a deployment with no directory installed keeps every principal id" do
+    tenant_scope = scope()
+
+    grant!(tenant_scope, :user, 7)
+
+    assert %Page{entries: [%PrincipalCapabilitySummary{principal_name: nil, principal_id: 7}]} =
+             Authz.list_principal_capabilities(tenant_scope)
+  end
+
+  test "name ordering is resolved before pagination, so it survives a page boundary" do
+    tenant_scope = scope()
+    install_principal_directory!()
+
+    for id <- [5, 7, 9], do: grant!(tenant_scope, :user, id)
+
+    # Display order is "ada lovelace" (9), "eMart Holdings" (5), "Zulu
+    # Facility" (7). Ordering by id would give 5, 7, 9; sorting raw binaries
+    # would file the lowercase "ada" last. Both wrong answers fail here, and
+    # they fail on the *first* page, which is what proves the order was
+    # resolved before the limit rather than inside it.
+    first =
+      Authz.list_principal_capabilities(tenant_scope,
+        sort_by: :principal_name,
+        sort_dir: :asc,
+        page_size: 2
+      )
+
+    second =
+      Authz.list_principal_capabilities(tenant_scope,
+        sort_by: :principal_name,
+        sort_dir: :asc,
+        page_size: 2,
+        page: 2
+      )
+
+    assert principal_ids(first) == [9, 5]
+    assert principal_ids(second) == [7]
+    assert first.total_entries == 3
+
+    # These screens default to newest-first, so the same sort descending has to
+    # reverse the whole ranking rather than reverse one page of it.
+    assert principal_ids(
+             Authz.list_principal_capabilities(tenant_scope,
+               sort_by: :principal_name,
+               page_size: 2
+             )
+           ) == [7, 5]
+  end
+
+  test "search reaches a principal name the capability key does not contain" do
+    tenant_scope = scope()
+    install_principal_directory!()
+
+    grant!(tenant_scope, :user, 7)
+    grant!(tenant_scope, :user, 88)
+
+    # "zulu" appears in no column of this table -- it is only the name the
+    # directory resolves for user 7.
+    assert principal_ids(Authz.list_principal_capabilities(tenant_scope, search: "zulu")) == [7]
+
+    # And the search is the directory's, not a coincidence of the SQL: with no
+    # provider installed the same term matches nothing.
+    install_test_registry!()
+
+    assert principal_ids(Authz.list_principal_capabilities(tenant_scope, search: "zulu")) == []
+  end
+
+  test "principal capability and role search reach a provider-owned email" do
+    tenant_scope = scope()
+    install_principal_directory!()
+
+    grant!(tenant_scope, :user, 7)
+
+    assert principal_ids(Authz.list_principal_capabilities(tenant_scope, search: "zulu@example")) ==
+             [7]
+
+    assert {:ok, role} =
+             Authz.create_role(tenant_scope, 10, %{name: "Auditor", code: "auditor"})
+
+    assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 10, :user, 7, role.id)
+
+    assert principal_ids(Authz.list_principal_roles(tenant_scope, search: "zulu@example")) == [7]
+  end
+
+  test "principal roles name and order by the same directory" do
+    tenant_scope = scope()
+    install_principal_directory!()
+
+    assert {:ok, role} =
+             Authz.create_role(tenant_scope, 10, %{name: "Auditor", code: "auditor"})
+
+    for id <- [5, 9],
+        do: assert({:ok, :assigned} = Authz.assign_role(tenant_scope, 10, :user, id, role.id))
+
+    page = Authz.list_principal_roles(tenant_scope, sort_by: :principal_name, sort_dir: :asc)
+
+    assert Enum.map(page.entries, & &1.principal_name) == ["ada lovelace", "eMart Holdings"]
+    assert principal_ids(page) == [9, 5]
+    assert principal_ids(Authz.list_principal_roles(tenant_scope, search: "emart")) == [5]
+  end
+
   test "principal capabilities sort by supplied company_order across pages" do
     tenant_scope = scope()
 

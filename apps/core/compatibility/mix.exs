@@ -27,10 +27,20 @@ defmodule Bilimbi.Core.Compatibility.MixProject do
   end
 
   def application do
-    [
+    application = [
       extra_applications: [:logger],
       env: Bilimbi.Base.ModuleRegistry.MixDiscovery.application_env(__DIR__)
     ]
+
+    if Mix.env() == :test do
+      Keyword.put(
+        application,
+        :mod,
+        {Bilimbi.Core.Compatibility.RuntimeSchemaFixture, []}
+      )
+    else
+      application
+    end
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
@@ -42,6 +52,12 @@ defmodule Bilimbi.Core.Compatibility.MixProject do
   end
 
   defp aliases do
-    [test: ["ecto.create --quiet -r Bilimbi.Base.Repo", "test"]]
+    [
+      test: [
+        "ecto.create --quiet -r Bilimbi.Base.Repo",
+        "ecto.migrate --quiet -r Bilimbi.Base.Repo --migrations-path ../../base/queue/priv/repo/migrations",
+        "test"
+      ]
+    ]
   end
 end

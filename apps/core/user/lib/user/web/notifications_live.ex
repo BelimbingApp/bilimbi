@@ -16,12 +16,8 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    user_id = session_user_id(socket)
+    user_id = current_user_id(socket.assigns.current_scope)
     scope = socket.assigns.current_scope.scope
-
-    if connected?(socket) and user_id > 0 and scope do
-      User.subscribe_notifications(scope, user_id)
-    end
 
     unread_count =
       case User.unread_notification_count(scope, user_id) do
@@ -215,11 +211,6 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
   defp parse_per_page(val, default) do
     int = parse_pos_integer(val, default)
     if int in @allowed_per_page, do: int, else: default
-  end
-
-  defp session_user_id(socket) do
-    user = socket.assigns.current_scope.user
-    user["user_id"] || user["id"] || user[:id] || 0
   end
 
   def format_relative_time(nil), do: ""

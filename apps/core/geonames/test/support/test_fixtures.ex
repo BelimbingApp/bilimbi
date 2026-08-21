@@ -80,6 +80,49 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
     SQL.query!(
       Repo,
       """
+      CREATE TEMPORARY TABLE IF NOT EXISTS geonames_postcode_overrides (
+        id bigserial PRIMARY KEY,
+        applied_postcode_id bigint NOT NULL UNIQUE,
+        country_iso varchar(2) NOT NULL,
+        postcode varchar(20) NOT NULL,
+        place_name varchar(180) NOT NULL,
+        admin1_code varchar(20),
+        admin_name1 varchar(100),
+        admin_code1 varchar(20),
+        admin_name2 varchar(100),
+        admin_code2 varchar(20),
+        admin_name3 varchar(100),
+        admin_code3 varchar(20),
+        latitude numeric(10,7),
+        longitude numeric(10,7),
+        accuracy smallint,
+        source_country_iso varchar(2),
+        source_postcode varchar(20),
+        source_place_name varchar(180),
+        source_admin1_code varchar(20),
+        source_admin_name1 varchar(100),
+        source_admin_code1 varchar(20),
+        source_admin_name2 varchar(100),
+        source_admin_code2 varchar(20),
+        source_admin_name3 varchar(100),
+        source_admin_code3 varchar(20),
+        source_latitude numeric(10,7),
+        source_longitude numeric(10,7),
+        source_accuracy smallint,
+        lock_version integer NOT NULL DEFAULT 1,
+        created_at timestamp(0) without time zone NOT NULL,
+        updated_at timestamp(0) without time zone NOT NULL,
+        CONSTRAINT geonames_postcode_overrides_country_iso_foreign
+          FOREIGN KEY (country_iso) REFERENCES geonames_countries (iso)
+          ON UPDATE CASCADE ON DELETE RESTRICT
+      ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      """
       CREATE TEMPORARY TABLE IF NOT EXISTS geonames_cities (
         id bigserial PRIMARY KEY,
         geoname_id integer NOT NULL UNIQUE,

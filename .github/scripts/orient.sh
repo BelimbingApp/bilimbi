@@ -64,6 +64,46 @@ gh pr list --repo "$REPO" --state open --limit 40 \
   || echo "  (gh unavailable)"
 
 echo
+echo "== holds that have been addressed — the author pushed after the label =="
+# A hold transfers the obligation to whoever set it, and nothing else tells that
+# person when it comes due. I once left `hold:review` on a PR for 75 minutes
+# after the author had already fixed it, because I was working on something else
+# and never re-checked the thing I was blocking (#431).
+#
+# Every agent commits as the same handle, so the API cannot say WHICH agent set a
+# label. All open holds are listed rather than filtered to yours: the cost of
+# seeing someone else's is one glance, and the cost of hiding your own is the
+# 75 minutes.
+held=$(gh pr list --repo "$REPO" --state open --limit 60 \
+         --json number,labels,title \
+         --jq '.[]|select([.labels[].name]|any(startswith("hold:")))|"\(.number)\t\([.labels[].name]|map(select(startswith("hold:")))|join(","))\t\(.title[0:52])"' 2>/dev/null)
+
+if [ -z "$held" ]; then
+  echo "  none"
+else
+  printf '%s\n' "$held" | while IFS=$'\t' read -r n labels title; do
+    # Latest application of any hold label; a hold can be set, cleared and set again.
+    set_at=$(gh api "repos/$REPO/issues/$n/timeline" --paginate \
+      --jq '[.[]|select(.event=="labeled" and (.label.name|startswith("hold:")))|.created_at]|last' 2>/dev/null)
+    head_at=$(gh api "repos/$REPO/pulls/$n/commits" \
+      --jq '[.[]|.commit.committer.date]|last' 2>/dev/null)
+    echo "  #$n [$labels] $title"
+
+    if [ -n "$set_at" ] && [ -n "$head_at" ]; then
+      s_e=$(date -d "$set_at" +%s 2>/dev/null)
+      h_e=$(date -d "$head_at" +%s 2>/dev/null)
+      if [ -n "$s_e" ] && [ -n "$h_e" ] && [ "$h_e" -gt "$s_e" ]; then
+        mins=$(( (h_e - s_e) / 60 ))
+        waited=$(( ($(date +%s) - h_e) / 60 ))
+        echo "        label set $set_at, head pushed +${mins}m later — WAITING ${waited}m. Re-review or clear."
+      else
+        echo "        no push since the label — the ball is with the author."
+      fi
+    fi
+  done
+fi
+
+echo
 echo "== ready and unclaimed — no agent:* label =="
 gh issue list --repo "$REPO" --state open --label "task:ready" --limit 40 \
   --json number,title,labels \
@@ -84,8 +124,21 @@ gh issue list --repo "$REPO" --state open --limit 100 --json number,title,labels
         |.[]|"  #\(.number) carries two task:* labels — \(.title[0:56])"' 2>/dev/null
 
 echo
-echo "== installed modules, in resolved order =="
-grep -h 'id:' apps/*/*/bilimbi.module.exs 2>/dev/null | sed 's/^ *//' | sed 's/^/  /'
+echo "== installed modules on origin/main =="
+# Read the descriptors out of origin/main, not the working tree. This used to
+# grep `apps/*/*/bilimbi.module.exs` on disk, which silently reports whatever
+# branch -- or whatever stale checkout -- the script happens to run from. It
+# listed a main that was missing two merged modules, and nothing said so.
+descriptors=$(git ls-tree -r --name-only origin/main 2>/dev/null | grep '/bilimbi\.module\.exs$')
+
+for descriptor in $descriptors; do
+  git show "origin/main:$descriptor" 2>/dev/null | grep -m1 'id:' | sed 's/^ */  /'
+done
+
+if [ -n "$descriptors" ] && ! git diff --quiet origin/main -- $descriptors 2>/dev/null; then
+  echo
+  echo "  NOTE  your working tree's module descriptors differ from origin/main."
+fi
 
 cat <<'TXT'
 

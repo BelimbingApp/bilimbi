@@ -12,6 +12,13 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   alias Bilimbi.Base.Database
   alias Bilimbi.Core.User
 
+  # `run` is a write verb, so the write-handler guard treats `run_query` as
+  # write-shaped. It is not: it calls `Database.execute_readonly/3`, which is
+  # where read-only is enforced, and the route requires
+  # `admin.system.database-table.list` — a read capability, correctly matched to
+  # a read. There is no weaker capability for this handler to refuse.
+  @write_guard_opt_out ~w(run_query)
+
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
@@ -55,7 +62,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   @impl true
   def handle_params(%{"slug" => slug}, _uri, socket) do
     scope = socket.assigns.current_scope.scope
-    user_id = current_user_id(socket)
+    user_id = current_user_id(socket.assigns.current_scope)
 
     case User.get_database_query(scope, user_id, slug) do
       {:ok, query} ->
@@ -132,7 +139,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   def handle_event("save", _params, socket) do
     if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
       scope = socket.assigns.current_scope.scope
-      user_id = current_user_id(socket)
+      user_id = current_user_id(socket.assigns.current_scope)
 
       attrs = %{
         "name" => socket.assigns.name,
@@ -218,7 +225,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   def handle_event("duplicate", _params, socket) do
     if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
       scope = socket.assigns.current_scope.scope
-      user_id = current_user_id(socket)
+      user_id = current_user_id(socket.assigns.current_scope)
 
       if socket.assigns.query do
         case User.duplicate_database_query(scope, user_id, socket.assigns.query.id) do
@@ -243,7 +250,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   def handle_event("delete", _params, socket) do
     if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
       scope = socket.assigns.current_scope.scope
-      user_id = current_user_id(socket)
+      user_id = current_user_id(socket.assigns.current_scope)
 
       if socket.assigns.is_new || is_nil(socket.assigns.query) do
         {:noreply,
@@ -324,17 +331,6 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
       end)
     end)
     |> Enum.map_join("; ", fn {k, v} -> "#{k}: #{Enum.join(v, ", ")}" end)
-  end
-
-  defp current_user_id(socket) do
-    user = socket.assigns.current_scope.user
-
-    cond do
-      is_map(user) and Map.has_key?(user, "user_id") -> user["user_id"]
-      is_map(user) and Map.has_key?(user, :id) -> user.id
-      is_map(user) and Map.has_key?(user, "id") -> user["id"]
-      true -> 0
-    end
   end
 
   defp to_integer(nil, default), do: default

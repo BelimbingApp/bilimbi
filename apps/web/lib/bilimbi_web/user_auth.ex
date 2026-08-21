@@ -25,6 +25,12 @@ defmodule BilimbiWeb.UserAuth do
   with an opaque payload; logout calls `Session.delete_session/1` before
   dropping the cookie.
 
+  Once identity is rehydrated, this edge also resolves Base Locale from the
+  authenticated user's explicit Settings scope and applies its language to the
+  Web and shared-UI Gettext backends. Anonymous requests use the global locale.
+  HTTP requests and LiveViews each apply it in their own process lifecycle, so
+  no user's language remains in another request or LiveView process.
+
   ## Cross-module seam
 
   `Bilimbi.Core.Company.fetch_tenant_id_for_company/1` is the public
@@ -37,12 +43,16 @@ defmodule BilimbiWeb.UserAuth do
   import Plug.Conn
   import Phoenix.Controller
 
+  require Logger
+
   use BilimbiWeb, :verified_routes
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.Decision
+  alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Session.Entry
+  alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
@@ -57,6 +67,7 @@ defmodule BilimbiWeb.UserAuth do
   # Opaque compatibility payload. Web never interprets session contents.
   @opaque_payload "{}"
   @denied_message "You do not have access to that page."
+  @gettext_backends [BilimbiWeb.Gettext, Bilimbi.Base.UI.Gettext]
 
   # ------------------------------------------------------------------
   # Login edge
@@ -320,8 +331,11 @@ defmodule BilimbiWeb.UserAuth do
   def fetch_current_scope(conn, _opts) do
     session_user = get_session(conn, @session_key)
     impersonation = get_session(conn, @impersonation_key)
+    current_scope = current_scope_from(session_user, impersonation)
 
-    case current_scope_from(session_user, impersonation) do
+    apply_locale(current_scope)
+
+    case current_scope do
       %{scope: %Scope{}} = current_scope ->
         assign(conn, :current_scope, current_scope)
 
@@ -434,7 +448,15 @@ defmodule BilimbiWeb.UserAuth do
       user_id = current_scope.actor.id
 
       if Phoenix.LiveView.connected?(socket) do
-        User.subscribe_notifications(current_scope.scope, user_id)
+        case User.subscribe_notifications(current_scope.scope, user_id) do
+          :ok ->
+            :ok
+
+          {:error, reason} ->
+            Logger.warning(
+              "UserAuth: failed to subscribe to user notifications topic for user #{user_id}: #{inspect(reason)}"
+            )
+        end
       end
 
       socket =
@@ -479,11 +501,31 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   defp mount_current_scope(socket, session) do
+    current_scope = current_scope_from(session[@session_key], session[@impersonation_key])
+
+    apply_locale(current_scope)
+
     Phoenix.Component.assign(
       socket,
       :current_scope,
-      current_scope_from(session[@session_key], session[@impersonation_key])
+      current_scope
     )
+  end
+
+  defp apply_locale(nil), do: put_gettext_locale(Locale.resolve(nil).language)
+
+  defp apply_locale(%{
+         user: %{"user_id" => user_id, "company_id" => company_id},
+         scope: %Scope{} = scope
+       }) do
+    user_id
+    |> SettingsScope.user(company_id, Scope.tenant_id(scope))
+    |> Locale.resolve()
+    |> then(&put_gettext_locale(&1.language))
+  end
+
+  defp put_gettext_locale(language) do
+    Enum.each(@gettext_backends, &Gettext.put_locale(&1, language))
   end
 
   defp current_scope_from(

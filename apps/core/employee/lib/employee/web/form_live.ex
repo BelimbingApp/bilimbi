@@ -59,25 +59,18 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
     "employment_end",
     "job_description"
   ]
+  @create_capability "admin.employee.create"
+  @update_capability "admin.employee.update"
 
   @impl true
   def mount(_params, _session, socket) do
-    scope = socket.assigns.current_scope.scope
-    user_company_id = socket.assigns.current_scope.user["company_id"]
-
-    {:ok, companies} = Company.list_companies(scope)
-
-    active_company_id =
-      case Enum.find(companies, &(&1.id == user_company_id)) do
-        nil -> (List.first(companies) && List.first(companies).id) || user_company_id
-        found -> found.id
-      end
+    actor = socket.assigns.current_scope.actor
 
     {:ok,
      socket
      |> assign(:active_nav, "admin.employee")
-     |> assign(:companies, companies)
-     |> assign(:company_id, active_company_id)
+     |> assign(:companies, [])
+     |> assign(:company_id, actor.company_id)
      |> assign(:statuses, @statuses)}
   end
 
@@ -96,28 +89,44 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
 
   defp apply_action(socket, :new, _params) do
     scope = socket.assigns.current_scope.scope
-    company_id = socket.assigns.company_id
+    actor = socket.assigns.current_scope.actor
 
-    socket
-    |> assign(:page_title, "Add Employee")
-    |> assign(:page_subtitle, "Create a new employment record")
-    |> assign(:save_button_label, "Add Employee")
-    |> assign(:employee, nil)
-    |> load_company_context(scope, company_id, nil)
-    |> assign_form(
-      form_changeset(%{
-        "company_id" => company_id,
-        "status" => "active",
-        "employee_type" => "full_time"
-      })
-    )
+    case Company.list_selectable_companies(actor, @create_capability) do
+      {:ok, companies} ->
+        company_id = actor.company_id
+
+        socket
+        |> assign(:page_title, "Add Employee")
+        |> assign(:page_subtitle, "Create a new employment record")
+        |> assign(:save_button_label, "Add Employee")
+        |> assign(:employee, nil)
+        |> assign(:companies, companies)
+        |> assign(:company_id, company_id)
+        |> load_company_context(scope, company_id, nil)
+        |> assign_form(
+          form_changeset(%{
+            "company_id" => company_id,
+            "status" => "active",
+            "employee_type" => "full_time"
+          })
+        )
+
+      {:error, :unauthorized} ->
+        socket
+        |> put_flash(:error, "You do not have permission to create employees.")
+        |> push_navigate(to: ~p"/dashboard")
+    end
   end
 
   defp apply_action(socket, :edit, %{"id" => id}) do
     scope = socket.assigns.current_scope.scope
+    actor = socket.assigns.current_scope.actor
 
     with {employee_id, ""} <- Integer.parse(id),
-         {:ok, employee} <- Employee.get_employee(scope, employee_id) do
+         {:ok, employee} <- Employee.get_employee(scope, employee_id),
+         {:ok, _company} <-
+           Company.authorize_company_target(actor, employee.company_id, @update_capability),
+         {:ok, companies} <- Company.list_selectable_companies(actor, @update_capability) do
       company_id = employee.company_id
       linked_user_id = find_linked_user_id(scope, employee.id)
 
@@ -126,6 +135,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
       |> assign(:page_subtitle, "Update employment record")
       |> assign(:save_button_label, "Save Employee")
       |> assign(:employee, employee)
+      |> assign(:companies, companies)
       |> assign(:company_id, company_id)
       |> load_company_context(scope, company_id, employee.id)
       |> assign_form(form_changeset(form_values(employee, linked_user_id)))
@@ -158,16 +168,24 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
 
     current_employee_id = if socket.assigns.employee, do: socket.assigns.employee.id, else: nil
 
-    socket =
-      if new_company_id != current_company_id do
-        socket
-        |> assign(:company_id, new_company_id)
-        |> load_company_context(scope, new_company_id, current_employee_id)
-      else
-        socket
-      end
+    changeset = form_changeset(params)
 
-    {:noreply, assign_form(socket, form_changeset(params))}
+    case authorize_company_target(socket, new_company_id, action_capability(socket)) do
+      :ok ->
+        socket =
+          if new_company_id != current_company_id do
+            socket
+            |> assign(:company_id, new_company_id)
+            |> load_company_context(scope, new_company_id, current_employee_id)
+          else
+            socket
+          end
+
+        {:noreply, assign_form(socket, changeset)}
+
+      {:error, _reason} ->
+        {:noreply, assign_form(socket, add_error(changeset, :company_id, "is not available"))}
+    end
   end
 
   def handle_event("save", %{"employee" => params}, socket) do
@@ -184,21 +202,12 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
       user_id = parse_id(params["user_id"])
       attributes = extract_attributes(params, company_id)
 
-      case Employee.create_employee(scope, company_id, attributes) do
-        {:ok, employee} ->
-          link_result = sync_user_link(scope, company_id, employee.id, user_id)
+      case authorize_company_target(socket, company_id, @create_capability) do
+        :ok ->
+          create_employee(socket, scope, company_id, user_id, attributes, changeset)
 
-          {:noreply,
-           socket
-           |> put_flash(:info, "#{employee.full_name} was created.")
-           |> flash_rejected_link(link_result)
-           |> push_navigate(to: ~p"/employees/#{employee.id}")}
-
-        {:error, :company_not_found} ->
-          {:noreply, put_flash(socket, :error, "That company is not in this workspace.")}
-
-        {:error, %Changeset{} = domain_changeset} ->
-          {:noreply, assign_form(socket, copy_domain_errors(changeset, domain_changeset))}
+        {:error, _reason} ->
+          {:noreply, assign_form(socket, add_error(changeset, :company_id, "is not available"))}
       end
     else
       {:noreply, assign_form(socket, changeset)}
@@ -221,30 +230,74 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
       user_id = parse_id(params["user_id"])
       attributes = extract_attributes(params, company_id)
 
-      case Employee.update_employee(scope, company_id, employee.id, attributes) do
-        {:ok, updated} ->
-          link_result = sync_user_link(scope, company_id, updated.id, user_id)
-
-          {:noreply,
-           socket
-           |> put_flash(:info, "#{updated.full_name} was updated.")
-           |> flash_rejected_link(link_result)
-           |> push_navigate(to: ~p"/employees/#{updated.id}")}
-
-        {:error, %Changeset{} = domain_changeset} ->
-          {:noreply, assign_form(socket, copy_domain_errors(changeset, domain_changeset))}
-
-        {:error, :invariant_violation} ->
-          {:noreply,
-           put_flash(socket, :error, "The platform orchestrator identity cannot be changed.")}
+      case authorize_company_target(socket, company_id, @update_capability) do
+        :ok ->
+          update_employee(socket, scope, employee, company_id, user_id, attributes, changeset)
 
         {:error, _reason} ->
-          {:noreply, put_flash(socket, :error, "That employee could not be updated.")}
+          {:noreply,
+           socket
+           |> put_flash(:error, "That company is not available in this workspace.")
+           |> push_navigate(to: ~p"/employees")}
       end
     else
       {:noreply, assign_form(socket, changeset)}
     end
   end
+
+  defp create_employee(socket, scope, company_id, user_id, attributes, changeset) do
+    case Employee.create_employee(scope, company_id, attributes) do
+      {:ok, employee} ->
+        link_result = sync_user_link(scope, company_id, employee.id, user_id)
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "#{employee.full_name} was created.")
+         |> flash_rejected_link(link_result)
+         |> push_navigate(to: ~p"/employees/#{employee.id}")}
+
+      {:error, :company_not_found} ->
+        {:noreply, put_flash(socket, :error, "That company is not in this workspace.")}
+
+      {:error, %Changeset{} = domain_changeset} ->
+        {:noreply, assign_form(socket, copy_domain_errors(changeset, domain_changeset))}
+    end
+  end
+
+  defp update_employee(socket, scope, employee, company_id, user_id, attributes, changeset) do
+    case Employee.update_employee(scope, company_id, employee.id, attributes) do
+      {:ok, updated} ->
+        link_result = sync_user_link(scope, company_id, updated.id, user_id)
+
+        {:noreply,
+         socket
+         |> put_flash(:info, "#{updated.full_name} was updated.")
+         |> flash_rejected_link(link_result)
+         |> push_navigate(to: ~p"/employees/#{updated.id}")}
+
+      {:error, %Changeset{} = domain_changeset} ->
+        {:noreply, assign_form(socket, copy_domain_errors(changeset, domain_changeset))}
+
+      {:error, :invariant_violation} ->
+        {:noreply,
+         put_flash(socket, :error, "The platform orchestrator identity cannot be changed.")}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "That employee could not be updated.")}
+    end
+  end
+
+  defp authorize_company_target(socket, company_id, capability) do
+    actor = socket.assigns.current_scope.actor
+
+    case Company.authorize_company_target(actor, company_id, capability) do
+      {:ok, _company} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp action_capability(%{assigns: %{live_action: :edit}}), do: @update_capability
+  defp action_capability(_socket), do: @create_capability
 
   defp load_company_context(socket, scope, company_id, current_employee_id) do
     departments =
@@ -530,12 +583,13 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
       <.page variant={:list}>
         <.header>
           <div class="flex items-center gap-2">
-            <span>{@page_title}</span>
-            <.icon name="hero-star" class="h-5 w-5 text-ink-muted/50" />
+            <span>{@page_title}</span> <.icon name="hero-star" class="h-5 w-5 text-ink-muted/50" />
           </div>
+
           <:subtitle>
             {@page_subtitle}
           </:subtitle>
+
           <:actions>
             <.link
               navigate={~p"/employees"}
@@ -567,6 +621,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
                 required
               />
             </div>
+
             <div>
               <.input
                 field={@form[:department_id]}
@@ -590,6 +645,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
                 required
               />
             </div>
+
             <div>
               <.input
                 field={@form[:full_name]}
@@ -612,6 +668,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
                 autocomplete="off"
               />
             </div>
+
             <div>
               <.input
                 field={@form[:designation]}
@@ -634,6 +691,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
                 required
               />
             </div>
+
             <div>
               <.input
                 field={@form[:status]}
@@ -657,6 +715,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
                 autocomplete="off"
               />
             </div>
+
             <div>
               <.input
                 field={@form[:mobile_number]}
@@ -677,6 +736,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
                 label_class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
               />
             </div>
+
             <div>
               <.input
                 field={@form[:employment_end]}
@@ -710,6 +770,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
                 options={for sup <- @supervisors, do: {sup.full_name, sup.id}}
               />
             </div>
+
             <div>
               <.input
                 field={@form[:user_id]}

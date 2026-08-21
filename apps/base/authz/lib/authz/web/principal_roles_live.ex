@@ -4,18 +4,25 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
 
   Ports Belimbing's `app/Base/Authz/Livewire/PrincipalRoles/Index.php`.
   Belimbing joins `users` for name, email, search, and `principal_name` sort,
-  and `companies` for the company column. Company names use the
-  `CompanyDirectory` seam (#183 / #382): `Authz.companies_in_scope/1` plus
-  `company_order` so pagination can follow display order without Base joining
-  Core. Principal names stay ids until #285; search is role name/code,
-  principal type, or principal id.
+  and `companies` for the company column. Bilimbi reaches both through seams,
+  because Base may not query Core. Company names use the `CompanyDirectory`
+  seam (#183 / #382) and principal names the `PrincipalDirectory` seam (#441,
+  ADR 0011), each with an id order resolved before pagination so display order
+  survives a page boundary.
+
+  Naming follows the hybrid #285 settled on: a principal inside the actor's
+  tenant is named, one outside keeps its durable id. Belimbing's join is
+  unscoped and names any user id it finds; that is not ported.
+
+  Search covers role name and code, principal type, principal id, principal
+  name, and provider-owned identity attributes such as a Core User email.
   """
 
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
 
-  @sortable ~w(created_at principal_type principal_id role_name company_id company_name)
+  @sortable ~w(created_at principal_type principal_id principal_name role_name company_id company_name)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -137,6 +144,12 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
   defp principal_label(%{principal_type: "agent"}), do: "Employee"
   defp principal_label(%{principal_type: "user"}), do: "User"
   defp principal_label(%{principal_type: other}), do: to_string(other)
+
+  # The Type column already says which kind this is, so the Principal column
+  # carries the name when the directory resolved one and the durable id when it
+  # did not. An unresolved principal is not an error and must not read as one.
+  defp principal_identity(%{principal_name: name}) when is_binary(name) and name != "", do: name
+  defp principal_identity(%{principal_id: id}), do: to_string(id)
 
   defp created_at(%{created_at: nil}), do: "—"
   defp created_at(%{created_at: at}), do: Calendar.strftime(at, "%Y-%m-%d %H:%M")

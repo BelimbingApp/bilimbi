@@ -18,6 +18,9 @@ config :web, BilimbiWeb.Mailer, adapter: Swoosh.Adapters.Test
 config :web, :mailer_sender, {"Bilimbi Test", "no-reply@bilimbi.test"}
 config :swoosh, :api_client, false
 config :bilimbi_base_settings, :belimbing_app_key, "base64:#{Base.encode64(<<0::256>>)}"
+config :bilimbi_base_queue, testing: :manual
+config :bilimbi_base_schedule, scheduler_enabled: false
+config :bilimbi_base_perf, instrumentation_enabled: false
 config :argon2_elixir, t_cost: 1, m_cost: 8, parallelism: 1
 config :bcrypt_elixir, log_rounds: 4
 config :logger, level: :warning

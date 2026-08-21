@@ -438,6 +438,87 @@ defmodule Bilimbi.Core.GeonamesTest do
     end
   end
 
+  describe "operator postcode maintenance" do
+    test "creates a validated operator row and exposes its provenance" do
+      assert {:ok, created} =
+               Geonames.create_postcode(%{
+                 "country_iso" => "my",
+                 "postcode" => " 63000 ",
+                 "place_name" => " Cyberjaya ",
+                 "admin1_code" => "MY.14",
+                 "latitude" => "2.9213",
+                 "longitude" => "101.6559",
+                 "accuracy" => "4"
+               })
+
+      assert created.postcode == "63000"
+      assert created.place_name == "Cyberjaya"
+      assert created.admin1_code == "14"
+      assert created.provenance == :operator
+      assert String.starts_with?(created.revision, "override:")
+      assert [%{place_name: "Cyberjaya"}] = Geonames.lookup_postcode("MY", "63000")
+
+      assert [%{provenance: :operator}] =
+               Geonames.page_postcodes(%{search: "Cyberjaya"}).entries
+    end
+
+    test "rejects invalid country, Admin1, coordinate, and accuracy values" do
+      assert {:error, changeset} =
+               Geonames.create_postcode(%{
+                 country_iso: "US",
+                 postcode: "99999",
+                 place_name: "Invalid",
+                 admin1_code: "MY.14",
+                 latitude: "91",
+                 accuracy: "9"
+               })
+
+      errors = errors_on(changeset)
+      assert "is not available for the selected country" in errors.admin1_code
+      assert "must be less than or equal to 90" in errors.latitude
+      assert "is required when latitude is set" in errors.longitude
+      assert "must be less than or equal to 6" in errors.accuracy
+
+      assert {:error, country_changeset} =
+               Geonames.create_postcode(%{
+                 country_iso: "ZZ",
+                 postcode: "99999",
+                 place_name: "Invalid"
+               })
+
+      assert "is not available" in errors_on(country_changeset).country_iso
+    end
+
+    test "turns a source row into an override and rejects a stale concurrent write" do
+      source = hd(Geonames.page_postcodes(%{search: "50000"}).entries)
+      assert source.provenance == :geonames
+
+      assert {:ok, updated} =
+               Geonames.update_postcode(source.id, source.revision, %{
+                 country_iso: "MY",
+                 postcode: "50000",
+                 place_name: "Kuala Lumpur City",
+                 admin1_code: "14",
+                 latitude: "3.139",
+                 longitude: "101.6869",
+                 accuracy: "4"
+               })
+
+      assert updated.provenance == :operator
+      assert updated.place_name == "Kuala Lumpur City"
+
+      assert {:error, :stale} =
+               Geonames.update_postcode(source.id, source.revision, %{
+                 country_iso: "MY",
+                 postcode: "50000",
+                 place_name: "Lost concurrent write"
+               })
+
+      assert [%{place_name: "Kuala Lumpur City"}] =
+               Geonames.lookup_postcode("MY", "50000")
+    end
+  end
+
   defp errors_on(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
       Regex.replace(~r"%{(\w+)}", message, fn _, key ->

@@ -13,12 +13,22 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
     # led until it took a base/ui dependency for its group screen and joined
     # base/session's tier. Safe to reorder: neither reads the other's tables,
     # and the ascending-order assertion below is the real invariant.
+    #
+    # base/session then dropped below base/tenancy, base/audit and base/authz
+    # when it took a base/principal_directory dependency to name users on the
+    # sessions screen (#285); that seam depends on base/tenancy, so session
+    # inherited the tier. Safe for the same reason, checked rather than assumed:
+    # session's one migration declares no foreign key, and no other module's
+    # migration references its table.
     assert Enum.map(migration_modules, & &1.id) == [
-             "base/session",
+             "base/queue",
              "base/settings",
              "base/tenancy",
              "base/audit",
              "base/authz",
+             "base/schedule",
+             "base/perf",
+             "base/session",
              "core/geonames",
              "core/company",
              "core/employee",
@@ -57,8 +67,14 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Core.Employee.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Core.User.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Base.Audit.Migrations.CreateCompatibilityBaseline,
+             Bilimbi.Base.Schedule.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Core.Employee.Migrations.AdaptEmployeeTypesTenancyIndexes,
-             Bilimbi.Core.Employee.Migrations.BroadenGlobalIndexAndAddSystemCompanyCheck
+             Bilimbi.Core.Employee.Migrations.BroadenGlobalIndexAndAddSystemCompanyCheck,
+             Bilimbi.Base.Queue.Migrations.CreateObanRuntime,
+             Bilimbi.Core.Geonames.Migrations.CreatePostcodeOverrides,
+             Bilimbi.Base.Schedule.Migrations.CreateOccurrenceRuntime,
+             Bilimbi.Base.Perf.Migrations.CreateSamples,
+             Bilimbi.Core.User.Migrations.AddUserAccountForeignKeyIndexes
            ]
 
     assert Enum.map(entries, &elem(&1, 2)) == [
@@ -73,6 +89,12 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              :compatible_baseline,
              :compatible_baseline,
              :compatible_baseline,
+             :compatible_baseline,
+             :bilimbi_only,
+             :bilimbi_only,
+             :bilimbi_only,
+             :bilimbi_only,
+             :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only
            ]

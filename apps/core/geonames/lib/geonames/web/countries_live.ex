@@ -15,6 +15,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   def mount(_params, _session, socket) do
     {:ok,
      socket
+     |> assign(:can_update?, allowed?(socket.assigns.current_scope, "admin.geonames.update"))
      |> assign(:updating_countries?, false)
      |> stream_configure(:countries, dom_id: &"country-#{&1.id}")}
   end
@@ -25,6 +26,10 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   end
 
   @impl true
+  def handle_event("save-country-name", _params, %{assigns: %{can_update?: false}} = socket) do
+    {:noreply, put_flash(socket, :error, "You do not have permission to update countries.")}
+  end
+
   def handle_event("save-country-name", %{"id" => id, "country" => name}, socket) do
     # `id` arrives from the client. `String.to_integer/1` raised on anything
     # non-numeric and took the LiveView down with it; `update_country_name/2`
@@ -69,6 +74,10 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
       )
 
     {:noreply, push_patch(socket, to: countries_path(state))}
+  end
+
+  def handle_event("update-countries", _params, %{assigns: %{can_update?: false}} = socket) do
+    {:noreply, put_flash(socket, :error, "You do not have permission to update countries.")}
   end
 
   def handle_event("update-countries", _params, %{assigns: %{updating_countries?: true}} = socket) do
@@ -130,6 +139,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
           </:title_actions>
           <:actions>
             <.button
+              :if={@can_update?}
               id="countries-update"
               type="button"
               variant="primary"
@@ -187,6 +197,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
             </:col>
             <:col :let={country} label="Country" sort="country" sort_id="countries-sort-country">
               <.inline_edit
+                :if={@can_update?}
                 id={"country-#{country.id}-name"}
                 value={country.country}
                 id_value={country.id}
@@ -194,6 +205,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
                 name="country"
                 label="Country name"
               />
+              <span :if={not @can_update?} class="font-medium text-ink">{country.country}</span>
             </:col>
             <:col :let={country} label="Capital" sort="capital" sort_id="countries-sort-capital">
               <span class="whitespace-nowrap tabular-nums text-ink-muted">{country.capital || "—"}</span>

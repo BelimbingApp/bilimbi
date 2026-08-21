@@ -10,6 +10,8 @@ defmodule Bilimbi.Core.Company do
 
   require Logger
 
+  alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Authz.Actor
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.InvariantError, as: TenantInvariantError
@@ -32,12 +34,14 @@ defmodule Bilimbi.Core.Company do
   @type lookup_error :: :not_provisioned | :invariant_violation | :database_unavailable
   @type access_lookup_error :: :not_found | :company_not_found | :relationship_not_found
   @list_limit 200
+  @manage_across_tenant_capability "admin.company.tenant-wide.manage"
 
   @spec get_company(Scope.t(), pos_integer()) :: {:ok, Summary.t()} | {:error, :not_found}
   def get_company(%Scope{} = scope, company_id) when is_integer(company_id) and company_id > 0 do
     query =
-      from company in Tenancy.scope_query(Schema, scope),
+      from(company in Tenancy.scope_query(Schema, scope),
         where: company.id == ^company_id and is_nil(company.deleted_at)
+      )
 
     case Repo.one(query) do
       nil -> {:error, :not_found}
@@ -81,9 +85,10 @@ defmodule Bilimbi.Core.Company do
   @spec fetch_tenant_id_for_company(term()) :: {:ok, pos_integer()} | {:error, :not_found}
   def fetch_tenant_id_for_company(company_id) when is_integer(company_id) and company_id > 0 do
     query =
-      from company in Schema,
+      from(company in Schema,
         where: company.id == ^company_id and is_nil(company.deleted_at),
         select: company.tenant_id
+      )
 
     case Repo.one(query) do
       nil -> {:error, :not_found}
@@ -109,6 +114,62 @@ defmodule Bilimbi.Core.Company do
       |> Enum.map(&Summary.from_schema/1)
 
     {:ok, companies}
+  end
+
+  @doc """
+  Lists the live companies an actor may target for an authorized operation.
+
+  The operation capability and company reach are independent: the tenant-wide
+  capability expands the actor's reach but never authorizes an operation by
+  itself. Every returned company remains inside the actor's validated tenant
+  scope.
+  """
+  @spec list_selectable_companies(Actor.t(), String.t()) ::
+          {:ok, [Summary.t()]} | {:error, :unauthorized}
+  def list_selectable_companies(%Actor{} = actor, operation_capability)
+      when is_binary(operation_capability) do
+    if capability_allowed?(actor, operation_capability) do
+      {:ok, companies} = list_companies(actor.scope)
+
+      if capability_allowed?(actor, @manage_across_tenant_capability) do
+        {:ok, companies}
+      else
+        {:ok, Enum.filter(companies, &(&1.id == actor.company_id))}
+      end
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  @doc """
+  Authorizes one live company as the target of an actor's operation.
+
+  Missing, deleted, and cross-tenant companies are indistinguishable. A
+  sibling company additionally requires the explicit tenant-wide reach
+  capability.
+  """
+  @spec authorize_company_target(Actor.t(), term(), String.t()) ::
+          {:ok, Summary.t()} | {:error, :not_found | :unauthorized}
+  def authorize_company_target(%Actor{} = actor, company_id, operation_capability)
+      when is_integer(company_id) and company_id > 0 and is_binary(operation_capability) do
+    with true <- capability_allowed?(actor, operation_capability),
+         {:ok, company} <- get_company(actor.scope, company_id),
+         true <-
+           company.id == actor.company_id or
+             capability_allowed?(actor, @manage_across_tenant_capability) do
+      {:ok, company}
+    else
+      false -> {:error, :unauthorized}
+      {:error, :not_found} = error -> error
+    end
+  end
+
+  def authorize_company_target(%Actor{}, _company_id, operation_capability)
+      when is_binary(operation_capability),
+      do: {:error, :not_found}
+
+  defp capability_allowed?(actor, capability) do
+    Authz.can(actor, capability).allowed
   end
 
   @doc """

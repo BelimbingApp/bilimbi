@@ -9,6 +9,7 @@ defmodule Bilimbi.Base.SystemTest do
   # Aliased, not imported as `System`: an `alias Bilimbi.Base.System` shadows
   # Elixir's own `System`, and these assertions compare against it.
   alias Bilimbi.Base.System, as: SystemInfo
+  alias Bilimbi.Base.System.Contributions
 
   describe "fact sections" do
     test "every section returns labelled facts and nothing raises" do
@@ -40,12 +41,13 @@ defmodule Bilimbi.Base.SystemTest do
       assert facts["Processes"] =~ ~r/^\d+ of \d+$/
     end
 
-    test "the queue reports unavailable rather than inventing a status" do
+    test "the queue reports the real supervised manual-test availability" do
       health = Map.new(SystemInfo.health(), &{&1.label, &1.value})
 
-      # #131 (Base Queue on Oban) is unstarted. A green tick here would be the
-      # one genuinely dangerous thing this screen could render.
-      assert health["Queue"] == :unavailable
+      # Manual mode starts no consumers, but it does supervise the migrated
+      # runtime and keeps the operational probe truthful.
+      assert health["Queue"] == "Available (0 pending, 0 retryable, 0 discarded)"
+      assert health["Performance"] in ["Unavailable", "Available (0 pending, 0 dropped)"]
     end
 
     test "loaded applications carry versions and are sorted" do
@@ -58,5 +60,18 @@ defmodule Bilimbi.Base.SystemTest do
       names = Enum.map(applications, & &1.name)
       assert "elixir" in names
     end
+  end
+
+  test "publishes one capability-gated localization destination" do
+    contributions = Contributions.contributions()
+
+    assert %{
+             route: "/system/localization",
+             capability: "admin.system.localization.manage"
+           } = Enum.find(contributions.menu, &(&1.id == "admin.system.localization"))
+
+    assert "admin.system.localization.manage" in contributions.authz.capabilities
+
+    refute "admin.system.localization.manage" in contributions.authz.roles["system_viewer"].capabilities
   end
 end

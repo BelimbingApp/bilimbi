@@ -16,7 +16,9 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
     settings: Bilimbi.Base.Settings.ContributionValidator,
     authz: Bilimbi.Base.Authz.ContributionValidator,
     menu: Bilimbi.Base.Menu.ContributionValidator,
-    dashboard: Bilimbi.Base.Dashboard.ContributionValidator
+    dashboard: Bilimbi.Base.Dashboard.ContributionValidator,
+    principal_directory: Bilimbi.Base.PrincipalDirectory.ContributionValidator,
+    schedule: Bilimbi.Base.Schedule.ContributionValidator
   }
   @consumer_keys @consumer_validators |> Map.keys() |> Enum.sort()
 
@@ -162,16 +164,32 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionRegistry do
               __STACKTRACE__
   end
 
-  defp validate_consumer!(_consumer, []), do: []
-
+  # A consumer that nothing contributed to still has a shape, and the shape is
+  # whatever its own validator builds from no entries: the menu's and the
+  # dashboard's are lists, while settings, authz, and the principal directory
+  # all reduce into maps. Answering `[]` for every consumer without asking gave
+  # `PrincipalDirectory.providers/0` an empty list where its `@spec` promises a
+  # map, and the first `Map.fetch/2` raised `BadMapError` -- see #496.
+  #
+  # A validator that is not loaded means its package is not installed, and a
+  # consumer's value is only ever read by the package owning its validator, so
+  # the `[]` below is a placeholder nothing can observe. With entries present it
+  # stays an error, because those entries would be silently dropped.
   defp validate_consumer!(consumer, entries) do
     validator = Map.fetch!(@consumer_validators, consumer)
 
-    unless Code.ensure_loaded?(validator) do
-      raise ArgumentError,
-            "#{consumer} contributions exist but validator #{inspect(validator)} is not installed"
+    cond do
+      Code.ensure_loaded?(validator) -> validate_with!(validator, entries)
+      entries == [] -> []
+      true -> raise ArgumentError, missing_validator_message(consumer, validator)
     end
+  end
 
+  defp missing_validator_message(consumer, validator) do
+    "#{consumer} contributions exist but validator #{inspect(validator)} is not installed"
+  end
+
+  defp validate_with!(validator, entries) do
     behaviours =
       validator.module_info(:attributes)
       |> Keyword.get_values(:behaviour)

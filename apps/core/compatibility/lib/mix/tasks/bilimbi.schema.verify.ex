@@ -13,7 +13,7 @@ defmodule Mix.Tasks.Bilimbi.Schema.Verify do
   use Mix.Task
 
   @shortdoc "Verifies the pinned Belimbing-compatible Base and Company schema"
-  @requirements ["app.start"]
+  @requirements ["app.config"]
 
   @impl Mix.Task
   def run(args) do
@@ -23,13 +23,27 @@ defmodule Mix.Tasks.Bilimbi.Schema.Verify do
       Mix.raise("unexpected arguments: #{Enum.join(remaining, " ")}")
     end
 
-    case Bilimbi.Core.Compatibility.verify(Bilimbi.Base.Repo, opts) do
+    with_repo!(Bilimbi.Base.Repo, fn repo -> verify!(repo, opts) end)
+  end
+
+  defp verify!(repo, opts) do
+    case Bilimbi.Core.Compatibility.verify(repo, opts) do
       :ok ->
         Mix.shell().info("Bilimbi compatibility schema verified.")
 
       {:error, errors} ->
         details = Enum.map_join(errors, "\n", &"  - #{&1}")
         Mix.raise("Bilimbi compatibility schema drift detected:\n#{details}")
+    end
+  end
+
+  defp with_repo!(repo, operation) do
+    case Ecto.Migrator.with_repo(repo, operation, mode: :temporary) do
+      {:ok, result, _started_apps} ->
+        result
+
+      {:error, error} ->
+        Mix.raise("Could not start repo #{inspect(repo)}, error: #{inspect(error)}")
     end
   end
 end
