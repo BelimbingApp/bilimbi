@@ -123,13 +123,30 @@ defmodule Bilimbi.Core.User.AdminAffiliationTest do
       assert String.starts_with?(stored_hash, "$argon2id$")
       assert Password.valid?("supersecretpassword", stored_hash)
 
-      # Audit mutation recorded
-      audit_record = Repo.get_by(MutationSchema, auditable_id: to_string(user.id))
+      # The explicit semantic mutation is recorded. Repo-level capture (ADR
+      # 0013) records additional "listener" rows for the same write, so the
+      # lookup names the semantic event rather than assuming one row.
+      audit_record =
+        Repo.get_by(MutationSchema,
+          auditable_id: to_string(user.id),
+          event: "created_unaffiliated"
+        )
+
       assert audit_record
-      assert audit_record.event == "created_unaffiliated"
       assert audit_record.new_values["email"] == "root@example.com"
       assert is_nil(audit_record.new_values["password"])
       assert is_nil(audit_record.new_values["password_hash"])
+
+      # And the listener row for the user insert never stored the secret.
+      listener_record =
+        Repo.get_by(MutationSchema,
+          auditable_id: to_string(user.id),
+          source: "listener",
+          auditable_type: "Bilimbi.Core.User.Schema"
+        )
+
+      assert listener_record
+      assert listener_record.new_values["password_hash"] in [nil, "[redacted]"]
     end
 
     test "create_unaffiliated_user fails closed for non-operator tenant",
