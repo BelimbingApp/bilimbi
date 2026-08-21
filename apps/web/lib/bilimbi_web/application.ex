@@ -9,6 +9,7 @@ defmodule BilimbiWeb.Application do
 
     children = [
       BilimbiWeb.Telemetry,
+      BilimbiWeb.PerfTelemetry,
       {DNSCluster, query: Application.get_env(:web, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: BilimbiWeb.PubSub},
       BilimbiWeb.RateLimit,

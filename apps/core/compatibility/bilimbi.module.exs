@@ -10,6 +10,7 @@
     "base/database",
     "base/locale",
     "base/menu",
+    "base/perf",
     "base/queue",
     "base/schedule",
     "base/ui",
