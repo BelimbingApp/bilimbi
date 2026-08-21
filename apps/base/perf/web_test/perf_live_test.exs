@@ -43,6 +43,10 @@ defmodule BilimbiWeb.PerfLiveTest do
     assert has_element?(view, "#performance-pending", "0")
     assert has_element?(view, "#performance-dropped", "0")
     assert has_element?(view, "#performance-regression-table")
+    assert has_element?(view, "#performance-pagination-summary", "Showing 1 to 1 of 1 results")
+    assert has_element?(view, "#performance-pagination-page-size option[value='25'][selected]")
+    refute has_element?(view, "#performance-pagination-previous")
+    refute has_element?(view, "#performance-page-size")
     refute render(view) =~ "credential"
 
     view
@@ -50,9 +54,19 @@ defmodule BilimbiWeb.PerfLiveTest do
       "filters" => %{
         "kind" => "job",
         "identity" => "base/report-export",
-        "outcome" => "error",
-        "page_size" => "50"
+        "outcome" => "error"
       }
+    })
+    |> render_change()
+
+    assert_patch(
+      view,
+      "/system/performance?identity=base%2Freport-export&kind=job&outcome=error&page=1&page_size=25"
+    )
+
+    view
+    |> form("#performance-pagination-page-size-form", %{
+      "filters" => %{"perPage" => "50"}
     })
     |> render_change()
 
@@ -60,6 +74,28 @@ defmodule BilimbiWeb.PerfLiveTest do
       view,
       "/system/performance?identity=base%2Freport-export&kind=job&outcome=error&page=1&page_size=50"
     )
+  end
+
+  test "uses standard pagination controls for sample history", %{conn: conn} do
+    grant_capabilities!("admin.system.perf.view")
+
+    for _index <- 1..31 do
+      record_request("/reports/:id")
+    end
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/performance")
+
+    assert has_element?(view, "#performance-pagination-summary", "Showing 1 to 25 of 31 results")
+    assert has_element?(view, "#performance-pagination-previous[disabled]")
+    assert has_element?(view, "#performance-pagination-page-1[aria-current='page']")
+    assert has_element?(view, "#performance-pagination-next")
+
+    view |> element("#performance-pagination-next") |> render_click()
+
+    assert_patch(view, "/system/performance?page=2&page_size=25")
+    assert has_element?(view, "#performance-pagination-summary", "Showing 26 to 31 of 31 results")
+    assert has_element?(view, "#performance-pagination-page-2[aria-current='page']")
+    assert has_element?(view, "#performance-pagination-next[disabled]")
   end
 
   test "dashboard widget is capability gated and links to diagnostics", %{conn: conn} do
