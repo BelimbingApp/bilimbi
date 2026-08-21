@@ -280,7 +280,10 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
         []
       end
 
-    contents = inspect(module_routes ++ host_routes, pretty: true, limit: :infinity) <> "\n"
+    entries = module_routes ++ host_routes
+    validate_unique_embed_keys!(entries)
+
+    contents = inspect(entries, pretty: true, limit: :infinity) <> "\n"
     manifest = route_manifest_path(workspace_root)
 
     unless File.regular?(manifest) and File.read!(manifest) == contents do
@@ -796,6 +799,46 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     end
   end
 
+  # An embeddable-panel entry: a module contributes a LiveComponent another
+  # module's page renders by string key, never by module name (#570; ADR 0006
+  # second amendment). Strict from day one: exactly these keys, no route keys
+  # mixed in, and only installed modules — not the host — may contribute one.
+  defp normalize_route!(%{embed: _} = entry, source) do
+    if source == "web" do
+      raise ArgumentError, "embed entries are module contributions; the host cannot declare one"
+    end
+
+    embed = Map.fetch!(entry, :embed)
+
+    unless is_binary(embed) and embed != "" do
+      raise ArgumentError, "embed must be a non-empty string key"
+    end
+
+    live_component = Map.get(entry, :live_component)
+
+    unless is_atom(live_component) and not is_nil(live_component) do
+      raise ArgumentError, "embed #{inspect(embed)} live_component must be a module atom"
+    end
+
+    capability = Map.get(entry, :capability)
+
+    unless is_nil(capability) or is_binary(capability) do
+      raise ArgumentError, "embed #{inspect(embed)} capability must be a binary or nil"
+    end
+
+    case Map.keys(entry) -- [:embed, :live_component, :capability] do
+      [] ->
+        # Canonical shape: :capability is always present so consumers can
+        # match on it instead of probing for the key.
+        %{embed: embed, live_component: live_component, capability: capability, source: source}
+
+      extra ->
+        raise ArgumentError,
+              "embed #{inspect(embed)} has unsupported keys #{inspect(extra)}; " <>
+                "an embed entry carries only :embed, :live_component, and :capability"
+    end
+  end
+
   defp normalize_route!(route, source) when is_map(route) do
     path = Map.get(route, :path)
 
@@ -842,6 +885,23 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
 
   defp normalize_route!(_route, _source) do
     raise ArgumentError, "each route must be a map"
+  end
+
+  defp validate_unique_embed_keys!(entries) do
+    entries
+    |> Enum.filter(&Map.has_key?(&1, :embed))
+    |> Enum.group_by(& &1.embed)
+    |> Enum.each(fn
+      {_key, [_single]} ->
+        :ok
+
+      {key, clashing} ->
+        sources = clashing |> Enum.map(& &1.source) |> Enum.sort() |> Enum.join(", ")
+
+        raise ArgumentError,
+              "embed key #{inspect(key)} is declared by more than one module (#{sources}); " <>
+                "embed keys are workspace-unique"
+    end)
   end
 
   defp malformed!(path, message) do

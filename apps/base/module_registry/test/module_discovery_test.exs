@@ -544,6 +544,90 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
            ]
   end
 
+  test "route manifest carries a validated embed entry in canonical shape", %{root: root} do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    File.mkdir_p!(Path.join(module_root, "priv"))
+
+    File.write!(
+      Path.join(module_root, "priv/web_routes.exs"),
+      "[%{embed: \"employee.accounts\", live_component: Test.AccountsPanel}]\n"
+    )
+
+    MixDiscovery.write_route_manifest!(root)
+    {entries, _binding} = Code.eval_file(MixDiscovery.route_manifest_path(root))
+
+    assert [
+             %{
+               embed: "employee.accounts",
+               live_component: Test.AccountsPanel,
+               capability: nil,
+               source: "base/ui"
+             }
+           ] = entries
+  end
+
+  test "rejects an embed entry mixing in route keys", %{root: root} do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    File.mkdir_p!(Path.join(module_root, "priv"))
+
+    File.write!(
+      Path.join(module_root, "priv/web_routes.exs"),
+      "[%{embed: \"x\", live_component: Test.P, path: \"/x\"}]\n"
+    )
+
+    assert_raise ArgumentError, ~r/unsupported keys/, fn ->
+      MixDiscovery.write_route_manifest!(root)
+    end
+  end
+
+  test "rejects an embed without a component module", %{root: root} do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    File.mkdir_p!(Path.join(module_root, "priv"))
+    File.write!(Path.join(module_root, "priv/web_routes.exs"), "[%{embed: \"x\"}]\n")
+
+    assert_raise ArgumentError, ~r/live_component must be a module atom/, fn ->
+      MixDiscovery.write_route_manifest!(root)
+    end
+  end
+
+  test "rejects a host-declared embed", %{root: root} do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    File.mkdir_p!(Path.join(module_root, "priv"))
+    File.write!(Path.join(module_root, "priv/web_routes.exs"), "[]\n")
+    File.mkdir_p!(Path.join([root, "apps", "web", "priv"]))
+
+    File.write!(
+      Path.join([root, "apps", "web", "priv", "web_routes.exs"]),
+      "[%{embed: \"x\", live_component: Test.P}]\n"
+    )
+
+    assert_raise ArgumentError, ~r/host cannot declare one/, fn ->
+      MixDiscovery.write_route_manifest!(root)
+    end
+  end
+
+  test "rejects duplicate embed keys across modules", %{root: root} do
+    put_container!(root, "base", :base)
+
+    for name <- ["ui", "menu"] do
+      module_root = put_module!(root, "base", name, web: "priv/web_routes.exs")
+      File.mkdir_p!(Path.join(module_root, "priv"))
+
+      File.write!(
+        Path.join(module_root, "priv/web_routes.exs"),
+        "[%{embed: \"employee.accounts\", live_component: Test.P#{name}}]\n"
+      )
+    end
+
+    assert_raise ArgumentError, ~r/workspace-unique/, fn ->
+      MixDiscovery.write_route_manifest!(root)
+    end
+  end
+
   test "workspace fingerprint changes when a web_routes.exs file changes", %{root: root} do
     put_container!(root, "base", :base)
     module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
