@@ -151,9 +151,6 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
   defp principal_identity(%{principal_name: name}) when is_binary(name) and name != "", do: name
   defp principal_identity(%{principal_id: id}), do: to_string(id)
 
-  defp created_at(%{created_at: nil}), do: "—"
-  defp created_at(%{created_at: at}), do: Calendar.strftime(at, "%Y-%m-%d %H:%M")
-
   defp assignment_noun(1), do: "assignment"
   defp assignment_noun(_count), do: "assignments"
 

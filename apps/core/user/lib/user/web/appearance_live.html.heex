@@ -88,6 +88,16 @@
         prompt={"Use installation default (#{@installation_locale})"}
         options={@locale_options}
         hint="Sets your preferred language and region for this account."
+      />
+
+      <.input
+        id="appearance-timezone-mode"
+        name="appearance[timezone_mode]"
+        type="select"
+        value={@timezone_mode}
+        label="Time zone display"
+        options={@timezone_mode_options}
+        hint="How dates and times render for this account: your company's time zone, this device's local time zone, or stored UTC."
         wrapper_class="mb-0"
       />
     </form>

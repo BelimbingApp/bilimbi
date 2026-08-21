@@ -60,7 +60,7 @@
       >
         <:col :let={mutation} label="Occurred" sort="occurred_at" sort_id="mutations-sort-occurred_at">
           <span class="whitespace-nowrap tabular-nums text-xs text-ink-muted">
-            {occurred_at(mutation)}
+            <.datetime id={"mutation-occurred-#{mutation.id}"} value={mutation.occurred_at} />
           </span>
         </:col>
 
