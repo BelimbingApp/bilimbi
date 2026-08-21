@@ -51,4 +51,31 @@ defmodule BilimbiWeb.CompanyEmployeesPanelTest do
     assert has_element?(view, "#company-employees-table td", "EMP-001")
     refute has_element?(view, "#company-employees-table-empty")
   end
+
+  test "applies company show URL-state to the discovered employees panel", %{conn: conn} do
+    grant_capabilities!(["admin.company.list", "admin.company.view"])
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, _employee} =
+      Employee.create_employee(scope, 73, %{
+        employee_number: "EMP-002",
+        full_name: "Alan Turing",
+        designation: "Cryptographer"
+      })
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_as()
+      |> live(
+        ~p"/companies/73?employees_search=alan&employees_sort=employee_number&employees_dir=desc&employees_per_page=50"
+      )
+
+    assert has_element?(view, "#company-employees-table td", "Alan Turing")
+    refute has_element?(view, "#company-employees-table td", "Grace Hopper")
+
+    assert has_element?(
+             view,
+             "#company-employees-panel th[aria-sort='descending'] button#company-employees-sort-employee-number"
+           )
+  end
 end

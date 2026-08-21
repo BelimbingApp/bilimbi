@@ -75,6 +75,22 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     locality: :string
   }
 
+  @page_sizes [25, 50, 100, 300]
+  @default_page 1
+  @default_page_size 25
+
+  @table_defaults %{
+    addresses: %{search: nil, sort_by: "priority", sort_dir: :asc, page: 1, per_page: 25},
+    users: %{search: nil, sort_by: "name", sort_dir: :asc, page: 1, per_page: 25},
+    employees: %{search: nil, sort_by: "full_name", sort_dir: :asc, page: 1, per_page: 25}
+  }
+
+  @table_sorts %{
+    addresses: ~w(label address kind primary priority valid_from valid_to),
+    users: ~w(name email email_verified),
+    employees: ~w(full_name employee_number employee_type status)
+  }
+
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     scope = socket.assigns.current_scope.scope
@@ -84,6 +100,18 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       _ -> {:ok, not_found(socket)}
     end
   end
+
+  @impl true
+  def handle_params(params, _uri, %{assigns: %{company: _company}} = socket) do
+    table_state = table_state_from_params(params)
+
+    {:noreply,
+     socket
+     |> assign(:table_state, table_state)
+     |> refresh_show_table_pages()}
+  end
+
+  def handle_params(_params, _uri, socket), do: {:noreply, socket}
 
   defp load_company(socket, scope, company_id) do
     case Company.get_company(scope, company_id) do
@@ -117,9 +145,12 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:relationships, relationships)
          |> assign(:external_accesses, external_accesses)
          |> assign(:external_access_users, external_access_users)
+         |> assign(:company_users, users)
          |> assign(:users_count, length(users))
          |> assign(:attached_addresses, attached_addresses)
          |> assign(:available_addresses, available_addresses)
+         |> assign(:page_sizes, @page_sizes)
+         |> assign(:table_state, default_table_state())
          |> assign(:address_kinds, @address_kinds)
          |> assign(:company_timezone, company_timezone || "")
          |> assign(:timezone_options, @common_timezones)
@@ -141,7 +172,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:create_address_kinds, [])
          |> assign(:create_address_is_primary, false)
          |> assign(:create_address_priority, 0)
-         |> stream(:company_users, users)}
+         |> refresh_show_table_pages()}
 
       {:error, :not_found} ->
         {:ok, not_found(socket)}
@@ -340,7 +371,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         {:noreply,
          socket
          |> put_flash(:info, "Address setting updated.")
-         |> assign(:attached_addresses, updated_attached)}
+         |> assign(:attached_addresses, updated_attached)
+         |> refresh_show_table_pages()}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to update address setting.")}
@@ -358,7 +390,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         {:noreply,
          socket
          |> put_flash(:info, "Address unlinked.")
-         |> assign(:attached_addresses, updated_attached)}
+         |> assign(:attached_addresses, updated_attached)
+         |> refresh_show_table_pages()}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to unlink address.")}
@@ -377,7 +410,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         {:noreply,
          socket
          |> put_flash(:info, "Address setting updated.")
-         |> assign(:attached_addresses, updated_attached)}
+         |> assign(:attached_addresses, updated_attached)
+         |> refresh_show_table_pages()}
 
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Failed to update address setting.")}
@@ -460,6 +494,33 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   def handle_event(event, _params, %{assigns: %{can_update?: false}} = socket)
       when event in @write_events,
       do: write_forbidden(socket)
+
+  def handle_event("addresses_filters", params, socket),
+    do: apply_table_filters(socket, :addresses, params)
+
+  def handle_event("users_filters", params, socket),
+    do: apply_table_filters(socket, :users, params)
+
+  def handle_event("employees_filters", params, socket),
+    do: apply_table_filters(socket, :employees, params)
+
+  def handle_event("addresses_sort", %{"sort" => sort_key}, socket),
+    do: apply_table_sort(socket, :addresses, sort_key)
+
+  def handle_event("users_sort", %{"sort" => sort_key}, socket),
+    do: apply_table_sort(socket, :users, sort_key)
+
+  def handle_event("employees_sort", %{"sort" => sort_key}, socket),
+    do: apply_table_sort(socket, :employees, sort_key)
+
+  def handle_event("addresses_page", %{"page" => page}, socket),
+    do: apply_table_page(socket, :addresses, page)
+
+  def handle_event("users_page", %{"page" => page}, socket),
+    do: apply_table_page(socket, :users, page)
+
+  def handle_event("employees_page", %{"page" => page}, socket),
+    do: apply_table_page(socket, :employees, page)
 
   def handle_event("edit_details", _params, socket) do
     company = socket.assigns.company
@@ -724,6 +785,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
            socket
            |> put_flash(:info, "Address attached.")
            |> assign(:attached_addresses, attached)
+           |> refresh_show_table_pages()
            |> assign(:modal_action, nil)}
 
         {:error, :company_not_found} ->
@@ -813,6 +875,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
            |> put_flash(:info, "Address created and attached.")
            |> assign(:attached_addresses, attached)
            |> assign(:available_addresses, available)
+           |> refresh_show_table_pages()
            |> assign(:modal_action, nil)
            |> assign(:address_form, nil)}
 
@@ -865,6 +928,303 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       address_id -> unlink_address(socket, address_id, params)
     end
   end
+
+  # ============================================================================
+  # Helpers: Show-page table state
+  # ============================================================================
+
+  defp apply_table_filters(socket, kind, params) do
+    current = current_table_state(socket, kind)
+    filters = Map.get(params, "#{table_param_prefix(kind)}_filters", params)
+
+    search =
+      if Map.has_key?(filters, "search"),
+        do: normalize_search(filters["search"]),
+        else: current.search
+
+    per_page =
+      cond do
+        Map.has_key?(filters, "perPage") -> normalize_page_size(filters["perPage"])
+        Map.has_key?(filters, "per_page") -> normalize_page_size(filters["per_page"])
+        true -> current.per_page
+      end
+
+    state = put_table_state(socket.assigns.table_state, kind, %{
+      current
+      | search: search,
+        per_page: per_page,
+        page: @default_page
+    })
+
+    {:noreply, push_patch(socket, to: company_show_path(socket, state))}
+  end
+
+  defp apply_table_sort(socket, kind, sort_key) do
+    state =
+      socket.assigns.table_state
+      |> put_table_state(kind, next_table_sort(current_table_state(socket, kind), kind, sort_key))
+
+    {:noreply, push_patch(socket, to: company_show_path(socket, state))}
+  end
+
+  defp apply_table_page(socket, kind, page) do
+    current = current_table_state(socket, kind)
+    target_page = normalize_page(page)
+    state = put_table_state(socket.assigns.table_state, kind, %{current | page: target_page})
+
+    {:noreply, push_patch(socket, to: company_show_path(socket, state))}
+  end
+
+  defp refresh_show_table_pages(socket) do
+    table_state = socket.assigns.table_state || default_table_state()
+    address_state = table_state.addresses
+    users_state = table_state.users
+
+    addresses_page =
+      socket.assigns.attached_addresses
+      |> build_table_page(address_state, &address_matches_search?/2, &address_sort_value/2)
+
+    users_page =
+      socket.assigns.company_users
+      |> build_table_page(users_state, &user_matches_search?/2, &user_sort_value/2)
+
+    socket
+    |> assign(:addresses_page, addresses_page)
+    |> assign(:users_page, users_page)
+    |> assign(:employees_table_state, table_state.employees)
+    |> assign(:addresses_filters_form, table_filters_form(:addresses, address_state))
+    |> assign(:users_filters_form, table_filters_form(:users, users_state))
+    |> stream(:company_users, users_page.entries, reset: true)
+  end
+
+  defp build_table_page(entries, state, match_fun, sort_fun) do
+    filtered =
+      entries
+      |> Enum.filter(&match_fun.(&1, state.search && String.downcase(state.search)))
+      |> Enum.sort_by(&sort_fun.(&1, state.sort_by))
+
+    sorted = if state.sort_dir == :desc, do: Enum.reverse(filtered), else: filtered
+    total_entries = length(sorted)
+    total_pages = total_pages(total_entries, state.per_page)
+    page = clamp_page(state.page, total_pages)
+    entries = Enum.slice(sorted, (page - 1) * state.per_page, state.per_page)
+
+    %{
+      entries: entries,
+      page: page,
+      page_size: state.per_page,
+      total_entries: total_entries,
+      total_pages: total_pages,
+      has_prev?: total_pages > 0 and page > 1,
+      has_next?: total_pages > 0 and page < total_pages
+    }
+  end
+
+  defp total_pages(0, _page_size), do: 0
+  defp total_pages(total_entries, page_size), do: ceil(total_entries / page_size)
+
+  defp clamp_page(_page, 0), do: 1
+  defp clamp_page(page, total_pages), do: min(max(page, 1), total_pages)
+
+  defp address_matches_search?(address, nil), do: address_matches_search?(address, "")
+  defp address_matches_search?(_address, ""), do: true
+
+  defp address_matches_search?(address, search) do
+    [
+      address.label,
+      address.line1,
+      address.line2,
+      address.line3,
+      address.locality,
+      address.postcode,
+      address.country_iso,
+      Enum.join(address.kind || [], " ")
+    ]
+    |> contains_search?(search)
+  end
+
+  defp user_matches_search?(user, nil), do: user_matches_search?(user, "")
+  defp user_matches_search?(_user, ""), do: true
+
+  defp user_matches_search?(user, search),
+    do: contains_search?([user.name, user.email], search)
+
+  defp address_sort_value(address, "label"), do: sort_string(address.label)
+
+  defp address_sort_value(address, "address") do
+    [address.line1, address.locality, address.country_iso]
+    |> Enum.reject(&blank?/1)
+    |> Enum.join(" ")
+    |> sort_string()
+  end
+
+  defp address_sort_value(address, "kind"), do: sort_string(Enum.join(address.kind || [], " "))
+  defp address_sort_value(address, "primary"), do: if(address.is_primary, do: 0, else: 1)
+  defp address_sort_value(address, "priority"), do: address.priority || 0
+  defp address_sort_value(address, "valid_from"), do: sort_string(address.valid_from)
+  defp address_sort_value(address, "valid_to"), do: sort_string(address.valid_to)
+  defp address_sort_value(address, _sort), do: address_sort_value(address, "priority")
+
+  defp user_sort_value(user, "name"), do: sort_string(user.name)
+  defp user_sort_value(user, "email"), do: sort_string(user.email)
+  defp user_sort_value(user, "email_verified"), do: if(user.email_verified_at, do: 0, else: 1)
+  defp user_sort_value(user, _sort), do: user_sort_value(user, "name")
+
+  defp contains_search?(fields, search) do
+    Enum.any?(fields, fn value ->
+      value
+      |> to_string()
+      |> String.downcase()
+      |> String.contains?(search)
+    end)
+  end
+
+  defp sort_string(nil), do: ""
+  defp sort_string(value), do: value |> to_string() |> String.downcase()
+
+  defp default_table_state, do: @table_defaults
+
+  defp table_state_from_params(params) do
+    [:addresses, :users, :employees]
+    |> Map.new(fn kind ->
+      prefix = table_param_prefix(kind)
+      default = Map.fetch!(@table_defaults, kind)
+
+      {kind,
+       %{
+         search: normalize_search(params["#{prefix}_search"]),
+         sort_by: normalize_sort_by(kind, params["#{prefix}_sort"]),
+         sort_dir: normalize_sort_dir(params["#{prefix}_dir"], default.sort_dir),
+         page: normalize_page(params["#{prefix}_page"]),
+         per_page: normalize_page_size(params["#{prefix}_per_page"] || params["#{prefix}_perPage"])
+       }}
+    end)
+  end
+
+  defp table_filters_form(kind, state),
+    do: to_form(table_filters_form_params(state), as: table_filters_form_name(kind))
+
+  defp table_filters_form_params(state) do
+    %{
+      "search" => state.search || "",
+      "perPage" => to_string(state.per_page)
+    }
+  end
+
+  defp table_filters_form_name(:addresses), do: :addresses_filters
+  defp table_filters_form_name(:users), do: :users_filters
+
+  defp current_table_state(socket, kind),
+    do: Map.get(socket.assigns.table_state || default_table_state(), kind, Map.fetch!(@table_defaults, kind))
+
+  defp put_table_state(table_state, kind, state), do: Map.put(table_state, kind, state)
+
+  defp next_table_sort(current, kind, sort_key) do
+    sort_by = normalize_sort_by(kind, sort_key)
+
+    if current.sort_by == sort_by do
+      %{current | sort_dir: toggle_sort_dir(current.sort_dir), page: @default_page}
+    else
+      %{current | sort_by: sort_by, sort_dir: :asc, page: @default_page}
+    end
+  end
+
+  defp toggle_sort_dir(:asc), do: :desc
+  defp toggle_sort_dir(:desc), do: :asc
+  defp toggle_sort_dir(_dir), do: :asc
+
+  defp normalize_search(nil), do: nil
+
+  defp normalize_search(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp normalize_search(_value), do: nil
+
+  defp normalize_sort_by(kind, nil), do: Map.fetch!(@table_defaults, kind).sort_by
+
+  defp normalize_sort_by(kind, value) when is_binary(value) do
+    sort = value |> String.trim() |> String.downcase()
+
+    if sort in Map.fetch!(@table_sorts, kind),
+      do: sort,
+      else: Map.fetch!(@table_defaults, kind).sort_by
+  end
+
+  defp normalize_sort_by(kind, _value), do: Map.fetch!(@table_defaults, kind).sort_by
+
+  defp normalize_sort_dir(nil, default), do: default
+
+  defp normalize_sort_dir(value, default) when is_binary(value) do
+    case value |> String.trim() |> String.downcase() do
+      "desc" -> :desc
+      "asc" -> :asc
+      _ -> default
+    end
+  end
+
+  defp normalize_sort_dir(_value, default), do: default
+
+  defp normalize_page(value) do
+    case positive_integer(value) do
+      page when is_integer(page) -> page
+      _ -> @default_page
+    end
+  end
+
+  defp normalize_page_size(value) do
+    case positive_integer(value) do
+      size when size in @page_sizes -> size
+      _ -> @default_page_size
+    end
+  end
+
+  defp positive_integer(value) when is_integer(value) and value > 0, do: value
+
+  defp positive_integer(value) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {int, ""} when int > 0 -> int
+      _ -> nil
+    end
+  end
+
+  defp positive_integer(_value), do: nil
+
+  defp company_show_path(socket, table_state) do
+    company = socket.assigns.company
+
+    params =
+      [:addresses, :users, :employees]
+      |> Enum.reduce([], fn kind, acc -> acc ++ table_query_params(kind, table_state[kind]) end)
+
+    case params do
+      [] -> ~p"/companies/#{company.id}"
+      _ -> ~p"/companies/#{company.id}?#{params}"
+    end
+  end
+
+  defp table_query_params(kind, state) do
+    default = Map.fetch!(@table_defaults, kind)
+    prefix = table_param_prefix(kind)
+
+    []
+    |> maybe_put_param("#{prefix}_search", state.search)
+    |> maybe_put_param("#{prefix}_sort", state.sort_by != default.sort_by && state.sort_by)
+    |> maybe_put_param("#{prefix}_dir", state.sort_dir != default.sort_dir && state.sort_dir)
+    |> maybe_put_param("#{prefix}_page", state.page != @default_page && state.page)
+    |> maybe_put_param("#{prefix}_per_page", state.per_page != @default_page_size && state.per_page)
+  end
+
+  defp maybe_put_param(params, _key, nil), do: params
+  defp maybe_put_param(params, _key, false), do: params
+  defp maybe_put_param(params, key, value), do: params ++ [{key, value}]
+
+  defp table_param_prefix(:addresses), do: "addresses"
+  defp table_param_prefix(:users), do: "users"
+  defp table_param_prefix(:employees), do: "employees"
 
   # ============================================================================
   # Helpers: Activities, Forms and Autocompletion
@@ -1349,22 +1709,51 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             </div>
           </div>
 
+          <.form
+            for={@addresses_filters_form}
+            id="company-addresses-filters"
+            phx-change="addresses_filters"
+            class="p-2 mb-2 rounded-xl border border-line bg-surface-muted"
+          >
+            <div class="relative">
+              <.icon
+                name="hero-magnifying-glass"
+                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              />
+              <.input
+                field={@addresses_filters_form[:search]}
+                id="company-addresses-search"
+                type="search"
+                phx-debounce="300"
+                maxlength="255"
+                label="Search addresses"
+                label_class="sr-only"
+                wrapper_class="mb-0"
+                placeholder="Search by label, address, kind, postcode..."
+                class="rounded-lg pl-8"
+              />
+            </div>
+          </.form>
+
           <.table
             id="company-addresses-table"
-            rows={@attached_addresses}
+            rows={@addresses_page.entries}
             row_id={fn addr -> "attached-address-#{addr.id}" end}
             row_item={fn addr -> addr end}
+            sort_by={@table_state.addresses.sort_by}
+            sort_dir={@table_state.addresses.sort_dir}
+            sort_event="addresses_sort"
             caption="Company Addresses"
           >
-            <:col :let={addr} label="Label">
+            <:col :let={addr} label="Label" sort="label" sort_id="company-addresses-sort-label">
               <span class="font-medium text-ink-strong">{addr.label || "—"}</span>
             </:col>
-            <:col :let={addr} label="Address">
+            <:col :let={addr} label="Address" sort="address" sort_id="company-addresses-sort-address">
               <span class="text-sm text-ink-subtle">
                 {Enum.join(Enum.reject([addr.line1, addr.locality, addr.country_iso], &blank?/1), ", ")}
               </span>
             </:col>
-            <:col :let={addr} label="Kind">
+            <:col :let={addr} label="Kind" sort="kind" sort_id="company-addresses-sort-kind">
               <div class="flex flex-wrap gap-1">
                 <%= for k <- (addr.kind || []) do %>
                   <.badge kind={:neutral}>{String.capitalize(k)}</.badge>
@@ -1372,7 +1761,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 <span :if={is_nil(addr.kind) or addr.kind == []} class="text-xs text-ink-subtle">—</span>
               </div>
             </:col>
-            <:col :let={addr} label="Primary">
+            <:col :let={addr} label="Primary" sort="primary" sort_id="company-addresses-sort-primary">
               <button
                 :if={@can_update?}
                 type="button"
@@ -1390,13 +1779,13 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 {if addr.is_primary, do: "Yes", else: "No"}
               </.badge>
             </:col>
-            <:col :let={addr} label="Priority">
+            <:col :let={addr} label="Priority" sort="priority" sort_id="company-addresses-sort-priority">
               <span class="tabular-nums text-sm text-ink">{addr.priority}</span>
             </:col>
-            <:col :let={addr} label="Valid From">
+            <:col :let={addr} label="Valid From" sort="valid_from" sort_id="company-addresses-sort-valid-from">
               <span class="tabular-nums text-xs text-ink-subtle">{addr.valid_from || "—"}</span>
             </:col>
-            <:col :let={addr} label="Valid To">
+            <:col :let={addr} label="Valid To" sort="valid_to" sort_id="company-addresses-sort-valid-to">
               <span class="tabular-nums text-xs text-ink-subtle">{addr.valid_to || "—"}</span>
             </:col>
             <:action :let={addr}>
@@ -1412,10 +1801,18 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 Unlink
               </button>
             </:action>
-            <:empty :if={@attached_addresses == []}>
+            <:empty :if={@addresses_page.total_entries == 0}>
               No addresses linked.
             </:empty>
           </.table>
+          <.pagination
+            id="company-addresses-pagination"
+            page={@addresses_page}
+            page_sizes={@page_sizes}
+            filters_form={@addresses_filters_form}
+            filters_event="addresses_filters"
+            page_event="addresses_page"
+          />
         </.card>
 
         <%!-- Section 3: Timezone Settings --%>
@@ -1639,24 +2036,69 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             <h2 class="text-sm font-semibold text-ink-strong">Users</h2>
             <.badge>{@users_count}</.badge>
           </div>
+          <.form
+            for={@users_filters_form}
+            id="company-users-filters"
+            phx-change="users_filters"
+            class="p-2 mb-2 rounded-xl border border-line bg-surface-muted"
+          >
+            <div class="relative">
+              <.icon
+                name="hero-magnifying-glass"
+                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              />
+              <.input
+                field={@users_filters_form[:search]}
+                id="company-users-search"
+                type="search"
+                phx-debounce="300"
+                maxlength="255"
+                label="Search users"
+                label_class="sr-only"
+                wrapper_class="mb-0"
+                placeholder="Search by name or email..."
+                class="rounded-lg pl-8"
+              />
+            </div>
+          </.form>
           <.table
             id="company-users-table"
             rows={@streams.company_users}
             row_id={fn {id, _} -> id end}
             row_item={fn {_, user} -> user end}
+            sort_by={@table_state.users.sort_by}
+            sort_dir={@table_state.users.sort_dir}
+            sort_event="users_sort"
             caption="Users"
           >
-            <:col :let={user} label="Name"><span class="font-medium">{user.name}</span></:col>
-            <:col :let={user} label="Email">{user.email}</:col>
-            <:col :let={user} label="Email verified">
+            <:col :let={user} label="Name" sort="name" sort_id="company-users-sort-name">
+              <span class="font-medium">{user.name}</span>
+            </:col>
+            <:col :let={user} label="Email" sort="email" sort_id="company-users-sort-email">
+              {user.email}
+            </:col>
+            <:col
+              :let={user}
+              label="Email verified"
+              sort="email_verified"
+              sort_id="company-users-sort-email-verified"
+            >
               <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
                 {if user.email_verified_at, do: "verified", else: "unverified"}
               </.badge>
             </:col>
-            <:empty :if={@users_count == 0}>
+            <:empty :if={@users_page.total_entries == 0}>
               No users found for this company.
             </:empty>
           </.table>
+          <.pagination
+            id="company-users-pagination"
+            page={@users_page}
+            page_sizes={@page_sizes}
+            filters_form={@users_filters_form}
+            filters_event="users_filters"
+            page_event="users_page"
+          />
         </section>
 
         <%!-- Section 9: Employees — core/employee-owned discovered embed (#595).
@@ -1667,7 +2109,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           key="company.employees"
           id="company-employees-panel"
           current_scope={@current_scope}
-          opts={%{company_id: @company.id}}
+          opts={%{company_id: @company.id, table_state: @employees_table_state, page_sizes: @page_sizes}}
         />
 
         <%!-- MODAL 1: Edit Company Details --%>
