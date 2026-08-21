@@ -151,6 +151,12 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
   defp input_type(%{definition: %{type: type}}) when type in [:integer, :float], do: "number"
   defp input_type(_field), do: "text"
 
+  defp boolean_field?(%{definition: %{type: :boolean}}), do: true
+  defp boolean_field?(_field), do: false
+
+  defp boolean_checked?(%{value: true}), do: true
+  defp boolean_checked?(_field), do: false
+
   defp input_value(%{value: nil}), do: ""
   defp input_value(%{value: value}) when is_list(value), do: Enum.join(value, ", ")
   defp input_value(%{value: value}), do: to_string(value)
