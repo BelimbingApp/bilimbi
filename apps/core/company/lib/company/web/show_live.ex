@@ -949,12 +949,13 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         true -> current.per_page
       end
 
-    state = put_table_state(socket.assigns.table_state, kind, %{
-      current
-      | search: search,
-        per_page: per_page,
-        page: @default_page
-    })
+    state =
+      put_table_state(socket.assigns.table_state, kind, %{
+        current
+        | search: search,
+          per_page: per_page,
+          page: @default_page
+      })
 
     {:noreply, push_patch(socket, to: company_show_path(socket, state))}
   end
@@ -994,7 +995,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     |> assign(:employees_table_state, table_state.employees)
     |> assign(:addresses_filters_form, table_filters_form(:addresses, address_state))
     |> assign(:users_filters_form, table_filters_form(:users, users_state))
-    |> stream(:company_users, users_page.entries, reset: true)
   end
 
   defp build_table_page(entries, state, match_fun, sort_fun) do
@@ -1096,7 +1096,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          sort_by: normalize_sort_by(kind, params["#{prefix}_sort"]),
          sort_dir: normalize_sort_dir(params["#{prefix}_dir"], default.sort_dir),
          page: normalize_page(params["#{prefix}_page"]),
-         per_page: normalize_page_size(params["#{prefix}_per_page"] || params["#{prefix}_perPage"])
+         per_page:
+           normalize_page_size(params["#{prefix}_per_page"] || params["#{prefix}_perPage"])
        }}
     end)
   end
@@ -1115,7 +1116,12 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   defp table_filters_form_name(:users), do: :users_filters
 
   defp current_table_state(socket, kind),
-    do: Map.get(socket.assigns.table_state || default_table_state(), kind, Map.fetch!(@table_defaults, kind))
+    do:
+      Map.get(
+        socket.assigns.table_state || default_table_state(),
+        kind,
+        Map.fetch!(@table_defaults, kind)
+      )
 
   defp put_table_state(table_state, kind, state), do: Map.put(table_state, kind, state)
 
@@ -1215,7 +1221,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     |> maybe_put_param("#{prefix}_sort", state.sort_by != default.sort_by && state.sort_by)
     |> maybe_put_param("#{prefix}_dir", state.sort_dir != default.sort_dir && state.sort_dir)
     |> maybe_put_param("#{prefix}_page", state.page != @default_page && state.page)
-    |> maybe_put_param("#{prefix}_per_page", state.per_page != @default_page_size && state.per_page)
+    |> maybe_put_param(
+      "#{prefix}_per_page",
+      state.per_page != @default_page_size && state.per_page
+    )
   end
 
   defp maybe_put_param(params, _key, nil), do: params
@@ -2063,9 +2072,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           </.form>
           <.table
             id="company-users-table"
-            rows={@streams.company_users}
-            row_id={fn {id, _} -> id end}
-            row_item={fn {_, user} -> user end}
+            rows={@users_page.entries}
+            row_id={fn user -> "company-user-#{user.id}" end}
+            row_item={fn user -> user end}
             sort_by={@table_state.users.sort_by}
             sort_dir={@table_state.users.sort_dir}
             sort_event="users_sort"
