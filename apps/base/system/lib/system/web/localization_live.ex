@@ -6,11 +6,18 @@ defmodule Bilimbi.Base.System.Web.LocalizationLive do
   policy owner: this LiveView renders its immutable catalogue, persists only
   through its public global API, and never reaches into Core Company bootstrap
   data. Bootstrap provenance is read-only here, matching pinned Belimbing.
+
+  The route capability check happens at mount; every save re-evaluates the
+  actor's current grants, because the capability shown when the LiveView
+  mounted is presentation state, not an authorization decision.
   """
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Locale
+
+  @manage_capability "admin.system.localization.manage"
 
   @source_labels %{
     "declared_default" => "Using declared default",
@@ -29,7 +36,15 @@ defmodule Bilimbi.Base.System.Web.LocalizationLive do
   end
 
   @impl true
-  def handle_event("save", %{"localization" => %{"locale" => locale}}, socket) do
+  def handle_event("save", params, socket) do
+    if can_manage?(socket) do
+      save(params, socket)
+    else
+      write_forbidden(socket)
+    end
+  end
+
+  defp save(%{"localization" => %{"locale" => locale}}, socket) do
     if Locale.supports?(locale) do
       case Locale.put(nil, locale) do
         {:ok, _locale} ->
@@ -46,8 +61,17 @@ defmodule Bilimbi.Base.System.Web.LocalizationLive do
     end
   end
 
-  def handle_event("save", _params, socket) do
+  defp save(_params, socket) do
     {:noreply, put_flash(socket, :error, "Choose a supported locale.")}
+  end
+
+  defp can_manage?(socket) do
+    Authz.can(socket.assigns.current_scope.actor, @manage_capability).allowed
+  end
+
+  defp write_forbidden(socket) do
+    {:noreply,
+     put_flash(socket, :error, "You do not have permission to manage the installation locale.")}
   end
 
   defp load_locale(socket) do
