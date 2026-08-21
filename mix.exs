@@ -1,6 +1,8 @@
 defmodule Bilimbi.Umbrella.MixProject do
   use Mix.Project
 
+  @precommit_test_containers ["apps/core", "apps/base", "apps/web"]
+
   def project do
     [
       apps_path: "apps",
@@ -39,9 +41,43 @@ defmodule Bilimbi.Umbrella.MixProject do
         "compile --warnings-as-errors",
         "deps.unlock --unused",
         "format",
-        "test",
+        "precommit.test",
         "bilimbi.contributions.verify"
-      ]
+      ],
+      "precommit.test": &precommit_test/1
     ]
+  end
+
+  defp precommit_test(_args) do
+    mix = System.find_executable("mix") || Mix.raise("could not find mix executable")
+
+    Enum.reduce_while(@precommit_test_containers, @precommit_test_containers, fn container,
+                                                                                 remaining ->
+      Mix.shell().info("==> #{container}")
+
+      case System.cmd(mix, ["test"],
+             cd: Path.expand(container, __DIR__),
+             into: IO.stream(:stdio, :line),
+             stderr_to_stdout: true
+           ) do
+        {_output, 0} ->
+          {:cont, tl(remaining)}
+
+        {_output, status} ->
+          report_skipped_precommit_tests(tl(remaining))
+          exit({:shutdown, status})
+      end
+    end)
+
+    :ok
+  end
+
+  defp report_skipped_precommit_tests([]), do: :ok
+
+  defp report_skipped_precommit_tests(skipped) do
+    Mix.shell().error("""
+    Precommit stopped before running these test containers:
+    #{Enum.map_join(skipped, "\n", &"  - #{&1}")}
+    """)
   end
 end
