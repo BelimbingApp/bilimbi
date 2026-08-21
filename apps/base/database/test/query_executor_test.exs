@@ -73,7 +73,8 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
       atom_count_before = :erlang.system_info(:atom_count)
       param = "zz_#{System.unique_integer([:positive])}"
 
-      assert {:ok, result} = Database.execute_readonly("SELECT :#{param}::text AS v", %{param => "x"})
+      assert {:ok, result} =
+               Database.execute_readonly("SELECT :#{param}::text AS v", %{param => "x"})
 
       assert result.rows == [%{"v" => "x"}]
       assert :erlang.system_info(:atom_count) == atom_count_before
