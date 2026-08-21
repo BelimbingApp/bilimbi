@@ -73,7 +73,7 @@ defmodule GraphEdges do
 
   @doc false
   def violations(apps_root, file_exceptions) do
-    descriptors = wildcard([apps_root, "*", "*", "bilimbi.module.exs"])
+    descriptors = descriptor_paths(apps_root)
 
     if descriptors == [] do
       {:error,
@@ -108,6 +108,20 @@ defmodule GraphEdges do
     |> Path.join()
     |> String.replace("\\", "/")
     |> Path.wildcard()
+  end
+
+  defp descriptor_paths(apps_root) do
+    [apps_root, "**", "bilimbi.module.exs"]
+    |> wildcard()
+    |> Enum.reject(&ignored_descriptor_path?/1)
+    |> Enum.sort()
+  end
+
+  defp ignored_descriptor_path?(path) do
+    path
+    |> String.replace("\\", "/")
+    |> String.split("/")
+    |> Enum.any?(&(&1 in ["_build", "deps", "node_modules"]))
   end
 
   defp check_module(m, ns_to_id, file_exceptions) do
@@ -239,6 +253,7 @@ defmodule SelfTest do
       write_module!(root, "base/aaa", Bilimbi.Base.Aaa, [])
       write_module!(root, "base/bbb", Bilimbi.Base.Bbb, [])
       write_module!(root, "base/ccc", Bilimbi.Base.Ccc, [])
+      write_module!(root, "domain/deep/nested", Bilimbi.Domain.Deep, [])
 
       results = [
         expect("clean self-reference passes", root, [], fn ->
@@ -249,6 +264,15 @@ defmodule SelfTest do
             def go, do: Aaa
           end
           """)
+        end),
+        expect("generated descriptors below _build are ignored", root, [], fn ->
+          generated_descriptor!(root, "_build")
+        end),
+        expect("generated descriptors below deps are ignored", root, [], fn ->
+          generated_descriptor!(root, "deps")
+        end),
+        expect("generated descriptors below node_modules are ignored", root, [], fn ->
+          generated_descriptor!(root, "node_modules")
         end),
         expect("plain undeclared alias fails", root, ["base/bbb"], fn ->
           lib!(root, "base/aaa", "a.ex", """
@@ -298,6 +322,14 @@ defmodule SelfTest do
             """)
           end
         ),
+        expect("deeper module descriptor is scanned", root, ["domain/deep/nested"], fn ->
+          lib!(root, "domain/deep/nested", "deep.ex", """
+          defmodule Bilimbi.Domain.Deep.Check do
+            alias Bilimbi.Base.Bbb
+            def go, do: Bbb
+          end
+          """)
+        end),
         expect_error("missing descriptors reports an error", Path.join(root, "missing_apps"))
       ]
 
@@ -384,6 +416,26 @@ defmodule SelfTest do
 
   defp lib!(root, id, name, source) do
     File.write!(Path.join([root, "apps" | String.split(id, "/")] ++ ["lib", name]), source)
+  end
+
+  defp generated_descriptor!(root, generated_dir) do
+    dir = Path.join([root, "apps", "base", "aaa", generated_dir, "sneaky"])
+    File.mkdir_p!(Path.join(dir, "lib"))
+
+    File.write!(Path.join(dir, "bilimbi.module.exs"), """
+    [
+      id: "base/sneaky",
+      namespace: Bilimbi.Base.Sneaky,
+      dependencies: []
+    ]
+    """)
+
+    File.write!(Path.join([dir, "lib", "sneaky.ex"]), """
+    defmodule Bilimbi.Base.Sneaky.Check do
+      alias Bilimbi.Base.Bbb
+      def go, do: Bbb
+    end
+    """)
   end
 end
 
