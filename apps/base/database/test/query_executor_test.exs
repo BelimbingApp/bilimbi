@@ -65,6 +65,9 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
     end
 
     test "does not mint atoms from SQL-authored parameter names" do
+      # The discriminating shape is a parameter that appears in the SQL but is
+      # ABSENT from the params map: the old code's `||` chain only reached
+      # String.to_atom/1 on that miss, so a present key never minted anything.
       # Warm the execution path first so lazy module loading cannot skew the
       # atom count; the measured call must then create zero atoms even though
       # its parameter name has never been seen by this VM.
@@ -73,10 +76,8 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
       atom_count_before = :erlang.system_info(:atom_count)
       param = "zz_#{System.unique_integer([:positive])}"
 
-      assert {:ok, result} =
-               Database.execute_readonly("SELECT :#{param}::text AS v", %{param => "x"})
+      assert {:ok, _} = Database.execute_readonly("SELECT :#{param}::text AS v", %{})
 
-      assert result.rows == [%{"v" => "x"}]
       assert :erlang.system_info(:atom_count) == atom_count_before
     end
 

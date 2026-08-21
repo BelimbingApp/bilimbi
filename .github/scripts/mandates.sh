@@ -36,7 +36,9 @@ tenant_hits=$(grep -rnE 'tenant_id\s*==\s*\^' apps/*/lib apps/*/*/lib 2>/dev/nul
 if [ -n "$tenant_hits" ]; then
   echo "FAIL AGENTS.md §13 — raw tenant filter outside the sanctioned owner-module sites:"
   echo "$tenant_hits"
-  echo "Begin the read with Tenancy.scope_query/2."
+  echo "Begin the read with Tenancy.scope_query/2. If this is a genuine owner-module"
+  echo "invariant (AGENTS.md §13), extending the allowlist above is a review decision"
+  echo "made in the same change that adds the match."
   fail=1
 fi
 
