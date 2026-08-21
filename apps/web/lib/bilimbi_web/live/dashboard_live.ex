@@ -25,6 +25,13 @@ defmodule BilimbiWeb.DashboardLive do
   alias Bilimbi.Core.User
   alias BilimbiWeb.UserAuth
 
+  @dashboard_layout_key "ui.dashboard.layout"
+  @dashboard_sections_key "ui.dashboard.sections"
+
+  # These customize the signed-in actor's own dashboard preference. They are
+  # self-service settings writes, not privileged administration writes (#376).
+  @write_guard_opt_out ~w(add-section remove-section move-section-up move-section-down)
+
   @widget_modules %{
     "base-dashboard-company-stats" => BilimbiWeb.Dashboard.CompanyStatsWidget,
     "base-dashboard-user-stats" => BilimbiWeb.Dashboard.UserStatsWidget,
@@ -49,8 +56,12 @@ defmodule BilimbiWeb.DashboardLive do
     layout = user_layout(socket.assigns.current_scope)
     visible = ordered_visible(authorized, layout)
     available = available_widgets(authorized, visible)
-    visible_sections = default_section_ids(current_company, users)
-    available_sections = available_sections(current_company, users, visible_sections)
+    default_section_ids = default_section_ids(current_company, users)
+
+    visible_sections =
+      ordered_visible_sections(default_section_ids, user_sections(socket.assigns.current_scope))
+
+    available_sections = available_sections(default_section_ids, visible_sections)
 
     audit_entries = audit_entries(scope)
     session_count = session_count(visible)
@@ -62,6 +73,7 @@ defmodule BilimbiWeb.DashboardLive do
      |> assign(:active_nav, nil)
      |> assign(:widgets, visible)
      |> assign(:available_widgets, available)
+     |> assign(:default_section_ids, default_section_ids)
      |> assign(:visible_sections, visible_sections)
      |> assign(:available_sections, available_sections)
      |> assign(:full_catalogue, full_catalogue)
@@ -117,7 +129,7 @@ defmodule BilimbiWeb.DashboardLive do
   end
 
   defp unverified_user_count(users) do
-    Enum.count(users, &(is_nil(&1.email_verified_at)))
+    Enum.count(users, &is_nil(&1.email_verified_at))
   end
 
   defp widget_module(widget_id) do
@@ -154,15 +166,10 @@ defmodule BilimbiWeb.DashboardLive do
   # dashboard (#359). `overridden?/2` asks the question the layout actually
   # depends on: is there a stored row for this user?
   defp user_layout(current_scope) do
-    settings_scope =
-      Settings.Scope.user(
-        current_scope.user["user_id"],
-        current_scope.user["company_id"],
-        current_scope.scope.tenant.id
-      )
+    settings_scope = user_settings_scope(current_scope)
 
-    with true <- Settings.overridden?("ui.dashboard.layout", settings_scope),
-         value when is_list(value) <- Settings.get("ui.dashboard.layout", settings_scope) do
+    with true <- Settings.overridden?(@dashboard_layout_key, settings_scope),
+         value when is_list(value) <- Settings.get(@dashboard_layout_key, settings_scope) do
       value
     else
       _ -> nil
@@ -170,14 +177,30 @@ defmodule BilimbiWeb.DashboardLive do
   end
 
   defp persist_layout(current_scope, widget_ids) do
-    settings_scope =
-      Settings.Scope.user(
-        current_scope.user["user_id"],
-        current_scope.user["company_id"],
-        current_scope.scope.tenant.id
-      )
+    Settings.put(@dashboard_layout_key, widget_ids, user_settings_scope(current_scope))
+  end
 
-    Settings.put("ui.dashboard.layout", widget_ids, settings_scope)
+  defp user_sections(current_scope) do
+    settings_scope = user_settings_scope(current_scope)
+
+    with true <- Settings.overridden?(@dashboard_sections_key, settings_scope),
+         value when is_list(value) <- Settings.get(@dashboard_sections_key, settings_scope) do
+      value
+    else
+      _ -> nil
+    end
+  end
+
+  defp persist_sections(current_scope, section_ids) do
+    Settings.put(@dashboard_sections_key, section_ids, user_settings_scope(current_scope))
+  end
+
+  defp user_settings_scope(current_scope) do
+    Settings.Scope.user(
+      current_scope.user["user_id"],
+      current_scope.user["company_id"],
+      current_scope.scope.tenant.id
+    )
   end
 
   defp authorized_catalogue(catalogue, current_scope) do
@@ -202,8 +225,13 @@ defmodule BilimbiWeb.DashboardLive do
     Enum.reject(authorized_catalogue, &(&1.id in visible_ids))
   end
 
-  defp available_sections(current_company, users, visible_ids) do
-    default_ids = default_section_ids(current_company, users)
+  defp ordered_visible_sections(default_ids, nil), do: default_ids
+
+  defp ordered_visible_sections(default_ids, section_ids) when is_list(section_ids) do
+    Enum.filter(section_ids, &(&1 in default_ids))
+  end
+
+  defp available_sections(default_ids, visible_ids) do
     Enum.reject(default_ids, &(&1 in visible_ids))
   end
 
@@ -264,7 +292,11 @@ defmodule BilimbiWeb.DashboardLive do
   def handle_event("add-section", %{"id" => id}, socket) do
     if id in socket.assigns.available_sections do
       visible_sections = socket.assigns.visible_sections ++ [id]
-      available_sections = List.delete(socket.assigns.available_sections, id)
+
+      available_sections =
+        available_sections(socket.assigns.default_section_ids, visible_sections)
+
+      _ = persist_sections(socket.assigns.current_scope, visible_sections)
 
       {:noreply,
        socket
@@ -280,7 +312,11 @@ defmodule BilimbiWeb.DashboardLive do
   def handle_event("remove-section", %{"id" => id}, socket) do
     if id in socket.assigns.visible_sections do
       visible_sections = List.delete(socket.assigns.visible_sections, id)
-      available_sections = socket.assigns.available_sections ++ [id]
+
+      available_sections =
+        available_sections(socket.assigns.default_section_ids, visible_sections)
+
+      _ = persist_sections(socket.assigns.current_scope, visible_sections)
 
       {:noreply,
        socket
@@ -294,14 +330,12 @@ defmodule BilimbiWeb.DashboardLive do
 
   @impl true
   def handle_event("move-section-up", %{"id" => id}, socket) do
-    sections = move_one(socket.assigns.visible_sections, id, -1)
-    {:noreply, assign(socket, :visible_sections, sections)}
+    move_section(socket, id, -1)
   end
 
   @impl true
   def handle_event("move-section-down", %{"id" => id}, socket) do
-    sections = move_one(socket.assigns.visible_sections, id, 1)
-    {:noreply, assign(socket, :visible_sections, sections)}
+    move_section(socket, id, 1)
   end
 
   @impl true
@@ -351,6 +385,17 @@ defmodule BilimbiWeb.DashboardLive do
       Enum.map(ids, &Map.fetch!(by_id, &1))
     else
       widgets
+    end
+  end
+
+  defp move_section(socket, id, direction) do
+    sections = move_one(socket.assigns.visible_sections, id, direction)
+
+    if sections == socket.assigns.visible_sections do
+      {:noreply, socket}
+    else
+      _ = persist_sections(socket.assigns.current_scope, sections)
+      {:noreply, assign(socket, :visible_sections, sections)}
     end
   end
 
@@ -461,6 +506,7 @@ defmodule BilimbiWeb.DashboardLive do
           :if={@widgets != []}
           id="dashboard-widgets"
           phx-hook="DashboardSort"
+          data-sort-enabled={to_string(@layout_editing)}
           class="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2"
         >
           <.render_widget
@@ -517,11 +563,15 @@ defmodule BilimbiWeb.DashboardLive do
                     </p>
                   </div>
                   <div class="flex shrink-0 flex-col items-end gap-2">
-                    <.badge kind={if @current_company.status == "active", do: :success, else: :warning}>
+                    <.badge kind={
+                      if @current_company.status == "active", do: :success, else: :warning
+                    }>
                       {@current_company.status}
                     </.badge>
                     <.link
-                      :if={!@layout_editing and UserAuth.allowed?(@current_scope, "admin.company.view")}
+                      :if={
+                        !@layout_editing and UserAuth.allowed?(@current_scope, "admin.company.view")
+                      }
                       navigate={~p"/companies/#{@current_company.id}"}
                       id="dashboard-company-open"
                       class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
