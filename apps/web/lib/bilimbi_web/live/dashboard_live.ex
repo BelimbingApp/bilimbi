@@ -62,7 +62,10 @@ defmodule BilimbiWeb.DashboardLive do
      |> assign(:available_widgets, available)
      |> assign(:full_catalogue, full_catalogue)
      |> assign(:company_count, length(companies))
+     |> assign(:active_company_count, active_company_count(companies))
      |> assign(:user_count, length(users))
+     |> assign(:verified_user_count, verified_user_count(users))
+     |> assign(:unverified_user_count, unverified_user_count(users))
      |> assign(:session_count, session_count)
      |> assign(:perf_diagnostics, perf_diagnostics)
      |> assign(:audit_entries, audit_entries)
@@ -99,6 +102,18 @@ defmodule BilimbiWeb.DashboardLive do
       sort_by: :occurred_at,
       sort_dir: :desc
     ).entries
+  end
+
+  defp active_company_count(companies) do
+    Enum.count(companies, &(&1.status == "active"))
+  end
+
+  defp verified_user_count(users) do
+    Enum.count(users, &(!is_nil(&1.email_verified_at)))
+  end
+
+  defp unverified_user_count(users) do
+    Enum.count(users, &(is_nil(&1.email_verified_at)))
   end
 
   defp widget_module(widget_id) do
@@ -328,24 +343,24 @@ defmodule BilimbiWeb.DashboardLive do
         <.header>
           Dashboard
           <:subtitle>
-            Signed in as {@current_scope.user["name"]} · {@current_scope.scope.tenant.name}
+            {@current_scope.scope.tenant.name} · {@current_scope.user["name"]}
           </:subtitle>
           <:actions>
             <.button
               :if={!@layout_editing}
-              id="edit-layout"
+              id="customize-layout"
               phx-click="toggle-layout-edit"
-              variant="primary"
+              class="rounded-lg px-3 py-1.5 text-xs font-medium shadow-none"
             >
-              Edit layout
+              Customize
             </.button>
             <.button
               :if={@layout_editing}
-              id="done-layout"
+              id="close-customize"
               phx-click="toggle-layout-edit"
-              variant="primary"
+              class="rounded-lg px-3 py-1.5 text-xs font-medium shadow-none"
             >
-              Done
+              Close
             </.button>
           </:actions>
         </.header>
@@ -355,7 +370,7 @@ defmodule BilimbiWeb.DashboardLive do
           id="add-widget-section"
           class="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-xs"
         >
-          <span class="text-xs font-semibold text-ink-muted">Add widget:</span>
+          <span class="text-xs font-semibold text-ink-muted">Customize dashboard:</span>
           <button
             :for={w <- @available_widgets}
             id={"add-widget-#{w.id}"}
@@ -372,14 +387,17 @@ defmodule BilimbiWeb.DashboardLive do
           :if={@widgets != []}
           id="dashboard-widgets"
           phx-hook="DashboardSort"
-          data-sort-enabled={if @layout_editing, do: "true", else: "false"}
-          class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3"
+          class="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2"
         >
           <.render_widget
             :for={widget <- @widgets}
             widget={widget}
             company_count={@company_count}
+            active_company_count={@active_company_count}
             user_count={@user_count}
+            verified_user_count={@verified_user_count}
+            unverified_user_count={@unverified_user_count}
+            current_company={@current_company}
             session_count={@session_count}
             perf_diagnostics={@perf_diagnostics}
             audit_entries={@audit_entries}
@@ -394,7 +412,7 @@ defmodule BilimbiWeb.DashboardLive do
             phx-click="toggle-layout-edit"
             class="font-medium text-ink underline underline-offset-2 hover:text-ink-strong"
           >
-            Edit layout
+            Customize dashboard
           </.link>
           &nbsp;to add widgets.
         </p>
@@ -478,18 +496,19 @@ defmodule BilimbiWeb.DashboardLive do
 
     ~H"""
     <div class="relative" id={"widget-#{@id}"} data-widget-id={@id}>
-      <div :if={@layout_editing} class="absolute right-1 top-1 z-10 flex gap-0.5">
+      <div class="absolute right-1 top-1 z-10 flex gap-0.5">
         <button
           id={"drag-#{@id}"}
           type="button"
           draggable="true"
           data-role="drag-handle"
-          title="Drag to reorder. Use the move buttons for keyboard access."
+          title="Drag to reorder. Changes save when dropped."
           aria-label={"Drag to reorder #{@widget.label}"}
           class="grid size-5 cursor-grab touch-none place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong active:cursor-grabbing"
         >
           <.icon name="hero-bars-3" class="size-3" />
         </button>
+        <div :if={@layout_editing} class="flex gap-0.5">
         <button
           id={"move-up-#{@id}"}
           type="button"
@@ -520,6 +539,7 @@ defmodule BilimbiWeb.DashboardLive do
         >
           <.icon name="hero-x-mark" class="size-3" />
         </button>
+        </div>
       </div>
 
       <%= case @id do %>
@@ -527,6 +547,8 @@ defmodule BilimbiWeb.DashboardLive do
           <.company_stat_card
             id="stat-companies"
             count={@company_count}
+            active_count={@active_company_count}
+            current_code={@current_company && @current_company.code}
             navigate={
               if UserAuth.allowed?(@current_scope, "admin.company.list"),
                 do: ~p"/companies"
@@ -536,6 +558,8 @@ defmodule BilimbiWeb.DashboardLive do
           <.user_stat_card
             id="stat-users"
             count={@user_count}
+            verified_count={@verified_user_count}
+            unverified_count={@unverified_user_count}
             navigate={
               if UserAuth.allowed?(@current_scope, "admin.user.list"),
                 do: ~p"/users"
@@ -563,24 +587,35 @@ defmodule BilimbiWeb.DashboardLive do
           <.link
             navigate="/system/performance"
             id="stat-performance"
-            class="block rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
+            class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
           >
-            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-              Performance
-            </p>
-            <p class="mt-1 text-sm font-semibold text-ink-strong">
-              {performance_health(@perf_diagnostics)}
-            </p>
-            <p class="mt-1 text-xs tabular-nums text-muted">
-              {performance_samples(@perf_diagnostics)} retained samples
-            </p>
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
+                Performance
+              </p>
+              <.action_arrow_icon />
+            </div>
+            <div class="mt-2.5 grid grid-cols-2 divide-x divide-line">
+              <div class="pr-3">
+                <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Health</p>
+                <p class="mt-1 text-sm font-semibold text-ink-strong">
+                  {performance_health(@perf_diagnostics)}
+                </p>
+              </div>
+              <div class="pl-3">
+                <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Samples</p>
+                <p class="mt-1 text-sm font-semibold tabular-nums text-ink-strong">
+                  {performance_samples(@perf_diagnostics)}
+                </p>
+              </div>
+            </div>
           </.link>
         <% other_id -> %>
           <div
             id={"dashboard-widget-#{other_id}"}
             class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
           >
-            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
               {@widget.label}
             </p>
           </div>
@@ -600,6 +635,8 @@ defmodule BilimbiWeb.DashboardLive do
 
   attr(:id, :string, required: true)
   attr(:count, :integer, required: true)
+  attr(:active_count, :integer, required: true)
+  attr(:current_code, :string, default: nil)
   attr(:navigate, :string, default: nil)
 
   defp company_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
@@ -607,15 +644,28 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Companies</p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
-      <span class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 group-hover:text-ink">
-        View all
-      </span>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
+          Companies
+        </p>
+        <.action_arrow_icon />
+      </div>
+      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Total</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
+        </div>
+        <div class="px-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Active</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@active_count}</p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Current</p>
+          <p class="mt-1 truncate text-sm font-semibold text-ink-strong">{@current_code || "—"}</p>
+        </div>
+      </div>
     </.link>
     """
   end
@@ -624,18 +674,35 @@ defmodule BilimbiWeb.DashboardLive do
     ~H"""
     <div
       id={@id}
-      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+      class="rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03]"
     >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Companies</p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
+          Companies
+        </p>
+      </div>
+      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Total</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
+        </div>
+        <div class="px-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Active</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@active_count}</p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Current</p>
+          <p class="mt-1 truncate text-sm font-semibold text-ink-strong">{@current_code || "—"}</p>
+        </div>
+      </div>
     </div>
     """
   end
 
   attr(:id, :string, required: true)
   attr(:count, :integer, required: true)
+  attr(:verified_count, :integer, required: true)
+  attr(:unverified_count, :integer, required: true)
   attr(:navigate, :string, default: nil)
 
   defp user_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
@@ -643,15 +710,30 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Users</p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
-      <span class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 group-hover:text-ink">
-        View all
-      </span>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">Users</p>
+        <.action_arrow_icon />
+      </div>
+      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Total</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
+        </div>
+        <div class="px-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Verified</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">
+            {@verified_count}
+          </p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Pending</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">
+            {@unverified_count}
+          </p>
+        </div>
+      </div>
     </.link>
     """
   end
@@ -660,12 +742,29 @@ defmodule BilimbiWeb.DashboardLive do
     ~H"""
     <div
       id={@id}
-      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+      class="rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03]"
     >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Users</p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">Users</p>
+      </div>
+      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Total</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
+        </div>
+        <div class="px-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Verified</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">
+            {@verified_count}
+          </p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Pending</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">
+            {@unverified_count}
+          </p>
+        </div>
+      </div>
     </div>
     """
   end
@@ -681,17 +780,28 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-        Sessions
-      </p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
-      <span class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 group-hover:text-ink">
-        View all
-      </span>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
+          Sessions
+        </p>
+        <.action_arrow_icon />
+      </div>
+      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Open</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
+        </div>
+        <div class="px-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Store</p>
+          <p class="mt-1 text-sm font-semibold text-ink-strong">Durable</p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Scope</p>
+          <p class="mt-1 text-sm font-semibold text-ink-strong">Platform</p>
+        </div>
+      </div>
     </.link>
     """
   end
@@ -700,14 +810,27 @@ defmodule BilimbiWeb.DashboardLive do
     ~H"""
     <div
       id={@id}
-      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+      class="rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03]"
     >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-        Sessions
-      </p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
+          Sessions
+        </p>
+      </div>
+      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Open</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
+        </div>
+        <div class="px-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Store</p>
+          <p class="mt-1 text-sm font-semibold text-ink-strong">Durable</p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Scope</p>
+          <p class="mt-1 text-sm font-semibold text-ink-strong">Platform</p>
+        </div>
+      </div>
     </div>
     """
   end
@@ -720,22 +843,24 @@ defmodule BilimbiWeb.DashboardLive do
     ~H"""
     <div id={@id} class="rounded-xl border border-line bg-surface shadow-xs shadow-ink/[0.03]">
       <div class="flex items-center justify-between border-b border-line px-4 py-3">
-        <h3 class="text-sm font-semibold text-ink-strong">Recent Activity</h3>
+        <h3 class="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-ink">
+          Recent Activity
+        </h3>
         <.link
           :if={@navigate}
           navigate={@navigate}
-          class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
+          class="text-brand-strong transition hover:text-brand"
         >
-          All activity
+          <.action_arrow_icon />
         </.link>
       </div>
-      <div :if={Enum.empty?(@entries)} class="px-4 py-6 text-center text-sm text-ink-subtle">
+      <div :if={Enum.empty?(@entries)} class="px-4 py-5 text-sm text-ink-subtle">
         No recent activity.
       </div>
       <div :if={Enum.any?(@entries)} class="divide-y divide-line">
         <div
           :for={entry <- @entries}
-          class="flex items-center gap-3 px-4 py-2.5 text-sm"
+          class="flex items-start gap-3 px-4 py-2.5 text-sm"
         >
           <.icon name="hero-document-text" class="size-4 shrink-0 text-ink-faint" />
           <div class="min-w-0 flex-1">
@@ -750,6 +875,19 @@ defmodule BilimbiWeb.DashboardLive do
         </div>
       </div>
     </div>
+    """
+  end
+
+  defp action_arrow_icon(assigns) do
+    ~H"""
+    <svg
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden="true"
+      class="size-4 shrink-0 text-brand-strong transition group-hover:translate-x-0.5"
+    >
+      <path d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" />
+    </svg>
     """
   end
 end

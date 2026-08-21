@@ -3,16 +3,14 @@
 // LiveView validates the order is a permutation of its current widget ids
 // before persisting anything, so a stale or forged push changes nothing.
 //
-// HTML5 drag and drop has no touch support; the keyboard move buttons next to
-// the handle remain the accessible reorder path, matching Belimbing's
-// "Drag to reorder. Use the move buttons for keyboard access."
+// Reordering is always available on desktop; dropping a card saves immediately.
+// HTML5 drag and drop still has no touch support, so the keyboard move buttons
+// in customize mode remain the accessible reorder path.
 const DashboardSort = {
   mounted() {
     this.dragged = null
 
     this.onDragStart = (e) => {
-      if (this.el.dataset.sortEnabled !== "true") return
-
       const item = e.target.closest("[data-widget-id]")
       if (!item) return
 
