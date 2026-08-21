@@ -81,8 +81,8 @@ matches=$(jq -c --argjson issue "$issue" '
   def claim_branch:
     .headRefName | test("(^|[-_/])issue-?" + ($issue | tostring) + "($|[-_/])");
   [.[]
-   | select(((.title // "") + "\\n" + (.body // "")) | contains(issue_reference)
-            or ((agent_labels | length) > 0 and claim_branch))
+   | select(((((.title // "") + "\\n" + (.body // "")) | contains(issue_reference))
+             or ((agent_labels | length) > 0 and claim_branch)))
    | {number, title, url, holders: agent_labels}]
 ' <<<"$prs")
 
