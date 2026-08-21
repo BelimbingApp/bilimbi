@@ -22,9 +22,16 @@ for fixture in "$here"/*.json; do
   fi
 
   out=$(REVIEW_GATE_INPUT="$fixture" "$gate" 2>&1) && st=0 || st=$?
+  contains=$(jq -r '._contains // ""' "$fixture")
 
   if { [[ "$expect" == pass ]] && [[ $st -eq 0 ]] && [[ "$out" == PASS:* ]]; } ||
      { [[ "$expect" == fail ]] && [[ $st -eq 1 ]] && [[ "$out" == FAIL:* ]]; }; then
+    if [[ -n "$contains" && "$out" != *"$contains"* ]]; then
+      printf 'FAIL %s (output did not contain %q; output: %.160s)\n' "$name" "$contains" "$out"
+      failures=$((failures + 1))
+      continue
+    fi
+
     printf 'ok   %s\n' "$name"
   else
     printf 'FAIL %s (expected %s; exit %s; output: %.160s)\n' "$name" "$expect" "$st" "$out"
