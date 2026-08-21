@@ -148,6 +148,35 @@ defmodule BilimbiWeb.CompanyLiveTest do
   end
 
   describe "Show" do
+    test "header shows the name once, with legal name or code as subtitle", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+      conn = log_in_as(conn)
+
+      # No distinct legal name: subtitle falls back to the code (#622).
+      {:ok, _view, html} = live(conn, ~p"/companies/73")
+      assert html =~ "Bilimbi Industries"
+      assert html =~ "bilimbi_industries"
+
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, _} =
+        Company.update_company(scope, 73, %{legal_name: "Bilimbi Industries Sdn. Bhd."})
+
+      {:ok, _view, html} = live(conn, ~p"/companies/73")
+      assert html =~ "Bilimbi Industries Sdn. Bhd."
+    end
+
+    test "relationships embed shows the effective period", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+      CompanyFixtures.insert_relationship_type!(11)
+      CompanyFixtures.insert_relationship!(21, 73, 74)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      assert has_element?(view, "#company-relationships-card th", "Effective")
+      assert has_element?(view, "#company-relationships-table td", "Always → Present")
+    end
+
     test "redirects away when the actor lacks admin.company.view", %{conn: conn} do
       assert {:error, {:redirect, %{to: "/dashboard"}}} =
                conn |> log_in_as() |> live(~p"/companies/73")
