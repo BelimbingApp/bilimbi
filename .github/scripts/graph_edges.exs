@@ -36,9 +36,6 @@ defmodule GraphEdges do
   #   (AGENTS.md §6; ADR 0004/0009/0011/0012). The consumers depend on the
   #   registry, so these are deliberate reverse edges of the decided seam,
   #   invoked behind Code.ensure_loaded?; declaring them would cycle.
-  # - employee's show_live probes Core.User/Core.Address (which both declare
-  #   core/employee) via function_exported? — known debt, tracked as #570;
-  #   remove this entry when #570 lands a declared seam.
   @file_exceptions %{
     {"base/module_registry", "lib/module_registry/contribution_registry.ex"} => [
       [:Bilimbi, :Base, :Settings],
@@ -47,10 +44,6 @@ defmodule GraphEdges do
       [:Bilimbi, :Base, :Dashboard],
       [:Bilimbi, :Base, :PrincipalDirectory],
       [:Bilimbi, :Base, :Schedule]
-    ],
-    {"core/employee", "lib/employee/web/show_live.ex"} => [
-      [:Bilimbi, :Core, :User],
-      [:Bilimbi, :Core, :Address]
     ]
   }
 
