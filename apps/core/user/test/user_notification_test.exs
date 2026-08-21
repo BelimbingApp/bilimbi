@@ -8,6 +8,8 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
   alias Bilimbi.Core.User.Notification
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
+  @notification_delivery_failure_event [:bilimbi, :core, :user, :notification_delivery, :failed]
+
   setup do
     UserFixtures.create_user_tables!()
     UserFixtures.create_notifications_table!()
@@ -276,21 +278,101 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
     end
 
     test "returns :ok when pubsub_server is nil", %{scope: scope} do
-      orig = Application.get_env(:bilimbi_core_user, :pubsub_server)
-
-      try do
-        Application.put_env(:bilimbi_core_user, :pubsub_server, nil)
+      with_pubsub_server(nil, fn ->
         assert :ok = User.subscribe_notifications(scope, 42)
         assert :ok = User.broadcast_notification(scope, 42, :test_event)
-      after
-        Application.put_env(:bilimbi_core_user, :pubsub_server, orig)
-      end
+      end)
     end
 
     test "subscribing multiple times from the same process succeeds idempotently", %{scope: scope} do
       user_id = 42
       assert :ok = User.subscribe_notifications(scope, user_id)
       assert :ok = User.subscribe_notifications(scope, user_id)
+    end
+
+    test "reports a configured unavailable PubSub server without leaking its failure", %{
+      scope: scope
+    } do
+      with_delivery_failure_telemetry(fn ->
+        with_pubsub_server(__MODULE__, fn ->
+          assert {:error, :pubsub_unavailable} = User.subscribe_notifications(scope, 42)
+
+          assert_delivery_failure(:subscribe)
+
+          assert {:error, :pubsub_unavailable} =
+                   User.broadcast_notification(scope, 42, {:created, %{private: "payload"}})
+
+          assert_delivery_failure(:broadcast)
+        end)
+      end)
+    end
+
+    test "keeps committed notification mutations successful when delivery is unavailable", %{
+      scope: scope
+    } do
+      with_delivery_failure_telemetry(fn ->
+        with_pubsub_server(__MODULE__, fn ->
+          assert {:ok, created} = User.send_notification(scope, 42, %{title: "Created once"})
+          assert {:ok, [persisted]} = User.list_notifications(scope, 42)
+          assert persisted.id == created.id
+          assert_delivery_failure(:broadcast)
+
+          assert {:ok, read} = User.mark_notification_as_read(scope, 42, created.id)
+          assert Notification.read?(read)
+          assert_delivery_failure(:broadcast)
+
+          assert {:ok, second} = User.send_notification(scope, 42, %{title: "Read all"})
+          assert_delivery_failure(:broadcast)
+
+          assert {:ok, 1} = User.mark_all_notifications_as_read(scope, 42)
+          assert_delivery_failure(:broadcast)
+
+          assert {:ok, deleted} = User.delete_notification(scope, 42, second.id)
+          assert deleted.id == second.id
+          assert {:error, :not_found} = User.get_notification(scope, 42, second.id)
+          assert_delivery_failure(:broadcast)
+        end)
+      end)
+    end
+  end
+
+  defp assert_delivery_failure(operation) do
+    assert_receive {@notification_delivery_failure_event, measurements, metadata}
+    assert measurements == %{count: 1}
+    assert metadata == %{operation: operation}
+  end
+
+  defp with_delivery_failure_telemetry(fun) do
+    handler_id = {__MODULE__, System.unique_integer([:positive])}
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        @notification_delivery_failure_event,
+        fn event, measurements, metadata, test_pid ->
+          send(test_pid, {event, measurements, metadata})
+        end,
+        self()
+      )
+
+    try do
+      fun.()
+    after
+      :telemetry.detach(handler_id)
+    end
+  end
+
+  defp with_pubsub_server(server, fun) do
+    previous = Application.fetch_env(:bilimbi_core_user, :pubsub_server)
+    Application.put_env(:bilimbi_core_user, :pubsub_server, server)
+
+    try do
+      fun.()
+    after
+      case previous do
+        {:ok, value} -> Application.put_env(:bilimbi_core_user, :pubsub_server, value)
+        :error -> Application.delete_env(:bilimbi_core_user, :pubsub_server)
+      end
     end
   end
 end

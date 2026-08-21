@@ -8,6 +8,7 @@
   dependencies: [
     "base/authz",
     "base/database",
+    "base/locale",
     "base/module_registry",
     "base/tenancy",
     "base/ui",
