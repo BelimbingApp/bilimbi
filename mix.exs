@@ -10,6 +10,11 @@ defmodule Bilimbi.Umbrella.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
+      # CI runs `mix dialyzer` from this umbrella root, so the PLT is built here.
+      # `mix bilimbi.screenshot` (apps/web) is the first shipped Mix task, and its
+      # `Mix.*` surface needs the Mix application in the PLT to type-check. PLT-only
+      # — this adds :mix to Dialyzer's analysis, not to any app's runtime.
+      dialyzer: [plt_add_apps: [:mix]],
       listeners: [Phoenix.CodeReloader]
     ]
   end

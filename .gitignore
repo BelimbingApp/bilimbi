@@ -38,6 +38,10 @@ npm-debug.log
 /assets/node_modules
 /apps/web/assets/node_modules
 
+# Screenshot harness (#615): Playwright lives in the driver dir, captures under /tmp
+/apps/web/priv/screenshot/node_modules
+/apps/web/priv/screenshot/package-lock.json
+
 # Local Elixir language-server state.
 /.elixir_ls
 
