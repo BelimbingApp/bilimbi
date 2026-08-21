@@ -98,7 +98,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         external_accesses = Company.list_external_accesses(scope, company_id) |> elem(1)
         external_access_users = load_external_access_users(scope, external_accesses)
         users = list_company_users(scope, company_id)
-        employees = list_company_employees(scope, company_id)
         attached_addresses = list_company_attached_addresses(scope, company_id)
         available_addresses = list_available_addresses(scope)
         company_timezone = get_company_timezone(company)
@@ -119,7 +118,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:external_accesses, external_accesses)
          |> assign(:external_access_users, external_access_users)
          |> assign(:users_count, length(users))
-         |> assign(:employees_count, length(employees))
          |> assign(:attached_addresses, attached_addresses)
          |> assign(:available_addresses, available_addresses)
          |> assign(:address_kinds, @address_kinds)
@@ -143,8 +141,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:create_address_kinds, [])
          |> assign(:create_address_is_primary, false)
          |> assign(:create_address_priority, 0)
-         |> stream(:company_users, users)
-         |> stream(:company_employees, employees)}
+         |> stream(:company_users, users)}
 
       {:error, :not_found} ->
         {:ok, not_found(socket)}
@@ -164,8 +161,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   end
 
   # ============================================================================
-  # Dynamic Integration with Core User, Employee, Address
-  # (Geonames is a declared dependency — call Bilimbi.Core.Geonames directly.)
+  # Dynamic Integration with Core User, Address
+  # (Geonames is a declared dependency — call Bilimbi.Core.Geonames directly.
+  #  Employees render through the core/employee-owned "company.employees"
+  #  discovered embed (#595), so this file no longer probes Core.Employee.)
   # ============================================================================
 
   defp list_company_users(scope, company_id) do
@@ -210,19 +209,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
       true ->
         %{}
-    end
-  end
-
-  defp list_company_employees(scope, company_id) do
-    emp_mod = Module.concat(["Bilimbi", "Core", "Employee"])
-
-    if Code.ensure_loaded?(emp_mod) and function_exported?(emp_mod, :list_employees, 2) do
-      case apply(emp_mod, :list_employees, [scope, company_id]) do
-        {:ok, employees} -> employees
-        _ -> []
-      end
-    else
-      []
     end
   end
 
@@ -1684,39 +1670,16 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           </.table>
         </section>
 
-        <%!-- Section 9: Employees --%>
-        <section id="company-employees" class="mt-6">
-          <div class="flex items-center gap-2 mb-2">
-            <h2 class="text-sm font-semibold text-ink-strong">Employees</h2>
-            <.badge>{@employees_count}</.badge>
-          </div>
-          <.table
-            id="company-employees-table"
-            rows={@streams.company_employees}
-            row_id={fn {id, _} -> id end}
-            row_item={fn {_, employee} -> employee end}
-            caption="Employees"
-          >
-            <:col :let={employee} label="Name">
-              <span class="font-medium">{employee.full_name}</span>
-              <span :if={employee.designation} class="block text-xs text-ink-subtle">
-                {employee.designation}
-              </span>
-            </:col>
-            <:col :let={employee} label="No.">
-              <code class="text-xs font-medium">{employee.employee_number}</code>
-            </:col>
-            <:col :let={employee} label="Type">{employee.employee_type}</:col>
-            <:col :let={employee} label="Status">
-              <.badge kind={if employee.status == "active", do: :success, else: :neutral}>
-                {employee.status}
-              </.badge>
-            </:col>
-            <:empty :if={@employees_count == 0}>
-              No employees found for this company.
-            </:empty>
-          </.table>
-        </section>
+        <%!-- Section 9: Employees — core/employee-owned discovered embed (#595).
+             Core Employee can depend on Core Company but not the reverse, so the
+             company page renders the panel by manifest key rather than probing
+             or declaring an edge that would cycle. --%>
+        <.discovered_panel
+          key="company.employees"
+          id="company-employees-panel"
+          current_scope={@current_scope}
+          opts={%{company_id: @company.id}}
+        />
 
         <%!-- MODAL 1: Edit Company Details --%>
         <div

@@ -40,5 +40,9 @@
     live: Bilimbi.Core.Employee.Web.TypeFormLive,
     session: :auth,
     capability: "admin.employee-type.update"
+  },
+  %{
+    embed: "company.employees",
+    live_component: Bilimbi.Core.Employee.Web.CompanyEmployeesPanel
   }
 ]

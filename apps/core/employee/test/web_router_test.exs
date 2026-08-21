@@ -4,7 +4,12 @@ defmodule Bilimbi.Core.Employee.Web.RouterTest do
   alias Bilimbi.Core.Employee.Web.Router
 
   test "declares company-scoped employee and type screens" do
-    by_path = Map.new(Router.routes(), &{&1.path, &1})
+    # Embed entries (module-contributed panels) carry no `:path`; this test is
+    # about the path-routed screens, so filter them out before keying by path.
+    by_path =
+      Router.routes()
+      |> Enum.filter(&Map.has_key?(&1, :path))
+      |> Map.new(&{&1.path, &1})
 
     assert by_path["/employees"].live == Bilimbi.Core.Employee.Web.IndexLive
     assert by_path["/employees"].capability == "admin.employee.list"
@@ -23,5 +28,19 @@ defmodule Bilimbi.Core.Employee.Web.RouterTest do
 
     assert by_path["/employee-types/new"].live == Bilimbi.Core.Employee.Web.TypeFormLive
     assert by_path["/employee-types/new"].capability == "admin.employee-type.create"
+  end
+
+  test "employee form account linking goes through the discovered seam" do
+    source =
+      Path.expand("../lib/employee/web/form_live.ex", __DIR__)
+      |> File.read!()
+
+    assert source =~ "DiscoveredPanels.dispatch(\"employee.accounts\", :employee_account_options"
+    assert source =~ "DiscoveredPanels.dispatch(\"employee.accounts\", :replace_employee_account"
+
+    refute source =~ ~S|Module.concat(["Bilimbi", "Core", "User"])|
+    refute source =~ "Code.ensure_loaded?"
+    refute source =~ "function_exported?"
+    refute source =~ "apply(user_mod"
   end
 end
