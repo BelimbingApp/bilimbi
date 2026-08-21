@@ -47,6 +47,7 @@ defmodule Bilimbi.Base.SystemTest do
       # Manual mode starts no consumers, but it does supervise the migrated
       # runtime and keeps the operational probe truthful.
       assert health["Queue"] == "Available (0 pending, 0 retryable, 0 discarded)"
+      assert health["Performance"] in ["Unavailable", "Available (0 pending, 0 dropped)"]
     end
 
     test "loaded applications carry versions and are sorted" do

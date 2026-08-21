@@ -30,8 +30,21 @@ defmodule BilimbiWeb.SettingsLiveTest do
   end
 
   defp open(conn) do
-    grant_capabilities!("base.settings.global.manage")
+    grant_capabilities!(["base.settings.global.manage", "admin.authz.decision-log.list"])
     conn |> log_in_as() |> live(~p"/system/settings")
+  end
+
+  test "definition capabilities hide and reject unauthorized settings", %{conn: conn} do
+    grant_capabilities!("base.settings.global.manage")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/settings")
+
+    refute has_element?(view, "#setting-perf-enabled")
+    view |> render_submit("save", %{"settings" => %{"perf.enabled" => "false"}})
+    refute Settings.overridden?("perf.enabled")
+
+    grant_capabilities!("admin.system.perf.manage")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/settings")
+    assert has_element?(view, "#setting-perf-enabled")
   end
 
   test "requires authentication", %{conn: conn} do
@@ -67,7 +80,7 @@ defmodule BilimbiWeb.SettingsLiveTest do
 
     assert Settings.get(@retention) == 45
     assert has_element?(view, "#setting-authz-decision_log_retention_days", "Set here")
-    assert render(view) =~ "2 settings updated"
+    assert render(view) =~ "1 setting updated"
   end
 
   test "clearing a field says so, and the value returns to its default", %{conn: conn} do
@@ -104,7 +117,7 @@ defmodule BilimbiWeb.SettingsLiveTest do
     # field means "stop overriding". Asserted so nobody "optimises" the write
     # away and silently turns a pin into an inherit.
     assert Settings.overridden?(@retention)
-    assert render(view) =~ "2 settings updated"
+    assert render(view) =~ "1 setting updated"
   end
 
   test "a submission that touches nothing reports no change", %{conn: conn} do

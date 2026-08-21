@@ -26,6 +26,17 @@ defmodule Bilimbi.Base.Schedule.Contributions do
         },
         runtime_claims: []
       },
+      menu: [
+        %{
+          id: "admin.system.schedule",
+          label: "Schedule",
+          icon: "clipboard-document-list",
+          parent: "admin.system",
+          route: "/system/schedule",
+          capability: @view,
+          order: 15
+        }
+      ],
       authz: %{
         capabilities: [@view, @execute, @manage],
         roles: %{"system_viewer" => %{capabilities: [@view]}}

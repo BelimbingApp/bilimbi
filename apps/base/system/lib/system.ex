@@ -20,6 +20,7 @@ defmodule Bilimbi.Base.System do
   it could not read a disk is worse than one that says it could not read a disk.
   """
 
+  alias Bilimbi.Base.Perf
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Repo
 
@@ -103,7 +104,8 @@ defmodule Bilimbi.Base.System do
     [
       fact("Database", connection_status()),
       fact("Cache", "In-memory (ETS)"),
-      fact("Queue", Queue.health_status())
+      fact("Queue", Queue.health_status()),
+      fact("Performance", Perf.health_status())
     ]
   end
 
