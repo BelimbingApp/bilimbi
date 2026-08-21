@@ -257,6 +257,8 @@ defmodule Bilimbi.Core.CompatibilityTest do
              expected_versions
 
     assert relation(MigrationTestRepo, schema, "bilimbi_only_probe") != nil
+    assert relation(MigrationTestRepo, schema, "users_company_id_index") != nil
+    assert relation(MigrationTestRepo, schema, "users_employee_id_index") != nil
     assert recorded_versions(MigrationTestRepo, schema) == expected_versions
     refute synthetic_version in Compatibility.baseline_versions()
   end
@@ -304,6 +306,8 @@ defmodule Bilimbi.Core.CompatibilityTest do
     synthetic_version = install_synthetic_migration!()
 
     assert relation(MigrationTestRepo, schema, "bilimbi_only_probe") == nil
+    assert relation(MigrationTestRepo, schema, "users_company_id_index") == nil
+    assert relation(MigrationTestRepo, schema, "users_employee_id_index") == nil
 
     assert {:ok, :adopted} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
 
@@ -318,6 +322,8 @@ defmodule Bilimbi.Core.CompatibilityTest do
     assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) == pending
 
     assert relation(MigrationTestRepo, schema, "bilimbi_only_probe") != nil
+    assert relation(MigrationTestRepo, schema, "users_company_id_index") != nil
+    assert relation(MigrationTestRepo, schema, "users_employee_id_index") != nil
 
     assert recorded_versions(MigrationTestRepo, schema) ==
              Enum.map(Compatibility.migration_entries(), &elem(&1, 0))

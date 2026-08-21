@@ -91,6 +91,17 @@ verdict=$(jq -r '
     else
       null
     end;
+  def expected_agent_label($label):
+    if ($label | type) == "string" and ($label | startswith("agent:")) then
+      ("agent:" + ($label[6:] | gsub("/"; "-"))) as $candidate
+      | if ($candidate | test("^agent:[a-z0-9]+(?:[._-][a-z0-9]+)*$")) then
+          $candidate
+        else
+          null
+        end
+    else
+      null
+    end;
   def marker_token:
     sub("^#{1,6}[[:space:]]+"; "")
     | try capture("^\\*\\*From:\\*\\*[[:space:]]+(?<id>[^[:space:]]+)(?:[[:space:]].*)?$").id catch null;
@@ -150,7 +161,14 @@ verdict=$(jq -r '
   | if ($agent_labels | length) != 1 then
       "FAIL: PR must carry exactly one agent:* label (found \($agent_labels | length))"
     elif ($agent_labels[0] | test("^agent:[a-z0-9]+(?:[._-][a-z0-9]+)*$") | not) then
-      "FAIL: PR agent:* label is not canonical"
+      ($agent_labels[0]) as $label
+      | (expected_agent_label($label)) as $expected
+      | "FAIL: agent label '\''\($label)'\'' is not canonical; labels use lower-case hyphen form"
+        + (if $expected != null and $expected != $label then
+             " (expected '\''\($expected)'\'')"
+           else
+             ""
+           end)
     elif (($pr.author.login | type) != "string" or $pr.author.login == "") then
       "FAIL: malformed PR author"
     else
