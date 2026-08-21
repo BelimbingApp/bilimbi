@@ -101,9 +101,82 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#nav-toggle-admin[aria-expanded='true']")
       assert has_element?(view, "#nav-children-admin:not([hidden])")
     end
+
+    test "search, status filter, and sort live in the URL", %{conn: conn} do
+      grant_capabilities!(["admin.company.list"])
+      conn = log_in_as(conn)
+
+      {:ok, view, _html} = live(conn, ~p"/companies?search=Subsidiary")
+      assert has_element?(view, "#companies td", "Bilimbi Subsidiary")
+      refute has_element?(view, "#companies td a", "Bilimbi Industries")
+
+      {:ok, view, _html} = live(conn, ~p"/companies?status=suspended")
+      assert has_element?(view, "#companies-empty")
+
+      {:ok, view, html} = live(conn, ~p"/companies?sort=name&dir=desc")
+      assert html =~ ~s(aria-sort="descending")
+      assert view |> element("#companies tr:first-child td:first-child") |> render() =~
+               "Bilimbi Subsidiary"
+    end
+
+    test "renders parent, jurisdiction, primary badge, and pagination controls", %{conn: conn} do
+      grant_capabilities!(["admin.company.list"])
+      CompanyFixtures.assign_primary_company!(41, 73)
+
+      {:ok, view, html} = conn |> log_in_as() |> live(~p"/companies")
+
+      assert has_element?(view, "#companies-search")
+      assert has_element?(view, "#companies-status-filter")
+      assert has_element?(view, "#companies-pagination")
+      assert html =~ "Parent"
+      assert html =~ "Jurisdiction"
+      assert view |> element("#companies") |> render() =~ "Primary"
+      assert view |> element("#companies") |> render() =~ "Bilimbi Industries"
+    end
+
+    test "junk query parameters normalize to defaults", %{conn: conn} do
+      grant_capabilities!(["admin.company.list"])
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_as()
+        |> live(~p"/companies?sort=bogus&dir=sideways&page=-3&per_page=7&status=nope")
+
+      assert has_element?(view, "#companies td", "Bilimbi Industries")
+      assert has_element?(view, "#companies td", "Bilimbi Subsidiary")
+    end
   end
 
   describe "Show" do
+    test "header shows the name once, with legal name or code as subtitle", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+      conn = log_in_as(conn)
+
+      # No distinct legal name: subtitle falls back to the code (#622).
+      {:ok, _view, html} = live(conn, ~p"/companies/73")
+      assert html =~ "Bilimbi Industries"
+      assert html =~ "bilimbi_industries"
+
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, _} =
+        Company.update_company(scope, 73, %{legal_name: "Bilimbi Industries Sdn. Bhd."})
+
+      {:ok, _view, html} = live(conn, ~p"/companies/73")
+      assert html =~ "Bilimbi Industries Sdn. Bhd."
+    end
+
+    test "relationships embed shows the effective period", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+      CompanyFixtures.insert_relationship_type!(11)
+      CompanyFixtures.insert_relationship!(21, 73, 74)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      assert has_element?(view, "#company-relationships-card th", "Effective")
+      assert has_element?(view, "#company-relationships-table td", "Always → Present")
+    end
+
     test "redirects away when the actor lacks admin.company.view", %{conn: conn} do
       assert {:error, {:redirect, %{to: "/dashboard"}}} =
                conn |> log_in_as() |> live(~p"/companies/73")

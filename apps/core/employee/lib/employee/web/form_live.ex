@@ -510,7 +510,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <.page variant={:list}>
+      <.page variant={:form}>
         <.header>
           <div class="flex items-center gap-2">
             <span>{@page_title}</span> <.icon name="hero-star" class="h-5 w-5 text-ink-muted/50" />
