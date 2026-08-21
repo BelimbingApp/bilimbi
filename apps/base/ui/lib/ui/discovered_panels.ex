@@ -36,46 +36,62 @@ defmodule Bilimbi.Base.UI.DiscoveredPanels do
              %{}
            end)
 
-  @doc "Resolves an embed key to its manifest entry."
-  @spec resolve(String.t()) :: {:ok, map()} | :error
-  # Compile-time branch: a standalone Base UI build has no manifest and no
-  # panels, and the type checker rightly flags a Map.fetch on the empty
-  # literal as constantly :error. The workspace build takes the real clause.
+  # Compile-time branch: a build whose manifest declares no embeds — every
+  # standalone Base UI build, and the workspace until the first provider lands
+  # — has a constantly-empty panel table, and the type checker rightly rejects
+  # code pretending otherwise. Each world compiles only its own truth.
   if @panels == %{} do
+    @doc "Resolves an embed key to its manifest entry."
+    @spec resolve(String.t()) :: {:ok, map()} | :error
     def resolve(key) when is_binary(key), do: :error
+
+    attr :key, :string, required: true
+    attr :id, :string, required: true
+    attr :current_scope, :map, required: true
+    attr :opts, :map, default: %{}, doc: "assigns passed through to the panel component"
+
+    def discovered_panel(assigns) do
+      ~H"""
+      <div id={@id} class="rounded-xl border border-line bg-surface-muted p-4 text-sm text-muted">
+        This panel is provided by a module that is not installed ({@key}).
+      </div>
+      """
+    end
   else
+    @doc "Resolves an embed key to its manifest entry."
+    @spec resolve(String.t()) :: {:ok, map()} | :error
     def resolve(key) when is_binary(key), do: Map.fetch(@panels, key)
-  end
 
-  attr :key, :string, required: true
-  attr :id, :string, required: true
-  attr :current_scope, :map, required: true
-  attr :opts, :map, default: %{}, doc: "assigns passed through to the panel component"
+    attr :key, :string, required: true
+    attr :id, :string, required: true
+    attr :current_scope, :map, required: true
+    attr :opts, :map, default: %{}, doc: "assigns passed through to the panel component"
 
-  def discovered_panel(assigns) do
-    case resolve(assigns.key) do
-      {:ok, %{capability: capability} = panel} ->
-        if is_nil(capability) or Bilimbi.Base.UI.allowed?(assigns.current_scope, capability) do
-          assigns = assign(assigns, :panel, panel)
+    def discovered_panel(assigns) do
+      case resolve(assigns.key) do
+        {:ok, %{capability: capability} = panel} ->
+          if is_nil(capability) or Bilimbi.Base.UI.allowed?(assigns.current_scope, capability) do
+            assigns = assign(assigns, :panel, panel)
 
+            ~H"""
+            <.live_component
+              module={@panel.live_component}
+              id={@id}
+              current_scope={@current_scope}
+              {@opts}
+            />
+            """
+          else
+            ~H""
+          end
+
+        :error ->
           ~H"""
-          <.live_component
-            module={@panel.live_component}
-            id={@id}
-            current_scope={@current_scope}
-            {@opts}
-          />
+          <div id={@id} class="rounded-xl border border-line bg-surface-muted p-4 text-sm text-muted">
+            This panel is provided by a module that is not installed ({@key}).
+          </div>
           """
-        else
-          ~H""
-        end
-
-      :error ->
-        ~H"""
-        <div id={@id} class="rounded-xl border border-line bg-surface-muted p-4 text-sm text-muted">
-          This panel is provided by a module that is not installed ({@key}).
-        </div>
-        """
+      end
     end
   end
 end
