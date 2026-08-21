@@ -113,8 +113,13 @@ done
 #    by minutes, so compare the branch ref too.
 if [ "$remote_head" = "$REVIEWED" ]; then
   say_ok "PR head is the reviewed SHA"
+elif [ -n "$REVIEWED" ] && [ "${remote_head#"$REVIEWED"}" != "$remote_head" ]; then
+  # A prefix of the head, i.e. an abbreviated SHA. The comparison is deliberately
+  # exact — what merges must be exactly what was verified — so say what to pass
+  # rather than advising a re-review that would change nothing.
+  say_bad "you passed an abbreviated SHA ($REVIEWED); pass the full 40-character head $remote_head"
 else
-  say_bad "PR head is ${remote_head:0:8} but you reviewed ${REVIEWED:0:8} — re-review the new head"
+  say_bad "PR head is $remote_head but you reviewed $REVIEWED — re-review the new head"
 fi
 # Only meaningful while the PR is open: the branch is normally deleted on merge,
 # and that 404 means "merged", not "diverged".
@@ -133,7 +138,11 @@ fi
 #    claim starts as exactly this shape; #450 was taken out of draft and labelled
 #    task:review, and every other check passed it (#453). Zero changed files is
 #    the unambiguous case -- a mode-only or rename change still reports files.
-files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq 'length' 2>/dev/null | paste -sd+ - | bc 2>/dev/null)
+# awk rather than `paste | bc`: bc is not installed everywhere, and its absence
+# was silent -- an empty $files fell through to the zero branch and accused a
+# healthy PR of being an empty claim (#598). END{print s+0} also yields 0 rather
+# than nothing on no input, so the check below stands on its own.
+files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq 'length' 2>/dev/null | awk '{s+=$1} END{print s+0}')
 if [ "${files:-0}" -eq 0 ] 2>/dev/null; then
   say_bad "no changed files — an empty PR is a claim, not a deliverable"
 else
