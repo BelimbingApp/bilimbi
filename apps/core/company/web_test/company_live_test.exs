@@ -100,6 +100,76 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#nav-toggle-admin[aria-expanded='true']")
       assert has_element?(view, "#nav-children-admin:not([hidden])")
     end
+
+    test "applies URL search, status, sort, and page size to the companies list", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+      CompanyFixtures.assign_primary_company!(41, 73)
+
+      CompanyFixtures.insert_company!(%{
+        id: 76,
+        parent_id: 73,
+        name: "Gamma Trading",
+        code: "gamma_trading",
+        status: "suspended",
+        legal_name: "Gamma Holdings",
+        email: "ops@gamma.test",
+        jurisdiction: "SG"
+      })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_as()
+        |> live(
+          ~p"/companies?search=holdings&status=suspended&sort=jurisdiction&dir=desc&per_page=50"
+        )
+
+      assert has_element?(view, "#companies td", "Gamma Holdings")
+      assert has_element?(view, "#companies td", "Gamma Trading")
+      assert has_element?(view, "#companies td", "Bilimbi Industries")
+      assert has_element?(view, "#companies td", "Singapore (SG)")
+      assert has_element?(view, "#companies-pagination-summary", "Showing 1 to 1 of 1 results")
+      assert has_element?(view, "th[aria-sort='descending'] #companies-sort-jurisdiction")
+      refute has_element?(view, "#companies td", "Bilimbi Subsidiary")
+
+      view
+      |> form("#companies-filters", filters: %{"search" => "bilimbi", "status" => "active"})
+      |> render_change()
+
+      assert_patch(view, "/companies?dir=desc&search=bilimbi&sort=jurisdiction&status=active")
+    end
+
+    test "deletes only non-primary companies when authorized", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.delete"])
+      CompanyFixtures.assign_primary_company!(41, 73)
+
+      CompanyFixtures.insert_company!(%{
+        id: 76,
+        name: "Delete Me Ltd",
+        code: "delete_me",
+        status: "pending"
+      })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies")
+
+      refute has_element?(view, "#company-73-delete")
+      assert has_element?(view, "#company-76-delete")
+
+      view |> element("#company-76-delete") |> render_click()
+
+      assert has_element?(view, "#flash-info", "Company deleted.")
+      refute has_element?(view, "#companies td", "Delete Me Ltd")
+
+      render_click(view, "delete", %{"id" => "73"})
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "Transfer the primary company before deleting it."
+             )
+
+      {:ok, scope} = Tenancy.scope(41)
+      assert {:ok, _company} = Company.get_company(scope, 73)
+    end
   end
 
   describe "Show" do

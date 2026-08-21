@@ -21,8 +21,10 @@ defmodule Bilimbi.Core.Company do
   alias Bilimbi.Core.Company.DepartmentType
   alias Bilimbi.Core.Company.ExternalAccess
   alias Bilimbi.Core.Company.ExternalAccessSummary
+  alias Bilimbi.Core.Company.IndexEntry
   alias Bilimbi.Core.Company.LegalEntityType
   alias Bilimbi.Core.Company.LiveCompanyProof
+  alias Bilimbi.Core.Company.Page
   alias Bilimbi.Core.Company.PrimaryCompanyInvariantError
   alias Bilimbi.Core.Company.PrimaryCompanyManager
   alias Bilimbi.Core.Company.PrimaryCompanyNotProvisionedError
@@ -34,6 +36,8 @@ defmodule Bilimbi.Core.Company do
   @type lookup_error :: :not_provisioned | :invariant_violation | :database_unavailable
   @type access_lookup_error :: :not_found | :company_not_found | :relationship_not_found
   @list_limit 200
+  @company_page_sizes [25, 50, 100, 300]
+  @company_sort_fields [:name, :status, :jurisdiction]
   @manage_across_tenant_capability "admin.company.tenant-wide.manage"
 
   @spec get_company(Scope.t(), pos_integer()) :: {:ok, Summary.t()} | {:error, :not_found}
@@ -114,6 +118,54 @@ defmodule Bilimbi.Core.Company do
       |> Enum.map(&Summary.from_schema/1)
 
     {:ok, companies}
+  end
+
+  @doc """
+  Lists live tenant companies for the administration index.
+
+  Supported options are `:search`, `:status`, `:sort_by`, `:sort_dir`, `:page`,
+  and `:page_size`. Results include the parent display name and primary-company
+  marker while keeping schema details inside Company.
+  """
+  @spec list_companies_page(Scope.t(), keyword()) :: Page.t()
+  def list_companies_page(%Scope{} = scope, opts \\ []) when is_list(opts) do
+    search = normalize_search(Keyword.get(opts, :search))
+    status = normalize_company_status(Keyword.get(opts, :status))
+    sort_by = normalize_company_sort_by(Keyword.get(opts, :sort_by))
+    sort_dir = normalize_sort_dir(Keyword.get(opts, :sort_dir))
+    page = positive_integer(Keyword.get(opts, :page)) || 1
+    page_size = normalize_company_page_size(Keyword.get(opts, :page_size))
+
+    query =
+      from(company in Tenancy.scope_query(Schema, scope),
+        where: is_nil(company.deleted_at)
+      )
+      |> filter_companies_by_search(search)
+      |> filter_companies_by_status(status)
+
+    total_entries = Repo.one(from(company in query, select: count(company.id)))
+    total_pages = total_pages(total_entries, page_size)
+
+    entries =
+      query
+      |> order_companies(sort_by, sort_dir)
+      |> offset(^((page - 1) * page_size))
+      |> limit(^page_size)
+      |> with_company_index_context()
+      |> Repo.all()
+      |> Enum.map(fn %{company: company, parent_name: parent_name, is_primary: is_primary?} ->
+        company
+        |> Summary.from_schema()
+        |> IndexEntry.from_summary(parent_name, is_primary?)
+      end)
+
+    %Page{
+      entries: entries,
+      page: page,
+      page_size: page_size,
+      total_entries: total_entries,
+      total_pages: total_pages
+    }
   end
 
   @doc """
@@ -330,6 +382,48 @@ defmodule Bilimbi.Core.Company do
   end
 
   def update_company(%Scope{}, _company_id, _attributes), do: {:error, :not_found}
+
+  @doc """
+  Soft-deletes a live Company row scoped to the caller's tenant.
+
+  The tenant primary company cannot be deleted through this API; callers must
+  explicitly transfer the primary assignment first.
+  """
+  @spec delete_company(Scope.t(), pos_integer()) ::
+          :ok | {:error, :not_found | :primary_company | Ecto.Changeset.t()}
+  def delete_company(%Scope{} = scope, company_id)
+      when is_integer(company_id) and company_id > 0 do
+    case Repo.transaction(fn ->
+           query =
+             from(company in Tenancy.scope_query(Schema, scope),
+               where: company.id == ^company_id and is_nil(company.deleted_at),
+               lock: "FOR UPDATE"
+             )
+
+           case Repo.one(query) do
+             nil ->
+               Repo.rollback(:not_found)
+
+             %Schema{} = company ->
+               if primary_company?(scope, company.id) do
+                 Repo.rollback(:primary_company)
+               else
+                 company
+                 |> Ecto.Changeset.change(deleted_at: now())
+                 |> Repo.update()
+                 |> case do
+                   {:ok, _company} -> :ok
+                   {:error, changeset} -> Repo.rollback(changeset)
+                 end
+               end
+           end
+         end) do
+      {:ok, :ok} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def delete_company(%Scope{}, _company_id), do: {:error, :not_found}
 
   @doc """
   Lists live direct child companies (subsidiaries) for a given parent company in the caller's tenant.
@@ -1189,6 +1283,137 @@ defmodule Bilimbi.Core.Company do
       {:ok, access} -> {:ok, ExternalAccessSummary.from_schema(access)}
       {:error, changeset} -> {:error, changeset}
     end
+  end
+
+  defp filter_companies_by_search(query, nil), do: query
+
+  defp filter_companies_by_search(query, search) do
+    pattern = "%#{escape_like(search)}%"
+
+    from(company in query,
+      where:
+        ilike(company.name, ^pattern) or ilike(company.code, ^pattern) or
+          ilike(coalesce(company.legal_name, ""), ^pattern) or
+          ilike(coalesce(company.email, ""), ^pattern) or
+          ilike(coalesce(company.jurisdiction, ""), ^pattern)
+    )
+  end
+
+  defp filter_companies_by_status(query, nil), do: query
+
+  defp filter_companies_by_status(query, status) do
+    from(company in query, where: company.status == ^status)
+  end
+
+  defp order_companies(query, sort_by, sort_dir) do
+    case sort_by do
+      :status ->
+        from(company in query,
+          order_by: [{^sort_dir, company.status}, {:asc, company.name}, {:asc, company.id}]
+        )
+
+      :jurisdiction ->
+        from(company in query,
+          order_by: [
+            {^sort_dir, company.jurisdiction},
+            {:asc, company.name},
+            {:asc, company.id}
+          ]
+        )
+
+      :name ->
+        from(company in query,
+          order_by: [{^sort_dir, company.name}, {:asc, company.id}]
+        )
+    end
+  end
+
+  defp with_company_index_context(query) do
+    from(company in query,
+      left_join: parent in Schema,
+      on: parent.id == company.parent_id and is_nil(parent.deleted_at),
+      left_join: primary in "tenant_primary_companies",
+      on: primary.tenant_id == company.tenant_id and primary.company_id == company.id,
+      select: %{
+        company: company,
+        parent_name: parent.name,
+        is_primary: not is_nil(primary.company_id)
+      }
+    )
+  end
+
+  defp normalize_search(nil), do: nil
+
+  defp normalize_search(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp normalize_search(_value), do: nil
+
+  defp normalize_company_status(value) when is_binary(value) do
+    value = String.downcase(String.trim(value))
+
+    if value in Schema.statuses(), do: value
+  end
+
+  defp normalize_company_status(_value), do: nil
+
+  defp normalize_company_sort_by(value) when is_atom(value) and value in @company_sort_fields,
+    do: value
+
+  defp normalize_company_sort_by(value) when is_binary(value) do
+    value
+    |> String.downcase()
+    |> String.trim()
+    |> case do
+      "status" -> :status
+      "jurisdiction" -> :jurisdiction
+      _ -> :name
+    end
+  end
+
+  defp normalize_company_sort_by(_value), do: :name
+
+  defp normalize_sort_dir(:desc), do: :desc
+
+  defp normalize_sort_dir(value) when is_binary(value) do
+    case String.downcase(String.trim(value)) do
+      "desc" -> :desc
+      _ -> :asc
+    end
+  end
+
+  defp normalize_sort_dir(_value), do: :asc
+
+  defp positive_integer(value) when is_integer(value) and value > 0, do: value
+
+  defp positive_integer(value) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {int, ""} when int > 0 -> int
+      _ -> nil
+    end
+  end
+
+  defp positive_integer(_value), do: nil
+
+  defp normalize_company_page_size(value) do
+    case positive_integer(value) do
+      size when size in @company_page_sizes -> size
+      _ -> 25
+    end
+  end
+
+  defp total_pages(0, _page_size), do: 0
+  defp total_pages(total_entries, page_size), do: div(total_entries + page_size - 1, page_size)
+
+  defp escape_like(search) do
+    search
+    |> String.replace("\\", "\\\\")
+    |> String.replace("%", "\\%")
+    |> String.replace("_", "\\_")
   end
 
   defp now do

@@ -5,6 +5,8 @@ defmodule Bilimbi.Core.CompanyTest do
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.AuthzCompanyDirectory
+  alias Bilimbi.Core.Company.IndexEntry
+  alias Bilimbi.Core.Company.Page
   alias Bilimbi.Core.Company.PrimaryCompanyManager
   alias Bilimbi.Core.Company.SchemaContract
   alias Bilimbi.Core.Company.Summary
@@ -133,6 +135,105 @@ defmodule Bilimbi.Core.CompanyTest do
 
     assert {:error, {:company_tenant_mismatch, 41}} =
              Company.assign_primary_company(other_scope, 73)
+  end
+
+  describe "list_companies_page/2" do
+    setup do
+      insert_tenant!()
+      insert_tenant!(%{id: 42, name: "Customer", is_platform_operator: false})
+
+      insert_company!(%{
+        id: 73,
+        name: "Bilimbi Industries",
+        code: "bilimbi_industries",
+        jurisdiction: "MY"
+      })
+
+      insert_company!(%{
+        id: 74,
+        parent_id: 73,
+        name: "Gamma Trading",
+        code: "gamma_trading",
+        status: "suspended",
+        legal_name: "Gamma Holdings",
+        email: "ops@gamma.test",
+        jurisdiction: "SG"
+      })
+
+      insert_company!(%{
+        id: 75,
+        tenant_id: 42,
+        name: "Gamma Elsewhere",
+        code: "gamma_elsewhere",
+        status: "suspended",
+        legal_name: "Gamma Holdings"
+      })
+
+      assign_primary_company!(41, 73)
+      {:ok, owner} = Tenancy.scope(41)
+
+      %{owner: owner}
+    end
+
+    test "searches, filters, and decorates index rows within the tenant", %{owner: owner} do
+      assert %Page{
+               entries: [
+                 %IndexEntry{
+                   id: 74,
+                   name: "Gamma Trading",
+                   parent_name: "Bilimbi Industries",
+                   is_primary: false
+                 }
+               ],
+               page: 1,
+               page_size: 25,
+               total_entries: 1,
+               total_pages: 1
+             } =
+               Company.list_companies_page(owner,
+                 search: "holdings",
+                 status: "suspended",
+                 sort_by: :jurisdiction,
+                 sort_dir: :desc
+               )
+    end
+
+    test "paginates with the operational list page sizes", %{owner: owner} do
+      for number <- 1..26 do
+        insert_company!(%{
+          id: 100 + number,
+          name: "Page Company #{String.pad_leading(to_string(number), 2, "0")}",
+          code: "page_company_#{number}"
+        })
+      end
+
+      page = Company.list_companies_page(owner, page: 2, page_size: 25, sort_by: :name)
+
+      assert %Page{page: 2, page_size: 25, total_entries: 28, total_pages: 2} = page
+      assert Enum.map(page.entries, & &1.id) == [124, 125, 126]
+    end
+  end
+
+  describe "delete_company/2" do
+    setup do
+      insert_tenant!()
+      insert_company!(%{id: 73})
+      insert_company!(%{id: 74, code: "branch", name: "Branch"})
+      assign_primary_company!(41, 73)
+      {:ok, owner} = Tenancy.scope(41)
+
+      %{owner: owner}
+    end
+
+    test "soft-deletes a non-primary live company", %{owner: owner} do
+      assert :ok = Company.delete_company(owner, 74)
+      assert {:error, :not_found} = Company.get_company(owner, 74)
+    end
+
+    test "refuses to delete the tenant primary company", %{owner: owner} do
+      assert {:error, :primary_company} = Company.delete_company(owner, 73)
+      assert {:ok, %Summary{id: 73}} = Company.get_company(owner, 73)
+    end
   end
 
   describe "get_company/2" do
