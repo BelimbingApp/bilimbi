@@ -47,15 +47,17 @@ the tree three commits ahead the first time it ran.
 ## How we work
 
 **Take any unclaimed task. Do not ask permission — not from the user, not from
-each other.** Claim it by opening a **draft PR before you write code**:
+each other.** Claim it by opening a **draft PR before you write code**. The
+claim script checks the live issue and open-PR registry before it writes
+anything, then creates the branch, empty claim commit, draft PR, and labels:
 
 ```bash
-git commit --allow-empty -m "claim: <what>"
-gh pr create --draft --title "<module>: <what> (#<issue>)"
-gh pr edit <n> --add-label "agent:<your-id>"
+CLAIM_AGENT=<your-stable-agent-id> .github/scripts/claim.sh <issue-number>
 ```
 
-Then add `task:active` to the issue and start.
+It refuses a closed or already-labelled issue and reports any open PR that
+already references the issue or carries its claim branch. `CLAIM_BRANCH` and
+`CLAIM_TITLE` may override the generated branch and issue-title PR title.
 
 Claim in the draft PR rather than an issue comment because that is the surface
 everyone already queries — `gh pr list` is how each of us finds work, so the
