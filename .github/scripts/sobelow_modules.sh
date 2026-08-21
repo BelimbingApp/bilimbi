@@ -10,6 +10,10 @@
 # pipeline can mask a failure. Run from the repository root.
 
 set -u
+# Without nullglob an unmatched glob iterates once as the literal pattern, so
+# the missing-descriptor guard below could never fire (found by codex on
+# review); with it, no matches means zero iterations and the guard is real.
+shopt -s nullglob
 
 fail=0
 found=0
