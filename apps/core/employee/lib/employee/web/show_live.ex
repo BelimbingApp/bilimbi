@@ -21,6 +21,11 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
 
+  # `toggle_add_subordinate` only flips the add-subordinate form's
+  # visibility assign; the persisting event is `add_subordinate`, which is
+  # capability-guarded (#420).
+  @write_guard_opt_out ~w(toggle_add_subordinate)
+
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     scope = socket.assigns.current_scope.scope

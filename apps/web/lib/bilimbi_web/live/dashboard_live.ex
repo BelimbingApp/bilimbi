@@ -30,7 +30,12 @@ defmodule BilimbiWeb.DashboardLive do
 
   # These customize the signed-in actor's own dashboard preference. They are
   # self-service settings writes, not privileged administration writes (#376).
-  @write_guard_opt_out ~w(add-section remove-section move-section-up move-section-down)
+  # `toggle-layout-edit` only flips the customize-mode assign; the widget
+  # events persist through `persist_layout/2` to the actor's own user
+  # settings scope (#420).
+  @write_guard_opt_out ~w(add-section remove-section move-section-up move-section-down
+                          add-widget remove-widget move-up move-down reorder-widgets
+                          toggle-layout-edit)
 
   @widget_modules %{
     "base-dashboard-company-stats" => BilimbiWeb.Dashboard.CompanyStatsWidget,

@@ -9,6 +9,11 @@ defmodule Bilimbi.Core.User.Web.PasswordLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  # Self-service: `save` changes the signed-in actor's own password and
+  # requires the current password inside the handler. No admin capability
+  # applies (#420).
+  @write_guard_opt_out ~w(save)
+
   import Ecto.Changeset
   import Bilimbi.Core.User.Web.SettingsComponents
 

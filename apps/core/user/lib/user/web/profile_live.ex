@@ -28,6 +28,10 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  # Self-service: `save` edits the signed-in actor's own profile under
+  # their own scope. No admin capability applies (#420).
+  @write_guard_opt_out ~w(save)
+
   import Ecto.Changeset
   import Bilimbi.Core.User.Web.SettingsComponents
 

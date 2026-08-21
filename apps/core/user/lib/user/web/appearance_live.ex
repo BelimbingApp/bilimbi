@@ -10,6 +10,11 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  # Self-service: `save` writes the signed-in actor's own theme and locale
+  # preference under their own settings scope. No admin capability applies
+  # (#420).
+  @write_guard_opt_out ~w(save)
+
   import Bilimbi.Core.User.Web.SettingsComponents
 
   alias Bilimbi.Base.Locale
