@@ -138,7 +138,11 @@ fi
 #    claim starts as exactly this shape; #450 was taken out of draft and labelled
 #    task:review, and every other check passed it (#453). Zero changed files is
 #    the unambiguous case -- a mode-only or rename change still reports files.
-files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq 'length' 2>/dev/null | paste -sd+ - | bc 2>/dev/null)
+# awk rather than `paste | bc`: bc is not installed everywhere, and its absence
+# was silent -- an empty $files fell through to the zero branch and accused a
+# healthy PR of being an empty claim (#598). END{print s+0} also yields 0 rather
+# than nothing on no input, so the check below stands on its own.
+files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq 'length' 2>/dev/null | awk '{s+=$1} END{print s+0}')
 if [ "${files:-0}" -eq 0 ] 2>/dev/null; then
   say_bad "no changed files — an empty PR is a claim, not a deliverable"
 else
