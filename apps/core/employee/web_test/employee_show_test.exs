@@ -119,9 +119,9 @@ defmodule BilimbiWeb.EmployeeShowTest do
     assert linked == employee.id
   end
 
-  # "An agent holds no user account" moved across the seam with the panel:
-  # Core User's update policy refuses new links to agents, and the panel
-  # unlinks when the employee it renders becomes one (#581).
+  # The manifest-dispatched Core User coordinator commits the unlink and the
+  # employee type transition together; there is no post-update panel notice to
+  # mistake for a successful reconciliation (#581).
   test "switching the employee type to agent unlinks the account", %{
     conn: conn,
     employee: employee
@@ -141,7 +141,7 @@ defmodule BilimbiWeb.EmployeeShowTest do
     |> element("#employee-type-form")
     |> render_change(%{"employee_type" => "agent"})
 
-    assert has_element?(view, "#account-panel-notice", "an agent holds no user account")
+    assert {:ok, %{employee_type: "agent"}} = Employee.get_employee(scope, 73, employee.id)
     assert {:ok, %{employee_id: nil}} = User.get_user(scope, 73, 91)
   end
 
