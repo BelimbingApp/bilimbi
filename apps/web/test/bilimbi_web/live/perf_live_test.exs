@@ -5,6 +5,7 @@ defmodule BilimbiWeb.PerfLiveTest do
 
   alias Bilimbi.Base.Perf
   alias Bilimbi.Base.Perf.Reporter
+  alias Bilimbi.Base.Settings
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias BilimbiWeb.PerfTelemetry
@@ -71,9 +72,37 @@ defmodule BilimbiWeb.PerfLiveTest do
     assert has_element?(view, "#stat-performance[href='/system/performance']", "Available")
   end
 
+  test "dashboard widget reports recorder degradation", %{conn: conn} do
+    previous_max_pending = Application.get_env(:bilimbi_base_perf, :max_pending)
+    Application.put_env(:bilimbi_base_perf, :max_pending, 1)
+    :sys.suspend(Reporter)
+
+    try do
+      assert :ok = Reporter.submit(%{})
+      assert {:error, :saturated} = Reporter.submit(%{})
+
+      grant_capabilities!("admin.system.perf.view")
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(view, "#stat-performance[href='/system/performance']", "Degraded")
+    after
+      :sys.resume(Reporter)
+      :sys.get_state(Reporter)
+
+      if is_nil(previous_max_pending) do
+        Application.delete_env(:bilimbi_base_perf, :max_pending)
+      else
+        Application.put_env(:bilimbi_base_perf, :max_pending, previous_max_pending)
+      end
+
+      restart_reporter!()
+    end
+  end
+
   test "real LiveView telemetry records successive interactions without leaking state", %{
     conn: conn
   } do
+    assert {:ok, 0} = Settings.put("perf.minimum_duration_ms", 0)
     :ok = PerfTelemetry.attach_handlers()
     on_exit(&PerfTelemetry.detach_handlers/0)
     grant_capabilities!("admin.system.perf.view")
@@ -87,13 +116,17 @@ defmodule BilimbiWeb.PerfLiveTest do
 
     :sys.get_state(Reporter)
 
-    assert {:ok, %{total: total}} =
+    assert {:ok, %{entries: entries, total: total}} =
              Perf.list_samples(
                identity: "liveview:Elixir.Bilimbi.Base.Perf.Web.IndexLive",
                page_size: 25
              )
 
     assert total >= 2
+
+    assert Enum.any?(entries, fn sample ->
+             sample.db_count > 0 and sample.db_duration_ms > 0
+           end)
 
     before_restart = total
 
@@ -138,5 +171,11 @@ defmodule BilimbiWeb.PerfLiveTest do
     )
 
     :sys.get_state(Reporter)
+  end
+
+  defp restart_reporter! do
+    :ok = Supervisor.terminate_child(Bilimbi.Base.Perf.Supervisor, Reporter)
+    {:ok, _pid} = Supervisor.restart_child(Bilimbi.Base.Perf.Supervisor, Reporter)
+    :ok
   end
 end

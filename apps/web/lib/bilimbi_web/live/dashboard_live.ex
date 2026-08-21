@@ -589,8 +589,10 @@ defmodule BilimbiWeb.DashboardLive do
     """
   end
 
-  defp performance_health(%{recorder: :available, store: :available}), do: "Available"
   defp performance_health(%{store: :unavailable}), do: "History unavailable"
+  defp performance_health(%{recorder: :unavailable}), do: "Recorder unavailable"
+  defp performance_health(%{recorder: :degraded, store: :available}), do: "Degraded"
+  defp performance_health(%{recorder: :available, store: :available}), do: "Available"
   defp performance_health(_diagnostics), do: "Unknown"
 
   defp performance_samples(%{samples: samples}) when is_integer(samples), do: samples

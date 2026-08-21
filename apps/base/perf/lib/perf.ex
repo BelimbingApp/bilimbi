@@ -89,9 +89,11 @@ defmodule Bilimbi.Base.Perf do
   end
 
   def handle_event([:bilimbi, :base, :repo, :query], measurements, _metadata, _generation) do
-    duration = native_milliseconds(Map.get(measurements, :total_time, 0))
+    duration = query_milliseconds(Map.get(measurements, :total_time, 0))
     accumulate_query(@request_key, duration)
     accumulate_query(@job_key, duration)
+    accumulate_query({@live_view_key, :handle_event}, duration)
+    accumulate_query({@live_view_key, :handle_params}, duration)
   end
 
   def handle_event(_event, _measurements, _metadata, _config), do: :ok
@@ -308,6 +310,13 @@ defmodule Bilimbi.Base.Perf do
         :ok
     end
   end
+
+  defp query_milliseconds(duration) when is_integer(duration) and duration > 0 do
+    native_per_millisecond = System.convert_time_unit(1, :millisecond, :native)
+    div(duration + native_per_millisecond - 1, native_per_millisecond)
+  end
+
+  defp query_milliseconds(_duration), do: 0
 
   defp clear_observation(key) do
     Process.delete(key)
