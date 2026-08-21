@@ -618,4 +618,31 @@ defmodule BilimbiWeb.UserShowTest do
     assert {path, _flash} = assert_redirect(view)
     assert path == to
   end
+
+  test "a write forged after grant revocation changes nothing", %{conn: conn} do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+    grant_capabilities!(["admin.user.view", "admin.user.update"])
+
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    {:ok, emp} =
+      Bilimbi.Core.Employee.create_employee(scope, 73, %{
+        full_name: "Revocation Probe",
+        employee_number: "EMP-609"
+      })
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/91")
+
+    grant =
+      Bilimbi.Base.Authz.list_principal_capabilities(scope, page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.user.update"))
+
+    assert {:ok, :removed} = Bilimbi.Base.Authz.remove_principal_capability(scope, grant.id)
+
+    render_submit(view, "link_employee", %{"employee_id" => "#{emp.id}"})
+
+    assert has_element?(view, "#flash-group", "You do not have permission to edit users.")
+    assert {:ok, %{employee_id: nil}} = Bilimbi.Core.User.get_user(scope, 73, 91)
+  end
 end
