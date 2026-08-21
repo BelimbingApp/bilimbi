@@ -15,8 +15,13 @@ defmodule Bilimbi.Base.UI.RouteContract do
                    "bilimbi_routes.exs"
                  ])
   @external_resource @manifest_path
+  # The manifest also carries embed entries (no :path); those belong to
+  # Bilimbi.Base.UI.DiscoveredPanels, not to route verification.
   @routes (if File.regular?(@manifest_path) do
-             elem(Code.eval_file(@manifest_path), 0)
+             @manifest_path
+             |> Code.eval_file()
+             |> elem(0)
+             |> Enum.filter(&Map.has_key?(&1, :path))
            else
              []
            end)
