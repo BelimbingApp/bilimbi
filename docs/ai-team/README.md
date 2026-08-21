@@ -91,6 +91,24 @@ split with them directly.
 open a PR — green CI plus a review by someone who is not you, then merge. Then
 take the next thing.
 
+**Merging is a duty, not an assumption.** Eight green, fully-reviewed PRs once
+sat unmerged for hours because everyone assumed "anyone may merge" meant
+someone would. If you see a PR that is green, reviewed, and unheld — gate it
+through *now*, whoever you are (except its author). The steward's heartbeat
+runs a drain pass over the whole queue each tick as the backstop, not the
+default path.
+
+**Decisions only the owner can make go to the pinned queue** ([#648](https://github.com/BelimbingApp/bilimbi/issues/648)) with the
+options pre-analyzed and a recommendation, and the source issue gets
+`task:kiatng`. Then move on — do not block, do not re-ask on the issue. One
+security decision once waited a full day because it had no surface of its own.
+
+**Decompose before you collide.** A screen file above ~500 lines serving more
+than one owner-domain is a coordination bomb: one such file needed three
+merge-in cycles on a single PR and serialized an entire lane. Split it into
+discovered panels (ADR 0006) *before* continuing feature work on it — panels
+gave two agents independent lanes on the same screen the day they landed.
+
 **Prefer a git worktree.** Agents share one checkout, and concurrent edits have
 caused non-fast-forward pushes and a mid-edit branch merge.
 
@@ -172,14 +190,43 @@ Anyone may merge a green, reviewed PR they did not author unless a hold is on it
 
 ## You have no GitHub identity
 
-Two human accounts are shared by every agent, so **neither assignee nor
+Shared human accounts post for every agent, so **neither assignee nor
 authorship identifies you.**
 
+- Your id must be **registered in [`roster.md`](./roster.md)** and unique —
+  two concurrent sessions sharing one id caused a false-impersonation
+  investigation and made the pair mutually unreviewable to the gate (a marker
+  matching the PR's lane is refused as self-review). Starting a session under
+  an id the roster shows active elsewhere: pick a suffixed id and register it.
 - Mark ownership with the `agent:<id>` label — **on the pull request as well as
   the issue.** Across the first run all 120 PRs carried none, and anything
   reasoning about PR ownership was blind.
 - Name yourself in every claim, handoff and review: `**From:** <your-agent-id>`.
 - Never infer who did something from GitHub metadata.
+
+**The recording token.** A reviewer PAT (account `faith-tohmm`) lets reviews
+*record* on PRs authored under the shared default account. Policy, exactly the
+`GH_DISCUSSION_TOKEN` shape: scope it per command, never reconfigure `gh`
+globally, never print or commit it, and use it **only** to record a review
+(`gh pr review`) on a PR **your agent did not author** — never to author,
+push, or merge. The review body still carries your `**From:**` line; the token
+supplies the account independence, your marker supplies the agent identity.
+
+```bash
+GH_TOKEN=$(cat ~/.secrets/faith_pat) gh pr review <n> --approve --body "..."
+```
+
+The token buys independence only against the *default-account* author.
+External agents author as `faith-tohmm` too (#635 was), and there the PAT
+records a self-review the gate rejects — record from the default account
+instead. Rule of thumb: **review from whichever account did not author the
+PR**; the gate's verdict line names both sides, so a mistake is visible, not
+silent.
+
+Session/socket names are transport, not identity: they rotate (three
+misdirected redirects in one night). Address agents by roster id in the
+message body and let the recipient disclaim; only `**From:**` lines and
+`agent:*` labels identify anyone.
 
 Sub-agents inherit their parent's label and a brief from the parent rather than
 re-reading the corpus.
@@ -196,11 +243,14 @@ re-reading the corpus.
 | Owner and state | `agent:<id>` and `task:*` labels |
 | Merge holds | `hold:author`, `hold:review` |
 | Gates and sweeps you can run | `.github/scripts/` |
+| Who is who — registered agent ids and lanes | [`roster.md`](./roster.md) |
+| Owner decisions pending | pinned issue [#648](https://github.com/BelimbingApp/bilimbi/issues/648), label `task:kiatng` |
+| UI/UX program — quality bar, review lanes | issue #614 |
 | RFCs and open questions | [Discussions](https://github.com/BelimbingApp/bilimbi/discussions) |
 | Durable architecture decisions | `docs/architecture/decisions/` |
 | Stage order and exit gates | [`PORTING_STAGES.md`](./PORTING_STAGES.md) |
 
-`docs/ai-team/` is these two files and nothing else. Coordination that
+`docs/ai-team/` is these three files and nothing else. Coordination that
 reappears here as new files is drift.
 
 ---
@@ -275,6 +325,22 @@ temporary table declared `email varchar UNIQUE` gets PostgreSQL's
 `users_email_key`, while the migration creates `users_email_unique`. The
 changeset error became a raised `ConstraintError`. Name constraints in fixtures
 exactly as the migration does.
+
+**Never pipe a command whose exit code you are about to read.** `mix compile
+--warnings-as-errors | tail` reports `tail`'s zero, and a broken commit was
+pushed over exactly that. Paid three separate times in one round, once by the
+review gate itself. Capture output to a file or a variable; check `$?` bare.
+
+**A capture is truthful only about its own branch.** Audit-environment
+screenshots composite whatever fixes that worktree carries — one showed an
+unmerged PR's button as if it were live, and another showed a long-fixed bug
+that simply wasn't on that branch. Verify the PR *diff* contains what it
+claims; read pixels as evidence about the branch that rendered them.
+
+**Under fail-fast, "CI shows one failure" never means "one failure exists."**
+Container test commands halt at the first non-zero child, so a red suite early
+in the chain hides every later red. "No such failure reported" and "passing"
+are different claims.
 
 **A hand-maintained copy of discoverable state is a coordination bottleneck
 wearing a test's clothes.** `workspace_boundary_test.exs` read each
