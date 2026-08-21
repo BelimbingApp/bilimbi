@@ -20,8 +20,8 @@ defmodule Bilimbi.Base.System do
   it could not read a disk is worse than one that says it could not read a disk.
   """
 
-  alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Perf
+  alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Repo
 
   @typedoc "A single labelled fact. `value` is `:unavailable` when it could not be read."
