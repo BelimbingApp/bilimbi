@@ -79,6 +79,9 @@ jobs:
           mix credo --strict "apps/**/*.{ex,exs}"
           --ignore-checks AliasUsage,Apply,CyclomaticComplexity,LineEndings,Nesting
 
+      - name: Enforce greppable AGENTS.md mandates
+        run: .github/scripts/mandates.sh
+
       - name: Audit known dependency vulnerabilities
         run: mix deps.audit
 
