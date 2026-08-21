@@ -13,8 +13,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   use Bilimbi.Base.UI, :live_view
 
-  alias Bilimbi.Base.UI.DiscoveredPanels
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.DiscoveredPanels
 
   @manage_capability "admin.employee.update"
 
