@@ -47,6 +47,7 @@ defmodule BilimbiWeb.UserAuth do
 
   use BilimbiWeb, :verified_routes
 
+  alias Bilimbi.Base.Audit.Context, as: AuditContext
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.Decision
   alias Bilimbi.Base.Locale
@@ -335,6 +336,7 @@ defmodule BilimbiWeb.UserAuth do
     current_scope = current_scope_from(session_user, impersonation)
 
     apply_locale(current_scope)
+    put_audit_context(current_scope, conn)
 
     case current_scope do
       %{scope: %Scope{}} = current_scope ->
@@ -522,6 +524,7 @@ defmodule BilimbiWeb.UserAuth do
     current_scope = current_scope_from(session[@session_key], session[@impersonation_key])
 
     apply_locale(current_scope)
+    put_audit_context(current_scope)
 
     Phoenix.Component.assign(
       socket,
@@ -557,6 +560,31 @@ defmodule BilimbiWeb.UserAuth do
         reraise error, __STACKTRACE__
       end
   end
+
+  # Captured mutations record who acted (ADR 0013). Resolved in the same
+  # per-process lifecycle as the locale; an anonymous request records the
+  # guest default rather than a stale actor from a previous request.
+  defp put_audit_context(current_scope, conn \\ nil)
+
+  defp put_audit_context(nil, _conn), do: AuditContext.put(nil)
+
+  defp put_audit_context(
+         %{user: %{"user_id" => _} = user, scope: %Scope{} = scope, actor: actor},
+         conn
+       ) do
+    AuditContext.put(%AuditContext{
+      actor_type: Atom.to_string(actor.type),
+      actor_id: actor.id,
+      company_id: user["company_id"],
+      tenant_id: Scope.tenant_id(scope),
+      ip_address: conn && conn.remote_ip |> :inet.ntoa() |> to_string(),
+      url: conn && request_url(conn),
+      user_agent: conn && get_req_header(conn, "user-agent") |> List.first(),
+      trace_id: Logger.metadata()[:request_id]
+    })
+  end
+
+  defp put_audit_context(_current_scope, _conn), do: AuditContext.put(nil)
 
   defp put_gettext_locale(language) do
     Enum.each(@gettext_backends, &Gettext.put_locale(&1, language))
