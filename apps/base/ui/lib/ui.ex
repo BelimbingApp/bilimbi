@@ -63,6 +63,7 @@ defmodule Bilimbi.Base.UI do
       import Phoenix.HTML
       import Bilimbi.Base.UI, only: [allowed?: 2]
       import Bilimbi.Base.UI.Components
+      import Bilimbi.Base.UI.DiscoveredPanels, only: [discovered_panel: 1]
 
       alias Bilimbi.Base.UI.Layouts
       alias Phoenix.LiveView.JS
