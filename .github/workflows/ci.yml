@@ -91,6 +91,9 @@ jobs:
       - name: Scan Phoenix security
         run: mix sobelow --root apps/web --private --exit medium
 
+      - name: Scan module-owned web adapters
+        run: .github/scripts/sobelow_modules.sh
+
   types:
     name: Elixir types
     runs-on: ubuntu-24.04
