@@ -6,7 +6,7 @@
 **Scope:** Web adapter placement, route discovery, module dependency on
 `phoenix_live_view`, host responsibilities, and AGENTS.md §4/§6 amendment
 plan
-**Last Updated:** 2026-08-13
+**Last Updated:** 2026-08-21
 
 ## Context
 
@@ -526,6 +526,27 @@ compile-time macro expansion, not a runtime lookup.
   validate `web:` providers and route contributions, keeping one verification
   path.
 
+## Amendment: test ownership and execution
+
+Module-owned web integration tests live in `web_test/` inside the same module
+directory as the adapter they exercise. They are not part of that module's
+standalone `mix test`: the Web Mix project discovers `web_test/` directories
+from installed descriptors with a non-null `web:` path and executes them with
+the real endpoint, discovered router, authentication hooks, and `ConnCase`.
+
+This distinction preserves both boundaries:
+
+- source ownership and install/remove composition remain directory-local;
+- a Base/Core/Domain/Extension module does not acquire a reverse dependency on
+  the Web host merely to compile endpoint tests.
+
+Tests for the endpoint, router shell, authentication lifecycle, host-only
+routes, and cross-module shell behavior remain in `apps/web/test`. Public API
+and adapter tests that do not need the host remain in the owning module's
+ordinary `test/` directory. A test's physical owner follows the production
+surface it primarily verifies; its execution project follows the runtime
+dependencies it needs.
+
 ## Interim placement rule for in-flight UI
 
 Before the `web:` descriptor key and host router macro land, UI-bearing
@@ -543,11 +564,10 @@ wiring is the last step, gated on the descriptor infrastructure.
 
 ## AGENTS.md amendment
 
-AGENTS.md §4 currently recommends `apps/web/lib/bilimbi_web/core/...` and
-`BilimbiWeb.Core.*Live`. §9 recommends `BilimbiWeb.Core.CompanyLive.Index`.
-These are stale after this ADR is Accepted. The amendment must happen **before
-any LiveView moves** (migration step 4), not after, so agents do not continue
-writing the old path. The amendment:
+Before the 2026-08-21 amendment, AGENTS.md §4 recommended
+`apps/web/lib/bilimbi_web/core/...` and `BilimbiWeb.Core.*Live`, while §9
+recommended `BilimbiWeb.Core.CompanyLive.Index`. Those rules became stale when
+this ADR was accepted. The completed amendment:
 
 - §4: replace the recommended placement with
   `apps/<layer>/<module>/lib/<module>/web/` and namespace
@@ -559,7 +579,7 @@ writing the old path. The amendment:
 - §10: note that `use Bilimbi.Base.UI, :live_view` replaces
   `use BilimbiWeb, :live_view` for module-owned LiveViews.
 
-The amendment is part of migration step 5 but must be sequenced before step 4.
+The amendment is migration step 5 and now reflects the implemented placement.
 
 ## Migration plan
 
@@ -590,9 +610,11 @@ This ADR records the decision. The migration is separate work, sequenced as:
    owning module's `deps/`. Implement each module's `Web.Router` with its
    route contributions.
 7. **Update tests** — Web integration tests continue to use public module
-   APIs for setup; LiveView tests move with their owning module. Tests that
-   need the endpoint get it through the standard cross-module test-support
-   rule.
+   APIs for setup. Module-owned LiveView integration tests move to the owning
+   module's `web_test/` directory and are discovered by the Web Mix project;
+   host-owned integration tests remain in `apps/web/test`. This is the
+   cross-module test-support rule: tests execute with the real host without a
+   production or test dependency from the module back to Web.
 
 Steps 1–4 are infrastructure that can land before any LiveView moves. Step 5
 amends AGENTS.md. Step 6 can proceed module-by-module. Step 7 follows each

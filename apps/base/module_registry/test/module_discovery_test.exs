@@ -69,6 +69,22 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
            ]
   end
 
+  test "web test paths are discovered only from installed UI-bearing modules", %{root: root} do
+    put_container!(root, "base", :base)
+    put_container!(root, "core", :core)
+    ui_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    no_ui_root = put_module!(root, "core", "compatibility")
+
+    File.mkdir_p!(Path.join(ui_root, "priv"))
+    File.write!(Path.join(ui_root, "priv/web_routes.exs"), "[]\n")
+    File.mkdir_p!(Path.join(ui_root, "web_test"))
+    File.mkdir_p!(Path.join(no_ui_root, "web_test"))
+
+    assert Enum.map(MixDiscovery.web_test_paths(root), &Path.relative_to(&1, root)) == [
+             Path.join(["apps", "base", "ui", "web_test"])
+           ]
+  end
+
   test "reloadable apps fail closed on a malformed descriptor", %{root: root} do
     put_container!(root, "base", :base)
     put_module!(root, "base", "ui")

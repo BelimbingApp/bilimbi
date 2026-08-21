@@ -61,6 +61,21 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     |> Kernel.++([:web])
   end
 
+  @doc """
+  Returns module-owned web integration test directories for the Web host.
+
+  These tests live with the module source but execute in the Web Mix project,
+  where the real endpoint, router, authentication hooks, and `ConnCase` are
+  available without introducing a forbidden module-to-Web dependency.
+  """
+  @spec web_test_paths(String.t()) :: [String.t()]
+  def web_test_paths(workspace_root) do
+    workspace_root
+    |> discover_workspace!()
+    |> Enum.filter(&(is_binary(&1.web) and File.dir?(Path.join(&1.path, "web_test"))))
+    |> Enum.map(&Path.join(&1.path, "web_test"))
+  end
+
   @doc "Returns local path dependencies for modules installed in a container."
   @spec container_dependencies(String.t()) :: [Mix.Project.dependency()]
   def container_dependencies(container_root) do

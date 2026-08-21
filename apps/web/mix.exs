@@ -13,6 +13,7 @@ defmodule Bilimbi.Web.MixProject do
       lockfile: "../../mix.lock",
       elixir: "~> 1.20",
       elixirc_paths: elixirc_paths(Mix.env()),
+      test_paths: test_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
@@ -31,6 +32,12 @@ defmodule Bilimbi.Web.MixProject do
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_env), do: ["lib"]
+
+  defp test_paths(:test) do
+    ["test" | Bilimbi.Base.ModuleRegistry.MixDiscovery.web_test_paths(Path.expand("../..", __DIR__))]
+  end
+
+  defp test_paths(_env), do: ["test"]
 
   defp deps do
     [
