@@ -19,7 +19,7 @@ Bilimbi is built with:
 - HEEx, Phoenix components, Tailwind CSS 4.3.0, and esbuild 0.25.4;
 - ExUnit and `Phoenix.LiveViewTest`;
 - Req 0.7.2 for Web's Swoosh API client and declared outbound HTTP;
-- Bandit 1.12.4 as the HTTP server;
+- Bandit 1.12.5 as the HTTP server;
 - Swoosh 1.27.0 for email where email is required.
 
 These versions record the current engineering baseline; `.mise.toml`,
