@@ -107,8 +107,11 @@ FROM <the already visibility-filtered, already-filtered query>
 ```
 
 That set is passed to the directory, which scopes it to the actor's tenant,
-resolves names, applies any name search, and returns the ranked survivors. Base
-then filters and orders its own query by that rank — the existing
+resolves names, applies name search and any provider-owned identity search, and
+returns the ranked survivors. A provider may answer candidate ids for an
+attribute such as Core User email; Base never receives or names that attribute.
+The provider must resolve only the supplied candidates inside the validated
+tenant scope. Base then filters and orders its own query by that rank — the existing
 `array_position` mechanism (`administration.ex:465-473`) — and only then applies
 `offset`/`limit`.
 
