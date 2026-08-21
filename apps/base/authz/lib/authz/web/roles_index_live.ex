@@ -19,7 +19,7 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
   # nothing is worse than one that is absent, so this offers what the API
   # accepts. Tracked on #99.
   @sortable ~w(name code is_system created_at)
-  @page_sizes [25, 50, 100]
+  @page_sizes [25, 50, 100, 300]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -36,8 +36,18 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
   end
 
   @impl true
-  def handle_event("search", %{"search" => search}, socket) do
-    {:noreply, push_state(socket, %{socket.assigns.state | search: search, page: 1})}
+  def handle_event("search", params, socket) do
+    current = socket.assigns.state
+    per_page = get_in(params, ["filters", "perPage"]) || Map.get(params, "perPage")
+
+    state = %{
+      current
+      | search: Map.get(params, "search", current.search),
+        page_size: page_size_from(per_page || current.page_size),
+        page: 1
+    }
+
+    {:noreply, push_state(socket, state)}
   end
 
   # The shared `<.table>` pushes the column as `phx-value-sort`, so the param is
@@ -86,6 +96,10 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
+      |> assign(
+        :filters_form,
+        to_form(%{"perPage" => Integer.to_string(state.page_size)}, as: :filters)
+      )
       |> stream(:roles, page.entries, reset: true)
     end
   end

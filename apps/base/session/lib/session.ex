@@ -11,11 +11,15 @@ defmodule Bilimbi.Base.Session do
 
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Session.Entry
+  alias Bilimbi.Base.Session.Page
   alias Bilimbi.Base.Session.Schema
   alias Bilimbi.Base.Session.Summary
 
   @default_limit 100
   @maximum_limit 500
+  @page_sizes [25, 50, 100, 300]
+  @default_page_size 25
+  @sortable_fields [:user_id, :ip_address, :user_agent, :last_activity]
 
   @spec put_session(String.t(), String.t(), map() | keyword()) ::
           {:ok, Entry.t()} | {:error, Ecto.Changeset.t()}
@@ -58,6 +62,50 @@ defmodule Bilimbi.Base.Session do
     |> limit(^limit)
     |> Repo.all()
     |> Enum.map(&Summary.from_schema/1)
+  end
+
+  @doc """
+  Lists payload-free session metadata in a bounded operational page.
+
+  Results are platform-global by design, like `list_sessions/1`; the durable
+  session store is not tenant-owned. The list reads only metadata and never
+  exposes or interprets opaque session payloads.
+  """
+  @spec list_sessions_page(keyword()) :: Page.t(Summary.t())
+  def list_sessions_page(opts \\ []) when is_list(opts) do
+    opts =
+      Keyword.validate!(opts,
+        search: nil,
+        page: 1,
+        page_size: @default_page_size,
+        sort_by: :last_activity,
+        sort_dir: :desc
+      )
+
+    search = validate_search!(opts[:search])
+    page = validate_page!(opts[:page])
+    page_size = validate_page_size!(opts[:page_size])
+    sort_by = validate_sort_by!(opts[:sort_by])
+    sort_dir = validate_sort_dir!(opts[:sort_dir])
+    query = maybe_search(Schema, search)
+
+    total_entries = Repo.aggregate(query, :count, :id)
+
+    entries =
+      query
+      |> order_sessions(sort_by, sort_dir)
+      |> limit(^page_size)
+      |> offset(^((page - 1) * page_size))
+      |> Repo.all()
+      |> Enum.map(&Summary.from_schema/1)
+
+    %Page{
+      entries: entries,
+      page: page,
+      page_size: page_size,
+      total_entries: total_entries,
+      total_pages: total_pages(total_entries, page_size)
+    }
   end
 
   @doc """
@@ -143,6 +191,18 @@ defmodule Bilimbi.Base.Session do
     )
   end
 
+  defp order_sessions(query, :last_activity, :desc) do
+    order_by(query, [session], desc: session.last_activity, asc: session.id)
+  end
+
+  defp order_sessions(query, sort_by, :asc) do
+    order_by(query, [session], asc_nulls_last: field(session, ^sort_by), asc: session.id)
+  end
+
+  defp order_sessions(query, sort_by, :desc) do
+    order_by(query, [session], desc_nulls_last: field(session, ^sort_by), asc: session.id)
+  end
+
   defp validate_search!(nil), do: nil
 
   defp validate_search!(search) when is_binary(search) do
@@ -162,4 +222,33 @@ defmodule Bilimbi.Base.Session do
     raise ArgumentError,
           "session limit must be between 1 and #{@maximum_limit}, got: #{inspect(limit)}"
   end
+
+  defp validate_page!(page) when is_integer(page) and page > 0, do: page
+
+  defp validate_page!(page) do
+    raise ArgumentError, "session page must be a positive integer, got: #{inspect(page)}"
+  end
+
+  defp validate_page_size!(page_size) when page_size in @page_sizes, do: page_size
+
+  defp validate_page_size!(page_size) do
+    raise ArgumentError,
+          "session page_size must be one of #{inspect(@page_sizes)}, got: #{inspect(page_size)}"
+  end
+
+  defp validate_sort_by!(sort_by) when sort_by in @sortable_fields, do: sort_by
+
+  defp validate_sort_by!(sort_by) do
+    raise ArgumentError,
+          "session sort_by must be one of #{inspect(@sortable_fields)}, got: #{inspect(sort_by)}"
+  end
+
+  defp validate_sort_dir!(sort_dir) when sort_dir in [:asc, :desc], do: sort_dir
+
+  defp validate_sort_dir!(sort_dir) do
+    raise ArgumentError, "session sort_dir must be :asc or :desc, got: #{inspect(sort_dir)}"
+  end
+
+  defp total_pages(0, _page_size), do: 0
+  defp total_pages(total_entries, page_size), do: div(total_entries + page_size - 1, page_size)
 end

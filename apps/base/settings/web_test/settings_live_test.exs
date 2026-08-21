@@ -19,6 +19,8 @@ defmodule BilimbiWeb.SettingsLiveTest do
 
   @retention "authz.decision_log_retention_days"
   @input "settings[#{@retention}]"
+  @perf_enabled "perf.enabled"
+  @perf_enabled_input "settings[#{@perf_enabled}]"
 
   setup do
     UserFixtures.create_user_tables!()
@@ -105,6 +107,32 @@ defmodule BilimbiWeb.SettingsLiveTest do
     assert render(view) =~ "Authorization log retention"
     assert render(view) =~ "must be a whole number"
     assert Settings.get(@retention) == 45
+  end
+
+  test "renders boolean settings as checkboxes and saves explicit false values", %{conn: conn} do
+    grant_capabilities!(["base.settings.global.manage", "admin.system.perf.manage"])
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/settings")
+
+    assert has_element?(
+             view,
+             "#input-perf-enabled[type='checkbox'][name='settings[perf.enabled]'][value='true'][checked]"
+           )
+
+    assert has_element?(
+             view,
+             "#setting-perf-enabled input[type='hidden'][name='settings[perf.enabled]'][value='false']"
+           )
+
+    view |> form("#settings-form", %{@perf_enabled_input => "false"}) |> render_submit()
+
+    assert Settings.get(@perf_enabled) == false
+    assert Settings.overridden?(@perf_enabled)
+    refute has_element?(view, "#input-perf-enabled[checked]")
+
+    view |> form("#settings-form", %{@perf_enabled_input => "true"}) |> render_submit()
+
+    assert Settings.get(@perf_enabled) == true
+    assert has_element?(view, "#input-perf-enabled[checked]")
   end
 
   test "submitting the default value still creates an override", %{conn: conn} do

@@ -79,11 +79,12 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
     assert has_element?(
              view,
              "#grants-pagination-summary",
-             "Page 1 of 1 · 1 direct capability"
+             "Showing 1 to 1 of 1 results"
            )
 
-    refute has_element?(view, "#grants-prev")
-    refute has_element?(view, "#grants-next")
+    assert has_element?(view, "#grants-pagination-page-size")
+    refute has_element?(view, "#grants-pagination-previous")
+    refute has_element?(view, "#grants-pagination-next")
   end
 
   test "filters to denials, which outrank a role's grant", %{conn: conn, scope: scope} do
