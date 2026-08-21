@@ -34,4 +34,21 @@ defmodule Bilimbi.Core.User.PrincipalDirectoryProvider do
 
     Map.new(users, fn {id, summary} -> {id, summary.name} end)
   end
+
+  @doc """
+  Finds candidate users by email without exposing email to Base.
+
+  `get_tenant_users/2` applies the tenant-owned-company boundary before this
+  provider inspects a summary, so an address from another tenant cannot make a
+  principal id appear in a Base Authz search.
+  """
+  @impl true
+  def search(%Scope{} = scope, ids, term) when is_list(ids) and is_binary(term) do
+    {:ok, users} = User.get_tenant_users(scope, ids)
+
+    users
+    |> Enum.flat_map(fn {id, summary} ->
+      if String.contains?(String.downcase(summary.email), term), do: [id], else: []
+    end)
+  end
 end
