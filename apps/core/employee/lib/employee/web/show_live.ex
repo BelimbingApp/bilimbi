@@ -1087,9 +1087,9 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
               <.button
                 id="employee-delete"
+                variant="danger"
                 phx-click="delete"
                 data-confirm={"Delete #{@employee.full_name}? This cannot be undone."}
-                class="bg-danger text-sm font-medium text-ink-inverse transition hover:opacity-90"
               >
                 Delete employee
               </.button>
