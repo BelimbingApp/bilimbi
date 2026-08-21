@@ -72,8 +72,21 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   def web_test_paths(workspace_root) do
     workspace_root
     |> discover_workspace!()
-    |> Enum.filter(&(is_binary(&1.web) and File.dir?(Path.join(&1.path, "web_test"))))
-    |> Enum.map(&Path.join(&1.path, "web_test"))
+    |> Enum.flat_map(fn descriptor ->
+      test_path = Path.join(descriptor.path, "web_test")
+
+      cond do
+        not is_binary(descriptor.web) or not File.dir?(test_path) ->
+          []
+
+        File.regular?(Path.join(test_path, "test_helper.exs")) ->
+          [test_path]
+
+        true ->
+          raise ArgumentError,
+                "#{descriptor.id} web_test must contain test_helper.exs for the Web test runner"
+      end
+    end)
   end
 
   @doc "Returns local path dependencies for modules installed in a container."
