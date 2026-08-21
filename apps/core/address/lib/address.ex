@@ -389,9 +389,7 @@ defmodule Bilimbi.Core.Address do
       Tenancy.InvariantError,
       Tenancy.NotProvisionedError,
       Company.PrimaryCompanyInvariantError,
-      Company.PrimaryCompanyNotProvisionedError,
-      DBConnection.ConnectionError,
-      Postgrex.Error
+      Company.PrimaryCompanyNotProvisionedError
     ] ->
       nil
   end
