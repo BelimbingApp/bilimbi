@@ -29,4 +29,18 @@ defmodule Bilimbi.Core.Employee.Web.RouterTest do
     assert by_path["/employee-types/new"].live == Bilimbi.Core.Employee.Web.TypeFormLive
     assert by_path["/employee-types/new"].capability == "admin.employee-type.create"
   end
+
+  test "employee form account linking goes through the discovered seam" do
+    source =
+      Path.expand("../lib/employee/web/form_live.ex", __DIR__)
+      |> File.read!()
+
+    assert source =~ "DiscoveredPanels.dispatch(\"employee.accounts\", :employee_account_options"
+    assert source =~ "DiscoveredPanels.dispatch(\"employee.accounts\", :replace_employee_account"
+
+    refute source =~ ~S|Module.concat(["Bilimbi", "Core", "User"])|
+    refute source =~ "Code.ensure_loaded?"
+    refute source =~ "function_exported?"
+    refute source =~ "apply(user_mod"
+  end
 end

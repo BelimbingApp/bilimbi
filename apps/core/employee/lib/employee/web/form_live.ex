@@ -10,6 +10,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
 
   import Ecto.Changeset
 
+  alias Bilimbi.Base.UI.DiscoveredPanels
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.Employee.TypeSummary
@@ -128,7 +129,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
            Company.authorize_company_target(actor, employee.company_id, @update_capability),
          {:ok, companies} <- Company.list_selectable_companies(actor, @update_capability) do
       company_id = employee.company_id
-      linked_user_id = find_linked_user_id(scope, employee.id)
+      linked_user_id = find_linked_user_id(scope, company_id, employee.id)
 
       socket
       |> assign(:page_title, "Edit Employee")
@@ -336,114 +337,43 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
   end
 
   defp list_assignable_users(scope, company_id, current_employee_id) do
-    user_mod = Module.concat(["Bilimbi", "Core", "User"])
-
-    if Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :list_users, 1) do
-      case apply(user_mod, :list_users, [scope]) do
-        {:ok, users} ->
-          Enum.filter(users, fn u ->
-            (u.company_id == company_id or is_nil(u.company_id)) and
-              (is_nil(u.employee_id) or
-                 (current_employee_id && u.employee_id == current_employee_id))
-          end)
-
-        _ ->
-          []
-      end
-    else
-      []
+    case employee_account_options(scope, company_id, current_employee_id) do
+      {:ok, %{available_users: users}} -> users
+      _error -> []
     end
   end
 
-  defp find_linked_user_id(scope, employee_id) do
-    user_mod = Module.concat(["Bilimbi", "Core", "User"])
-
-    if Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :list_users, 1) do
-      case apply(user_mod, :list_users, [scope]) do
-        {:ok, users} ->
-          case Enum.find(users, &(&1.employee_id == employee_id)) do
-            nil -> nil
-            user -> user.id
-          end
-
-        _ ->
-          nil
-      end
-    else
-      nil
+  defp find_linked_user_id(scope, company_id, employee_id) do
+    case employee_account_options(scope, company_id, employee_id) do
+      {:ok, %{linked_user_id: linked_user_id}} -> linked_user_id
+      _error -> nil
     end
   end
 
   defp sync_user_link(scope, company_id, employee_id, new_user_id) do
-    user_mod = Module.concat(["Bilimbi", "Core", "User"])
+    case DiscoveredPanels.dispatch("employee.accounts", :replace_employee_account, [
+           scope,
+           company_id,
+           employee_id,
+           new_user_id
+         ]) do
+      {:ok, _linked_user} ->
+        :ok
 
-    if Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :list_users, 1) and
-         function_exported?(user_mod, :update_user, 4) do
-      case apply(user_mod, :list_users, [scope]) do
-        {:ok, users} ->
-          currently_linked = Enum.find(users, &(&1.employee_id == employee_id))
-          current_linked_user_id = if currently_linked, do: currently_linked.id, else: nil
+      {:error, :not_installed} when is_nil(new_user_id) ->
+        :ok
 
-          cond do
-            new_user_id == current_linked_user_id ->
-              :ok
-
-            is_nil(new_user_id) and not is_nil(currently_linked) ->
-              apply(user_mod, :update_user, [
-                scope,
-                currently_linked.company_id || company_id,
-                currently_linked.id,
-                %{employee_id: nil}
-              ])
-
-            not is_nil(new_user_id) ->
-              # Belimbing validates the same two conditions in its rule rather
-              # than only in the render (`Create.php:114-119`:
-              # `->where('company_id', ...)->whereNull('employee_id')`). Keeping
-              # them in `list_assignable_users/3` alone left the select correct
-              # and the save path open: a forged `user_id` naming a user already
-              # linked to another employee took the account off them silently.
-              target_user =
-                Enum.find(users, fn u ->
-                  u.id == new_user_id and u.company_id == company_id and
-                    (is_nil(u.employee_id) or u.employee_id == employee_id)
-                end)
-
-              if target_user do
-                if currently_linked && currently_linked.id != new_user_id do
-                  apply(user_mod, :update_user, [
-                    scope,
-                    currently_linked.company_id || company_id,
-                    currently_linked.id,
-                    %{employee_id: nil}
-                  ])
-                end
-
-                target_company_id = target_user.company_id || company_id
-
-                case apply(user_mod, :update_user, [
-                       scope,
-                       target_company_id,
-                       new_user_id,
-                       %{employee_id: employee_id}
-                     ]) do
-                  {:ok, _} -> :ok
-                  {:error, _} = error -> error
-                end
-              else
-                {:error, :invalid_user}
-              end
-
-            true ->
-              :ok
-          end
-
-        _ ->
-          :ok
-      end
-    else
-      :ok
+      {:error, _reason} ->
+        {:error, :invalid_user}
     end
+  end
+
+  defp employee_account_options(scope, company_id, current_employee_id) do
+    DiscoveredPanels.dispatch("employee.accounts", :employee_account_options, [
+      scope,
+      company_id,
+      current_employee_id
+    ])
   end
 
   # A refused link used to be discarded, so an operator whose chosen account was

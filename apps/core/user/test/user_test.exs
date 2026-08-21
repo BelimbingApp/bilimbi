@@ -10,6 +10,7 @@ defmodule Bilimbi.Core.UserTest do
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.Contributions
   alias Bilimbi.Core.User.Summary
+  alias Bilimbi.Core.User.Web.EmployeeAccountPanel
 
   import Bilimbi.Core.User.TestFixtures
 
@@ -466,6 +467,144 @@ defmodule Bilimbi.Core.UserTest do
 
       assert %{employee_id: ["cannot link an account to an agent"]} = errors_on(changeset)
     end
+
+    test "employee account handler lists only assignable company users", %{scope_a: scope_a} do
+      {:ok, employee} = create_employee(scope_a, 73, "EMP-ACCT-1")
+      {:ok, other_employee} = create_employee(scope_a, 73, "EMP-ACCT-2")
+
+      insert_user!(%{
+        id: 101,
+        company_id: 73,
+        employee_id: employee.id,
+        name: "Linked",
+        email: "linked@example.com"
+      })
+
+      insert_user!(%{
+        id: 102,
+        company_id: 73,
+        employee_id: nil,
+        name: "Available",
+        email: "available@example.com"
+      })
+
+      insert_user!(%{
+        id: 103,
+        company_id: 73,
+        employee_id: other_employee.id,
+        name: "Taken",
+        email: "taken@example.com"
+      })
+
+      insert_user!(%{
+        id: 104,
+        company_id: 74,
+        employee_id: nil,
+        name: "Other Company",
+        email: "other@example.com"
+      })
+
+      insert_user!(%{
+        id: 105,
+        company_id: nil,
+        employee_id: nil,
+        name: "Unaffiliated",
+        email: "unaffiliated@example.com"
+      })
+
+      assert {:ok, account_options} =
+               EmployeeAccountPanel.dispatch(
+                 :employee_account_options,
+                 scope_a,
+                 73,
+                 employee.id
+               )
+
+      assert account_options.linked_user_id == 101
+      assert Enum.map(account_options.available_users, & &1.id) == [101, 102]
+    end
+
+    test "employee account handler replaces a link without stealing taken accounts", %{
+      scope_a: scope_a
+    } do
+      {:ok, employee} = create_employee(scope_a, 73, "EMP-ACCT-3")
+      {:ok, other_employee} = create_employee(scope_a, 73, "EMP-ACCT-4")
+
+      insert_user!(%{
+        id: 111,
+        company_id: 73,
+        employee_id: employee.id,
+        email: "old-link@example.com"
+      })
+
+      insert_user!(%{
+        id: 112,
+        company_id: 73,
+        employee_id: nil,
+        email: "new-link@example.com"
+      })
+
+      insert_user!(%{
+        id: 113,
+        company_id: 73,
+        employee_id: other_employee.id,
+        email: "taken-link@example.com"
+      })
+
+      assert {:ok, %Summary{id: 112, employee_id: employee_id}} =
+               EmployeeAccountPanel.dispatch(
+                 :replace_employee_account,
+                 scope_a,
+                 73,
+                 employee.id,
+                 112
+               )
+
+      assert employee_id == employee.id
+      assert stored_employee_id(111) == nil
+      assert stored_employee_id(112) == employee.id
+
+      assert {:error, :user_not_found} =
+               EmployeeAccountPanel.dispatch(
+                 :replace_employee_account,
+                 scope_a,
+                 73,
+                 employee.id,
+                 113
+               )
+
+      assert stored_employee_id(112) == employee.id
+      assert stored_employee_id(113) == other_employee.id
+    end
+
+    test "employee account handler refuses account links for agent employees", %{scope_a: scope_a} do
+      :ok = Employee.ensure_system_types()
+
+      {:ok, agent} =
+        Employee.create_employee(scope_a, 73, %{
+          employee_number: "AGT-2",
+          full_name: "Helpful Agent",
+          employee_type: "agent"
+        })
+
+      insert_user!(%{
+        id: 121,
+        company_id: 73,
+        employee_id: nil,
+        email: "agent-link@example.com"
+      })
+
+      assert {:error, :agent_employee} =
+               EmployeeAccountPanel.dispatch(
+                 :replace_employee_account,
+                 scope_a,
+                 73,
+                 agent.id,
+                 121
+               )
+
+      assert stored_employee_id(121) == nil
+    end
   end
 
   describe "lifecycle" do
@@ -510,6 +649,17 @@ defmodule Bilimbi.Core.UserTest do
         options |> Keyword.get(String.to_existing_atom(key), key) |> to_string()
       end)
     end)
+  end
+
+  defp stored_employee_id(user_id) do
+    %{rows: [[employee_id]]} =
+      Ecto.Adapters.SQL.query!(
+        Bilimbi.Base.Repo,
+        "SELECT employee_id FROM users WHERE id = $1",
+        [user_id]
+      )
+
+    employee_id
   end
 
   defp create_employee(scope, company_id, number) do

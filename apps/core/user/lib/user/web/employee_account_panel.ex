@@ -6,11 +6,11 @@ defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
   panel; the employee page renders it by the `"employee.accounts"` manifest
   key and never names this module (#581, mechanism from #570/#575).
 
-  The panel also declares the operation the employee page uses for a type
-  transition. That operation runs through the manifest resolver rather than a
-  reverse module reference, and delegates to Core User's transaction-safe
-  coordinator so changing an employee to an agent either unlinks the account
-  and changes the type, or rolls both writes back.
+  The panel also declares the operations the employee pages use for account
+  choices, replacement, and type transitions. Those operations run through the
+  manifest resolver rather than a reverse module reference, and delegate to
+  Core User's transaction-safe coordinators so the User-owned account link never
+  has to be read or written from Core Employee.
 
   Every write re-evaluates the actor's current grants through `Authz.can/2`
   (the #482/#541 pattern); mount-time capability state is presentation, not
@@ -79,25 +79,49 @@ defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
     # rendering the panel, so a non-ok here is infrastructure failure —
     # raising reaches the recovery boundary instead of rendering a broken
     # section as an empty one (#409).
-    {:ok, users} = User.list_company_users(scope, socket.assigns.company_id)
-
-    linked_user = Enum.find(users, &(&1.employee_id == socket.assigns.employee_id))
-
-    available_users =
-      Enum.filter(
-        users,
-        &(is_nil(&1.employee_id) or &1.employee_id == socket.assigns.employee_id)
-      )
+    {:ok, account_state} =
+      account_state(scope, socket.assigns.company_id, socket.assigns.employee_id)
 
     socket
-    |> assign(:linked_user, linked_user)
-    |> assign(:available_users, available_users)
+    |> assign(:linked_user, account_state.linked_user)
+    |> assign(:available_users, account_state.available_users)
   end
 
   @doc false
+  def dispatch(:employee_account_options, scope, company_id, current_employee_id) do
+    account_state(scope, company_id, current_employee_id)
+  end
+
+  def dispatch(:replace_employee_account, scope, company_id, employee_id, user_id) do
+    User.replace_employee_account(scope, company_id, employee_id, user_id)
+  end
+
   def dispatch(:change_employee_type, scope, company_id, employee_id, type) do
     User.change_employee_type(scope, company_id, employee_id, type)
   end
+
+  defp account_state(scope, company_id, current_employee_id) do
+    with {:ok, users} <- User.list_company_users(scope, company_id) do
+      linked_user =
+        if is_integer(current_employee_id) do
+          Enum.find(users, &(&1.employee_id == current_employee_id))
+        end
+
+      available_users = Enum.filter(users, &available_for_employee?(&1, current_employee_id))
+
+      {:ok,
+       %{
+         linked_user: linked_user,
+         linked_user_id: linked_user && linked_user.id,
+         available_users: available_users
+       }}
+    end
+  end
+
+  defp available_for_employee?(user, nil), do: is_nil(user.employee_id)
+
+  defp available_for_employee?(user, employee_id),
+    do: is_nil(user.employee_id) or user.employee_id == employee_id
 
   defp can_manage_accounts?(current_scope) do
     Authz.can(current_scope.actor, @manage_capability).allowed
