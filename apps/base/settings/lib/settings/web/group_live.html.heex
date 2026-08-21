@@ -61,7 +61,18 @@
           </label>
           <p class="mt-0.5 text-xs text-ink-subtle">{field.definition.help}</p>
 
+          <.input
+            :if={boolean_field?(field)}
+            type="checkbox"
+            id={"input-#{String.replace(field.key, ".", "-")}"}
+            name={"settings[#{field.key}]"}
+            checked={boolean_checked?(field)}
+            label="Enabled"
+            wrapper_class="mb-0 mt-2.5"
+          />
+
           <input
+            :if={!boolean_field?(field)}
             type={input_type(field)}
             id={"input-#{String.replace(field.key, ".", "-")}"}
             name={"settings[#{field.key}]"}
