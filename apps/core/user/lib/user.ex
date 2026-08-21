@@ -65,6 +65,7 @@ defmodule Bilimbi.Core.User do
   @preference_keys [
     "ai.last_used_model_hints",
     "ui.dashboard.layout",
+    "ui.dashboard.sections",
     "ui.landing_menu_id",
     "ui.theme"
   ]
@@ -369,7 +370,7 @@ defmodule Bilimbi.Core.User do
     end
   end
 
-  @doc "Returns the four module-owned preferences resolved at user scope."
+  @doc "Returns the module-owned preferences resolved at user scope."
   @spec user_preferences(Scope.t(), pos_integer(), pos_integer()) ::
           {:ok, %{required(String.t()) => term()}} | {:error, lookup_error()}
   def user_preferences(%Scope{} = scope, company_id, user_id) do
@@ -1341,7 +1342,11 @@ defmodule Bilimbi.Core.User do
        when is_binary(value) and byte_size(value) <= 255, do: :ok
 
   defp valid_preference(key, value)
-       when key in ["ui.dashboard.layout", "ai.last_used_model_hints"] and
+       when key in [
+              "ui.dashboard.layout",
+              "ui.dashboard.sections",
+              "ai.last_used_model_hints"
+            ] and
               (is_list(value) or is_map(value)),
        do: :ok
 

@@ -129,7 +129,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
       refute has_element?(view, "#stat-recent-audit")
 
       # Enter edit mode
-      view |> element("#edit-layout") |> render_click()
+      view |> element("#customize-layout") |> render_click()
 
       # Gated widgets are not in available list
       refute has_element?(view, "#add-widget-base-dashboard-recent-audit")
@@ -200,7 +200,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
       refute has_element?(view, "#stat-sessions")
 
       # Not offered for adding either.
-      view |> element("#edit-layout") |> render_click()
+      view |> element("#customize-layout") |> render_click()
       refute has_element?(view, "#add-widget-base-dashboard-session-stats")
     end
 
@@ -235,8 +235,8 @@ defmodule BilimbiWeb.DashboardLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
       # Enter edit mode
-      view |> element("#edit-layout") |> render_click()
-      assert has_element?(view, "#done-layout")
+      view |> element("#customize-layout") |> render_click()
+      assert has_element?(view, "#close-customize")
 
       # Remove companies widget
       view |> element("#remove-base-dashboard-company-stats") |> render_click()
@@ -252,14 +252,14 @@ defmodule BilimbiWeb.DashboardLiveTest do
       refute has_element?(view, "#add-widget-base-dashboard-company-stats")
 
       # Exit edit mode
-      view |> element("#done-layout") |> render_click()
-      assert has_element?(view, "#edit-layout")
+      view |> element("#close-customize") |> render_click()
+      assert has_element?(view, "#customize-layout")
     end
 
     test "reorders widgets via move-up and move-down", %{conn: conn} do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
-      view |> element("#edit-layout") |> render_click()
+      view |> element("#customize-layout") |> render_click()
 
       # Move second widget (users) up
       view |> element("#move-up-base-dashboard-user-stats") |> render_click()
@@ -344,11 +344,62 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
       refute has_element?(view, "#drag-base-dashboard-company-stats")
 
-      view |> element("#edit-layout") |> render_click()
+      view |> element("#customize-layout") |> render_click()
 
       assert has_element?(view, "#drag-base-dashboard-company-stats")
       assert has_element?(view, "#drag-base-dashboard-company-stats")
       assert has_element?(view, "#dashboard-widgets[data-sort-enabled='true']")
+    end
+
+    test "forged section ids leave visible and available sections unchanged", %{conn: conn} do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      view |> element("#customize-layout") |> render_click()
+
+      render_click(view, "remove-section", %{"id" => "forged-section"})
+
+      assert section_order(view) == ["current-company", "recent-users"]
+      refute has_element?(view, "#add-section-current-company")
+      refute has_element?(view, "#add-section-recent-users")
+      refute Settings.overridden?("ui.dashboard.sections", Settings.Scope.user(91, 73, 41))
+
+      view |> element("#remove-section-recent-users") |> render_click()
+
+      assert section_order(view) == ["current-company"]
+      assert has_element?(view, "#add-section-recent-users")
+
+      assert Settings.get("ui.dashboard.sections", Settings.Scope.user(91, 73, 41)) == [
+               "current-company"
+             ]
+
+      render_click(view, "add-section", %{"id" => "forged-section"})
+
+      assert section_order(view) == ["current-company"]
+      assert has_element?(view, "#add-section-recent-users")
+
+      assert Settings.get("ui.dashboard.sections", Settings.Scope.user(91, 73, 41)) == [
+               "current-company"
+             ]
+    end
+
+    test "section choices persist across remounts", %{conn: conn} do
+      conn = log_in_as(conn)
+      {:ok, view, _html} = live(conn, ~p"/dashboard")
+
+      view |> element("#customize-layout") |> render_click()
+      view |> element("#remove-section-current-company") |> render_click()
+
+      refute has_element?(view, "#dashboard-current-company")
+      assert section_order(view) == ["recent-users"]
+
+      assert Settings.get("ui.dashboard.sections", Settings.Scope.user(91, 73, 41)) == [
+               "recent-users"
+             ]
+
+      {:ok, remounted, _html} = live(conn, ~p"/dashboard")
+
+      refute has_element?(remounted, "#dashboard-current-company")
+      assert section_order(remounted) == ["recent-users"]
     end
 
     test "the layout setting answers with its declared empty default when nothing is stored",
@@ -389,7 +440,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
     test "displays empty state when all widgets are removed", %{conn: conn} do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
-      view |> element("#edit-layout") |> render_click()
+      view |> element("#customize-layout") |> render_click()
       view |> element("#remove-base-dashboard-company-stats") |> render_click()
       view |> element("#remove-base-dashboard-user-stats") |> render_click()
 
@@ -459,6 +510,14 @@ defmodule BilimbiWeb.DashboardLiveTest do
     html = render(view)
 
     ~r{id="widget-([^"]+)"}
+    |> Regex.scan(html)
+    |> Enum.map(fn [_match, id] -> id end)
+  end
+
+  defp section_order(view) do
+    html = render(view)
+
+    ~r{id="dashboard-(current-company|recent-users)"}
     |> Regex.scan(html)
     |> Enum.map(fn [_match, id] -> id end)
   end
