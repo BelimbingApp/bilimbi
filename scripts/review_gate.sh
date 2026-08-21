@@ -116,7 +116,11 @@ verdict=$(jq -r '
     gsub("\\r"; "")
     | gsub("^[[:space:]]+|[[:space:]]+$"; "")
     | sub("^#{1,6}[[:space:]]+"; "")
-    | gsub("\\*\\*"; "");
+    | gsub("\\*\\*"; "")
+    # Ending a sentence with a full stop is how English works; "accept." is
+    # not a different verdict from "accept" (#597). A question mark is not
+    # stripped — "accept?" is genuinely not a verdict.
+    | sub("[[:space:]]*[.!]+$"; "");
   def line_verdict:
     if test("^>") then
       null
@@ -142,6 +146,17 @@ verdict=$(jq -r '
     else
       null
     end;
+  # A line that starts like a verdict but fails the strict match. Quoted in
+  # the no-approval failure so a silent discard becomes a one-second fix by
+  # the reviewer — the #586/#590/#597 pattern is the tooling stating a
+  # conclusion while withholding the fact needed to act on it.
+  def near_miss_lines($body):
+    [safe_logical_lines($body)[]
+     | normalized_verdict_line
+     | select(test("^>") | not)
+     | select(line_verdict == null)
+     | select(test("(?i)^(verdict:[[:space:]]*)?(accept|changes[[:space:]]+required)\\b"))
+     | .[0:80]];
 
   . as $pr
   | ([$pr.labels[].name | select(startswith("agent:"))]) as $agent_labels
@@ -158,6 +173,8 @@ verdict=$(jq -r '
                             changes: ($verdict == "changes required"),
                             accept: ($verdict == "accept")}]
     ) as $events
+  | ([($pr.reviews[].body // empty), ($pr.comments[].body // empty)]
+     | map(near_miss_lines(.)) | add | .[0:3]) as $near_misses
   | if ($agent_labels | length) != 1 then
       "FAIL: PR must carry exactly one agent:* label (found \($agent_labels | length))"
     elif ($agent_labels[0] | test("^agent:[a-z0-9]+(?:[._-][a-z0-9]+)*$") | not) then
@@ -191,6 +208,12 @@ verdict=$(jq -r '
           | select(.account != $pr.author.login)]) as $valid
       | if ($approvals | length) == 0 then
           "FAIL: no unrevoked approval verdict found"
+          + (if ($near_misses | length) > 0 then
+               "; verdict-shaped line(s) did not parse: "
+               + ($near_misses | map("\"" + . + "\"") | join(" | "))
+             else
+               ""
+             end)
         elif ($valid | length) == 0 then
           "FAIL: approvals exist but none is independent (lane=\($lane), pr-author=\($pr.author.login))"
         else
