@@ -34,7 +34,10 @@ defmodule Bilimbi.Web.MixProject do
   defp elixirc_paths(_env), do: ["lib"]
 
   defp test_paths(:test) do
-    ["test" | Bilimbi.Base.ModuleRegistry.MixDiscovery.web_test_paths(Path.expand("../..", __DIR__))]
+    [
+      "test"
+      | Bilimbi.Base.ModuleRegistry.MixDiscovery.web_test_paths(Path.expand("../..", __DIR__))
+    ]
   end
 
   defp test_paths(_env), do: ["test"]
