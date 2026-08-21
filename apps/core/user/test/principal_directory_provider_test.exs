@@ -61,6 +61,12 @@ defmodule Bilimbi.Core.User.PrincipalDirectoryProviderTest do
     assert Provider.names(scope, [91, 92]) == %{91 => "Ada Lovelace"}
   end
 
+  test "searches email only among users visible to the scope", %{scope: scope, other_scope: other} do
+    assert Provider.search(scope, [91, 92], "ada@example.com") == [91]
+    assert Provider.search(scope, [91, 92], "grace@example.com") == []
+    assert Provider.search(other, [91, 92], "grace@example.com") == [92]
+  end
+
   test "the boundary is symmetric, not a property of one tenant", %{other_scope: other} do
     assert Provider.names(other, [92]) == %{92 => "Grace Hopper"}
     assert Provider.names(other, [91]) == %{}
