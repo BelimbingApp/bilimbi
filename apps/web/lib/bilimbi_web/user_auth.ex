@@ -52,11 +52,11 @@ defmodule BilimbiWeb.UserAuth do
   alias Bilimbi.Base.DateTime, as: BaseDateTime
   alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Session
-  alias Bilimbi.Base.UI.DateTimeDisplay
   alias Bilimbi.Base.Session.Entry
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.UI.DateTimeDisplay
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
