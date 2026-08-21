@@ -328,7 +328,7 @@ defmodule BilimbiWeb.DashboardLive do
         <.header>
           Dashboard
           <:subtitle>
-            Welcome back, {@current_scope.user["name"]}. Here’s the current state of {@current_scope.scope.tenant.name}.
+            Signed in as {@current_scope.user["name"]} · {@current_scope.scope.tenant.name}
           </:subtitle>
           <:actions>
             <.button
@@ -349,33 +349,6 @@ defmodule BilimbiWeb.DashboardLive do
             </.button>
           </:actions>
         </.header>
-
-        <section
-          id="dashboard-overview"
-          class="mt-4 flex flex-col gap-3 rounded-2xl border border-line bg-surface px-4 py-4 shadow-xs shadow-ink/[0.03] sm:px-5"
-        >
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div class="max-w-2xl">
-              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-brand-strong">
-                Workspace overview
-              </p>
-              <h2 class="mt-1 text-lg font-semibold tracking-tight text-ink-strong">
-                Key admin areas are one click away
-              </h2>
-              <p class="mt-1 text-sm leading-6 text-ink-subtle">
-                Use the summary cards below to jump into company, user, and session management. Activity updates stay visible as the workspace changes.
-              </p>
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <span class="inline-flex items-center rounded-full bg-brand-surface px-3 py-1 text-xs font-medium text-brand-strong">
-                {length(@widgets)} widget{if length(@widgets) == 1, do: "", else: "s"} active
-              </span>
-              <span class="inline-flex items-center rounded-full bg-surface-sunken px-3 py-1 text-xs font-medium text-ink-muted">
-                {@current_scope.scope.tenant.name}
-              </span>
-            </div>
-          </div>
-        </section>
 
         <div
           :if={@layout_editing and @available_widgets != []}
@@ -400,7 +373,7 @@ defmodule BilimbiWeb.DashboardLive do
           id="dashboard-widgets"
           phx-hook="DashboardSort"
           data-sort-enabled={if @layout_editing, do: "true", else: "false"}
-          class="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+          class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3"
         >
           <.render_widget
             :for={widget <- @widgets}
@@ -501,19 +474,10 @@ defmodule BilimbiWeb.DashboardLive do
   end
 
   defp render_widget(%{widget: widget} = assigns) do
-    assigns =
-      assigns
-      |> assign(:id, widget.id)
-      |> assign(
-        :wrapper_class,
-        case widget.id do
-          "base-dashboard-recent-audit" -> "sm:col-span-2 xl:col-span-1"
-          _ -> nil
-        end
-      )
+    assigns = assign(assigns, :id, widget.id)
 
     ~H"""
-    <div class={["relative", @wrapper_class]} id={"widget-#{@id}"} data-widget-id={@id}>
+    <div class="relative" id={"widget-#{@id}"} data-widget-id={@id}>
       <div :if={@layout_editing} class="absolute right-1 top-1 z-10 flex gap-0.5">
         <button
           id={"drag-#{@id}"}
@@ -643,24 +607,15 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group block rounded-2xl border border-line bg-surface px-5 py-4 shadow-xs shadow-ink/[0.03] transition duration-150 hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
+      class="group rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
     >
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <p class="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-ink-faint">Companies</p>
-          <p class="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-ink-strong">
-            {@count}
-          </p>
-          <p class="mt-1 text-sm text-ink-subtle">Manage tenant companies and workspace structure.</p>
-        </div>
-        <span class="grid size-9 shrink-0 place-items-center rounded-full bg-surface text-brand-strong shadow-sm shadow-ink/[0.04]">
-          <.icon name="hero-building-office-2" class="size-4" />
-        </span>
-      </div>
-      <div class="mt-4 flex items-center justify-between text-sm font-medium text-brand-strong">
-        <span>Open companies</span>
-        <.icon name="hero-arrow-right" class="size-4 transition group-hover:translate-x-0.5" />
-      </div>
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Companies</p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+        {@count}
+      </p>
+      <span class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 group-hover:text-ink">
+        View all
+      </span>
     </.link>
     """
   end
@@ -669,20 +624,12 @@ defmodule BilimbiWeb.DashboardLive do
     ~H"""
     <div
       id={@id}
-      class="rounded-2xl border border-line bg-gradient-to-b from-surface to-brand-surface px-5 py-4 shadow-xs shadow-ink/[0.03]"
+      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
     >
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <p class="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-ink-faint">Companies</p>
-          <p class="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-ink-strong">
-            {@count}
-          </p>
-          <p class="mt-1 text-sm text-ink-subtle">Manage tenant companies and workspace structure.</p>
-        </div>
-        <span class="grid size-9 shrink-0 place-items-center rounded-full bg-surface text-brand-strong shadow-sm shadow-ink/[0.04]">
-          <.icon name="hero-building-office-2" class="size-4" />
-        </span>
-      </div>
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Companies</p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+        {@count}
+      </p>
     </div>
     """
   end
@@ -696,24 +643,15 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group block rounded-2xl border border-line bg-surface px-5 py-4 shadow-xs shadow-ink/[0.03] transition duration-150 hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
+      class="group rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
     >
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <p class="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-ink-faint">Users</p>
-          <p class="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-ink-strong">
-            {@count}
-          </p>
-          <p class="mt-1 text-sm text-ink-subtle">Review workspace access, roles, and account status.</p>
-        </div>
-        <span class="grid size-9 shrink-0 place-items-center rounded-full bg-surface text-brand-strong shadow-sm shadow-ink/[0.04]">
-          <.icon name="hero-users" class="size-4" />
-        </span>
-      </div>
-      <div class="mt-4 flex items-center justify-between text-sm font-medium text-brand-strong">
-        <span>Open users</span>
-        <.icon name="hero-arrow-right" class="size-4 transition group-hover:translate-x-0.5" />
-      </div>
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Users</p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+        {@count}
+      </p>
+      <span class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 group-hover:text-ink">
+        View all
+      </span>
     </.link>
     """
   end
@@ -722,20 +660,12 @@ defmodule BilimbiWeb.DashboardLive do
     ~H"""
     <div
       id={@id}
-      class="rounded-2xl border border-line bg-gradient-to-b from-surface to-brand-surface px-5 py-4 shadow-xs shadow-ink/[0.03]"
+      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
     >
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <p class="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-ink-faint">Users</p>
-          <p class="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-ink-strong">
-            {@count}
-          </p>
-          <p class="mt-1 text-sm text-ink-subtle">Review workspace access, roles, and account status.</p>
-        </div>
-        <span class="grid size-9 shrink-0 place-items-center rounded-full bg-surface text-brand-strong shadow-sm shadow-ink/[0.04]">
-          <.icon name="hero-users" class="size-4" />
-        </span>
-      </div>
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Users</p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+        {@count}
+      </p>
     </div>
     """
   end
@@ -751,26 +681,17 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group block rounded-2xl border border-line bg-surface px-5 py-4 shadow-xs shadow-ink/[0.03] transition duration-150 hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
+      class="group rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
     >
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <p class="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-ink-faint">
-            Sessions
-          </p>
-          <p class="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-ink-strong">
-            {@count}
-          </p>
-          <p class="mt-1 text-sm text-ink-subtle">Monitor active access and recent workspace sessions.</p>
-        </div>
-        <span class="grid size-9 shrink-0 place-items-center rounded-full bg-surface text-brand-strong shadow-sm shadow-ink/[0.04]">
-          <.icon name="hero-computer-desktop" class="size-4" />
-        </span>
-      </div>
-      <div class="mt-4 flex items-center justify-between text-sm font-medium text-brand-strong">
-        <span>Open sessions</span>
-        <.icon name="hero-arrow-right" class="size-4 transition group-hover:translate-x-0.5" />
-      </div>
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+        Sessions
+      </p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+        {@count}
+      </p>
+      <span class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 group-hover:text-ink">
+        View all
+      </span>
     </.link>
     """
   end
@@ -779,22 +700,14 @@ defmodule BilimbiWeb.DashboardLive do
     ~H"""
     <div
       id={@id}
-      class="rounded-2xl border border-line bg-gradient-to-b from-surface to-brand-surface px-5 py-4 shadow-xs shadow-ink/[0.03]"
+      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
     >
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <p class="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-ink-faint">
-            Sessions
-          </p>
-          <p class="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-ink-strong">
-            {@count}
-          </p>
-          <p class="mt-1 text-sm text-ink-subtle">Monitor active access and recent workspace sessions.</p>
-        </div>
-        <span class="grid size-9 shrink-0 place-items-center rounded-full bg-surface text-brand-strong shadow-sm shadow-ink/[0.04]">
-          <.icon name="hero-computer-desktop" class="size-4" />
-        </span>
-      </div>
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+        Sessions
+      </p>
+      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
+        {@count}
+      </p>
     </div>
     """
   end
@@ -805,12 +718,9 @@ defmodule BilimbiWeb.DashboardLive do
 
   defp audit_activity_card(assigns) do
     ~H"""
-    <div id={@id} class="rounded-2xl border border-line bg-surface shadow-xs shadow-ink/[0.03]">
-      <div class="flex items-center justify-between border-b border-line px-5 py-4">
-        <div>
-          <h3 class="text-base font-semibold tracking-tight text-ink-strong">Recent Activity</h3>
-          <p class="mt-1 text-sm text-ink-subtle">The latest audit events across your workspace.</p>
-        </div>
+    <div id={@id} class="rounded-xl border border-line bg-surface shadow-xs shadow-ink/[0.03]">
+      <div class="flex items-center justify-between border-b border-line px-4 py-3">
+        <h3 class="text-sm font-semibold text-ink-strong">Recent Activity</h3>
         <.link
           :if={@navigate}
           navigate={@navigate}
@@ -819,19 +729,13 @@ defmodule BilimbiWeb.DashboardLive do
           All activity
         </.link>
       </div>
-      <div :if={Enum.empty?(@entries)} class="px-5 py-8 text-center">
-        <div class="mx-auto flex max-w-sm flex-col items-center gap-2 text-sm text-ink-subtle">
-          <span class="grid size-10 place-items-center rounded-full bg-brand-surface text-brand-strong">
-            <.icon name="hero-bolt" class="size-5" />
-          </span>
-          <p class="font-medium text-ink">No recent activity yet</p>
-          <p>New mutations and admin changes will appear here when they happen.</p>
-        </div>
+      <div :if={Enum.empty?(@entries)} class="px-4 py-6 text-center text-sm text-ink-subtle">
+        No recent activity.
       </div>
       <div :if={Enum.any?(@entries)} class="divide-y divide-line">
         <div
           :for={entry <- @entries}
-          class="flex items-center gap-3 px-5 py-3 text-sm"
+          class="flex items-center gap-3 px-4 py-2.5 text-sm"
         >
           <.icon name="hero-document-text" class="size-4 shrink-0 text-ink-faint" />
           <div class="min-w-0 flex-1">
