@@ -3,9 +3,11 @@ defmodule BilimbiWeb.SystemLocalizationLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Locale.Bootstrap
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -94,5 +96,32 @@ defmodule BilimbiWeb.SystemLocalizationLiveTest do
            } = Locale.resolve(nil)
 
     assert render(view) =~ "Choose a supported locale."
+  end
+
+  test "a save forged after grant revocation changes nothing", %{conn: conn} do
+    assert %{locale: "en-US", source: "platform_operator_address"} =
+             Locale.resolve(nil, %Bootstrap{country_iso: "US"})
+
+    {:ok, view, _html} = open(conn)
+
+    {:ok, scope} = Tenancy.scope(41)
+
+    grant =
+      Authz.list_principal_capabilities(scope, page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.system.localization.manage"))
+
+    assert {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
+
+    render_submit(view, "save", %{"localization" => %{"locale" => "fr-FR"}})
+
+    assert %{
+             locale: "en-US",
+             source: "platform_operator_address",
+             inferred_country: "US"
+           } = Locale.resolve(nil)
+
+    assert Settings.get("ui.locale_source", nil) != "manual"
+    assert render(view) =~ "You do not have permission to manage the installation locale."
   end
 end
