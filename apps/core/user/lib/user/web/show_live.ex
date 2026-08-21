@@ -1552,7 +1552,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 <h2 class="text-sm font-semibold text-danger-ink">Delete this user</h2>
                 <p class="mt-0.5 text-xs text-danger-ink">Permanently deletes this account. This cannot be undone.</p>
               </div>
-              <.button id="user-delete" phx-click="delete" data-confirm={"Delete #{@user.name}? This cannot be undone."} class="border-danger bg-danger text-sm font-medium text-action-ink hover:opacity-90">
+              <.button
+                id="user-delete"
+                variant="danger"
+                phx-click="delete"
+                data-confirm={"Delete #{@user.name}? This cannot be undone."}
+              >
                 Delete user
               </.button>
             </div>

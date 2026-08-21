@@ -18,8 +18,15 @@ defmodule Bilimbi.Base.PrincipalDirectory.Provider do
 
   alias Bilimbi.Base.Tenancy.Scope
 
-  @typedoc "The principal kinds Base Authz stores in `principal_capabilities`."
-  @type kind :: :user | :agent
+  @typedoc """
+  The kinds of identity a screen references and cannot name itself. `:user` and
+  `:agent` are the authz-principal subset Base Authz stores in
+  `principal_capabilities`; `:employee` is a Core identity named on Core screens
+  (an employee referenced by id across an upward edge — a department Head, a
+  supervisor). See ADR 0014; the seam names referenced identities, of which
+  principals are the subset.
+  """
+  @type kind :: :user | :agent | :employee
 
   @doc "The one kind this provider answers for."
   @callback principal_kind() :: kind()

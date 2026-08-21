@@ -70,11 +70,12 @@ defmodule BilimbiWeb.AuthzPrincipalRolesLiveTest do
     assert has_element?(
              view,
              "#assignments-pagination-summary",
-             "Page 1 of 1 · 1 assignment"
+             "Showing 1 to 1 of 1 results"
            )
 
-    refute has_element?(view, "#assignments-prev")
-    refute has_element?(view, "#assignments-next")
+    assert has_element?(view, "#assignments-pagination-page-size")
+    refute has_element?(view, "#assignments-pagination-previous")
+    refute has_element?(view, "#assignments-pagination-next")
   end
 
   test "search narrows by role name", %{conn: conn, scope: scope} do

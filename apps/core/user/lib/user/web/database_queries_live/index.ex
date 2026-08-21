@@ -61,20 +61,12 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
   end
 
   @impl true
-  def handle_event("sort", %{"column" => column}, socket) when column in @sortable do
-    sort_dir =
-      if socket.assigns.sort_by == column do
-        if socket.assigns.sort_dir == :asc, do: :desc, else: :asc
-      else
-        default_sort_dir(column)
-      end
+  def handle_event("sort", %{"sort" => column}, socket) when column in @sortable do
+    sort_queries(socket, column)
+  end
 
-    {:noreply,
-     socket
-     |> assign(:sort_by, column)
-     |> assign(:sort_dir, sort_dir)
-     |> assign(:page, 1)
-     |> load_queries()}
+  def handle_event("sort", %{"column" => column}, socket) when column in @sortable do
+    sort_queries(socket, column)
   end
 
   def handle_event("sort", _params, socket), do: {:noreply, socket}
@@ -133,6 +125,22 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
 
   defp default_sort_dir(col) when col in ["created_at", "updated_at"], do: :desc
   defp default_sort_dir(_col), do: :asc
+
+  defp sort_queries(socket, column) do
+    sort_dir =
+      if socket.assigns.sort_by == column do
+        if socket.assigns.sort_dir == :asc, do: :desc, else: :asc
+      else
+        default_sort_dir(column)
+      end
+
+    {:noreply,
+     socket
+     |> assign(:sort_by, column)
+     |> assign(:sort_dir, sort_dir)
+     |> assign(:page, 1)
+     |> load_queries()}
+  end
 
   defp load_queries(socket) do
     scope = socket.assigns.current_scope.scope

@@ -11,7 +11,7 @@ defmodule Bilimbi.Base.PrincipalDirectory.ContributionValidator do
 
   alias Bilimbi.Base.PrincipalDirectory.Provider
 
-  @kinds [:user, :agent]
+  @kinds [:user, :agent, :employee]
 
   @impl true
   @spec validate_contributions!([%{descriptor: map(), payload: term()}]) :: %{
@@ -21,8 +21,40 @@ defmodule Bilimbi.Base.PrincipalDirectory.ContributionValidator do
     Enum.reduce(entries, %{}, &merge_entry!/2)
   end
 
-  defp merge_entry!(%{descriptor: descriptor, payload: provider}, acc)
-       when is_atom(provider) and not is_nil(provider) do
+  # A module contributes one provider (a module atom) or several (a list of
+  # them), one per kind — Core Employee names both `:agent` and `:employee`
+  # (ADR 0014). A second provider for the same kind, from any module, is still a
+  # defect: which name a screen shows must not depend on installation order.
+  defp merge_entry!(%{descriptor: descriptor, payload: payload}, acc) do
+    payload
+    |> providers!(descriptor)
+    |> Enum.reduce(acc, &merge_provider!(descriptor, &1, &2))
+  end
+
+  defp providers!(provider, _descriptor) when is_atom(provider) and not is_nil(provider),
+    do: [provider]
+
+  defp providers!(providers, descriptor) when is_list(providers) and providers != [] do
+    Enum.each(providers, fn provider ->
+      unless is_atom(provider) and not is_nil(provider) do
+        invalid!(
+          descriptor.id,
+          "principal_directory list entries must be module atoms, got #{inspect(provider)}"
+        )
+      end
+    end)
+
+    providers
+  end
+
+  defp providers!(payload, descriptor) do
+    invalid!(
+      descriptor.id,
+      "principal_directory must be a module atom or a non-empty list of them, got #{inspect(payload)}"
+    )
+  end
+
+  defp merge_provider!(descriptor, provider, acc) do
     kind = validate_provider!(descriptor, provider)
 
     case Map.fetch(acc, kind) do
@@ -35,10 +67,6 @@ defmodule Bilimbi.Base.PrincipalDirectory.ContributionValidator do
       :error ->
         Map.put(acc, kind, provider)
     end
-  end
-
-  defp merge_entry!(%{descriptor: descriptor, payload: payload}, _acc) do
-    invalid!(descriptor.id, "principal_directory must be a module atom, got #{inspect(payload)}")
   end
 
   defp validate_provider!(descriptor, provider) do

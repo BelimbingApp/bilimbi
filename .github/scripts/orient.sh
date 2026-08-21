@@ -15,7 +15,10 @@ cd "$ROOT" || exit 2
 REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || echo BelimbingApp/bilimbi)
 
 BLB=${BLB_PATH:-/home/kiat/repo/laravel/blb}
-BLB_COMMIT=e70b4d33c0b10790e681f4c2b5095d85a53bc918
+# Operational citation pin for the Belimbing checkout agents read. Historical
+# compatibility citations may intentionally name older commits; do not rewrite
+# those unless the compatibility decision itself changes.
+BLB_COMMIT=769bc31ddb632f5d2c5acb0fd05b777197df87cc
 
 echo "== canonical Belimbing checkout =="
 # Citing the wrong tree has actually happened: /home/kiat/repo/Belimbing is
@@ -29,7 +32,7 @@ else
   at=$(git -C "$BLB" rev-parse HEAD)
   ahead=$(git -C "$BLB" rev-list --count "${BLB_COMMIT}..HEAD" 2>/dev/null)
   if [ "$at" = "$BLB_COMMIT" ]; then
-    echo "  ok      $BLB at ${at:0:8}, the commit this port targets"
+    echo "  ok      $BLB at ${at:0:8}, the operational citation pin"
   elif git -C "$BLB" merge-base --is-ancestor "$BLB_COMMIT" HEAD 2>/dev/null; then
     echo "  MOVED   $BLB is ${ahead} commit(s) ahead of the pinned ${BLB_COMMIT:0:8} (now ${at:0:8})."
     echo "          Fast-forward, so nothing already cited was rewritten — but these"

@@ -5,6 +5,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.{Department, DepartmentType, LegalEntityType, Relationship}
@@ -282,6 +283,67 @@ defmodule BilimbiWeb.CompanyLiveTest do
                view,
                "#company-employees-table-empty",
                "No employees found for this company."
+             )
+    end
+
+    test "applies URL-state search, sort, and page size to addresses and users", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+      {:ok, scope} = Tenancy.scope(41)
+
+      UserFixtures.insert_user!(%{
+        id: 92,
+        company_id: 73,
+        name: "Grace User",
+        email: "grace@example.com"
+      })
+
+      {:ok, _headquarters} =
+        Address.create_and_attach_to_company(
+          scope,
+          73,
+          %{
+            "label" => "Main HQ",
+            "line1" => "456 Corporate Ave",
+            "locality" => "Kuala Lumpur",
+            "country_iso" => "MY"
+          },
+          %{kind: ["headquarters"], priority: 1}
+        )
+
+      {:ok, _branch} =
+        Address.create_and_attach_to_company(
+          scope,
+          73,
+          %{
+            "label" => "Branch Office",
+            "line1" => "789 Tech Hub",
+            "locality" => "Kuala Lumpur",
+            "country_iso" => "MY"
+          },
+          %{kind: ["branch"], priority: 2}
+        )
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_as()
+        |> live(
+          ~p"/companies/73?addresses_search=branch&addresses_sort=label&addresses_dir=desc&addresses_per_page=50&users_search=grace&users_sort=email&users_dir=desc&users_per_page=50"
+        )
+
+      assert has_element?(view, "#company-addresses-table td", "Branch Office")
+      refute has_element?(view, "#company-addresses-table td", "Main HQ")
+
+      assert has_element?(
+               view,
+               "#company-addresses-card th[aria-sort='descending'] button#company-addresses-sort-label"
+             )
+
+      assert has_element?(view, "#company-users-table td", "Grace User")
+      refute has_element?(view, "#company-users-table td", "Ada Lovelace")
+
+      assert has_element?(
+               view,
+               "#company-users th[aria-sort='descending'] button#company-users-sort-email"
              )
     end
 

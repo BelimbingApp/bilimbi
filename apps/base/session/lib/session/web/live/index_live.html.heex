@@ -15,16 +15,16 @@
           <.icon name="bilimbi-pin" class="size-3.5" />
         </button>
       </:title_actions>
+
       <:subtitle>View and manage active sessions</:subtitle>
     </.header>
 
     <.card id="sessions-card" inner_class="p-0">
       <.form
-        for={%{}}
-        as={:filters}
+        for={@filters_form}
         id="sessions-search"
-        phx-change="search"
-        phx-submit="search"
+        phx-change="filters"
+        phx-submit="filters"
         class="p-2 mb-2"
       >
         <div class="relative">
@@ -33,10 +33,9 @@
             class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
           />
           <.input
+            field={@filters_form[:search]}
             type="search"
-            name="q"
             id="sessions-search-q"
-            value={@query}
             phx-debounce="300"
             label="Search sessions"
             label_class="sr-only"
@@ -52,23 +51,45 @@
         rows={@streams.sessions}
         row_id={fn {id, _session} -> id end}
         row_item={fn {_id, session} -> session end}
+        sort_by={@index_state.sort_by}
+        sort_dir={@index_state.sort_dir}
         framed={false}
       >
-        <:col :let={session} label="User">{user_label(session, @user_names)}</:col>
-        <:col :let={session} label="IP Address">
+        <:col :let={session} label="User" sort="user_id" sort_id="sessions-sort-user_id">
+          {user_label(session, @user_names)}
+        </:col>
+        <:col
+          :let={session}
+          label="IP Address"
+          sort="ip_address"
+          sort_id="sessions-sort-ip_address"
+        >
           <span class="tabular-nums text-ink-muted">{session.ip_address || "—"}</span>
         </:col>
-        <:col :let={session} label="User Agent">
+        <:col
+          :let={session}
+          label="User Agent"
+          sort="user_agent"
+          sort_id="sessions-sort-user_agent"
+        >
           <span class="max-w-xs truncate text-ink-muted" title={session.user_agent}>
             {truncate_ua(session.user_agent)}
           </span>
         </:col>
-        <:col :let={session} label="Last Activity">
-          <span class="text-ink-muted">{relative_activity(session.last_activity)}</span>
+        <:col
+          :let={session}
+          label="Last Activity"
+          sort="last_activity"
+          sort_id="sessions-sort-last_activity"
+        >
+          <span class="text-ink-muted">
+            {relative_activity(session.last_activity)}
+          </span>
         </:col>
         <:col :let={session} label="Status">
           <.badge :if={session.id == @current_session_id} kind={:success}>Current</.badge>
         </:col>
+
         <:action :let={session}>
           <.button
             :if={
@@ -86,10 +107,18 @@
             <span class="sr-only">Terminate</span>
           </.button>
         </:action>
-        <:empty :if={@sessions_count == 0}>
+
+        <:empty :if={@sessions_page.total_entries == 0}>
           No sessions found.
         </:empty>
       </.table>
+
+      <.pagination
+        id="sessions-pagination"
+        page={@sessions_page}
+        page_sizes={@page_sizes}
+        filters_form={@filters_form}
+      />
     </.card>
   </.page>
 </Layouts.app>
