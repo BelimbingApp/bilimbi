@@ -57,6 +57,28 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
       assert result.rows == [%{"doubled" => 84}]
     end
 
+    test "binds atom-keyed params and preserves a false value" do
+      sql = "SELECT :flag::boolean AS flag"
+
+      assert {:ok, result} = Database.execute_readonly(sql, %{flag: false})
+      assert result.rows == [%{"flag" => false}]
+    end
+
+    test "does not mint atoms from SQL-authored parameter names" do
+      # Warm the execution path first so lazy module loading cannot skew the
+      # atom count; the measured call must then create zero atoms even though
+      # its parameter name has never been seen by this VM.
+      assert {:ok, _} = Database.execute_readonly("SELECT :warm::text AS v", %{"warm" => "x"})
+
+      atom_count_before = :erlang.system_info(:atom_count)
+      param = "zz_#{System.unique_integer([:positive])}"
+
+      assert {:ok, result} = Database.execute_readonly("SELECT :#{param}::text AS v", %{param => "x"})
+
+      assert result.rows == [%{"v" => "x"}]
+      assert :erlang.system_info(:atom_count) == atom_count_before
+    end
+
     test "supports pagination and sorting" do
       sql = "SELECT generate_series(1, 10) AS num"
 
