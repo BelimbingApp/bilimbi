@@ -1461,9 +1461,14 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
       <.page variant={:detail}>
         <.header>
-          {Company.Summary.display_name(@company)}
+          {@company.name}
           <:subtitle>
-            {@company.legal_name || @company.code}
+            <%!-- Belimbing: title=name, subtitle=legal_name. Repeating the
+                 name when no distinct legal name exists says nothing, so the
+                 code stands in (#622). --%>
+            {if @company.legal_name && @company.legal_name != @company.name,
+              do: @company.legal_name,
+              else: @company.code}
           </:subtitle>
           <:actions>
             <.badge kind={
@@ -1982,6 +1987,11 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               <.badge kind={:neutral}>
                 {if rel.direction == :outgoing, do: "Outgoing", else: "Incoming"}
               </.badge>
+            </:col>
+            <:col :let={rel} label="Effective">
+              <span class="text-xs tabular-nums text-ink-subtle">
+                {rel.effective_from || "Always"} → {rel.effective_to || "Present"}
+              </span>
             </:col>
             <:col :let={rel} label="Status">
               <.badge kind={if rel.is_active, do: :success, else: :neutral}>

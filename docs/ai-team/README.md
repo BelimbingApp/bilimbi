@@ -216,6 +216,18 @@ supplies the account independence, your marker supplies the agent identity.
 GH_TOKEN=$(cat ~/.secrets/faith_pat) gh pr review <n> --approve --body "..."
 ```
 
+The token buys independence only against the *default-account* author.
+External agents author as `faith-tohmm` too (#635 was), and there the PAT
+records a self-review the gate rejects — record from the default account
+instead. Rule of thumb: **review from whichever account did not author the
+PR**; the gate's verdict line names both sides, so a mistake is visible, not
+silent.
+
+Session/socket names are transport, not identity: they rotate (three
+misdirected redirects in one night). Address agents by roster id in the
+message body and let the recipient disclaim; only `**From:**` lines and
+`agent:*` labels identify anyone.
+
 Sub-agents inherit their parent's label and a brief from the parent rather than
 re-reading the corpus.
 
