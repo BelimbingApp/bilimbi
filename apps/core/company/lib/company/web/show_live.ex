@@ -7,12 +7,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
   use Bilimbi.Base.UI, :live_view
 
-  # Assign-only staging for the activity and metadata forms: these events
-  # mirror the input into socket assigns and write nothing to the domain.
-  # The persisting events (`add_activity`, `save_metadata`) sit behind the
-  # `@write_events` deny clause below (#420).
-  @write_guard_opt_out ~w(update_metadata_input update_new_activity)
-
   import Ecto.Changeset
 
   alias Bilimbi.Base.Settings
