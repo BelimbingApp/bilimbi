@@ -133,7 +133,6 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
     {"apps/core/company/lib/company/web/show_live.ex", "update_metadata_input"},
     {"apps/core/company/lib/company/web/show_live.ex", "update_new_activity"},
     {"apps/core/employee/lib/employee/web/show_live.ex", "toggle_add_subordinate"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "toggle_edit_kind"},
     {"apps/core/user/lib/user/web/appearance_live.ex", "save"},
     {"apps/core/user/lib/user/web/notification_bell_component.ex", "mark_all_read"},
     {"apps/core/user/lib/user/web/notification_bell_component.ex", "toggle_dropdown"},

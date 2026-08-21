@@ -547,6 +547,31 @@ ordinary `test/` directory. A test's physical owner follows the production
 surface it primarily verifies; its execution project follows the runtime
 dependencies it needs.
 
+## Amendment: embeddable panels (#570, 2026-08-21)
+
+A module's web manifest may also declare **embeddable panels** — LiveComponents
+another module's page renders inline without naming the providing module:
+
+```elixir
+%{embed: "employee.addresses", live_component: Bilimbi.Core.Address.Web.EmployeeAddressesPanel}
+```
+
+An embed entry carries exactly `:embed` (a workspace-unique string key),
+`:live_component`, and optional `:capability`; discovery rejects route keys
+mixed into an embed entry, host-declared embeds, and duplicate keys across
+modules. Base UI's `<.discovered_panel key=... id=... current_scope=... opts=...>`
+resolves the key from the same compile-time manifest `RouteContract` reads:
+a missing provider renders a visible not-installed notice, a declared
+capability the scope lacks hides the panel the way menu entries hide, and the
+panel component re-authorizes every write it handles itself.
+
+This exists for pages whose canonical workflow composes another module's
+reads *and writes* inline while the declared dependency runs in the other
+direction (the employee page's address section: `core/address` declares
+`core/employee`, so employee cannot declare address without a cycle). The
+panel inverts UI ownership instead of inverting the dependency: the write
+lives with its owner, and the embedding page holds only a string key.
+
 ## Interim placement rule for in-flight UI
 
 Before the `web:` descriptor key and host router macro land, UI-bearing

@@ -615,8 +615,11 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       view |> element("#toggle-primary-#{address.id}") |> render_click()
       assert render(view) =~ "Address setting updated."
 
-      # Edit priority
-      render_click(view, "edit_address_priority", %{"id" => to_string(address.id)})
+      # Edit priority — driven through the clickable element so the event
+      # reaches the discovered panel component, as a user's click would.
+      view
+      |> element("div[phx-click='edit_address_priority'][phx-value-id='#{address.id}']")
+      |> render_click()
 
       assert has_element?(view, "#priority-form-#{address.id}")
 
@@ -627,9 +630,14 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       assert render(view) =~ "Address setting updated."
       assert has_element?(view, "#address-row-#{address.id}", "10")
 
-      # Edit kinds
-      render_click(view, "edit_address_kinds", %{"id" => to_string(address.id)})
-      render_click(view, "toggle_edit_kind", %{"kind" => "billing"})
+      # Edit kinds — element-driven for the same component-target reason
+      view
+      |> element("div[phx-click='edit_address_kinds'][phx-value-id='#{address.id}']")
+      |> render_click()
+
+      view
+      |> element("input[phx-click='toggle_edit_kind'][phx-value-kind='billing']")
+      |> render_click()
 
       view
       |> element("#save-kinds-#{address.id}")
