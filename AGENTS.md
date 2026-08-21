@@ -173,7 +173,8 @@ UI adapter. Module-owned endpoint/router integration tests live in
 `web_test/`; the Web Mix project discovers and runs them so they can use the
 real host without creating a forbidden module-to-Web dependency. Each such
 directory carries a `test_helper.exs` that requires the Web host's shared test
-helper; discovery fails closed when that bridge is missing.
+helper; discovery fails closed when that bridge or the owner's non-null `web:`
+descriptor is missing.
 
 ## 5. Stable identities and schema compatibility
 

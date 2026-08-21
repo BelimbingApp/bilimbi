@@ -76,8 +76,12 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
       test_path = Path.join(descriptor.path, "web_test")
 
       cond do
-        not is_binary(descriptor.web) or not File.dir?(test_path) ->
+        not File.dir?(test_path) ->
           []
+
+        not is_binary(descriptor.web) ->
+          raise ArgumentError,
+                "#{descriptor.id} web_test requires a non-null web descriptor"
 
         File.regular?(Path.join(test_path, "test_helper.exs")) ->
           [test_path]
