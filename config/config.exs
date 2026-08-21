@@ -30,6 +30,11 @@ config :bilimbi_core_user,
 config :phoenix_live_view,
   root_tag_attribute: "phx-r"
 
+# ADR 0013 (#630): repo-level mutation capture. Base Database defines the
+# seam; Base Audit implements the canonical row policy; the workspace wires
+# them here so no compile-time edge crosses the module graph.
+config :bilimbi_base_database, write_capture: Bilimbi.Base.Audit.MutationCapture
+
 config :esbuild,
   version: "0.25.4",
   bilimbi_web: [
