@@ -2,8 +2,10 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   @moduledoc """
   Shows one employee in the signed-in company and provides administrative management:
   in-place field editing, lifecycle status and type selection, department/supervisor
-  assignments, user account linking, direct subordinates management with sortable table,
-  and address attachments.
+  assignments, and direct subordinates management with sortable table. Account
+  linking and address attachments render as discovered embeds owned by Core User
+  and Core Address (`employee.accounts`, `employee.addresses`); this page names
+  neither module.
 
   Deleting the platform orchestrator (`SYS-001` / `agent`) is refused by the domain as
   `:invariant_violation`; this screen reports that honestly rather than hiding the row.
@@ -87,13 +89,6 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
         _ -> []
       end
 
-    # Users (dynamic dispatch)
-    company_users = list_company_users(scope, company_id)
-    linked_user = Enum.find(company_users, &(&1.employee_id == employee.id))
-
-    available_users =
-      Enum.filter(company_users, &(is_nil(&1.employee_id) or &1.employee_id == employee.id))
-
     # Subordinates
     subordinates =
       case Employee.list_subordinates(scope, company_id, employee.id) do
@@ -125,9 +120,6 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     |> assign(:supervisors, supervisors)
     |> assign(:supervisor_map, supervisor_map)
     |> assign(:employee_types, employee_types)
-    |> assign(:company_users, company_users)
-    |> assign(:linked_user, linked_user)
-    |> assign(:available_users, available_users)
     |> assign(:subordinates, subordinates)
     |> assign(:available_subordinates, available_subordinates)
     |> assign(:sorted_subordinates, sorted_subordinates)
@@ -205,24 +197,13 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       employee = socket.assigns.employee
       type = params["employee_type"] || params["value"] || ""
 
-      # An agent holds no user account, so switching to agent unlinks one. If that
-      # unlink fails the type change must not proceed — it is what makes the
-      # invariant true.
-      unlink =
-        if type == "agent" and not is_nil(socket.assigns.linked_user) do
-          update_user_employee_id(scope, employee.company_id, socket.assigns.linked_user.id, nil)
-        else
-          {:ok, nil}
-        end
-
-      result =
-        with {:ok, _} <- unlink do
-          Employee.update_employee(scope, employee.company_id, employee.id, %{
-            employee_type: type
-          })
-        end
-
-      case result do
+      # "An agent holds no user account" is Core User's invariant now (#581):
+      # its update policy refuses new links to agents, and its employee-page
+      # account panel unlinks when it observes this type change. This page no
+      # longer reaches across the seam at type-change time.
+      case Employee.update_employee(scope, employee.company_id, employee.id, %{
+             employee_type: type
+           }) do
         {:ok, updated_employee} ->
           {:noreply,
            socket
@@ -295,53 +276,6 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
         {:error, _} ->
           {:noreply, put_flash(socket, :error, "Failed to update supervisor assignment.")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit employees.")}
-    end
-  end
-
-  def handle_event("save_user", params, socket) do
-    if socket.assigns.can_manage? do
-      scope = socket.assigns.current_scope.scope
-      employee = socket.assigns.employee
-      current_linked = socket.assigns.linked_user
-
-      user_id_val = params["user_id"] || params["value"] || ""
-
-      target_user_id =
-        case Integer.parse(to_string(user_id_val)) do
-          {id, ""} when id > 0 -> id
-          _ -> nil
-        end
-
-      # Unlink the current user first. A failure here has to stop the link:
-      # carrying on would leave two users pointing at this employee.
-      unlink =
-        if current_linked && current_linked.id != target_user_id do
-          update_user_employee_id(scope, employee.company_id, current_linked.id, nil)
-        else
-          {:ok, nil}
-        end
-
-      result =
-        with {:ok, _} <- unlink do
-          if target_user_id do
-            update_user_employee_id(scope, employee.company_id, target_user_id, employee.id)
-          else
-            {:ok, nil}
-          end
-        end
-
-      case result do
-        {:ok, _} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "User link updated.")
-           |> load_data(employee)}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to update linked user account.")}
       end
     else
       {:noreply, put_flash(socket, :error, "You do not have permission to edit employees.")}
@@ -441,7 +375,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
      |> assign(:sorted_subordinates, sorted)}
   end
 
-  # --- Event Handlers: Addresses ---
+  # --- Event Handlers: Danger Zone ---
 
   def handle_event("delete", _params, socket) do
     scope = socket.assigns.current_scope.scope
@@ -464,40 +398,6 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       end
     else
       {:noreply, put_flash(socket, :error, "You do not have access to that action.")}
-    end
-  end
-
-  # These helpers reach Core.User and Core.Address without a declared dependency,
-  # so `Code.ensure_loaded?/1` and `function_exported?/3` answer "is the module
-  # installed" and the `else` branch is the honest answer when it is not.
-  #
-  # There is deliberately no `rescue` around the `apply/3`. Once those two guards
-  # pass the function exists, so a raise can only come from inside the callee — a
-  # missing table, a constraint, a bug — and that is precisely what must reach the
-  # caller. A `rescue _ -> {:ok, nil}` here reported a failed write as a
-  # successful one (#409), and a `rescue _ -> []` renders a broken section as an
-  # empty one, which is how #359 stayed green in CI.
-
-  defp list_company_users(scope, company_id) do
-    user_mod = Bilimbi.Core.User
-
-    if Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :list_company_users, 2) do
-      case apply(user_mod, :list_company_users, [scope, company_id]) do
-        {:ok, users} -> users
-        _ -> []
-      end
-    else
-      []
-    end
-  end
-
-  defp update_user_employee_id(scope, company_id, user_id, employee_id) do
-    user_mod = Bilimbi.Core.User
-
-    if Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :update_user, 4) do
-      apply(user_mod, :update_user, [scope, company_id, user_id, %{employee_id: employee_id}])
-    else
-      {:error, :not_available}
     end
   end
 
@@ -930,57 +830,18 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   </dd>
                 </div>
 
-                <%= if @employee.employee_type != "agent" do %>
-                  <div>
-                    <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                      User
-                    </dt>
-
-                    <dd class="mt-0.5 text-sm text-ink">
-                      <%= if @can_manage? do %>
-                        <form
-                          phx-change="save_user"
-                          id="employee-user-form"
-                          class="inline-flex items-center gap-2"
-                        >
-                          <select
-                            id="employee-user"
-                            name="user_id"
-                            class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
-                          >
-                            <option value="" selected={is_nil(@linked_user)}>None</option>
-
-                            <%= for u <- @available_users do %>
-                              <option value={u.id} selected={@linked_user && @linked_user.id == u.id}>
-                                {u.name}
-                              </option>
-                            <% end %>
-                          </select>
-
-                          <%= if @linked_user do %>
-                            <.link
-                              navigate={~p"/users/#{@linked_user.id}"}
-                              class="text-xs font-medium text-brand-strong hover:underline"
-                            >
-                              {@linked_user.name}
-                            </.link>
-                          <% end %>
-                        </form>
-                      <% else %>
-                        <%= if @linked_user do %>
-                          <.link
-                            navigate={~p"/users/#{@linked_user.id}"}
-                            class="text-sm text-brand-strong hover:underline"
-                          >
-                            {@linked_user.name}
-                          </.link>
-                        <% else %>
-                          <span class="text-sm text-ink-subtle">None</span>
-                        <% end %>
-                      <% end %>
-                    </dd>
-                  </div>
-                <% end %>
+                <.discovered_panel
+                  key="employee.accounts"
+                  id="account-panel"
+                  current_scope={@current_scope}
+                  opts={
+                    %{
+                      employee_id: @employee.id,
+                      company_id: @employee.company_id,
+                      employee_type: @employee.employee_type
+                    }
+                  }
+                />
 
                 <div>
                   <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">

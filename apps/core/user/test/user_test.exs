@@ -440,6 +440,32 @@ defmodule Bilimbi.Core.UserTest do
       assert {:error, changeset} = User.create_user(scope_a, 73, attributes)
       assert %{employee_id: ["does not belong to the company"]} = errors_on(changeset)
     end
+
+    # An agent holds no user account (#581). This policy is the invariant's
+    # front door; the employee-page panel reconciliation is its back door.
+    test "rejects linking an account to an agent employee", %{scope_a: scope_a} do
+      :ok = Employee.ensure_system_types()
+
+      {:ok, agent} =
+        Employee.create_employee(scope_a, 73, %{
+          employee_number: "AGT-1",
+          full_name: "Helpful Agent",
+          employee_type: "agent"
+        })
+
+      attributes = Map.put(valid_attributes(), :employee_id, agent.id)
+
+      assert {:error, changeset} = User.create_user(scope_a, 73, attributes)
+      assert %{employee_id: ["cannot link an account to an agent"]} = errors_on(changeset)
+
+      {:ok, %{id: user_id}} =
+        User.create_user(scope_a, 73, %{valid_attributes() | email: "grace@example.com"})
+
+      assert {:error, changeset} =
+               User.update_user(scope_a, 73, user_id, %{employee_id: agent.id})
+
+      assert %{employee_id: ["cannot link an account to an agent"]} = errors_on(changeset)
+    end
   end
 
   describe "lifecycle" do
