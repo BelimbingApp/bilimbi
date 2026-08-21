@@ -140,23 +140,23 @@ defmodule Bilimbi.Base.UI.Layouts do
             <span class="text-sm font-semibold tracking-tight text-ink-strong">Bilimbi</span>
           </.link>
 
-          <div class="flex items-center gap-3">
+          <div class="flex min-w-0 flex-1 items-center justify-end gap-3">
             {render_slot(@topbar_actions)}
 
             <p
               id="app-tenant"
-              class="flex min-w-0 max-w-[50%] items-center gap-1.5 text-xs text-ink-subtle"
+              class="flex min-w-0 max-w-[40vw] items-center gap-1.5 text-xs text-ink-subtle"
               title={"Every screen in this shell acts on tenant #{@current_scope.scope.tenant.name}"}
             >
               <.icon name="hero-identification" class="size-3.5 shrink-0" />
-              <span class="hidden sm:inline">Tenant</span>
-              <span class="truncate font-medium text-ink-muted">
+              <span class="hidden shrink-0 whitespace-nowrap sm:inline">Tenant</span>
+              <span class="min-w-0 truncate font-medium text-ink-muted">
                 {@current_scope.scope.tenant.name}
               </span>
-              <span class="tabular-nums">#{@current_scope.scope.tenant.id}</span>
+              <span class="shrink-0 whitespace-nowrap tabular-nums">#{@current_scope.scope.tenant.id}</span>
               <span
                 :if={@current_scope.scope.tenant.is_platform_operator}
-                class="hidden text-ink-faint sm:inline"
+                class="hidden shrink-0 whitespace-nowrap text-ink-faint sm:inline"
               >
                 · platform operator
               </span>

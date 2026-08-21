@@ -63,6 +63,8 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
      |> assign(:company_order, Enum.map(companies, & &1.id))}
   end
 
+  @page_sizes [25, 50, 100, 300]
+
   @impl true
   def handle_params(params, _uri, socket) do
     {:noreply, load(socket, state_from_params(params))}
@@ -70,10 +72,14 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
 
   @impl true
   def handle_event("filter", params, socket) do
+    current = socket.assigns.state
+    per_page = get_in(params, ["filters", "perPage"]) || Map.get(params, "perPage")
+
     state = %{
-      socket.assigns.state
-      | search: Map.get(params, "search", ""),
-        result: member_or_blank(Map.get(params, "result"), @results),
+      current
+      | search: Map.get(params, "search", current.search),
+        result: member_or_blank(Map.get(params, "result", current.result), @results),
+        page_size: page_size_from(per_page, current.page_size),
         page: 1
     }
 
@@ -122,7 +128,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
         sort_by: state.sort_by,
         sort_dir: state.sort_dir,
         page: state.page,
-        page_size: 25,
+        page_size: state.page_size,
         company_order: socket.assigns.company_order
       )
 
@@ -137,6 +143,10 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
+      |> assign(
+        :filters_form,
+        to_form(%{"perPage" => Integer.to_string(state.page_size)}, as: :filters)
+      )
       |> stream(:grants, page.entries, reset: true)
     end
   end
@@ -154,7 +164,8 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
       result: member_or_blank(Map.get(params, "result"), @results),
       sort_by: sort_by_from(Map.get(params, "sort_by")),
       sort_dir: sort_dir_from(params),
-      page: to_int(Map.get(params, "page"), 1)
+      page: to_int(Map.get(params, "page"), 1),
+      page_size: page_size_from(Map.get(params, "per_page"), 25)
     }
   end
 
@@ -164,8 +175,16 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
       "result" => state.result,
       "sort_by" => state.sort_by,
       "sort_dir" => state.sort_dir,
-      "page" => state.page
+      "page" => state.page,
+      "per_page" => state.page_size
     }
+  end
+
+  defp page_size_from(value, fallback) do
+    case to_int(value, fallback) do
+      size when size in @page_sizes -> size
+      _ -> fallback
+    end
   end
 
   # Anything unrecognised becomes "no filter" rather than reaching
@@ -232,9 +251,6 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
   # Extracted so the summary line stays one readable line, as the sibling Roles
   # and Decision Logs screens have it. Inline, the longer noun pushed the `if`
   # past the formatter's width and it came back as six wrapped lines.
-  defp grant_noun(1), do: "direct capability"
-  defp grant_noun(_count), do: "direct capabilities"
-
   # The grants query is visibility-filtered to `company_ids/1`, and the
   # directory returns exactly that id set, so every row resolves. A company
   # archived between the two queries is not in the directory; its id is the

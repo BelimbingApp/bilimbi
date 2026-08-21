@@ -20,7 +20,8 @@ defmodule Bilimbi.Base.Authz.Administration do
   alias Bilimbi.Base.Tenancy.Scope
 
   @default_page_size 25
-  @maximum_page_size 100
+  # 300 is the largest §12 operational-list page size (25/50/100/300).
+  @maximum_page_size 300
   @capability_sort_fields %{
     key: :key,
     domain: :domain,

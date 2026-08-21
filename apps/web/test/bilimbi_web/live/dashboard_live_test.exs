@@ -12,7 +12,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
   setup do
     UserFixtures.create_user_tables!()
-    CompanyFixtures.insert_tenant!(%{id: 41})
+    CompanyFixtures.insert_tenant!(%{id: 41, name: "Bilimbi local development"})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     CompanyFixtures.assign_primary_company!(41, 73)
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
@@ -28,6 +28,19 @@ defmodule BilimbiWeb.DashboardLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
     assert has_element?(view, "#app-tenant", "41")
+    assert has_element?(view, "#app-tenant span.truncate", "Bilimbi local development")
+
+    assert has_element?(
+             view,
+             "#app-tenant span.whitespace-nowrap",
+             "· platform operator"
+           )
+
+    assert has_element?(
+             view,
+             "#app-tenant[title='Every screen in this shell acts on tenant Bilimbi local development']"
+           )
+
     assert has_element?(view, "#stat-companies", "1")
     assert has_element?(view, "#stat-users", "1")
 
