@@ -160,11 +160,6 @@ defmodule Bilimbi.Core.User.Web.NotificationBellComponent do
     end
   end
 
-  defp current_user_id(current_scope) do
-    user = current_scope.user
-    user["user_id"] || user["id"] || user[:id] || 0
-  end
-
   def badge_count(count) when count > 99, do: "99+"
   def badge_count(count), do: to_string(count)
 

@@ -58,6 +58,11 @@ group that Core Company declares — `company_external_accesses.user_id`, its
 because the verifier reports a partly-present optional group as an incomplete
 contribution.
 
+Bilimbi also adds Bilimbi-only indexes on `users.company_id` and
+`users.employee_id`. Belimbing's PostgreSQL schema lacks them, so the schema
+contract treats those indexes as optional during adoption while normal Bilimbi
+migration installs them for fresh and adopted databases.
+
 ## Design notes
 
 **Tenancy is derived, not stored.** `users` has no `tenant_id`. A user reaches

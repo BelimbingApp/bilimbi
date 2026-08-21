@@ -201,9 +201,8 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
         []
       )
 
-      # Perf and Schedule's newer empty runtime migrations roll back first; the
-      # third step reaches Geonames and must refuse retained operator provenance.
-      {output, status} = run_mix("bilimbi.rollback", ["--step", "3", "--quiet"], env)
+      step = rollback_step_to(Bilimbi.Core.Geonames.Migrations.CreatePostcodeOverrides)
+      {output, status} = run_mix("bilimbi.rollback", ["--step", to_string(step), "--quiet"], env)
 
       assert status != 0
       assert output =~ "cannot roll back postcode overrides while operator corrections exist"
@@ -226,7 +225,8 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
         []
       )
 
-      {output, status} = run_mix("bilimbi.rollback", ["--step", "1", "--quiet"], env)
+      step = rollback_step_to(Bilimbi.Base.Perf.Migrations.CreateSamples)
+      {output, status} = run_mix("bilimbi.rollback", ["--step", to_string(step), "--quiet"], env)
 
       assert status != 0
       assert output =~ "cannot roll back Base Perf while performance history exists"
@@ -336,6 +336,18 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       []
     ).rows
     |> Enum.map(fn [version] -> version end)
+  end
+
+  defp rollback_step_to(module) do
+    Compatibility.migration_entries()
+    |> Enum.reverse()
+    |> Enum.find_index(fn {_version, migration_module, _disposition} ->
+      migration_module == module
+    end)
+    |> case do
+      nil -> raise ArgumentError, "unknown migration module: #{inspect(module)}"
+      index -> index + 1
+    end
   end
 
   defp relation(table) do
