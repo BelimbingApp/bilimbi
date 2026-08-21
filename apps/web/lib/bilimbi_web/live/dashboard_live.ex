@@ -25,6 +25,13 @@ defmodule BilimbiWeb.DashboardLive do
   alias Bilimbi.Core.User
   alias BilimbiWeb.UserAuth
 
+  @dashboard_layout_key "ui.dashboard.layout"
+  @dashboard_sections_key "ui.dashboard.sections"
+
+  # These customize the signed-in actor's own dashboard preference. They are
+  # self-service settings writes, not privileged administration writes (#376).
+  @write_guard_opt_out ~w(add-section remove-section move-section-up move-section-down)
+
   @widget_modules %{
     "base-dashboard-company-stats" => BilimbiWeb.Dashboard.CompanyStatsWidget,
     "base-dashboard-user-stats" => BilimbiWeb.Dashboard.UserStatsWidget,
@@ -49,6 +56,12 @@ defmodule BilimbiWeb.DashboardLive do
     layout = user_layout(socket.assigns.current_scope)
     visible = ordered_visible(authorized, layout)
     available = available_widgets(authorized, visible)
+    default_section_ids = default_section_ids(current_company, users)
+
+    visible_sections =
+      ordered_visible_sections(default_section_ids, user_sections(socket.assigns.current_scope))
+
+    available_sections = available_sections(default_section_ids, visible_sections)
 
     audit_entries = audit_entries(scope)
     session_count = session_count(visible)
@@ -60,9 +73,15 @@ defmodule BilimbiWeb.DashboardLive do
      |> assign(:active_nav, nil)
      |> assign(:widgets, visible)
      |> assign(:available_widgets, available)
+     |> assign(:default_section_ids, default_section_ids)
+     |> assign(:visible_sections, visible_sections)
+     |> assign(:available_sections, available_sections)
      |> assign(:full_catalogue, full_catalogue)
      |> assign(:company_count, length(companies))
+     |> assign(:active_company_count, active_company_count(companies))
      |> assign(:user_count, length(users))
+     |> assign(:verified_user_count, verified_user_count(users))
+     |> assign(:unverified_user_count, unverified_user_count(users))
      |> assign(:session_count, session_count)
      |> assign(:perf_diagnostics, perf_diagnostics)
      |> assign(:audit_entries, audit_entries)
@@ -101,6 +120,18 @@ defmodule BilimbiWeb.DashboardLive do
     ).entries
   end
 
+  defp active_company_count(companies) do
+    Enum.count(companies, &(&1.status == "active"))
+  end
+
+  defp verified_user_count(users) do
+    Enum.count(users, &(!is_nil(&1.email_verified_at)))
+  end
+
+  defp unverified_user_count(users) do
+    Enum.count(users, &is_nil(&1.email_verified_at))
+  end
+
   defp widget_module(widget_id) do
     Map.get(@widget_modules, widget_id)
   end
@@ -135,15 +166,10 @@ defmodule BilimbiWeb.DashboardLive do
   # dashboard (#359). `overridden?/2` asks the question the layout actually
   # depends on: is there a stored row for this user?
   defp user_layout(current_scope) do
-    settings_scope =
-      Settings.Scope.user(
-        current_scope.user["user_id"],
-        current_scope.user["company_id"],
-        current_scope.scope.tenant.id
-      )
+    settings_scope = user_settings_scope(current_scope)
 
-    with true <- Settings.overridden?("ui.dashboard.layout", settings_scope),
-         value when is_list(value) <- Settings.get("ui.dashboard.layout", settings_scope) do
+    with true <- Settings.overridden?(@dashboard_layout_key, settings_scope),
+         value when is_list(value) <- Settings.get(@dashboard_layout_key, settings_scope) do
       value
     else
       _ -> nil
@@ -151,14 +177,30 @@ defmodule BilimbiWeb.DashboardLive do
   end
 
   defp persist_layout(current_scope, widget_ids) do
-    settings_scope =
-      Settings.Scope.user(
-        current_scope.user["user_id"],
-        current_scope.user["company_id"],
-        current_scope.scope.tenant.id
-      )
+    Settings.put(@dashboard_layout_key, widget_ids, user_settings_scope(current_scope))
+  end
 
-    Settings.put("ui.dashboard.layout", widget_ids, settings_scope)
+  defp user_sections(current_scope) do
+    settings_scope = user_settings_scope(current_scope)
+
+    with true <- Settings.overridden?(@dashboard_sections_key, settings_scope),
+         value when is_list(value) <- Settings.get(@dashboard_sections_key, settings_scope) do
+      value
+    else
+      _ -> nil
+    end
+  end
+
+  defp persist_sections(current_scope, section_ids) do
+    Settings.put(@dashboard_sections_key, section_ids, user_settings_scope(current_scope))
+  end
+
+  defp user_settings_scope(current_scope) do
+    Settings.Scope.user(
+      current_scope.user["user_id"],
+      current_scope.user["company_id"],
+      current_scope.scope.tenant.id
+    )
   end
 
   defp authorized_catalogue(catalogue, current_scope) do
@@ -182,6 +224,24 @@ defmodule BilimbiWeb.DashboardLive do
     visible_ids = MapSet.new(visible, & &1.id)
     Enum.reject(authorized_catalogue, &(&1.id in visible_ids))
   end
+
+  defp ordered_visible_sections(default_ids, nil), do: default_ids
+
+  defp ordered_visible_sections(default_ids, section_ids) when is_list(section_ids) do
+    Enum.filter(section_ids, &(&1 in default_ids))
+  end
+
+  defp available_sections(default_ids, visible_ids) do
+    Enum.reject(default_ids, &(&1 in visible_ids))
+  end
+
+  defp default_section_ids(current_company, _users) do
+    ids = ["recent-users"]
+    if current_company, do: ["current-company" | ids], else: ids
+  end
+
+  defp section_label("current-company"), do: "Your Company"
+  defp section_label("recent-users"), do: "People in this workspace"
 
   @impl true
   def handle_event("add-widget", %{"id" => id}, socket) do
@@ -226,6 +286,56 @@ defmodule BilimbiWeb.DashboardLive do
       {[], _} ->
         {:noreply, socket}
     end
+  end
+
+  @impl true
+  def handle_event("add-section", %{"id" => id}, socket) do
+    if id in socket.assigns.available_sections do
+      visible_sections = socket.assigns.visible_sections ++ [id]
+
+      available_sections =
+        available_sections(socket.assigns.default_section_ids, visible_sections)
+
+      _ = persist_sections(socket.assigns.current_scope, visible_sections)
+
+      {:noreply,
+       socket
+       |> assign(:visible_sections, visible_sections)
+       |> assign(:available_sections, available_sections)
+       |> put_flash(:info, "#{section_label(id)} added to dashboard.")}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("remove-section", %{"id" => id}, socket) do
+    if id in socket.assigns.visible_sections do
+      visible_sections = List.delete(socket.assigns.visible_sections, id)
+
+      available_sections =
+        available_sections(socket.assigns.default_section_ids, visible_sections)
+
+      _ = persist_sections(socket.assigns.current_scope, visible_sections)
+
+      {:noreply,
+       socket
+       |> assign(:visible_sections, visible_sections)
+       |> assign(:available_sections, available_sections)
+       |> put_flash(:info, "#{section_label(id)} removed from dashboard.")}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("move-section-up", %{"id" => id}, socket) do
+    move_section(socket, id, -1)
+  end
+
+  @impl true
+  def handle_event("move-section-down", %{"id" => id}, socket) do
+    move_section(socket, id, 1)
   end
 
   @impl true
@@ -278,8 +388,22 @@ defmodule BilimbiWeb.DashboardLive do
     end
   end
 
+  defp move_section(socket, id, direction) do
+    sections = move_one(socket.assigns.visible_sections, id, direction)
+
+    if sections == socket.assigns.visible_sections do
+      {:noreply, socket}
+    else
+      _ = persist_sections(socket.assigns.current_scope, sections)
+      {:noreply, assign(socket, :visible_sections, sections)}
+    end
+  end
+
+  defp item_id(%{id: id}), do: id
+  defp item_id(id) when is_binary(id), do: id
+
   defp move_one(widgets, id, direction) do
-    case Enum.find_index(widgets, &(&1.id == id)) do
+    case Enum.find_index(widgets, &(item_id(&1) == id)) do
       nil ->
         widgets
 
@@ -328,34 +452,34 @@ defmodule BilimbiWeb.DashboardLive do
         <.header>
           Dashboard
           <:subtitle>
-            Signed in as {@current_scope.user["name"]} · {@current_scope.scope.tenant.name}
+            {@current_scope.scope.tenant.name} · {@current_scope.user["name"]}
           </:subtitle>
           <:actions>
             <.button
               :if={!@layout_editing}
-              id="edit-layout"
+              id="customize-layout"
               phx-click="toggle-layout-edit"
-              variant="primary"
+              class="rounded-lg px-3 py-1.5 text-xs font-medium shadow-none"
             >
-              Edit layout
+              Customize
             </.button>
             <.button
               :if={@layout_editing}
-              id="done-layout"
+              id="close-customize"
               phx-click="toggle-layout-edit"
-              variant="primary"
+              class="rounded-lg px-3 py-1.5 text-xs font-medium shadow-none"
             >
-              Done
+              Close
             </.button>
           </:actions>
         </.header>
 
         <div
-          :if={@layout_editing and @available_widgets != []}
+          :if={@layout_editing and (@available_widgets != [] or @available_sections != [])}
           id="add-widget-section"
           class="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface p-3 shadow-xs"
         >
-          <span class="text-xs font-semibold text-ink-muted">Add widget:</span>
+          <span class="text-xs font-semibold text-ink-muted">Customize dashboard:</span>
           <button
             :for={w <- @available_widgets}
             id={"add-widget-#{w.id}"}
@@ -366,20 +490,34 @@ defmodule BilimbiWeb.DashboardLive do
           >
             + {w.label}
           </button>
+          <button
+            :for={id <- @available_sections}
+            id={"add-section-#{id}"}
+            type="button"
+            phx-click="add-section"
+            phx-value-id={id}
+            class="rounded-md border border-line bg-surface-sunken px-2 py-1 text-xs font-medium text-ink transition hover:bg-surface hover:text-ink-strong"
+          >
+            + {section_label(id)}
+          </button>
         </div>
 
         <div
           :if={@widgets != []}
           id="dashboard-widgets"
           phx-hook="DashboardSort"
-          data-sort-enabled={if @layout_editing, do: "true", else: "false"}
-          class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3"
+          data-sort-enabled={to_string(@layout_editing)}
+          class="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-2"
         >
           <.render_widget
             :for={widget <- @widgets}
             widget={widget}
             company_count={@company_count}
+            active_company_count={@active_company_count}
             user_count={@user_count}
+            verified_user_count={@verified_user_count}
+            unverified_user_count={@unverified_user_count}
+            current_company={@current_company}
             session_count={@session_count}
             perf_diagnostics={@perf_diagnostics}
             audit_entries={@audit_entries}
@@ -394,80 +532,153 @@ defmodule BilimbiWeb.DashboardLive do
             phx-click="toggle-layout-edit"
             class="font-medium text-ink underline underline-offset-2 hover:text-ink-strong"
           >
-            Edit layout
+            Customize dashboard
           </.link>
           &nbsp;to add widgets.
         </p>
 
-        <section
-          :if={@current_company}
-          id="dashboard-current-company"
-          data-company-id={@current_company.id}
-          class="mt-6 overflow-hidden rounded-xl border border-line bg-surface shadow-xs shadow-ink/[0.03]"
-        >
-          <div class="h-0.5 bg-brand" aria-hidden="true"></div>
-          <div class="flex items-center justify-between gap-4 px-5 py-4">
-            <div class="min-w-0">
-              <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-                Your company
-              </p>
-              <h2
-                id="dashboard-company-name"
-                class="mt-1 truncate text-base font-semibold text-ink-strong"
+        <%= for section_id <- @visible_sections do %>
+          <%= case section_id do %>
+            <% "current-company" -> %>
+              <section
+                :if={@current_company}
+                id="dashboard-current-company"
+                data-company-id={@current_company.id}
+                class="mt-6 overflow-hidden rounded-xl border border-line bg-surface shadow-xs shadow-ink/[0.03]"
               >
-                {Company.Summary.display_name(@current_company)}
-              </h2>
-              <p class="mt-0.5 text-xs text-ink-subtle">
-                <code class="font-medium">{@current_company.code}</code>
-              </p>
-            </div>
-            <div class="flex shrink-0 flex-col items-end gap-2">
-              <.badge kind={if @current_company.status == "active", do: :success, else: :warning}>
-                {@current_company.status}
-              </.badge>
-              <.link
-                :if={UserAuth.allowed?(@current_scope, "admin.company.view")}
-                navigate={~p"/companies/#{@current_company.id}"}
-                id="dashboard-company-open"
-                class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
-              >
-                Open company
-              </.link>
-            </div>
-          </div>
-        </section>
-
-        <section id="dashboard-recent-users" class="mt-6">
-          <div class="mb-2 flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-ink-strong">People in this workspace</h2>
-            <.link
-              :if={UserAuth.allowed?(@current_scope, "admin.user.list")}
-              navigate={~p"/users"}
-              class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
-            >
-              All users
-            </.link>
-          </div>
-          <.table
-            id="dashboard-users"
-            rows={Enum.take(@users, 5)}
-            row_id={&"dashboard-user-#{&1.id}"}
-            caption="People in this workspace"
-          >
-            <:col :let={user} label="Name">
-              <span class="font-medium">{user.name}</span>
-            </:col>
-            <:col :let={user} label="Email">{user.email}</:col>
-            <:col :let={user} label="Email verified">
-              <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
-                {if user.email_verified_at, do: "verified", else: "unverified"}
-              </.badge>
-            </:col>
-            <:empty :if={@users == []}>
-              No users are affiliated with a company in this tenant yet.
-            </:empty>
-          </.table>
-        </section>
+                <div class="h-0.5 bg-brand" aria-hidden="true"></div>
+                <div class="flex items-center justify-between gap-4 px-5 py-4">
+                  <div class="min-w-0">
+                    <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                      Your company
+                    </p>
+                    <h2
+                      id="dashboard-company-name"
+                      class="mt-1 truncate text-base font-semibold text-ink-strong"
+                    >
+                      {Company.Summary.display_name(@current_company)}
+                    </h2>
+                    <p class="mt-0.5 text-xs text-ink-subtle">
+                      <code class="font-medium">{@current_company.code}</code>
+                    </p>
+                  </div>
+                  <div class="flex shrink-0 flex-col items-end gap-2">
+                    <.badge kind={
+                      if @current_company.status == "active", do: :success, else: :warning
+                    }>
+                      {@current_company.status}
+                    </.badge>
+                    <.link
+                      :if={
+                        !@layout_editing and UserAuth.allowed?(@current_scope, "admin.company.view")
+                      }
+                      navigate={~p"/companies/#{@current_company.id}"}
+                      id="dashboard-company-open"
+                      class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
+                    >
+                      Open company
+                    </.link>
+                    <div :if={@layout_editing} class="flex gap-0.5">
+                      <button
+                        id="move-section-up-current-company"
+                        type="button"
+                        phx-click="move-section-up"
+                        phx-value-id="current-company"
+                        title="Move up"
+                        class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                      >
+                        <.icon name="hero-chevron-up" class="size-3" />
+                      </button>
+                      <button
+                        id="move-section-down-current-company"
+                        type="button"
+                        phx-click="move-section-down"
+                        phx-value-id="current-company"
+                        title="Move down"
+                        class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                      >
+                        <.icon name="hero-chevron-down" class="size-3" />
+                      </button>
+                      <button
+                        id="remove-section-current-company"
+                        type="button"
+                        phx-click="remove-section"
+                        phx-value-id="current-company"
+                        class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                        title="Remove section"
+                      >
+                        <.icon name="hero-x-mark" class="size-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            <% "recent-users" -> %>
+              <section id="dashboard-recent-users" class="mt-6">
+                <div class="mb-2 flex items-center justify-between">
+                  <h2 class="text-sm font-semibold text-ink-strong">People in this workspace</h2>
+                  <.link
+                    :if={!@layout_editing and UserAuth.allowed?(@current_scope, "admin.user.list")}
+                    navigate={~p"/users"}
+                    class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
+                  >
+                    All users
+                  </.link>
+                  <div :if={@layout_editing} class="flex gap-0.5">
+                    <button
+                      id="move-section-up-recent-users"
+                      type="button"
+                      phx-click="move-section-up"
+                      phx-value-id="recent-users"
+                      title="Move up"
+                      class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                    >
+                      <.icon name="hero-chevron-up" class="size-3" />
+                    </button>
+                    <button
+                      id="move-section-down-recent-users"
+                      type="button"
+                      phx-click="move-section-down"
+                      phx-value-id="recent-users"
+                      title="Move down"
+                      class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                    >
+                      <.icon name="hero-chevron-down" class="size-3" />
+                    </button>
+                    <button
+                      id="remove-section-recent-users"
+                      type="button"
+                      phx-click="remove-section"
+                      phx-value-id="recent-users"
+                      class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+                      title="Remove section"
+                    >
+                      <.icon name="hero-x-mark" class="size-3" />
+                    </button>
+                  </div>
+                </div>
+                <.table
+                  id="dashboard-users"
+                  rows={Enum.take(@users, 5)}
+                  row_id={&"dashboard-user-#{&1.id}"}
+                  caption="People in this workspace"
+                >
+                  <:col :let={user} label="Name">
+                    <span class="font-medium">{user.name}</span>
+                  </:col>
+                  <:col :let={user} label="Email">{user.email}</:col>
+                  <:col :let={user} label="Email verified">
+                    <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
+                      {if user.email_verified_at, do: "verified", else: "unverified"}
+                    </.badge>
+                  </:col>
+                  <:empty :if={@users == []}>
+                    No users are affiliated with a company in this tenant yet.
+                  </:empty>
+                </.table>
+              </section>
+          <% end %>
+        <% end %>
       </.page>
     </Layouts.app>
     """
@@ -484,42 +695,44 @@ defmodule BilimbiWeb.DashboardLive do
           type="button"
           draggable="true"
           data-role="drag-handle"
-          title="Drag to reorder. Use the move buttons for keyboard access."
+          title="Drag to reorder. Changes save when dropped."
           aria-label={"Drag to reorder #{@widget.label}"}
           class="grid size-5 cursor-grab touch-none place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong active:cursor-grabbing"
         >
           <.icon name="hero-bars-3" class="size-3" />
         </button>
-        <button
-          id={"move-up-#{@id}"}
-          type="button"
-          phx-click="move-up"
-          phx-value-id={@id}
-          title="Move up"
-          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-        >
-          <.icon name="hero-chevron-up" class="size-3" />
-        </button>
-        <button
-          id={"move-down-#{@id}"}
-          type="button"
-          phx-click="move-down"
-          phx-value-id={@id}
-          title="Move down"
-          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-        >
-          <.icon name="hero-chevron-down" class="size-3" />
-        </button>
-        <button
-          id={"remove-#{@id}"}
-          type="button"
-          phx-click="remove-widget"
-          phx-value-id={@id}
-          title="Remove widget"
-          class="ml-1 grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-        >
-          <.icon name="hero-x-mark" class="size-3" />
-        </button>
+        <div class="flex gap-0.5">
+          <button
+            id={"move-up-#{@id}"}
+            type="button"
+            phx-click="move-up"
+            phx-value-id={@id}
+            title="Move up"
+            class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          >
+            <.icon name="hero-chevron-up" class="size-3" />
+          </button>
+          <button
+            id={"move-down-#{@id}"}
+            type="button"
+            phx-click="move-down"
+            phx-value-id={@id}
+            title="Move down"
+            class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          >
+            <.icon name="hero-chevron-down" class="size-3" />
+          </button>
+          <button
+            id={"remove-#{@id}"}
+            type="button"
+            phx-click="remove-widget"
+            phx-value-id={@id}
+            title="Remove widget"
+            class="ml-1 grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          >
+            <.icon name="hero-x-mark" class="size-3" />
+          </button>
+        </div>
       </div>
 
       <%= case @id do %>
@@ -527,8 +740,10 @@ defmodule BilimbiWeb.DashboardLive do
           <.company_stat_card
             id="stat-companies"
             count={@company_count}
+            active_count={@active_company_count}
+            current_code={@current_company && @current_company.code}
             navigate={
-              if UserAuth.allowed?(@current_scope, "admin.company.list"),
+              if !@layout_editing and UserAuth.allowed?(@current_scope, "admin.company.list"),
                 do: ~p"/companies"
             }
           />
@@ -536,8 +751,10 @@ defmodule BilimbiWeb.DashboardLive do
           <.user_stat_card
             id="stat-users"
             count={@user_count}
+            verified_count={@verified_user_count}
+            unverified_count={@unverified_user_count}
             navigate={
-              if UserAuth.allowed?(@current_scope, "admin.user.list"),
+              if !@layout_editing and UserAuth.allowed?(@current_scope, "admin.user.list"),
                 do: ~p"/users"
             }
           />
@@ -546,7 +763,7 @@ defmodule BilimbiWeb.DashboardLive do
             id="stat-sessions"
             count={@session_count}
             navigate={
-              if UserAuth.allowed?(@current_scope, "admin.system.session.list"),
+              if !@layout_editing and UserAuth.allowed?(@current_scope, "admin.system.session.list"),
                 do: "/system/sessions"
             }
           />
@@ -555,32 +772,22 @@ defmodule BilimbiWeb.DashboardLive do
             id="stat-recent-audit"
             entries={@audit_entries}
             navigate={
-              if UserAuth.allowed?(@current_scope, "admin.audit.log.list"),
+              if !@layout_editing and UserAuth.allowed?(@current_scope, "admin.audit.log.list"),
                 do: ~p"/audit/mutations"
             }
           />
         <% "base-perf-health" -> %>
-          <.link
-            navigate="/system/performance"
+          <.performance_stat_card
             id="stat-performance"
-            class="block rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
-          >
-            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-              Performance
-            </p>
-            <p class="mt-1 text-sm font-semibold text-ink-strong">
-              {performance_health(@perf_diagnostics)}
-            </p>
-            <p class="mt-1 text-xs tabular-nums text-muted">
-              {performance_samples(@perf_diagnostics)} retained samples
-            </p>
-          </.link>
+            diagnostics={@perf_diagnostics}
+            navigate={if !@layout_editing, do: "/system/performance"}
+          />
         <% other_id -> %>
           <div
             id={"dashboard-widget-#{other_id}"}
             class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
           >
-            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
               {@widget.label}
             </p>
           </div>
@@ -599,7 +806,73 @@ defmodule BilimbiWeb.DashboardLive do
   defp performance_samples(_diagnostics), do: "—"
 
   attr(:id, :string, required: true)
+  attr(:diagnostics, :map, default: nil)
+  attr(:navigate, :string, default: nil)
+
+  defp performance_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
+    ~H"""
+    <.link
+      navigate={@navigate}
+      id={@id}
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
+    >
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
+          Performance
+        </p>
+        <.action_arrow_icon />
+      </div>
+      <div class="mt-2.5 grid grid-cols-2 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Health</p>
+          <p class="mt-1 text-sm font-semibold text-ink-strong">
+            {performance_health(@diagnostics)}
+          </p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Samples</p>
+          <p class="mt-1 text-sm font-semibold tabular-nums text-ink-strong">
+            {performance_samples(@diagnostics)}
+          </p>
+        </div>
+      </div>
+    </.link>
+    """
+  end
+
+  defp performance_stat_card(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class="rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03]"
+    >
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
+          Performance
+        </p>
+      </div>
+      <div class="mt-2.5 grid grid-cols-2 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Health</p>
+          <p class="mt-1 text-sm font-semibold text-ink-strong">
+            {performance_health(@diagnostics)}
+          </p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Samples</p>
+          <p class="mt-1 text-sm font-semibold tabular-nums text-ink-strong">
+            {performance_samples(@diagnostics)}
+          </p>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  attr(:id, :string, required: true)
   attr(:count, :integer, required: true)
+  attr(:active_count, :integer, required: true)
+  attr(:current_code, :string, default: nil)
   attr(:navigate, :string, default: nil)
 
   defp company_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
@@ -607,15 +880,28 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Companies</p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
-      <span class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 group-hover:text-ink">
-        View all
-      </span>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
+          Companies
+        </p>
+        <.action_arrow_icon />
+      </div>
+      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Total</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
+        </div>
+        <div class="px-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Active</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@active_count}</p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Current</p>
+          <p class="mt-1 truncate text-sm font-semibold text-ink-strong">{@current_code || "—"}</p>
+        </div>
+      </div>
     </.link>
     """
   end
@@ -624,18 +910,35 @@ defmodule BilimbiWeb.DashboardLive do
     ~H"""
     <div
       id={@id}
-      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+      class="rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03]"
     >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Companies</p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
+          Companies
+        </p>
+      </div>
+      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Total</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
+        </div>
+        <div class="px-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Active</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@active_count}</p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Current</p>
+          <p class="mt-1 truncate text-sm font-semibold text-ink-strong">{@current_code || "—"}</p>
+        </div>
+      </div>
     </div>
     """
   end
 
   attr(:id, :string, required: true)
   attr(:count, :integer, required: true)
+  attr(:verified_count, :integer, required: true)
+  attr(:unverified_count, :integer, required: true)
   attr(:navigate, :string, default: nil)
 
   defp user_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
@@ -643,15 +946,30 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Users</p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
-      <span class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 group-hover:text-ink">
-        View all
-      </span>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">Users</p>
+        <.action_arrow_icon />
+      </div>
+      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Total</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
+        </div>
+        <div class="px-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Verified</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">
+            {@verified_count}
+          </p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Pending</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">
+            {@unverified_count}
+          </p>
+        </div>
+      </div>
     </.link>
     """
   end
@@ -660,12 +978,29 @@ defmodule BilimbiWeb.DashboardLive do
     ~H"""
     <div
       id={@id}
-      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+      class="rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03]"
     >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">Users</p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">Users</p>
+      </div>
+      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Total</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
+        </div>
+        <div class="px-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Verified</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">
+            {@verified_count}
+          </p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Pending</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">
+            {@unverified_count}
+          </p>
+        </div>
+      </div>
     </div>
     """
   end
@@ -681,17 +1016,28 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-        Sessions
-      </p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
-      <span class="mt-2 inline-block text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 group-hover:text-ink">
-        View all
-      </span>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
+          Sessions
+        </p>
+        <.action_arrow_icon />
+      </div>
+      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Open</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
+        </div>
+        <div class="px-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Store</p>
+          <p class="mt-1 text-sm font-semibold text-ink-strong">Durable</p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Scope</p>
+          <p class="mt-1 text-sm font-semibold text-ink-strong">Platform</p>
+        </div>
+      </div>
     </.link>
     """
   end
@@ -700,14 +1046,27 @@ defmodule BilimbiWeb.DashboardLive do
     ~H"""
     <div
       id={@id}
-      class="rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03]"
+      class="rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03]"
     >
-      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-        Sessions
-      </p>
-      <p class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-ink-strong">
-        {@count}
-      </p>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
+          Sessions
+        </p>
+      </div>
+      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
+        <div class="pr-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Open</p>
+          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
+        </div>
+        <div class="px-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Store</p>
+          <p class="mt-1 text-sm font-semibold text-ink-strong">Durable</p>
+        </div>
+        <div class="pl-3">
+          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Scope</p>
+          <p class="mt-1 text-sm font-semibold text-ink-strong">Platform</p>
+        </div>
+      </div>
     </div>
     """
   end
@@ -720,22 +1079,24 @@ defmodule BilimbiWeb.DashboardLive do
     ~H"""
     <div id={@id} class="rounded-xl border border-line bg-surface shadow-xs shadow-ink/[0.03]">
       <div class="flex items-center justify-between border-b border-line px-4 py-3">
-        <h3 class="text-sm font-semibold text-ink-strong">Recent Activity</h3>
+        <h3 class="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-ink">
+          Recent Activity
+        </h3>
         <.link
           :if={@navigate}
           navigate={@navigate}
-          class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
+          class="text-brand-strong transition hover:text-brand"
         >
-          All activity
+          <.action_arrow_icon />
         </.link>
       </div>
-      <div :if={Enum.empty?(@entries)} class="px-4 py-6 text-center text-sm text-ink-subtle">
+      <div :if={Enum.empty?(@entries)} class="px-4 py-5 text-sm text-ink-subtle">
         No recent activity.
       </div>
       <div :if={Enum.any?(@entries)} class="divide-y divide-line">
         <div
           :for={entry <- @entries}
-          class="flex items-center gap-3 px-4 py-2.5 text-sm"
+          class="flex items-start gap-3 px-4 py-2.5 text-sm"
         >
           <.icon name="hero-document-text" class="size-4 shrink-0 text-ink-faint" />
           <div class="min-w-0 flex-1">
@@ -750,6 +1111,19 @@ defmodule BilimbiWeb.DashboardLive do
         </div>
       </div>
     </div>
+    """
+  end
+
+  defp action_arrow_icon(assigns) do
+    ~H"""
+    <svg
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden="true"
+      class="size-4 shrink-0 text-brand-strong transition group-hover:translate-x-0.5"
+    >
+      <path d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" />
+    </svg>
     """
   end
 end
