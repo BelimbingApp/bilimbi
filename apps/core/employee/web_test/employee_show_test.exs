@@ -178,4 +178,27 @@ defmodule BilimbiWeb.EmployeeShowTest do
     {:ok, scope} = Tenancy.scope(41)
     assert {:ok, %{employee_id: nil}} = User.get_user(scope, 74, 92)
   end
+
+  test "a write forged after grant revocation changes nothing", %{
+    conn: conn,
+    employee: employee
+  } do
+    grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+    {:ok, scope} = Tenancy.scope(41)
+
+    grant =
+      Bilimbi.Base.Authz.list_principal_capabilities(scope, page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.employee.update"))
+
+    assert {:ok, :removed} = Bilimbi.Base.Authz.remove_principal_capability(scope, grant.id)
+
+    render_submit(view, "save_field", %{"full_name" => "Forged Name"})
+
+    assert has_element?(view, "#flash-group", "You do not have permission to edit employees.")
+    assert {:ok, %{full_name: "John Doe"}} = Employee.get_employee(scope, 73, employee.id)
+  end
 end
