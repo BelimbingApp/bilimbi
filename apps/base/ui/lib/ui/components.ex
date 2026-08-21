@@ -686,6 +686,8 @@ defmodule Bilimbi.Base.UI.Components do
   attr :page, :any, required: true
   attr :page_sizes, :list, default: [25, 50, 100, 300]
   attr :filters_form, :any, required: true
+  attr :filters_event, :string, default: "filters"
+  attr :page_event, :string, default: "page"
 
   def pagination(assigns) do
     ~H"""
@@ -701,7 +703,7 @@ defmodule Bilimbi.Base.UI.Components do
         <.form
           id={"#{@id}-page-size-form"}
           for={@filters_form}
-          phx-change="filters"
+          phx-change={@filters_event}
           class="flex items-center gap-1.5"
         >
           <span class="text-xs text-ink-muted">{gettext("Rows per page")}</span>
@@ -726,7 +728,7 @@ defmodule Bilimbi.Base.UI.Components do
         <button
           id={"#{@id}-previous"}
           type="button"
-          phx-click="page"
+          phx-click={@page_event}
           phx-value-page={@page.page - 1}
           disabled={@page.page <= 1}
           aria-label="Previous page"
@@ -741,7 +743,7 @@ defmodule Bilimbi.Base.UI.Components do
             :if={is_integer(step)}
             id={"#{@id}-page-#{step}"}
             type="button"
-            phx-click="page"
+            phx-click={@page_event}
             phx-value-page={step}
             aria-current={if(step == @page.page, do: "page")}
             aria-label={"Page #{step}"}
@@ -757,7 +759,7 @@ defmodule Bilimbi.Base.UI.Components do
         <button
           id={"#{@id}-next"}
           type="button"
-          phx-click="page"
+          phx-click={@page_event}
           phx-value-page={@page.page + 1}
           disabled={@page.page >= @page.total_pages or @page.total_pages == 0}
           aria-label="Next page"
