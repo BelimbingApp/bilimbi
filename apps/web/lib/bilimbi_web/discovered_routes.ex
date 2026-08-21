@@ -7,7 +7,9 @@ defmodule BilimbiWeb.DiscoveredRoutes do
                  )
 
   def module_routes(routes) when is_list(routes) do
-    Enum.reject(routes, &(&1[:source] == "web"))
+    # Embed entries (no :path) belong to Bilimbi.Base.UI.DiscoveredPanels,
+    # not to the router.
+    Enum.reject(routes, &(&1[:source] == "web" or not Map.has_key?(&1, :path)))
   end
 
   defmacro inject do

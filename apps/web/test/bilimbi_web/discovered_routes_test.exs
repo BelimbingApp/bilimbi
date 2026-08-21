@@ -102,7 +102,8 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
 
   defp manifest_routes do
     manifest = Path.expand("../../../../_build/test/bilimbi_routes.exs", __DIR__)
-    {routes, _binding} = Code.eval_file(manifest)
-    routes
+    {entries, _binding} = Code.eval_file(manifest)
+    # The manifest also carries embed entries; these assertions are about routes.
+    Enum.filter(entries, &Map.has_key?(&1, :path))
   end
 end

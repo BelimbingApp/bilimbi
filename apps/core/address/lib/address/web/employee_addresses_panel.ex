@@ -568,6 +568,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                             <% else %>
                               <div
                                 phx-click={if @can_manage?, do: "edit_address_kinds"}
+                                phx-target={@myself}
                                 phx-value-id={addr.id}
                                 class={[
                                   "flex flex-wrap gap-1 items-center",
@@ -644,6 +645,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                             <% else %>
                               <div
                                 phx-click={if @can_manage?, do: "edit_address_priority"}
+                                phx-target={@myself}
                                 phx-value-id={addr.id}
                                 class={[
                                   "inline-flex items-center gap-1",
