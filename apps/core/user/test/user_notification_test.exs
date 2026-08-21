@@ -337,7 +337,8 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
   end
 
   defp assert_delivery_failure(operation) do
-    assert_receive {@notification_delivery_failure_event, %{count: 1}, metadata}
+    assert_receive {@notification_delivery_failure_event, measurements, metadata}
+    assert measurements == %{count: 1}
     assert metadata == %{operation: operation}
   end
 
