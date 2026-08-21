@@ -86,7 +86,9 @@ jobs:
         run: mix hex.audit
 
       - name: Verify declared module-graph edges
-        run: elixir .github/scripts/graph_edges.exs
+        run: |
+          elixir .github/scripts/graph_edges.exs --self-test
+          elixir .github/scripts/graph_edges.exs
 
       - name: Scan Phoenix security
         run: mix sobelow --root apps/web --private --exit medium
