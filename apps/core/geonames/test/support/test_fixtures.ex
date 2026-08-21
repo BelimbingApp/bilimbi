@@ -148,8 +148,10 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
   end
 
   def insert_country!(attributes \\ %{}) do
-    attributes =
-      Map.merge(
+    iso = Map.get(attributes, :iso, "MY")
+
+    defaults =
+      if iso == "MY" do
         %{
           iso: "MY",
           iso3: "MYS",
@@ -162,12 +164,32 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
           phone: nil,
           currency_code: "MYR",
           currency_name: "Ringgit",
+          languages: "ms,en",
           geoname_id: 1_733_045,
           created_at: nil,
           updated_at: nil
-        },
-        attributes
-      )
+        }
+      else
+        %{
+          iso: iso,
+          iso3: "#{iso}X",
+          iso_numeric: "9#{:erlang.phash2(iso, 89) + 10}",
+          country: "Country #{iso}",
+          capital: "Capital #{iso}",
+          area: 100_000.0,
+          population: 1_000_000,
+          continent: "AS",
+          phone: nil,
+          currency_code: "XXX",
+          currency_name: "Currency #{iso}",
+          languages: nil,
+          geoname_id: :erlang.phash2(iso, 1_000_000) + 1,
+          created_at: nil,
+          updated_at: nil
+        }
+      end
+
+    attributes = Map.merge(defaults, attributes)
 
     existing_rows =
       SQL.query!(
@@ -192,10 +214,11 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
             phone = $8,
             currency_code = $9,
             currency_name = $10,
-            geoname_id = $11,
-            created_at = $12,
-            updated_at = $13
-          WHERE id = $14
+            languages = $11,
+            geoname_id = $12,
+            created_at = $13,
+            updated_at = $14
+          WHERE id = $15
           """,
           [
             attributes.iso3,
@@ -208,6 +231,7 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
             attributes.phone,
             attributes.currency_code,
             attributes.currency_name,
+            attributes.languages,
             attributes.geoname_id,
             attributes.created_at,
             attributes.updated_at,
@@ -221,9 +245,9 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
           """
           INSERT INTO geonames_countries (
             iso, iso3, iso_numeric, country, capital, area, population,
-            continent, phone, currency_code, currency_name, geoname_id, created_at, updated_at
+            continent, phone, currency_code, currency_name, languages, geoname_id, created_at, updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
           """,
           [
             attributes.iso,
@@ -237,6 +261,7 @@ defmodule Bilimbi.Core.Geonames.TestFixtures do
             attributes.phone,
             attributes.currency_code,
             attributes.currency_name,
+            attributes.languages,
             attributes.geoname_id,
             attributes.created_at,
             attributes.updated_at
