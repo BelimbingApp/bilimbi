@@ -96,6 +96,7 @@
   --color-warning-ink: var(--color-amber-900);
 
   --color-danger: var(--color-red-600);
+  --color-danger-hover: var(--color-red-700);
   --color-danger-surface: var(--color-red-50);
   --color-danger-line: var(--color-red-200);
   --color-danger-ink: var(--color-red-900);
