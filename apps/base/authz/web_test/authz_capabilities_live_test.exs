@@ -99,7 +99,7 @@ defmodule BilimbiWeb.AuthzCapabilitiesLiveTest do
 
     assert_patched(
       view,
-      ~p"/authz/capabilities?domain=&page=1&search=&sort_by=module&sort_dir=asc"
+      ~p"/authz/capabilities?domain=&page=1&per_page=25&search=&sort_by=module&sort_dir=asc"
     )
 
     # Invert to desc
@@ -107,7 +107,7 @@ defmodule BilimbiWeb.AuthzCapabilitiesLiveTest do
 
     assert_patched(
       view,
-      ~p"/authz/capabilities?domain=&page=1&search=&sort_by=module&sort_dir=desc"
+      ~p"/authz/capabilities?domain=&page=1&per_page=25&search=&sort_by=module&sort_dir=desc"
     )
   end
 end

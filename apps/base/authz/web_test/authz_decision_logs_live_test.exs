@@ -59,9 +59,12 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     {:ok, view, _html} = open(conn)
 
     summary = view |> element("#logs-pagination-summary") |> render()
-    assert summary =~ ~r/Page 1 of 1 · [1-9]\d* decisions/
-    refute has_element?(view, "#logs-prev")
-    refute has_element?(view, "#logs-next")
+    assert summary =~ ~r/Showing 1 to [1-9]\d* of [1-9]\d* results/
+    # The standard <.pagination> renders the size select always and the page
+    # controls only past one page (#623).
+    assert has_element?(view, "#logs-pagination-page-size")
+    refute has_element?(view, "#logs-pagination-previous")
+    refute has_element?(view, "#logs-pagination-next")
   end
 
   test "filters to denials, which is what this screen is opened for", %{
