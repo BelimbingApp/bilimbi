@@ -30,6 +30,7 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
   # which needs a join this read model does not have (#185).
   @sortable ~w(occurred_at capability allowed reason resource actor_type)
   @results ~w(allowed denied)
+  @page_sizes [25, 50, 100, 300]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -42,11 +43,17 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
   end
 
   @impl true
+  # The search/result inputs post top-level names; `<.pagination>`'s page-size
+  # select posts under `filters[perPage]`. Both funnel through this event.
   def handle_event("filter", params, socket) do
+    current = socket.assigns.state
+    per_page = get_in(params, ["filters", "perPage"]) || Map.get(params, "perPage")
+
     state = %{
-      socket.assigns.state
-      | search: Map.get(params, "search", ""),
-        result: result_from(Map.get(params, "result")),
+      current
+      | search: Map.get(params, "search", current.search),
+        result: result_from(Map.get(params, "result", current.result)),
+        page_size: page_size_from(per_page, current.page_size),
         page: 1
     }
 
@@ -108,6 +115,10 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
+      |> assign(
+        :filters_form,
+        to_form(%{"perPage" => Integer.to_string(state.page_size)}, as: :filters)
+      )
       |> stream(:logs, page.entries, reset: true)
     end
   end
@@ -126,7 +137,7 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
       sort_by: sort_by_from(Map.get(params, "sort_by")),
       sort_dir: sort_dir_from(params),
       page: to_int(Map.get(params, "page"), 1),
-      page_size: 25
+      page_size: page_size_from(Map.get(params, "per_page"), 25)
     }
   end
 
@@ -136,8 +147,16 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
       "result" => state.result,
       "sort_by" => state.sort_by,
       "sort_dir" => state.sort_dir,
-      "page" => state.page
+      "page" => state.page,
+      "per_page" => state.page_size
     }
+  end
+
+  defp page_size_from(value, fallback) do
+    case to_int(value, fallback) do
+      size when size in @page_sizes -> size
+      _ -> fallback
+    end
   end
 
   defp result_from(value) when value in @results, do: value

@@ -130,35 +130,12 @@
         </:empty>
       </.table>
 
-      <div
-        :if={@page.total_pages > 0}
+      <.pagination
         id="assignments-pagination"
-        class="flex items-center justify-between border-t border-line px-4 py-3 text-sm"
-      >
-        <p id="assignments-pagination-summary" class="text-ink-subtle">
-          Page {@page.page} of {@page.total_pages} · {@page.total_entries} {assignment_noun(
-            @page.total_entries
-          )}
-        </p>
-        <div :if={@page.total_pages > 1} class="flex gap-2">
-          <.button
-            :if={@page.page > 1}
-            id="assignments-prev"
-            phx-click="page"
-            phx-value-page={@page.page - 1}
-          >
-            Previous
-          </.button>
-          <.button
-            :if={@page.page < @page.total_pages}
-            id="assignments-next"
-            phx-click="page"
-            phx-value-page={@page.page + 1}
-          >
-            Next
-          </.button>
-        </div>
-      </div>
+        page={@page}
+        filters_form={@filters_form}
+        filters_event="filter"
+      />
     </.card>
   </.page>
 </Layouts.app>
