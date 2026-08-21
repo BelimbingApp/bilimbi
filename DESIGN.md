@@ -86,7 +86,10 @@ Page content width is a shared decision, not a per-screen one. Every screen
 wraps its content in the `<.page>` component and lets its variant choose the
 width: `:list` for operational index screens, `:form` for single-column edit
 forms, `:detail` for show screens and the dashboard. Never hand-write
-`mx-auto max-w-*` on a screen's root container.
+`mx-auto max-w-*` on a screen's root container. Every create and edit form
+renders at the `:form` width — related field pairs may share a row inside it
+(the company create screen is the exemplar), but the page never widens to
+fit more columns.
 
 ## Data tables & row density
 
