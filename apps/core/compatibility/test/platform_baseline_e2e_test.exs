@@ -201,7 +201,9 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
         []
       )
 
-      {output, status} = run_mix("bilimbi.rollback", ["--step", "1", "--quiet"], env)
+      # Schedule's newer empty runtime migration rolls back first; the second
+      # step reaches Geonames and must refuse its retained operator provenance.
+      {output, status} = run_mix("bilimbi.rollback", ["--step", "2", "--quiet"], env)
 
       assert status != 0
       assert output =~ "cannot roll back postcode overrides while operator corrections exist"

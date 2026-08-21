@@ -11,6 +11,7 @@
     "base/locale",
     "base/menu",
     "base/queue",
+    "base/schedule",
     "base/ui",
     "base/module_registry",
     "base/principal_directory",

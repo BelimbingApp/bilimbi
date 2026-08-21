@@ -26,6 +26,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              "base/tenancy",
              "base/audit",
              "base/authz",
+             "base/schedule",
              "base/session",
              "core/geonames",
              "core/company",
@@ -65,10 +66,12 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Core.Employee.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Core.User.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Base.Audit.Migrations.CreateCompatibilityBaseline,
+             Bilimbi.Base.Schedule.Migrations.CreateCompatibilityBaseline,
              Bilimbi.Core.Employee.Migrations.AdaptEmployeeTypesTenancyIndexes,
              Bilimbi.Core.Employee.Migrations.BroadenGlobalIndexAndAddSystemCompanyCheck,
              Bilimbi.Base.Queue.Migrations.CreateObanRuntime,
-             Bilimbi.Core.Geonames.Migrations.CreatePostcodeOverrides
+             Bilimbi.Core.Geonames.Migrations.CreatePostcodeOverrides,
+             Bilimbi.Base.Schedule.Migrations.CreateOccurrenceRuntime
            ]
 
     assert Enum.map(entries, &elem(&1, 2)) == [
@@ -83,6 +86,8 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              :compatible_baseline,
              :compatible_baseline,
              :compatible_baseline,
+             :compatible_baseline,
+             :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,

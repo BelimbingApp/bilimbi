@@ -52,7 +52,7 @@ config :tailwind,
 
 config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",
-  metadata: [:request_id]
+  metadata: [:request_id, :schedule_key, :schedule_owner, :schedule_reason, :schedule_source]
 
 config :phoenix, :json_library, Jason
 

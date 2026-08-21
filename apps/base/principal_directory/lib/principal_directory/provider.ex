@@ -3,8 +3,8 @@ defmodule Bilimbi.Base.PrincipalDirectory.Provider do
   What a Core module implements so Base screens can name its principals.
 
   One provider per principal kind. A provider answers only for its own kind and
-  only inside the scope it is given; it never orders, never searches, and never
-  decides what a screen shows for a principal it cannot resolve. Those belong to
+  only inside the scope it is given; it never orders or decides what a screen
+  shows for a principal it cannot resolve. Those belong to
   `Bilimbi.Base.PrincipalDirectory`, so that ordering is consistent across kinds
   and a screen mixing users and agents interleaves them by name rather than
   listing one kind after the other.
@@ -32,4 +32,16 @@ defmodule Bilimbi.Base.PrincipalDirectory.Provider do
   construction rather than by filtering afterwards.
   """
   @callback names(Scope.t(), [pos_integer()]) :: %{pos_integer() => String.t()}
+
+  @doc """
+  Returns candidate ids matching a provider-owned search attribute.
+
+  The candidate list is supplied by the Base-owned screen, so this callback
+  must only return ids from it and only from within `scope`. It lets a provider
+  search attributes such as an account email without exposing that attribute in
+  a Base contract. Name matching remains owned by `PrincipalDirectory`.
+  """
+  @callback search(Scope.t(), [pos_integer()], String.t()) :: [pos_integer()]
+
+  @optional_callbacks search: 3
 end

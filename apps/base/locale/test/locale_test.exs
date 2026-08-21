@@ -182,6 +182,8 @@ defmodule Bilimbi.Base.LocaleTest do
 
   @tag :without_settings_table
   test "pre-provisioning returns the declared default without inventing provenance" do
+    Ecto.Adapters.SQL.query!(Repo, "DROP TABLE IF EXISTS base_settings", [])
+
     assert %Resolved{
              locale: "en-MY",
              language: "en",

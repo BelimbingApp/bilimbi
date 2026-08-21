@@ -18,12 +18,17 @@ defmodule Bilimbi.Base.PrincipalDirectory.TestUserProvider do
     2 => "Zulu Facility",
     1 => "eMart Holdings"
   }
+  @email_matches %{"billing@example.test" => [1]}
 
   @impl true
   def principal_kind, do: :user
 
   @impl true
   def names(_scope, ids), do: Map.take(@names, ids)
+
+  @impl true
+  def search(_scope, ids, term),
+    do: @email_matches |> Map.get(term, []) |> Enum.filter(&(&1 in ids))
 end
 
 defmodule Bilimbi.Base.PrincipalDirectory.TestAgentProvider do

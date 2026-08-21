@@ -101,7 +101,11 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
   end
 
   test ".gitignore ignores deps, _build, and build artifacts without trailing slash restriction" do
-    gitignore = File.read!(Path.join(@workspace_root, ".gitignore"))
+    gitignore =
+      @workspace_root
+      |> Path.join(".gitignore")
+      |> File.read!()
+      |> String.replace("\r\n", "\n")
 
     for path <- ~w(/_build /deps /cover /doc /tmp /.elixir_ls) do
       assert gitignore =~ "\n#{path}\n" or gitignore =~ "#{path}\n",
