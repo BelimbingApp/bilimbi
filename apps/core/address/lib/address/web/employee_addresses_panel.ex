@@ -23,6 +23,11 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
   @manage_capability "admin.employee.update"
   @valid_address_kinds ~w(headquarters billing shipping branch other)
 
+  # `toggle_edit_kind` only flips a checkbox in the kinds-edit form's local
+  # state; the persistence event is `save_address_kinds`, which re-authorizes.
+  # There is no weaker capability for this handler to refuse.
+  @write_guard_opt_out ~w(toggle_edit_kind)
+
   @impl true
   def mount(socket) do
     {:ok,
@@ -385,7 +390,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                     {length(@attached_addresses)}
                   </span>
                 </h3>
-      
+
                 <.button
                   :if={@can_manage?}
                   id="btn-open-attach-address"
@@ -396,7 +401,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                   <.icon name="bilimbi-plus" class="size-3.5" /> <span>Attach Address</span>
                 </.button>
               </div>
-      
+
               <div class="overflow-x-auto">
                 <table id="addresses-table" class="w-full text-left text-xs text-ink">
                   <thead>
@@ -414,7 +419,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                           <% end %>
                         </button>
                       </th>
-      
+
                       <th class="py-2 px-3 font-semibold">
                         <button
                           type="button"
@@ -428,7 +433,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                           <% end %>
                         </button>
                       </th>
-      
+
                       <th class="py-2 px-3 font-semibold">
                         <button
                           type="button"
@@ -442,7 +447,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                           <% end %>
                         </button>
                       </th>
-      
+
                       <th class="py-2 px-3 font-semibold">
                         <button
                           type="button"
@@ -456,7 +461,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                           <% end %>
                         </button>
                       </th>
-      
+
                       <th class="py-2 px-3 font-semibold">
                         <button
                           type="button"
@@ -470,7 +475,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                           <% end %>
                         </button>
                       </th>
-      
+
                       <th class="py-2 px-3 font-semibold">
                         <button
                           type="button"
@@ -484,7 +489,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                           <% end %>
                         </button>
                       </th>
-      
+
                       <th class="py-2 px-3 font-semibold">
                         <button
                           type="button"
@@ -498,11 +503,11 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                           <% end %>
                         </button>
                       </th>
-      
+
                       <th :if={@can_manage?} class="py-2 pl-3 text-right font-semibold">Actions</th>
                     </tr>
                   </thead>
-      
+
                   <tbody class="divide-y divide-line">
                     <%= if @sorted_addresses == [] do %>
                       <tr>
@@ -522,11 +527,11 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                           <td class="py-2 pr-3 font-medium text-ink">
                             <span>{addr.label || "Address #{addr.id}"}</span>
                           </td>
-      
+
                           <td class="py-2 px-3 text-ink-subtle">
                             {format_address_summary(addr)}
                           </td>
-      
+
                           <td class="py-2 px-3">
                             <%= if @editing_kinds_address_id == addr.id do %>
                               <div class="space-y-1">
@@ -542,7 +547,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                                     /> <span>{String.capitalize(k)}</span>
                                   </label>
                                 <% end %>
-      
+
                                 <div class="flex items-center gap-1 pt-1">
                                   <.button
                                     id={"save-kinds-#{addr.id}"}
@@ -554,7 +559,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                                   >
                                     Save
                                   </.button>
-      
+
                                   <.button
                                     id={"cancel-kinds-#{addr.id}"}
                                     type="button"
@@ -584,7 +589,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                                     </span>
                                   <% end %>
                                 <% end %>
-      
+
                                 <.icon
                                   :if={@can_manage?}
                                   name="bilimbi-pencil"
@@ -593,7 +598,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                               </div>
                             <% end %>
                           </td>
-      
+
                           <td class="py-2 px-3">
                             <%= if @can_manage? do %>
                               <button
@@ -618,7 +623,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                               <% end %>
                             <% end %>
                           </td>
-      
+
                           <td class="py-2 px-3 tabular-nums">
                             <%= if @editing_priority_address_id == addr.id do %>
                               <form
@@ -661,15 +666,15 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                               </div>
                             <% end %>
                           </td>
-      
+
                           <td class="py-2 px-3 tabular-nums text-ink-subtle">
                             {display_or_dash(addr.valid_from)}
                           </td>
-      
+
                           <td class="py-2 px-3 tabular-nums text-ink-subtle">
                             {display_or_dash(addr.valid_to)}
                           </td>
-      
+
                           <td :if={@can_manage?} class="py-2 pl-3 text-right">
                             <.button
                               id={"unlink-address-#{addr.id}"}
@@ -701,11 +706,11 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
             <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
               Attach Address
             </h3>
-      
+
             <p class="text-xs text-ink-muted">
               Select an address from the company to attach to this employee.
             </p>
-      
+
             <.form
               for={@attach_form}
               phx-submit="attach_address" phx-target={@myself}
@@ -719,31 +724,31 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                 >
                   Address
                 </label>
-      
+
                 <select
                   id="employee-attach-address"
                   name="address[address_id]"
                   class="w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                 >
                   <option value="">Select an address...</option>
-      
+
                   <%= for addr <- @available_addresses do %>
                     <option value={addr.id}>
                       {addr.label} — {format_address_summary(addr)}
                     </option>
                   <% end %>
                 </select>
-      
+
                 <%= if Map.has_key?(@attach_errors, :address_id) do %>
                   <p class="text-xs text-danger mt-1">{@attach_errors.address_id}</p>
                 <% end %>
               </div>
-      
+
               <div>
                 <span class="block text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-1">
                   Kind
                 </span>
-      
+
                 <div class="flex flex-wrap gap-x-4 gap-y-2">
                   <%= for k <- @address_kinds do %>
                     <label class="flex items-center gap-2 text-xs text-ink cursor-pointer">
@@ -758,7 +763,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                   <% end %>
                 </div>
               </div>
-      
+
               <div class="flex items-center gap-2">
                 <input
                   id="employee-attach-is-primary"
@@ -774,7 +779,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                   Primary Address
                 </label>
               </div>
-      
+
               <div>
                 <label
                   for="employee-attach-priority"
@@ -782,7 +787,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                 >
                   Priority
                 </label>
-      
+
                 <input
                   id="employee-attach-priority"
                   type="number"
@@ -795,12 +800,12 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                   Lower number = higher priority. Used to order addresses of the same kind (0 = top).
                 </p>
               </div>
-      
+
               <div class="flex items-center justify-end gap-2 pt-2 border-t border-line">
                 <.button type="button" phx-click="close_attach_modal" phx-target={@myself} class="text-xs px-3 py-1.5">
                   Cancel
                 </.button>
-      
+
                 <.button
                   id="btn-submit-attach-address"
                   type="submit"
