@@ -9,6 +9,7 @@
     "base/authz",
     "base/database",
     "base/module_registry",
+    "base/settings",
     "base/tenancy",
     "base/ui",
     "core/geonames"
