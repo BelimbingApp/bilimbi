@@ -33,6 +33,9 @@ defmodule Bilimbi.Core.MenuRouteIntegrityTest do
     |> then(fn path ->
       if File.regular?(path), do: path |> Code.eval_file() |> elem(0), else: []
     end)
+    # The manifest also carries embed entries (no :path); menu links resolve
+    # against routes only.
+    |> Enum.filter(&Map.has_key?(&1, :path))
   end
 
   defp find_route(routes, menu_path) do
