@@ -25,6 +25,19 @@ defmodule Bilimbi.Base.Audit do
   @mutation_sort_fields [:occurred_at, :actor_type, :event, :auditable_type, :trace_id]
   @action_sort_fields [:occurred_at, :actor_type, :event, :url, :trace_id]
 
+  @doc """
+  Runs `fun` with repo-level mutation capture disabled in this process.
+
+  The port of Belimbing's `MutationListener::withoutAuditing` (ADR 0013):
+  seeds, schema lifecycle tasks, and reconciliation writes that must not
+  flood the mutation trail run under it. Explicit `record_mutation/2`
+  calls still work inside the block.
+  """
+  @spec without_auditing((-> result)) :: result when result: var
+  def without_auditing(fun) when is_function(fun, 0) do
+    Bilimbi.Base.Database.WriteCapture.without_capture(fun)
+  end
+
   @spec record_mutation(Scope.t() | :unscoped, map()) ::
           {:ok, Mutation.t()} | {:error, Ecto.Changeset.t()}
   def record_mutation(%Scope{} = scope, attributes) when is_map(attributes) do

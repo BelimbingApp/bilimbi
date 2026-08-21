@@ -17,6 +17,8 @@ defmodule Bilimbi.Core.Company do
   alias Bilimbi.Base.Tenancy.InvariantError, as: TenantInvariantError
   alias Bilimbi.Base.Tenancy.NotProvisionedError, as: TenantNotProvisionedError
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Core.Company.AdministrationIndex
+  alias Bilimbi.Core.Company.AdministrationPage
   alias Bilimbi.Core.Company.Department
   alias Bilimbi.Core.Company.DepartmentType
   alias Bilimbi.Core.Company.ExternalAccess
@@ -114,6 +116,24 @@ defmodule Bilimbi.Core.Company do
       |> Enum.map(&Summary.from_schema/1)
 
     {:ok, companies}
+  end
+
+  @doc """
+  Lists one bounded page of live companies for the administration index.
+
+  Options: `:page`, `:page_size` (1..300), `:search` (name, code, legal
+  name, email, jurisdiction), `:status_filter` (`:all` or one of
+  `Schema.statuses/0`), `:sort_by` (`:name`, `:status`, or
+  `:jurisdiction`), and `:sort_dir` (`:asc` or `:desc`). Each entry
+  carries its parent company's name and whether it is the tenant's
+  designated primary company.
+  """
+  @spec list_administration_page(Scope.t(), keyword()) ::
+          {:ok, AdministrationPage.t()} | {:error, :invalid_options}
+  def list_administration_page(%Scope{} = scope, options \\ []) do
+    with {:ok, normalized_options} <- AdministrationIndex.normalize_options(options) do
+      {:ok, AdministrationIndex.page(scope, normalized_options)}
+    end
   end
 
   @doc """
