@@ -54,7 +54,7 @@ defmodule Bilimbi.Base.Perf.Reporter do
 
   @impl true
   def handle_cast({:record, attributes}, state) do
-    accepted =
+    inserted =
       try do
         with_dynamic_repo(fn -> record(attributes) end)
       rescue
@@ -65,8 +65,8 @@ defmodule Bilimbi.Base.Perf.Reporter do
         release_slot()
       end
 
-    accepted = state.accepted + accepted
-    if accepted > 0 and rem(accepted, @prune_every) == 0, do: Perf.prune()
+    accepted = state.accepted + inserted
+    if inserted == 1 and rem(accepted, @prune_every) == 0, do: Perf.prune()
     {:noreply, %{state | accepted: accepted}}
   end
 

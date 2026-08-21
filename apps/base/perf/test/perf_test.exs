@@ -266,6 +266,43 @@ defmodule Bilimbi.Base.PerfTest do
     end
   end
 
+  test "rejected samples do not repeat pruning at an acceptance boundary" do
+    original_accepted = :sys.get_state(Reporter).accepted
+    :sys.replace_state(Reporter, &%{&1 | accepted: 99})
+
+    on_exit(fn ->
+      :sys.replace_state(Reporter, &%{&1 | accepted: original_accepted})
+    end)
+
+    target = self()
+    handler = "perf-prune-boundary-#{System.unique_integer([:positive])}"
+
+    :ok =
+      :telemetry.attach(
+        handler,
+        [:bilimbi, :base, :repo, :query],
+        fn _event, _measurements, metadata, _config ->
+          if String.starts_with?(metadata.query, "DELETE FROM \"base_perf_samples\"") do
+            send(target, :prune_query)
+          end
+        end,
+        nil
+      )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    assert :ok = Reporter.submit(valid_attributes("/accepted-boundary"))
+    assert %{accepted: 100} = :sys.get_state(Reporter)
+    assert_receive :prune_query
+    assert_receive :prune_query
+    refute_receive :prune_query
+
+    put_settings(%{"perf.minimum_duration_ms" => 60_000})
+    assert :ok = Reporter.submit(valid_attributes("/rejected-after-boundary"))
+    assert %{accepted: 100} = :sys.get_state(Reporter)
+    refute_receive :prune_query
+  end
+
   test "disabled and unavailable settings fail closed without raising" do
     put_settings(%{"perf.enabled" => false})
 
