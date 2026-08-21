@@ -516,5 +516,96 @@ defmodule Bilimbi.Core.CompanyTest do
     assert Company.primary_company?(owner, 74) == false
   end
 
+  describe "list_administration_page/2" do
+    alias Bilimbi.Core.Company.AdministrationEntry
+    alias Bilimbi.Core.Company.AdministrationPage
+
+    setup do
+      insert_tenant!()
+      insert_tenant!(%{id: 42, name: "Customer", is_platform_operator: false})
+
+      insert_company!(%{
+        id: 73,
+        code: "acme_ops",
+        name: "Acme Operations",
+        legal_name: "Acme Operations Sdn. Bhd.",
+        email: "ops@acme.example",
+        jurisdiction: "MY"
+      })
+
+      insert_company!(%{
+        id: 75,
+        code: "beta_lab",
+        name: "Beta Labs",
+        parent_id: 73,
+        status: "suspended",
+        jurisdiction: "SG"
+      })
+
+      insert_company!(%{id: 76, code: "gone", deleted_at: ~N[2026-08-11 12:00:00]})
+      insert_company!(%{id: 74, tenant_id: 42, code: "other_tenant", name: "Elsewhere"})
+      assign_primary_company!(41, 73)
+
+      {:ok, owner} = Tenancy.scope(41)
+      %{owner: owner}
+    end
+
+    test "pages live tenant companies with parent name and primary flag", %{owner: owner} do
+      assert {:ok, %AdministrationPage{entries: [acme, beta], total_entries: 2, total_pages: 1}} =
+               Company.list_administration_page(owner)
+
+      assert %AdministrationEntry{id: 73, primary?: true, parent_name: nil} = acme
+      assert %AdministrationEntry{id: 75, primary?: false, parent_name: "Acme Operations"} = beta
+      assert AdministrationEntry.display_name(acme) == "Acme Operations Sdn. Bhd."
+    end
+
+    test "search matches name, code, legal name, email, and jurisdiction", %{owner: owner} do
+      for {term, expected_id} <- [
+            {"beta", 75},
+            {"acme_ops", 73},
+            {"Sdn. Bhd", 73},
+            {"ops@acme", 73},
+            {"SG", 75}
+          ] do
+        assert {:ok, %AdministrationPage{entries: [%{id: ^expected_id}]}} =
+                 Company.list_administration_page(owner, search: term),
+               "search #{inspect(term)}"
+      end
+
+      assert {:ok, %AdministrationPage{entries: [], total_entries: 0}} =
+               Company.list_administration_page(owner, search: "no such company")
+    end
+
+    test "status filter and sort orders", %{owner: owner} do
+      assert {:ok, %AdministrationPage{entries: [%{id: 75}]}} =
+               Company.list_administration_page(owner, status_filter: "suspended")
+
+      assert {:ok, %AdministrationPage{entries: [%{id: 75}, %{id: 73}]}} =
+               Company.list_administration_page(owner, sort_by: :name, sort_dir: :desc)
+
+      assert {:ok, %AdministrationPage{entries: [%{id: 75}, %{id: 73}]}} =
+               Company.list_administration_page(owner, sort_by: :jurisdiction, sort_dir: :desc)
+    end
+
+    test "bounded pagination and option validation", %{owner: owner} do
+      assert {:ok,
+              %AdministrationPage{
+                entries: [%{id: 75}],
+                page: 2,
+                has_prev?: true,
+                has_next?: false,
+                total_pages: 2
+              }} = Company.list_administration_page(owner, page: 2, page_size: 1)
+
+      assert {:error, :invalid_options} = Company.list_administration_page(owner, page: 0)
+      assert {:error, :invalid_options} = Company.list_administration_page(owner, page_size: 301)
+
+      assert {:error, :invalid_options} =
+               Company.list_administration_page(owner, status_filter: "bogus")
+
+      assert {:error, :invalid_options} = Company.list_administration_page(owner, sort_by: :code)
+    end
+  end
+
   defp opaque(value), do: :erlang.element(1, {value})
 end
