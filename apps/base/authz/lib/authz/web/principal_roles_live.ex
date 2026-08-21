@@ -35,6 +35,8 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
      |> assign(:company_order, Enum.map(companies, & &1.id))}
   end
 
+  @page_sizes [25, 50, 100, 300]
+
   @impl true
   def handle_params(params, _uri, socket) do
     {:noreply, load(socket, state_from_params(params))}
@@ -42,7 +44,16 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
 
   @impl true
   def handle_event("filter", params, socket) do
-    state = %{socket.assigns.state | search: Map.get(params, "search", ""), page: 1}
+    current = socket.assigns.state
+    per_page = get_in(params, ["filters", "perPage"]) || Map.get(params, "perPage")
+
+    state = %{
+      current
+      | search: Map.get(params, "search", current.search),
+        page_size: page_size_from(per_page, current.page_size),
+        page: 1
+    }
+
     {:noreply, push_state(socket, state)}
   end
 
@@ -82,7 +93,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
         sort_by: state.sort_by,
         sort_dir: state.sort_dir,
         page: state.page,
-        page_size: 25,
+        page_size: state.page_size,
         company_order: socket.assigns.company_order
       )
 
@@ -92,6 +103,10 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
+      |> assign(
+        :filters_form,
+        to_form(%{"perPage" => Integer.to_string(state.page_size)}, as: :filters)
+      )
       |> stream(:assignments, page.entries, reset: true)
     end
   end
@@ -104,7 +119,8 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
       search: Map.get(params, "search", ""),
       sort_by: sort_by_from(Map.get(params, "sort_by")),
       sort_dir: sort_dir_from(params),
-      page: to_int(Map.get(params, "page"), 1)
+      page: to_int(Map.get(params, "page"), 1),
+      page_size: page_size_from(Map.get(params, "per_page"), 25)
     }
   end
 
@@ -113,8 +129,16 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
       "search" => state.search,
       "sort_by" => state.sort_by,
       "sort_dir" => state.sort_dir,
-      "page" => state.page
+      "page" => state.page,
+      "per_page" => state.page_size
     }
+  end
+
+  defp page_size_from(value, fallback) do
+    case to_int(value, fallback) do
+      size when size in @page_sizes -> size
+      _ -> fallback
+    end
   end
 
   defp sort_by_from(value) when value in @sortable, do: String.to_existing_atom(value)
@@ -150,9 +174,6 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
   # did not. An unresolved principal is not an error and must not read as one.
   defp principal_identity(%{principal_name: name}) when is_binary(name) and name != "", do: name
   defp principal_identity(%{principal_id: id}), do: to_string(id)
-
-  defp assignment_noun(1), do: "assignment"
-  defp assignment_noun(_count), do: "assignments"
 
   defp company_name(_names, nil), do: "Global"
 

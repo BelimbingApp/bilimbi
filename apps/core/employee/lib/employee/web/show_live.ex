@@ -15,16 +15,17 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.UI.DiscoveredPanels
+  alias Phoenix.LiveView.JS
 
   @manage_capability "admin.employee.update"
 
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
 
-  # `toggle_add_subordinate` only flips the add-subordinate form's
-  # visibility assign; the persisting event is `add_subordinate`, which is
-  # capability-guarded (#420).
-  @write_guard_opt_out ~w(toggle_add_subordinate)
+  # `toggle_add_subordinate`, `edit_field`, and `cancel_edit_field` only flip
+  # visibility assigns; the persisting events are `add_subordinate` and the
+  # `save_*` family, which are capability-guarded (#420).
+  @write_guard_opt_out ~w(toggle_add_subordinate edit_field cancel_edit_field)
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -49,6 +50,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   defp init_ui_state(socket) do
     socket
+    |> assign(:editing_field, nil)
     |> assign(:adding_subordinate, false)
     |> assign(:selected_subordinate_id, "")
     |> assign(:subordinates_sort_by, "full_name")
@@ -121,6 +123,9 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       )
 
     socket
+    # A save reloads through here, so the just-edited select folds back to
+    # its read state; a failed save skips load_data and stays open to retry.
+    |> assign(:editing_field, nil)
     |> assign(:employee, employee)
     |> assign(:can_manage?, can_manage?)
     |> assign(:can_delete?, can_delete?)
@@ -178,6 +183,23 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     else
       {:noreply, put_flash(socket, :error, "You do not have permission to edit employees.")}
     end
+  end
+
+  @editable_selects ~w(department supervisor employee_type status)
+
+  def handle_event("edit_field", %{"field" => field}, socket)
+      when field in @editable_selects do
+    if can_manage?(socket) do
+      {:noreply, assign(socket, :editing_field, field)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("edit_field", _params, socket), do: {:noreply, socket}
+
+  def handle_event("cancel_edit_field", _params, socket) do
+    {:noreply, assign(socket, :editing_field, nil)}
   end
 
   def handle_event("save_status", params, socket) do
@@ -484,6 +506,45 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   # --- Render Template ---
 
+  # Edit-in-place shell for the employment-info selects (#619): managers see
+  # the read state (badge, name, or link — the scan layer a raw `<select>`
+  # loses) with a hover pencil; clicking swaps in the `:editor` slot, whose
+  # existing `save_*` form closes it through `load_data/2`. Escape or blur
+  # cancels. Read-only visitors get the `:display` slot without the trigger.
+  attr :field, :string, required: true
+  attr :label, :string, required: true
+  attr :editing, :boolean, required: true
+  attr :can_manage?, :boolean, required: true
+  slot :display, required: true
+  slot :editor, required: true
+
+  defp eip_field(assigns) do
+    ~H"""
+    <button
+      :if={@can_manage? and not @editing}
+      type="button"
+      id={"employee-#{@field}-display"}
+      phx-click="edit_field"
+      phx-value-field={@field}
+      aria-label={@label}
+      class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
+    >
+      {render_slot(@display)}
+      <.icon
+        name="hero-pencil"
+        class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+      />
+    </button>
+    <%!-- Window-scoped: the select may not hold focus (JS.focus is
+         best-effort), and Escape must cancel regardless. Only one editor
+         mounts at a time, so the listener is unambiguous. --%>
+    <div :if={@can_manage? and @editing} phx-window-keydown="cancel_edit_field" phx-key="Escape">
+      {render_slot(@editor)}
+    </div>
+    <span :if={not @can_manage?}>{render_slot(@display)}</span>
+    """
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -694,29 +755,44 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   </dt>
 
                   <dd class="mt-0.5 text-sm text-ink">
-                    <%= if @can_manage? do %>
-                      <form
-                        phx-change="save_department"
-                        id="employee-department-form"
-                        class="inline-block"
-                      >
-                        <select
-                          id="employee-department"
-                          name="department_id"
-                          class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                    <.eip_field
+                      field="department"
+                      label="Edit department"
+                      editing={@editing_field == "department"}
+                      can_manage?={@can_manage?}
+                    >
+                      <:display>
+                        <span class={[
+                          "truncate",
+                          is_nil(@employee.department_id) && "text-ink-muted"
+                        ]}>
+                          {Map.get(@department_map, @employee.department_id, "None")}
+                        </span>
+                      </:display>
+                      <:editor>
+                        <form
+                          phx-change="save_department"
+                          id="employee-department-form"
+                          class="inline-block"
                         >
-                          <option value="" selected={is_nil(@employee.department_id)}>None</option>
+                          <select
+                            id="employee-department"
+                            name="department_id"
+                            phx-mounted={JS.focus()}
+                            phx-blur="cancel_edit_field"
+                            class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                          >
+                            <option value="" selected={is_nil(@employee.department_id)}>None</option>
 
-                          <%= for dept <- @departments do %>
-                            <option value={dept.id} selected={@employee.department_id == dept.id}>
-                              {if dept.type, do: dept.type.name, else: "Department #{dept.id}"}
-                            </option>
-                          <% end %>
-                        </select>
-                      </form>
-                    <% else %>
-                      <span>{Map.get(@department_map, @employee.department_id, "None")}</span>
-                    <% end %>
+                            <%= for dept <- @departments do %>
+                              <option value={dept.id} selected={@employee.department_id == dept.id}>
+                                {if dept.type, do: dept.type.name, else: "Department #{dept.id}"}
+                              </option>
+                            <% end %>
+                          </select>
+                        </form>
+                      </:editor>
+                    </.eip_field>
                   </dd>
                 </div>
 
@@ -726,29 +802,44 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   </dt>
 
                   <dd class="mt-0.5 text-sm text-ink">
-                    <%= if @can_manage? do %>
-                      <form
-                        phx-change="save_supervisor"
-                        id="employee-supervisor-form"
-                        class="inline-block"
-                      >
-                        <select
-                          id="employee-supervisor"
-                          name="supervisor_id"
-                          class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                    <.eip_field
+                      field="supervisor"
+                      label="Edit supervisor"
+                      editing={@editing_field == "supervisor"}
+                      can_manage?={@can_manage?}
+                    >
+                      <:display>
+                        <span class={[
+                          "truncate",
+                          is_nil(@employee.supervisor_id) && "text-ink-muted"
+                        ]}>
+                          {Map.get(@supervisor_map, @employee.supervisor_id, "None")}
+                        </span>
+                      </:display>
+                      <:editor>
+                        <form
+                          phx-change="save_supervisor"
+                          id="employee-supervisor-form"
+                          class="inline-block"
                         >
-                          <option value="" selected={is_nil(@employee.supervisor_id)}>None</option>
+                          <select
+                            id="employee-supervisor"
+                            name="supervisor_id"
+                            phx-mounted={JS.focus()}
+                            phx-blur="cancel_edit_field"
+                            class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                          >
+                            <option value="" selected={is_nil(@employee.supervisor_id)}>None</option>
 
-                          <%= for sup <- @supervisors do %>
-                            <option value={sup.id} selected={@employee.supervisor_id == sup.id}>
-                              {sup.full_name}
-                            </option>
-                          <% end %>
-                        </select>
-                      </form>
-                    <% else %>
-                      <span>{Map.get(@supervisor_map, @employee.supervisor_id, "None")}</span>
-                    <% end %>
+                            <%= for sup <- @supervisors do %>
+                              <option value={sup.id} selected={@employee.supervisor_id == sup.id}>
+                                {sup.full_name}
+                              </option>
+                            <% end %>
+                          </select>
+                        </form>
+                      </:editor>
+                    </.eip_field>
                   </dd>
                 </div>
 
@@ -758,45 +849,57 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   </dt>
 
                   <dd class="mt-0.5 text-sm text-ink">
-                    <%= if @can_manage? do %>
-                      <form
-                        phx-change="save_employee_type"
-                        id="employee-type-form"
-                        class="inline-block"
-                      >
-                        <select
-                          id="employee-type"
-                          name="employee_type"
-                          class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                    <.eip_field
+                      field="employee_type"
+                      label="Edit employee type"
+                      editing={@editing_field == "employee_type"}
+                      can_manage?={@can_manage?}
+                    >
+                      <:display>
+                        <%!-- Neutral for every type, matching the index table
+                             (same thing, same look); status alone carries color. --%>
+                        <.badge kind={:neutral}>
+                          {employee_type_label(@employee_types, @employee.employee_type)}
+                        </.badge>
+                      </:display>
+                      <:editor>
+                        <form
+                          phx-change="save_employee_type"
+                          id="employee-type-form"
+                          class="inline-block"
                         >
-                          <optgroup label="Human">
-                            <%= for type <- Enum.reject(@employee_types, &(&1.code == "agent")) do %>
-                              <option
-                                value={type.code}
-                                selected={@employee.employee_type == type.code}
-                              >
-                                {type.label}
-                              </option>
-                            <% end %>
-                          </optgroup>
+                          <select
+                            id="employee-type"
+                            name="employee_type"
+                            phx-mounted={JS.focus()}
+                            phx-blur="cancel_edit_field"
+                            class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                          >
+                            <optgroup label="Human">
+                              <%= for type <- Enum.reject(@employee_types, &(&1.code == "agent")) do %>
+                                <option
+                                  value={type.code}
+                                  selected={@employee.employee_type == type.code}
+                                >
+                                  {type.label}
+                                </option>
+                              <% end %>
+                            </optgroup>
 
-                          <optgroup label="Agent">
-                            <%= for type <- Enum.filter(@employee_types, &(&1.code == "agent")) do %>
-                              <option
-                                value={type.code}
-                                selected={@employee.employee_type == type.code}
-                              >
-                                {type.label}
-                              </option>
-                            <% end %>
-                          </optgroup>
-                        </select>
-                      </form>
-                    <% else %>
-                      <.badge kind={if @employee.employee_type == "agent", do: :info, else: :neutral}>
-                        {@employee.employee_type}
-                      </.badge>
-                    <% end %>
+                            <optgroup label="Agent">
+                              <%= for type <- Enum.filter(@employee_types, &(&1.code == "agent")) do %>
+                                <option
+                                  value={type.code}
+                                  selected={@employee.employee_type == type.code}
+                                >
+                                  {type.label}
+                                </option>
+                              <% end %>
+                            </optgroup>
+                          </select>
+                        </form>
+                      </:editor>
+                    </.eip_field>
                   </dd>
                 </div>
 
@@ -806,39 +909,49 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   </dt>
 
                   <dd class="mt-0.5 text-sm text-ink">
-                    <%= if @can_manage? do %>
-                      <form phx-change="save_status" id="employee-status-form" class="inline-block">
-                        <select
-                          id="employee-status"
-                          name="status"
-                          class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
-                        >
-                          <option value="pending" selected={@employee.status == "pending"}>
-                            Pending
-                          </option>
+                    <.eip_field
+                      field="status"
+                      label="Edit status"
+                      editing={@editing_field == "status"}
+                      can_manage?={@can_manage?}
+                    >
+                      <:display>
+                        <.badge kind={status_badge_kind(@employee.status)}>
+                          {String.capitalize(@employee.status)}
+                        </.badge>
+                      </:display>
+                      <:editor>
+                        <form phx-change="save_status" id="employee-status-form" class="inline-block">
+                          <select
+                            id="employee-status"
+                            name="status"
+                            phx-mounted={JS.focus()}
+                            phx-blur="cancel_edit_field"
+                            class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                          >
+                            <option value="pending" selected={@employee.status == "pending"}>
+                              Pending
+                            </option>
 
-                          <option value="probation" selected={@employee.status == "probation"}>
-                            Probation
-                          </option>
+                            <option value="probation" selected={@employee.status == "probation"}>
+                              Probation
+                            </option>
 
-                          <option value="active" selected={@employee.status == "active"}>
-                            Active
-                          </option>
+                            <option value="active" selected={@employee.status == "active"}>
+                              Active
+                            </option>
 
-                          <option value="inactive" selected={@employee.status == "inactive"}>
-                            Inactive
-                          </option>
+                            <option value="inactive" selected={@employee.status == "inactive"}>
+                              Inactive
+                            </option>
 
-                          <option value="terminated" selected={@employee.status == "terminated"}>
-                            Terminated
-                          </option>
-                        </select>
-                      </form>
-                    <% else %>
-                      <.badge kind={status_badge_kind(@employee.status)}>
-                        {String.capitalize(@employee.status)}
-                      </.badge>
-                    <% end %>
+                            <option value="terminated" selected={@employee.status == "terminated"}>
+                              Terminated
+                            </option>
+                          </select>
+                        </form>
+                      </:editor>
+                    </.eip_field>
                   </dd>
                 </div>
 
@@ -1087,9 +1200,9 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
               <.button
                 id="employee-delete"
+                variant="danger"
                 phx-click="delete"
                 data-confirm={"Delete #{@employee.full_name}? This cannot be undone."}
-                class="bg-danger text-sm font-medium text-ink-inverse transition hover:opacity-90"
               >
                 Delete employee
               </.button>
@@ -1105,6 +1218,13 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   defp status_badge_kind("probation"), do: :warning
   defp status_badge_kind("terminated"), do: :danger
   defp status_badge_kind(_), do: :neutral
+
+  defp employee_type_label(types, code) do
+    case Enum.find(types, &(&1.code == code)) do
+      %{label: label} when is_binary(label) -> label
+      _ -> code |> String.replace("_", " ") |> String.capitalize()
+    end
+  end
 
   defp display_or_dash(nil), do: "—"
   defp display_or_dash(""), do: "—"

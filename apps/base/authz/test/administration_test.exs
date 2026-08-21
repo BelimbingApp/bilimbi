@@ -674,8 +674,9 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
   end
 
   test "administration options reject unbounded or unknown input" do
+    # 300 is the top of the §12 page-size ladder (25/50/100/300).
     assert_raise ArgumentError, ~r/page_size/, fn ->
-      Authz.list_decision_logs(scope(), page_size: 101)
+      Authz.list_decision_logs(scope(), page_size: 301)
     end
 
     assert_raise ArgumentError, ~r/sort_by/, fn ->

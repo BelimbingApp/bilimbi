@@ -170,13 +170,19 @@ defmodule Bilimbi.Base.UI.Components do
   attr :rest, :global, include: ~w(href navigate patch method download name value disabled type)
 
   attr :class, :any
-  attr :variant, :string, values: ~w(primary)
+  attr :variant, :string, values: ~w(primary danger)
   slot :inner_block, required: true
 
   def button(%{rest: rest} = assigns) do
+    # Each variant owns every color property it sets, including the focus ring;
+    # a color defined in both the shared base and a variant is resolved by
+    # stylesheet order, not by this list's order (#619's invisible button).
     variants = %{
-      "primary" => "bg-action text-action-ink hover:bg-action-hover",
-      nil => "border border-line-strong bg-surface text-ink hover:bg-surface-sunken"
+      "primary" => "bg-action text-action-ink hover:bg-action-hover focus-visible:ring-action/25",
+      "danger" => "bg-danger text-ink-inverse hover:bg-danger-hover focus-visible:ring-danger/30",
+      nil =>
+        "border border-line-strong bg-surface text-ink hover:bg-surface-sunken " <>
+          "focus-visible:ring-action/25"
     }
 
     # A caller-supplied class extends the button; it must not replace the
@@ -186,7 +192,7 @@ defmodule Bilimbi.Base.UI.Components do
       assign(assigns, :class, [
         "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
         "shadow-sm transition focus-visible:outline-none focus-visible:ring-2",
-        "focus-visible:ring-action/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
+        "focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
         "disabled:cursor-not-allowed disabled:opacity-50",
         Map.fetch!(variants, assigns[:variant]),
         assigns[:class]
@@ -680,6 +686,8 @@ defmodule Bilimbi.Base.UI.Components do
   attr :page, :any, required: true
   attr :page_sizes, :list, default: [25, 50, 100, 300]
   attr :filters_form, :any, required: true
+  attr :filters_event, :string, default: "filters"
+  attr :page_event, :string, default: "page"
 
   def pagination(assigns) do
     ~H"""
@@ -695,7 +703,7 @@ defmodule Bilimbi.Base.UI.Components do
         <.form
           id={"#{@id}-page-size-form"}
           for={@filters_form}
-          phx-change="filters"
+          phx-change={@filters_event}
           class="flex items-center gap-1.5"
         >
           <span class="text-xs text-ink-muted">{gettext("Rows per page")}</span>
@@ -720,7 +728,7 @@ defmodule Bilimbi.Base.UI.Components do
         <button
           id={"#{@id}-previous"}
           type="button"
-          phx-click="page"
+          phx-click={@page_event}
           phx-value-page={@page.page - 1}
           disabled={@page.page <= 1}
           aria-label="Previous page"
@@ -735,7 +743,7 @@ defmodule Bilimbi.Base.UI.Components do
             :if={is_integer(step)}
             id={"#{@id}-page-#{step}"}
             type="button"
-            phx-click="page"
+            phx-click={@page_event}
             phx-value-page={step}
             aria-current={if(step == @page.page, do: "page")}
             aria-label={"Page #{step}"}
@@ -751,7 +759,7 @@ defmodule Bilimbi.Base.UI.Components do
         <button
           id={"#{@id}-next"}
           type="button"
-          phx-click="page"
+          phx-click={@page_event}
           phx-value-page={@page.page + 1}
           disabled={@page.page >= @page.total_pages or @page.total_pages == 0}
           aria-label="Next page"

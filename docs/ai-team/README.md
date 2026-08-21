@@ -30,32 +30,41 @@ around an error; others plan from it.
 ### The canonical source is a specific checkout
 
 ```
-/home/kiat/repo/laravel/blb    pinned at e70b4d33c0b10790e681f4c2b5095d85a53bc918
+/home/kiat/repo/laravel/blb    operational citation pin 769bc31ddb632f5d2c5acb0fd05b777197df87cc
 ```
 
 `/home/kiat/repo/Belimbing` is **planning material with no `app/` tree**. If
 you cite "Belimbing", cite a `laravel/blb` path or you are citing the wrong
 thing. This mistake has been made.
 
-That checkout moves, and a pin written on this page cannot notice.
+This is the operational citation pin for the checkout agents read, not a
+blanket replacement for historical compatibility evidence. ADRs, schema
+contracts, and compatibility code may keep older commit citations when that
+older commit is the source for the decision they record.
+
+That checkout moves, and a pin written on this page cannot notice by itself.
 `.github/scripts/orient.sh` reports where it actually is, whether the pinned
-commit is still an ancestor, and which `app/` files changed after it — it found
-the tree three commits ahead the first time it ran.
+commit is still an ancestor, and which `app/` files changed after it. If an
+agent ports or cites a post-pin file, either advance this operational pin in the
+same change or cite that newer SHA explicitly. Do **not** advance the pin merely
+because Belimbing has new commits.
 
 ---
 
 ## How we work
 
 **Take any unclaimed task. Do not ask permission — not from the user, not from
-each other.** Claim it by opening a **draft PR before you write code**:
+each other.** Claim it by opening a **draft PR before you write code**. The
+claim script checks the live issue and open-PR registry before it writes
+anything, then creates the branch, empty claim commit, draft PR, and labels:
 
 ```bash
-git commit --allow-empty -m "claim: <what>"
-gh pr create --draft --title "<module>: <what> (#<issue>)"
-gh pr edit <n> --add-label "agent:<your-id>"
+CLAIM_AGENT=<your-stable-agent-id> .github/scripts/claim.sh <issue-number>
 ```
 
-Then add `task:active` to the issue and start.
+It refuses a closed or already-labelled issue and reports any open PR that
+already references the issue or carries its claim branch. `CLAIM_BRANCH` and
+`CLAIM_TITLE` may override the generated branch and issue-title PR title.
 
 Claim in the draft PR rather than an issue comment because that is the surface
 everyone already queries — `gh pr list` is how each of us finds work, so the
@@ -81,6 +90,24 @@ split with them directly.
 **Keep the queue full.** When you find work, open an issue. When you finish,
 open a PR — green CI plus a review by someone who is not you, then merge. Then
 take the next thing.
+
+**Merging is a duty, not an assumption.** Eight green, fully-reviewed PRs once
+sat unmerged for hours because everyone assumed "anyone may merge" meant
+someone would. If you see a PR that is green, reviewed, and unheld — gate it
+through *now*, whoever you are (except its author). The steward's heartbeat
+runs a drain pass over the whole queue each tick as the backstop, not the
+default path.
+
+**Decisions only the owner can make go to the pinned queue** ([#648](https://github.com/BelimbingApp/bilimbi/issues/648)) with the
+options pre-analyzed and a recommendation, and the source issue gets
+`task:kiatng`. Then move on — do not block, do not re-ask on the issue. One
+security decision once waited a full day because it had no surface of its own.
+
+**Decompose before you collide.** A screen file above ~500 lines serving more
+than one owner-domain is a coordination bomb: one such file needed three
+merge-in cycles on a single PR and serialized an entire lane. Split it into
+discovered panels (ADR 0006) *before* continuing feature work on it — panels
+gave two agents independent lanes on the same screen the day they landed.
 
 **Prefer a git worktree.** Agents share one checkout, and concurrent edits have
 caused non-fast-forward pushes and a mid-edit branch merge.
@@ -163,14 +190,31 @@ Anyone may merge a green, reviewed PR they did not author unless a hold is on it
 
 ## You have no GitHub identity
 
-Two human accounts are shared by every agent, so **neither assignee nor
+Shared human accounts post for every agent, so **neither assignee nor
 authorship identifies you.**
 
+- Your id must be **registered in [`roster.md`](./roster.md)** and unique —
+  two concurrent sessions sharing one id caused a false-impersonation
+  investigation and made the pair mutually unreviewable to the gate (a marker
+  matching the PR's lane is refused as self-review). Starting a session under
+  an id the roster shows active elsewhere: pick a suffixed id and register it.
 - Mark ownership with the `agent:<id>` label — **on the pull request as well as
   the issue.** Across the first run all 120 PRs carried none, and anything
   reasoning about PR ownership was blind.
 - Name yourself in every claim, handoff and review: `**From:** <your-agent-id>`.
 - Never infer who did something from GitHub metadata.
+
+**The recording token.** A reviewer PAT (account `faith-tohmm`) lets reviews
+*record* on PRs authored under the shared default account. Policy, exactly the
+`GH_DISCUSSION_TOKEN` shape: scope it per command, never reconfigure `gh`
+globally, never print or commit it, and use it **only** to record a review
+(`gh pr review`) on a PR **your agent did not author** — never to author,
+push, or merge. The review body still carries your `**From:**` line; the token
+supplies the account independence, your marker supplies the agent identity.
+
+```bash
+GH_TOKEN=$(cat ~/.secrets/faith_pat) gh pr review <n> --approve --body "..."
+```
 
 Sub-agents inherit their parent's label and a brief from the parent rather than
 re-reading the corpus.
@@ -187,11 +231,14 @@ re-reading the corpus.
 | Owner and state | `agent:<id>` and `task:*` labels |
 | Merge holds | `hold:author`, `hold:review` |
 | Gates and sweeps you can run | `.github/scripts/` |
+| Who is who — registered agent ids and lanes | [`roster.md`](./roster.md) |
+| Owner decisions pending | pinned issue [#648](https://github.com/BelimbingApp/bilimbi/issues/648), label `task:kiatng` |
+| UI/UX program — quality bar, review lanes | issue #614 |
 | RFCs and open questions | [Discussions](https://github.com/BelimbingApp/bilimbi/discussions) |
 | Durable architecture decisions | `docs/architecture/decisions/` |
 | Stage order and exit gates | [`PORTING_STAGES.md`](./PORTING_STAGES.md) |
 
-`docs/ai-team/` is these two files and nothing else. Coordination that
+`docs/ai-team/` is these three files and nothing else. Coordination that
 reappears here as new files is drift.
 
 ---
@@ -266,6 +313,22 @@ temporary table declared `email varchar UNIQUE` gets PostgreSQL's
 `users_email_key`, while the migration creates `users_email_unique`. The
 changeset error became a raised `ConstraintError`. Name constraints in fixtures
 exactly as the migration does.
+
+**Never pipe a command whose exit code you are about to read.** `mix compile
+--warnings-as-errors | tail` reports `tail`'s zero, and a broken commit was
+pushed over exactly that. Paid three separate times in one round, once by the
+review gate itself. Capture output to a file or a variable; check `$?` bare.
+
+**A capture is truthful only about its own branch.** Audit-environment
+screenshots composite whatever fixes that worktree carries — one showed an
+unmerged PR's button as if it were live, and another showed a long-fixed bug
+that simply wasn't on that branch. Verify the PR *diff* contains what it
+claims; read pixels as evidence about the branch that rendered them.
+
+**Under fail-fast, "CI shows one failure" never means "one failure exists."**
+Container test commands halt at the first non-zero child, so a red suite early
+in the chain hides every later red. "No such failure reported" and "passing"
+are different claims.
 
 **A hand-maintained copy of discoverable state is a coordination bottleneck
 wearing a test's clothes.** `workspace_boundary_test.exs` read each

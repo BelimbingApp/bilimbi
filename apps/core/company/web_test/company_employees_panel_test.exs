@@ -34,7 +34,8 @@ defmodule BilimbiWeb.CompanyEmployeesPanelTest do
       Employee.create_employee(scope, 73, %{
         employee_number: "EMP-001",
         full_name: "Grace Hopper",
-        designation: "Rear Admiral"
+        designation: "Rear Admiral",
+        employee_type: "full_time"
       })
 
     :ok
@@ -49,6 +50,37 @@ defmodule BilimbiWeb.CompanyEmployeesPanelTest do
     # company page never names the module.
     assert has_element?(view, "#company-employees-table td", "Grace Hopper")
     assert has_element?(view, "#company-employees-table td", "EMP-001")
+    # The type renders as the humanized label ("Full Time"), not the raw enum
+    # code, matching the employee index (#616).
+    assert has_element?(view, "#company-employees-table td", "Full Time")
+    refute has_element?(view, "#company-employees-table td", "full_time")
     refute has_element?(view, "#company-employees-table-empty")
+  end
+
+  test "applies company show URL-state to the discovered employees panel", %{conn: conn} do
+    grant_capabilities!(["admin.company.list", "admin.company.view"])
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, _employee} =
+      Employee.create_employee(scope, 73, %{
+        employee_number: "EMP-002",
+        full_name: "Alan Turing",
+        designation: "Cryptographer"
+      })
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_as()
+      |> live(
+        ~p"/companies/73?employees_search=alan&employees_sort=employee_number&employees_dir=desc&employees_per_page=50"
+      )
+
+    assert has_element?(view, "#company-employees-table td", "Alan Turing")
+    refute has_element?(view, "#company-employees-table td", "Grace Hopper")
+
+    assert has_element?(
+             view,
+             "#company-employees-panel th[aria-sort='descending'] button#company-employees-sort-employee-number"
+           )
   end
 end

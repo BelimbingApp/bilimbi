@@ -93,9 +93,10 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
 
       {:ok, view, _html} = open_index(conn)
 
-      assert has_element?(view, "#roles-pagination-summary", "Page 1 of 1 · 1 role")
-      refute has_element?(view, "#roles-prev")
-      refute has_element?(view, "#roles-next")
+      assert has_element?(view, "#roles-pagination-summary", "Showing 1 to 1 of 1 results")
+      assert has_element?(view, "#roles-pagination-page-size")
+      refute has_element?(view, "#roles-pagination-previous")
+      refute has_element?(view, "#roles-pagination-next")
     end
 
     test "does not show another tenant's custom role", %{conn: conn, ours: ours, theirs: theirs} do
