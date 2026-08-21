@@ -91,7 +91,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
   def handle_event("duplicate", %{"id" => id_str}, socket) do
     if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
       scope = socket.assigns.current_scope.scope
-      user_id = current_user_id(socket)
+      user_id = current_user_id(socket.assigns.current_scope)
       query_id = to_integer(id_str, 0)
 
       case User.duplicate_database_query(scope, user_id, query_id) do
@@ -113,7 +113,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
   def handle_event("delete", %{"id" => id_str}, socket) do
     if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
       scope = socket.assigns.current_scope.scope
-      user_id = current_user_id(socket)
+      user_id = current_user_id(socket.assigns.current_scope)
       query_id = to_integer(id_str, 0)
 
       case User.delete_database_query(scope, user_id, query_id) do
@@ -136,7 +136,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
 
   defp load_queries(socket) do
     scope = socket.assigns.current_scope.scope
-    user_id = current_user_id(socket)
+    user_id = current_user_id(socket.assigns.current_scope)
 
     opts = [
       search: socket.assigns.search,
@@ -162,17 +162,6 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
     |> assign(:total_count, total_count)
     |> assign(:total_pages, total_pages)
     |> assign(:page, page)
-  end
-
-  defp current_user_id(socket) do
-    user = socket.assigns.current_scope.user
-
-    cond do
-      is_map(user) and Map.has_key?(user, "user_id") -> user["user_id"]
-      is_map(user) and Map.has_key?(user, :id) -> user.id
-      is_map(user) and Map.has_key?(user, "id") -> user["id"]
-      true -> 0
-    end
   end
 
   defp to_integer(nil, default), do: default
