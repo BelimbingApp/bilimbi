@@ -8,6 +8,11 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  # Self-service: both events act on the signed-in actor's own
+  # notifications, resolved from the session scope; Belimbing guards this
+  # page with authentication alone. No admin capability applies (#420).
+  @write_guard_opt_out ~w(mark_read mark_all_read)
+
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.Notification
 

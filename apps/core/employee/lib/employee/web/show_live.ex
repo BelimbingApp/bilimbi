@@ -11,6 +11,11 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  # `toggle_add_subordinate` only flips the add-subordinate form's
+  # visibility assign; the persisting event is `add_subordinate`, which is
+  # capability-guarded (#420).
+  @write_guard_opt_out ~w(toggle_add_subordinate)
+
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
 

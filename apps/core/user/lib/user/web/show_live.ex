@@ -7,6 +7,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  # These four toggles only flip section-visibility assigns; every
+  # persisting event behind them (`assign_roles`, password change, employee
+  # link) carries its own capability check (#420).
+  @write_guard_opt_out ~w(toggle_assign_roles toggle_change_password
+                          toggle_effective_permissions toggle_link_employee)
+
   alias Bilimbi.Base.Authz
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee

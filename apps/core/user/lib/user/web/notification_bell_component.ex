@@ -7,6 +7,11 @@ defmodule Bilimbi.Core.User.Web.NotificationBellComponent do
 
   use Bilimbi.Base.UI, :live_component
 
+  # Self-service: `mark_all_read` acts on the signed-in actor's own
+  # notifications, resolved from the session scope. `toggle_dropdown` only
+  # flips the open/closed assign (#420).
+  @write_guard_opt_out ~w(mark_all_read toggle_dropdown)
+
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.Notification
   alias Phoenix.LiveView.JS

@@ -128,29 +128,10 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
 
   # Acknowledged debt from when this test landed. Each {module_path, event}
   # is an unguarded write-shaped handler. Delete the entry in the same change
-  # that guards or opts out the event.
-  @tracked [
-    {"apps/core/company/lib/company/web/show_live.ex", "update_metadata_input"},
-    {"apps/core/company/lib/company/web/show_live.ex", "update_new_activity"},
-    {"apps/core/employee/lib/employee/web/show_live.ex", "toggle_add_subordinate"},
-    {"apps/core/user/lib/user/web/appearance_live.ex", "save"},
-    {"apps/core/user/lib/user/web/notification_bell_component.ex", "mark_all_read"},
-    {"apps/core/user/lib/user/web/notification_bell_component.ex", "toggle_dropdown"},
-    {"apps/core/user/lib/user/web/notifications_live.ex", "mark_all_read"},
-    {"apps/core/user/lib/user/web/notifications_live.ex", "mark_read"},
-    {"apps/core/user/lib/user/web/password_live.ex", "save"},
-    {"apps/core/user/lib/user/web/profile_live.ex", "save"},
-    {"apps/core/user/lib/user/web/show_live.ex", "toggle_assign_roles"},
-    {"apps/core/user/lib/user/web/show_live.ex", "toggle_change_password"},
-    {"apps/core/user/lib/user/web/show_live.ex", "toggle_effective_permissions"},
-    {"apps/core/user/lib/user/web/show_live.ex", "toggle_link_employee"},
-    {"apps/web/lib/bilimbi_web/live/dashboard_live.ex", "add-widget"},
-    {"apps/web/lib/bilimbi_web/live/dashboard_live.ex", "move-down"},
-    {"apps/web/lib/bilimbi_web/live/dashboard_live.ex", "move-up"},
-    {"apps/web/lib/bilimbi_web/live/dashboard_live.ex", "remove-widget"},
-    {"apps/web/lib/bilimbi_web/live/dashboard_live.ex", "reorder-widgets"},
-    {"apps/web/lib/bilimbi_web/live/dashboard_live.ex", "toggle-layout-edit"}
-  ]
+  # that guards or opts out the event. Emptied by #420: every original entry
+  # gained a guard, a route capability, or a reasoned opt-out — new debt is
+  # not welcome here, fix the handler instead.
+  @tracked []
 
   test "every write-shaped handle_event is capability-guarded or explicitly opted out" do
     route_write_modules = route_write_modules()
