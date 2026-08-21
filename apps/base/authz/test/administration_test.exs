@@ -538,6 +538,23 @@ defmodule Bilimbi.Base.Authz.AdministrationTest do
     assert principal_ids(Authz.list_principal_capabilities(tenant_scope, search: "zulu")) == []
   end
 
+  test "principal capability and role search reach a provider-owned email" do
+    tenant_scope = scope()
+    install_principal_directory!()
+
+    grant!(tenant_scope, :user, 7)
+
+    assert principal_ids(Authz.list_principal_capabilities(tenant_scope, search: "zulu@example")) ==
+             [7]
+
+    assert {:ok, role} =
+             Authz.create_role(tenant_scope, 10, %{name: "Auditor", code: "auditor"})
+
+    assert {:ok, :assigned} = Authz.assign_role(tenant_scope, 10, :user, 7, role.id)
+
+    assert principal_ids(Authz.list_principal_roles(tenant_scope, search: "zulu@example")) == [7]
+  end
+
   test "principal roles name and order by the same directory" do
     tenant_scope = scope()
     install_principal_directory!()

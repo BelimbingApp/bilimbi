@@ -18,6 +18,7 @@ defmodule BilimbiWeb.DashboardLive do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Dashboard
+  alias Bilimbi.Base.Perf
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Settings
   alias Bilimbi.Core.Company
@@ -28,7 +29,8 @@ defmodule BilimbiWeb.DashboardLive do
     "base-dashboard-company-stats" => BilimbiWeb.Dashboard.CompanyStatsWidget,
     "base-dashboard-user-stats" => BilimbiWeb.Dashboard.UserStatsWidget,
     "base-dashboard-recent-audit" => BilimbiWeb.Dashboard.RecentAuditWidget,
-    "base-dashboard-session-stats" => BilimbiWeb.Dashboard.SessionStatsWidget
+    "base-dashboard-session-stats" => BilimbiWeb.Dashboard.SessionStatsWidget,
+    "base-perf-health" => Bilimbi.Base.Perf.DashboardWidget
   }
 
   @impl true
@@ -50,6 +52,7 @@ defmodule BilimbiWeb.DashboardLive do
 
     audit_entries = audit_entries(scope)
     session_count = session_count(visible)
+    perf_diagnostics = perf_diagnostics(visible)
 
     {:ok,
      socket
@@ -61,6 +64,7 @@ defmodule BilimbiWeb.DashboardLive do
      |> assign(:company_count, length(companies))
      |> assign(:user_count, length(users))
      |> assign(:session_count, session_count)
+     |> assign(:perf_diagnostics, perf_diagnostics)
      |> assign(:audit_entries, audit_entries)
      |> assign(:companies, companies)
      |> assign(:users, users)
@@ -75,6 +79,14 @@ defmodule BilimbiWeb.DashboardLive do
   defp session_count(visible_widgets) do
     if Enum.any?(visible_widgets, &(&1.id == "base-dashboard-session-stats")) do
       Session.count_sessions()
+    else
+      nil
+    end
+  end
+
+  defp perf_diagnostics(visible_widgets) do
+    if Enum.any?(visible_widgets, &(&1.id == "base-perf-health")) do
+      Perf.diagnostics()
     else
       nil
     end
@@ -293,6 +305,7 @@ defmodule BilimbiWeb.DashboardLive do
      socket
      |> assign(:audit_entries, audit_entries)
      |> assign(:session_count, session_count(socket.assigns.widgets))
+     |> assign(:perf_diagnostics, perf_diagnostics(socket.assigns.widgets))
      |> assign(:refresh_timer, nil)
      |> schedule_refresh(socket.assigns.widgets)}
   end
@@ -368,6 +381,7 @@ defmodule BilimbiWeb.DashboardLive do
             company_count={@company_count}
             user_count={@user_count}
             session_count={@session_count}
+            perf_diagnostics={@perf_diagnostics}
             audit_entries={@audit_entries}
             current_scope={@current_scope}
             layout_editing={@layout_editing}
@@ -545,6 +559,22 @@ defmodule BilimbiWeb.DashboardLive do
                 do: ~p"/audit/mutations"
             }
           />
+        <% "base-perf-health" -> %>
+          <.link
+            navigate="/system/performance"
+            id="stat-performance"
+            class="block rounded-xl border border-line bg-surface px-4 py-3.5 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong"
+          >
+            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+              Performance
+            </p>
+            <p class="mt-1 text-sm font-semibold text-ink-strong">
+              {performance_health(@perf_diagnostics)}
+            </p>
+            <p class="mt-1 text-xs tabular-nums text-muted">
+              {performance_samples(@perf_diagnostics)} retained samples
+            </p>
+          </.link>
         <% other_id -> %>
           <div
             id={"dashboard-widget-#{other_id}"}
@@ -559,9 +589,18 @@ defmodule BilimbiWeb.DashboardLive do
     """
   end
 
-  attr :id, :string, required: true
-  attr :count, :integer, required: true
-  attr :navigate, :string, default: nil
+  defp performance_health(%{store: :unavailable}), do: "History unavailable"
+  defp performance_health(%{recorder: :unavailable}), do: "Recorder unavailable"
+  defp performance_health(%{recorder: :degraded, store: :available}), do: "Degraded"
+  defp performance_health(%{recorder: :available, store: :available}), do: "Available"
+  defp performance_health(_diagnostics), do: "Unknown"
+
+  defp performance_samples(%{samples: samples}) when is_integer(samples), do: samples
+  defp performance_samples(_diagnostics), do: "—"
+
+  attr(:id, :string, required: true)
+  attr(:count, :integer, required: true)
+  attr(:navigate, :string, default: nil)
 
   defp company_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
     ~H"""
@@ -595,9 +634,9 @@ defmodule BilimbiWeb.DashboardLive do
     """
   end
 
-  attr :id, :string, required: true
-  attr :count, :integer, required: true
-  attr :navigate, :string, default: nil
+  attr(:id, :string, required: true)
+  attr(:count, :integer, required: true)
+  attr(:navigate, :string, default: nil)
 
   defp user_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
     ~H"""
@@ -631,9 +670,9 @@ defmodule BilimbiWeb.DashboardLive do
     """
   end
 
-  attr :id, :string, required: true
-  attr :count, :integer, required: true
-  attr :navigate, :string, default: nil
+  attr(:id, :string, required: true)
+  attr(:count, :integer, required: true)
+  attr(:navigate, :string, default: nil)
 
   # The sessions screen is contributed by Base Session and injected through
   # discovered routes, so its href is a plain string rather than a `~p` route.
@@ -673,9 +712,9 @@ defmodule BilimbiWeb.DashboardLive do
     """
   end
 
-  attr :id, :string, required: true
-  attr :entries, :list, required: true
-  attr :navigate, :string, default: nil
+  attr(:id, :string, required: true)
+  attr(:entries, :list, required: true)
+  attr(:navigate, :string, default: nil)
 
   defp audit_activity_card(assigns) do
     ~H"""

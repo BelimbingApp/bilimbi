@@ -90,10 +90,13 @@ defmodule Bilimbi.Base.PrincipalDirectoryContractTest do
              PrincipalDirectory.rank(scope, [{:user, 1}, {:user, 2}], providers: p, ceiling: 1)
 
     # A silently truncated ranking would look like a sort and would not be one.
-    refute match?({:ok, _}, PrincipalDirectory.rank(scope, [{:user, 1}, {:user, 2}],
-             providers: p,
-             ceiling: 1
-           ))
+    refute match?(
+             {:ok, _},
+             PrincipalDirectory.rank(scope, [{:user, 1}, {:user, 2}],
+               providers: p,
+               ceiling: 1
+             )
+           )
   end
 
   test "search filters case-insensitively", %{scope: scope, providers: p} do
@@ -104,6 +107,19 @@ defmodule Bilimbi.Base.PrincipalDirectoryContractTest do
       )
 
     assert Enum.map(ranked, & &1.name) == ["ada lovelace"]
+  end
+
+  test "search includes a provider-owned match without exposing its attribute", %{
+    scope: scope,
+    providers: p
+  } do
+    {:ok, ranked} =
+      PrincipalDirectory.rank(scope, [{:user, 1}, {:user, 2}, {:agent, 1}],
+        providers: p,
+        search: "billing@example.test"
+      )
+
+    assert Enum.map(ranked, &{&1.kind, &1.id, &1.name}) == [{:user, 1, "eMart Holdings"}]
   end
 
   test "search refuses rather than degrading when a kind cannot be resolved",

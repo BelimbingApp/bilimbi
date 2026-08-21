@@ -55,9 +55,9 @@ defmodule Bilimbi.Base.PrincipalDirectory do
 
   Options:
 
-    * `:search` — case-insensitive substring on the display name. Absent means
-      no filtering; present with an unresolvable kind is an error, not a
-      degraded result.
+    * `:search` — case-insensitive substring on the display name and any
+      provider-owned searchable attributes. Absent means no filtering; present
+      with an unresolvable kind is an error, not a degraded result.
     * `:ceiling` — maximum candidates to resolve, default `#{@default_ceiling}`.
     * `:providers` — the provider map to use instead of the installed one. The
       contract test supplies a double this way, because Base cannot exercise a
@@ -83,7 +83,13 @@ defmodule Bilimbi.Base.PrincipalDirectory do
         {:error, :name_search_unavailable}
 
       true ->
-        {:ok, candidates |> resolve(scope, providers) |> filter(search) |> order()}
+        matches = provider_search_matches(candidates, scope, providers, search)
+
+        {:ok,
+         candidates
+         |> resolve(scope, providers)
+         |> filter(search, matches)
+         |> order()}
     end
   end
 
@@ -109,10 +115,32 @@ defmodule Bilimbi.Base.PrincipalDirectory do
     end)
   end
 
-  defp filter(named, nil), do: named
+  defp provider_search_matches(_candidates, _scope, _providers, nil), do: MapSet.new()
 
-  defp filter(named, search) do
-    Enum.filter(named, &String.contains?(String.downcase(&1.name), search))
+  defp provider_search_matches(candidates, scope, providers, search) do
+    candidates
+    |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
+    |> Enum.flat_map(fn {kind, ids} ->
+      provider = Map.fetch!(providers, kind)
+
+      if Code.ensure_loaded?(provider) and function_exported?(provider, :search, 3) do
+        provider.search(scope, ids, search)
+        |> Enum.filter(&(&1 in ids))
+        |> Enum.map(&{kind, &1})
+      else
+        []
+      end
+    end)
+    |> MapSet.new()
+  end
+
+  defp filter(named, nil, _provider_matches), do: named
+
+  defp filter(named, search, provider_matches) do
+    Enum.filter(named, fn %{kind: kind, id: id, name: name} ->
+      String.contains?(String.downcase(name), search) or
+        MapSet.member?(provider_matches, {kind, id})
+    end)
   end
 
   # Normalised name first so the order matches what the operator reads; kind and

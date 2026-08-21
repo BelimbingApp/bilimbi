@@ -14,9 +14,8 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
   tenant is named, one outside keeps its durable id. Belimbing's join is
   unscoped and names any user id it finds; that is not ported.
 
-  Search covers role name and code, principal type, principal id, and
-  principal name. Belimbing also searches `users.email`, which the seam does
-  not expose; that divergence is recorded in #500.
+  Search covers role name and code, principal type, principal id, principal
+  name, and provider-owned identity attributes such as a Core User email.
   """
 
   use Bilimbi.Base.UI, :live_view

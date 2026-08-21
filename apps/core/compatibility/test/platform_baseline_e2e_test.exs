@@ -201,14 +201,37 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
         []
       )
 
-      # Schedule's newer empty runtime migration rolls back first; the second
-      # step reaches Geonames and must refuse its retained operator provenance.
-      {output, status} = run_mix("bilimbi.rollback", ["--step", "2", "--quiet"], env)
+      # Perf and Schedule's newer empty runtime migrations roll back first; the
+      # third step reaches Geonames and must refuse retained operator provenance.
+      {output, status} = run_mix("bilimbi.rollback", ["--step", "3", "--quiet"], env)
 
       assert status != 0
       assert output =~ "cannot roll back postcode overrides while operator corrections exist"
       assert relation("geonames_postcode_overrides") == "geonames_postcode_overrides"
       assert 20_260_820_143_500 in recorded_versions()
+    end)
+  end
+
+  test "rollback refuses to discard retained performance history", %{env: env} = context do
+    PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->
+      run_mix!("bilimbi.migrate", ["--quiet"], env)
+
+      SQL.query!(
+        PlatformBaselineTestRepo,
+        """
+        INSERT INTO base_perf_samples
+          (kind, identity, outcome, duration_ms, db_duration_ms, db_count, observed_at)
+        VALUES ('request', '/health', 'ok', 12, 0, 0, timezone('UTC', now()))
+        """,
+        []
+      )
+
+      {output, status} = run_mix("bilimbi.rollback", ["--step", "1", "--quiet"], env)
+
+      assert status != 0
+      assert output =~ "cannot roll back Base Perf while performance history exists"
+      assert relation("base_perf_samples") == "base_perf_samples"
+      assert 20_260_821_213_000 in recorded_versions()
     end)
   end
 
