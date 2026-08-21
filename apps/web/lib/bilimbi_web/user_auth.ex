@@ -55,6 +55,7 @@ defmodule BilimbiWeb.UserAuth do
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Core.Address
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.Summary
@@ -512,7 +513,8 @@ defmodule BilimbiWeb.UserAuth do
     )
   end
 
-  defp apply_locale(nil), do: put_gettext_locale(Locale.resolve(nil).language)
+  defp apply_locale(nil),
+    do: put_gettext_locale(Locale.resolve(nil, locale_bootstrap()).language)
 
   defp apply_locale(%{
          user: %{"user_id" => user_id, "company_id" => company_id},
@@ -520,8 +522,23 @@ defmodule BilimbiWeb.UserAuth do
        }) do
     user_id
     |> SettingsScope.user(company_id, Scope.tenant_id(scope))
-    |> Locale.resolve()
+    |> Locale.resolve(locale_bootstrap())
     |> then(&put_gettext_locale(&1.language))
+  end
+
+  # Platform-operator address facts feed one-time locale inference. The
+  # resolver touches Company/Address/Geonames, so it runs only while no
+  # supported global locale row exists; once inference persists, this stays
+  # a single Settings read per request.
+  defp locale_bootstrap do
+    if Locale.overridden?(nil), do: nil, else: Address.platform_operator_locale_bootstrap()
+  rescue
+    error in Postgrex.Error ->
+      if match?(%{postgres: %{code: :undefined_table}}, error) do
+        nil
+      else
+        reraise error, __STACKTRACE__
+      end
   end
 
   defp put_gettext_locale(language) do
