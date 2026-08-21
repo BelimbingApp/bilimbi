@@ -651,37 +651,37 @@ defmodule BilimbiWeb.DashboardLive do
         >
           <.icon name="hero-bars-3" class="size-3" />
         </button>
-        <div :if={@layout_editing} class="flex gap-0.5">
-        <button
-          id={"move-up-#{@id}"}
-          type="button"
-          phx-click="move-up"
-          phx-value-id={@id}
-          title="Move up"
-          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-        >
-          <.icon name="hero-chevron-up" class="size-3" />
-        </button>
-        <button
-          id={"move-down-#{@id}"}
-          type="button"
-          phx-click="move-down"
-          phx-value-id={@id}
-          title="Move down"
-          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-        >
-          <.icon name="hero-chevron-down" class="size-3" />
-        </button>
-        <button
-          id={"remove-#{@id}"}
-          type="button"
-          phx-click="remove-widget"
-          phx-value-id={@id}
-          title="Remove widget"
-          class="ml-1 grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-        >
-          <.icon name="hero-x-mark" class="size-3" />
-        </button>
+        <div class="flex gap-0.5">
+          <button
+            id={"move-up-#{@id}"}
+            type="button"
+            phx-click="move-up"
+            phx-value-id={@id}
+            title="Move up"
+            class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          >
+            <.icon name="hero-chevron-up" class="size-3" />
+          </button>
+          <button
+            id={"move-down-#{@id}"}
+            type="button"
+            phx-click="move-down"
+            phx-value-id={@id}
+            title="Move down"
+            class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          >
+            <.icon name="hero-chevron-down" class="size-3" />
+          </button>
+          <button
+            id={"remove-#{@id}"}
+            type="button"
+            phx-click="remove-widget"
+            phx-value-id={@id}
+            title="Remove widget"
+            class="ml-1 grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          >
+            <.icon name="hero-x-mark" class="size-3" />
+          </button>
         </div>
       </div>
 
