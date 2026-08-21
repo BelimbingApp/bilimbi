@@ -45,10 +45,14 @@ defmodule Bilimbi.Base.UI.DiscoveredPanels do
     @spec resolve(String.t()) :: {:ok, map()} | :error
     def resolve(key) when is_binary(key), do: :error
 
-    attr :key, :string, required: true
-    attr :id, :string, required: true
-    attr :current_scope, :map, required: true
-    attr :opts, :map, default: %{}, doc: "assigns passed through to the panel component"
+    @doc "Runs a panel operation declared for an installed panel."
+    @spec dispatch(String.t(), atom(), [term()]) :: {:error, :not_installed}
+    def dispatch(_key, _operation, _args), do: {:error, :not_installed}
+
+    attr(:key, :string, required: true)
+    attr(:id, :string, required: true)
+    attr(:current_scope, :map, required: true)
+    attr(:opts, :map, default: %{}, doc: "assigns passed through to the panel component")
 
     def discovered_panel(assigns) do
       ~H"""
@@ -62,10 +66,26 @@ defmodule Bilimbi.Base.UI.DiscoveredPanels do
     @spec resolve(String.t()) :: {:ok, map()} | :error
     def resolve(key) when is_binary(key), do: Map.fetch(@panels, key)
 
-    attr :key, :string, required: true
-    attr :id, :string, required: true
-    attr :current_scope, :map, required: true
-    attr :opts, :map, default: %{}, doc: "assigns passed through to the panel component"
+    @doc "Runs an operation through the panel's declared handler."
+    @spec dispatch(String.t(), atom(), [term()]) :: term()
+    def dispatch(key, operation, args)
+        when is_binary(key) and is_atom(operation) and is_list(args) do
+      case resolve(key) do
+        {:ok, %{operation_handler: nil}} ->
+          {:error, :operation_not_supported}
+
+        {:ok, %{operation_handler: handler}} ->
+          apply(handler, :dispatch, [operation | args])
+
+        :error ->
+          {:error, :not_installed}
+      end
+    end
+
+    attr(:key, :string, required: true)
+    attr(:id, :string, required: true)
+    attr(:current_scope, :map, required: true)
+    attr(:opts, :map, default: %{}, doc: "assigns passed through to the panel component")
 
     def discovered_panel(assigns) do
       case resolve(assigns.key) do

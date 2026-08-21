@@ -13,6 +13,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.UI.DiscoveredPanels
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
 
@@ -197,13 +198,15 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       employee = socket.assigns.employee
       type = params["employee_type"] || params["value"] || ""
 
-      # "An agent holds no user account" is Core User's invariant now (#581):
-      # its update policy refuses new links to agents, and its employee-page
-      # account panel unlinks when it observes this type change. This page no
-      # longer reaches across the seam at type-change time.
-      case Employee.update_employee(scope, employee.company_id, employee.id, %{
-             employee_type: type
-           }) do
+      # The manifest-declared account operation owns the cross-module account
+      # transition. It is not probing: a missing provider fails honestly, and
+      # Core User performs the unlink and Employee write in one transaction.
+      case DiscoveredPanels.dispatch("employee.accounts", :change_employee_type, [
+             scope,
+             employee.company_id,
+             employee.id,
+             type
+           ]) do
         {:ok, updated_employee} ->
           {:noreply,
            socket

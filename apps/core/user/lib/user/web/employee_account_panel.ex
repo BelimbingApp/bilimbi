@@ -6,13 +6,11 @@ defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
   panel; the employee page renders it by the `"employee.accounts"` manifest
   key and never names this module (#581, mechanism from #570/#575).
 
-  The agent invariant lives on this side of the seam now. Linking is refused
-  by `Core.User.update_user` policy when the target employee is an agent, and
-  when this panel observes an employee that became an agent while an account
-  was still linked it reconciles by unlinking — Core User applying its own
-  policy at its observation point, replacing the employee page's former
-  probe-driven unlink. A failed reconciliation renders as a visible panel
-  notice with the link still shown; nothing pretends to have succeeded (#409).
+  The panel also declares the operation the employee page uses for a type
+  transition. That operation runs through the manifest resolver rather than a
+  reverse module reference, and delegates to Core User's transaction-safe
+  coordinator so changing an employee to an agent either unlinks the account
+  and changes the type, or rolls both writes back.
 
   Every write re-evaluates the actor's current grants through `Authz.can/2`
   (the #482/#541 pattern); mount-time capability state is presentation, not
@@ -38,15 +36,13 @@ defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
      socket
      |> assign(assigns)
      |> assign(:can_manage?, can_manage_accounts?(assigns.current_scope))
-     |> reload()
-     |> reconcile_agent_link()}
+     |> reload()}
   end
 
   @impl true
   def handle_event("save_user", params, socket) do
     if can_manage_accounts?(socket.assigns.current_scope) do
       scope = socket.assigns.current_scope.scope
-      current_linked = socket.assigns.linked_user
 
       target_user_id =
         case Integer.parse(to_string(params["user_id"] || "")) do
@@ -54,27 +50,12 @@ defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
           _ -> nil
         end
 
-      # Unlink the current user first. A failure here has to stop the link:
-      # carrying on would leave two users pointing at this employee.
-      unlink =
-        if current_linked && current_linked.id != target_user_id do
-          unlink_user(scope, socket.assigns.company_id, current_linked.id)
-        else
-          {:ok, nil}
-        end
-
-      result =
-        with {:ok, _} <- unlink do
-          if target_user_id do
-            User.update_user(scope, socket.assigns.company_id, target_user_id, %{
-              employee_id: socket.assigns.employee_id
-            })
-          else
-            {:ok, nil}
-          end
-        end
-
-      case result do
+      case User.replace_employee_account(
+             scope,
+             socket.assigns.company_id,
+             socket.assigns.employee_id,
+             target_user_id
+           ) do
         {:ok, _} ->
           {:noreply, socket |> notice(:info, "User link updated.") |> reload()}
 
@@ -113,33 +94,9 @@ defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
     |> assign(:available_users, available_users)
   end
 
-  # An agent holds no user account. The employee page no longer reaches into
-  # Core User at type-change time; this panel observes the type on every
-  # update and unlinks under Core User's own authority.
-  defp reconcile_agent_link(
-         %{assigns: %{employee_type: "agent", linked_user: %{} = linked}} = socket
-       ) do
-    scope = socket.assigns.current_scope.scope
-
-    case unlink_user(scope, socket.assigns.company_id, linked.id) do
-      {:ok, _} ->
-        socket
-        |> notice(:info, "Unlinked #{linked.name}: an agent holds no user account.")
-        |> reload()
-
-      {:error, _} ->
-        notice(
-          socket,
-          :error,
-          "#{linked.name} is still linked but an agent holds no user account. The unlink failed; retry or unlink from the user page."
-        )
-    end
-  end
-
-  defp reconcile_agent_link(socket), do: socket
-
-  defp unlink_user(scope, company_id, user_id) do
-    User.update_user(scope, company_id, user_id, %{employee_id: nil})
+  @doc false
+  def dispatch(:change_employee_type, scope, company_id, employee_id, type) do
+    User.change_employee_type(scope, company_id, employee_id, type)
   end
 
   defp can_manage_accounts?(current_scope) do

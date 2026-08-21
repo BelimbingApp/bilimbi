@@ -44,7 +44,8 @@ defmodule Bilimbi.Core.User.WebRoutesTest do
   test "contributes the employee account panel as a discovered embed" do
     assert %{
              embed: "employee.accounts",
-             live_component: Bilimbi.Core.User.Web.EmployeeAccountPanel
+             live_component: Bilimbi.Core.User.Web.EmployeeAccountPanel,
+             operation_handler: Bilimbi.Core.User.Web.EmployeeAccountPanel
            } in routes()
   end
 

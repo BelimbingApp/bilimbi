@@ -826,16 +826,29 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
       raise ArgumentError, "embed #{inspect(embed)} capability must be a binary or nil"
     end
 
-    case Map.keys(entry) -- [:embed, :live_component, :capability] do
+    operation_handler = Map.get(entry, :operation_handler)
+
+    unless is_nil(operation_handler) or is_atom(operation_handler) do
+      raise ArgumentError,
+            "embed #{inspect(embed)} operation_handler must be a module atom or nil"
+    end
+
+    case Map.keys(entry) -- [:embed, :live_component, :capability, :operation_handler] do
       [] ->
         # Canonical shape: :capability is always present so consumers can
         # match on it instead of probing for the key.
-        %{embed: embed, live_component: live_component, capability: capability, source: source}
+        %{
+          embed: embed,
+          live_component: live_component,
+          capability: capability,
+          operation_handler: operation_handler,
+          source: source
+        }
 
       extra ->
         raise ArgumentError,
               "embed #{inspect(embed)} has unsupported keys #{inspect(extra)}; " <>
-                "an embed entry carries only :embed, :live_component, and :capability"
+                "an embed entry carries only :embed, :live_component, :capability, and :operation_handler"
     end
   end
 
