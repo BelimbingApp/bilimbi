@@ -3,6 +3,9 @@ defmodule Bilimbi.Base.ScheduleTest do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
+  alias Bilimbi.Base.Authz.Actor
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Queue.JobRef
@@ -16,11 +19,15 @@ defmodule Bilimbi.Base.ScheduleTest do
   alias Bilimbi.Base.Schedule.Scheduler
   alias Bilimbi.Base.Schedule.Suppression
   alias Bilimbi.Base.Schedule.TestWorker
+  alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
+  alias Bilimbi.Base.Tenancy.Identity
+  alias Bilimbi.Base.Tenancy.Scope
   alias Crontab.CronExpression.Parser
 
   setup do
     SettingsFixtures.create_settings_table!()
+    AuditFixtures.create_audit_tables!()
     definition = definition()
 
     ContributionRegistry.put_snapshot_for_test!(%{
@@ -48,6 +55,141 @@ defmodule Bilimbi.Base.ScheduleTest do
     on_exit(&ContributionRegistry.clear_for_test!/0)
     on_exit(fn -> Application.delete_env(:bilimbi_base_schedule, :test_recipient) end)
     %{definition: definition}
+  end
+
+  test "operator task summaries expose immutable schedule facts without worker arguments", %{
+    definition: definition
+  } do
+    definition = %{definition | owner: "base/perf", owner_route: "/system/performance"}
+    put_definitions([definition])
+
+    Repo.insert!(%Run{
+      source: "scheduler",
+      key: definition.key,
+      name: definition.task_name,
+      status: "failed",
+      started_at: ~N[2026-08-20 12:00:00],
+      finished_at: ~N[2026-08-20 12:00:02],
+      runtime_ms: 2_000,
+      output_excerpt: "secret-output-must-not-leak"
+    })
+
+    assert {:ok, [task]} = Schedule.list_tasks(search: "TEST", status: "unreviewed")
+    assert task.key == definition.key
+    assert task.owner == "base/perf"
+    assert task.owner_route == "/system/performance"
+    assert task.expression == "30 1 * * *"
+    assert task.timezone == "America/New_York"
+    assert task.overlap == :forbid
+    assert task.misfire == :coalesce
+    assert task.last_status == :failed
+    assert task.last_runtime_ms == 2_000
+    refute Map.has_key?(task, :args)
+    refute Map.has_key?(task, :output_excerpt)
+
+    assert {:ok, []} = Schedule.list_tasks(status: "succeeded")
+    assert {:error, :invalid_options} = Schedule.list_tasks(page_size: 500)
+    assert {:error, :invalid_options} = Schedule.list_tasks(search: String.duplicate("x", 256))
+  end
+
+  test "history filtering and pagination happen in the database with exact totals", %{
+    definition: definition
+  } do
+    Enum.each(1..30, fn offset ->
+      Repo.insert!(%Run{
+        source: "scheduler",
+        key: definition.key,
+        name: "Test schedule #{offset}",
+        status: if(rem(offset, 2) == 0, do: "succeeded", else: "failed"),
+        started_at: NaiveDateTime.add(~N[2026-08-01 00:00:00], offset, :hour),
+        output_excerpt: "private payload #{offset}"
+      })
+    end)
+
+    assert {:ok, page} =
+             Schedule.list_runs(
+               search: "Test schedule",
+               status: "succeeded",
+               start_date: ~D[2026-08-01],
+               end_date: ~D[2026-08-03],
+               sort_by: :started_at,
+               sort_dir: :asc,
+               page: 1,
+               page_size: 25
+             )
+
+    assert page.total_entries == 15
+    assert page.total_pages == 1
+    assert length(page.entries) == 15
+
+    assert Enum.map(page.entries, & &1.started_at) ==
+             Enum.sort(Enum.map(page.entries, & &1.started_at))
+
+    assert Enum.all?(page.entries, &(&1.status == "succeeded"))
+    refute Map.has_key?(hd(page.entries), :output_excerpt)
+
+    assert {:ok, second_page} = Schedule.list_runs(page: 2, page_size: 25)
+    assert second_page.total_entries == 30
+    assert second_page.total_pages == 2
+    assert length(second_page.entries) == 5
+
+    assert {:error, :invalid_options} =
+             Schedule.list_runs(start_date: ~D[2026-08-03], end_date: ~D[2026-08-01])
+
+    assert {:error, :invalid_options} = Schedule.list_runs(search: String.duplicate("x", 256))
+  end
+
+  test "operator commands persist actor-attributed audit facts and reject stale definitions", %{
+    definition: definition
+  } do
+    actor = actor()
+
+    assert :ok = Schedule.review_definition(actor, definition.key, true)
+    assert :ok = Schedule.suppress(actor, definition.key)
+    assert :ok = Schedule.resume(actor, definition.key)
+    assert {:ok, 45} = Schedule.set_history_retention(actor, 45)
+    assert Settings.get("schedule.history.keep_days") == 45
+
+    assert {:ok, actions} = Audit.list_actions(actor.scope)
+
+    assert Enum.map(actions, & &1.event) == [
+             "schedule.task.enabled",
+             "schedule.task.paused",
+             "schedule.task.resumed",
+             "schedule.retention.changed"
+           ]
+
+    assert Enum.all?(actions, &(&1.actor_type == "user" and &1.actor_id == actor.id))
+    assert Enum.all?(actions, &(&1.company_id == actor.company_id))
+    assert Enum.all?(actions, &(&1.payload["source"] == "scheduler"))
+
+    assert {:error, :not_found} = Schedule.suppress(actor, "removed.definition")
+    assert {:ok, unchanged} = Audit.list_actions(actor.scope)
+    assert length(unchanged) == 4
+    assert {:error, :invalid_retention} = Schedule.set_history_retention(actor, 3651)
+  end
+
+  test "diagnostics distinguish recorder failure from Queue evidence" do
+    diagnostics = Schedule.diagnostics()
+    assert diagnostics.queue == :available
+    assert diagnostics.recorder == :available
+
+    Ecto.Adapters.SQL.query!(
+      Repo,
+      "ALTER TABLE base_schedule_runs RENAME TO unavailable_runs",
+      []
+    )
+
+    failed = Schedule.diagnostics()
+    assert failed.queue == :available
+    assert failed.recorder == :unavailable
+    assert failed.due_work == :none_due
+
+    Ecto.Adapters.SQL.query!(
+      Repo,
+      "ALTER TABLE unavailable_runs RENAME TO base_schedule_runs",
+      []
+    )
   end
 
   test "new definitions fail closed until their exact fingerprint is reviewed", %{
@@ -330,6 +472,18 @@ defmodule Bilimbi.Base.ScheduleTest do
     ContributionRegistry.put_snapshot_for_test!(
       put_in(snapshot, [:consumers, :schedule], schedule)
     )
+  end
+
+  defp actor do
+    scope =
+      Scope.for_tenant(%Identity{
+        id: 41,
+        name: "Operator tenant",
+        status: "active",
+        is_platform_operator: true
+      })
+
+    Actor.new!(:user, 91, scope, 73)
   end
 
   defp restore_occurrence_table do

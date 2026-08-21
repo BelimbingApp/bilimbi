@@ -10,6 +10,7 @@
     "base/locale",
     "base/menu",
     "base/module_registry",
+    "base/perf",
     "base/queue",
     "base/ui"
   ],

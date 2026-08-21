@@ -60,6 +60,7 @@ defmodule BilimbiWeb.ConnCase do
     apply(Module.concat(["Bilimbi.Base.Authz.TestFixtures"]), :create_authz_tables!, [])
     apply(Module.concat(["Bilimbi.Base.Settings.TestFixtures"]), :create_settings_table!, [])
     apply(Module.concat(["Bilimbi.Base.Audit.TestFixtures"]), :create_audit_tables!, [])
+    apply(Module.concat(["Bilimbi.Base.Perf.TestFixtures"]), :create_perf_table!, [])
     apply(Module.concat(["Bilimbi.Core.User.TestFixtures"]), :create_notifications_table!, [])
 
     # Employee Show loads attached addresses on mount, and both the show suite

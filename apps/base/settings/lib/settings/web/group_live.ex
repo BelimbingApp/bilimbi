@@ -94,7 +94,18 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
   defp scope(_socket), do: nil
 
   defp load_fields(socket) do
-    assign(socket, :fields, Form.fields(socket.assigns.page.groups, scope(socket)))
+    fields =
+      socket.assigns.page.groups
+      |> Form.fields(scope(socket))
+      |> Enum.filter(&authorized_field?(socket.assigns.current_scope, &1))
+
+    assign(socket, :fields, fields)
+  end
+
+  defp authorized_field?(_current_scope, %{definition: %{capability: nil}}), do: true
+
+  defp authorized_field?(current_scope, %{definition: %{capability: capability}}) do
+    allowed?(current_scope, capability)
   end
 
   defp fields_in(fields, group) do

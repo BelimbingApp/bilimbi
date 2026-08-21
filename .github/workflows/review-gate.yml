@@ -66,6 +66,10 @@ jobs:
           fi
       - name: Evaluate independent approval
         if: steps.resolve.outputs.present == 'true'
+        # `review_gate.sh` exits non-zero on FAIL, and that exit code is the
+        # entire point of this job. The explicit shell makes the pipeline
+        # propagate the gate's status through `tee`.
+        shell: bash -eo pipefail {0}
         run: |
           "$RUNNER_TEMP/review_gate.sh" "$PR_NUMBER" | tee "$GITHUB_STEP_SUMMARY"
       - name: Gate not yet installed
