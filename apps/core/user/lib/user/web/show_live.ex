@@ -14,6 +14,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                           toggle_effective_permissions toggle_link_employee)
 
   alias Bilimbi.Base.Authz
+
+  @manage_capability "admin.user.update"
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.User
@@ -71,7 +73,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   defp load_data(socket, user) do
     scope = socket.assigns.current_scope.scope
     current_scope = socket.assigns.current_scope
-    can_manage? = allowed?(current_scope, "admin.user.update")
+    can_manage? = allowed?(current_scope, @manage_capability)
 
     {:ok, companies} = Company.list_companies(scope)
     company_names = Map.new(companies, &{&1.id, Company.Summary.display_name(&1)})
@@ -254,7 +256,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   @impl true
   def handle_event("save_field", params, socket) do
-    if socket.assigns.can_manage? do
+    if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
 
@@ -290,7 +292,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("save_company", params, socket) do
-    if socket.assigns.can_manage? do
+    if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
 
@@ -375,7 +377,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("assign_selected_roles", params, socket) do
-    if socket.assigns.can_manage? do
+    if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
       current_scope = socket.assigns.current_scope
@@ -437,7 +439,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         %{"assignment-id" => assignment_id_str, "role-id" => role_id_str},
         socket
       ) do
-    if socket.assigns.can_manage? do
+    if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
 
@@ -478,7 +480,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("add_selected_capabilities", params, socket) do
-    if socket.assigns.can_manage? do
+    if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
       current_scope = socket.assigns.current_scope
@@ -530,7 +532,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("deny_capability", %{"capability-key" => cap_key}, socket) do
-    if socket.assigns.can_manage? do
+    if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
 
@@ -561,7 +563,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("remove_capability", %{"grant-id" => grant_id_str}, socket) do
-    if socket.assigns.can_manage? do
+    if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
 
@@ -593,7 +595,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("update_password", params, socket) do
-    if socket.assigns.can_manage? do
+    if can_manage?(socket) do
       p = params["user"] || params
       password = p["password"] || ""
       confirmation = p["password_confirmation"] || ""
@@ -646,7 +648,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("link_employee", %{"employee_id" => employee_id_str}, socket) do
-    if socket.assigns.can_manage? do
+    if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
 
@@ -673,7 +675,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("unlink_employee", %{"employee-id" => _employee_id_str}, socket) do
-    if socket.assigns.can_manage? do
+    if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
 
@@ -716,7 +718,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("save_new_employee", params, socket) do
-    if socket.assigns.can_manage? do
+    if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
       p = params["employee"] || params
@@ -1852,5 +1854,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       _ ->
         false
     end
+  end
+
+  # The mount-time assign hides controls; it is presentation state. Every
+  # write asks again, because a LiveView process outlives its mount and a
+  # revoked grant must not keep working until remount (#609, the #482/#541
+  # pattern).
+  defp can_manage?(socket) do
+    Authz.can(socket.assigns.current_scope.actor, @manage_capability).allowed
   end
 end

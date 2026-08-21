@@ -18,6 +18,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Core.Company
+  alias Bilimbi.Core.Geonames
 
   @address_kinds ~w(headquarters billing shipping branch other)
   @common_timezones [
@@ -164,6 +165,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
   # ============================================================================
   # Dynamic Integration with Core User, Employee, Address
+  # (Geonames is a declared dependency — call Bilimbi.Core.Geonames directly.)
   # ============================================================================
 
   defp list_company_users(scope, company_id) do
@@ -224,59 +226,20 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     end
   end
 
-  defp geonames_mod do
-    Module.concat(["Bilimbi", "Core", "Geonames"])
-  end
+  # Geonames is a declared company dependency (bilimbi.module.exs). Call it
+  # directly — the same pattern create_live.ex already uses. Do not probe.
+  defp list_geonames_countries, do: Geonames.list_countries()
 
-  defp list_geonames_countries do
-    mod = geonames_mod()
+  defp list_geonames_admin1(country_iso), do: Geonames.list_admin1(country_iso)
 
-    if Code.ensure_loaded?(mod) and function_exported?(mod, :list_countries, 0) do
-      apply(mod, :list_countries, [])
-    else
-      []
-    end
-  end
+  defp lookup_geonames_postcode(country_iso, postcode),
+    do: Geonames.lookup_postcode(country_iso, postcode)
 
-  defp list_geonames_admin1(country_iso) do
-    mod = geonames_mod()
+  defp search_geonames_postcodes(country_iso, postcode),
+    do: Geonames.search_postcodes(country_iso, postcode)
 
-    if Code.ensure_loaded?(mod) and function_exported?(mod, :list_admin1, 1) do
-      apply(mod, :list_admin1, [country_iso])
-    else
-      []
-    end
-  end
-
-  defp lookup_geonames_postcode(country_iso, postcode) do
-    mod = geonames_mod()
-
-    if Code.ensure_loaded?(mod) and function_exported?(mod, :lookup_postcode, 2) do
-      apply(mod, :lookup_postcode, [country_iso, postcode])
-    else
-      []
-    end
-  end
-
-  defp search_geonames_postcodes(country_iso, postcode) do
-    mod = geonames_mod()
-
-    if Code.ensure_loaded?(mod) and function_exported?(mod, :search_postcodes, 2) do
-      apply(mod, :search_postcodes, [country_iso, postcode])
-    else
-      []
-    end
-  end
-
-  defp search_geonames_city_names(country_iso, locality, opts) do
-    mod = geonames_mod()
-
-    if Code.ensure_loaded?(mod) and function_exported?(mod, :search_city_names, 3) do
-      apply(mod, :search_city_names, [country_iso, locality, opts])
-    else
-      []
-    end
-  end
+  defp search_geonames_city_names(country_iso, locality, opts),
+    do: Geonames.search_city_names(country_iso, locality, opts)
 
   defp address_mod do
     Module.concat(["Bilimbi", "Core", "Address"])
