@@ -57,8 +57,15 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
         Path.expand("../../../core/user_administration/priv/web_routes.exs", __DIR__)
       )
 
+    # Embed contributions share the manifest with routes and carry no :path.
     host_paths = MapSet.new(host_routes, & &1.path)
-    module_paths = MapSet.new(user_routes ++ administration_routes, & &1.path)
+
+    module_paths =
+      for route <- user_routes ++ administration_routes,
+          path = route[:path],
+          is_binary(path),
+          into: MapSet.new(),
+          do: path
 
     assert MapSet.disjoint?(host_paths, module_paths)
   end

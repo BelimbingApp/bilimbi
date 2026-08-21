@@ -6,7 +6,8 @@ defmodule Bilimbi.Core.User.WebRoutesTest do
     routes
   end
 
-  defp route!(path), do: Enum.find(routes(), &(&1.path == path))
+  # Embed contributions share the manifest with routes and carry no :path.
+  defp route!(path), do: Enum.find(routes(), &(&1[:path] == path))
 
   test "retains the capability-gated create, show, and edit routes" do
     assert %{
@@ -33,10 +34,19 @@ defmodule Bilimbi.Core.User.WebRoutesTest do
     # failed it and the fix was to paste the new entry in. That checks the list
     # has not changed rather than that the rules hold. This states the rule: an
     # admin route without a capability is reachable by any signed-in account.
-    for route <- routes(), String.starts_with?(route.path, "/users") do
+    for route <- routes(),
+        is_binary(route[:path]) and String.starts_with?(route[:path], "/users") do
       assert is_binary(route[:capability]),
-             "#{route.path} is an administrative route with no capability"
+             "#{route[:path]} is an administrative route with no capability"
     end
+  end
+
+  test "contributes the employee account panel as a discovered embed" do
+    assert %{
+             embed: "employee.accounts",
+             live_component: Bilimbi.Core.User.Web.EmployeeAccountPanel,
+             operation_handler: Bilimbi.Core.User.Web.EmployeeAccountPanel
+           } in routes()
   end
 
   test "the profile route is deliberately open to any signed-in account" do

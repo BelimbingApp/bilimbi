@@ -94,10 +94,12 @@ defmodule BilimbiWeb.EmployeeShowTest do
     assert {:ok, _} = Employee.get_employee(scope, 73, orchestrator.id)
   end
 
+  # The account panel is a `core/user`-owned discovered embed (#581); these
+  # page-level tests stay here because the page is where the seam composes.
   # The link path had no coverage at all, and it was where #409 lived: a
   # `rescue _ -> {:ok, nil}` around the write meant every failure flashed
-  # success. Both of these assert the store, because the flash was the thing
-  # that lied.
+  # success. These assert the store, because the rendered outcome was the
+  # thing that lied.
   test "links a user account and records it in the database", %{
     conn: conn,
     employee: employee
@@ -110,11 +112,37 @@ defmodule BilimbiWeb.EmployeeShowTest do
     |> element("#employee-user-form")
     |> render_change(%{"user_id" => "91"})
 
-    assert has_element?(view, "#flash-group", "User link updated.")
+    assert has_element?(view, "#account-panel-notice", "User link updated.")
 
     {:ok, scope} = Tenancy.scope(41)
     assert {:ok, %{employee_id: linked}} = User.get_user(scope, 73, 91)
     assert linked == employee.id
+  end
+
+  # The manifest-dispatched Core User coordinator commits the unlink and the
+  # employee type transition together; there is no post-update panel notice to
+  # mistake for a successful reconciliation (#581).
+  test "switching the employee type to agent unlinks the account", %{
+    conn: conn,
+    employee: employee
+  } do
+    grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+    view
+    |> element("#employee-user-form")
+    |> render_change(%{"user_id" => "91"})
+
+    {:ok, scope} = Tenancy.scope(41)
+    assert {:ok, %{employee_id: _linked}} = User.get_user(scope, 73, 91)
+
+    view
+    |> element("#employee-type-form")
+    |> render_change(%{"employee_type" => "agent"})
+
+    assert {:ok, %{employee_type: "agent"}} = Employee.get_employee(scope, 73, employee.id)
+    assert {:ok, %{employee_id: nil}} = User.get_user(scope, 73, 91)
   end
 
   test "refuses to link a user from another company and writes nothing", %{
@@ -145,7 +173,7 @@ defmodule BilimbiWeb.EmployeeShowTest do
     |> element("#employee-user-form")
     |> render_change(%{"user_id" => "92"})
 
-    assert has_element?(view, "#flash-group", "Failed to update linked user account.")
+    assert has_element?(view, "#account-panel-notice", "Failed to update linked user account.")
 
     {:ok, scope} = Tenancy.scope(41)
     assert {:ok, %{employee_id: nil}} = User.get_user(scope, 74, 92)
