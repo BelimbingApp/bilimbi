@@ -33,19 +33,34 @@ for fixture in "$here"/*.json; do
 done
 
 # The fixtures above prove the gate returns the right exit status. They cannot
-# see whether the workflow honours it -- and it did not. The step piped the gate
-# into `tee`, and a `run:` block with no explicit `shell:` runs under
-# `bash -e {0}`, which has no `pipefail`, so the pipeline reported `tee`'s
-# status. #499, #503 and #505 all merged with zero reviews and a green
-# "Independent review present" (#516). This asserts the half no fixture covers.
+# see whether the workflow honours it -- and it did not. Assert that the exact
+# evaluation step both pipes the gate into `tee` and declares a pipefail shell;
+# matching those strings elsewhere in the workflow would not protect the gate.
 workflow="$here/../../../.github/workflows/review-gate.yml"
 
-if [[ -f "$workflow" ]]; then
-  if grep -Eq 'review_gate\.sh".*\|' "$workflow" && ! grep -q 'set -o pipefail' "$workflow"; then
-    printf 'FAIL wiring (review-gate.yml pipes the gate without pipefail; the verdict cannot fail the check)\n' >&2
+if [[ ! -f "$workflow" ]]; then
+  printf 'FAIL wiring (review-gate.yml is missing)\n' >&2
+  failures=$((failures + 1))
+else
+  evaluation_step=$(
+    awk '
+      /^      - name: Evaluate independent approval[[:space:]]*$/ { capture = 1 }
+      capture && /^      - name:/ && !/Evaluate independent approval/ { exit }
+      capture { print }
+    ' "$workflow"
+  )
+
+  if [[ -z "$evaluation_step" ]]; then
+    printf 'FAIL wiring (Evaluate independent approval step is missing)\n' >&2
+    failures=$((failures + 1))
+  elif ! grep -Eq '^        shell: bash -eo pipefail \{0\}[[:space:]]*$' <<<"$evaluation_step"; then
+    printf 'FAIL wiring (evaluation step does not declare bash pipefail)\n' >&2
+    failures=$((failures + 1))
+  elif ! grep -Eq '^[[:space:]]*"\$RUNNER_TEMP/review_gate\.sh"[[:space:]]+"\$PR_NUMBER"[[:space:]]+\|[[:space:]]+tee[[:space:]]+"\$GITHUB_STEP_SUMMARY"[[:space:]]*$' <<<"$evaluation_step"; then
+    printf 'FAIL wiring (evaluation step does not pipe the gate into the summary)\n' >&2
     failures=$((failures + 1))
   else
-    printf 'ok   wiring (review-gate.yml cannot swallow the gate verdict)\n'
+    printf 'ok   wiring (evaluation step cannot swallow the gate verdict)\n'
   fi
 fi
 
