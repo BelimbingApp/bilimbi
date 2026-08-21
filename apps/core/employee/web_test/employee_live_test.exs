@@ -490,7 +490,13 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
 
-      # Change status to probation
+      # The selects sit behind edit-in-place read states (#619): the badge
+      # shows first, and the form exists only after the trigger is clicked.
+      assert has_element?(view, "#employee-status-display")
+      refute has_element?(view, "#employee-status-form")
+
+      view |> element("#employee-status-display") |> render_click()
+
       view
       |> form("#employee-status-form")
       |> render_change(%{"status" => "probation"})
@@ -499,7 +505,12 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       {:ok, updated} = Employee.get_employee(scope, 73, employee.id)
       assert updated.status == "probation"
 
+      # A successful save folds the field back to its read state.
+      refute has_element?(view, "#employee-status-form")
+
       # Change employee type to part_time
+      view |> element("#employee-employee_type-display") |> render_click()
+
       view
       |> form("#employee-type-form")
       |> render_change(%{"employee_type" => "part_time"})
@@ -519,7 +530,9 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
 
-      # Assign department
+      # Assign department (open the edit-in-place field first, #619)
+      view |> element("#employee-department-display") |> render_click()
+
       view
       |> form("#employee-department-form")
       |> render_change(%{"department_id" => "101"})
@@ -529,6 +542,8 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       assert updated.department_id == 101
 
       # Assign supervisor
+      view |> element("#employee-supervisor-display") |> render_click()
+
       view
       |> form("#employee-supervisor-form")
       |> render_change(%{"supervisor_id" => to_string(peer.id)})

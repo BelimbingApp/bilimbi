@@ -82,6 +82,11 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       assert html =~ "Active Users"
       assert html =~ "Company Directory"
       refute html =~ "Secret Query"
+      table_html = view |> element("#database-queries-card") |> render()
+      assert has_element?(view, "#database-queries-table")
+      assert html =~ ~s(id="database-queries-table-sort-updated_at")
+      assert html =~ ~s(aria-sort="descending")
+      refute table_html =~ "uppercase"
 
       # Refute create button and row action buttons for read-only user
       refute has_element?(view, "#btn-create-query")

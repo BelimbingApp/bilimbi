@@ -53,17 +53,15 @@
 
     <.card id="performance-history" inner_class="p-0">
       <.form
-        for={%{}}
-        as={:filters}
+        for={@filters_form}
         id="performance-filters"
         phx-change="filter"
         phx-submit="filter"
-        class="mb-2 grid gap-2 p-2 sm:grid-cols-4"
+        class="mb-2 grid gap-2 p-2 sm:grid-cols-3"
       >
-        <.input type="search" id="performance-identity" name="filters[identity]" value={@filters.identity} label="Route or worker" placeholder="Exact identity" phx-debounce="300" />
-        <.input type="select" id="performance-kind" name="filters[kind]" value={@filters.kind} label="Kind" options={[{"All", ""}, {"Request", "request"}, {"LiveView", "liveview"}, {"Job", "job"}, {"Runtime", "runtime"}]} />
-        <.input type="select" id="performance-outcome" name="filters[outcome]" value={@filters.outcome} label="Outcome" options={[{"All", ""}, {"OK", "ok"}, {"Error", "error"}, {"Cancelled", "cancelled"}, {"Discarded", "discarded"}]} />
-        <.input type="select" id="performance-page-size" name="filters[page_size]" value={@filters.page_size} label="Rows" options={[25, 50, 100, 300]} />
+        <.input type="search" id="performance-identity" field={@filters_form[:identity]} label="Route or worker" placeholder="Exact identity" phx-debounce="300" />
+        <.input type="select" id="performance-kind" field={@filters_form[:kind]} label="Kind" options={[{"All", ""}, {"Request", "request"}, {"LiveView", "liveview"}, {"Job", "job"}, {"Runtime", "runtime"}]} />
+        <.input type="select" id="performance-outcome" field={@filters_form[:outcome]} label="Outcome" options={[{"All", ""}, {"OK", "ok"}, {"Error", "error"}, {"Cancelled", "cancelled"}, {"Discarded", "discarded"}]} />
       </.form>
 
       <.table id="performance-sample-table" rows={@streams.samples} row_id={fn {id, _sample} -> id end} row_item={fn {_id, sample} -> sample end} framed={false}>
@@ -76,13 +74,13 @@
         <:empty :if={@total == 0}>No matching performance history.</:empty>
       </.table>
 
-      <div id="performance-pagination" class="flex items-center justify-between border-t border-line px-2 py-1.5">
-        <span class="text-xs text-muted">Page {@filters.page} of {@page_count}</span>
-        <div class="flex gap-1">
-          <.button id="performance-previous" phx-click="previous" disabled={@filters.page <= 1} class="rounded-md">Previous</.button>
-          <.button id="performance-next" phx-click="next" disabled={@filters.page >= @page_count} class="rounded-md">Next</.button>
-        </div>
-      </div>
+      <.pagination
+        id="performance-pagination"
+        page={@samples_page}
+        page_sizes={@page_sizes}
+        filters_form={@filters_form}
+        filters_event="filter"
+      />
     </.card>
   </.page>
 </Layouts.app>
