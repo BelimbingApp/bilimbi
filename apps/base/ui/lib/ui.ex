@@ -19,6 +19,29 @@ defmodule Bilimbi.Base.UI do
 
   def allowed?(_current_scope, _capability), do: false
 
+  @doc """
+  The signed-in user's id, from the `current_scope` assign.
+
+  `BilimbiWeb.UserAuth.presentation_user/2` is the only thing that builds this
+  map, and it always writes a positive integer under `"user_id"`. So there is
+  one shape, and anything else means scope propagation is broken — a route
+  without the right `live_session`, or a component rendered outside it.
+
+  This raises rather than returning a default on purpose. Three adapters
+  previously fell back to user id `0`, which scoped every read to a user that
+  does not exist: empty lists and a working-looking screen instead of a crash
+  naming the bug. AGENTS.md §9 is explicit that a missing assign is fixed at
+  the route, not papered over with a value.
+  """
+  @spec current_user_id(map()) :: pos_integer()
+  def current_user_id(%{user: %{"user_id" => id}}) when is_integer(id) and id > 0, do: id
+
+  def current_user_id(current_scope) do
+    raise ArgumentError,
+          "current_scope carries no \"user_id\"; fix the route's live_session and " <>
+            "scope propagation rather than defaulting the id. Got: #{inspect(current_scope)}"
+  end
+
   def live_view do
     quote do
       use Phoenix.LiveView
@@ -61,7 +84,7 @@ defmodule Bilimbi.Base.UI do
       use Gettext, backend: Bilimbi.Base.UI.Gettext
 
       import Phoenix.HTML
-      import Bilimbi.Base.UI, only: [allowed?: 2]
+      import Bilimbi.Base.UI, only: [allowed?: 2, current_user_id: 1]
       import Bilimbi.Base.UI.Components
 
       alias Bilimbi.Base.UI.Layouts
