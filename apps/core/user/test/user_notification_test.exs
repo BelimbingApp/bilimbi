@@ -297,14 +297,12 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
         with_pubsub_server(__MODULE__, fn ->
           assert {:error, :pubsub_unavailable} = User.subscribe_notifications(scope, 42)
 
-          assert_receive {@notification_delivery_failure_event, %{count: 1},
-                          %{operation: :subscribe}}
+          assert_delivery_failure(:subscribe)
 
           assert {:error, :pubsub_unavailable} =
                    User.broadcast_notification(scope, 42, {:created, %{private: "payload"}})
 
-          assert_receive {@notification_delivery_failure_event, %{count: 1},
-                          %{operation: :broadcast}}
+          assert_delivery_failure(:broadcast)
         end)
       end)
     end
@@ -339,7 +337,8 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
   end
 
   defp assert_delivery_failure(operation) do
-    assert_receive {@notification_delivery_failure_event, %{count: 1}, %{operation: ^operation}}
+    assert_receive {@notification_delivery_failure_event, %{count: 1}, metadata}
+    assert metadata == %{operation: operation}
   end
 
   defp with_delivery_failure_telemetry(fun) do
