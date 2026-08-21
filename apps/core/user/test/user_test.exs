@@ -368,12 +368,13 @@ defmodule Bilimbi.Core.UserTest do
   end
 
   describe "user preferences" do
-    test "publishes the four canonical setting definitions" do
+    test "publishes the canonical setting definitions" do
       definitions = Contributions.contributions().settings.definitions
 
       assert Map.keys(definitions) |> Enum.sort() == [
                "ai.last_used_model_hints",
                "ui.dashboard.layout",
+               "ui.dashboard.sections",
                "ui.landing_menu_id",
                "ui.theme"
              ]
@@ -399,6 +400,7 @@ defmodule Bilimbi.Core.UserTest do
       assert preferences["ui.theme"] == "system"
       assert preferences["ui.landing_menu_id"] == ""
       assert preferences["ui.dashboard.layout"] == []
+      assert preferences["ui.dashboard.sections"] == []
       assert preferences["ai.last_used_model_hints"] == []
 
       assert {:ok, "dark"} =

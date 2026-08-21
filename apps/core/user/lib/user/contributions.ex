@@ -26,6 +26,15 @@ defmodule Bilimbi.Core.User.Contributions do
       editable: "dashboard.customize",
       capability: "base.settings.user.manage"
     },
+    "ui.dashboard.sections" => %{
+      type: :array,
+      scopes: [:user],
+      default: [],
+      label: "Dashboard sections",
+      help: "The ordered dashboard sections selected by this account.",
+      editable: "dashboard.customize",
+      capability: "base.settings.user.manage"
+    },
     "ui.landing_menu_id" => %{
       type: :string,
       scopes: [:user],
