@@ -7,6 +7,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Core.Company
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.Employee.AdministrationPage
 
@@ -48,6 +49,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
      |> assign(:page_sizes, @page_sizes)
      |> assign(:index_state, %State{})
      |> assign(:employees_page, empty_page())
+     |> assign(:department_map, %{})
      |> assign(:filters_form, to_form(filters_form_params(%State{}), as: :filters))}
   end
 
@@ -151,6 +153,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
         socket
         |> assign(:index_state, state)
         |> assign(:employees_page, page)
+        |> assign(:department_map, department_map(scope, company_id))
         |> assign(:company_id, company_id)
         |> assign(:filters_form, to_form(filters_form_params(state), as: :filters))
         |> stream(:employees, page.entries, reset: true)
@@ -174,6 +177,20 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
       has_prev?: false,
       has_next?: false
     }
+  end
+
+  # Department names come through Company's public API, same as the show
+  # page — the departments table belongs to Core Company, not this module.
+  defp department_map(scope, company_id) do
+    case Company.list_departments(scope, company_id) do
+      {:ok, departments} ->
+        Map.new(departments, fn dept ->
+          {dept.id, if(dept.type, do: dept.type.name, else: "Department #{dept.id}")}
+        end)
+
+      _ ->
+        %{}
+    end
   end
 
   defp resolve_scope(socket) do
@@ -374,7 +391,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
                   label="Search employees"
                   label_class="sr-only"
                   wrapper_class="mb-0"
-                  placeholder="Search by name, employee number, email, designation..."
+                  placeholder="Search by name, employee number, email, designation, or job description..."
                   class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
                 />
               </div>
@@ -418,6 +435,12 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
 
             <:col :let={employee} label="No.">
               <code class="text-xs font-medium tabular-nums">{employee.employee_number}</code>
+            </:col>
+
+            <:col :let={employee} label="Department">
+              <span class={[is_nil(employee.department_id) && "text-ink-faint"]}>
+                {Map.get(@department_map, employee.department_id, "—")}
+              </span>
             </:col>
 
             <:col

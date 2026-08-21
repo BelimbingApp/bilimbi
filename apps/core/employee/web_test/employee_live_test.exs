@@ -84,6 +84,33 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     refute has_element?(view, "#employee-new")
   end
 
+  test "renders the Department column from Company's public API", %{conn: conn, scope: scope} do
+    grant_capabilities!("admin.employee.list")
+
+    {:ok, dept_type} =
+      Bilimbi.Core.Company.create_department_type(%{
+        code: "engineering",
+        name: "Engineering",
+        category: "operational"
+      })
+
+    CompanyFixtures.insert_department!(101, 73, dept_type.id)
+
+    {:ok, _assigned} =
+      Employee.create_employee(scope, 73, %{
+        employee_number: "EMP-777",
+        full_name: "Dept Member",
+        department_id: 101
+      })
+
+    {:ok, view, html} = conn |> log_in_as() |> live(~p"/employees")
+
+    assert html =~ "Department"
+    assert has_element?(view, "#employees td", "Engineering")
+    # John Doe has no department; his cell renders the muted dash.
+    assert has_element?(view, "#employees td span", "—")
+  end
+
   test "shows a create action when the actor may create employees", %{conn: conn} do
     grant_capabilities!([
       "admin.employee.list",
