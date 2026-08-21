@@ -32,6 +32,38 @@ for fixture in "$here"/*.json; do
   fi
 done
 
+# The fixtures above prove the gate returns the right exit status. They cannot
+# see whether the workflow honours it -- and it did not. Assert that the exact
+# evaluation step both pipes the gate into `tee` and declares a pipefail shell;
+# matching those strings elsewhere in the workflow would not protect the gate.
+workflow="$here/../../../.github/workflows/review-gate.yml"
+
+if [[ ! -f "$workflow" ]]; then
+  printf 'FAIL wiring (review-gate.yml is missing)\n' >&2
+  failures=$((failures + 1))
+else
+  evaluation_step=$(
+    awk '
+      /^      - name: Evaluate independent approval[[:space:]]*$/ { capture = 1 }
+      capture && /^      - name:/ && !/Evaluate independent approval/ { exit }
+      capture { print }
+    ' "$workflow"
+  )
+
+  if [[ -z "$evaluation_step" ]]; then
+    printf 'FAIL wiring (Evaluate independent approval step is missing)\n' >&2
+    failures=$((failures + 1))
+  elif ! grep -Eq '^        shell: bash -eo pipefail \{0\}[[:space:]]*$' <<<"$evaluation_step"; then
+    printf 'FAIL wiring (evaluation step does not declare bash pipefail)\n' >&2
+    failures=$((failures + 1))
+  elif ! grep -Eq '^[[:space:]]*"\$RUNNER_TEMP/review_gate\.sh"[[:space:]]+"\$PR_NUMBER"[[:space:]]+\|[[:space:]]+tee[[:space:]]+"\$GITHUB_STEP_SUMMARY"[[:space:]]*$' <<<"$evaluation_step"; then
+    printf 'FAIL wiring (evaluation step does not pipe the gate into the summary)\n' >&2
+    failures=$((failures + 1))
+  else
+    printf 'ok   wiring (evaluation step cannot swallow the gate verdict)\n'
+  fi
+fi
+
 if [[ $failures -gt 0 ]]; then
   echo "$failures fixture(s) failed" >&2
   exit 1
