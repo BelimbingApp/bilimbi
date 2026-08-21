@@ -146,16 +146,40 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
     {:ok, view, _html} = open(conn)
 
+    # The standard <.pagination> ids and summary (#653).
     assert has_element?(view, "#notifications-pagination")
-    assert has_element?(view, "#pagination-summary", "Showing 1 to 25 of 30 notifications")
-    assert has_element?(view, "#pagination-next")
-    assert has_element?(view, "#pagination-prev-disabled")
+
+    assert has_element?(
+             view,
+             "#notifications-pagination-summary",
+             "Showing 1 to 25 of 30 results"
+           )
+
+    assert has_element?(view, "#notifications-pagination-page-size")
+    assert has_element?(view, "#notifications-pagination-previous[disabled]")
 
     # Navigate to page 2
-    view |> element("#pagination-next") |> render_click()
-    assert has_element?(view, "#pagination-summary", "Showing 26 to 30 of 30 notifications")
-    assert has_element?(view, "#pagination-prev")
-    assert has_element?(view, "#pagination-next-disabled")
+    view |> element("#notifications-pagination-next") |> render_click()
+
+    assert has_element?(
+             view,
+             "#notifications-pagination-summary",
+             "Showing 26 to 30 of 30 results"
+           )
+
+    assert has_element?(view, "#notifications-pagination-next[disabled]")
+    refute has_element?(view, "#notifications-pagination-previous[disabled]")
+
+    # The size select feeds the standard filters event and patches per_page.
+    view
+    |> form("#notifications-pagination-page-size-form", %{"filters" => %{"perPage" => "50"}})
+    |> render_change()
+
+    assert has_element?(
+             view,
+             "#notifications-pagination-summary",
+             "Showing 1 to 30 of 30 results"
+           )
   end
 
   test "does not show notifications belonging to other users", %{conn: conn, scope: scope} do
