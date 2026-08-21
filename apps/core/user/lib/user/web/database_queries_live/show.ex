@@ -10,6 +10,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Database
+  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.User
 
   # `run` is a write verb, so the write-handler guard treats `run_query` as
@@ -137,7 +138,8 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
 
   @impl true
   def handle_event("save", _params, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
+    if operator?(socket) and
+         allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
       scope = socket.assigns.current_scope.scope
       user_id = current_user_id(socket.assigns.current_scope)
 
@@ -223,7 +225,8 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
 
   @impl true
   def handle_event("duplicate", _params, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
+    if operator?(socket) and
+         allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
       scope = socket.assigns.current_scope.scope
       user_id = current_user_id(socket.assigns.current_scope)
 
@@ -248,7 +251,8 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
 
   @impl true
   def handle_event("delete", _params, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
+    if operator?(socket) and
+         allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
       scope = socket.assigns.current_scope.scope
       user_id = current_user_id(socket.assigns.current_scope)
 
@@ -274,6 +278,15 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
     end
   end
 
+  # #650: the whole console is operator-only. Mount gates it, but every write and
+  # execute re-checks here because mount state is presentation, not authorization.
+  defp operator?(socket) do
+    case socket.assigns.current_scope do
+      %{scope: %Scope{} = scope} -> Scope.platform_operator?(scope)
+      _ -> false
+    end
+  end
+
   defp execute_query(socket) do
     sql = socket.assigns.sql_query
     params = socket.assigns.param_values
@@ -286,7 +299,10 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
       page: page,
       per_page: per_page,
       sort_by: sort_by,
-      sort_dir: sort_dir
+      sort_dir: sort_dir,
+      # #650: assert the operator tenant live per execution; the executor fails
+      # closed without it, so a mid-session operator revocation stops working here.
+      operator: operator?(socket)
     ]
 
     case Database.execute_readonly(sql, params, opts) do

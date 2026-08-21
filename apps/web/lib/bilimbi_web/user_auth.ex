@@ -501,6 +501,23 @@ defmodule BilimbiWeb.UserAuth do
     end
   end
 
+  def on_mount(:require_platform_operator, _params, _session, socket) do
+    if operator_scope?(socket.assigns.current_scope) do
+      {:cont, socket}
+    else
+      {:halt,
+       socket
+       |> Phoenix.LiveView.put_flash(:error, @denied_message)
+       |> Phoenix.LiveView.redirect(to: ~p"/dashboard")}
+    end
+  end
+
+  # An operator-only screen (#650) requires the actor's tenant to be the platform
+  # operator, not merely a capability grant. The per-event handlers re-check the
+  # same, because mount state is presentation.
+  defp operator_scope?(%{scope: %Scope{} = scope}), do: Scope.platform_operator?(scope)
+  defp operator_scope?(_), do: false
+
   defp mount_current_scope(socket, session) do
     current_scope = current_scope_from(session[@session_key], session[@impersonation_key])
 

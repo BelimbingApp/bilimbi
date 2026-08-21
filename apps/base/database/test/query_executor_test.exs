@@ -31,9 +31,16 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
     end
   end
 
+  # #650: the engine is operator-only tooling and fails closed unless the caller
+  # asserts the platform-operator tenant. These tests exercise the SQL contract
+  # as the operator; the "operator gate" describe below covers the guard itself.
+  defp as_operator(sql, params \\ %{}, opts \\ []) do
+    Database.execute_readonly(sql, params, Keyword.put(opts, :operator, true))
+  end
+
   describe "execute_readonly/3" do
     test "executes simple select query" do
-      assert {:ok, result} = Database.execute_readonly("SELECT 1 AS num, 'test' AS label")
+      assert {:ok, result} = as_operator("SELECT 1 AS num, 'test' AS label")
       assert result.columns == ["num", "label"]
       assert result.rows == [%{"num" => 1, "label" => "test"}]
       assert result.total == 1
@@ -46,21 +53,21 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
       sql = "SELECT :greeting || ', ' || :name AS msg"
       params = %{"greeting" => "Hello", "name" => "World"}
 
-      assert {:ok, result} = Database.execute_readonly(sql, params)
+      assert {:ok, result} = as_operator(sql, params)
       assert result.rows == [%{"msg" => "Hello, World"}]
     end
 
     test "executes query with WITH clause" do
       sql = "WITH vals AS (SELECT 42 AS answer) SELECT answer * 2 AS doubled FROM vals"
 
-      assert {:ok, result} = Database.execute_readonly(sql)
+      assert {:ok, result} = as_operator(sql)
       assert result.rows == [%{"doubled" => 84}]
     end
 
     test "binds atom-keyed params and preserves a false value" do
       sql = "SELECT :flag::boolean AS flag"
 
-      assert {:ok, result} = Database.execute_readonly(sql, %{flag: false})
+      assert {:ok, result} = as_operator(sql, %{flag: false})
       assert result.rows == [%{"flag" => false}]
     end
 
@@ -71,12 +78,12 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
       # Warm the execution path first so lazy module loading cannot skew the
       # atom count; the measured call must then create zero atoms even though
       # its parameter name has never been seen by this VM.
-      assert {:ok, _} = Database.execute_readonly("SELECT :warm::text AS v", %{"warm" => "x"})
+      assert {:ok, _} = as_operator("SELECT :warm::text AS v", %{"warm" => "x"})
 
       atom_count_before = :erlang.system_info(:atom_count)
       param = "zz_#{System.unique_integer([:positive])}"
 
-      assert {:ok, _} = Database.execute_readonly("SELECT :#{param}::text AS v", %{})
+      assert {:ok, _} = as_operator("SELECT :#{param}::text AS v", %{})
 
       assert :erlang.system_info(:atom_count) == atom_count_before
     end
@@ -85,7 +92,7 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
       sql = "SELECT generate_series(1, 10) AS num"
 
       assert {:ok, result} =
-               Database.execute_readonly(sql, %{},
+               as_operator(sql, %{},
                  page: 2,
                  per_page: 3,
                  order_by: "num",
@@ -100,31 +107,59 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
     end
 
     test "rejects empty SQL" do
-      assert {:error, "Query cannot be empty."} = Database.execute_readonly("   ")
+      assert {:error, "Query cannot be empty."} = as_operator("   ")
     end
 
     test "rejects non-SELECT/WITH statements" do
       assert {:error, "Only SELECT or WITH queries are permitted."} =
-               Database.execute_readonly("SET search_path TO public")
+               as_operator("SET search_path TO public")
     end
 
     test "rejects write / DDL keywords" do
       assert {:error, "Write or DDL statements are not permitted in queries."} =
-               Database.execute_readonly("SELECT * FROM users; DROP TABLE users;")
+               as_operator("SELECT * FROM users; DROP TABLE users;")
 
       assert {:error, "Only SELECT or WITH queries are permitted."} =
-               Database.execute_readonly("INSERT INTO users (name) VALUES ('attacker')")
+               as_operator("INSERT INTO users (name) VALUES ('attacker')")
 
       assert {:error, "Only SELECT or WITH queries are permitted."} =
-               Database.execute_readonly("UPDATE users SET name = 'attacker'")
+               as_operator("UPDATE users SET name = 'attacker'")
 
       assert {:error, "Only SELECT or WITH queries are permitted."} =
-               Database.execute_readonly("DELETE FROM users")
+               as_operator("DELETE FROM users")
     end
 
     test "handles syntax errors gracefully" do
-      assert {:error, msg} = Database.execute_readonly("SELECT * FROM non_existent_table_xyz")
+      assert {:error, msg} = as_operator("SELECT * FROM non_existent_table_xyz")
       assert msg =~ "does not exist" or msg =~ "SQL error"
+    end
+  end
+
+  describe "operator gate (#650)" do
+    test "fails closed when the operator tenant is not asserted" do
+      # The gate runs before SQL validation, so even a well-formed SELECT is
+      # refused, and the refusal never depends on query shape.
+      assert {:error, msg} = Database.execute_readonly("SELECT 1")
+      assert msg =~ "platform operator"
+
+      assert {:error, ^msg} = Database.execute_readonly("SELECT 1", %{}, operator: false)
+    end
+
+    test "runs the same well-formed query once the operator is asserted" do
+      assert {:ok, result} = Database.execute_readonly("SELECT 1 AS n", %{}, operator: true)
+      assert result.rows == [%{"n" => 1}]
+    end
+
+    test "refuses before reaching the store, so an invalid query still fails closed" do
+      # A query that would error at Postgres if the gate ever let it through:
+      # the operator error, not the DB error, proves the store was never reached.
+      assert {:error, msg} =
+               Database.execute_readonly("SELECT * FROM __blb_absent_table_650", %{},
+                 operator: false
+               )
+
+      assert msg =~ "platform operator"
+      refute msg =~ "does not exist"
     end
   end
 end
