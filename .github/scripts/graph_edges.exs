@@ -12,9 +12,10 @@
 # AST is walked for `Bilimbi.<Layer>.<Name>` references — plain aliases, use,
 # fully-qualified calls, and grouped aliases (`alias Bilimbi.Base.{A, B}`) all
 # count, while moduledocs and comments are strings/absent in the AST, so prose
-# mentioning a module cannot false-positive. Aliasing a bare layer
-# (`alias Bilimbi.Base`) is rejected outright: it would let later `Base.X`
-# references dodge the walk, and the workspace has no legitimate use of it.
+# mentioning a module cannot false-positive. Aliasing the bare root
+# (`alias Bilimbi`) or a bare layer (`alias Bilimbi.Base`) is rejected outright:
+# it would let later `B.Base.X` or `Base.X` references dodge the walk, and the
+# workspace has no legitimate use of it.
 # The namespace→id map derives from the descriptors at run time; there is no
 # hand-maintained list. `Bilimbi.Base.Repo` maps to base/database per the
 # documented AGENTS.md exception.
@@ -67,17 +68,23 @@ defmodule GraphEdges do
       violations ->
         Enum.each(violations, &IO.puts(:stderr, &1))
         IO.puts(:stderr, "\nDeclare the edge in the module's bilimbi.module.exs dependencies —")
-        IO.puts(:stderr, "the descriptor is the contract, and transitive availability is not a declaration.")
+
+        IO.puts(
+          :stderr,
+          "the descriptor is the contract, and transitive availability is not a declaration."
+        )
+
         System.halt(1)
     end
   end
 
   @doc false
   def violations(apps_root, file_exceptions) do
-    descriptors = Path.wildcard(Path.join(apps_root, "*/*/bilimbi.module.exs"))
+    descriptors = wildcard([apps_root, "*", "*", "bilimbi.module.exs"])
 
     if descriptors == [] do
-      {:error, "FAIL: no module descriptors below #{apps_root}/ — layout changed under this script"}
+      {:error,
+       "FAIL: no module descriptors below #{apps_root}/ — layout changed under this script"}
     else
       modules = Enum.map(descriptors, &load_descriptor/1)
 
@@ -103,11 +110,18 @@ defmodule GraphEdges do
     }
   end
 
+  defp wildcard(segments) do
+    segments
+    |> Path.join()
+    |> String.replace("\\", "/")
+    |> Path.wildcard()
+  end
+
   defp check_module(m, ns_to_id, file_exceptions) do
     self_prefix = Module.split(m.namespace) |> Enum.map(&String.to_atom/1)
     allowed_ids = MapSet.new([m.id | m.deps])
 
-    Path.wildcard(Path.join(m.dir, "lib/**/*.ex"))
+    wildcard([m.dir, "lib", "**", "*.ex"])
     |> Enum.flat_map(fn file ->
       extra_allowed =
         Map.get(file_exceptions, {m.id, Path.relative_to(file, m.dir)}, [])
@@ -121,7 +135,7 @@ defmodule GraphEdges do
     |> Enum.uniq()
   end
 
-  # Collects {three_segment_prefix, line} plus {:bare_layer, line} markers.
+  # Collects {three_segment_prefix, line} plus bare-root/layer markers.
   # Grouped-alias nodes are replaced with a leaf so their inner __aliases__
   # children (the two-segment base and the one-segment members) are not
   # revisited and double-reported.
@@ -139,6 +153,9 @@ defmodule GraphEdges do
                 end
 
               {:__graph_group_handled__, refs ++ acc}
+
+            {:__aliases__, meta, [:Bilimbi]} = node, acc ->
+              {node, [{:bare_root, meta[:line] || 0} | acc]}
 
             {:__aliases__, meta, [:Bilimbi, layer]} = node, acc when layer in @layers ->
               {node, [{:bare_layer, meta[:line] || 0} | acc]}
@@ -167,6 +184,13 @@ defmodule GraphEdges do
 
   defp judge(:unparseable, _line, file, m, _self, _allowed, _map, _extra) do
     ["#{m.id}: #{file} could not be parsed; gate cannot certify it"]
+  end
+
+  defp judge(:bare_root, line, file, m, _self, _allowed, _map, _extra) do
+    [
+      "#{m.id}: #{file}:#{line} aliases the bare Bilimbi root namespace, which would let " <>
+        "later shortened references dodge this gate — alias the full module instead"
+    ]
   end
 
   defp judge(:bare_layer, line, file, m, _self, _allowed, _map, _extra) do
@@ -215,7 +239,8 @@ defmodule SelfTest do
   # repository's recent history is about.
 
   def run do
-    root = Path.join(System.tmp_dir!(), "graph_edges_selftest_#{System.unique_integer([:positive])}")
+    root =
+      Path.join(System.tmp_dir!(), "graph_edges_selftest_#{System.unique_integer([:positive])}")
 
     try do
       write_module!(root, "base/aaa", Bilimbi.Base.Aaa, [])
@@ -256,6 +281,14 @@ defmodule SelfTest do
           end
           """)
         end),
+        expect("bare root alias fails", root, ["bare Bilimbi root"], fn ->
+          lib!(root, "base/aaa", "a.ex", """
+          defmodule Bilimbi.Base.Aaa.A do
+            alias Bilimbi, as: B
+            def go, do: B.Base.Bbb
+          end
+          """)
+        end),
         expect_with_exceptions(
           "exception admits only its listed namespaces",
           root,
@@ -271,7 +304,8 @@ defmodule SelfTest do
             end
             """)
           end
-        )
+        ),
+        expect_error("missing descriptors reports an error", Path.join(root, "missing_apps"))
       ]
 
       failed = Enum.reject(results, & &1)
@@ -289,10 +323,31 @@ defmodule SelfTest do
   defp expect(name, root, must_mention, setup),
     do: expect_with_exceptions(name, root, %{}, must_mention, [], setup)
 
+  defp expect_error(name, apps_root) do
+    case GraphEdges.violations(apps_root, %{}) do
+      {:error, message} when is_binary(message) ->
+        IO.puts("ok   #{name}")
+        true
+
+      other ->
+        IO.puts(
+          :stderr,
+          "SELF-TEST FAIL #{name}: expected {:error, message}, got #{inspect(other)}"
+        )
+
+        false
+    end
+  end
+
   defp expect_with_exceptions(name, root, exceptions, must_mention, must_not_mention, setup) do
     setup.()
     violations = GraphEdges.violations(Path.join(root, "apps"), exceptions)
-    text = violations |> List.wrap() |> Enum.join("\n")
+
+    text =
+      case violations do
+        {:error, message} -> message
+        violations -> violations |> List.wrap() |> Enum.join("\n")
+      end
 
     missing = Enum.reject(must_mention, &String.contains?(text, &1))
     forbidden = Enum.filter(must_not_mention, &String.contains?(text, &1))
@@ -308,7 +363,11 @@ defmodule SelfTest do
         false
 
       forbidden != [] ->
-        IO.puts(:stderr, "SELF-TEST FAIL #{name}: #{inspect(forbidden)} wrongly reported in\n#{text}")
+        IO.puts(
+          :stderr,
+          "SELF-TEST FAIL #{name}: #{inspect(forbidden)} wrongly reported in\n#{text}"
+        )
+
         false
 
       true ->
