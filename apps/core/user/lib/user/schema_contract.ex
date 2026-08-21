@@ -37,6 +37,10 @@ defmodule Bilimbi.Core.User.SchemaContract do
         "users_pkey" => index(["id"], true),
         "users_email_unique" => index(["email"], true)
       },
+      optional_indexes: %{
+        "users_company_id_index" => index(["company_id"]),
+        "users_employee_id_index" => index(["employee_id"])
+      },
       foreign_keys: %{
         "users_company_id_foreign" => foreign_key("company_id", "companies", :nilify_all),
         "users_employee_id_foreign" => foreign_key("employee_id", "employees", :nilify_all)
