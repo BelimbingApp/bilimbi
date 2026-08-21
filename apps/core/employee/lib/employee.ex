@@ -92,11 +92,14 @@ defmodule Bilimbi.Core.Employee do
     with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)) do
       employees =
         from(employee in Schema,
+          left_join: employee_type in EmployeeType,
+          on: employee_type.code == employee.employee_type,
           where: employee.company_id == ^company_id,
-          order_by: employee.id
+          order_by: employee.id,
+          select: {employee, employee_type.label}
         )
         |> Repo.all()
-        |> Enum.map(&Summary.from_schema/1)
+        |> Enum.map(&Summary.from_query_result/1)
 
       {:ok, employees}
     end

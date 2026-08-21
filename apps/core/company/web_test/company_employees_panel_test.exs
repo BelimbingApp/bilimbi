@@ -34,7 +34,8 @@ defmodule BilimbiWeb.CompanyEmployeesPanelTest do
       Employee.create_employee(scope, 73, %{
         employee_number: "EMP-001",
         full_name: "Grace Hopper",
-        designation: "Rear Admiral"
+        designation: "Rear Admiral",
+        employee_type: "full_time"
       })
 
     :ok
@@ -49,6 +50,10 @@ defmodule BilimbiWeb.CompanyEmployeesPanelTest do
     # company page never names the module.
     assert has_element?(view, "#company-employees-table td", "Grace Hopper")
     assert has_element?(view, "#company-employees-table td", "EMP-001")
+    # The type renders as the humanized label ("Full Time"), not the raw enum
+    # code, matching the employee index (#616).
+    assert has_element?(view, "#company-employees-table td", "Full Time")
+    refute has_element?(view, "#company-employees-table td", "full_time")
     refute has_element?(view, "#company-employees-table-empty")
   end
 
