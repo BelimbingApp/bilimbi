@@ -428,8 +428,17 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
                   Delete
                 </button>
               </div>
-              <span :if={type.is_system} class="text-xs text-ink-faint">
-                System types cannot be edited
+              <%!-- The Kind column's System badge already says what this row
+                   is; the actions cell is w-0, so prose here wraps word-per-
+                   line and wrecks row density (#619). A lock with a tooltip
+                   keeps the why reachable without repeating it per row. --%>
+              <span
+                :if={type.is_system}
+                class="inline-flex items-center justify-end whitespace-nowrap text-ink-faint"
+                title="System types cannot be edited"
+              >
+                <.icon name="hero-lock-closed" class="size-3.5" />
+                <span class="sr-only">System types cannot be edited</span>
               </span>
             </:action>
 

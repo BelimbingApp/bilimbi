@@ -22,6 +22,8 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
      |> assign(:domains, domains)}
   end
 
+  @page_sizes [25, 50, 100, 300]
+
   @impl true
   def handle_params(params, _uri, socket) do
     {:noreply, load(socket, state_from_params(params))}
@@ -29,10 +31,15 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
 
   @impl true
   def handle_event("filter", params, socket) do
+    current = socket.assigns.state
+    per_page = get_in(params, ["filters", "perPage"]) || Map.get(params, "perPage")
+
     state = %{
-      socket.assigns.state
-      | search: Map.get(params, "search", ""),
-        domain: member_or_blank(Map.get(params, "domain"), socket.assigns.domains),
+      current
+      | search: Map.get(params, "search", current.search),
+        domain:
+          member_or_blank(Map.get(params, "domain", current.domain), socket.assigns.domains),
+        page_size: page_size_from(per_page, current.page_size),
         page: 1
     }
 
@@ -73,7 +80,7 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
         sort_by: state.sort_by,
         sort_dir: state.sort_dir,
         page: state.page,
-        page_size: 50
+        page_size: state.page_size
       )
 
     if beyond_last_page?(page) do
@@ -82,6 +89,10 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
+      |> assign(
+        :filters_form,
+        to_form(%{"perPage" => Integer.to_string(state.page_size)}, as: :filters)
+      )
       |> stream(:capabilities, page.entries, reset: true)
     end
   end
@@ -95,7 +106,8 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
       domain: Map.get(params, "domain", ""),
       sort_by: sort_by_from(Map.get(params, "sort_by")),
       sort_dir: sort_dir_from(params),
-      page: to_int(Map.get(params, "page"), 1)
+      page: to_int(Map.get(params, "page"), 1),
+      page_size: page_size_from(Map.get(params, "per_page"), 25)
     }
   end
 
@@ -105,8 +117,16 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
       "domain" => state.domain,
       "sort_by" => state.sort_by,
       "sort_dir" => state.sort_dir,
-      "page" => state.page
+      "page" => state.page,
+      "per_page" => state.page_size
     }
+  end
+
+  defp page_size_from(value, fallback) do
+    case to_int(value, fallback) do
+      size when size in @page_sizes -> size
+      _ -> fallback
+    end
   end
 
   defp member_or_blank(value, allowed) when is_binary(value) do
@@ -136,7 +156,4 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
 
   defp nilify(""), do: nil
   defp nilify(value), do: value
-
-  defp capability_noun(1), do: "capability"
-  defp capability_noun(_count), do: "capabilities"
 end
