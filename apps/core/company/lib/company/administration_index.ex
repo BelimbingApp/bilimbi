@@ -86,17 +86,18 @@ defmodule Bilimbi.Core.Company.AdministrationIndex do
     }
   end
 
-  # The parent join stays inside the same tenant by construction: a parent_id
-  # can only reference a company row, and every company row carries this
-  # tenant's id through the scoped base query on the child side.
+  # Both joins hang off the Tenancy.scope_query base and add no tenant
+  # comparison of their own: the parent join cannot cross tenants because the
+  # composite FK `companies_parent_tenant_foreign` enforces (parent_id,
+  # tenant_id) → (id, tenant_id); the primary join needs only company_id,
+  # which is UNIQUE in tenant_primary_companies, so a match already implies
+  # this company's tenant.
   defp base_query(scope) do
-    tenant_id = Scope.tenant_id(scope)
-
     from company in Tenancy.scope_query(Schema, scope),
       left_join: parent in Schema,
       on: parent.id == company.parent_id and is_nil(parent.deleted_at),
       left_join: primary in "tenant_primary_companies",
-      on: primary.tenant_id == ^tenant_id and primary.company_id == company.id,
+      on: primary.company_id == company.id,
       where: is_nil(company.deleted_at)
   end
 
