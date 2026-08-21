@@ -113,8 +113,13 @@ done
 #    by minutes, so compare the branch ref too.
 if [ "$remote_head" = "$REVIEWED" ]; then
   say_ok "PR head is the reviewed SHA"
+elif [ -n "$REVIEWED" ] && [ "${remote_head#"$REVIEWED"}" != "$remote_head" ]; then
+  # A prefix of the head, i.e. an abbreviated SHA. The comparison is deliberately
+  # exact — what merges must be exactly what was verified — so say what to pass
+  # rather than advising a re-review that would change nothing.
+  say_bad "you passed an abbreviated SHA ($REVIEWED); pass the full 40-character head $remote_head"
 else
-  say_bad "PR head is ${remote_head:0:8} but you reviewed ${REVIEWED:0:8} — re-review the new head"
+  say_bad "PR head is $remote_head but you reviewed $REVIEWED — re-review the new head"
 fi
 # Only meaningful while the PR is open: the branch is normally deleted on merge,
 # and that 404 means "merged", not "diverged".
