@@ -9,9 +9,29 @@
 @source "../../../../_build/dev/phoenix-colocated/web/*/";
 /* Menu contributions provide bare icon names at runtime. Keep the generated
  * Heroicon utilities available for their rail-only rendering. */
-@source inline("hero-{building-library,building-office-2,circle-stack,clipboard-document-list,cog-6-tooth,flag,globe-alt,information-circle,key,map,map-pin,magnifying-glass,paint-brush,puzzle-piece,shield-check,user-circle,user-group,users}");
+@source inline("hero-{building-library,building-office-2,chart-bar,circle-stack,clipboard-document-list,cog-6-tooth,flag,globe-alt,information-circle,key,map,map-pin,magnifying-glass,paint-brush,puzzle-piece,shield-check,user-circle,user-group,users}");
 
 @plugin "../vendor/heroicons";
+
+/* Instrument Sans is vendored under SIL OFL 1.1 in priv/static/fonts/OFL.txt
+ * from Instrument/instrument-sans at 7fa22308a3d0c94ee2b3cd537a1196b65db34a3e.
+ * Keep these font files local so production shells do not make third-party
+ * stylesheet requests. */
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/instrument-sans-variable.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Instrument Sans";
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/instrument-sans-variable-italic.woff2") format("woff2");
+}
 
 /* Semantic color roles — the shared theme rules required by DESIGN.md.
  *

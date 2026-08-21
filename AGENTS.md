@@ -19,7 +19,7 @@ Bilimbi is built with:
 - HEEx, Phoenix components, Tailwind CSS 4.3.0, and esbuild 0.25.4;
 - ExUnit and `Phoenix.LiveViewTest`;
 - Req 0.7.2 for Web's Swoosh API client and declared outbound HTTP;
-- Bandit 1.12.4 as the HTTP server;
+- Bandit 1.12.5 as the HTTP server;
 - Swoosh 1.27.0 for email where email is required.
 
 These versions record the current engineering baseline; `.mise.toml`,
@@ -149,9 +149,11 @@ Follow the normative roles, dependency rules, and placement tests in
 
 ### Web
 
-`BilimbiWeb` contains Phoenix adapters: routers, controllers, LiveViews,
-function components, layouts, and web-specific presentation. Ownership of
-mounted presentation follows 0010.
+`BilimbiWeb` is the Phoenix host. It owns the endpoint, router shell,
+authentication hooks, host-only routes, assets, and host integration support.
+Module LiveViews, controllers, colocated templates, and route contributions
+belong to the Base/Core/Domain/Extension module whose workflow they adapt, as
+decided by ADR 0006. Shared presentation primitives belong to Base UI.
 
 Recommended placement:
 
@@ -159,13 +161,20 @@ Recommended placement:
 apps/core/company/lib/company.ex
 apps/core/company/lib/company/schema.ex
 apps/core/company/lib/company/queries.ex
+apps/core/company/lib/company/web/index_live.ex
+apps/core/company/lib/company/web/index_live.html.heex
 apps/core/company/priv/repo/migrations/
 apps/core/company/test/
-apps/web/lib/bilimbi_web/core/company_live/index.ex
-apps/web/lib/bilimbi_web/core/company_live/index.html.heex
+apps/core/company/web_test/company_live_test.exs
 ```
 
-The domain API is the deep module. The LiveView is its UI adapter.
+The domain API is the deep module. `Bilimbi.Core.Company.Web.IndexLive` is its
+UI adapter. Module-owned endpoint/router integration tests live in
+`web_test/`; the Web Mix project discovers and runs them so they can use the
+real host without creating a forbidden module-to-Web dependency. Each such
+directory carries a `test_helper.exs` that requires the Web host's shared test
+helper; discovery fails closed when that bridge or the owner's non-null `web:`
+descriptor is missing.
 
 ## 5. Stable identities and schema compatibility
 
@@ -291,8 +300,10 @@ apps/base/tenancy/
 ├── lib/
 │   ├── tenancy.ex
 │   └── tenancy/
+│       └── web/          # optional module-owned Phoenix adapters
 ├── priv/repo/migrations/
 ├── test/
+├── web_test/             # optional real-host integration tests
 └── docs/
 ```
 
@@ -307,14 +318,16 @@ generic discovery and names no child module; each immediate child has a valid
 
 The module descriptor is the sole declaration of its stable module ID, layer,
 OTP application ID, namespace, module dependencies, required/optional state,
-migration path, optional compatibility contract, and optional contribution
-provider. Every descriptor carries `contribution_provider`; use `nil` when the
-module contributes nothing. A non-nil provider implements the ModuleRegistry
-behavior and returns immutable plain terms below only `:settings`, `:authz`,
-`:menu`, `:dashboard`, `:principal_directory`, and `:schedule`, as decided by
-ADR 0004, ADR 0009, ADR 0011, and ADR 0012. Its `mix.exs` derives local module path
-dependencies and application metadata from that descriptor; do not repeat
-module dependency names manually.
+migration path, optional compatibility contract, route-data path, and optional
+contribution provider. Every descriptor carries `web`; use `nil` when the
+module contributes no routes, otherwise point it at the module-owned plain-data
+route file. Every descriptor also carries `contribution_provider`; use `nil`
+when the module contributes nothing. A non-nil provider implements the
+ModuleRegistry behavior and returns immutable plain terms below only
+`:settings`, `:authz`, `:menu`, `:dashboard`, `:principal_directory`, and
+`:schedule`, as decided by ADR 0004, ADR 0009, ADR 0011, and ADR 0012. Its
+`mix.exs` derives local module path dependencies and application metadata from
+that descriptor; do not repeat module dependency names manually.
 
 A descriptor with a non-null `migrations` path must also declare
 `migration_dispositions`, mapping every owned migration filename version
@@ -443,12 +456,13 @@ format, and test after updates.
 - Do not use deprecated `live_redirect` or `live_patch`. Use `<.link
   navigate={...}>`, `<.link patch={...}>`, `push_navigate/2`, and
   `push_patch/2`.
-- LiveViews use a `Live` suffix, such as
-  `BilimbiWeb.Core.CompanyLive.Index`.
+- Module-owned LiveViews use a `Live` suffix, such as
+  `Bilimbi.Core.Company.Web.IndexLive`.
 - Keep business rules out of controllers and LiveViews. They coordinate
   request state and call domain APIs.
-- Use the existing `BilimbiWeb.Layouts` and `BilimbiWeb.CoreComponents` instead
-  of creating parallel shared foundations.
+- Use the existing `Bilimbi.Base.UI.Layouts` and
+  `Bilimbi.Base.UI.Components` instead of creating parallel shared
+  foundations.
 
 ### Layouts and authenticated routes
 
@@ -464,11 +478,13 @@ Pass `current_scope` whenever the route is authenticated. If an assign is
 missing, fix the route's `live_session` and scope propagation rather than
 adding a fallback value in the template.
 
-The `<.flash_group>` component belongs only in `BilimbiWeb.Layouts`. Do not call
-or recreate it elsewhere.
+The `<.flash_group>` component belongs only in `Bilimbi.Base.UI.Layouts`. Do
+not call or recreate it elsewhere.
 
 ## 10. HEEx, forms, and components
 
+- Module-owned LiveViews use `Bilimbi.Base.UI, :live_view`; they never use or
+  depend on `BilimbiWeb, :live_view`.
 - Use `~H` or `.html.heex`; never use old `~E` templates.
 - Use the imported `<.form>` and `<.input>` components.
 - Assign forms with `to_form/1` or `to_form/2`; templates consume
@@ -569,8 +585,9 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
 - Add a semantic role when a workflow genuinely needs one, not when a single
   screen wants a shade. Roles carry meaning; `brand` is identity and never
   reports status.
-- `phx.gen.live`, `phx.gen.html`, and `phx.gen.schema` emit only calls into
-  `BilimbiWeb.CoreComponents`, so their output needs no styling pass.
+- `phx.gen.live`, `phx.gen.html`, and `phx.gen.schema` output must use the
+  shared `Bilimbi.Base.UI.Components`; do not introduce a parallel
+  `BilimbiWeb.CoreComponents` layer.
   `phx.gen.auth` is the exception: its templates hardcode daisyUI classes
   (`btn btn-primary`, `btn-soft`, `alert alert-outline`, `alert alert-info`).
   Convert those to semantic roles in the same change that runs the generator.

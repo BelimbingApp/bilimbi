@@ -11,8 +11,11 @@ ModuleRegistry snapshot. Provider order is the validated dependency-first
 descriptor order. A definition declares an explicit durable key, five-field
 cron expression, IANA timezone, task name, capability-owned worker, bounded
 plain arguments, overlap policy, and the currently supported `:coalesce`
-misfire policy. No topology glob, environment provider list, reflection scan,
-or second dependency graph participates.
+misfire policy. A contributor may also declare an internal owner route so the
+operator board can link back to the capability that owns the task without
+making the definition editable in Base Schedule. No topology glob,
+environment provider list, reflection scan, or second dependency graph
+participates.
 
 ## Time and delivery
 
@@ -67,6 +70,16 @@ agreed window; restoring Laravel does not make its inert jobs executable in
 Bilimbi.
 
 The runtime contributes installation-global `admin.system.schedule.view`,
-`.execute`, and `.manage` capabilities. It has no actor-attributed mutation in
-this increment, so it does not invent an Audit event; the authorized operator
-adapter and its audit boundary belong to the separate UI increment.
+`.execute`, and `.manage` capabilities. The Schedule operator board keeps
+these capabilities distinct: view reads bounded task, history, and diagnostic
+facts; execute queues run-now; manage reviews definitions, pauses or resumes
+them, and changes retention. Every handler re-authorizes against current Authz
+state. Successful operator commands and their actor are recorded through Base
+Audit in the same transaction as the controlled state change; operational run
+rows remain separate best-effort evidence.
+
+History filtering, ordering, exact totals, and pagination happen in PostgreSQL
+before rows reach the LiveView. Worker arguments and recorded output excerpts
+never cross the operator-facing Schedule API. Diagnostics report scheduler,
+Queue, recorder, and due-work evidence independently, using unknown or
+unavailable states rather than deriving health from missing rows.

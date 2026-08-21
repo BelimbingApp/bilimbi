@@ -27,6 +27,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              "base/audit",
              "base/authz",
              "base/schedule",
+             "base/perf",
              "base/session",
              "core/geonames",
              "core/company",
@@ -71,7 +72,8 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Core.Employee.Migrations.BroadenGlobalIndexAndAddSystemCompanyCheck,
              Bilimbi.Base.Queue.Migrations.CreateObanRuntime,
              Bilimbi.Core.Geonames.Migrations.CreatePostcodeOverrides,
-             Bilimbi.Base.Schedule.Migrations.CreateOccurrenceRuntime
+             Bilimbi.Base.Schedule.Migrations.CreateOccurrenceRuntime,
+             Bilimbi.Base.Perf.Migrations.CreateSamples
            ]
 
     assert Enum.map(entries, &elem(&1, 2)) == [
@@ -87,6 +89,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              :compatible_baseline,
              :compatible_baseline,
              :compatible_baseline,
+             :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,

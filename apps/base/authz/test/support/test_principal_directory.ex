@@ -21,6 +21,7 @@ defmodule Bilimbi.Base.Authz.TestUserDirectory do
     7 => "Zulu Facility",
     5 => "eMart Holdings"
   }
+  @emails %{9 => "ada@example.test", 7 => "zulu@example.test", 5 => "emart@example.test"}
 
   @impl true
   def principal_kind, do: :user
@@ -28,6 +29,18 @@ defmodule Bilimbi.Base.Authz.TestUserDirectory do
   @impl true
   def names(scope, ids) do
     if Scope.tenant_id(scope) == 1, do: Map.take(@names, ids), else: %{}
+  end
+
+  @impl true
+  def search(scope, ids, term) do
+    if Scope.tenant_id(scope) == 1 do
+      @emails
+      |> Enum.flat_map(fn {id, email} ->
+        if id in ids and String.contains?(email, term), do: [id], else: []
+      end)
+    else
+      []
+    end
   end
 end
 

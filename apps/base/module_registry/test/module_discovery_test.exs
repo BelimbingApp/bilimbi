@@ -69,6 +69,49 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
            ]
   end
 
+  test "web test paths are discovered from installed UI-bearing modules", %{root: root} do
+    put_container!(root, "base", :base)
+    put_container!(root, "core", :core)
+    ui_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    put_module!(root, "core", "compatibility")
+
+    File.mkdir_p!(Path.join(ui_root, "priv"))
+    File.write!(Path.join(ui_root, "priv/web_routes.exs"), "[]\n")
+    File.mkdir_p!(Path.join(ui_root, "web_test"))
+    File.write!(Path.join(ui_root, "web_test/test_helper.exs"), "# test helper\n")
+
+    assert Enum.map(MixDiscovery.web_test_paths(root), &Path.relative_to(&1, root)) == [
+             Path.join(["apps", "base", "ui", "web_test"])
+           ]
+  end
+
+  test "web test paths fail closed for a module without a web descriptor", %{root: root} do
+    put_container!(root, "core", :core)
+    no_ui_root = put_module!(root, "core", "compatibility")
+
+    File.mkdir_p!(Path.join(no_ui_root, "web_test"))
+    File.write!(Path.join(no_ui_root, "web_test/test_helper.exs"), "# test helper\n")
+
+    assert_raise ArgumentError,
+                 ~r/core\/compatibility web_test requires a non-null web descriptor/,
+                 fn ->
+                   MixDiscovery.web_test_paths(root)
+                 end
+  end
+
+  test "web test paths fail closed without a host test helper", %{root: root} do
+    put_container!(root, "base", :base)
+    ui_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+
+    File.mkdir_p!(Path.join(ui_root, "priv"))
+    File.write!(Path.join(ui_root, "priv/web_routes.exs"), "[]\n")
+    File.mkdir_p!(Path.join(ui_root, "web_test"))
+
+    assert_raise ArgumentError, ~r/base\/ui web_test must contain test_helper.exs/, fn ->
+      MixDiscovery.web_test_paths(root)
+    end
+  end
+
   test "reloadable apps fail closed on a malformed descriptor", %{root: root} do
     put_container!(root, "base", :base)
     put_module!(root, "base", "ui")

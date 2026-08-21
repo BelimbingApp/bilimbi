@@ -6,10 +6,12 @@
   otp_app: :bilimbi_base_system,
   namespace: Bilimbi.Base.System,
   dependencies: [
+    "base/authz",
     "base/database",
     "base/locale",
     "base/menu",
     "base/module_registry",
+    "base/perf",
     "base/queue",
     "base/ui"
   ],
