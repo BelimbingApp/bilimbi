@@ -787,6 +787,62 @@ defmodule Bilimbi.Core.User do
     end
   end
 
+  @doc """
+  Replaces the account linked to an employee.
+
+  This is the User-owned half of the employee account workflow.  It locks the
+  employee affiliation and every affected account before changing the link, so
+  replacing a link cannot leave two accounts attached to one employee.
+  """
+  @spec replace_employee_account(Scope.t(), pos_integer(), pos_integer(), pos_integer() | nil) ::
+          {:ok, Summary.t() | nil}
+          | {:error, lookup_error() | :employee_not_found | Changeset.t()}
+  def replace_employee_account(%Scope{} = scope, company_id, employee_id, user_id)
+      when is_integer(company_id) and is_integer(employee_id) do
+    Repo.transaction(fn ->
+      with {:ok, _company} <- lock_target_company(scope, company_id),
+           {:ok, _proof} <- maybe_lock_employee(scope, company_id, employee_id),
+           {:ok, employee} <- Employee.get_employee(scope, company_id, employee_id),
+           :ok <- reject_agent_account(employee, user_id),
+           {:ok, linked_users} <- lock_employee_users(company_id, employee_id),
+           {:ok, target_user} <- lock_replacement_user(company_id, user_id, employee_id),
+           :ok <- clear_employee_users(linked_users, target_user),
+           {:ok, linked} <- attach_employee(target_user, employee_id) do
+        linked
+      else
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> transaction_result()
+  end
+
+  @doc """
+  Changes an employee type while preserving the no-account-on-agent invariant.
+
+  The employee page owns the interaction; this User-owned coordinator owns the
+  cross-module account mutation.  Both writes run in the one shared Repo
+  transaction, so an invalid or refused employee update rolls the unlink back.
+  """
+  @spec change_employee_type(Scope.t(), pos_integer(), pos_integer(), String.t()) ::
+          {:ok, Bilimbi.Core.Employee.Summary.t()}
+          | {:error, lookup_error() | :employee_not_found | Changeset.t()}
+  def change_employee_type(%Scope{} = scope, company_id, employee_id, type)
+      when is_integer(company_id) and is_integer(employee_id) and is_binary(type) do
+    Repo.transaction(fn ->
+      with {:ok, _company} <- lock_target_company(scope, company_id),
+           {:ok, _proof} <- maybe_lock_employee(scope, company_id, employee_id),
+           {:ok, linked_users} <- lock_employee_users(company_id, employee_id),
+           :ok <- maybe_clear_agent_accounts(linked_users, type),
+           {:ok, employee} <-
+             Employee.update_employee(scope, company_id, employee_id, %{employee_type: type}) do
+        employee
+      else
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> transaction_result()
+  end
+
   @spec delete_user(Scope.t(), pos_integer(), pos_integer()) :: :ok | {:error, lookup_error()}
   def delete_user(%Scope{} = scope, company_id, user_id) do
     with {:ok, _company} <- normalize_company(Company.get_company(scope, company_id)),
@@ -1386,6 +1442,12 @@ defmodule Bilimbi.Core.User do
 
       employee_id ->
         case Employee.get_employee(scope, company_id, employee_id) do
+          # An agent holds no user account (#581). This policy is the
+          # invariant's front door; the employee-page account panel is its
+          # reconciliation when an already-linked employee becomes an agent.
+          {:ok, %{employee_type: "agent"}} ->
+            Changeset.add_error(changeset, :employee_id, "cannot link an account to an agent")
+
           {:ok, _employee} ->
             changeset
 
@@ -1394,6 +1456,69 @@ defmodule Bilimbi.Core.User do
         end
     end
   end
+
+  defp reject_agent_account(_employee, nil), do: :ok
+  defp reject_agent_account(%{employee_type: "agent"}, _user_id), do: {:error, :agent_employee}
+  defp reject_agent_account(_employee, user_id) when is_integer(user_id) and user_id > 0, do: :ok
+  defp reject_agent_account(_employee, _user_id), do: {:error, :user_not_found}
+
+  defp lock_employee_users(company_id, employee_id) do
+    users =
+      from(user in Schema,
+        where: user.company_id == ^company_id and user.employee_id == ^employee_id,
+        order_by: [asc: user.id],
+        lock: "FOR UPDATE"
+      )
+      |> Repo.all()
+
+    {:ok, users}
+  end
+
+  defp lock_replacement_user(_company_id, nil, _employee_id), do: {:ok, nil}
+
+  defp lock_replacement_user(company_id, user_id, employee_id)
+       when is_integer(user_id) and user_id > 0 do
+    user =
+      from(user in Schema,
+        where:
+          user.id == ^user_id and user.company_id == ^company_id and
+            (is_nil(user.employee_id) or user.employee_id == ^employee_id),
+        lock: "FOR UPDATE"
+      )
+      |> Repo.one()
+
+    if user, do: {:ok, user}, else: {:error, :user_not_found}
+  end
+
+  defp lock_replacement_user(_company_id, _user_id, _employee_id), do: {:error, :user_not_found}
+
+  defp clear_employee_users(linked_users, target_user) do
+    linked_users
+    |> Enum.reject(&(target_user && &1.id == target_user.id))
+    |> Enum.reduce_while(:ok, fn user, :ok ->
+      case user |> Schema.update_changeset(%{employee_id: nil}) |> Repo.update() do
+        {:ok, _updated} -> {:cont, :ok}
+        {:error, changeset} -> {:halt, {:error, changeset}}
+      end
+    end)
+  end
+
+  defp attach_employee(nil, _employee_id), do: {:ok, nil}
+
+  defp attach_employee(user, employee_id) do
+    case user |> Schema.update_changeset(%{employee_id: employee_id}) |> Repo.update() do
+      {:ok, updated} -> {:ok, Summary.from_schema(updated)}
+      {:error, changeset} -> {:error, changeset}
+    end
+  end
+
+  defp maybe_clear_agent_accounts(_linked_users, type) when type != "agent", do: :ok
+
+  defp maybe_clear_agent_accounts(linked_users, "agent"),
+    do: clear_employee_users(linked_users, nil)
+
+  defp transaction_result({:ok, result}), do: {:ok, result}
+  defp transaction_result({:error, reason}), do: {:error, reason}
 
   defp user_schema(company_id, user_id) do
     Repo.get_by(Schema, id: user_id, company_id: company_id)

@@ -52,5 +52,10 @@
     live: Bilimbi.Core.User.Web.DatabaseQueriesLive.Show,
     session: :auth,
     capability: "admin.system.database-table.list"
+  },
+  %{
+    embed: "employee.accounts",
+    live_component: Bilimbi.Core.User.Web.EmployeeAccountPanel,
+    operation_handler: Bilimbi.Core.User.Web.EmployeeAccountPanel
   }
 ]
