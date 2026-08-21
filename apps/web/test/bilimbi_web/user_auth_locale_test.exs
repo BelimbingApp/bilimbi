@@ -5,6 +5,9 @@ defmodule BilimbiWeb.UserAuthLocaleTest do
 
   alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
+  alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Core.Address
+  alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -45,6 +48,35 @@ defmodule BilimbiWeb.UserAuthLocaleTest do
     assert html_response(anonymous_conn, 200)
     assert Gettext.get_locale(BilimbiWeb.Gettext) == "fr"
     assert Gettext.get_locale(Bilimbi.Base.UI.Gettext) == "fr"
+  end
+
+  test "anonymous requests infer the global locale from the platform-operator primary address",
+       %{conn: conn} do
+    AddressFixtures.create_geonames_tables!()
+    AddressFixtures.create_address_tables!()
+    AddressFixtures.insert_country!(%{iso: "FR"})
+    AddressFixtures.assign_primary_company!(41, 73)
+
+    {:ok, operator} = Tenancy.scope(41)
+
+    assert {:ok, _address} =
+             Address.create_and_attach_to_company(
+               operator,
+               73,
+               %{label: "HQ", line1: "1 Rue de Rivoli", country_iso: "FR"},
+               %{is_primary: true}
+             )
+
+    refute Locale.overridden?(nil)
+
+    conn = get(conn, ~p"/")
+    assert html_response(conn, 200)
+    assert Gettext.get_locale(BilimbiWeb.Gettext) == "fr"
+    assert Gettext.get_locale(Bilimbi.Base.UI.Gettext) == "fr"
+
+    # Inference persisted globally; later requests resolve from Settings alone.
+    assert Locale.overridden?(nil)
+    assert Locale.resolve(nil).language == "fr"
   end
 
   test "keeps concurrent LiveView languages isolated by account" do
