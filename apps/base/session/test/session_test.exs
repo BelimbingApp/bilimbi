@@ -5,6 +5,7 @@ defmodule Bilimbi.Base.SessionTest do
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Session.Contributions
   alias Bilimbi.Base.Session.Entry
+  alias Bilimbi.Base.Session.Page
   alias Bilimbi.Base.Session.Schema
   alias Bilimbi.Base.Session.Summary
 
@@ -70,6 +71,33 @@ defmodule Bilimbi.Base.SessionTest do
 
     assert_raise ArgumentError, ~r/unknown keys/, fn ->
       Session.list_sessions(page: 2)
+    end
+  end
+
+  test "lists payload-free metadata in sortable bounded pages" do
+    put_session!("alpha", 100, "10.0.0.1", "Alpha")
+    put_session!("bravo", 200, "10.0.0.2", "Bravo")
+    put_session!("charlie", 300, "10.0.0.3", "Charlie")
+
+    assert %Page{
+             entries: [%Summary{id: "charlie"}, %Summary{id: "bravo"}, %Summary{id: "alpha"}],
+             page: 1,
+             page_size: 25,
+             total_entries: 3,
+             total_pages: 1
+           } = Session.list_sessions_page(search: "10.0.0", sort_by: :ip_address, sort_dir: :desc)
+
+    assert %Page{entries: [], page: 2, total_entries: 3, total_pages: 1} =
+             Session.list_sessions_page(page: 2, page_size: 25)
+
+    refute Map.has_key?(hd(Session.list_sessions_page(page_size: 25).entries), :payload)
+
+    assert_raise ArgumentError, ~r/session page_size must be one of \[25, 50, 100, 300\]/, fn ->
+      Session.list_sessions_page(page_size: 10)
+    end
+
+    assert_raise ArgumentError, ~r/session sort_by must be one of/, fn ->
+      Session.list_sessions_page(sort_by: :payload)
     end
   end
 
