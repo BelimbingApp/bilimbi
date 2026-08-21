@@ -338,17 +338,20 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
             framed={false}
           >
             <:col :let={company} label="Name" sort="name" sort_id="companies-sort-name">
+              <%!-- The name leads every surface; the legal name is formal
+                   detail (#614 identity-line ruling). Display now matches
+                   the sort field. --%>
               <.link
                 navigate={~p"/companies/#{company.id}"}
                 class="font-medium text-ink-strong hover:underline"
               >
-                {Company.AdministrationEntry.display_name(company)}
+                {company.name}
               </.link>
               <span
                 :if={company.legal_name && company.legal_name != company.name}
                 class="block text-xs text-ink-subtle"
               >
-                {company.name}
+                {company.legal_name}
               </span>
             </:col>
 

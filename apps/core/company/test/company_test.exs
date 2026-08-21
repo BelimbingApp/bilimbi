@@ -281,8 +281,8 @@ defmodule Bilimbi.Core.CompanyTest do
       insert_company!(%{id: 73, code: "zulu", name: "Zulu Holdings"})
       insert_company!(%{id: 75, code: "alpha", name: "Alpha Trading"})
 
-      # `display_name/1` prefers legal_name, so this row sorts under "M" though
-      # its `name` starts with "B". Sorting on the wrong field puts it last.
+      # The legal name starts with "M" while `name` starts with "B"; sorting
+      # on the wrong field would put this row last instead of first.
       insert_company!(%{
         id: 77,
         code: "mid",
@@ -556,7 +556,12 @@ defmodule Bilimbi.Core.CompanyTest do
 
       assert %AdministrationEntry{id: 73, primary?: true, parent_name: nil} = acme
       assert %AdministrationEntry{id: 75, primary?: false, parent_name: "Acme Operations"} = beta
-      assert AdministrationEntry.display_name(acme) == "Acme Operations Sdn. Bhd."
+
+      assert %AdministrationEntry{
+               name: "Acme Operations",
+               legal_name: "Acme Operations Sdn. Bhd."
+             } =
+               acme
     end
 
     test "search matches name, code, legal name, email, and jurisdiction", %{owner: owner} do

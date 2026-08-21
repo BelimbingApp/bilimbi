@@ -49,10 +49,4 @@ defmodule Bilimbi.Core.Company.AdministrationEntry do
       primary?: primary?
     }
   end
-
-  @doc "The line users recognize the company by: legal name when present."
-  @spec display_name(t()) :: String.t()
-  def display_name(%__MODULE__{legal_name: legal_name, name: name}) do
-    legal_name || name
-  end
 end
