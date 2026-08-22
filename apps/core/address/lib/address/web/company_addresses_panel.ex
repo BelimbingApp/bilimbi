@@ -44,11 +44,6 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
     locality: :string
   }
 
-  # `toggle_edit_kind` only flips a checkbox in the kinds-edit form's local
-  # state; the persistence event is `save_address_kinds`, which re-authorizes.
-  # There is no weaker capability for this handler to refuse.
-  @write_guard_opt_out ~w(toggle_edit_kind)
-
   @impl true
   def mount(socket) do
     {:ok,

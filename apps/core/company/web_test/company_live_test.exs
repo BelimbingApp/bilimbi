@@ -625,8 +625,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
       refute has_element?(view, "#edit-company-details-btn")
       refute has_element?(view, "#add-activity-form")
       refute has_element?(view, "#edit-metadata-btn")
-      refute has_element?(view, "#create-attach-address-btn")
-      refute has_element?(view, "#attach-existing-address-btn")
+      refute has_element?(view, "#btn-open-create-address")
+      refute has_element?(view, "#btn-open-attach-address")
     end
 
     test "redirects away for another tenant's company", %{conn: conn} do

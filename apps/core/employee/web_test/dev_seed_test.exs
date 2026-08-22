@@ -11,6 +11,8 @@ defmodule BilimbiWeb.DevSeedTest do
 
   alias Bilimbi.Base.ModuleRegistry
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Core.Address
+  alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
@@ -21,6 +23,10 @@ defmodule BilimbiWeb.DevSeedTest do
     # company, department, employee, and employee-type tables plus the head FK.
     UserFixtures.create_user_tables!()
     CompanyFixtures.create_department_types_table!()
+    # core/address ships a dev seed too, so its tables must exist for the run.
+    AddressFixtures.create_geonames_tables!()
+    AddressFixtures.create_address_tables!()
+    AddressFixtures.insert_country!(%{iso: "MY", country: "Malaysia"})
     CompanyFixtures.insert_tenant!(%{id: 41, is_platform_operator: true})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41, name: "Bilimbi", code: "bilimbi"})
 
@@ -37,17 +43,21 @@ defmodule BilimbiWeb.DevSeedTest do
 
   defp seed_paths, do: ModuleRegistry.dev_seed_paths!()
 
-  test "core/company's seed sorts before core/employee's" do
+  test "a dependency's seed sorts before its dependents'" do
     paths = seed_paths()
     company_idx = Enum.find_index(paths, &String.contains?(&1, "bilimbi_core_company"))
     employee_idx = Enum.find_index(paths, &String.contains?(&1, "bilimbi_core_employee"))
+    address_idx = Enum.find_index(paths, &String.contains?(&1, "bilimbi_core_address"))
 
     assert is_integer(company_idx), "core/company must ship a dev seed"
     assert is_integer(employee_idx), "core/employee must ship a dev seed"
+    assert is_integer(address_idx), "core/address must ship a dev seed"
+    # core/employee and core/address both declare the core/company edge.
     assert company_idx < employee_idx, "the dependency must be seeded first"
+    assert company_idx < address_idx, "the dependency must be seeded first"
   end
 
-  test "seeding yields one headed department (a resolved name) and one headless", ctx do
+  test "seeding yields departments, employees, and a populated company address", ctx do
     run_seeds(seed_paths(), ctx.scope, ctx.company_id)
 
     {:ok, departments} = Company.list_departments(ctx.scope, ctx.company_id)
@@ -63,6 +73,10 @@ defmodule BilimbiWeb.DevSeedTest do
     headed = Enum.find(departments, & &1.head_id)
     {:ok, resolved} = Employee.get_tenant_employees(ctx.scope, [headed.head_id])
     assert resolved[headed.head_id].full_name == "Ada Lovelace"
+
+    # core/address's seed attached a sample address to the operator company.
+    {:ok, attached} = Address.list_company_attached_addresses(ctx.scope, ctx.company_id)
+    assert Enum.any?(attached, &(&1.label == "Head Office"))
   end
 
   test "the seeds are idempotent — a second run adds nothing", ctx do
@@ -72,8 +86,10 @@ defmodule BilimbiWeb.DevSeedTest do
 
     {:ok, departments} = Company.list_departments(ctx.scope, ctx.company_id)
     {:ok, employees} = Employee.list_employees(ctx.scope, ctx.company_id)
+    {:ok, attached} = Address.list_company_attached_addresses(ctx.scope, ctx.company_id)
 
     assert length(departments) == 2
     assert length(employees) == 3
+    assert Enum.count(attached, &(&1.label == "Head Office")) == 1
   end
 end
