@@ -9,5 +9,6 @@
   migrations: nil,
   web: "priv/web_routes.exs",
   schema_contract: nil,
-  contribution_provider: Bilimbi.Base.UI.Contributions
+  contribution_provider: Bilimbi.Base.UI.Contributions,
+  dev_seed: nil
 ]

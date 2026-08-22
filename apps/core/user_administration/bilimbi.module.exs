@@ -17,5 +17,6 @@
   migrations: nil,
   web: "priv/web_routes.exs",
   schema_contract: nil,
-  contribution_provider: nil
+  contribution_provider: nil,
+  dev_seed: nil
 ]

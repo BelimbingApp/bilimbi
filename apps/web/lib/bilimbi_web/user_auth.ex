@@ -50,12 +50,14 @@ defmodule BilimbiWeb.UserAuth do
   alias Bilimbi.Base.Audit.Context, as: AuditContext
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.Decision
+  alias Bilimbi.Base.DateTime, as: BaseDateTime
   alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Session.Entry
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.UI.DateTimeDisplay
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
@@ -534,17 +536,28 @@ defmodule BilimbiWeb.UserAuth do
     )
   end
 
-  defp apply_locale(nil),
-    do: put_gettext_locale(Locale.resolve(nil, locale_bootstrap()).language)
+  defp apply_locale(nil) do
+    put_gettext_locale(Locale.resolve(nil, locale_bootstrap()).language)
+    DateTimeDisplay.put(BaseDateTime.display(nil))
+  end
 
   defp apply_locale(%{
          user: %{"user_id" => user_id, "company_id" => company_id},
          scope: %Scope{} = scope
        }) do
-    user_id
-    |> SettingsScope.user(company_id, Scope.tenant_id(scope))
+    tenant_id = Scope.tenant_id(scope)
+    user_settings_scope = SettingsScope.user(user_id, company_id, tenant_id)
+
+    user_settings_scope
     |> Locale.resolve(locale_bootstrap())
     |> then(&put_gettext_locale(&1.language))
+
+    # Timestamp display policy resolves in the same per-process lifecycle as
+    # the locale, so no user's mode or company zone leaks into another
+    # request or LiveView process (#459).
+    DateTimeDisplay.put(
+      BaseDateTime.display(user_settings_scope, SettingsScope.company(company_id, tenant_id))
+    )
   end
 
   # Platform-operator address facts feed one-time locale inference. The

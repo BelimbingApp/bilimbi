@@ -10,5 +10,6 @@
   migration_dispositions: %{20_260_813_114_300 => :compatible_baseline},
   web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Base.Audit.SchemaContract,
-  contribution_provider: Bilimbi.Base.Audit.Contributions
+  contribution_provider: Bilimbi.Base.Audit.Contributions,
+  dev_seed: nil
 ]
