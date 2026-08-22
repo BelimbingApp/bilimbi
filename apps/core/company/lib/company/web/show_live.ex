@@ -110,7 +110,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         relationships = Company.list_relationships(scope, company_id) |> elem(1)
         external_accesses = Company.list_external_accesses(scope, company_id) |> elem(1)
         external_access_users = load_external_access_users(scope, external_accesses)
-        users = list_company_users(scope, company_id)
         company_timezone = get_company_timezone(company)
 
         {:ok,
@@ -129,8 +128,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:relationships, relationships)
          |> assign(:external_accesses, external_accesses)
          |> assign(:external_access_users, external_access_users)
-         |> assign(:company_users, users)
-         |> assign(:users_count, length(users))
          |> assign(:page_sizes, @page_sizes)
          |> assign(:table_state, default_table_state())
          |> assign(:company_timezone, company_timezone || "")
@@ -188,19 +185,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   #  through the core/address-owned "company.addresses" embed (#595), so this
   #  file no longer probes Core.Employee or Core.Address.)
   # ============================================================================
-
-  defp list_company_users(scope, company_id) do
-    user_mod = Module.concat(["Bilimbi", "Core", "User"])
-
-    if Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :list_company_users, 2) do
-      case apply(user_mod, :list_company_users, [scope, company_id]) do
-        {:ok, users} -> users
-        _ -> []
-      end
-    else
-      []
-    end
-  end
 
   defp load_external_access_users(scope, external_accesses) do
     user_mod = Module.concat(["Bilimbi", "Core", "User"])
@@ -563,69 +547,14 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
   defp refresh_show_table_pages(socket) do
     table_state = socket.assigns.table_state || default_table_state()
-    users_state = table_state.users
 
-    users_page =
-      socket.assigns.company_users
-      |> build_table_page(users_state, &user_matches_search?/2, &user_sort_value/2)
-
+    # Users and Employees are both core-owned discovered embeds now; the page
+    # only tracks their URL table-state and hands it to the panels, which do
+    # their own listing (#595).
     socket
-    |> assign(:users_page, users_page)
+    |> assign(:users_table_state, table_state.users)
     |> assign(:employees_table_state, table_state.employees)
-    |> assign(:users_filters_form, table_filters_form(:users, users_state))
   end
-
-  defp build_table_page(entries, state, match_fun, sort_fun) do
-    filtered =
-      entries
-      |> Enum.filter(&match_fun.(&1, state.search && String.downcase(state.search)))
-      |> Enum.sort_by(&sort_fun.(&1, state.sort_by))
-
-    sorted = if state.sort_dir == :desc, do: Enum.reverse(filtered), else: filtered
-    total_entries = length(sorted)
-    total_pages = total_pages(total_entries, state.per_page)
-    page = clamp_page(state.page, total_pages)
-    entries = Enum.slice(sorted, (page - 1) * state.per_page, state.per_page)
-
-    %{
-      entries: entries,
-      page: page,
-      page_size: state.per_page,
-      total_entries: total_entries,
-      total_pages: total_pages,
-      has_prev?: total_pages > 0 and page > 1,
-      has_next?: total_pages > 0 and page < total_pages
-    }
-  end
-
-  defp total_pages(0, _page_size), do: 0
-  defp total_pages(total_entries, page_size), do: ceil(total_entries / page_size)
-
-  defp clamp_page(_page, 0), do: 1
-  defp clamp_page(page, total_pages), do: min(max(page, 1), total_pages)
-
-  defp user_matches_search?(user, nil), do: user_matches_search?(user, "")
-  defp user_matches_search?(_user, ""), do: true
-
-  defp user_matches_search?(user, search),
-    do: contains_search?([user.name, user.email], search)
-
-  defp user_sort_value(user, "name"), do: sort_string(user.name)
-  defp user_sort_value(user, "email"), do: sort_string(user.email)
-  defp user_sort_value(user, "email_verified"), do: if(user.email_verified_at, do: 0, else: 1)
-  defp user_sort_value(user, _sort), do: user_sort_value(user, "name")
-
-  defp contains_search?(fields, search) do
-    Enum.any?(fields, fn value ->
-      value
-      |> to_string()
-      |> String.downcase()
-      |> String.contains?(search)
-    end)
-  end
-
-  defp sort_string(nil), do: ""
-  defp sort_string(value), do: value |> to_string() |> String.downcase()
 
   defp default_table_state, do: @table_defaults
 
@@ -646,18 +575,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
        }}
     end)
   end
-
-  defp table_filters_form(kind, state),
-    do: to_form(table_filters_form_params(state), as: table_filters_form_name(kind))
-
-  defp table_filters_form_params(state) do
-    %{
-      "search" => state.search || "",
-      "perPage" => to_string(state.per_page)
-    }
-  end
-
-  defp table_filters_form_name(:users), do: :users_filters
 
   defp current_table_state(socket, kind),
     do:
@@ -1366,76 +1283,15 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           </.table>
         </.card>
 
-        <%!-- Section 8: Users --%>
-        <section id="company-users" class="mt-6">
-          <div class="flex items-center gap-2 mb-2">
-            <h2 class="text-sm font-semibold text-ink-strong">Users</h2>
-            <.badge>{@users_count}</.badge>
-          </div>
-          <.form
-            for={@users_filters_form}
-            id="company-users-filters"
-            phx-change="users_filters"
-            class="p-2 mb-2 rounded-xl border border-line bg-surface-muted"
-          >
-            <div class="relative">
-              <.icon
-                name="hero-magnifying-glass"
-                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-              />
-              <.input
-                field={@users_filters_form[:search]}
-                id="company-users-search"
-                type="search"
-                phx-debounce="300"
-                maxlength="255"
-                label="Search users"
-                label_class="sr-only"
-                wrapper_class="mb-0"
-                placeholder="Search by name or email..."
-                class="rounded-lg pl-8"
-              />
-            </div>
-          </.form>
-          <.table
-            id="company-users-table"
-            rows={@users_page.entries}
-            row_id={fn user -> "company-user-#{user.id}" end}
-            row_item={fn user -> user end}
-            sort_by={@table_state.users.sort_by}
-            sort_dir={@table_state.users.sort_dir}
-            sort_event="users_sort"
-            caption="Users"
-          >
-            <:col :let={user} label="Name" sort="name" sort_id="company-users-sort-name">
-              <span class="font-medium">{user.name}</span>
-            </:col>
-            <:col :let={user} label="Email" sort="email" sort_id="company-users-sort-email">
-              {user.email}
-            </:col>
-            <:col
-              :let={user}
-              label="Email verified"
-              sort="email_verified"
-              sort_id="company-users-sort-email-verified"
-            >
-              <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
-                {if user.email_verified_at, do: "verified", else: "unverified"}
-              </.badge>
-            </:col>
-            <:empty :if={@users_page.total_entries == 0}>
-              No users found for this company.
-            </:empty>
-          </.table>
-          <.pagination
-            id="company-users-pagination"
-            page={@users_page}
-            page_sizes={@page_sizes}
-            filters_form={@users_filters_form}
-            filters_event="users_filters"
-            page_event="users_page"
-          />
-        </section>
+        <%!-- Section 8: Users — core/user-owned discovered embed (#595). Core User
+             can depend on Core Company but not the reverse, so the company page
+             renders the panel by manifest key rather than probing. --%>
+        <.discovered_panel
+          key="company.users"
+          id="company-users-panel"
+          current_scope={@current_scope}
+          opts={%{company_id: @company.id, table_state: @users_table_state, page_sizes: @page_sizes}}
+        />
 
         <%!-- Section 9: Employees — core/employee-owned discovered embed (#595).
              Core Employee can depend on Core Company but not the reverse, so the
