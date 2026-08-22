@@ -10,6 +10,7 @@
     "base/datetime",
     "base/database",
     "base/module_registry",
+    "base/principal_directory",
     "base/settings",
     "base/tenancy",
     "base/ui",
