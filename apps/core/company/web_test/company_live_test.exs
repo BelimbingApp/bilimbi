@@ -285,15 +285,10 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      # `String.to_integer/1` raised on each of these, taking the LiveView down.
-      render_click(view, "toggle_address_primary", %{"id" => "not-a-number"})
-      render_click(view, "unlink_address", %{"id" => "../../etc"})
+      # `String.to_integer/1` raised on a non-numeric index, taking the LiveView
+      # down. (The address writes moved to the core/address panel, which guards
+      # its own ids; see the panel's forged-write test above.)
       render_click(view, "remove_activity", %{"index" => "abc"})
-
-      render_submit(view, "save_address_priority", %{
-        "id" => "oops",
-        "priority" => "also-oops"
-      })
 
       assert render(view) =~ "Bilimbi Industries"
     end
@@ -552,6 +547,74 @@ defmodule BilimbiWeb.CompanyLiveTest do
       |> render_change()
 
       assert has_element?(view, "#flash-info", "Timezone cleared.")
+    end
+
+    test "creates and attaches a new address through the company.addresses panel", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # The address behaviour now lives in the core/address-owned panel, reached
+      # by manifest key; its events are phx-targeted to the component.
+      view |> element("#btn-open-create-address") |> render_click()
+      assert has_element?(view, "#company-create-address-modal")
+
+      view
+      |> form("#create-attach-address-form",
+        address: %{
+          "label" => "Head Office",
+          "line1" => "1 Market Street",
+          "locality" => "Kuala Lumpur",
+          "country_iso" => "MY"
+        }
+      )
+      |> render_submit()
+
+      assert has_element?(view, "#company-addresses-panel", "Head Office")
+
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, attached} = Bilimbi.Core.Address.list_company_attached_addresses(scope, 73)
+      assert Enum.any?(attached, &(&1.label == "Head Office"))
+    end
+
+    test "a forged create-and-attach after grant revocation writes nothing", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # Open the create modal while still authorized, so the form is in the DOM.
+      view |> element("#btn-open-create-address") |> render_click()
+      assert has_element?(view, "#create-attach-address-form")
+
+      # Revoke the write capability. No LiveView event fires, so the form persists.
+      {:ok, scope} = Tenancy.scope(41)
+
+      grant =
+        Bilimbi.Base.Authz.list_principal_capabilities(scope, page_size: 100)
+        |> Map.fetch!(:entries)
+        |> Enum.find(&(&1.capability == "admin.company.update"))
+
+      assert {:ok, :removed} = Bilimbi.Base.Authz.remove_principal_capability(scope, grant.id)
+
+      # Forge the create submit against the still-rendered form. The panel
+      # re-authorizes live per write (#610), so it refuses.
+      view
+      |> form("#create-attach-address-form",
+        address: %{
+          "label" => "Forged HQ",
+          "line1" => "9 Forge Road",
+          "locality" => "Kuala Lumpur",
+          "country_iso" => "MY"
+        }
+      )
+      |> render_submit()
+
+      # No attachment and no address row: the write never reached the store.
+      {:ok, attached} = Bilimbi.Core.Address.list_company_attached_addresses(scope, 73)
+      refute Enum.any?(attached, &(&1.label == "Forged HQ"))
+
+      {:ok, all_addresses} = Bilimbi.Core.Address.list_addresses(scope)
+      refute Enum.any?(all_addresses, &(&1.label == "Forged HQ"))
     end
 
     test "hides write controls when actor lacks admin.company.update", %{conn: conn} do
