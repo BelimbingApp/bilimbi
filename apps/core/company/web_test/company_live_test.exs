@@ -6,7 +6,6 @@ defmodule BilimbiWeb.CompanyLiveTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
-  alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.{Department, DepartmentType, LegalEntityType, Relationship}
@@ -268,8 +267,6 @@ defmodule BilimbiWeb.CompanyLiveTest do
       render_click(view, "remove_activity", %{"index" => "0"})
       render_submit(view, "save_metadata", %{"metadata" => ~s({"forged":true})})
       render_click(view, "save_timezone", %{"timezone" => "Etc/UTC"})
-      render_click(view, "unlink_address", %{"id" => "1"})
-      render_click(view, "toggle_address_primary", %{"id" => "1"})
 
       assert has_element?(
                view,
@@ -289,15 +286,10 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      # `String.to_integer/1` raised on each of these, taking the LiveView down.
-      render_click(view, "toggle_address_primary", %{"id" => "not-a-number"})
-      render_click(view, "unlink_address", %{"id" => "../../etc"})
+      # `String.to_integer/1` raised on a non-numeric index, taking the LiveView
+      # down. (The address writes moved to the core/address panel, which guards
+      # its own ids; see the panel's forged-write test above.)
       render_click(view, "remove_activity", %{"index" => "abc"})
-
-      render_submit(view, "save_address_priority", %{
-        "id" => "oops",
-        "priority" => "also-oops"
-      })
 
       assert render(view) =~ "Bilimbi Industries"
     end
@@ -318,9 +310,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
              )
     end
 
-    test "applies URL-state search, sort, and page size to addresses and users", %{conn: conn} do
+    test "applies URL-state search, sort, and page size to users", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view"])
-      {:ok, scope} = Tenancy.scope(41)
 
       UserFixtures.insert_user!(%{
         id: 92,
@@ -329,46 +320,12 @@ defmodule BilimbiWeb.CompanyLiveTest do
         email: "grace@example.com"
       })
 
-      {:ok, _headquarters} =
-        Address.create_and_attach_to_company(
-          scope,
-          73,
-          %{
-            "label" => "Main HQ",
-            "line1" => "456 Corporate Ave",
-            "locality" => "Kuala Lumpur",
-            "country_iso" => "MY"
-          },
-          %{kind: ["headquarters"], priority: 1}
-        )
-
-      {:ok, _branch} =
-        Address.create_and_attach_to_company(
-          scope,
-          73,
-          %{
-            "label" => "Branch Office",
-            "line1" => "789 Tech Hub",
-            "locality" => "Kuala Lumpur",
-            "country_iso" => "MY"
-          },
-          %{kind: ["branch"], priority: 2}
-        )
-
       {:ok, view, _html} =
         conn
         |> log_in_as()
         |> live(
-          ~p"/companies/73?addresses_search=branch&addresses_sort=label&addresses_dir=desc&addresses_per_page=50&users_search=grace&users_sort=email&users_dir=desc&users_per_page=50"
+          ~p"/companies/73?users_search=grace&users_sort=email&users_dir=desc&users_per_page=50"
         )
-
-      assert has_element?(view, "#company-addresses-table td", "Branch Office")
-      refute has_element?(view, "#company-addresses-table td", "Main HQ")
-
-      assert has_element?(
-               view,
-               "#company-addresses-card th[aria-sort='descending'] button#company-addresses-sort-label"
-             )
 
       assert has_element?(view, "#company-users-table td", "Grace User")
       refute has_element?(view, "#company-users-table td", "Ada Lovelace")
@@ -428,7 +385,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#company-subsidiaries-table td", "Bilimbi Subsidiary")
 
       # Other cards
-      assert has_element?(view, "#company-addresses-card")
+      assert has_element?(view, "#company-addresses-panel")
       assert has_element?(view, "#company-timezone-card")
       assert has_element?(view, "#company-departments-card")
       assert has_element?(view, "#company-relationships-card")
@@ -593,88 +550,72 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#flash-info", "Timezone cleared.")
     end
 
-    test "attaches an existing address, toggles primary, changes priority, and unlinks it", %{
-      conn: conn
-    } do
-      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
-
-      {:ok, scope} = Tenancy.scope(41)
-
-      {:ok, address} =
-        Bilimbi.Core.Address.create_address(scope, %{
-          "label" => "Main HQ",
-          "line1" => "456 Corporate Ave",
-          "locality" => "Kuala Lumpur",
-          "country_iso" => "MY"
-        })
-
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
-
-      # Open attach modal
-      view |> element("#attach-existing-address-btn") |> render_click()
-      assert has_element?(view, "#company-attach-modal")
-
-      # Submit attachment
-      view
-      |> form("#company-attach-address-form", %{
-        "attach" => %{
-          "address_id" => to_string(address.id),
-          "kinds" => ["headquarters", "billing"],
-          "is_primary" => "true",
-          "priority" => "1"
-        }
-      })
-      |> render_submit()
-
-      refute has_element?(view, "#company-attach-modal")
-      assert has_element?(view, "#attached-address-#{address.id} td", "Main HQ")
-      assert has_element?(view, "#attached-address-#{address.id} span", "Headquarters")
-      assert has_element?(view, "#attached-address-#{address.id} span", "Billing")
-      assert has_element?(view, "#attached-address-#{address.id} span", "Yes")
-
-      # Toggle primary
-      view |> element("#toggle-primary-#{address.id}") |> render_click()
-      assert has_element?(view, "#attached-address-#{address.id} span", "No")
-
-      # Change priority
-      render_click(view, "save_address_priority", %{
-        "id" => to_string(address.id),
-        "priority" => "5"
-      })
-
-      assert has_element?(view, "#attached-address-#{address.id} td", "5")
-
-      # Unlink address
-      view |> element("#unlink-address-#{address.id}") |> render_click()
-      assert has_element?(view, "#company-addresses-table-empty", "No addresses linked.")
-    end
-
-    test "creates and attaches a new address with geonames integration", %{conn: conn} do
+    test "creates and attaches a new address through the company.addresses panel", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      # Open create & attach modal
-      view |> element("#create-attach-address-btn") |> render_click()
+      # The address behaviour now lives in the core/address-owned panel, reached
+      # by manifest key; its events are phx-targeted to the component.
+      view |> element("#btn-open-create-address") |> render_click()
       assert has_element?(view, "#company-create-address-modal")
 
-      # Submit create & attach form
       view
-      |> form("#create-attach-address-form", %{
-        "address" => %{
-          "label" => "Branch Office",
-          "line1" => "789 Tech Hub",
+      |> form("#create-attach-address-form",
+        address: %{
+          "label" => "Head Office",
+          "line1" => "1 Market Street",
           "locality" => "Kuala Lumpur",
-          "country_iso" => "MY",
-          "kinds" => ["branch"],
-          "priority" => "2"
+          "country_iso" => "MY"
         }
-      })
+      )
       |> render_submit()
 
-      refute has_element?(view, "#company-create-address-modal")
-      assert has_element?(view, "#company-addresses-table td", "Branch Office")
-      assert has_element?(view, "#company-addresses-table span", "Branch")
+      assert has_element?(view, "#company-addresses-panel", "Head Office")
+
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, attached} = Bilimbi.Core.Address.list_company_attached_addresses(scope, 73)
+      assert Enum.any?(attached, &(&1.label == "Head Office"))
+    end
+
+    test "a forged create-and-attach after grant revocation writes nothing", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # Open the create modal while still authorized, so the form is in the DOM.
+      view |> element("#btn-open-create-address") |> render_click()
+      assert has_element?(view, "#create-attach-address-form")
+
+      # Revoke the write capability. No LiveView event fires, so the form persists.
+      {:ok, scope} = Tenancy.scope(41)
+
+      grant =
+        Bilimbi.Base.Authz.list_principal_capabilities(scope, page_size: 100)
+        |> Map.fetch!(:entries)
+        |> Enum.find(&(&1.capability == "admin.company.update"))
+
+      assert {:ok, :removed} = Bilimbi.Base.Authz.remove_principal_capability(scope, grant.id)
+
+      # Forge the create submit against the still-rendered form. The panel
+      # re-authorizes live per write (#610), so it refuses.
+      view
+      |> form("#create-attach-address-form",
+        address: %{
+          "label" => "Forged HQ",
+          "line1" => "9 Forge Road",
+          "locality" => "Kuala Lumpur",
+          "country_iso" => "MY"
+        }
+      )
+      |> render_submit()
+
+      # No attachment and no address row: the write never reached the store.
+      {:ok, attached} = Bilimbi.Core.Address.list_company_attached_addresses(scope, 73)
+      refute Enum.any?(attached, &(&1.label == "Forged HQ"))
+
+      {:ok, all_addresses} = Bilimbi.Core.Address.list_addresses(scope)
+      refute Enum.any?(all_addresses, &(&1.label == "Forged HQ"))
     end
 
     test "hides write controls when actor lacks admin.company.update", %{conn: conn} do
@@ -685,8 +626,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
       refute has_element?(view, "#edit-company-details-btn")
       refute has_element?(view, "#add-activity-form")
       refute has_element?(view, "#edit-metadata-btn")
-      refute has_element?(view, "#create-attach-address-btn")
-      refute has_element?(view, "#attach-existing-address-btn")
+      refute has_element?(view, "#btn-open-create-address")
+      refute has_element?(view, "#btn-open-attach-address")
     end
 
     test "redirects away for another tenant's company", %{conn: conn} do
