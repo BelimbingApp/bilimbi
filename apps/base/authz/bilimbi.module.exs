@@ -17,5 +17,6 @@
   migration_dispositions: %{20_260_811_093_953 => :compatible_baseline},
   web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Base.Authz.SchemaContract,
-  contribution_provider: Bilimbi.Base.Authz.Contributions
+  contribution_provider: Bilimbi.Base.Authz.Contributions,
+  dev_seed: nil
 ]

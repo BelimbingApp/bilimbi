@@ -56,4 +56,15 @@ defmodule Bilimbi.Core.Company.Department do
     |> validate_required([:status])
     |> validate_inclusion(:status, @statuses)
   end
+
+  @doc """
+  Appoints (or clears, with `nil`) the department head. The head is an employee;
+  the foreign-key constraint nilifies the head if that employee is removed.
+  """
+  @spec head_changeset(t(), pos_integer() | nil) :: Ecto.Changeset.t()
+  def head_changeset(department, head_id) do
+    department
+    |> cast(%{"head_id" => head_id}, [:head_id])
+    |> foreign_key_constraint(:head_id, name: :company_departments_head_id_foreign)
+  end
 end

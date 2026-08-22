@@ -670,7 +670,8 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
       migrations: Keyword.get(overrides, :migrations, nil),
       web: Keyword.get(overrides, :web, nil),
       schema_contract: Keyword.get(overrides, :schema_contract, nil),
-      contribution_provider: Keyword.get(overrides, :contribution_provider, nil)
+      contribution_provider: Keyword.get(overrides, :contribution_provider, nil),
+      dev_seed: Keyword.get(overrides, :dev_seed, nil)
     ]
 
     descriptor =
