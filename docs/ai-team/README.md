@@ -342,6 +342,14 @@ Container test commands halt at the first non-zero child, so a red suite early
 in the chain hides every later red. "No such failure reported" and "passing"
 are different claims.
 
+**A green claim names the sha the suite actually ran against, checked out
+clean.** "Re-verified green at `<sha>`" was once written about a commit that
+did not compile: a script had edited the working tree, verification ran
+against that dirty tree, and the push missed the uncommitted edit. Three
+agents hit variants of claim-before-verify in one night. Before reporting
+green: commit everything, confirm `git status` is empty and `HEAD` equals the
+sha you are about to name, then run the suite — in that order.
+
 **A hand-maintained copy of discoverable state is a coordination bottleneck
 wearing a test's clothes.** `workspace_boundary_test.exs` read each
 `bilimbi.module.exs` and asserted it equalled a hand-written copy of the same
