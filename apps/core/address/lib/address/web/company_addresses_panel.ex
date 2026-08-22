@@ -26,6 +26,11 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
   import Ecto.Changeset, only: [cast: 3, validate_length: 3, add_error: 4]
 
   @manage_capability "admin.company.update"
+
+  # `toggle_edit_kind` only flips a checkbox in the kinds-edit form's local
+  # state; the persistence event is `save_address_kinds`, which re-authorizes.
+  # There is no weaker capability for this handler to refuse (#575 precedent).
+  @write_guard_opt_out ~w(toggle_edit_kind)
   @valid_address_kinds ~w(headquarters billing shipping branch other)
 
   # The create-and-attach form's fields, cast as a schemaless changeset — the
