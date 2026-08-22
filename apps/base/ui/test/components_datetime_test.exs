@@ -57,6 +57,29 @@ defmodule Bilimbi.Base.UI.ComponentsDatetimeTest do
     assert render_datetime(%{value: nil}) =~ ">—<"
   end
 
+  test "a calendar date renders zone-free with no mode logic and no hook" do
+    # A %Date{} is not an instant: converting it through company/local modes
+    # could shift the day, so it renders as-is with no zone suffix (#619).
+    html = render_datetime(%{value: ~D[2026-01-02], format: :date})
+
+    assert html =~ "02/01/2026"
+    refute html =~ "UTC"
+    refute html =~ "phx-hook"
+    assert html =~ ~s(datetime="2026-01-02")
+  end
+
+  test "a calendar date ignores an explicit display context" do
+    html =
+      render_datetime(%{
+        value: ~D[2026-01-02],
+        format: :date,
+        display: %{mode: :company, timezone: "Asia/Kuala_Lumpur"}
+      })
+
+    assert html =~ "02/01/2026"
+    refute html =~ "+08"
+  end
+
   test "no context renders local mode: UTC-labelled text with the browser hook" do
     html = render_datetime(%{})
     assert html =~ "01/01/2026, 16:30 UTC"
