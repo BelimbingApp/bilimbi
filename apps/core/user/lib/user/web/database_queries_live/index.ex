@@ -8,6 +8,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.User
 
   @sortable ~w(name description created_at updated_at)
@@ -81,7 +82,8 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
 
   @impl true
   def handle_event("duplicate", %{"id" => id_str}, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
+    if operator?(socket) and
+         allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
       scope = socket.assigns.current_scope.scope
       user_id = current_user_id(socket.assigns.current_scope)
       query_id = to_integer(id_str, 0)
@@ -103,7 +105,8 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
 
   @impl true
   def handle_event("delete", %{"id" => id_str}, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
+    if operator?(socket) and
+         allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
       scope = socket.assigns.current_scope.scope
       user_id = current_user_id(socket.assigns.current_scope)
       query_id = to_integer(id_str, 0)
@@ -125,6 +128,15 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
 
   defp default_sort_dir(col) when col in ["created_at", "updated_at"], do: :desc
   defp default_sort_dir(_col), do: :asc
+
+  # #650: the console is operator-only. Mount gates it; the write handlers
+  # re-check here because mount state is presentation, not authorization.
+  defp operator?(socket) do
+    case socket.assigns.current_scope do
+      %{scope: %Scope{} = scope} -> Scope.platform_operator?(scope)
+      _ -> false
+    end
+  end
 
   defp sort_queries(socket, column) do
     sort_dir =

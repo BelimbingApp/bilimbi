@@ -43,6 +43,11 @@ defmodule Bilimbi.Base.Database.Contributions do
       authz: %{
         capabilities: @capabilities,
         roles: %{
+          # #650: these capabilities gate the menu and the read verbs, but the raw-SQL
+          # console itself is operator-only tooling. The route and every write/execute
+          # handler additionally require the platform-operator tenant via
+          # `Scope.platform_operator?/1` — granting this role to a non-operator surfaces
+          # the pages but never lets them run or mutate a query.
           "system_viewer" => %{
             capabilities: [
               "admin.system.database-table.list",
