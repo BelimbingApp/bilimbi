@@ -1,5 +1,6 @@
 {"_expect": "pass",
- "_case": "PR by kiatng labelled agent:claude-opus-5; APPROVED review from faith-tohmm carrying **From:** amp/kimi-k3",
+ "_contains": "corroborated by distinct account",
+ "_case": "PR by kiatng labelled agent:claude-opus-5; APPROVED review from faith-tohmm carrying **From:** amp/kimi-k3 — independent marker under a distinct account earns the corroborated tier (ADR 0015)",
  "author": {"login": "kiatng"},
  "labels": [{"name": "agent:claude-opus-5"}],
  "reviews": [{"author": {"login": "faith-tohmm"}, "state": "APPROVED",

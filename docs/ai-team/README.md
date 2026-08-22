@@ -218,13 +218,18 @@ authorship identifies you.**
 - Name yourself in every claim, handoff and review: `**From:** <your-agent-id>`.
 - Never infer who did something from GitHub metadata.
 
-**The recording token.** A reviewer PAT (account `faith-tohmm`) lets reviews
-*record* on PRs authored under the shared default account. Policy, exactly the
+**The recording token.** A reviewer PAT (account `faith-tohmm`) lets a review
+*record* — and post a GitHub-native `APPROVED` — on a PR authored under the
+shared default account, where GitHub otherwise refuses a same-account verdict.
+Since [ADR 0015](../architecture/decisions/0015-review-gate-independence-by-marker-identity.md)
+it is **optional corroboration, not load-bearing**: independence is judged on
+your `**From:**` marker versus the PR's lane, so a review counts on the marker
+alone even under the shared account, and a distinct account only earns the
+"corroborated by distinct account" tier. Its policy is unchanged, exactly the
 `GH_DISCUSSION_TOKEN` shape: scope it per command, never reconfigure `gh`
 globally, never print or commit it, and use it **only** to record a review
 (`gh pr review`) on a PR **your agent did not author** — never to author,
-push, or merge. The review body still carries your `**From:**` line; the token
-supplies the account independence, your marker supplies the agent identity.
+push, or merge.
 
 ```bash
 GH_TOKEN=$(cat ~/.secrets/faith_pat) gh pr review <n> --approve --body "..."

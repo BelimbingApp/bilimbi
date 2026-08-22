@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
 # review_gate.sh — decide whether a PR carries a genuine independent approval.
 #
-# Agreed spec (Discussion #196, issue #198, docs/ai-team/README.md §3/§8).
-# The team shares two GitHub accounts, so GitHub authorship cannot identify an
-# agent and self-approval is blocked natively. This gate reads the team's only
-# machine-readable identity — one canonical `agent:*` label and one canonical
-# non-quoted/non-fenced `**From:** <id>` marker — and passes only when BOTH
-# hold:
+# Agreed spec (Discussion #196, issue #198, docs/ai-team/README.md §3/§8;
+# ADR 0015). The team shares few GitHub accounts, so GitHub authorship cannot
+# identify an agent: the account is transport, and the marker is identity. This
+# gate reads the team's only reliable identity — one canonical `agent:*` label
+# and one canonical non-quoted/non-fenced `**From:** <id>` marker — and passes
+# when an approving marker's agent id differs from the PR's `agent:*` lane (an
+# agent must not approve its own lane).
 #
-#   1. the approving marker's agent id differs from the PR's `agent:*` label
-#      (an agent must not approve its own lane), and
-#   2. the approving review/comment's GitHub account differs from the PR
-#      author's account (the same agent can paste a marker under the same PAT).
+# The account is NOT a condition of independence (#560): a genuine cross-agent
+# review under the shared account and a forged marker pasted under it are
+# identical bytes, so the account cannot tell them apart. It is retained only as
+# diagnostic and tie-break — a distinct account earns the "corroborated by
+# distinct account" PASS tier and ranks which independent approval to headline.
+# Marker forgery is out of scope for this gate and is resolved by transcript
+# audit (ADR 0015 §3).
 #
 # Formal GitHub APPROVED and CHANGES_REQUESTED review states are authoritative.
 # A COMMENTED review or issue comment may supply a fallback verdict only on one
@@ -203,9 +207,13 @@ verdict=$(jq -r '
                        | select((.at == null) or (.at >= $a.at))]
                        | length) > 0)})
          | map(select(.revoked | not))) as $approvals
+      # Independence is judged on the marker id versus the lane; the account is
+      # transport, not identity (ADR 0015, #560). A distinct account is retained
+      # only as a tie-break: it ranks which independent approval to headline and
+      # earns the "corroborated" tier, never decides whether one is independent.
       | ([$approvals[]
-          | select("agent:" + (.id | gsub("/"; "-")) != $lane)
-          | select(.account != $pr.author.login)]) as $valid
+          | select("agent:" + (.id | gsub("/"; "-")) != $lane)]) as $independent
+      | ($independent | map(select(.account != $pr.author.login))) as $corroborated
       | if ($approvals | length) == 0 then
           "FAIL: no unrevoked approval verdict found"
           + (if ($near_misses | length) > 0 then
@@ -214,10 +222,12 @@ verdict=$(jq -r '
              else
                ""
              end)
-        elif ($valid | length) == 0 then
+        elif ($independent | length) == 0 then
           "FAIL: approvals exist but none is independent (lane=\($lane), pr-author=\($pr.author.login))"
+        elif ($corroborated | length) > 0 then
+          "PASS: independent approval by \($corroborated[0].id) via \($corroborated[0].account) (corroborated by distinct account)"
         else
-          "PASS: independent approval by \($valid[0].id) via \($valid[0].account)"
+          "PASS: independent approval by \($independent[0].id) via \($independent[0].account) (marker-attested)"
         end
     end
 ' "$input")
