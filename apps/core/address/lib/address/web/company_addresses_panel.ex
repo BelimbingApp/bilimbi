@@ -10,6 +10,13 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
   (#570/#575).
 
   Visibility of the edit affordances uses the assign computed on update;
+  Recorded divergence (#667, visual-lane disposition upheld on review): the
+  former inline section offered list search and rows-per-page; this panel,
+  like its #575 employee twin, has neither — every attached address renders
+  unpaged, so nothing is hidden, and search over the small attached set is
+  chrome, not capability. Restore both only if a real operator workflow
+  outgrows the full listing.
+
   every write re-evaluates the actor's current grants through `Authz.can/2`
   (the #482/#541/#610 pattern) — mount-time capability state is presentation,
   not an authorization decision. Outcomes render as a panel-local notice
