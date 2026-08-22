@@ -651,15 +651,25 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
                   </span>
                 </h3>
 
-                <.button
-                  :if={@can_manage?}
-                  id="btn-open-attach-address"
-                  phx-click="open_attach_modal" phx-target={@myself}
-                  variant="primary"
-                  class="text-xs px-2.5 py-1"
-                >
-                  <.icon name="bilimbi-plus" class="size-3.5" /> <span>Attach Address</span>
-                </.button>
+                <div :if={@can_manage?} class="flex items-center gap-2">
+                  <.button
+                    id="btn-open-attach-address"
+                    phx-click="open_attach_modal"
+                    phx-target={@myself}
+                    class="text-xs px-2.5 py-1"
+                  >
+                    <.icon name="bilimbi-plus" class="size-3.5" /> <span>Attach Address</span>
+                  </.button>
+                  <.button
+                    id="btn-open-create-address"
+                    phx-click="open_create_modal"
+                    phx-target={@myself}
+                    variant="primary"
+                    class="text-xs px-2.5 py-1"
+                  >
+                    <.icon name="bilimbi-plus" class="size-3.5" /> <span>Create &amp; Attach</span>
+                  </.button>
+                </div>
               </div>
 
               <div class="overflow-x-auto">
@@ -1077,9 +1087,131 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
               </div>
             </.form>
           </div>
-              </div>    </div>
+              </div>
+
+      <%!-- Create & attach: a new address made and linked in one step (#595). --%>
+      <div
+        :if={@show_create_modal}
+        id="company-create-address-modal"
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/40 p-4"
+      >
+        <div class="w-full max-w-2xl rounded-2xl border border-line bg-surface p-6 shadow-xl">
+          <h3 class="text-base font-semibold text-ink-strong mb-4">Create &amp; Attach Address</h3>
+
+          <.form
+            for={@address_form}
+            id="create-attach-address-form"
+            phx-change="validate_create_address"
+            phx-submit="save_create_address"
+            phx-target={@myself}
+            class="space-y-4"
+          >
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <.input field={@address_form[:label]} id="create-address-label" label="Label" />
+              <.input field={@address_form[:phone]} id="create-address-phone" label="Phone" type="tel" />
+            </div>
+
+            <.input field={@address_form[:line1]} id="create-address-line1" label="Address Line 1" />
+            <.input field={@address_form[:line2]} id="create-address-line2" label="Address Line 2" />
+            <.input field={@address_form[:line3]} id="create-address-line3" label="Address Line 3" />
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <.input
+                type="select"
+                field={@address_form[:country_iso]}
+                id="create-address-country-iso"
+                label="Country"
+                options={country_options(@countries)}
+              />
+              <.input
+                type="select"
+                field={@address_form[:admin1_code]}
+                id="create-address-admin1-code"
+                label="State / Province"
+                prompt="Select state..."
+                options={admin1_options(@admin1_options)}
+              />
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <.input field={@address_form[:postcode]} id="create-address-postcode" label="Postcode" />
+              <.input field={@address_form[:locality]} id="create-address-locality" label="Locality" />
+            </div>
+
+            <div class="border-t border-line pt-4">
+              <h4 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle mb-3">
+                Link Settings
+              </h4>
+              <div class="space-y-3">
+                <div>
+                  <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+                    Kind
+                  </span>
+                  <div class="flex flex-wrap gap-4">
+                    <label
+                      :for={kind <- @address_kinds}
+                      class="flex items-center gap-2 text-sm text-ink cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        name="address[kinds][]"
+                        value={kind}
+                        checked={kind in @create_address_kinds}
+                        class="rounded border-line text-action focus:ring-action"
+                      />
+                      {String.capitalize(kind)}
+                    </label>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <label class="flex items-center gap-2 text-sm text-ink cursor-pointer mt-6">
+                    <input
+                      type="checkbox"
+                      name="address[is_primary]"
+                      value="true"
+                      checked={@create_address_is_primary}
+                      class="rounded border-line text-action focus:ring-action"
+                    />
+                    Primary Address
+                  </label>
+
+                  <div>
+                    <label for="create-address-priority" class="mb-1.5 block text-sm font-medium text-ink">
+                      Priority
+                    </label>
+                    <input
+                      type="number"
+                      name="address[priority]"
+                      id="create-address-priority"
+                      value={@create_address_priority}
+                      min="0"
+                      class="w-28 rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-action"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-line">
+              <.button type="button" phx-click="close_create_modal" phx-target={@myself}>
+                Cancel
+              </.button>
+              <.button id="btn-submit-create-address" type="submit" variant="primary">
+                Create &amp; Attach
+              </.button>
+            </div>
+          </.form>
+        </div>
+      </div>
+    </div>
     """
   end
+
+  defp country_options(countries),
+    do: Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
+
+  defp admin1_options(admin1), do: Enum.map(admin1, &{&1.name, &1.code})
 
   defp sort_addresses(addresses, sort_by, sort_dir) do
     mult = if sort_dir == "desc", do: -1, else: 1
