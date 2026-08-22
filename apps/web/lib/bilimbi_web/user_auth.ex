@@ -342,15 +342,33 @@ defmodule BilimbiWeb.UserAuth do
 
     case current_scope do
       %{scope: %Scope{}} = current_scope ->
-        assign(conn, :current_scope, current_scope)
+        conn
+        |> assign(:current_scope, current_scope)
+        |> assign(:ui_theme, ui_theme(current_scope))
 
       nil ->
         conn
         |> assign(:session_expired, not is_nil(get_session(conn, @session_key)))
         |> maybe_clear_stale_session()
         |> assign(:current_scope, nil)
+        |> assign(:ui_theme, nil)
     end
   end
+
+  # The root layout stamps `data-theme` only for an explicit light/dark
+  # choice; "system" (the default) stamps nothing so the stylesheet's
+  # `prefers-color-scheme` block governs (#657).
+  defp ui_theme(%{
+         user: %{"user_id" => user_id, "company_id" => company_id},
+         scope: %Scope{} = scope
+       }) do
+    case Bilimbi.Core.User.get_user_preference(scope, company_id, user_id, "ui.theme") do
+      {:ok, theme} when theme in ["light", "dark"] -> theme
+      _ -> nil
+    end
+  end
+
+  defp ui_theme(_current_scope), do: nil
 
   defp maybe_clear_stale_session(conn) do
     if get_session(conn, @session_key), do: configure_session(conn, drop: true), else: conn
@@ -517,8 +535,9 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   # An operator-only screen (#650) requires the actor's tenant to be the platform
-  # operator, not merely a capability grant. The per-event handlers re-check the
-  # same, because mount state is presentation.
+  # operator, not merely a capability grant. This mount checks the scope rehydrated
+  # for the request; event handlers repeat that mount-proven check at their own
+  # guards, and a changed tenant marker takes effect on a fresh authenticated mount.
   defp operator_scope?(%{scope: %Scope{} = scope}), do: Scope.platform_operator?(scope)
   defp operator_scope?(_), do: false
 

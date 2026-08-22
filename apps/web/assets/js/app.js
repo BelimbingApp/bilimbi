@@ -41,6 +41,18 @@ topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
+// Appearance save pushes this so the theme applies without a reload. An
+// explicit choice stamps data-theme; "system" removes the stamp so the
+// stylesheet's prefers-color-scheme block governs (#657). The server
+// stamps the same attribute on the next full render.
+window.addEventListener("phx:theme-changed", ({detail}) => {
+  if (detail.theme === "light" || detail.theme === "dark") {
+    document.documentElement.dataset.theme = detail.theme
+  } else {
+    delete document.documentElement.dataset.theme
+  }
+})
+
 // connect if there are any LiveViews on the page
 liveSocket.connect()
 

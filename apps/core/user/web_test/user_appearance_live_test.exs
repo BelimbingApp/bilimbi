@@ -32,15 +32,13 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/settings/appearance")
   end
 
-  test "renders the honest light-only theme state and the locale select", %{conn: conn} do
+  test "renders appearance options and defaults to system", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
     assert has_element?(view, "#appearance-form")
-    # No radio saves a dead choice while rendering is light-only (#657);
-    # the ui.theme storage contract stays intact underneath.
-    refute has_element?(view, "input[name='appearance[theme]']")
-    assert has_element?(view, "#theme-current", "Light")
-    assert has_element?(view, "#theme-current", "currently renders the light theme")
+    assert has_element?(view, "input[name='appearance[theme]'][value='light']")
+    assert has_element?(view, "input[name='appearance[theme]'][value='dark']")
+    assert has_element?(view, "input[name='appearance[theme]'][value='system'][checked]")
     assert has_element?(view, "#appearance-locale")
 
     assert has_element?(
@@ -52,18 +50,53 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     assert has_element?(view, "#appearance-locale option[value='de-CH']", "German (Switzerland)")
   end
 
-  test "ui.theme storage stays intact as the future foundation's contract", %{conn: conn} do
-    # The control is gone from the screen (#657), but the preference API —
-    # the consumer contract the dark-theme foundation will read — still
-    # stores and validates the value, and a stored non-light choice renders
-    # the page without resurrecting dead controls.
+  test "updates theme to dark and dispatches theme-changed event", %{conn: conn} do
+    {:ok, view, _html} = open(conn)
+
+    view
+    |> form("#appearance-form", %{
+      "appearance" => %{"theme" => "dark"}
+    })
+    |> render_change()
+
+    assert render(view) =~ "Appearance settings saved."
+
+    # Verify saved to User preference / settings
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
-    assert {:ok, "dark"} = User.put_user_preference(scope, 73, 91, "ui.theme", "dark")
+    assert {:ok, "dark"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+  end
+
+  test "the root layout stamps data-theme only for an explicit choice", %{conn: conn} do
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    # System (no stored preference): nothing stamped; prefers-color-scheme governs.
+    conn = log_in_as(conn)
+    refute get(conn, ~p"/settings/appearance") |> html_response(200) =~ "data-theme"
+
+    {:ok, "dark"} = User.put_user_preference(scope, 73, 91, "ui.theme", "dark")
+    assert get(conn, ~p"/settings/appearance") |> html_response(200) =~ ~s(data-theme="dark")
+
+    {:ok, "light"} = User.put_user_preference(scope, 73, 91, "ui.theme", "light")
+    assert get(conn, ~p"/settings/appearance") |> html_response(200) =~ ~s(data-theme="light")
+  end
+
+  test "switching back to system deletes preference override", %{conn: conn} do
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+    {:ok, "dark"} = User.put_user_preference(scope, 73, 91, "ui.theme", "dark")
 
     {:ok, view, _html} = open(conn)
-    refute has_element?(view, "input[name='appearance[theme]']")
-    assert has_element?(view, "#theme-current", "Light")
-    assert {:ok, "dark"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+    assert has_element?(view, "input[name='appearance[theme]'][value='dark'][checked]")
+
+    view
+    |> form("#appearance-form", %{
+      "appearance" => %{"theme" => "system"}
+    })
+    |> render_change()
+
+    assert render(view) =~ "Appearance settings saved."
+
+    # Verify preference override was cleared back to system default
+    assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
   end
 
   test "stores and clears the signed-in account's locale override", %{conn: conn} do
@@ -74,7 +107,7 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
 
     view
     |> form("#appearance-form", %{
-      "appearance" => %{"locale" => "de-CH"}
+      "appearance" => %{"theme" => "system", "locale" => "de-CH"}
     })
     |> render_change()
 
@@ -84,7 +117,7 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
 
     view
     |> form("#appearance-form", %{
-      "appearance" => %{"locale" => ""}
+      "appearance" => %{"theme" => "system", "locale" => ""}
     })
     |> render_change()
 

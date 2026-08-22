@@ -129,8 +129,9 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
   defp default_sort_dir(col) when col in ["created_at", "updated_at"], do: :desc
   defp default_sort_dir(_col), do: :asc
 
-  # #650: the console is operator-only. Mount gates it; the write handlers
-  # re-check here because mount state is presentation, not authorization.
+  # #650: the console is operator-only. Mount gates it, and every mutation
+  # repeats the operator proof captured in that mount's scope. A changed tenant
+  # marker is observed by a fresh authenticated mount.
   defp operator?(socket) do
     case socket.assigns.current_scope do
       %{scope: %Scope{} = scope} -> Scope.platform_operator?(scope)
