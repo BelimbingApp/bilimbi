@@ -146,8 +146,9 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     |> push_navigate(to: ~p"/employees")
   end
 
-  defp employee_auditable_types,
-    do: ["Bilimbi.Core.Employee.Schema", "Bilimbi.Core.Employee"]
+  defp employee_auditable_types do
+    ["Bilimbi.Core.Employee.Schema", "Bilimbi.Core.Employee", Employee.addressable_identity()]
+  end
 
   # --- Event Handlers: Inline Editing of Text Fields ---
 
@@ -567,7 +568,6 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
               current_scope={@current_scope}
               opts={%{auditable_types: employee_auditable_types(), auditable_id: @employee.id}}
             />
-
             <.button id="employee-back" navigate={~p"/employees"}>
               Back to List
             </.button>

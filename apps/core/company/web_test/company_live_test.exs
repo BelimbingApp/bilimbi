@@ -3,9 +3,9 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
   import Phoenix.LiveViewTest
 
-  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
@@ -323,7 +323,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
           company_id: 73,
           actor_type: "user",
           actor_id: 91,
-          auditable_type: "Bilimbi.Core.Company.Schema",
+          auditable_type: Company.addressable_identity(),
           auditable_id: "73",
           subject_name: "Bilimbi Industries",
           event: "updated",
@@ -337,7 +337,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
           company_id: 74,
           actor_type: "user",
           actor_id: 91,
-          auditable_type: "Bilimbi.Core.Company.Schema",
+          auditable_type: Company.addressable_identity(),
           auditable_id: "74",
           subject_name: "Bilimbi Subsidiary",
           event: "updated",

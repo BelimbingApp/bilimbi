@@ -215,8 +215,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # directly — the same pattern create_live.ex already uses. Do not probe.
   defp list_geonames_countries, do: Geonames.list_countries()
 
-  defp company_auditable_types,
-    do: ["Bilimbi.Core.Company.Schema", "Bilimbi.Core.Company"]
+  defp company_auditable_types do
+    ["Bilimbi.Core.Company.Schema", "Bilimbi.Core.Company", Company.addressable_identity()]
+  end
 
   defp not_found(socket) do
     socket

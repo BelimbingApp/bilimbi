@@ -64,7 +64,7 @@ defmodule BilimbiWeb.EmployeeShowTest do
         company_id: 73,
         actor_type: "user",
         actor_id: 91,
-        auditable_type: "Bilimbi.Core.Employee.Schema",
+        auditable_type: Employee.addressable_identity(),
         auditable_id: to_string(employee.id),
         subject_name: "John Doe",
         event: "updated",
