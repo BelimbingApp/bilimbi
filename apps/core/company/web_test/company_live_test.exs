@@ -3,6 +3,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
@@ -1170,6 +1171,159 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#company-departments-empty")
     end
 
+    test "appoints, reassigns, and clears a department head through the employee directory", %{
+      conn: conn
+    } do
+      grant_capabilities!(["admin.company.view", "admin.company.update"])
+      {:ok, scope} = Tenancy.scope(41)
+      :ok = Employee.ensure_system_types()
+
+      {:ok, ada} =
+        Employee.create_employee(scope, 73, %{
+          employee_number: "EMP-201",
+          full_name: "Ada Lovelace",
+          employee_type: "full_time"
+        })
+
+      {:ok, grace} =
+        Employee.create_employee(scope, 73, %{
+          employee_number: "EMP-202",
+          full_name: "Grace Hopper",
+          employee_type: "full_time"
+        })
+
+      {:ok, sibling_employee} =
+        Employee.create_employee(scope, 74, %{
+          employee_number: "EMP-203",
+          full_name: "Katherine Johnson",
+          employee_type: "full_time"
+        })
+
+      {:ok, type} = Company.create_department_type(%{code: "ENG", name: "Engineering"})
+
+      {:ok, department} =
+        Company.create_department(scope, 73, %{department_type_id: type.id, status: "active"})
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73/departments")
+
+      view |> element("#edit-dept-head-#{department.id}") |> render_click()
+
+      assert has_element?(view, "#department-head-modal")
+      assert has_element?(view, "#department-head-id option", "Ada Lovelace")
+      assert has_element?(view, "#department-head-id option", "Grace Hopper")
+      refute has_element?(view, "#department-head-id option", "Katherine Johnson")
+
+      view
+      |> form("#department-head-form", %{"department_head" => %{"head_id" => ada.id}})
+      |> render_submit()
+
+      assert Repo.get!(Department, department.id).head_id == ada.id
+      assert has_element?(view, "#company-departments td", "Ada Lovelace")
+
+      view |> element("#edit-dept-head-#{department.id}") |> render_click()
+
+      view
+      |> form("#department-head-form", %{"department_head" => %{"head_id" => grace.id}})
+      |> render_submit()
+
+      assert Repo.get!(Department, department.id).head_id == grace.id
+
+      view |> element("#edit-dept-head-#{department.id}") |> render_click()
+
+      render_submit(view, "save_head", %{
+        "department_head" => %{"head_id" => sibling_employee.id}
+      })
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "That employee is not eligible to lead this department."
+             )
+
+      assert Repo.get!(Department, department.id).head_id == grace.id
+
+      view
+      |> form("#department-head-form", %{"department_head" => %{"head_id" => ""}})
+      |> render_submit()
+
+      assert Repo.get!(Department, department.id).head_id == nil
+      assert has_element?(view, "#company-departments td", "—")
+    end
+
+    test "ignores a forged department head while creating a department", %{conn: conn} do
+      grant_capabilities!(["admin.company.view", "admin.company.update"])
+      {:ok, scope} = Tenancy.scope(41)
+      :ok = Employee.ensure_system_types()
+
+      {:ok, sibling_employee} =
+        Employee.create_employee(scope, 74, %{
+          employee_number: "EMP-204",
+          full_name: "Katherine Johnson",
+          employee_type: "full_time"
+        })
+
+      {:ok, type} = Company.create_department_type(%{code: "ENG", name: "Engineering"})
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73/departments")
+
+      render_submit(view, "save", %{
+        "department" => %{
+          "department_type_id" => to_string(type.id),
+          "head_id" => to_string(sibling_employee.id),
+          "status" => "active"
+        }
+      })
+
+      department = Repo.get_by!(Department, company_id: 73)
+      assert department.head_id == nil
+    end
+
+    test "re-authorizes a department-head write event after the capability is revoked", %{
+      conn: conn
+    } do
+      grant_capabilities!(["admin.company.view", "admin.company.update"])
+      {:ok, scope} = Tenancy.scope(41)
+      :ok = Employee.ensure_system_types()
+
+      {:ok, employee} =
+        Employee.create_employee(scope, 73, %{
+          employee_number: "EMP-204",
+          full_name: "Margaret Hamilton",
+          employee_type: "full_time"
+        })
+
+      {:ok, type} = Company.create_department_type(%{code: "OPS", name: "Operations"})
+
+      {:ok, department} =
+        Company.create_department(scope, 73, %{department_type_id: type.id, status: "active"})
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73/departments")
+
+      {:ok, :stored} =
+        Authz.put_principal_capability(
+          scope,
+          73,
+          :user,
+          91,
+          "admin.company.update",
+          false
+        )
+
+      render_click(view, "edit_head", %{"id" => to_string(department.id)})
+
+      render_submit(view, "save_head", %{
+        "department_head" => %{"head_id" => to_string(employee.id)}
+      })
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "You do not have permission to change company administration data."
+             )
+
+      assert Repo.get!(Department, department.id).head_id == nil
+    end
+
     test "hides write controls and rejects direct write events without update capability", %{
       conn: conn
     } do
@@ -1196,6 +1350,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       refute has_element?(view, "#suspend-dept-#{department.id}")
       refute has_element?(view, "#deactivate-dept-#{department.id}")
       refute has_element?(view, "#delete-dept-#{department.id}")
+      refute has_element?(view, "#edit-dept-head-#{department.id}")
 
       render_click(view, "update_status", %{
         "id" => to_string(department.id),
@@ -1203,6 +1358,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
       })
 
       render_click(view, "delete", %{"id" => to_string(department.id)})
+
+      render_click(view, "edit_head", %{"id" => to_string(department.id)})
 
       render_submit(view, "save", %{
         "department" => %{

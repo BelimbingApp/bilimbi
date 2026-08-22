@@ -41,6 +41,18 @@ defmodule Bilimbi.Base.PrincipalDirectory.Provider do
   @callback names(Scope.t(), [pos_integer()]) :: %{pos_integer() => String.t()}
 
   @doc """
+  Returns the IDs eligible for a provider-owned picker selection.
+
+  `selection` is deliberately opaque to Base. The provider owns both the
+  vocabulary and the containment check: for example, the employee provider can
+  answer the employees currently belonging to one company without making a
+  Core Company consumer depend on Core Employee. Consumers must ask again when
+  they persist a submitted ID; a rendered select is not an authorization
+  boundary.
+  """
+  @callback candidate_ids(Scope.t(), selection :: term()) :: [pos_integer()]
+
+  @doc """
   Returns candidate ids matching a provider-owned search attribute.
 
   The candidate list is supplied by the Base-owned screen, so this callback
@@ -50,5 +62,5 @@ defmodule Bilimbi.Base.PrincipalDirectory.Provider do
   """
   @callback search(Scope.t(), [pos_integer()], String.t()) :: [pos_integer()]
 
-  @optional_callbacks search: 3
+  @optional_callbacks search: 3, candidate_ids: 2
 end
