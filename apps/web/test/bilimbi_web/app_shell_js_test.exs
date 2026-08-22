@@ -48,6 +48,62 @@ defmodule BilimbiWeb.AppShellJsTest do
     assert source =~ "url:${item.url}"
   end
 
+  test "a saved object-form navigation pin survives reload and renders" do
+    source = File.read!(@hook)
+    encoded_source = Base.encode64(source)
+
+    script = """
+    const {default: AppShell} = await import("data:text/javascript;base64,#{encoded_source}")
+    const storage = new Map([["sidebarPinnedItems", JSON.stringify([{id: "nav-companies"}])]])
+
+    globalThis.window = {
+      location: {origin: "https://bilimbi.test"},
+      localStorage: {
+        getItem: (key) => storage.get(key) ?? null,
+        setItem: (key, value) => storage.set(key, value),
+      },
+    }
+
+    const element = () => ({
+      dataset: {},
+      append: () => {},
+      setAttribute: () => {},
+      hasAttribute: () => false,
+      getAttribute: () => null,
+      querySelector: () => null,
+    })
+
+    const navItem = {
+      ...element(),
+      dataset: {navLabel: "Companies"},
+      href: "/companies",
+    }
+
+    const rows = []
+    globalThis.document = {
+      getElementById: (id) => (id === "nav-companies" ? navItem : null),
+      createElement: element,
+    }
+
+    const hook = Object.create(AppShell)
+    hook.sidebar = {contains: (item) => item === navItem}
+    hook.root = {querySelectorAll: () => []}
+    hook.pinned = {hidden: true}
+    hook.pinnedItems = {
+      replaceChildren: () => rows.splice(0),
+      append: (row) => rows.push(row),
+    }
+    hook.rail = false
+    hook.pinnedEntries = hook.readPinnedItems()
+    hook.renderPinnedItems()
+
+    console.log(JSON.stringify({entries: hook.pinnedEntries, rows: rows.length}))
+    """
+
+    assert {"{\"entries\":[{\"id\":\"nav-companies\"}],\"rows\":1}\n", 0} =
+             System.cmd("node", ["--input-type=module", "--eval", script])
+  end
+
   test "Escape closes the drawer and the toggle stays outside the inert region", %{source: source} do
     assert source =~ ~S[if (event.key === "Escape")]
     assert source =~ "this.closeDrawer()"

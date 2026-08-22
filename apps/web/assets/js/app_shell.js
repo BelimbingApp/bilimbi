@@ -128,9 +128,15 @@ const AppShell = {
   },
 
   normalizePinnedItem(item) {
-    if (typeof item === "string" && item.trim()) return {id: item}
+    if (typeof item === "string") {
+      const id = item.trim()
+      return id ? {id} : null
+    }
 
     if (!item || typeof item !== "object" || Array.isArray(item)) return null
+
+    const id = typeof item.id === "string" ? item.id.trim() : ""
+    if (id) return {id}
 
     const label = typeof item.label === "string" ? item.label.trim() : ""
     const url = this.normalizePinnedUrl(item.url)
