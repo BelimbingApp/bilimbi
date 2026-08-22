@@ -557,6 +557,22 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       <.page variant={:detail}>
         <.header>
           {Employee.Summary.display_name(@employee)}
+          <:title_actions>
+            <button
+              type="button"
+              id="employee-pin"
+              data-nav-pin="record"
+              data-nav-pin-record="true"
+              data-nav-pin-label={"Administration / Employees / #{Employee.Summary.display_name(@employee)}"}
+              data-nav-pin-url={~p"/employees/#{@employee.id}"}
+              title="Pin this employee to sidebar"
+              aria-label="Pin this employee to sidebar"
+              aria-pressed="false"
+              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            >
+              <.icon name="bilimbi-pin" class="size-3.5" />
+            </button>
+          </:title_actions>
           <:subtitle>
             {@employee.designation || @employee.job_description || @employee.employee_number}
           </:subtitle>

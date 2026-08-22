@@ -882,6 +882,22 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       <.page variant={:detail}>
         <.header>
           {@user.name}
+          <:title_actions>
+            <button
+              type="button"
+              id="user-pin"
+              data-nav-pin="record"
+              data-nav-pin-record="true"
+              data-nav-pin-label={"Administration / Users / #{@user.name}"}
+              data-nav-pin-url={~p"/users/#{@user.id}"}
+              title="Pin this user to sidebar"
+              aria-label="Pin this user to sidebar"
+              aria-pressed="false"
+              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            >
+              <.icon name="bilimbi-pin" class="size-3.5" />
+            </button>
+          </:title_actions>
           <:subtitle>
             <%= if @company_name do %>
               {@company_name}
@@ -928,11 +944,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         <div class="mt-6 space-y-6">
           <!-- Card 1: User Details with In-place Editing -->
           <.card id="user-details-card" inner_class="p-5 sm:p-6">
-            <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-4">User Details</h3>
+            <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-4">
+              User Details
+            </h3>
 
             <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div id="user-detail-name">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Name</dt>
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
+                  Name
+                </dt>
                 <dd class="mt-0.5 text-sm text-ink">
                   <%= if @can_manage? do %>
                     <.inline_edit
@@ -950,7 +970,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               </div>
 
               <div id="user-detail-email">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Email</dt>
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
+                  Email
+                </dt>
                 <dd class="mt-0.5 text-sm text-ink">
                   <%= if @can_manage? do %>
                     <.inline_edit
@@ -968,7 +990,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               </div>
 
               <div id="user-detail-company">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Company</dt>
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
+                  Company
+                </dt>
                 <dd class="mt-0.5 text-sm text-ink">
                   <%= if @can_manage? do %>
                     <form phx-change="save_company" id="user-company-form" class="inline-block">
@@ -989,7 +1013,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     </form>
                   <% else %>
                     <%= if @company_name do %>
-                      <.link navigate={~p"/companies/#{@user.company_id}"} class="text-action hover:underline">
+                      <.link
+                        navigate={~p"/companies/#{@user.company_id}"}
+                        class="text-action hover:underline"
+                      >
                         {@company_name}
                       </.link>
                     <% else %>
@@ -1000,7 +1027,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               </div>
 
               <div id="user-detail-email-verified">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Email Verified</dt>
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
+                  Email Verified
+                </dt>
                 <dd class="mt-0.5 text-sm text-ink">
                   <.badge kind={if @user.email_verified_at, do: :success, else: :warning}>
                     <%= if @user.email_verified_at do %>
@@ -1013,17 +1042,21 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               </div>
 
               <div id="user-detail-created">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Created</dt>
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
+                  Created
+                </dt>
                 <dd class="mt-0.5 text-sm text-ink-muted tabular-nums">
-                  <.datetime id="user-created-at" :if={@user.created_at} value={@user.created_at} />
+                  <.datetime :if={@user.created_at} id="user-created-at" value={@user.created_at} />
                   <span :if={is_nil(@user.created_at)} class="text-ink-faint">—</span>
                 </dd>
               </div>
 
               <div id="user-detail-updated">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">Updated</dt>
+                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
+                  Updated
+                </dt>
                 <dd class="mt-0.5 text-sm text-ink-muted tabular-nums">
-                  <.datetime id="user-updated-at" :if={@user.updated_at} value={@user.updated_at} />
+                  <.datetime :if={@user.updated_at} id="user-updated-at" value={@user.updated_at} />
                   <span :if={is_nil(@user.updated_at)} class="text-ink-faint">—</span>
                 </dd>
               </div>
@@ -1035,7 +1068,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             <div class="flex items-center justify-between mb-1">
               <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                 Roles & Permissions
-                <span id="assigned-roles-count" class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink">
+                <span
+                  id="assigned-roles-count"
+                  class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
+                >
                   {length(@assigned_roles)}
                 </span>
               </h3>
@@ -1052,7 +1088,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
             <!-- Assigned Roles -->
             <dl class="mb-4" id="assigned-roles-container">
-              <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">Roles</dt>
+              <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">
+                Roles
+              </dt>
               <dd>
                 <%= if @assigned_roles == [] do %>
                   <span class="text-sm text-ink-muted" id="no-roles-msg">No roles assigned.</span>
@@ -1112,8 +1150,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       class="w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none"
                     />
                   </div>
-                  <form phx-change="select_roles" phx-submit="assign_selected_roles" id="assign-roles-form">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 max-h-48 overflow-y-auto" id="available-roles-list">
+                  <form
+                    phx-change="select_roles"
+                    phx-submit="assign_selected_roles"
+                    id="assign-roles-form"
+                  >
+                    <div
+                      class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 max-h-48 overflow-y-auto"
+                      id="available-roles-list"
+                    >
                       <label
                         :for={role <- @filtered_available_roles}
                         id={"available-role-label-#{role.id}"}
@@ -1161,7 +1206,14 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 class="flex items-center gap-2 w-full text-left group cursor-pointer focus:outline-none"
               >
                 <span class="shrink-0 text-ink-muted w-3 grid place-items-center" aria-hidden="true">
-                  <.icon name={if @show_effective_permissions, do: "hero-chevron-down", else: "hero-chevron-right"} class="size-3" />
+                  <.icon
+                    name={
+                      if @show_effective_permissions,
+                        do: "hero-chevron-down",
+                        else: "hero-chevron-right"
+                    }
+                    class="size-3"
+                  />
                 </span>
                 <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                   Effective Permissions
@@ -1179,8 +1231,14 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 <%= if @grouped_effective_permissions == %{} do %>
                   <p class="text-sm text-ink-muted">No permissions.</p>
                 <% else %>
-                  <dl :for={{domain, caps} <- @grouped_effective_permissions} id={"permissions-domain-#{domain}"} class="mb-3">
-                    <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-1">{domain}</dt>
+                  <dl
+                    :for={{domain, caps} <- @grouped_effective_permissions}
+                    id={"permissions-domain-#{domain}"}
+                    class="mb-3"
+                  >
+                    <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-1">
+                      {domain}
+                    </dt>
                     <dd class="flex flex-wrap gap-1">
                       <%= for cap <- caps do %>
                         <% is_direct = Map.has_key?(@direct_grant_ids, cap) %>
@@ -1231,10 +1289,22 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 <% end %>
 
                 <!-- Denied Capabilities Grouped by Domain (Red) -->
-                <div :if={@grouped_denied_permissions != %{}} id="denied-permissions-section" class="mt-4 pt-4 border-t border-line">
-                  <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">Denied</div>
-                  <div :for={{domain, caps} <- @grouped_denied_permissions} id={"denied-domain-#{domain}"} class="mb-3">
-                    <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-1">{domain}</div>
+                <div
+                  :if={@grouped_denied_permissions != %{}}
+                  id="denied-permissions-section"
+                  class="mt-4 pt-4 border-t border-line"
+                >
+                  <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">
+                    Denied
+                  </div>
+                  <div
+                    :for={{domain, caps} <- @grouped_denied_permissions}
+                    id={"denied-domain-#{domain}"}
+                    class="mb-3"
+                  >
+                    <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-1">
+                      {domain}
+                    </div>
                     <div class="flex flex-wrap gap-1">
                       <span
                         :for={cap <- caps}
@@ -1261,11 +1331,16 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
                 <!-- Add Capabilities Picker -->
                 <div
-                  :if={@can_manage? and not is_nil(@user.company_id) and @grouped_available_capabilities != %{}}
+                  :if={
+                    @can_manage? and not is_nil(@user.company_id) and
+                      @grouped_available_capabilities != %{}
+                  }
                   id="add-capabilities-section"
                   class="mt-4 pt-4 border-t border-line"
                 >
-                  <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">Add Capabilities</div>
+                  <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">
+                    Add Capabilities
+                  </div>
                   <input
                     type="text"
                     id="capability-search-input"
@@ -1274,8 +1349,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     value={@capability_search}
                     class="w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none mb-2"
                   />
-                  <form phx-change="select_capabilities" phx-submit="add_selected_capabilities" id="add-capabilities-form">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 max-h-48 overflow-y-auto" id="available-capabilities-list">
+                  <form
+                    phx-change="select_capabilities"
+                    phx-submit="add_selected_capabilities"
+                    id="add-capabilities-form"
+                  >
+                    <div
+                      class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 max-h-48 overflow-y-auto"
+                      id="available-capabilities-list"
+                    >
                       <%= for {_domain, caps} <- @grouped_available_capabilities, cap <- caps, String.contains?(String.downcase(cap), String.downcase(@capability_search)) do %>
                         <label
                           id={"available-cap-label-#{String.replace(cap, ".", "-")}"}
@@ -1293,7 +1375,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       <% end %>
                     </div>
                     <div :if={@selected_capability_keys != []} class="mt-2">
-                      <.button type="submit" variant="primary" id="confirm-add-capabilities-btn" class="text-xs">
+                      <.button
+                        type="submit"
+                        variant="primary"
+                        id="confirm-add-capabilities-btn"
+                        class="text-xs"
+                      >
                         Add ({length(@selected_capability_keys)})
                       </.button>
                     </div>
@@ -1312,7 +1399,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               class="flex items-center gap-2 w-full text-left group cursor-pointer focus:outline-none"
             >
               <span class="shrink-0 text-ink-muted w-3 grid place-items-center" aria-hidden="true">
-                <.icon name={if @show_change_password, do: "hero-chevron-down", else: "hero-chevron-right"} class="size-3" />
+                <.icon
+                  name={if @show_change_password, do: "hero-chevron-down", else: "hero-chevron-right"}
+                  class="size-3"
+                />
               </span>
               <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                 Change Password
@@ -1337,14 +1427,20 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     placeholder="Enter new password"
                     class="block w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/20"
                   />
-                  <p :if={@password_errors[:password]} class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink">
+                  <p
+                    :if={@password_errors[:password]}
+                    class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink"
+                  >
                     <.icon name="hero-exclamation-circle" class="size-4 shrink-0 text-danger" />
                     {@password_errors[:password]}
                   </p>
                 </div>
 
                 <div>
-                  <label for="user-new-password-confirmation" class="mb-1.5 block text-sm font-medium text-ink">Confirm New Password</label>
+                  <label
+                    for="user-new-password-confirmation"
+                    class="mb-1.5 block text-sm font-medium text-ink"
+                  >Confirm New Password</label>
                   <input
                     type="password"
                     name="password_confirmation"
@@ -1354,7 +1450,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     placeholder="Confirm new password"
                     class="block w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/20"
                   />
-                  <p :if={@password_errors[:password_confirmation]} class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink">
+                  <p
+                    :if={@password_errors[:password_confirmation]}
+                    class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink"
+                  >
                     <.icon name="hero-exclamation-circle" class="size-4 shrink-0 text-danger" />
                     {@password_errors[:password_confirmation]}
                   </p>
@@ -1372,7 +1471,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             <div class="flex items-center justify-between">
               <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                 Employee Records
-                <span id="employees-count" class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink">
+                <span
+                  id="employees-count"
+                  class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
+                >
                   {length(@employees)}
                 </span>
               </h3>
@@ -1402,13 +1504,19 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               framed={false}
             >
               <:col :let={emp} label="Employee No." sort="employee_number">
-                <.link navigate={~p"/employees/#{emp.id}"} class="text-action hover:underline font-medium">
+                <.link
+                  navigate={~p"/employees/#{emp.id}"}
+                  class="text-action hover:underline font-medium"
+                >
                   {emp.employee_number || "—"}
                 </.link>
               </:col>
               <:col :let={emp} label="Company" sort="company">
                 <%= if Map.get(@company_names, emp.company_id) do %>
-                  <.link navigate={~p"/companies/#{emp.company_id}"} class="text-action hover:underline">
+                  <.link
+                    navigate={~p"/companies/#{emp.company_id}"}
+                    class="text-action hover:underline"
+                  >
                     {Map.get(@company_names, emp.company_id)}
                   </.link>
                 <% else %>
@@ -1428,7 +1536,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               </:col>
               <:col :let={emp} label="Employment Start" sort="employment_start">
                 <span class="text-ink-muted tabular-nums">
-                  <.datetime id={"employee-start-#{emp.id}"} :if={emp.employment_start} value={emp.employment_start} />
+                  <.datetime
+                    :if={emp.employment_start}
+                    id={"employee-start-#{emp.id}"}
+                    value={emp.employment_start}
+                  />
                   <span :if={is_nil(emp.employment_start)} class="text-ink-faint">—</span>
                 </span>
               </:col>
@@ -1452,7 +1564,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             </.table>
 
             <!-- Link Existing Employee Form -->
-            <div :if={@can_manage? and @unlinkable_employees != []} id="link-employee-section" class="mt-4 pt-4 border-t border-line">
+            <div
+              :if={@can_manage? and @unlinkable_employees != []}
+              id="link-employee-section"
+              class="mt-4 pt-4 border-t border-line"
+            >
               <div :if={not @show_link_employee}>
                 <.button
                   type="button"
@@ -1464,8 +1580,16 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <span>Link Employee</span>
                 </.button>
               </div>
-              <div :if={@show_link_employee} class="flex items-center gap-2" id="link-employee-form-container">
-                <form phx-submit="link_employee" id="link-employee-form" class="flex items-center gap-2">
+              <div
+                :if={@show_link_employee}
+                class="flex items-center gap-2"
+                id="link-employee-form-container"
+              >
+                <form
+                  phx-submit="link_employee"
+                  id="link-employee-form"
+                  class="flex items-center gap-2"
+                >
                   <select
                     name="employee_id"
                     id="link-employee-select"
@@ -1479,7 +1603,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       {emp.full_name} ({emp.employee_number})
                     </option>
                   </select>
-                  <.button type="submit" variant="primary" id="confirm-link-employee-btn" class="text-xs">
+                  <.button
+                    type="submit"
+                    variant="primary"
+                    id="confirm-link-employee-btn"
+                    class="text-xs"
+                  >
                     Link
                   </.button>
                   <.button type="button" phx-click="toggle_link_employee" class="text-xs">
@@ -1495,7 +1624,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             <div class="flex items-center justify-between">
               <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                 External Accesses
-                <span id="external-accesses-count" class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink">
+                <span
+                  id="external-accesses-count"
+                  class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
+                >
                   {length(@external_accesses)}
                 </span>
               </h3>
@@ -1514,7 +1646,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             >
               <:col :let={access} label="Granting Company" sort="company">
                 <%= if Map.get(@company_names, access.company_id) do %>
-                  <.link navigate={~p"/companies/#{access.company_id}"} class="text-action hover:underline font-medium">
+                  <.link
+                    navigate={~p"/companies/#{access.company_id}"}
+                    class="text-action hover:underline font-medium"
+                  >
                     {Map.get(@company_names, access.company_id)}
                   </.link>
                 <% else %>
@@ -1524,7 +1659,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               <:col :let={access} label="Permissions" sort="permissions">
                 <%= if is_list(access.permissions) and access.permissions != [] do %>
                   <div class="flex flex-wrap gap-1">
-                    <span :for={p <- access.permissions} class="inline-flex rounded bg-surface-muted px-1.5 py-0.5 text-[11px] text-ink">
+                    <span
+                      :for={p <- access.permissions}
+                      class="inline-flex rounded bg-surface-muted px-1.5 py-0.5 text-[11px] text-ink"
+                    >
                       {p}
                     </span>
                   </div>
@@ -1539,13 +1677,21 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               </:col>
               <:col :let={access} label="Granted At" sort="granted_at">
                 <span class="text-ink-muted tabular-nums">
-                  <.datetime id={"access-granted-#{access.id}"} :if={access.access_granted_at} value={access.access_granted_at} />
+                  <.datetime
+                    :if={access.access_granted_at}
+                    id={"access-granted-#{access.id}"}
+                    value={access.access_granted_at}
+                  />
                   <span :if={is_nil(access.access_granted_at)} class="text-ink-faint">—</span>
                 </span>
               </:col>
               <:col :let={access} label="Expires At" sort="expires_at">
                 <span class="text-ink-muted tabular-nums">
-                  <.datetime id={"access-expires-#{access.id}"} :if={access.access_expires_at} value={access.access_expires_at} />
+                  <.datetime
+                    :if={access.access_expires_at}
+                    id={"access-expires-#{access.id}"}
+                    value={access.access_expires_at}
+                  />
                   <span :if={is_nil(access.access_expires_at)} class="text-ink-faint">—</span>
                 </span>
               </:col>
@@ -1556,11 +1702,17 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           </.card>
 
           <!-- Card 6: Danger Zone (Delete Account) -->
-          <section :if={allowed?(@current_scope, "admin.user.delete")} id="user-danger" class="rounded-xl border border-danger-line bg-danger-surface px-5 py-4">
+          <section
+            :if={allowed?(@current_scope, "admin.user.delete")}
+            id="user-danger"
+            class="rounded-xl border border-danger-line bg-danger-surface px-5 py-4"
+          >
             <div class="flex items-center justify-between gap-4">
               <div>
                 <h2 class="text-sm font-semibold text-danger-ink">Delete this user</h2>
-                <p class="mt-0.5 text-xs text-danger-ink">Permanently deletes this account. This cannot be undone.</p>
+                <p class="mt-0.5 text-xs text-danger-ink">
+                  Permanently deletes this account. This cannot be undone.
+                </p>
               </div>
               <.button
                 id="user-delete"
@@ -1610,7 +1762,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     {Company.Summary.display_name(company)}
                   </option>
                 </select>
-                <p :if={@new_employee_errors[:company_id]} class="mt-1 text-xs text-danger-ink">{@new_employee_errors[:company_id]}</p>
+                <p :if={@new_employee_errors[:company_id]} class="mt-1 text-xs text-danger-ink">
+                  {@new_employee_errors[:company_id]}
+                </p>
               </div>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1624,7 +1778,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     value={@new_employee_form[:employee_number].value}
                     class="mt-1 block w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
                   />
-                  <p :if={@new_employee_errors[:employee_number]} class="mt-1 text-xs text-danger-ink">{@new_employee_errors[:employee_number]}</p>
+                  <p :if={@new_employee_errors[:employee_number]} class="mt-1 text-xs text-danger-ink">
+                    {@new_employee_errors[:employee_number]}
+                  </p>
                 </div>
                 <div>
                   <label for="new-emp-name" class="block text-xs font-medium text-ink">Full Name</label>
@@ -1636,7 +1792,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     value={@new_employee_form[:full_name].value}
                     class="mt-1 block w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
                   />
-                  <p :if={@new_employee_errors[:full_name]} class="mt-1 text-xs text-danger-ink">{@new_employee_errors[:full_name]}</p>
+                  <p :if={@new_employee_errors[:full_name]} class="mt-1 text-xs text-danger-ink">
+                    {@new_employee_errors[:full_name]}
+                  </p>
                 </div>
               </div>
 
@@ -1665,7 +1823,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               </div>
 
               <div class="mt-6 flex justify-end gap-2">
-                <.button type="button" phx-click="close_add_employee_modal" id="cancel-add-employee-btn" class="text-xs">
+                <.button
+                  type="button"
+                  phx-click="close_add_employee_modal"
+                  id="cancel-add-employee-btn"
+                  class="text-xs"
+                >
                   Cancel
                 </.button>
                 <.button type="submit" variant="primary" id="confirm-add-employee-btn" class="text-xs">

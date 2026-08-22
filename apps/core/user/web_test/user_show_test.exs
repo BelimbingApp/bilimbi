@@ -54,6 +54,12 @@ defmodule BilimbiWeb.UserShowTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
 
     assert has_element?(view, "h1", "Grace Hopper")
+
+    assert has_element?(
+             view,
+             "#user-pin[data-nav-pin-record='true'][data-nav-pin-label='Administration / Users / Grace Hopper'][data-nav-pin-url='/users/92']"
+           )
+
     assert has_element?(view, "#user-back[href='/users']", "Back")
     assert has_element?(view, "a[href='/companies/73']", "Bilimbi Industries")
     assert has_element?(view, "#app-content", "unverified")

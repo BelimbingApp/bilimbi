@@ -402,6 +402,11 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
     assert has_element?(view, "h1", "John Doe")
     assert has_element?(view, "#employee-edit")
+
+    assert has_element?(
+             view,
+             "#employee-pin[data-nav-pin-record='true'][data-nav-pin-label='Administration / Employees / John Doe'][data-nav-pin-url='/employees/#{employee.id}']"
+           )
   end
 
   describe "employee show page parity with Belimbing" do

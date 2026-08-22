@@ -28,12 +28,12 @@ const AppShell = {
     this.rail = window.localStorage.getItem("sidebarRail") === "1"
     this.width = this.readWidth()
     this.expandedBranches = this.readExpandedBranches()
-    this.pinnedItemIds = this.readPinnedItemIds()
+    this.pinnedEntries = this.readPinnedItems()
     this.drawerOpen = false
     this.lastFocus = null
     this.dragging = false
-    this.draggedPinnedId = null
-    this.dropPinnedId = null
+    this.draggedPinnedKey = null
+    this.dropPinnedKey = null
 
     this.onToggle = () => this.toggleSidebar()
     this.onBackdrop = () => this.closeDrawer()
@@ -103,20 +103,64 @@ const AppShell = {
     window.localStorage.setItem(NAV_EXPANSION_STORAGE, JSON.stringify(this.expandedBranches))
   },
 
-  readPinnedItemIds() {
+  readPinnedItems() {
     try {
       const stored = JSON.parse(window.localStorage.getItem(PINNED_STORAGE) ?? "[]")
 
-      return Array.isArray(stored)
-        ? [...new Set(stored.filter((id) => typeof id === "string"))]
-        : []
+      if (!Array.isArray(stored)) return []
+
+      const items = stored
+        .map((item) => this.normalizePinnedItem(item))
+        .filter((item) => item)
+
+      return items.filter(
+        (item, index) =>
+          items.findIndex((candidate) => this.pinnedItemKey(candidate) === this.pinnedItemKey(item)) ===
+            index
+      )
     } catch {
       return []
     }
   },
 
-  savePinnedItemIds() {
-    window.localStorage.setItem(PINNED_STORAGE, JSON.stringify(this.pinnedItemIds))
+  savePinnedItems() {
+    window.localStorage.setItem(PINNED_STORAGE, JSON.stringify(this.pinnedEntries))
+  },
+
+  normalizePinnedItem(item) {
+    if (typeof item === "string") {
+      const id = item.trim()
+      return id ? {id} : null
+    }
+
+    if (!item || typeof item !== "object" || Array.isArray(item)) return null
+
+    const id = typeof item.id === "string" ? item.id.trim() : ""
+    if (id) return {id}
+
+    const label = typeof item.label === "string" ? item.label.trim() : ""
+    const url = this.normalizePinnedUrl(item.url)
+
+    return label && url ? {label, url} : null
+  },
+
+  normalizePinnedUrl(url) {
+    if (typeof url !== "string") return null
+
+    try {
+      const parsed = new URL(url, window.location.origin)
+      if (parsed.origin !== window.location.origin) return null
+
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`
+    } catch {
+      return null
+    }
+  },
+
+  pinnedItemKey(item) {
+    if (item?.id) return `nav:${item.id}`
+    if (item?.url) return `url:${item.url}`
+    return null
   },
 
   startDrag(event) {
@@ -215,11 +259,19 @@ const AppShell = {
   },
 
   onSidebarClick(event) {
+    const unpin = event.target.closest("[data-nav-unpin]")
+
+    if (unpin && this.root?.contains(unpin)) {
+      event.preventDefault()
+      this.removePinnedItem(unpin.dataset.navUnpin)
+      return
+    }
+
     const pin = event.target.closest("[data-nav-pin]")
 
     if (pin && this.root?.contains(pin)) {
       event.preventDefault()
-      this.togglePinnedItem(pin.dataset.navPin)
+      this.togglePinnedItem(this.pinnedItemFromControl(pin))
       return
     }
 
@@ -265,22 +317,69 @@ const AppShell = {
     branch.querySelector(".app-nav-children")?.toggleAttribute("hidden", !expanded)
   },
 
-  togglePinnedItem(id) {
-    if (!id) return
-
-    if (this.pinnedItemIds.includes(id)) {
-      this.pinnedItemIds = this.pinnedItemIds.filter((itemId) => itemId !== id)
-    } else {
-      this.pinnedItemIds.push(id)
+  pinnedItemFromControl(pin) {
+    if (pin.dataset.navPinRecord === "true") {
+      return this.normalizePinnedItem({
+        label: pin.dataset.navPinLabel,
+        url: pin.dataset.navPinUrl,
+      })
     }
 
-    this.savePinnedItemIds()
+    return this.normalizePinnedItem(pin.dataset.navPin)
+  },
+
+  togglePinnedItem(item) {
+    const key = this.pinnedItemKey(item)
+    if (!key) return
+
+    if (this.pinnedEntries.some((pinnedItem) => this.pinnedItemKey(pinnedItem) === key)) {
+      this.pinnedEntries = this.pinnedEntries.filter(
+        (pinnedItem) => this.pinnedItemKey(pinnedItem) !== key
+      )
+    } else {
+      this.pinnedEntries.push(item)
+    }
+
+    this.savePinnedItems()
+    this.renderPinnedItems()
+  },
+
+  removePinnedItem(key) {
+    if (!key) return
+
+    this.pinnedEntries = this.pinnedEntries.filter(
+      (pinnedItem) => this.pinnedItemKey(pinnedItem) !== key
+    )
+    this.savePinnedItems()
     this.renderPinnedItems()
   },
 
   navItem(id) {
     const item = document.getElementById(id)
     return this.sidebar?.contains(item) ? item : null
+  },
+
+  resolvePinnedItem(pinnedItem) {
+    if (pinnedItem.id) {
+      const item = this.navItem(pinnedItem.id)
+      if (!item) return null
+
+      return {
+        key: this.pinnedItemKey(pinnedItem),
+        pinnedItem,
+        item,
+        label: item.dataset.navLabel,
+        url: item.href,
+      }
+    }
+
+    return {
+      key: this.pinnedItemKey(pinnedItem),
+      pinnedItem,
+      item: null,
+      label: pinnedItem.label,
+      url: pinnedItem.url,
+    }
   },
 
   pinnedRow(event) {
@@ -298,21 +397,21 @@ const AppShell = {
       return
     }
 
-    this.draggedPinnedId = row.dataset.pinnedItem
+    this.draggedPinnedKey = row.dataset.pinnedItem
     event.dataTransfer.effectAllowed = "move"
-    event.dataTransfer.setData("text/plain", this.draggedPinnedId)
+    event.dataTransfer.setData("text/plain", this.draggedPinnedKey)
     row.dataset.pinnedDragging = "true"
   },
 
   overPinnedDrag(event) {
     const row = this.pinnedRow(event)
 
-    if (!row || !this.draggedPinnedId || !event.dataTransfer) return
+    if (!row || !this.draggedPinnedKey || !event.dataTransfer) return
 
     event.preventDefault()
     event.dataTransfer.dropEffect = "move"
 
-    if (row.dataset.pinnedItem === this.draggedPinnedId) return
+    if (row.dataset.pinnedItem === this.draggedPinnedKey) return
 
     this.setPinnedDropTarget(row.dataset.pinnedItem)
   },
@@ -320,21 +419,28 @@ const AppShell = {
   dropPinnedDrag(event) {
     const row = this.pinnedRow(event)
 
-    if (!row || !this.draggedPinnedId) return
+    if (!row || !this.draggedPinnedKey) return
 
     event.preventDefault()
 
-    const targetId = row.dataset.pinnedItem
-    const draggedId = this.draggedPinnedId
+    const targetKey = row.dataset.pinnedItem
+    const draggedKey = this.draggedPinnedKey
 
-    if (targetId !== draggedId) {
-      const reordered = this.pinnedItemIds.filter((id) => id !== draggedId)
-      const targetIndex = reordered.indexOf(targetId)
+    if (targetKey !== draggedKey) {
+      const reordered = this.pinnedEntries.filter(
+        (pinnedItem) => this.pinnedItemKey(pinnedItem) !== draggedKey
+      )
+      const targetIndex = reordered.findIndex(
+        (pinnedItem) => this.pinnedItemKey(pinnedItem) === targetKey
+      )
 
       if (targetIndex >= 0) {
-        reordered.splice(targetIndex, 0, draggedId)
-        this.pinnedItemIds = reordered
-        this.savePinnedItemIds()
+        const draggedItem = this.pinnedEntries.find(
+          (pinnedItem) => this.pinnedItemKey(pinnedItem) === draggedKey
+        )
+        reordered.splice(targetIndex, 0, draggedItem)
+        this.pinnedEntries = reordered
+        this.savePinnedItems()
       }
     }
 
@@ -343,8 +449,8 @@ const AppShell = {
   },
 
   endPinnedDrag() {
-    this.draggedPinnedId = null
-    this.dropPinnedId = null
+    this.draggedPinnedKey = null
+    this.dropPinnedKey = null
 
     for (const row of this.pinnedItems?.querySelectorAll("[data-pinned-item]") ?? []) {
       delete row.dataset.pinnedDragging
@@ -353,9 +459,9 @@ const AppShell = {
   },
 
   setPinnedDropTarget(id) {
-    if (this.dropPinnedId === id) return
+    if (this.dropPinnedKey === id) return
 
-    this.dropPinnedId = id
+    this.dropPinnedKey = id
 
     for (const row of this.pinnedItems?.querySelectorAll("[data-pinned-item]") ?? []) {
       if (row.dataset.pinnedItem === id) {
@@ -369,21 +475,19 @@ const AppShell = {
   renderPinnedItems() {
     if (!this.pinned || !this.pinnedItems) return
 
-    const items = this.pinnedItemIds
-      .map((id) => ({id, item: this.navItem(id)}))
-      .filter(({item}) => item)
+    const items = this.pinnedEntries.map((item) => this.resolvePinnedItem(item)).filter((item) => item)
 
-    if (items.length !== this.pinnedItemIds.length) {
-      this.pinnedItemIds = items.map(({id}) => id)
-      this.savePinnedItemIds()
+    if (items.length !== this.pinnedEntries.length) {
+      this.pinnedEntries = items.map(({pinnedItem}) => pinnedItem)
+      this.savePinnedItems()
     }
 
     this.pinnedItems.replaceChildren()
 
-    for (const {id, item} of items) {
+    for (const {key, item, label: pinLabel, url} of items) {
       const row = document.createElement("div")
       row.className = "app-pinned-row group flex min-w-0 items-center"
-      row.dataset.pinnedItem = id
+      row.dataset.pinnedItem = key
       row.draggable = !this.rail
 
       const grip = document.createElement("span")
@@ -394,31 +498,41 @@ const AppShell = {
       grip.title = "Drag to reorder"
 
       const link = document.createElement("a")
-      link.href = item.href
+      link.href = url
       link.className =
         "app-pinned-link flex min-w-0 flex-1 items-center rounded-none px-1 py-px text-sm font-normal text-link transition hover:bg-surface-subtle hover:text-ink"
 
       for (const attribute of ["data-phx-link", "data-phx-link-state"]) {
-        if (item.hasAttribute(attribute)) link.setAttribute(attribute, item.getAttribute(attribute))
+        if (item?.hasAttribute(attribute)) link.setAttribute(attribute, item.getAttribute(attribute))
       }
 
-      const icon = item.querySelector(".app-nav-icon")?.cloneNode(true)
+      if (!item) {
+        link.setAttribute("data-phx-link", "redirect")
+        link.setAttribute("data-phx-link-state", "push")
+      }
+
+      const icon = item?.querySelector(".app-nav-icon")?.cloneNode(true)
       if (icon) link.append(icon)
 
       const label = document.createElement("span")
-      label.className = "app-nav-label app-pinned-label ml-3 min-w-0 truncate"
-      label.textContent = item.dataset.navLabel
+      label.className = [
+        "app-nav-label app-pinned-label min-w-0 truncate",
+        item && "ml-3",
+      ]
+        .filter(Boolean)
+        .join(" ")
+      label.textContent = pinLabel
       link.append(label)
 
       const unpin = document.createElement("button")
       unpin.type = "button"
-      unpin.dataset.navPin = id
-      unpin.title = `Unpin ${item.dataset.navLabel}`
-      unpin.setAttribute("aria-label", `Unpin ${item.dataset.navLabel}`)
+      unpin.dataset.navUnpin = key
+      unpin.title = `Unpin ${pinLabel}`
+      unpin.setAttribute("aria-label", `Unpin ${pinLabel}`)
       unpin.className =
         "app-pinned-unpin grid size-4 shrink-0 place-items-center rounded-sm text-muted opacity-0 transition hover:bg-surface-subtle hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
 
-      const pinIcon = item.parentElement?.querySelector("[data-nav-pin] svg")?.cloneNode(true)
+      const pinIcon = item?.parentElement?.querySelector("[data-nav-pin] svg")?.cloneNode(true)
       if (pinIcon) unpin.append(pinIcon)
 
       row.append(grip, link, unpin)
@@ -426,7 +540,13 @@ const AppShell = {
     }
 
     for (const pin of this.root.querySelectorAll("[data-nav-pin]")) {
-      const pinned = this.pinnedItemIds.includes(pin.dataset.navPin)
+      const pinnedItem = this.pinnedItemFromControl(pin)
+      const key = this.pinnedItemKey(pinnedItem)
+      if (!key) continue
+
+      const pinned = this.pinnedEntries.some(
+        (item) => this.pinnedItemKey(item) === key
+      )
       pin.dataset.pinned = String(pinned)
       pin.setAttribute("aria-pressed", String(pinned))
       pin.title = `${pinned ? "Unpin" : "Pin"} ${pin.getAttribute("aria-label")

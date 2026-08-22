@@ -799,6 +799,22 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       <.page variant={:detail}>
         <.header>
           {@company.name}
+          <:title_actions>
+            <button
+              type="button"
+              id="company-pin"
+              data-nav-pin="record"
+              data-nav-pin-record="true"
+              data-nav-pin-label={"Administration / Companies / #{@company.name}"}
+              data-nav-pin-url={~p"/companies/#{@company.id}"}
+              title="Pin this company to sidebar"
+              aria-label="Pin this company to sidebar"
+              aria-pressed="false"
+              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            >
+              <.icon name="bilimbi-pin" class="size-3.5" />
+            </button>
+          </:title_actions>
           <:subtitle>
             <%!-- Belimbing: title=name, subtitle=legal_name. Repeating the
                  name when no distinct legal name exists says nothing, so the
@@ -973,7 +989,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                   </button>
                 </span>
               <% end %>
-              <span :if={is_nil(@company.scope_activities) or @company.scope_activities == []} class="text-sm text-ink-subtle">
+              <span
+                :if={is_nil(@company.scope_activities) or @company.scope_activities == []}
+                class="text-sm text-ink-subtle"
+              >
                 —
               </span>
             </div>
@@ -1018,7 +1037,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
             <div :if={not @editing_metadata?} class="mt-2">
               <%= if @company.metadata do %>
-                <pre id="company-metadata-display" class="overflow-x-auto rounded-xl bg-surface-sunken p-3 text-xs font-mono text-ink">{format_metadata(@company.metadata)}</pre>
+                <pre
+                  id="company-metadata-display"
+                  class="overflow-x-auto rounded-xl bg-surface-sunken p-3 text-xs font-mono text-ink"
+                >{format_metadata(@company.metadata)}</pre>
               <% else %>
                 <span class="text-sm text-ink-subtle">—</span>
               <% end %>
@@ -1102,7 +1124,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             caption="Subsidiaries"
           >
             <:col :let={child} label="Name">
-              <.link navigate={~p"/companies/#{child.id}"} class="font-medium text-action hover:underline">
+              <.link
+                navigate={~p"/companies/#{child.id}"}
+                class="font-medium text-action hover:underline"
+              >
                 {child.name}
               </.link>
             </:col>
@@ -1202,7 +1227,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             caption="Relationships"
           >
             <:col :let={rel} label="Company">
-              <.link navigate={~p"/companies/#{rel.other_company.id}"} class="font-medium text-action hover:underline">
+              <.link
+                navigate={~p"/companies/#{rel.other_company.id}"}
+                class="font-medium text-action hover:underline"
+              >
                 {rel.other_company.name}
               </.link>
             </:col>
@@ -1253,7 +1281,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           >
             <:col :let={access} label="User">
               <%= if name = @external_access_names[access.user_id] do %>
-                <.link navigate={~p"/users/#{access.user_id}"} class="font-medium text-action hover:underline">
+                <.link
+                  navigate={~p"/users/#{access.user_id}"}
+                  class="font-medium text-action hover:underline"
+                >
                   {name}
                 </.link>
               <% else %>
@@ -1261,10 +1292,16 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               <% end %>
             </:col>
             <:col :let={access} label="Permissions">
-              <div :if={is_list(access.permissions) and access.permissions != []} class="flex flex-wrap gap-1">
+              <div
+                :if={is_list(access.permissions) and access.permissions != []}
+                class="flex flex-wrap gap-1"
+              >
                 <.badge :for={permission <- access.permissions}>{permission}</.badge>
               </div>
-              <span :if={not (is_list(access.permissions) and access.permissions != [])} class="text-ink-subtle">
+              <span
+                :if={not (is_list(access.permissions) and access.permissions != [])}
+                class="text-ink-subtle"
+              >
                 —
               </span>
             </:col>
@@ -1304,7 +1341,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           key="company.employees"
           id="company-employees-panel"
           current_scope={@current_scope}
-          opts={%{company_id: @company.id, table_state: @employees_table_state, page_sizes: @page_sizes}}
+          opts={
+            %{company_id: @company.id, table_state: @employees_table_state, page_sizes: @page_sizes}
+          }
         />
 
         <%!-- MODAL 1: Edit Company Details --%>
@@ -1428,7 +1467,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             </.form>
           </div>
         </div>
-
       </.page>
     </Layouts.app>
     """
