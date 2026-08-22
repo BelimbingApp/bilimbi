@@ -138,6 +138,22 @@ defmodule Bilimbi.Base.PrincipalDirectoryContractTest do
     assert length(ranked) == 2
   end
 
+  test "provider-owned picker choices retain the directory's named ordering", %{
+    scope: scope,
+    providers: p
+  } do
+    assert {:ok, choices} =
+             PrincipalDirectory.choices(scope, :user, :billing_contacts, providers: p)
+
+    assert Enum.map(choices, &{&1.id, &1.name}) ==
+             [{3, "ada lovelace"}, {1, "eMart Holdings"}]
+  end
+
+  test "a provider without picker support fails closed", %{scope: scope} do
+    assert {:error, :selection_unavailable} =
+             PrincipalDirectory.choices(scope, :agent, :anything, providers: @providers)
+  end
+
   defp scope do
     Scope.for_tenant(%Identity{
       id: 1,

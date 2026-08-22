@@ -97,6 +97,40 @@ defmodule Bilimbi.Base.PrincipalDirectory do
   @spec providers() :: %{Provider.kind() => module()}
   def providers, do: ContributionRegistry.consumer!(:principal_directory)
 
+  @doc """
+  Returns the named, display-ordered choices an installed provider owns for a
+  picker selection.
+
+  The selection is opaque to Base and is interpreted only by the provider. This
+  is intentionally separate from `rank/3`: callers of `rank/3` already own a
+  bounded set of referenced IDs, while a picker needs its owner to derive the
+  eligible IDs without leaking a sibling module's query or schema across the
+  boundary. The returned names and ordering still use the ordinary directory
+  contract.
+  """
+  @spec choices(Scope.t(), Provider.kind(), term(), keyword()) ::
+          {:ok, [named()]} | {:error, :selection_unavailable | :too_many_candidates}
+  def choices(%Scope{} = scope, kind, selection, opts \\ []) do
+    providers = Keyword.get_lazy(opts, :providers, &providers/0)
+
+    case Map.fetch(providers, kind) do
+      {:ok, provider} when is_atom(provider) ->
+        if Code.ensure_loaded?(provider) and function_exported?(provider, :candidate_ids, 2) do
+          candidates = provider.candidate_ids(scope, selection) |> Enum.map(&{kind, &1})
+
+          rank(scope, candidates,
+            providers: providers,
+            ceiling: Keyword.get(opts, :ceiling, @default_ceiling)
+          )
+        else
+          {:error, :selection_unavailable}
+        end
+
+      :error ->
+        {:error, :selection_unavailable}
+    end
+  end
+
   defp resolve(candidates, scope, providers) do
     candidates
     |> Enum.group_by(&elem(&1, 0), &elem(&1, 1))
