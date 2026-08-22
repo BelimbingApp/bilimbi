@@ -109,7 +109,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         department_head_names = resolve_department_heads(scope, departments)
         relationships = Company.list_relationships(scope, company_id) |> elem(1)
         external_accesses = Company.list_external_accesses(scope, company_id) |> elem(1)
-        external_access_users = load_external_access_users(scope, external_accesses)
+        external_access_names = resolve_external_access_names(scope, external_accesses)
         company_timezone = get_company_timezone(company)
 
         {:ok,
@@ -127,7 +127,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:department_head_names, department_head_names)
          |> assign(:relationships, relationships)
          |> assign(:external_accesses, external_accesses)
-         |> assign(:external_access_users, external_access_users)
+         |> assign(:external_access_names, external_access_names)
          |> assign(:page_sizes, @page_sizes)
          |> assign(:table_state, default_table_state())
          |> assign(:company_timezone, company_timezone || "")
@@ -178,43 +178,36 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   end
 
   # ============================================================================
-  # Dynamic Integration with Core User
-  # (Geonames is a declared dependency — call Bilimbi.Core.Geonames directly for
-  #  the jurisdiction country label. Employees render through the
-  #  core/employee-owned "company.employees" discovered embed and addresses
-  #  through the core/address-owned "company.addresses" embed (#595), so this
-  #  file no longer probes Core.Employee or Core.Address.)
+  # Naming siblings across the module boundary
+  #
+  # This file reaches no sibling Core module by runtime probe (#595, #669).
+  # Geonames is a declared dependency, called directly for the jurisdiction
+  # label. Employees, addresses and users render through their owners' discovered
+  # embeds ("company.employees" / "company.addresses" / "company.users"). The one
+  # remaining cross-boundary need — naming the user an external-access grant
+  # points at — goes through base/principal_directory, the same seam the
+  # department Head column uses for `{:employee, id}` (ADR 0011/0014).
   # ============================================================================
 
-  defp load_external_access_users(scope, external_accesses) do
-    user_mod = Module.concat(["Bilimbi", "Core", "User"])
-
-    user_ids =
+  # An external-access grant names a user, which core/company cannot reach across
+  # the module boundary. base/principal_directory resolves the `{:user, id}`
+  # identities through the user-owned provider, so this file names grantees
+  # without depending on core/user. Returns a user_id => name map; a grant to a
+  # deleted or unresolvable user is simply absent and falls back to the em dash in
+  # the table — which is exactly what an operator needs to see.
+  defp resolve_external_access_names(scope, external_accesses) do
+    candidates =
       external_accesses
       |> Enum.map(& &1.user_id)
       |> Enum.reject(&is_nil/1)
       |> Enum.uniq()
+      |> Enum.map(&{:user, &1})
 
-    cond do
-      user_ids == [] ->
-        %{}
-
-      Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :get_tenant_users, 2) ->
-        case apply(user_mod, :get_tenant_users, [scope, user_ids]) do
-          {:ok, users_map} -> users_map
-          _ -> %{}
-        end
-
-      Code.ensure_loaded?(user_mod) and function_exported?(user_mod, :get_tenant_user, 2) ->
-        Enum.reduce(user_ids, %{}, fn user_id, acc ->
-          case apply(user_mod, :get_tenant_user, [scope, user_id]) do
-            {:ok, user} -> Map.put(acc, user_id, user)
-            _ -> acc
-          end
-        end)
-
-      true ->
-        %{}
+    with [_ | _] <- candidates,
+         {:ok, named} <- PrincipalDirectory.rank(scope, candidates) do
+      Map.new(named, fn %{id: id, name: name} -> {id, name} end)
+    else
+      _ -> %{}
     end
   end
 
@@ -1249,9 +1242,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             caption="External Accesses"
           >
             <:col :let={access} label="User">
-              <%= if user = @external_access_users[access.user_id] do %>
+              <%= if name = @external_access_names[access.user_id] do %>
                 <.link navigate={~p"/users/#{access.user_id}"} class="font-medium text-action hover:underline">
-                  {user.name}
+                  {name}
                 </.link>
               <% else %>
                 <span class="text-ink-subtle">—</span>
