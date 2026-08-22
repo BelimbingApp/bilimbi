@@ -59,13 +59,14 @@ defmodule Bilimbi.Core.User.Web.CompanyUsersPanel do
   @impl true
   def render(assigns) do
     ~H"""
-    <.card id={@id} class="mt-6">
-      <div class="flex items-center gap-2 mb-4">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-          Users
-        </h3>
-        <.badge>{@users_count}</.badge>
-      </div>
+    <div id={@id} class="contents">
+      <.card class="mt-6">
+        <div class="flex items-center gap-2 mb-4">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+            Users
+          </h3>
+          <.badge>{@users_count}</.badge>
+        </div>
       <.form
         for={@filters_form}
         id="company-users-filters"
@@ -129,7 +130,8 @@ defmodule Bilimbi.Core.User.Web.CompanyUsersPanel do
         filters_event="users_filters"
         page_event="users_page"
       />
-    </.card>
+      </.card>
+    </div>
     """
   end
 

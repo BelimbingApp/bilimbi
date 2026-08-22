@@ -54,88 +54,95 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
   @impl true
   def render(assigns) do
     ~H"""
-    <.card id={@id} class="mt-6">
-      <div class="flex items-center gap-2 mb-4">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-          Employees
-        </h3>
-        <.badge>{@employees_count}</.badge>
-      </div>
-      <.form
-        for={@filters_form}
-        id="company-employees-filters"
-        phx-change="employees_filters"
-        class="p-2 mb-2 rounded-xl border border-line bg-surface-muted"
-      >
-        <div class="relative">
-          <.icon
-            name="hero-magnifying-glass"
-            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-          />
-          <.input
-            field={@filters_form[:search]}
-            id="company-employees-search"
-            type="search"
-            phx-debounce="300"
-            maxlength="255"
-            label="Search employees"
-            label_class="sr-only"
-            wrapper_class="mb-0"
-            placeholder="Search by name, employee number, email, designation..."
-            class="rounded-lg pl-8"
-          />
+    <div id={@id} class="contents">
+      <.card class="mt-6">
+        <div class="flex items-center gap-2 mb-4">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+            Employees
+          </h3>
+          <.badge>{@employees_count}</.badge>
         </div>
-      </.form>
-      <.table
-        id="company-employees-table"
-        rows={@employees_page.entries}
-        row_id={fn employee -> "company-employee-#{employee.id}" end}
-        row_item={fn employee -> employee end}
-        sort_by={@table_state.sort_by}
-        sort_dir={@table_state.sort_dir}
-        sort_event="employees_sort"
-        caption="Employees"
-      >
-        <:col :let={employee} label="Name" sort="full_name" sort_id="company-employees-sort-full-name">
-          <span class="font-medium">{employee.full_name}</span>
-          <span :if={employee.designation} class="block text-xs text-ink-subtle">
-            {employee.designation}
-          </span>
-        </:col>
-        <:col
-          :let={employee}
-          label="No."
-          sort="employee_number"
-          sort_id="company-employees-sort-employee-number"
+        <.form
+          for={@filters_form}
+          id="company-employees-filters"
+          phx-change="employees_filters"
+          class="p-2 mb-2 rounded-xl border border-line bg-surface-muted"
         >
-          <code class="text-xs font-medium">{employee.employee_number}</code>
-        </:col>
-        <:col
-          :let={employee}
-          label="Type"
-          sort="employee_type"
-          sort_id="company-employees-sort-employee-type"
+          <div class="relative">
+            <.icon
+              name="hero-magnifying-glass"
+              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+            />
+            <.input
+              field={@filters_form[:search]}
+              id="company-employees-search"
+              type="search"
+              phx-debounce="300"
+              maxlength="255"
+              label="Search employees"
+              label_class="sr-only"
+              wrapper_class="mb-0"
+              placeholder="Search by name, employee number, email, designation..."
+              class="rounded-lg pl-8"
+            />
+          </div>
+        </.form>
+        <.table
+          id="company-employees-table"
+          rows={@employees_page.entries}
+          row_id={fn employee -> "company-employee-#{employee.id}" end}
+          row_item={fn employee -> employee end}
+          sort_by={@table_state.sort_by}
+          sort_dir={@table_state.sort_dir}
+          sort_event="employees_sort"
+          caption="Employees"
         >
-          {employee.employee_type_label || employee.employee_type}
-        </:col>
-        <:col :let={employee} label="Status" sort="status" sort_id="company-employees-sort-status">
-          <.badge kind={if employee.status == "active", do: :success, else: :neutral}>
-            {employee.status}
-          </.badge>
-        </:col>
-        <:empty :if={@employees_page.total_entries == 0}>
-          No employees found for this company.
-        </:empty>
-      </.table>
-      <.pagination
-        id="company-employees-pagination"
-        page={@employees_page}
-        page_sizes={@page_sizes}
-        filters_form={@filters_form}
-        filters_event="employees_filters"
-        page_event="employees_page"
-      />
-    </.card>
+          <:col
+            :let={employee}
+            label="Name"
+            sort="full_name"
+            sort_id="company-employees-sort-full-name"
+          >
+            <span class="font-medium">{employee.full_name}</span>
+            <span :if={employee.designation} class="block text-xs text-ink-subtle">
+              {employee.designation}
+            </span>
+          </:col>
+          <:col
+            :let={employee}
+            label="No."
+            sort="employee_number"
+            sort_id="company-employees-sort-employee-number"
+          >
+            <code class="text-xs font-medium">{employee.employee_number}</code>
+          </:col>
+          <:col
+            :let={employee}
+            label="Type"
+            sort="employee_type"
+            sort_id="company-employees-sort-employee-type"
+          >
+            {employee.employee_type_label || employee.employee_type}
+          </:col>
+          <:col :let={employee} label="Status" sort="status" sort_id="company-employees-sort-status">
+            <.badge kind={if employee.status == "active", do: :success, else: :neutral}>
+              {employee.status}
+            </.badge>
+          </:col>
+          <:empty :if={@employees_page.total_entries == 0}>
+            No employees found for this company.
+          </:empty>
+        </.table>
+        <.pagination
+          id="company-employees-pagination"
+          page={@employees_page}
+          page_sizes={@page_sizes}
+          filters_form={@filters_form}
+          filters_event="employees_filters"
+          page_event="employees_page"
+        />
+      </.card>
+    </div>
     """
   end
 
