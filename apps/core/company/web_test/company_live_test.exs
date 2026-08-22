@@ -363,6 +363,11 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
+      assert has_element?(
+               view,
+               "#company-pin[data-nav-pin-record='true'][data-nav-pin-label='Administration / Companies / Bilimbi Industries'][data-nav-pin-url='/companies/73']"
+             )
+
       # Details card
       assert has_element?(view, "#detail-name", "Bilimbi Industries")
       assert has_element?(view, "#detail-legal-name", "Bilimbi Industries Sdn Bhd")

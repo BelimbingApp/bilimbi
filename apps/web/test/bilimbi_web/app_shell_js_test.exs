@@ -37,6 +37,17 @@ defmodule BilimbiWeb.AppShellJsTest do
     assert source =~ ~S{this.root.querySelectorAll("[data-nav-pin]")}
   end
 
+  test "record pins persist a safe label and URL alongside legacy navigation IDs", %{
+    source: source
+  } do
+    assert source =~ "normalizePinnedItem"
+    assert source =~ "normalizePinnedUrl"
+    assert source =~ ~S[pin.dataset.navPinRecord === "true"]
+    assert source =~ ~S[unpin.dataset.navUnpin = key]
+    assert source =~ ~S[link.setAttribute("data-phx-link", "redirect")]
+    assert source =~ "url:${item.url}"
+  end
+
   test "Escape closes the drawer and the toggle stays outside the inert region", %{source: source} do
     assert source =~ ~S[if (event.key === "Escape")]
     assert source =~ "this.closeDrawer()"
