@@ -41,6 +41,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
           web: nil | String.t(),
           schema_contract: nil | module(),
           contribution_provider: nil | module(),
+          dev_seed: nil | String.t(),
           path: String.t(),
           container_id: String.t()
         }
