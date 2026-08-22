@@ -332,7 +332,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(
                view,
-               "#company-users th[aria-sort='descending'] button#company-users-sort-email"
+               "#company-users-panel th[aria-sort='descending'] button#company-users-sort-email"
              )
     end
 
