@@ -20,15 +20,15 @@ defmodule Bilimbi.Core.Company.ShowLiveGeonamesDirectTest do
     :search_city_names
   ]
 
-  test "show_live pins direct Geonames calls and tripwires the old probe form" do
+  test "show_live pins its direct Geonames call and tripwires the old probe form" do
     source = File.read!(@show_live)
 
+    # Only the country list survives on the page (the jurisdiction / country
+    # select). The postcode/admin1/locality cascade moved into the core/address
+    # `company.addresses` panel with the create-and-attach flow (#595); its
+    # direct-call pin lives in that module's own test.
     assert source =~ "alias Bilimbi.Core.Geonames"
     assert source =~ "Geonames.list_countries()"
-    assert source =~ "Geonames.list_admin1("
-    assert source =~ "Geonames.lookup_postcode("
-    assert source =~ "Geonames.search_postcodes("
-    assert source =~ "Geonames.search_city_names("
 
     refute source =~ ~r/geonames_mod\b/
     refute source =~ ~r/Module\.concat\(\["Bilimbi", "Core", "Geonames"\]\)/

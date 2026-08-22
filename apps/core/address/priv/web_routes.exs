@@ -20,5 +20,9 @@
   %{
     embed: "employee.addresses",
     live_component: Bilimbi.Core.Address.Web.EmployeeAddressesPanel
+  },
+  %{
+    embed: "company.addresses",
+    live_component: Bilimbi.Core.Address.Web.CompanyAddressesPanel
   }
 ]
