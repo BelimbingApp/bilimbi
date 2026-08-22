@@ -974,7 +974,11 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   </dt>
 
                   <dd class="mt-0.5 text-sm text-ink px-1 -mx-1 py-0.5 tabular-nums">
-                    {display_or_dash(@employee.employment_start)}
+                    <.datetime
+                      id="employee-employment-start"
+                      value={@employee.employment_start}
+                      format={:date}
+                    />
                   </dd>
                 </div>
 
@@ -984,7 +988,11 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   </dt>
 
                   <dd class="mt-0.5 text-sm text-ink px-1 -mx-1 py-0.5 tabular-nums">
-                    {display_or_dash(@employee.employment_end)}
+                    <.datetime
+                      id="employee-employment-end"
+                      value={@employee.employment_end}
+                      format={:date}
+                    />
                   </dd>
                 </div>
               </dl>
