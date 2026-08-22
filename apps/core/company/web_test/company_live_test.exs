@@ -10,6 +10,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.{Department, DepartmentType, LegalEntityType, Relationship}
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
+  alias Bilimbi.Core.Employee
   alias Bilimbi.Core.Geonames.TestFixtures, as: GeonamesFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -115,6 +116,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {:ok, view, html} = live(conn, ~p"/companies?sort=name&dir=desc")
       assert html =~ ~s(aria-sort="descending")
+
       assert view |> element("#companies tr:first-child td:first-child") |> render() =~
                "Bilimbi Subsidiary"
     end
@@ -429,6 +431,52 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#company-timezone-card")
       assert has_element?(view, "#company-departments-card")
       assert has_element?(view, "#company-relationships-card")
+    end
+
+    test "departments table names the head employee via the principal directory", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+
+      {:ok, scope} = Tenancy.scope(41)
+
+      # The head is a plain employee in company 73. core/company names it across
+      # the boundary through base/principal_directory (ADR 0014), never by
+      # depending on core/employee.
+      {:ok, _type} =
+        Employee.create_employee_type(scope, 73, %{code: "field_staff", label: "Field Staff"})
+
+      {:ok, head} =
+        Employee.create_employee(scope, 73, %{
+          employee_number: "E-100",
+          full_name: "Grace Hopper",
+          employee_type: "field_staff",
+          status: "active"
+        })
+
+      {:ok, eng} = Company.create_department_type(%{code: "ENG", name: "Engineering"})
+      {:ok, ops} = Company.create_department_type(%{code: "OPS", name: "Operations"})
+
+      {:ok, _headed} =
+        Company.create_department(scope, 73, %{
+          department_type_id: eng.id,
+          head_id: head.id,
+          status: "active"
+        })
+
+      {:ok, _headless} =
+        Company.create_department(scope, 73, %{department_type_id: ops.id, status: "active"})
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # The "Head" column header lives in the card's <thead>, outside the table body.
+      card = view |> element("#company-departments-card") |> render()
+      assert card =~ "Head"
+
+      table = view |> element("#company-departments-table") |> render()
+      # The headed department shows the resolved employee name...
+      assert table =~ "Grace Hopper"
+      # ...and the headless one falls back to the em dash, never a bare id.
+      assert table =~ "—"
+      refute table =~ "head_id"
     end
 
     test "edits company details via modal and validates fields", %{conn: conn} do

@@ -15,6 +15,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
   import Ecto.Changeset
 
+  alias Bilimbi.Base.PrincipalDirectory
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Core.Company
@@ -122,6 +123,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         parent_companies = load_parent_companies(scope, company_id)
         children = Company.list_child_companies(scope, company_id) |> elem(1)
         departments = Company.list_departments(scope, company_id) |> elem(1)
+        department_head_names = resolve_department_heads(scope, departments)
         relationships = Company.list_relationships(scope, company_id) |> elem(1)
         external_accesses = Company.list_external_accesses(scope, company_id) |> elem(1)
         external_access_users = load_external_access_users(scope, external_accesses)
@@ -142,6 +144,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:parent_companies, parent_companies)
          |> assign(:children, children)
          |> assign(:departments, departments)
+         |> assign(:department_head_names, department_head_names)
          |> assign(:relationships, relationships)
          |> assign(:external_accesses, external_accesses)
          |> assign(:external_access_users, external_access_users)
@@ -182,6 +185,27 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   defp load_parent_companies(scope, company_id) do
     case Company.list_companies(scope) do
       {:ok, companies} -> Enum.reject(companies, &(&1.id == company_id))
+    end
+  end
+
+  # A department's head is an employee, which core/company cannot name across the
+  # module boundary. base/principal_directory resolves the `{:employee, id}`
+  # identities through the employee-owned provider (ADR 0011/0014), so this file
+  # never depends on core/employee. Returns a head_id => name map; unresolved or
+  # headless departments simply fall back to "—" in the table.
+  defp resolve_department_heads(scope, departments) do
+    candidates =
+      departments
+      |> Enum.map(& &1.head_id)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+      |> Enum.map(&{:employee, &1})
+
+    with [_ | _] <- candidates,
+         {:ok, named} <- PrincipalDirectory.rank(scope, candidates) do
+      Map.new(named, fn %{id: id, name: name} -> {id, name} end)
+    else
+      _ -> %{}
     end
   end
 
@@ -1928,6 +1952,11 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             </:col>
             <:col :let={dept} label="Category">
               <span class="text-sm text-ink-subtle">{dept.type.category || "—"}</span>
+            </:col>
+            <:col :let={dept} label="Head">
+              <span class="text-sm text-ink-subtle">
+                {@department_head_names[dept.head_id] || "—"}
+              </span>
             </:col>
             <:col :let={dept} label="Status">
               <.badge kind={if dept.status == "active", do: :success, else: :warning}>
