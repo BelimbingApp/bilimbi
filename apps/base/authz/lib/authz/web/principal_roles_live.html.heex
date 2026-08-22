@@ -119,7 +119,7 @@
           sort_id="assignments-sort-created_at"
         >
           <span class="whitespace-nowrap tabular-nums text-ink-muted">
-            {created_at(assignment)}
+            <.datetime id={"assignment-created-#{assignment.id}"} value={assignment.created_at} />
           </span>
         </:col>
 

@@ -198,7 +198,4 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
   defp resource_label(%{resource_type: nil}), do: "—"
   defp resource_label(%{resource_type: type, resource_id: nil}), do: type
   defp resource_label(%{resource_type: type, resource_id: id}), do: "#{type} ##{id}"
-
-  defp occurred_at(%{occurred_at: nil}), do: "—"
-  defp occurred_at(%{occurred_at: at}), do: Calendar.strftime(at, "%Y-%m-%d %H:%M:%S")
 end

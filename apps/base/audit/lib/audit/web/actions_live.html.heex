@@ -108,7 +108,7 @@
       >
         <:col :let={action} label="Occurred" sort="occurred_at" sort_id="actions-sort-occurred_at">
           <span class="whitespace-nowrap tabular-nums text-xs text-ink-muted">
-            {occurred_at(action)}
+            <.datetime id={"action-occurred-#{action.id}"} value={action.occurred_at} />
           </span>
         </:col>
 

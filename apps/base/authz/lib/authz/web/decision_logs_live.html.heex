@@ -72,7 +72,7 @@
         framed={false}
       >
         <:col :let={log} label="When" sort="occurred_at" sort_id="logs-sort-occurred_at">
-          <span class="whitespace-nowrap tabular-nums text-ink-muted">{occurred_at(log)}</span>
+          <span class="whitespace-nowrap tabular-nums text-ink-muted"><.datetime id={"log-occurred-#{log.id}"} value={log.occurred_at} /></span>
         </:col>
 
         <:col :let={log} label="Actor" sort="actor_type" sort_id="logs-sort-actor_type">

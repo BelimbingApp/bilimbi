@@ -107,4 +107,37 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
     assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
   end
+
+  test "stores and clears the signed-in account's time zone display mode", %{conn: conn} do
+    {:ok, view, _html} = open(conn)
+
+    assert has_element?(view, "#appearance-timezone-mode option[value='']")
+    assert has_element?(view, "#appearance-timezone-mode option[value='utc']")
+
+    view
+    |> form("#appearance-form", %{"appearance" => %{"timezone_mode" => "utc"}})
+    |> render_change()
+
+    scope = SettingsScope.user(91, 73, 41)
+    assert Bilimbi.Base.DateTime.mode(scope) == :utc
+    assert Bilimbi.Base.DateTime.mode_overridden?(scope)
+
+    view
+    |> form("#appearance-form", %{"appearance" => %{"timezone_mode" => ""}})
+    |> render_change()
+
+    refute Bilimbi.Base.DateTime.mode_overridden?(scope)
+    assert Bilimbi.Base.DateTime.mode(scope) == :company
+  end
+
+  test "rejects a forged time zone mode without persisting it", %{conn: conn} do
+    {:ok, view, _html} = open(conn)
+
+    # "galactic" is never a rendered option; forging the event is the point.
+    view
+    |> render_change("save", %{"appearance" => %{"timezone_mode" => "galactic"}})
+
+    assert has_element?(view, "#flash-group", "Choose a supported theme, locale, and time zone display.")
+    refute Bilimbi.Base.DateTime.mode_overridden?(SettingsScope.user(91, 73, 41))
+  end
 end

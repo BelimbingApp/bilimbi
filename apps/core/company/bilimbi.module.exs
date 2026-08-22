@@ -7,6 +7,7 @@
   namespace: Bilimbi.Core.Company,
   dependencies: [
     "base/authz",
+    "base/datetime",
     "base/database",
     "base/module_registry",
     "base/principal_directory",
