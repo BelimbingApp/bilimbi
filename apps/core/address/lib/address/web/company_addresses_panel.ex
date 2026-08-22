@@ -21,9 +21,28 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Core.Address
+  alias Bilimbi.Core.Geonames
+
+  import Ecto.Changeset, only: [cast: 3, validate_length: 3, add_error: 4]
 
   @manage_capability "admin.company.update"
   @valid_address_kinds ~w(headquarters billing shipping branch other)
+
+  # The create-and-attach form's fields, cast as a schemaless changeset — the
+  # company page's inline create flow moved here whole (#595). Geonames resolves
+  # the cascading country/admin1/postcode/locality selects; core/address already
+  # declares the core/geonames edge, so nothing new lands on core/company.
+  @address_field_types %{
+    label: :string,
+    phone: :string,
+    line1: :string,
+    line2: :string,
+    line3: :string,
+    country_iso: :string,
+    admin1_code: :string,
+    postcode: :string,
+    locality: :string
+  }
 
   # `toggle_edit_kind` only flips a checkbox in the kinds-edit form's local
   # state; the persistence event is `save_address_kinds`, which re-authorizes.
@@ -44,7 +63,19 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
      |> assign(:selected_edit_kinds, [])
      |> assign(:addresses_sort_by, "label")
      |> assign(:addresses_sort_dir, "asc")
-     |> assign(:address_kinds, @valid_address_kinds)}
+     |> assign(:address_kinds, @valid_address_kinds)
+     # Create-and-attach flow (ported from the company page's inline section).
+     |> assign(:show_create_modal, false)
+     |> assign(:address_form, nil)
+     |> assign(:address_form_params, %{})
+     |> assign(:auto_location, %{admin1_code: false, locality: false})
+     |> assign(:admin1_options, [])
+     |> assign(:postcode_options, [])
+     |> assign(:locality_options, [])
+     |> assign(:create_address_kinds, [])
+     |> assign(:create_address_is_primary, false)
+     |> assign(:create_address_priority, 0)
+     |> assign(:countries, Geonames.list_countries())}
   end
 
   @impl true
@@ -329,6 +360,111 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
      |> assign(:sorted_addresses, sorted)}
   end
 
+  # --- Create-and-attach: a new address made and linked in one step ---
+
+  def handle_event("open_create_modal", _params, socket) do
+    params = %{"country_iso" => "MY"}
+
+    {:noreply,
+     socket
+     |> assign(:show_create_modal, true)
+     |> assign(:address_form_params, params)
+     |> assign(:auto_location, %{admin1_code: false, locality: false})
+     |> assign(:create_address_kinds, [])
+     |> assign(:create_address_is_primary, false)
+     |> assign(:create_address_priority, 0)
+     |> assign_address_form(address_form_changeset(params))
+     |> assign_address_location_options(params)}
+  end
+
+  def handle_event("close_create_modal", _params, socket) do
+    {:noreply, socket |> assign(:show_create_modal, false) |> assign(:address_form, nil)}
+  end
+
+  def handle_event("validate_create_address", %{"address" => incoming}, socket) do
+    {params, auto_location} = address_location_params(socket, incoming)
+
+    kinds = Map.get(incoming, "kinds") || socket.assigns.create_address_kinds
+    is_primary = incoming["is_primary"] in [true, "true", "1"]
+
+    priority =
+      case Integer.parse(incoming["priority"] || "0") do
+        {p, _} -> p
+        _ -> socket.assigns.create_address_priority
+      end
+
+    {:noreply,
+     socket
+     |> assign(:address_form_params, params)
+     |> assign(:auto_location, auto_location)
+     |> assign(:create_address_kinds, kinds)
+     |> assign(:create_address_is_primary, is_primary)
+     |> assign(:create_address_priority, priority)
+     |> assign_address_form(address_form_changeset(params))
+     |> assign_address_location_options(params)}
+  end
+
+  def handle_event("save_create_address", %{"address" => incoming}, socket) do
+    if can_manage?(socket) do
+      {params, auto_location} = address_location_params(socket, incoming)
+      changeset = address_form_changeset(params)
+      scope = socket.assigns.current_scope.scope
+
+      if changeset.valid? do
+        kinds = Map.get(incoming, "kinds") || socket.assigns.create_address_kinds
+        is_primary = incoming["is_primary"] in [true, "true", "1"]
+
+        priority =
+          case Integer.parse(incoming["priority"] || "0") do
+            {p, _} -> p
+            _ -> socket.assigns.create_address_priority
+          end
+
+        attachment_attrs = %{
+          kind: kinds,
+          is_primary: is_primary,
+          priority: priority,
+          valid_from: Date.utc_today()
+        }
+
+        case Address.create_and_attach_to_company(
+               scope,
+               socket.assigns.company_id,
+               params,
+               attachment_attrs
+             ) do
+          {:ok, _address} ->
+            {:noreply,
+             socket
+             |> notice(:info, "Address created and attached.")
+             |> assign(:show_create_modal, false)
+             |> assign(:address_form, nil)
+             |> reload()}
+
+          {:error, %Ecto.Changeset{} = domain_changeset} ->
+            {:noreply,
+             socket
+             |> assign(:address_form_params, params)
+             |> assign(:auto_location, auto_location)
+             |> assign_address_form(copy_address_domain_errors(changeset, domain_changeset))
+             |> assign_address_location_options(params)}
+
+          {:error, reason} ->
+            {:noreply, notice(socket, :error, "Failed to create address: #{inspect(reason)}")}
+        end
+      else
+        {:noreply,
+         socket
+         |> assign(:address_form_params, params)
+         |> assign(:auto_location, auto_location)
+         |> assign_address_form(changeset)
+         |> assign_address_location_options(params)}
+      end
+    else
+      {:noreply, write_forbidden(socket)}
+    end
+  end
+
   # --- Data & helpers ---
 
   defp reload(socket) do
@@ -366,6 +502,128 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
   end
 
   defp notice(socket, kind, message), do: assign(socket, :notice, {kind, message})
+
+  # --- Create-form location cascade (Geonames-backed, ported from show_live) ---
+
+  defp address_location_params(socket, incoming) do
+    old = socket.assigns.address_form_params
+    old_auto = socket.assigns.auto_location
+
+    incoming = normalize_address_country(incoming)
+    country_changed? = field(incoming, "country_iso") != field(old, "country_iso")
+    postcode_changed? = field(incoming, "postcode") != field(old, "postcode")
+
+    cond do
+      country_changed? ->
+        {clear_address_location_dependents(incoming), %{admin1_code: false, locality: false}}
+
+      postcode_changed? and field(incoming, "postcode") != "" ->
+        auto_fill_address_location(incoming, old_auto)
+
+      true ->
+        {incoming, old_auto}
+    end
+  end
+
+  defp auto_fill_address_location(params, old_auto) do
+    params =
+      params
+      |> maybe_clear_auto("admin1_code", old_auto.admin1_code)
+      |> maybe_clear_auto("locality", old_auto.locality)
+
+    matches = Geonames.lookup_postcode(field(params, "country_iso"), field(params, "postcode"))
+
+    localities = matches |> Enum.map(& &1.place_name) |> Enum.reject(&blank?/1) |> Enum.uniq()
+    admin1_code = matching_admin1_code(field(params, "country_iso"), matches)
+
+    params = if admin1_code, do: Map.put(params, "admin1_code", admin1_code), else: params
+
+    params =
+      if length(localities) == 1, do: Map.put(params, "locality", hd(localities)), else: params
+
+    {params,
+     %{
+       admin1_code: not is_nil(admin1_code),
+       locality: length(localities) == 1
+     }}
+  end
+
+  defp matching_admin1_code(_country_iso, []), do: nil
+
+  defp matching_admin1_code(country_iso, [first | _rest]) do
+    raw_code = first.admin1_code
+
+    country_iso
+    |> Geonames.list_admin1()
+    |> Enum.find_value(fn admin1 ->
+      if admin1.code == raw_code or String.ends_with?(admin1.code, ".#{raw_code}"),
+        do: admin1.code
+    end)
+  end
+
+  defp assign_address_location_options(socket, params) do
+    country_iso = field(params, "country_iso")
+    postcode = field(params, "postcode")
+    locality = field(params, "locality")
+    admin1_code = field(params, "admin1_code")
+
+    exact_localities =
+      country_iso
+      |> Geonames.lookup_postcode(postcode)
+      |> Enum.map(& &1.place_name)
+      |> Enum.reject(&blank?/1)
+      |> Enum.uniq()
+
+    locality_options =
+      exact_localities ++
+        Geonames.search_city_names(country_iso, locality, admin1_code: admin1_code)
+
+    socket
+    |> assign(:admin1_options, Geonames.list_admin1(country_iso))
+    |> assign(:postcode_options, Geonames.search_postcodes(country_iso, postcode))
+    |> assign(:locality_options, Enum.uniq(locality_options))
+  end
+
+  defp address_form_changeset(params) do
+    {%{}, @address_field_types}
+    |> cast(params, Map.keys(@address_field_types))
+    |> validate_length(:label, max: 255)
+    |> validate_length(:phone, max: 255)
+    |> validate_length(:locality, max: 255)
+    |> validate_length(:postcode, max: 255)
+    |> validate_length(:country_iso, is: 2)
+    |> validate_length(:admin1_code, max: 20)
+    |> Map.put(:action, :validate)
+  end
+
+  defp copy_address_domain_errors(form_changeset, %Ecto.Changeset{} = domain_changeset) do
+    domain_changeset.errors
+    |> Enum.reduce(form_changeset, fn {field, {message, opts}}, acc ->
+      if Map.has_key?(@address_field_types, field),
+        do: add_error(acc, field, message, opts),
+        else: acc
+    end)
+    |> Map.put(:action, :insert)
+  end
+
+  defp assign_address_form(socket, %Ecto.Changeset{} = changeset),
+    do: assign(socket, :address_form, to_form(changeset, as: :address))
+
+  defp normalize_address_country(params) do
+    Map.update(params, "country_iso", "", fn value ->
+      value |> to_string() |> String.trim() |> String.upcase()
+    end)
+  end
+
+  defp clear_address_location_dependents(params) do
+    Enum.reduce(~w(admin1_code postcode locality), params, &Map.put(&2, &1, ""))
+  end
+
+  defp maybe_clear_auto(params, field_name, true), do: Map.put(params, field_name, "")
+  defp maybe_clear_auto(params, _field_name, false), do: params
+
+  defp field(params, name), do: Map.get(params, name, "")
+  defp blank?(value), do: is_nil(value) or (is_binary(value) and String.trim(value) == "")
 
   @impl true
   def render(assigns) do
