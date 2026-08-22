@@ -517,8 +517,9 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   # An operator-only screen (#650) requires the actor's tenant to be the platform
-  # operator, not merely a capability grant. The per-event handlers re-check the
-  # same, because mount state is presentation.
+  # operator, not merely a capability grant. This mount checks the scope rehydrated
+  # for the request; event handlers repeat that mount-proven check at their own
+  # guards, and a changed tenant marker takes effect on a fresh authenticated mount.
   defp operator_scope?(%{scope: %Scope{} = scope}), do: Scope.platform_operator?(scope)
   defp operator_scope?(_), do: false
 

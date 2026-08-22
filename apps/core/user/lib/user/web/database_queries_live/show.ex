@@ -278,8 +278,9 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
     end
   end
 
-  # #650: the whole console is operator-only. Mount gates it, but every write and
-  # execute re-checks here because mount state is presentation, not authorization.
+  # #650: the whole console is operator-only. Mount gates it, and every write and
+  # execution repeats the operator proof captured in that mount's scope. A changed
+  # tenant marker is observed by a fresh authenticated mount.
   defp operator?(socket) do
     case socket.assigns.current_scope do
       %{scope: %Scope{} = scope} -> Scope.platform_operator?(scope)
@@ -300,8 +301,8 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
       per_page: per_page,
       sort_by: sort_by,
       sort_dir: sort_dir,
-      # #650: assert the operator tenant live per execution; the executor fails
-      # closed without it, so a mid-session operator revocation stops working here.
+      # #650: pass the mount-proven operator marker at the engine boundary. The
+      # executor fails closed without it; this guard does not re-resolve tenancy.
       operator: operator?(socket)
     ]
 
