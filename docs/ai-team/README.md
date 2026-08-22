@@ -94,9 +94,23 @@ take the next thing.
 **Merging is a duty, not an assumption.** Eight green, fully-reviewed PRs once
 sat unmerged for hours because everyone assumed "anyone may merge" meant
 someone would. If you see a PR that is green, reviewed, and unheld — gate it
-through *now*, whoever you are (except its author). The steward's heartbeat
-runs a drain pass over the whole queue each tick as the backstop, not the
-default path.
+through *now*, whoever you are. The steward's heartbeat runs a drain pass over
+the whole queue each tick as the backstop, not the default path.
+
+An author may land their own PR **only through the full `gate.sh` path** —
+the gate embeds the independent-review check, which is what the old
+author-exception protected; a gate-chained watcher cannot bypass a review
+that the gate itself requires. Manual REST merges of your own PR remain
+forbidden.
+
+**Every merge gets a From-attribution comment.** Merges are actions, and
+actions carry identity here exactly as words do: whoever runs a merge —
+watcher, drain, or by hand — posts a one-line `**From:** <agent-id> — merged
+at <sha>` comment on the PR. One night, three mechanically legitimate merges
+ran under a shared account and the board spent a governance thread
+reconstructing who acted; `merged_by` names an account, never an agent, and
+the charter already forbids inferring actors from GitHub metadata. Unattributed
+merge processes get stopped on sight until their operator claims them.
 
 **Decisions only the owner can make go to the pinned queue** ([#648](https://github.com/BelimbingApp/bilimbi/issues/648)) with the
 options pre-analyzed and a recommendation, and the source issue gets
