@@ -3,18 +3,6 @@ defmodule Bilimbi.Core.Company.Contributions do
 
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionProvider
 
-  @settings %{
-    "localization.timezone" => %{
-      type: :string,
-      scopes: [:tenant, :company],
-      default: "UTC",
-      label: "Timezone",
-      help: "Default timezone for this company.",
-      editable: "company.profile",
-      capability: "admin.company.update"
-    }
-  }
-
   @impl true
   def contributions do
     %{
@@ -45,7 +33,10 @@ defmodule Bilimbi.Core.Company.Contributions do
           order: 20
         }
       ],
-      settings: %{definitions: @settings, runtime_claims: []},
+      # `localization.timezone` moved to base/datetime, the policy owner
+      # (#459/#447); Company keeps the management surface and writes it
+      # through the public Settings API under its own capability.
+      settings: %{definitions: %{}, runtime_claims: []},
       authz: %{
         domains: %{"core" => "Core platform modules"},
         capabilities: [

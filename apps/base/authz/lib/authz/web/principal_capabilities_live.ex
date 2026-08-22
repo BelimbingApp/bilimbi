@@ -236,9 +236,6 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
   defp principal_identity(%{principal_name: name}) when is_binary(name) and name != "", do: name
   defp principal_identity(%{principal_id: id}), do: to_string(id)
 
-  defp created_at(%{created_at: nil}), do: "—"
-  defp created_at(%{created_at: at}), do: Calendar.strftime(at, "%Y-%m-%d %H:%M")
-
   # `put_principal_capability/6` rejects an unknown key, so this cannot be
   # created through the API. It becomes reachable when a module that declared
   # a capability is uninstalled: its rows survive, the registry forgets the

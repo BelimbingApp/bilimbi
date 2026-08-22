@@ -8,6 +8,7 @@
   dependencies: [
     "base/dashboard",
     "base/database",
+    "base/datetime",
     "base/locale",
     "base/menu",
     "base/perf",
