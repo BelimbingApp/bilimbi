@@ -1,26 +1,31 @@
-defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
+defmodule Bilimbi.Core.User.Web.CompanyUsersPanel do
   @moduledoc """
-  Company-page employees panel, contributed as a discovered embed.
+  Company-page users panel, contributed as a discovered embed.
 
-  Core Employee owns the employee read; the company page renders it by the
-  `"company.employees"` manifest key and never names this module (#570/#595).
-  Ported behaviour-for-behaviour from the company show page's former inline
-  Employees section, which reached `Employee.list_employees/2` through a
+  Core User owns the company-users read; the company page renders it by the
+  `"company.users"` manifest key and never names this module (#595). Ported
+  behaviour-for-behaviour from the company show page's former inline Users
+  section, which reached `User.list_company_users/2` through a
   `Code.ensure_loaded?` + `function_exported?` probe.
 
   The panel is read-only and carries no capability of its own: the company
   route already gates on `admin.company.view`, and this list is the same
   informational content the section rendered unconditionally before. There is
   no write here, so `<.discovered_panel>` renders it for anyone who reaches the
-  company page and `dispatch/3` is never involved.
+  company page. The filter/sort/page events still parse-don't-crash on forged
+  params (#661), because a read surface must survive garbage input too.
+
+  Mirrors the `company.employees` embed shape (#595) so the two company-page
+  discovered panels stay uniform.
   """
 
   use Bilimbi.Base.UI, :live_component
 
-  alias Bilimbi.Core.Employee
+  alias Bilimbi.Core.User
 
   @page_sizes [25, 50, 100, 300]
-  @default_state %{search: nil, sort_by: "full_name", sort_dir: :asc, page: 1, per_page: 25}
+  @default_state %{search: nil, sort_by: "name", sort_dir: :asc, page: 1, per_page: 25}
+  @sortable ~w(name email email_verified)
 
   @impl true
   def update(assigns, socket) do
@@ -30,25 +35,25 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
      |> reload()}
   end
 
-  # Deliberately strict, matching the address panel (#409): the company page
-  # resolved this company before rendering the panel, so a non-ok here is
-  # infrastructure failure or a mid-session deletion — raising reaches the
-  # recovery boundary instead of rendering a broken section as an empty one.
+  # Deliberately strict, matching the employees/address panels (#409): the
+  # company page resolved this company before rendering the panel, so a non-ok
+  # here is infrastructure failure or a mid-session deletion — raising reaches
+  # the recovery boundary instead of rendering a broken section as an empty one.
   defp reload(socket) do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.company_id
     table_state = normalize_table_state(socket.assigns[:table_state])
     page_sizes = socket.assigns[:page_sizes] || @page_sizes
-    {:ok, employees} = Employee.list_employees(scope, company_id)
-    employees_page = build_page(employees, table_state)
+    {:ok, users} = User.list_company_users(scope, company_id)
+    users_page = build_page(users, table_state)
 
     socket
-    |> assign(:employees, employees)
-    |> assign(:employees_count, length(employees))
-    |> assign(:employees_page, employees_page)
+    |> assign(:users, users)
+    |> assign(:users_count, length(users))
+    |> assign(:users_page, users_page)
     |> assign(:page_sizes, page_sizes)
     |> assign(:table_state, table_state)
-    |> assign(:filters_form, to_form(filters_form_params(table_state), as: :employees_filters))
+    |> assign(:filters_form, to_form(filters_form_params(table_state), as: :users_filters))
   end
 
   @impl true
@@ -57,14 +62,14 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
     <.card id={@id} class="mt-6">
       <div class="flex items-center gap-2 mb-4">
         <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-          Employees
+          Users
         </h3>
-        <.badge>{@employees_count}</.badge>
+        <.badge>{@users_count}</.badge>
       </div>
       <.form
         for={@filters_form}
-        id="company-employees-filters"
-        phx-change="employees_filters"
+        id="company-users-filters"
+        phx-change="users_filters"
         class="p-2 mb-2 rounded-xl border border-line bg-surface-muted"
       >
         <div class="relative">
@@ -74,66 +79,55 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
           />
           <.input
             field={@filters_form[:search]}
-            id="company-employees-search"
+            id="company-users-search"
             type="search"
             phx-debounce="300"
             maxlength="255"
-            label="Search employees"
+            label="Search users"
             label_class="sr-only"
             wrapper_class="mb-0"
-            placeholder="Search by name, employee number, email, designation..."
+            placeholder="Search by name or email..."
             class="rounded-lg pl-8"
           />
         </div>
       </.form>
       <.table
-        id="company-employees-table"
-        rows={@employees_page.entries}
-        row_id={fn employee -> "company-employee-#{employee.id}" end}
-        row_item={fn employee -> employee end}
+        id="company-users-table"
+        rows={@users_page.entries}
+        row_id={fn user -> "company-user-#{user.id}" end}
+        row_item={fn user -> user end}
         sort_by={@table_state.sort_by}
         sort_dir={@table_state.sort_dir}
-        sort_event="employees_sort"
-        caption="Employees"
+        sort_event="users_sort"
+        caption="Users"
       >
-        <:col :let={employee} label="Name" sort="full_name" sort_id="company-employees-sort-full-name">
-          <span class="font-medium">{employee.full_name}</span>
-          <span :if={employee.designation} class="block text-xs text-ink-subtle">
-            {employee.designation}
-          </span>
+        <:col :let={user} label="Name" sort="name" sort_id="company-users-sort-name">
+          <span class="font-medium">{user.name}</span>
+        </:col>
+        <:col :let={user} label="Email" sort="email" sort_id="company-users-sort-email">
+          {user.email}
         </:col>
         <:col
-          :let={employee}
-          label="No."
-          sort="employee_number"
-          sort_id="company-employees-sort-employee-number"
+          :let={user}
+          label="Email verified"
+          sort="email_verified"
+          sort_id="company-users-sort-email-verified"
         >
-          <code class="text-xs font-medium">{employee.employee_number}</code>
-        </:col>
-        <:col
-          :let={employee}
-          label="Type"
-          sort="employee_type"
-          sort_id="company-employees-sort-employee-type"
-        >
-          {employee.employee_type_label || employee.employee_type}
-        </:col>
-        <:col :let={employee} label="Status" sort="status" sort_id="company-employees-sort-status">
-          <.badge kind={if employee.status == "active", do: :success, else: :neutral}>
-            {employee.status}
+          <.badge kind={if user.email_verified_at, do: :success, else: :warning}>
+            {if user.email_verified_at, do: "verified", else: "unverified"}
           </.badge>
         </:col>
-        <:empty :if={@employees_page.total_entries == 0}>
-          No employees found for this company.
+        <:empty :if={@users_page.total_entries == 0}>
+          No users found for this company.
         </:empty>
       </.table>
       <.pagination
-        id="company-employees-pagination"
-        page={@employees_page}
+        id="company-users-pagination"
+        page={@users_page}
         page_sizes={@page_sizes}
         filters_form={@filters_form}
-        filters_event="employees_filters"
-        page_event="employees_page"
+        filters_event="users_filters"
+        page_event="users_page"
       />
     </.card>
     """
@@ -151,9 +145,9 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
 
   defp normalize_table_state(_state), do: @default_state
 
-  defp build_page(employees, state) do
+  defp build_page(users, state) do
     filtered =
-      employees
+      users
       |> Enum.filter(&matches_search?(&1, state.search && String.downcase(state.search)))
       |> Enum.sort_by(&sort_value(&1, state.sort_by))
 
@@ -180,35 +174,19 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
   defp clamp_page(_page, 0), do: 1
   defp clamp_page(page, total_pages), do: min(max(page, 1), total_pages)
 
-  defp matches_search?(_employee, nil), do: true
+  defp matches_search?(_user, nil), do: true
 
-  defp matches_search?(employee, search) do
-    [
-      employee.full_name,
-      employee.short_name,
-      employee.employee_number,
-      employee.employee_type,
-      employee.employee_type_label,
-      employee.designation,
-      employee.email,
-      employee.status
-    ]
+  defp matches_search?(user, search) do
+    [user.name, user.email]
     |> Enum.any?(fn value ->
-      value
-      |> to_string()
-      |> String.downcase()
-      |> String.contains?(search)
+      value |> to_string() |> String.downcase() |> String.contains?(search)
     end)
   end
 
-  defp sort_value(employee, "full_name"), do: sort_string(employee.full_name)
-  defp sort_value(employee, "employee_number"), do: sort_string(employee.employee_number)
-
-  defp sort_value(employee, "employee_type"),
-    do: sort_string(employee.employee_type_label || employee.employee_type)
-
-  defp sort_value(employee, "status"), do: sort_string(employee.status)
-  defp sort_value(employee, _sort), do: sort_value(employee, "full_name")
+  defp sort_value(user, "name"), do: sort_string(user.name)
+  defp sort_value(user, "email"), do: sort_string(user.email)
+  defp sort_value(user, "email_verified"), do: if(user.email_verified_at, do: 0, else: 1)
+  defp sort_value(user, _sort), do: sort_value(user, "name")
 
   defp filters_form_params(state) do
     %{
@@ -228,9 +206,7 @@ defmodule Bilimbi.Core.Employee.Web.CompanyEmployeesPanel do
 
   defp normalize_search(_value), do: nil
 
-  defp normalize_sort_by(value) when value in ~w(full_name employee_number employee_type status),
-    do: value
-
+  defp normalize_sort_by(value) when value in @sortable, do: value
   defp normalize_sort_by(_value), do: @default_state.sort_by
 
   defp normalize_sort_dir(value) when value in [:asc, :desc], do: value

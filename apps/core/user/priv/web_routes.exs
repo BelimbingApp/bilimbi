@@ -61,5 +61,9 @@
     embed: "employee.accounts",
     live_component: Bilimbi.Core.User.Web.EmployeeAccountPanel,
     operation_handler: Bilimbi.Core.User.Web.EmployeeAccountPanel
+  },
+  %{
+    embed: "company.users",
+    live_component: Bilimbi.Core.User.Web.CompanyUsersPanel
   }
 ]
