@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-canvas">
+<%!-- data-theme is stamped only for an explicit light/dark choice; the
+     "system" default stamps nothing and prefers-color-scheme governs (#657). --%>
+<html lang="en" class="h-full bg-canvas" data-theme={assigns[:ui_theme]}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
