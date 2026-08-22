@@ -21,7 +21,8 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     :migrations,
     :web,
     :schema_contract,
-    :contribution_provider
+    :contribution_provider,
+    :dev_seed
   ]
   @migration_dispositions [:compatible_baseline, :bilimbi_only]
 

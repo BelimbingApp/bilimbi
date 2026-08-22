@@ -19,5 +19,6 @@
   migration_dispositions: %{20_260_821_213_000 => :bilimbi_only},
   web: "priv/web_routes.exs",
   schema_contract: nil,
-  contribution_provider: Bilimbi.Base.Perf.Contributions
+  contribution_provider: Bilimbi.Base.Perf.Contributions,
+  dev_seed: nil
 ]

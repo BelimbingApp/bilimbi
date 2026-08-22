@@ -78,6 +78,33 @@ defmodule Bilimbi.Core.CompanyTest do
     refute Company.department_belongs_to_company?(owner, soft_deleted_company_id, 103)
   end
 
+  test "appoints and clears a department head, scoped to the owning company" do
+    insert_tenant!()
+    insert_company!()
+    insert_company!(%{id: 74, code: "other_company"})
+    create_departments_table!()
+    insert_department!(101, 73)
+    insert_department!(102, 74)
+
+    {:ok, scope} = Tenancy.scope(41)
+
+    # The head is an employee id, which core/company never resolves — a dependent
+    # module supplies it. Here 555 stands in for that id.
+    assert {:ok, appointed} = Company.update_department_head(scope, 73, 101, 555)
+    assert appointed.head_id == 555
+
+    # Passing nil clears the head.
+    assert {:ok, cleared} = Company.update_department_head(scope, 73, 101, nil)
+    assert cleared.head_id == nil
+
+    # A department owned by another company is not reachable through this one.
+    assert {:error, :not_found} = Company.update_department_head(scope, 73, 102, 555)
+    assert {:error, :not_found} = Company.update_department_head(scope, 73, -1, 555)
+
+    # An absent company fails closed before any department lookup.
+    assert {:error, :company_not_found} = Company.update_department_head(scope, 999, 101, 555)
+  end
+
   test "returns a setup state when explicit identity is not provisioned" do
     assert {:error, :not_provisioned} = Company.platform_operator_company()
 

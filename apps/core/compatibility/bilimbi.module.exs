@@ -31,5 +31,6 @@
   migrations: nil,
   web: nil,
   schema_contract: nil,
-  contribution_provider: nil
+  contribution_provider: nil,
+  dev_seed: nil
 ]
