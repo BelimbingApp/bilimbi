@@ -127,6 +127,51 @@ defmodule Bilimbi.Base.AuditTest do
     assert action_id == owned_action.id
   end
 
+  test "lists recent subject mutations by auditable identity within one tenant" do
+    insert_tenant!(%{id: 41})
+    insert_tenant!(%{id: 42, is_platform_operator: false})
+
+    {:ok, owner} = Tenancy.scope(41)
+    {:ok, other} = Tenancy.scope(42)
+
+    {:ok, older} =
+      Audit.record_mutation(
+        owner,
+        mutation_attrs(%{
+          auditable_type: "Bilimbi.Core.Company.Schema",
+          auditable_id: "73",
+          event: "created",
+          occurred_at: ~N[2026-08-13 03:00:00]
+        })
+      )
+
+    {:ok, newer} =
+      Audit.record_mutation(
+        owner,
+        mutation_attrs(%{
+          auditable_type: "App\\Core\\Company\\Models\\Company",
+          auditable_id: "73",
+          event: "updated",
+          occurred_at: ~N[2026-08-13 03:01:00]
+        })
+      )
+
+    {:ok, _other_subject} =
+      Audit.record_mutation(owner, mutation_attrs(%{auditable_id: "74"}))
+
+    {:ok, _other_tenant} =
+      Audit.record_mutation(other, mutation_attrs(%{auditable_id: "73"}))
+
+    assert {:ok, entries} =
+             Audit.list_subject_mutations(
+               owner,
+               ["Bilimbi.Core.Company.Schema", "App\\Core\\Company\\Models\\Company"],
+               73
+             )
+
+    assert Enum.map(entries, & &1.id) == [newer.id, older.id]
+  end
+
   test "rejects unknown actor_type, missing required fields, and explicit nil defaults" do
     assert {:error, unknown_actor} =
              Audit.record_mutation(:unscoped, mutation_attrs(%{actor_type: "system"}))

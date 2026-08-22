@@ -3,6 +3,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
@@ -308,6 +310,53 @@ defmodule BilimbiWeb.CompanyLiveTest do
                "#company-employees-table-empty",
                "No employees found for this company."
              )
+    end
+
+    test "shows record history only with audit permission and filters to this company", %{
+      conn: conn
+    } do
+      AuditFixtures.create_audit_tables!()
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, _visible} =
+        Audit.record_mutation(scope, %{
+          company_id: 73,
+          actor_type: "user",
+          actor_id: 91,
+          auditable_type: Company.addressable_identity(),
+          auditable_id: "73",
+          subject_name: "Bilimbi Industries",
+          event: "updated",
+          occurred_at: ~N[2026-08-18 10:00:00],
+          old_values: %{"name" => "Old Name"},
+          new_values: %{"name" => "Bilimbi Industries"}
+        })
+
+      {:ok, _other} =
+        Audit.record_mutation(scope, %{
+          company_id: 74,
+          actor_type: "user",
+          actor_id: 91,
+          auditable_type: Company.addressable_identity(),
+          auditable_id: "74",
+          subject_name: "Bilimbi Subsidiary",
+          event: "updated",
+          occurred_at: ~N[2026-08-18 10:01:00],
+          old_values: %{"name" => "Other Old"},
+          new_values: %{"name" => "Other New"}
+        })
+
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+      refute has_element?(view, "#company-record-history-toggle")
+
+      grant_capabilities!("admin.audit.log.list")
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      assert has_element?(view, "#company-record-history-toggle", "History")
+      assert has_element?(view, "#company-record-history-panel", "Old Name")
+      assert has_element?(view, "#company-record-history-panel", "Bilimbi Industries")
+      refute has_element?(view, "#company-record-history-panel", "Other Old")
     end
 
     test "applies URL-state search, sort, and page size to users", %{conn: conn} do

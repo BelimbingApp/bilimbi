@@ -252,6 +252,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     )
   end
 
+  defp user_auditable_types,
+    do: ["Bilimbi.Core.User.Schema", User.notifiable_identity()]
+
   # --- Event Handlers: Inline Editing ---
 
   @impl true
@@ -887,6 +890,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             <% end %>
           </:subtitle>
           <:actions>
+            <.discovered_panel
+              key="record.history"
+              id="user-record-history"
+              current_scope={@current_scope}
+              opts={%{auditable_types: user_auditable_types(), auditable_id: @user.id}}
+            />
+
             <.button id="user-back" navigate={~p"/users"}>
               Back
             </.button>
