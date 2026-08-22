@@ -77,7 +77,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
 
     changeset =
       %Department{company_id: company_id}
-      |> Department.changeset(params)
+      |> Department.changeset(creation_params(params))
       |> Map.put(:action, :validate)
 
     {:noreply, assign_form(socket, changeset)}
@@ -110,7 +110,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.company.id
 
-    case Company.create_department(scope, company_id, params) do
+    case Company.create_department(scope, company_id, creation_params(params)) do
       {:ok, _department} ->
         {:ok, departments} = Company.list_departments(scope, company_id)
 
@@ -312,6 +312,11 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
   defp head_choices(scope, company_id) do
     PrincipalDirectory.choices(scope, :employee, %{company_id: company_id})
   end
+
+  # Department heads are appointed only through `save_head`, which validates
+  # the company-scoped employee choice immediately before the Company write.
+  # The creation form has no head field, so ignore a forged one here.
+  defp creation_params(params), do: Map.delete(params, "head_id")
 
   defp resolve_department_heads(scope, departments) do
     candidates =

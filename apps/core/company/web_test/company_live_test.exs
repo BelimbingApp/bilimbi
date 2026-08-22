@@ -1250,7 +1250,37 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#company-departments td", "—")
     end
 
-    test "re-authorizes a department-head write event after the capability is revoked", %{conn: conn} do
+    test "ignores a forged department head while creating a department", %{conn: conn} do
+      grant_capabilities!(["admin.company.view", "admin.company.update"])
+      {:ok, scope} = Tenancy.scope(41)
+      :ok = Employee.ensure_system_types()
+
+      {:ok, sibling_employee} =
+        Employee.create_employee(scope, 74, %{
+          employee_number: "EMP-204",
+          full_name: "Katherine Johnson",
+          employee_type: "full_time"
+        })
+
+      {:ok, type} = Company.create_department_type(%{code: "ENG", name: "Engineering"})
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73/departments")
+
+      render_submit(view, "save", %{
+        "department" => %{
+          "department_type_id" => to_string(type.id),
+          "head_id" => to_string(sibling_employee.id),
+          "status" => "active"
+        }
+      })
+
+      department = Repo.get_by!(Department, company_id: 73)
+      assert department.head_id == nil
+    end
+
+    test "re-authorizes a department-head write event after the capability is revoked", %{
+      conn: conn
+    } do
       grant_capabilities!(["admin.company.view", "admin.company.update"])
       {:ok, scope} = Tenancy.scope(41)
       :ok = Employee.ensure_system_types()
