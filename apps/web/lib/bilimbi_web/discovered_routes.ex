@@ -29,8 +29,16 @@ defmodule BilimbiWeb.DiscoveredRoutes do
         live_mod = route.live
         session = Map.get(route, :session, :auth)
         capability = Map.get(route, :capability)
+        operator = Map.get(route, :operator, false) == true
         session_name = :"discovered_#{:erlang.phash2({path, live_mod})}"
         {pipeline, hooks} = pipes_and_hooks(session, capability)
+
+        # An operator-only route (e.g. the raw-SQL console, #650) gates on the
+        # platform-operator tenant AFTER auth + capability. Fail-closed at mount.
+        hooks =
+          if operator,
+            do: hooks ++ [{BilimbiWeb.UserAuth, :require_platform_operator}],
+            else: hooks
 
         quote do
           scope "/" do

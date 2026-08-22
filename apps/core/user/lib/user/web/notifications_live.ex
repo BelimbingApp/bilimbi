@@ -160,6 +160,30 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
     end
   end
 
+  # The standard <.pagination> pushes these two events (#653).
+  def handle_event("filters", params, socket) do
+    per_page = parse_per_page(get_in(params, ["filters", "perPage"]), socket.assigns.per_page)
+
+    {:noreply,
+     push_patch(socket,
+       to: ~p"/notifications?filter=#{socket.assigns.current_filter}&page=1&per_page=#{per_page}"
+     )}
+  end
+
+  def handle_event("page", %{"page" => page}, socket) do
+    page =
+      case Integer.parse(to_string(page)) do
+        {int, ""} when int > 0 -> int
+        _ -> 1
+      end
+
+    {:noreply,
+     push_patch(socket,
+       to:
+         ~p"/notifications?filter=#{socket.assigns.current_filter}&page=#{page}&per_page=#{socket.assigns.per_page}"
+     )}
+  end
+
   defp load_notifications(socket, filter, page, per_page, opts) do
     user_id = socket.assigns.user_id
     scope = socket.assigns.current_scope.scope
@@ -196,6 +220,19 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
     |> assign(:per_page, per_page)
     |> assign(:notification_count, total_count)
     |> assign(:unread_count, unread_count)
+    # The standard <.pagination> reads a page shape and a filters form; its
+    # total_pages is the honest ceil (0 when empty) so the footer hides
+    # itself, while :total_pages above stays max(1, ...) for the guards.
+    |> assign(:pagination_page, %{
+      page: page,
+      page_size: per_page,
+      total_entries: total_count,
+      total_pages: ceil(total_count / per_page)
+    })
+    |> assign(
+      :filters_form,
+      to_form(%{"perPage" => Integer.to_string(per_page)}, as: :filters)
+    )
     |> stream(:notifications, notifications, reset: reset)
   end
 
