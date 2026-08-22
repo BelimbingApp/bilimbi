@@ -71,6 +71,32 @@ defmodule Bilimbi.Base.Audit do
     {:ok, mutations}
   end
 
+  @doc "Lists recent mutations for one auditable subject in the scope."
+  @spec list_subject_mutations(
+          Scope.t(),
+          String.t() | [String.t()],
+          String.t() | integer(),
+          keyword()
+        ) ::
+          {:ok, [Mutation.t()]}
+  def list_subject_mutations(%Scope{} = scope, auditable_types, auditable_id, opts \\ []) do
+    opts = Keyword.validate!(opts, limit: 5)
+    types = auditable_types |> List.wrap() |> Enum.map(&to_string/1)
+    id = to_string(auditable_id)
+    limit = max(opts[:limit] || 5, 1)
+
+    mutations =
+      from(mutation in Tenancy.scope_query(MutationSchema, scope),
+        where: mutation.auditable_type in ^types and mutation.auditable_id == ^id,
+        order_by: [desc: mutation.occurred_at, desc: mutation.id],
+        limit: ^limit
+      )
+      |> Repo.all()
+      |> Enum.map(&Mutation.from_schema/1)
+
+    {:ok, mutations}
+  end
+
   @doc "Lists mutations for the scope through a bounded administration page."
   @spec list_mutations(Scope.t(), keyword()) :: Page.t(Mutation.t())
   def list_mutations(%Scope{} = scope, opts) when is_list(opts) do

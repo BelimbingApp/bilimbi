@@ -3,7 +3,9 @@ defmodule BilimbiWeb.UserShowTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Audit
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
+  alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   setup do
@@ -52,11 +54,52 @@ defmodule BilimbiWeb.UserShowTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
 
     assert has_element?(view, "h1", "Grace Hopper")
+
+    assert has_element?(
+             view,
+             "#user-pin[data-nav-pin-record='true'][data-nav-pin-label='Administration / Users / Grace Hopper'][data-nav-pin-url='/users/92']"
+           )
+
     assert has_element?(view, "#user-back[href='/users']", "Back")
     assert has_element?(view, "a[href='/companies/73']", "Bilimbi Industries")
     assert has_element?(view, "#app-content", "unverified")
     refute has_element?(view, "#user-edit")
     refute has_element?(view, "#user-danger")
+  end
+
+  test "shows record history for the user's compatible auditable identity", %{conn: conn} do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    {:ok, _mutation} =
+      Audit.record_mutation(scope, %{
+        company_id: 73,
+        actor_type: "user",
+        actor_id: 91,
+        auditable_type: User.notifiable_identity(),
+        auditable_id: "92",
+        subject_name: "Grace Hopper",
+        event: "updated",
+        occurred_at: ~N[2026-08-18 10:00:00],
+        old_values: %{"email" => "old@example.com"},
+        new_values: %{"email" => "grace@example.com"}
+      })
+
+    grant_capabilities!(["admin.user.view", "admin.audit.log.list"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+
+    assert has_element?(view, "#user-record-history-toggle", "History")
+    assert has_element?(view, "#user-record-history-panel", "old@example.com")
+    assert has_element?(view, "#user-record-history-panel", "grace@example.com")
   end
 
   test "hides the destructive action without admin.user.delete", %{conn: conn} do

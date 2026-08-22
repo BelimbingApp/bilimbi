@@ -146,6 +146,10 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     |> push_navigate(to: ~p"/employees")
   end
 
+  defp employee_auditable_types do
+    ["Bilimbi.Core.Employee.Schema", "Bilimbi.Core.Employee", Employee.addressable_identity()]
+  end
+
   # --- Event Handlers: Inline Editing of Text Fields ---
 
   @impl true
@@ -535,6 +539,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
         class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
       />
     </button>
+
     <%!-- Window-scoped: the select may not hold focus (JS.focus is
          best-effort), and Escape must cancel regardless. Only one editor
          mounts at a time, so the listener is unambiguous. --%>
@@ -552,11 +557,33 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       <.page variant={:detail}>
         <.header>
           {Employee.Summary.display_name(@employee)}
+          <:title_actions>
+            <button
+              type="button"
+              id="employee-pin"
+              data-nav-pin="record"
+              data-nav-pin-record="true"
+              data-nav-pin-label={"Administration / Employees / #{Employee.Summary.display_name(@employee)}"}
+              data-nav-pin-url={~p"/employees/#{@employee.id}"}
+              title="Pin this employee to sidebar"
+              aria-label="Pin this employee to sidebar"
+              aria-pressed="false"
+              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            >
+              <.icon name="bilimbi-pin" class="size-3.5" />
+            </button>
+          </:title_actions>
           <:subtitle>
             {@employee.designation || @employee.job_description || @employee.employee_number}
           </:subtitle>
 
           <:actions>
+            <.discovered_panel
+              key="record.history"
+              id="employee-record-history"
+              current_scope={@current_scope}
+              opts={%{auditable_types: employee_auditable_types(), auditable_id: @employee.id}}
+            />
             <.button id="employee-back" navigate={~p"/employees"}>
               Back to List
             </.button>
@@ -974,7 +1001,11 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   </dt>
 
                   <dd class="mt-0.5 text-sm text-ink px-1 -mx-1 py-0.5 tabular-nums">
-                    {display_or_dash(@employee.employment_start)}
+                    <.datetime
+                      id="employee-employment-start"
+                      value={@employee.employment_start}
+                      format={:date}
+                    />
                   </dd>
                 </div>
 
@@ -984,7 +1015,11 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   </dt>
 
                   <dd class="mt-0.5 text-sm text-ink px-1 -mx-1 py-0.5 tabular-nums">
-                    {display_or_dash(@employee.employment_end)}
+                    <.datetime
+                      id="employee-employment-end"
+                      value={@employee.employment_end}
+                      format={:date}
+                    />
                   </dd>
                 </div>
               </dl>
