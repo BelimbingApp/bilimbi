@@ -841,10 +841,17 @@ defmodule Bilimbi.Base.UI.Components do
     assigns =
       assigns
       |> assign(:date_time, datetime_value(assigns.value))
+      |> assign(:date, date_value(assigns.value))
       |> assign(:mode, display_mode(display))
       |> assign(:resolved_display, display)
 
     ~H"""
+    <%!-- A calendar date is a zone-free fact: converting it through the
+         company/local display modes could shift the day, so a %Date{}
+         renders as-is with no mode logic and no zone suffix (#619). --%>
+    <time :if={@date} id={@id} datetime={Date.to_iso8601(@date)} class={["tabular-nums", @class]}>
+      {Calendar.strftime(@date, "%d/%m/%Y")}
+    </time>
     <time
       :if={@date_time && @mode == :local}
       id={@id}
@@ -864,13 +871,16 @@ defmodule Bilimbi.Base.UI.Components do
     >
       {policy_datetime(@date_time, @format, @mode, @resolved_display)}
     </time>
-    <span :if={is_nil(@date_time)} id={@id} class={@class}>—</span>
+    <span :if={is_nil(@date_time) and is_nil(@date)} id={@id} class={@class}>—</span>
     """
   end
 
   defp datetime_value(%DateTime{} = value), do: value
   defp datetime_value(%NaiveDateTime{} = value), do: DateTime.from_naive!(value, "Etc/UTC")
   defp datetime_value(_value), do: nil
+
+  defp date_value(%Date{} = value), do: value
+  defp date_value(_value), do: nil
 
   defp display_mode(%{mode: mode}) when mode in [:company, :local, :utc], do: mode
   defp display_mode(_display), do: :local
