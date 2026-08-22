@@ -21,6 +21,7 @@ defmodule Bilimbi.Core.Employee.EmployeeDirectoryProviderTest do
 
     CompanyFixtures.insert_tenant!(%{id: 41, name: "Tenant 41"})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
+    CompanyFixtures.insert_company!(%{id: 76, tenant_id: 41, name: "Sibling", code: "sibling"})
     CompanyFixtures.insert_tenant!(%{id: 42, name: "Tenant 42"})
     CompanyFixtures.insert_company!(%{id: 74, tenant_id: 42, name: "Other", code: "other"})
 
@@ -79,5 +80,21 @@ defmodule Bilimbi.Core.Employee.EmployeeDirectoryProviderTest do
   } do
     assert Provider.names(scope, [404]) == %{}
     assert Provider.names(scope, []) == %{}
+  end
+
+  test "lists only employees who currently belong to the selected company", %{
+    scope: scope,
+    mine: mine
+  } do
+    {:ok, sibling} =
+      Employee.create_employee(scope, 76, %{
+        employee_number: "EMP-003",
+        full_name: "Katherine Johnson",
+        employee_type: "full_time"
+      })
+
+    assert Provider.candidate_ids(scope, %{company_id: 73}) == [mine.id]
+    assert Provider.candidate_ids(scope, %{company_id: 76}) == [sibling.id]
+    assert Provider.candidate_ids(scope, %{company_id: 999}) == []
   end
 end

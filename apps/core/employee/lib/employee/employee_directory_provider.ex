@@ -32,4 +32,18 @@ defmodule Bilimbi.Core.Employee.EmployeeDirectoryProvider do
 
     Map.new(employees, fn {id, summary} -> {id, summary.full_name} end)
   end
+
+  # The selector remains opaque to base/principal_directory. This provider owns
+  # the employee-company membership proof, so Core Company can offer and
+  # revalidate a department-head choice without an upward Core dependency.
+  @impl true
+  def candidate_ids(%Scope{} = scope, %{company_id: company_id})
+      when is_integer(company_id) and company_id > 0 do
+    case Employee.list_employees(scope, company_id) do
+      {:ok, employees} -> Enum.map(employees, & &1.id)
+      {:error, :company_not_found} -> []
+    end
+  end
+
+  def candidate_ids(%Scope{}, _selection), do: []
 end

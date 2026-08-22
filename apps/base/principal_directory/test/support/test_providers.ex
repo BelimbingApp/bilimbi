@@ -29,6 +29,11 @@ defmodule Bilimbi.Base.PrincipalDirectory.TestUserProvider do
   @impl true
   def search(_scope, ids, term),
     do: @email_matches |> Map.get(term, []) |> Enum.filter(&(&1 in ids))
+
+  @impl true
+  def candidate_ids(_scope, :billing_contacts), do: [3, 1]
+
+  def candidate_ids(_scope, _selection), do: []
 end
 
 defmodule Bilimbi.Base.PrincipalDirectory.TestAgentProvider do
