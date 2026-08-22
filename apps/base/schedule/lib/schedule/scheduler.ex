@@ -68,13 +68,28 @@ defmodule Bilimbi.Base.Schedule.Scheduler do
           end
         end
 
-      _error ->
+      # previous_occurrence returns a specific reason — :invalid_timezone,
+      # :invalid_expression (a misconfigured cron the schedule silently never
+      # runs on), or :unresolvable_time (a DST edge). Collapsing them to a
+      # generic :time_resolution_failed threw away the actionable half at the
+      # source, the same defect #682 fixes at the sink; pass the real reason
+      # through, keeping a generic fallback for any unexpected shape.
+      {:error, reason} ->
+        diagnostic(definition, reason)
+
+      _other ->
         diagnostic(definition, :time_resolution_failed)
     end
   end
 
+  # The reason is the actionable half. A plain-text sink (the LiveView console,
+  # #682) renders only the message and drops metadata, so the reason and key go
+  # in the message text; the structured fields stay for structured sinks. This
+  # warning fires only for non-benign reasons (the benign five return :ok above),
+  # so every occurrence is a real enqueue failure worth reading.
   defp diagnostic(definition, reason) do
-    Logger.warning("schedule occurrence was not enqueued",
+    Logger.warning(
+      "schedule occurrence was not enqueued: key=#{definition.key} reason=#{inspect(reason)}",
       schedule_key: definition.key,
       schedule_owner: definition.owner,
       schedule_reason: reason
