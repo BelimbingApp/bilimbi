@@ -45,7 +45,8 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
       when is_binary(sql) and (is_map(params) or is_list(params)) and is_list(opts) do
     trimmed_sql = sql |> String.trim() |> String.trim_trailing(";") |> String.trim()
 
-    with :ok <- validate_sql(trimmed_sql) do
+    with :ok <- require_operator(opts),
+         :ok <- validate_sql(trimmed_sql) do
       page = max(Keyword.get(opts, :page, 1), 1)
       per_page = min(max(Keyword.get(opts, :per_page, 25), 1), @max_rows)
       order_by = Keyword.get(opts, :order_by)
@@ -64,6 +65,16 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
         timeout_ms
       )
     end
+  end
+
+  # #650: the raw-SQL console is operator tooling and carries no tenant predicate,
+  # so the caller must assert the platform-operator tenant via `operator: true`.
+  # Absent or false fails closed, so no future caller reaches this API
+  # tenant-scoped by accident.
+  defp require_operator(opts) do
+    if Keyword.get(opts, :operator) == true,
+      do: :ok,
+      else: {:error, "The database console is restricted to the platform operator."}
   end
 
   @doc """

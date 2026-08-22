@@ -45,13 +45,17 @@
     path: "/admin/system/database-queries",
     live: Bilimbi.Core.User.Web.DatabaseQueriesLive.Index,
     session: :auth,
-    capability: "admin.system.database-table.list"
+    capability: "admin.system.database-table.list",
+    # Raw-SQL console: operator tooling with no tenant predicate, so gate it to
+    # the platform-operator tenant on top of the capability (#650/#549).
+    operator: true
   },
   %{
     path: "/admin/system/database-queries/:slug",
     live: Bilimbi.Core.User.Web.DatabaseQueriesLive.Show,
     session: :auth,
-    capability: "admin.system.database-table.list"
+    capability: "admin.system.database-table.list",
+    operator: true
   },
   %{
     embed: "employee.accounts",
