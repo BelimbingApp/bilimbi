@@ -155,7 +155,8 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
       migration_dispositions: %{20_260_817_000_001 => :compatible_baseline},
       web: nil,
       schema_contract: nil,
-      contribution_provider: nil
+      contribution_provider: nil,
+      dev_seed: nil
     ]
 
     File.write!(

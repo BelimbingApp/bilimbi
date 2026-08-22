@@ -23,5 +23,6 @@
   },
   web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Core.Company.SchemaContract,
-  contribution_provider: Bilimbi.Core.Company.Contributions
+  contribution_provider: Bilimbi.Core.Company.Contributions,
+  dev_seed: "priv/dev_seed.exs"
 ]

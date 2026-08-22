@@ -21,7 +21,8 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     :migrations,
     :web,
     :schema_contract,
-    :contribution_provider
+    :contribution_provider,
+    :dev_seed
   ]
   @migration_dispositions [:compatible_baseline, :bilimbi_only]
 
@@ -40,6 +41,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
           web: nil | String.t(),
           schema_contract: nil | module(),
           contribution_provider: nil | module(),
+          dev_seed: nil | String.t(),
           path: String.t(),
           container_id: String.t()
         }
