@@ -166,8 +166,12 @@ defmodule Bilimbi.Base.Schedule.Execution do
 
   defp naive_now, do: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
+  # Same shape as the scheduler diagnostic (#682): the code names the failure but
+  # a plain-text sink drops the metadata, so which schedule it was is lost. Carry
+  # key and source in the message; keep the structured fields for structured sinks.
   defp diagnostic(code, metadata) do
-    Logger.warning("schedule recorder #{code}",
+    Logger.warning(
+      "schedule recorder #{code}: key=#{metadata["key"]} source=#{metadata["source"]}",
       schedule_source: metadata["source"],
       schedule_key: metadata["key"]
     )

@@ -447,6 +447,25 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert {:error, :unavailable} = Schedule.run_now("test.schedule")
   end
 
+  test "not-enqueued warning carries the specific reason and key in the message text (#682)" do
+    # A misconfigured timezone fails time resolution before enqueue. The reason
+    # is the actionable half, and a plain-text sink (the LiveView console)
+    # renders only the message and drops metadata — so the message must name the
+    # specific reason, not the former generic :time_resolution_failed.
+    bad = %{definition() | key: "test.badtz", timezone: "Not/AZone"}
+    put_definitions([bad])
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert :ok = Scheduler.poll(~U[2026-01-01 00:00:00Z])
+      end)
+
+    assert log =~ "schedule occurrence was not enqueued"
+    assert log =~ "key=test.badtz"
+    assert log =~ "reason=:invalid_timezone"
+    refute log =~ "time_resolution_failed"
+  end
+
   defp definition do
     {:ok, cron} = Parser.parse("30 1 * * *", false, [:prior, :subsequent])
 
