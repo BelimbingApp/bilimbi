@@ -118,7 +118,7 @@
 
         <:col :let={grant} label="Granted" sort="created_at" sort_id="grants-sort-created_at">
           <span class="whitespace-nowrap tabular-nums text-ink-muted">
-            {created_at(grant)}
+            <.datetime id={"grant-created-#{grant.id}"} value={grant.created_at} />
           </span>
         </:col>
 

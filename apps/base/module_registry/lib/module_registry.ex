@@ -55,6 +55,31 @@ defmodule Bilimbi.Base.ModuleRegistry do
     end)
   end
 
+  @doc """
+  Absolute paths to the module-owned dev-seed scripts, in dependency order.
+
+  A module ships sample data for local development by declaring
+  `dev_seed: "priv/dev_seed.exs"` in its descriptor; modules that ship none
+  declare `dev_seed: nil`. Ordering follows each descriptor's resolved `:order`,
+  so a dependency's sample data is seeded before a dependent's — a dependent's
+  script may reference the earlier data through a right-direction public API.
+
+  Unlike `migration_paths!/0`, this reads the loaded descriptors directly rather
+  than through `installed_modules!/0`: dev seeding is a best-effort convenience
+  that seeds whatever modules are loaded, so it must not require the whole graph
+  to be present the way a migration run does.
+  """
+  @spec dev_seed_paths!() :: [String.t()]
+  def dev_seed_paths! do
+    Application.loaded_applications()
+    |> Enum.map(fn {app, _description, _version} -> Application.get_env(app, :bilimbi_module) end)
+    |> Enum.filter(&(is_map(&1) and is_binary(Map.get(&1, :dev_seed))))
+    |> Enum.sort_by(& &1.order)
+    |> Enum.map(fn descriptor ->
+      Application.app_dir(descriptor.otp_app, descriptor.dev_seed)
+    end)
+  end
+
   @spec migration_dispositions!() :: %{pos_integer() => :compatible_baseline | :bilimbi_only}
   def migration_dispositions! do
     migration_modules!()

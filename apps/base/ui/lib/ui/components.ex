@@ -808,23 +808,45 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
-  Renders a timestamp with a readable UTC fallback and browser-local rendering.
+  Renders a timestamp honoring the process display context (#459).
 
-  Compatible source timestamps are stored as UTC `NaiveDateTime` values. The
-  server-rendered text makes that assumption explicit so the value remains
-  truthful before LiveView's JavaScript hook localizes it for the operator.
+  Compatible source timestamps are stored as UTC `NaiveDateTime` values and
+  are explicitly interpreted as UTC. The mode comes from the per-process
+  `Bilimbi.Base.UI.DateTimeDisplay` context the web edge resolved (or the
+  `display` attr when a caller carries it explicitly):
+
+    * `:local` — the server-rendered text stays truthful, labelled UTC, and
+      the `DateTime` hook enhances it into the browser's time zone.
+    * `:company` — the server shifts into the company IANA zone through the
+      database module the context carries and renders final text labelled
+      with the zone abbreviation; no client enhancement. A zone that cannot
+      convert falls back to the truthful UTC text rather than guessing.
+    * `:utc` — the server renders the stored UTC value as final text.
+
+  With no context stored, `:local` — the pre-policy behavior, and the
+  truthful no-JavaScript fallback in every mode is the server text itself.
   """
   attr :id, :string, required: true
   attr :value, :any, default: nil
   attr :format, :atom, values: [:date, :time, :datetime], default: :datetime
   attr :class, :any, default: nil
 
+  attr :display, :any,
+    default: nil,
+    doc: "explicit display context; defaults to the process context"
+
   def datetime(assigns) do
-    assigns = assign(assigns, :date_time, datetime_value(assigns.value))
+    display = assigns.display || Bilimbi.Base.UI.DateTimeDisplay.get()
+
+    assigns =
+      assigns
+      |> assign(:date_time, datetime_value(assigns.value))
+      |> assign(:mode, display_mode(display))
+      |> assign(:resolved_display, display)
 
     ~H"""
     <time
-      :if={@date_time}
+      :if={@date_time && @mode == :local}
       id={@id}
       datetime={DateTime.to_iso8601(@date_time)}
       data-format={@format}
@@ -834,6 +856,14 @@ defmodule Bilimbi.Base.UI.Components do
     >
       {server_datetime(@date_time, @format)}
     </time>
+    <time
+      :if={@date_time && @mode != :local}
+      id={@id}
+      datetime={DateTime.to_iso8601(@date_time)}
+      class={["tabular-nums", @class]}
+    >
+      {policy_datetime(@date_time, @format, @mode, @resolved_display)}
+    </time>
     <span :if={is_nil(@date_time)} id={@id} class={@class}>—</span>
     """
   end
@@ -842,9 +872,32 @@ defmodule Bilimbi.Base.UI.Components do
   defp datetime_value(%NaiveDateTime{} = value), do: DateTime.from_naive!(value, "Etc/UTC")
   defp datetime_value(_value), do: nil
 
+  defp display_mode(%{mode: mode}) when mode in [:company, :local, :utc], do: mode
+  defp display_mode(_display), do: :local
+
+  defp policy_datetime(value, format, :utc, _display), do: server_datetime(value, format)
+
+  defp policy_datetime(value, format, :company, display) do
+    with %{timezone: timezone, tz_db: tz_db} when is_binary(timezone) and is_atom(tz_db) <-
+           display,
+         {:ok, shifted} <- DateTime.shift_zone(value, timezone, tz_db) do
+      zoned_datetime(shifted, format)
+    else
+      # An unconvertible zone or an incomplete context renders the truthful
+      # stored value instead of a wrong local-looking one.
+      _other -> server_datetime(value, format)
+    end
+  end
+
   defp server_datetime(value, :date), do: Calendar.strftime(value, "%d/%m/%Y UTC")
   defp server_datetime(value, :time), do: Calendar.strftime(value, "%H:%M UTC")
   defp server_datetime(value, :datetime), do: Calendar.strftime(value, "%d/%m/%Y, %H:%M UTC")
+
+  defp zoned_datetime(value, :date), do: Calendar.strftime(value, "%d/%m/%Y ") <> value.zone_abbr
+  defp zoned_datetime(value, :time), do: Calendar.strftime(value, "%H:%M ") <> value.zone_abbr
+
+  defp zoned_datetime(value, :datetime),
+    do: Calendar.strftime(value, "%d/%m/%Y, %H:%M ") <> value.zone_abbr
 
   # Helper used by inputs to generate form errors
   slot :inner_block, required: true

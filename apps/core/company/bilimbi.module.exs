@@ -7,6 +7,7 @@
   namespace: Bilimbi.Core.Company,
   dependencies: [
     "base/authz",
+    "base/datetime",
     "base/database",
     "base/module_registry",
     "base/principal_directory",
@@ -22,5 +23,6 @@
   },
   web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Core.Company.SchemaContract,
-  contribution_provider: Bilimbi.Core.Company.Contributions
+  contribution_provider: Bilimbi.Core.Company.Contributions,
+  dev_seed: "priv/dev_seed.exs"
 ]

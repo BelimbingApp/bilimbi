@@ -711,24 +711,22 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
     scope = SettingsScope.company(company.id, company.tenant_id)
 
-    if tz == "" do
-      Settings.delete("localization.timezone", scope)
+    cond do
+      tz == "" ->
+        Settings.delete("localization.timezone", scope)
 
-      {:noreply,
-       socket
-       |> put_flash(:info, "Timezone cleared.")
-       |> assign(:company_timezone, "")}
-    else
-      case Settings.put("localization.timezone", tz, scope) do
-        {:ok, _} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Timezone saved: #{tz}")
-           |> assign(:company_timezone, tz)}
+        {:noreply,
+         socket
+         |> put_flash(:info, "Timezone cleared.")
+         |> assign(:company_timezone, "")}
 
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to save timezone.")}
-      end
+      # The stdlib database is UTC-only; validity means the real IANA
+      # database can convert it (#459). A forged value never persists.
+      not Bilimbi.Base.DateTime.valid_timezone?(tz) ->
+        {:noreply, put_flash(socket, :error, "Choose a valid IANA timezone.")}
+
+      true ->
+        save_valid_timezone(socket, scope, tz)
     end
   end
 
@@ -1262,6 +1260,19 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # ============================================================================
   # Helpers: Activities, Forms and Autocompletion
   # ============================================================================
+
+  defp save_valid_timezone(socket, scope, tz) do
+    case Settings.put("localization.timezone", tz, scope) do
+      {:ok, _} ->
+        {:noreply,
+         socket
+         |> put_flash(:info, "Timezone saved: #{tz}")
+         |> assign(:company_timezone, tz)}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Failed to save timezone.")}
+    end
+  end
 
   defp add_activity_internal(socket, raw_activity) do
     activity = String.trim(to_string(raw_activity))

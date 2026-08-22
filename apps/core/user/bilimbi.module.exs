@@ -8,6 +8,7 @@
   dependencies: [
     "base/audit",
     "base/authz",
+    "base/datetime",
     "base/database",
     "base/locale",
     "base/module_registry",
@@ -26,5 +27,6 @@
   },
   web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Core.User.SchemaContract,
-  contribution_provider: Bilimbi.Core.User.Contributions
+  contribution_provider: Bilimbi.Core.User.Contributions,
+  dev_seed: nil
 ]

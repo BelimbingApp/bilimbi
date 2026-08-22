@@ -194,9 +194,6 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
   defp nilify(""), do: nil
   defp nilify(val), do: val
 
-  defp occurred_at(%{occurred_at: nil}), do: "—"
-  defp occurred_at(%{occurred_at: dt}), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M:%S")
-
   defp actor_label(%{actor_type: "user", actor_id: id}) when is_integer(id) and id > 0,
     do: "User ##{id}"
 

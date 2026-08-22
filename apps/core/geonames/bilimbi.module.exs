@@ -13,5 +13,6 @@
   },
   web: "priv/web_routes.exs",
   schema_contract: Bilimbi.Core.Geonames.SchemaContract,
-  contribution_provider: Bilimbi.Core.Geonames.Contributions
+  contribution_provider: Bilimbi.Core.Geonames.Contributions,
+  dev_seed: nil
 ]

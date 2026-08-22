@@ -9,5 +9,6 @@
   migrations: nil,
   web: nil,
   schema_contract: nil,
-  contribution_provider: Bilimbi.Base.Dashboard.Contributions
+  contribution_provider: Bilimbi.Base.Dashboard.Contributions,
+  dev_seed: nil
 ]

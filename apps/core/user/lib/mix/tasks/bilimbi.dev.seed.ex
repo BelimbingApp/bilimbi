@@ -22,6 +22,7 @@ defmodule Mix.Tasks.Bilimbi.Dev.Seed do
 
   use Mix.Task
 
+  alias Bilimbi.Base.ModuleRegistry
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.User
@@ -50,10 +51,13 @@ defmodule Mix.Tasks.Bilimbi.Dev.Seed do
            Company.provision_platform_operator(@tenant_name, @company_attributes),
          {:ok, scope} <- Tenancy.scope(result.tenant.id),
          {:ok, user_status} <- ensure_user(scope, result.company.id) do
+      seeded = run_module_seeds!(scope, result.company.id)
+
       Mix.shell().info(
         "Development seed ready: tenant #{result.tenant.id} (#{result.tenant_status}), " <>
           "company #{result.company.id} (#{result.company_status}), " <>
-          user_message(user_status)
+          user_message(user_status) <>
+          module_seed_message(seeded)
       )
     else
       {:error, %Ecto.Changeset{} = changeset} ->
@@ -78,6 +82,27 @@ defmodule Mix.Tasks.Bilimbi.Dev.Seed do
       end
     end
   end
+
+  # Each installed module may own dev sample data at `priv/dev_seed.exs` (declared
+  # via the `dev_seed` descriptor key). base/module_registry discovers them in
+  # dependency order — so a module's script may reference an earlier one's data
+  # through a right-direction public API — and each is evaluated with `scope` and
+  # `company_id` bound. The task's dev-env guard covers every script.
+  defp run_module_seeds!(scope, company_id) do
+    paths = ModuleRegistry.dev_seed_paths!()
+    Enum.each(paths, &eval_module_seed!(&1, scope, company_id))
+    length(paths)
+  end
+
+  defp eval_module_seed!(path, scope, company_id) do
+    Code.eval_string(File.read!(path), [scope: scope, company_id: company_id], file: path)
+  rescue
+    error ->
+      Mix.raise("dev seed #{Path.relative_to_cwd(path)} failed: #{Exception.message(error)}")
+  end
+
+  defp module_seed_message(0), do: ", no module sample data"
+  defp module_seed_message(count), do: ", #{count} module seed(s)"
 
   defp user_message(:created) do
     "user #{@user_attributes.email} (created). Password: #{@user_attributes.password}."
