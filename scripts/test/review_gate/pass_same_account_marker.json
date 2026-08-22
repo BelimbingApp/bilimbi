@@ -1,0 +1,8 @@
+{"_expect": "pass",
+ "_contains": "marker-attested",
+ "_case": "genuine cross-agent review under the PR author's shared account: independent on the marker (amp/kimi-k3 != lane claude-opus-5), passes marker-attested because the account is transport, not identity (ADR 0015, #560)",
+ "author": {"login": "kiatng"},
+ "labels": [{"name": "agent:claude-opus-5"}],
+ "reviews": [],
+ "comments": [{"author": {"login": "kiatng"}, "createdAt": "2026-08-17T01:00:00Z",
+               "body": "**From:** amp/kimi-k3\nverdict: accept"}]}
