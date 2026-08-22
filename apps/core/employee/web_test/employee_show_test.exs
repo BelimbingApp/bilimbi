@@ -3,6 +3,8 @@ defmodule BilimbiWeb.EmployeeShowTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
@@ -48,6 +50,36 @@ defmodule BilimbiWeb.EmployeeShowTest do
     assert has_element?(view, "#app-content", "EMP-001")
     refute has_element?(view, "#employee-edit")
     refute has_element?(view, "#employee-danger")
+  end
+
+  test "shows record history when the actor can list audit logs", %{
+    conn: conn,
+    employee: employee
+  } do
+    AuditFixtures.create_audit_tables!()
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, _mutation} =
+      Audit.record_mutation(scope, %{
+        company_id: 73,
+        actor_type: "user",
+        actor_id: 91,
+        auditable_type: "Bilimbi.Core.Employee.Schema",
+        auditable_id: to_string(employee.id),
+        subject_name: "John Doe",
+        event: "updated",
+        occurred_at: ~N[2026-08-18 10:00:00],
+        old_values: %{"designation" => "Analyst"},
+        new_values: %{"designation" => "Lead Analyst"}
+      })
+
+    grant_capabilities!(["admin.employee.view", "admin.audit.log.list"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+    assert has_element?(view, "#employee-record-history-toggle", "History")
+    assert has_element?(view, "#employee-record-history-panel", "Analyst")
+    assert has_element?(view, "#employee-record-history-panel", "Lead Analyst")
   end
 
   test "hides the destructive action without admin.employee.delete", %{

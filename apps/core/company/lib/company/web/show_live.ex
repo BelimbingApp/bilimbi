@@ -215,6 +215,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # directly — the same pattern create_live.ex already uses. Do not probe.
   defp list_geonames_countries, do: Geonames.list_countries()
 
+  defp company_auditable_types,
+    do: ["Bilimbi.Core.Company.Schema", "Bilimbi.Core.Company"]
+
   defp not_found(socket) do
     socket
     |> put_flash(:error, "That company does not exist in this workspace.")
@@ -804,6 +807,12 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               else: @company.code}
           </:subtitle>
           <:actions>
+            <.discovered_panel
+              key="record.history"
+              id="company-record-history"
+              current_scope={@current_scope}
+              opts={%{auditable_types: company_auditable_types(), auditable_id: @company.id}}
+            />
             <.badge kind={
               case @company.status do
                 "active" -> :success
