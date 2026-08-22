@@ -13,15 +13,12 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # `@write_events` deny clause below (#420).
   @write_guard_opt_out ~w(update_metadata_input update_new_activity)
 
-  import Ecto.Changeset
-
   alias Bilimbi.Base.PrincipalDirectory
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Geonames
 
-  @address_kinds ~w(headquarters billing shipping branch other)
   @common_timezones [
     "UTC",
     "Africa/Cairo",
@@ -64,30 +61,16 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     "Pacific/Honolulu"
   ]
 
-  @address_field_types %{
-    label: :string,
-    phone: :string,
-    line1: :string,
-    line2: :string,
-    line3: :string,
-    country_iso: :string,
-    admin1_code: :string,
-    postcode: :string,
-    locality: :string
-  }
-
   @page_sizes [25, 50, 100, 300]
   @default_page 1
   @default_page_size 25
 
   @table_defaults %{
-    addresses: %{search: nil, sort_by: "priority", sort_dir: :asc, page: 1, per_page: 25},
     users: %{search: nil, sort_by: "name", sort_dir: :asc, page: 1, per_page: 25},
     employees: %{search: nil, sort_by: "full_name", sort_dir: :asc, page: 1, per_page: 25}
   }
 
   @table_sorts %{
-    addresses: ~w(label address kind primary priority valid_from valid_to),
     users: ~w(name email email_verified),
     employees: ~w(full_name employee_number employee_type status)
   }
@@ -128,8 +111,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         external_accesses = Company.list_external_accesses(scope, company_id) |> elem(1)
         external_access_users = load_external_access_users(scope, external_accesses)
         users = list_company_users(scope, company_id)
-        attached_addresses = list_company_attached_addresses(scope, company_id)
-        available_addresses = list_available_addresses(scope)
         company_timezone = get_company_timezone(company)
 
         {:ok,
@@ -150,11 +131,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:external_access_users, external_access_users)
          |> assign(:company_users, users)
          |> assign(:users_count, length(users))
-         |> assign(:attached_addresses, attached_addresses)
-         |> assign(:available_addresses, available_addresses)
          |> assign(:page_sizes, @page_sizes)
          |> assign(:table_state, default_table_state())
-         |> assign(:address_kinds, @address_kinds)
          |> assign(:company_timezone, company_timezone || "")
          |> assign(:timezone_options, @common_timezones)
          |> assign(:modal_action, nil)
@@ -162,19 +140,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:new_activity, "")
          |> assign(:editing_metadata?, false)
          |> assign(:metadata_input, format_metadata(company.metadata))
-         |> assign(:attach_address_id, nil)
-         |> assign(:attach_kinds, [])
-         |> assign(:attach_is_primary, false)
-         |> assign(:attach_priority, 0)
-         |> assign(:address_form_params, %{})
-         |> assign(:address_form, nil)
-         |> assign(:auto_location, %{admin1_code: false, locality: false})
-         |> assign(:admin1_options, [])
-         |> assign(:postcode_options, [])
-         |> assign(:locality_options, [])
-         |> assign(:create_address_kinds, [])
-         |> assign(:create_address_is_primary, false)
-         |> assign(:create_address_priority, 0)
          |> refresh_show_table_pages()}
 
       {:error, :not_found} ->
@@ -216,10 +181,12 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   end
 
   # ============================================================================
-  # Dynamic Integration with Core User, Address
-  # (Geonames is a declared dependency — call Bilimbi.Core.Geonames directly.
-  #  Employees render through the core/employee-owned "company.employees"
-  #  discovered embed (#595), so this file no longer probes Core.Employee.)
+  # Dynamic Integration with Core User
+  # (Geonames is a declared dependency — call Bilimbi.Core.Geonames directly for
+  #  the jurisdiction country label. Employees render through the
+  #  core/employee-owned "company.employees" discovered embed and addresses
+  #  through the core/address-owned "company.addresses" embed (#595), so this
+  #  file no longer probes Core.Employee or Core.Address.)
   # ============================================================================
 
   defp list_company_users(scope, company_id) do
@@ -271,92 +238,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # directly — the same pattern create_live.ex already uses. Do not probe.
   defp list_geonames_countries, do: Geonames.list_countries()
 
-  defp list_geonames_admin1(country_iso), do: Geonames.list_admin1(country_iso)
-
-  defp lookup_geonames_postcode(country_iso, postcode),
-    do: Geonames.lookup_postcode(country_iso, postcode)
-
-  defp search_geonames_postcodes(country_iso, postcode),
-    do: Geonames.search_postcodes(country_iso, postcode)
-
-  defp search_geonames_city_names(country_iso, locality, opts),
-    do: Geonames.search_city_names(country_iso, locality, opts)
-
-  defp address_mod do
-    Module.concat(["Bilimbi", "Core", "Address"])
-  end
-
-  defp list_company_attached_addresses(scope, company_id) do
-    mod = address_mod()
-
-    if Code.ensure_loaded?(mod) and
-         function_exported?(mod, :list_company_attached_addresses, 2) do
-      case apply(mod, :list_company_attached_addresses, [scope, company_id]) do
-        {:ok, list} when is_list(list) -> list
-        list when is_list(list) -> list
-        _ -> []
-      end
-    else
-      []
-    end
-  end
-
-  defp list_available_addresses(scope) do
-    mod = address_mod()
-
-    if Code.ensure_loaded?(mod) and function_exported?(mod, :list_addresses, 1) do
-      case apply(mod, :list_addresses, [scope]) do
-        {:ok, list} when is_list(list) -> list
-        list when is_list(list) -> list
-        _ -> []
-      end
-    else
-      []
-    end
-  end
-
-  defp attach_address_to_company(scope, address_id, company_id, attrs) do
-    mod = address_mod()
-
-    if Code.ensure_loaded?(mod) and function_exported?(mod, :attach_to_company, 4) do
-      apply(mod, :attach_to_company, [scope, address_id, company_id, attrs])
-    else
-      {:error, :address_unavailable}
-    end
-  end
-
-  defp create_and_attach_address_to_company(scope, company_id, params, attrs) do
-    mod = address_mod()
-
-    if Code.ensure_loaded?(mod) and
-         function_exported?(mod, :create_and_attach_to_company, 4) do
-      apply(mod, :create_and_attach_to_company, [scope, company_id, params, attrs])
-    else
-      {:error, :address_unavailable}
-    end
-  end
-
-  defp update_company_address_attachment(scope, address_id, company_id, attrs) do
-    mod = address_mod()
-
-    if Code.ensure_loaded?(mod) and
-         function_exported?(mod, :update_company_attachment, 4) do
-      apply(mod, :update_company_attachment, [scope, address_id, company_id, attrs])
-    else
-      {:error, :address_unavailable}
-    end
-  end
-
-  defp detach_address_from_company(scope, address_id, company_id) do
-    mod = address_mod()
-
-    if Code.ensure_loaded?(mod) and function_exported?(mod, :detach_from_company, 3) do
-      apply(mod, :detach_from_company, [scope, address_id, company_id])
-    else
-      {:error, :address_unavailable}
-    end
-  end
-
   defp not_found(socket) do
     socket
     |> put_flash(:error, "That company does not exist in this workspace.")
@@ -376,71 +257,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # ============================================================================
   # Handlers: Company Details Edit Modal
   # ============================================================================
-
-  defp toggle_address_primary(socket, address_id, _params) do
-    scope = socket.assigns.current_scope.scope
-    company = socket.assigns.company
-
-    attached = socket.assigns.attached_addresses
-    current = Enum.find(attached, &(&1.id == address_id))
-
-    new_primary = if current, do: not current.is_primary, else: true
-
-    case update_company_address_attachment(scope, address_id, company.id, %{
-           is_primary: new_primary
-         }) do
-      {:ok, :updated} ->
-        updated_attached = list_company_attached_addresses(scope, company.id)
-
-        {:noreply,
-         socket
-         |> put_flash(:info, "Address setting updated.")
-         |> assign(:attached_addresses, updated_attached)
-         |> refresh_show_table_pages()}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to update address setting.")}
-    end
-  end
-
-  defp unlink_address(socket, address_id, _params) do
-    scope = socket.assigns.current_scope.scope
-    company = socket.assigns.company
-
-    case detach_address_from_company(scope, address_id, company.id) do
-      :ok ->
-        updated_attached = list_company_attached_addresses(scope, company.id)
-
-        {:noreply,
-         socket
-         |> put_flash(:info, "Address unlinked.")
-         |> assign(:attached_addresses, updated_attached)
-         |> refresh_show_table_pages()}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to unlink address.")}
-    end
-  end
-
-  defp save_address_priority(socket, address_id, priority_str) do
-    priority = parse_id(priority_str) || 0
-    scope = socket.assigns.current_scope.scope
-    company = socket.assigns.company
-
-    case update_company_address_attachment(scope, address_id, company.id, %{priority: priority}) do
-      {:ok, :updated} ->
-        updated_attached = list_company_attached_addresses(scope, company.id)
-
-        {:noreply,
-         socket
-         |> put_flash(:info, "Address setting updated.")
-         |> assign(:attached_addresses, updated_attached)
-         |> refresh_show_table_pages()}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to update address setting.")}
-    end
-  end
 
   defp remove_activity_at(socket, scope, company, current, index) do
     new_activities =
@@ -475,19 +291,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   # `String.to_integer/1` raises on anything non-numeric, so a forged id crashed
   # the LiveView rather than being refused. Returns nil for junk; callers treat
   # a nil id as "no such address", which is what a forged id is.
-  defp parse_id(value) when is_integer(value) and value > 0, do: value
-
-  defp parse_id(value) when is_binary(value) do
-    case Integer.parse(value) do
-      {id, ""} when id > 0 -> id
-      _ -> nil
-    end
-  end
-
-  defp parse_id(_value), do: nil
-
-  # An activity index, so 0 is valid -- and it must be inside the list, or
-  # `List.delete_at/2` silently no-ops and the flash claims a removal.
   defp parse_index(value, length) do
     case Integer.parse(to_string(value)) do
       {index, ""} when index >= 0 and index < length -> index
@@ -507,11 +310,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     remove_activity
     save_metadata
     save_timezone
-    save_attach
-    save_create_address
-    toggle_address_primary
-    save_address_priority
-    unlink_address
   )
 
   @impl true
@@ -519,26 +317,17 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       when event in @write_events,
       do: write_forbidden(socket)
 
-  def handle_event("addresses_filters", params, socket),
-    do: apply_table_filters(socket, :addresses, params)
-
   def handle_event("users_filters", params, socket),
     do: apply_table_filters(socket, :users, params)
 
   def handle_event("employees_filters", params, socket),
     do: apply_table_filters(socket, :employees, params)
 
-  def handle_event("addresses_sort", %{"sort" => sort_key}, socket),
-    do: apply_table_sort(socket, :addresses, sort_key)
-
   def handle_event("users_sort", %{"sort" => sort_key}, socket),
     do: apply_table_sort(socket, :users, sort_key)
 
   def handle_event("employees_sort", %{"sort" => sort_key}, socket),
     do: apply_table_sort(socket, :employees, sort_key)
-
-  def handle_event("addresses_page", %{"page" => page}, socket),
-    do: apply_table_page(socket, :addresses, page)
 
   def handle_event("users_page", %{"page" => page}, socket),
     do: apply_table_page(socket, :users, page)
@@ -575,8 +364,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     {:noreply,
      socket
      |> assign(:modal_action, nil)
-     |> assign(:details_form, nil)
-     |> assign(:address_form, nil)}
+     |> assign(:details_form, nil)}
   end
 
   def handle_event("validate_details", %{"company" => params}, socket) do
@@ -730,231 +518,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     end
   end
 
-  # ============================================================================
-  # Handlers: Attach Existing Address Modal
-  # ============================================================================
-
-  def handle_event("open_attach_modal", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:modal_action, :attach_existing_address)
-     |> assign(:attach_address_id, nil)
-     |> assign(:attach_kinds, [])
-     |> assign(:attach_is_primary, false)
-     |> assign(:attach_priority, 0)}
-  end
-
-  def handle_event("validate_attach", %{"attach" => params}, socket) do
-    address_id =
-      case Map.get(params, "address_id") do
-        nil -> nil
-        "" -> nil
-        val -> parse_id(val)
-      end
-
-    kinds = Map.get(params, "kinds") || []
-    is_primary = params["is_primary"] in [true, "true", "1"]
-
-    priority =
-      case Integer.parse(params["priority"] || "0") do
-        {p, _} -> p
-        _ -> 0
-      end
-
-    {:noreply,
-     socket
-     |> assign(:attach_address_id, address_id)
-     |> assign(:attach_kinds, kinds)
-     |> assign(:attach_is_primary, is_primary)
-     |> assign(:attach_priority, priority)}
-  end
-
-  def handle_event("save_attach", %{"attach" => params}, socket) do
-    scope = socket.assigns.current_scope.scope
-    company = socket.assigns.company
-
-    address_id =
-      case Map.get(params, "address_id") do
-        nil -> 0
-        "" -> 0
-        val -> parse_id(val) || 0
-      end
-
-    if address_id == 0 do
-      {:noreply, put_flash(socket, :error, "Choose an address before attaching.")}
-    else
-      kinds = Map.get(params, "kinds") || []
-      is_primary = params["is_primary"] in [true, "true", "1"]
-
-      priority =
-        case Integer.parse(params["priority"] || "0") do
-          {p, _} -> p
-          _ -> 0
-        end
-
-      attrs = %{
-        kind: kinds,
-        is_primary: is_primary,
-        priority: priority,
-        valid_from: Date.utc_today()
-      }
-
-      case attach_address_to_company(scope, address_id, company.id, attrs) do
-        {:ok, :attached} ->
-          attached = list_company_attached_addresses(scope, company.id)
-
-          {:noreply,
-           socket
-           |> put_flash(:info, "Address attached.")
-           |> assign(:attached_addresses, attached)
-           |> refresh_show_table_pages()
-           |> assign(:modal_action, nil)}
-
-        {:error, :company_not_found} ->
-          {:noreply, put_flash(socket, :error, "Company not found.")}
-
-        {:error, :address_not_found} ->
-          {:noreply, put_flash(socket, :error, "The selected address is not available.")}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to attach address.")}
-      end
-    end
-  end
-
-  # ============================================================================
-  # Handlers: Create & Attach Address Modal
-  # ============================================================================
-
-  def handle_event("open_create_address_modal", _params, socket) do
-    params = %{"country_iso" => "MY"}
-
-    {:noreply,
-     socket
-     |> assign(:modal_action, :create_and_attach_address)
-     |> assign(:address_form_params, params)
-     |> assign(:auto_location, %{admin1_code: false, locality: false})
-     |> assign(:create_address_kinds, [])
-     |> assign(:create_address_is_primary, false)
-     |> assign(:create_address_priority, 0)
-     |> assign_address_form(address_form_changeset(params))
-     |> assign_address_location_options(params)}
-  end
-
-  def handle_event("validate_create_address", %{"address" => incoming}, socket) do
-    {params, auto_location} = address_location_params(socket, incoming)
-
-    kinds = Map.get(incoming, "kinds") || socket.assigns.create_address_kinds
-    is_primary = incoming["is_primary"] in [true, "true", "1"]
-
-    priority =
-      case Integer.parse(incoming["priority"] || "0") do
-        {p, _} -> p
-        _ -> socket.assigns.create_address_priority
-      end
-
-    {:noreply,
-     socket
-     |> assign(:address_form_params, params)
-     |> assign(:auto_location, auto_location)
-     |> assign(:create_address_kinds, kinds)
-     |> assign(:create_address_is_primary, is_primary)
-     |> assign(:create_address_priority, priority)
-     |> assign_address_form(address_form_changeset(params))
-     |> assign_address_location_options(params)}
-  end
-
-  def handle_event("save_create_address", %{"address" => incoming}, socket) do
-    {params, auto_location} = address_location_params(socket, incoming)
-    changeset = address_form_changeset(params)
-    scope = socket.assigns.current_scope.scope
-    company = socket.assigns.company
-
-    if changeset.valid? do
-      kinds = Map.get(incoming, "kinds") || socket.assigns.create_address_kinds
-      is_primary = incoming["is_primary"] in [true, "true", "1"]
-
-      priority =
-        case Integer.parse(incoming["priority"] || "0") do
-          {p, _} -> p
-          _ -> socket.assigns.create_address_priority
-        end
-
-      attachment_attrs = %{
-        kind: kinds,
-        is_primary: is_primary,
-        priority: priority,
-        valid_from: Date.utc_today()
-      }
-
-      case create_and_attach_address_to_company(scope, company.id, params, attachment_attrs) do
-        {:ok, _address} ->
-          attached = list_company_attached_addresses(scope, company.id)
-          available = list_available_addresses(scope)
-
-          {:noreply,
-           socket
-           |> put_flash(:info, "Address created and attached.")
-           |> assign(:attached_addresses, attached)
-           |> assign(:available_addresses, available)
-           |> refresh_show_table_pages()
-           |> assign(:modal_action, nil)
-           |> assign(:address_form, nil)}
-
-        {:error, %Ecto.Changeset{} = domain_changeset} ->
-          {:noreply,
-           socket
-           |> assign(:address_form_params, params)
-           |> assign(:auto_location, auto_location)
-           |> assign_address_form(copy_address_domain_errors(changeset, domain_changeset))
-           |> assign_address_location_options(params)}
-
-        {:error, reason} ->
-          {:noreply, put_flash(socket, :error, "Failed to create address: #{inspect(reason)}")}
-      end
-    else
-      {:noreply,
-       socket
-       |> assign(:address_form_params, params)
-       |> assign(:auto_location, auto_location)
-       |> assign_address_form(changeset)
-       |> assign_address_location_options(params)}
-    end
-  end
-
-  # ============================================================================
-  # Handlers: Address Row Inline Mutations (Primary, Priority, Kinds, Unlink)
-  # ============================================================================
-
-  def handle_event("toggle_address_primary", %{"id" => address_id_str} = params, socket) do
-    case parse_id(address_id_str) do
-      nil -> {:noreply, socket}
-      address_id -> toggle_address_primary(socket, address_id, params)
-    end
-  end
-
-  def handle_event(
-        "save_address_priority",
-        %{"id" => address_id_str, "priority" => priority_str},
-        socket
-      ) do
-    case parse_id(address_id_str) do
-      nil -> {:noreply, socket}
-      address_id -> save_address_priority(socket, address_id, priority_str)
-    end
-  end
-
-  def handle_event("unlink_address", %{"id" => address_id_str} = params, socket) do
-    case parse_id(address_id_str) do
-      nil -> {:noreply, socket}
-      address_id -> unlink_address(socket, address_id, params)
-    end
-  end
-
-  # ============================================================================
-  # Helpers: Show-page table state
-  # ============================================================================
-
   defp apply_table_filters(socket, kind, params) do
     current = current_table_state(socket, kind)
     filters = Map.get(params, "#{table_param_prefix(kind)}_filters", params)
@@ -1000,22 +563,15 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
   defp refresh_show_table_pages(socket) do
     table_state = socket.assigns.table_state || default_table_state()
-    address_state = table_state.addresses
     users_state = table_state.users
-
-    addresses_page =
-      socket.assigns.attached_addresses
-      |> build_table_page(address_state, &address_matches_search?/2, &address_sort_value/2)
 
     users_page =
       socket.assigns.company_users
       |> build_table_page(users_state, &user_matches_search?/2, &user_sort_value/2)
 
     socket
-    |> assign(:addresses_page, addresses_page)
     |> assign(:users_page, users_page)
     |> assign(:employees_table_state, table_state.employees)
-    |> assign(:addresses_filters_form, table_filters_form(:addresses, address_state))
     |> assign(:users_filters_form, table_filters_form(:users, users_state))
   end
 
@@ -1048,44 +604,11 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   defp clamp_page(_page, 0), do: 1
   defp clamp_page(page, total_pages), do: min(max(page, 1), total_pages)
 
-  defp address_matches_search?(address, nil), do: address_matches_search?(address, "")
-  defp address_matches_search?(_address, ""), do: true
-
-  defp address_matches_search?(address, search) do
-    [
-      address.label,
-      address.line1,
-      address.line2,
-      address.line3,
-      address.locality,
-      address.postcode,
-      address.country_iso,
-      Enum.join(address.kind || [], " ")
-    ]
-    |> contains_search?(search)
-  end
-
   defp user_matches_search?(user, nil), do: user_matches_search?(user, "")
   defp user_matches_search?(_user, ""), do: true
 
   defp user_matches_search?(user, search),
     do: contains_search?([user.name, user.email], search)
-
-  defp address_sort_value(address, "label"), do: sort_string(address.label)
-
-  defp address_sort_value(address, "address") do
-    [address.line1, address.locality, address.country_iso]
-    |> Enum.reject(&blank?/1)
-    |> Enum.join(" ")
-    |> sort_string()
-  end
-
-  defp address_sort_value(address, "kind"), do: sort_string(Enum.join(address.kind || [], " "))
-  defp address_sort_value(address, "primary"), do: if(address.is_primary, do: 0, else: 1)
-  defp address_sort_value(address, "priority"), do: address.priority || 0
-  defp address_sort_value(address, "valid_from"), do: sort_string(address.valid_from)
-  defp address_sort_value(address, "valid_to"), do: sort_string(address.valid_to)
-  defp address_sort_value(address, _sort), do: address_sort_value(address, "priority")
 
   defp user_sort_value(user, "name"), do: sort_string(user.name)
   defp user_sort_value(user, "email"), do: sort_string(user.email)
@@ -1107,7 +630,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   defp default_table_state, do: @table_defaults
 
   defp table_state_from_params(params) do
-    [:addresses, :users, :employees]
+    [:users, :employees]
     |> Map.new(fn kind ->
       prefix = table_param_prefix(kind)
       default = Map.fetch!(@table_defaults, kind)
@@ -1134,7 +657,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     }
   end
 
-  defp table_filters_form_name(:addresses), do: :addresses_filters
   defp table_filters_form_name(:users), do: :users_filters
 
   defp current_table_state(socket, kind),
@@ -1225,7 +747,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     company = socket.assigns.company
 
     params =
-      [:addresses, :users, :employees]
+      [:users, :employees]
       |> Enum.reduce([], fn kind, acc -> acc ++ table_query_params(kind, table_state[kind]) end)
 
     case params do
@@ -1253,7 +775,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   defp maybe_put_param(params, _key, false), do: params
   defp maybe_put_param(params, key, value), do: params ++ [{key, value}]
 
-  defp table_param_prefix(:addresses), do: "addresses"
   defp table_param_prefix(:users), do: "users"
   defp table_param_prefix(:employees), do: "employees"
 
@@ -1299,130 +820,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     end
   end
 
-  defp address_location_params(socket, incoming) do
-    old = socket.assigns.address_form_params
-    old_auto = socket.assigns.auto_location
-
-    incoming = normalize_address_country(incoming)
-    country_changed? = field(incoming, "country_iso") != field(old, "country_iso")
-    postcode_changed? = field(incoming, "postcode") != field(old, "postcode")
-
-    cond do
-      country_changed? ->
-        {clear_address_location_dependents(incoming), %{admin1_code: false, locality: false}}
-
-      postcode_changed? and field(incoming, "postcode") != "" ->
-        auto_fill_address_location(incoming, old_auto)
-
-      true ->
-        {incoming, old_auto}
-    end
-  end
-
-  defp auto_fill_address_location(params, old_auto) do
-    params =
-      params
-      |> maybe_clear_auto("admin1_code", old_auto.admin1_code)
-      |> maybe_clear_auto("locality", old_auto.locality)
-
-    matches =
-      lookup_geonames_postcode(field(params, "country_iso"), field(params, "postcode"))
-
-    localities = matches |> Enum.map(& &1.place_name) |> Enum.reject(&blank?/1) |> Enum.uniq()
-    admin1_code = matching_admin1_code(field(params, "country_iso"), matches)
-
-    params = if admin1_code, do: Map.put(params, "admin1_code", admin1_code), else: params
-
-    params =
-      if length(localities) == 1, do: Map.put(params, "locality", hd(localities)), else: params
-
-    {params,
-     %{
-       admin1_code: not is_nil(admin1_code),
-       locality: length(localities) == 1
-     }}
-  end
-
-  defp matching_admin1_code(_country_iso, []), do: nil
-
-  defp matching_admin1_code(country_iso, [first | _rest]) do
-    raw_code = first.admin1_code
-
-    country_iso
-    |> list_geonames_admin1()
-    |> Enum.find_value(fn admin1 ->
-      if admin1.code == raw_code or String.ends_with?(admin1.code, ".#{raw_code}"),
-        do: admin1.code
-    end)
-  end
-
-  defp assign_address_location_options(socket, params) do
-    country_iso = field(params, "country_iso")
-    postcode = field(params, "postcode")
-    locality = field(params, "locality")
-    admin1_code = field(params, "admin1_code")
-
-    exact_localities =
-      lookup_geonames_postcode(country_iso, postcode)
-      |> Enum.map(& &1.place_name)
-      |> Enum.reject(&blank?/1)
-      |> Enum.uniq()
-
-    locality_options =
-      exact_localities ++
-        search_geonames_city_names(country_iso, locality, admin1_code: admin1_code)
-
-    socket
-    |> assign(:admin1_options, list_geonames_admin1(country_iso))
-    |> assign(:postcode_options, search_geonames_postcodes(country_iso, postcode))
-    |> assign(:locality_options, Enum.uniq(locality_options))
-  end
-
-  defp address_form_changeset(params) do
-    {%{}, @address_field_types}
-    |> cast(params, Map.keys(@address_field_types))
-    |> validate_length(:label, max: 255)
-    |> validate_length(:phone, max: 255)
-    |> validate_length(:locality, max: 255)
-    |> validate_length(:postcode, max: 255)
-    |> validate_length(:country_iso, is: 2)
-    |> validate_length(:admin1_code, max: 20)
-    |> Map.put(:action, :validate)
-  end
-
-  defp copy_address_domain_errors(form_changeset, %Ecto.Changeset{} = domain_changeset) do
-    domain_changeset.errors
-    |> Enum.reduce(form_changeset, fn {field, {message, opts}}, acc ->
-      if Map.has_key?(@address_field_types, field),
-        do: add_error(acc, field, message, opts),
-        else: acc
-    end)
-    |> Map.put(:action, :insert)
-  end
-
-  defp assign_address_form(socket, %Ecto.Changeset{} = changeset),
-    do: assign(socket, :address_form, to_form(changeset, as: :address))
-
-  defp normalize_address_country(params) do
-    Map.update(params, "country_iso", "", fn value ->
-      value |> to_string() |> String.trim() |> String.upcase()
-    end)
-  end
-
-  defp clear_address_location_dependents(params) do
-    Enum.reduce(~w(admin1_code postcode locality), params, &Map.put(&2, &1, ""))
-  end
-
-  defp maybe_clear_auto(params, field_name, true), do: Map.put(params, field_name, "")
-  defp maybe_clear_auto(params, _field_name, false), do: params
-
-  defp field(params, name), do: Map.get(params, name, "")
-  defp blank?(value), do: is_nil(value) or (is_binary(value) and String.trim(value) == "")
-
   defp country_options(countries),
     do: Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
-
-  defp admin1_options(admin1), do: Enum.map(admin1, &{&1.name, &1.code})
 
   defp legal_entity_type_options(types), do: Enum.map(types, &{&1.name, &1.id})
 
@@ -1730,139 +1129,17 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           </div>
         </.card>
 
-        <%!-- Section 2: Addresses --%>
-        <.card id="company-addresses-card" class="mt-6">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-2">
-              <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Addresses
-              </h3>
-              <.badge>{length(@attached_addresses)}</.badge>
-            </div>
-            <div :if={@can_update?} class="flex items-center gap-2">
-              <.button
-                id="create-attach-address-btn"
-                variant="primary"
-                phx-click="open_create_address_modal"
-                class="text-xs"
-              >
-                Create & Attach
-              </.button>
-              <.button
-                id="attach-existing-address-btn"
-                phx-click="open_attach_modal"
-                class="text-xs"
-              >
-                Attach Existing
-              </.button>
-            </div>
-          </div>
-
-          <.form
-            for={@addresses_filters_form}
-            id="company-addresses-filters"
-            phx-change="addresses_filters"
-            class="p-2 mb-2 rounded-xl border border-line bg-surface-muted"
-          >
-            <div class="relative">
-              <.icon
-                name="hero-magnifying-glass"
-                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-              />
-              <.input
-                field={@addresses_filters_form[:search]}
-                id="company-addresses-search"
-                type="search"
-                phx-debounce="300"
-                maxlength="255"
-                label="Search addresses"
-                label_class="sr-only"
-                wrapper_class="mb-0"
-                placeholder="Search by label, address, kind, postcode..."
-                class="rounded-lg pl-8"
-              />
-            </div>
-          </.form>
-
-          <.table
-            id="company-addresses-table"
-            rows={@addresses_page.entries}
-            row_id={fn addr -> "attached-address-#{addr.id}" end}
-            row_item={fn addr -> addr end}
-            sort_by={@table_state.addresses.sort_by}
-            sort_dir={@table_state.addresses.sort_dir}
-            sort_event="addresses_sort"
-            caption="Company Addresses"
-          >
-            <:col :let={addr} label="Label" sort="label" sort_id="company-addresses-sort-label">
-              <span class="font-medium text-ink-strong">{addr.label || "—"}</span>
-            </:col>
-            <:col :let={addr} label="Address" sort="address" sort_id="company-addresses-sort-address">
-              <span class="text-sm text-ink-subtle">
-                {Enum.join(Enum.reject([addr.line1, addr.locality, addr.country_iso], &blank?/1), ", ")}
-              </span>
-            </:col>
-            <:col :let={addr} label="Kind" sort="kind" sort_id="company-addresses-sort-kind">
-              <div class="flex flex-wrap gap-1">
-                <%= for k <- (addr.kind || []) do %>
-                  <.badge kind={:neutral}>{String.capitalize(k)}</.badge>
-                <% end %>
-                <span :if={is_nil(addr.kind) or addr.kind == []} class="text-xs text-ink-subtle">—</span>
-              </div>
-            </:col>
-            <:col :let={addr} label="Primary" sort="primary" sort_id="company-addresses-sort-primary">
-              <button
-                :if={@can_update?}
-                type="button"
-                id={"toggle-primary-#{addr.id}"}
-                phx-click="toggle_address_primary"
-                phx-value-id={addr.id}
-                class="cursor-pointer"
-                title="Toggle primary"
-              >
-                <.badge kind={if addr.is_primary, do: :success, else: :neutral}>
-                  {if addr.is_primary, do: "Yes", else: "No"}
-                </.badge>
-              </button>
-              <.badge :if={not @can_update?} kind={if addr.is_primary, do: :success, else: :neutral}>
-                {if addr.is_primary, do: "Yes", else: "No"}
-              </.badge>
-            </:col>
-            <:col :let={addr} label="Priority" sort="priority" sort_id="company-addresses-sort-priority">
-              <span class="tabular-nums text-sm text-ink">{addr.priority}</span>
-            </:col>
-            <:col :let={addr} label="Valid From" sort="valid_from" sort_id="company-addresses-sort-valid-from">
-              <span class="tabular-nums text-xs text-ink-subtle">{addr.valid_from || "—"}</span>
-            </:col>
-            <:col :let={addr} label="Valid To" sort="valid_to" sort_id="company-addresses-sort-valid-to">
-              <span class="tabular-nums text-xs text-ink-subtle">{addr.valid_to || "—"}</span>
-            </:col>
-            <:action :let={addr}>
-              <button
-                :if={@can_update?}
-                type="button"
-                id={"unlink-address-#{addr.id}"}
-                phx-click="unlink_address"
-                phx-value-id={addr.id}
-                data-confirm="Are you sure you want to unlink this address?"
-                class="text-xs text-danger hover:underline"
-              >
-                Unlink
-              </button>
-            </:action>
-            <:empty :if={@addresses_page.total_entries == 0}>
-              No addresses linked.
-            </:empty>
-          </.table>
-          <.pagination
-            id="company-addresses-pagination"
-            page={@addresses_page}
-            page_sizes={@page_sizes}
-            filters_form={@addresses_filters_form}
-            filters_event="addresses_filters"
-            page_event="addresses_page"
-          />
-        </.card>
+        <%!-- Section 2: Addresses — core/address-owned discovered embed (#595).
+             Core Address can depend on Core Company but not the reverse, so the
+             company page renders the panel by manifest key rather than probing.
+             The former inline section (attach/create/detach/update plus the
+             Geonames create cascade) now lives entirely in the panel. --%>
+        <.discovered_panel
+          key="company.addresses"
+          id="company-addresses-panel"
+          current_scope={@current_scope}
+          opts={%{company_id: @company.id}}
+        />
 
         <%!-- Section 3: Timezone Settings --%>
         <.card id="company-timezone-card" class="mt-6">
@@ -2293,254 +1570,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           </div>
         </div>
 
-        <%!-- MODAL 2: Attach Existing Address --%>
-        <div
-          :if={@modal_action == :attach_existing_address}
-          id="company-attach-modal"
-          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/40 p-4"
-        >
-          <div class="w-full max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-xl">
-            <h3 class="text-base font-semibold text-ink-strong mb-4">
-              Attach Address
-            </h3>
-
-            <form
-              id="company-attach-address-form"
-              phx-change="validate_attach"
-              phx-submit="save_attach"
-              class="space-y-4"
-            >
-              <div>
-                <label for="company-attach-address-select" class="mb-1.5 block text-sm font-medium text-ink">
-                  Address
-                </label>
-                <select
-                  id="company-attach-address-select"
-                  name="attach[address_id]"
-                  class="w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-action"
-                >
-                  <option value="">Select an address...</option>
-                  <%= for addr <- @available_addresses do %>
-                    <option value={addr.id} selected={@attach_address_id == addr.id}>
-                      {addr.label || "Address ##{addr.id}"} — {Enum.join(Enum.reject([addr.line1, addr.locality, addr.country_iso], &blank?/1), ", ")}
-                    </option>
-                  <% end %>
-                </select>
-              </div>
-
-              <div>
-                <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                  Kind
-                </span>
-                <div class="flex flex-wrap gap-4">
-                  <%= for kind <- @address_kinds do %>
-                    <label class="flex items-center gap-2 text-sm text-ink cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="attach[kinds][]"
-                        value={kind}
-                        checked={kind in @attach_kinds}
-                        class="rounded border-line text-action focus:ring-action"
-                      />
-                      {String.capitalize(kind)}
-                    </label>
-                  <% end %>
-                </div>
-              </div>
-
-              <div>
-                <label class="flex items-center gap-2 text-sm text-ink cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="attach[is_primary]"
-                    value="true"
-                    checked={@attach_is_primary}
-                    class="rounded border-line text-action focus:ring-action"
-                  />
-                  Primary Address
-                </label>
-              </div>
-
-              <div>
-                <label for="company-attach-priority-input" class="mb-1.5 block text-sm font-medium text-ink">
-                  Priority
-                </label>
-                <input
-                  type="number"
-                  name="attach[priority]"
-                  id="company-attach-priority-input"
-                  value={@attach_priority}
-                  min="0"
-                  class="w-28 rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-action"
-                />
-                <p class="mt-1 text-xs text-ink-subtle">
-                  Lower number = higher priority. Used to order addresses of the same kind (0 = top).
-                </p>
-              </div>
-
-              <div class="flex items-center justify-end gap-3 pt-4 border-t border-line">
-                <.button type="button" phx-click="close_modal">
-                  Cancel
-                </.button>
-                <.button type="submit" variant="primary">
-                  Attach
-                </.button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <%!-- MODAL 3: Create & Attach Address --%>
-        <div
-          :if={@modal_action == :create_and_attach_address}
-          id="company-create-address-modal"
-          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/40 p-4"
-        >
-          <div class="w-full max-w-2xl rounded-2xl border border-line bg-surface p-6 shadow-xl">
-            <h3 class="text-base font-semibold text-ink-strong mb-4">
-              Create & Attach Address
-            </h3>
-
-            <.form
-              for={@address_form}
-              id="create-attach-address-form"
-              phx-change="validate_create_address"
-              phx-submit="save_create_address"
-              class="space-y-4"
-            >
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <.input
-                  field={@address_form[:label]}
-                  id="create-address-label"
-                  label="Label"
-                  placeholder="HQ, Warehouse, etc."
-                />
-                <.input
-                  field={@address_form[:phone]}
-                  id="create-address-phone"
-                  label="Phone"
-                  type="tel"
-                  placeholder="Contact number"
-                />
-              </div>
-
-              <.input
-                field={@address_form[:line1]}
-                id="create-address-line1"
-                label="Address Line 1"
-                placeholder="Street and number"
-              />
-              <.input
-                field={@address_form[:line2]}
-                id="create-address-line2"
-                label="Address Line 2"
-                placeholder="Building, suite (optional)"
-              />
-              <.input
-                field={@address_form[:line3]}
-                id="create-address-line3"
-                label="Address Line 3"
-                placeholder="Additional detail (optional)"
-              />
-
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <.input
-                  type="select"
-                  field={@address_form[:country_iso]}
-                  id="create-address-country-iso"
-                  label="Country"
-                  options={country_options(@countries)}
-                />
-                <.input
-                  type="select"
-                  field={@address_form[:admin1_code]}
-                  id="create-address-admin1-code"
-                  label="State / Province"
-                  prompt="Select state..."
-                  options={admin1_options(@admin1_options)}
-                />
-              </div>
-
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <.input
-                  field={@address_form[:postcode]}
-                  id="create-address-postcode"
-                  label="Postcode"
-                  placeholder="Search postcode..."
-                />
-                <.input
-                  field={@address_form[:locality]}
-                  id="create-address-locality"
-                  label="Locality"
-                  placeholder="City / town"
-                />
-              </div>
-
-              <div class="border-t border-line pt-4">
-                <h4 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle mb-3">
-                  Link Settings
-                </h4>
-                <div class="space-y-3">
-                  <div>
-                    <span class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                      Kind
-                    </span>
-                    <div class="flex flex-wrap gap-4">
-                      <%= for kind <- @address_kinds do %>
-                        <label class="flex items-center gap-2 text-sm text-ink cursor-pointer">
-                          <input
-                            type="checkbox"
-                            name="address[kinds][]"
-                            value={kind}
-                            checked={kind in @create_address_kinds}
-                            class="rounded border-line text-action focus:ring-action"
-                          />
-                          {String.capitalize(kind)}
-                        </label>
-                      <% end %>
-                    </div>
-                  </div>
-
-                  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <label class="flex items-center gap-2 text-sm text-ink cursor-pointer mt-6">
-                      <input
-                        type="checkbox"
-                        name="address[is_primary]"
-                        value="true"
-                        checked={@create_address_is_primary}
-                        class="rounded border-line text-action focus:ring-action"
-                      />
-                      Primary Address
-                    </label>
-
-                    <div>
-                      <label for="create-address-priority" class="mb-1.5 block text-sm font-medium text-ink">
-                        Priority
-                      </label>
-                      <input
-                        type="number"
-                        name="address[priority]"
-                        id="create-address-priority"
-                        value={@create_address_priority}
-                        min="0"
-                        class="w-28 rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-action"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="flex items-center justify-end gap-3 pt-4 border-t border-line">
-                <.button type="button" phx-click="close_modal">
-                  Cancel
-                </.button>
-                <.button type="submit" variant="primary">
-                  Create & Attach
-                </.button>
-              </div>
-            </.form>
-          </div>
-        </div>
       </.page>
     </Layouts.app>
     """
