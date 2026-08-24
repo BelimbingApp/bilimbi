@@ -104,6 +104,102 @@ defmodule BilimbiWeb.AppShellJsTest do
              System.cmd("node", ["--input-type=module", "--eval", script])
   end
 
+  test "updated() restores a server-reset aria-pressed through apply() alone (#685)" do
+    # A LiveView patch re-renders a pinned page's title pin with the server
+    # default aria-pressed="false". The hook's single sync path —
+    # updated() -> apply() -> renderPinnedItems() — must restore the stored
+    # pressed state without any second render call.
+    source = File.read!(@hook)
+    encoded_source = Base.encode64(source)
+
+    script = """
+    const {default: AppShell} = await import("data:text/javascript;base64,#{encoded_source}")
+
+    const stored = [{label: "Administration / Companies / Bilimbi Development", url: "/companies/1"}]
+    const storage = new Map([["sidebarPinnedItems", JSON.stringify(stored)]])
+
+    globalThis.window = {
+      location: {origin: "https://bilimbi.test"},
+      localStorage: {
+        getItem: (key) => storage.get(key) ?? null,
+        setItem: (key, value) => storage.set(key, value),
+      },
+    }
+
+    const element = () => ({
+      dataset: {},
+      style: {},
+      append: () => {},
+      setAttribute: () => {},
+      toggleAttribute: () => {},
+      hasAttribute: () => false,
+      getAttribute: () => null,
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    })
+
+    globalThis.document = {getElementById: () => null, createElement: element}
+
+    // The title pin as the server just re-rendered it: pressed state lost.
+    const attrs = new Map([
+      ["aria-pressed", "false"],
+      ["aria-label", "Pin this company to sidebar"],
+    ])
+    const titlePin = {
+      dataset: {
+        navPin: "record",
+        navPinRecord: "true",
+        navPinLabel: "Administration / Companies / Bilimbi Development",
+        navPinUrl: "/companies/1",
+      },
+      title: "Pin this company to sidebar",
+      getAttribute: (name) => attrs.get(name) ?? null,
+      setAttribute: (name, value) => attrs.set(name, value),
+    }
+
+    let renders = 0
+    const hook = Object.create(AppShell)
+    hook.root = {
+      dataset: {},
+      querySelectorAll: (sel) => (sel === "[data-nav-pin]" ? [titlePin] : []),
+    }
+    hook.sidebar = element()
+    hook.toggle = element()
+    hook.content = element()
+    hook.statusbar = element()
+    hook.topbarMain = element()
+    hook.backdrop = element()
+    hook.mq = {matches: true}
+    hook.rail = false
+    hook.drawerOpen = false
+    hook.width = 240
+    hook.expandedBranches = {}
+    hook.pinned = {hidden: true}
+    hook.pinnedItems = {replaceChildren: () => {}, append: () => renders++}
+    hook.pinnedEntries = hook.readPinnedItems()
+
+    hook.updated()
+
+    console.log(
+      JSON.stringify({
+        pressed: attrs.get("aria-pressed"),
+        datasetPinned: titlePin.dataset.pinned,
+        title: titlePin.title,
+        rows: renders,
+      })
+    )
+    """
+
+    assert {output, 0} = System.cmd("node", ["--input-type=module", "--eval", script])
+
+    assert %{
+             "pressed" => "true",
+             "datasetPinned" => "true",
+             "title" => "Unpin this company to sidebar",
+             "rows" => 1
+           } = JSON.decode!(String.trim(output))
+  end
+
   test "Escape closes the drawer and the toggle stays outside the inert region", %{source: source} do
     assert source =~ ~S[if (event.key === "Escape")]
     assert source =~ "this.closeDrawer()"
