@@ -2,6 +2,10 @@
 
 Date: 2026-08-22
 
+> This ADR records the shared-Repo audit decision. The current shared Repo,
+> persistence ownership, and migration rules are centralized in
+> [Bilimbi Database Architecture](../database.md).
+
 ## Status
 
 Proposed

@@ -400,6 +400,9 @@ are pinned but not fetched, so root `mix format` and `mix precommit` fail until
 `mix deps.get`. Module-level `mix test` works without it — run
 `cd apps/<layer>/<module> && mix test`.
 
+The normative database rules and dependency categories live in
+[Database Architecture](../architecture/database.md).
+
 **Cross-module foreign keys belong to the *depending* module's migration**, and
 the owning module declares them as an `optional_groups` entry. Add every member
 of a group in one migration; a partly-present group is reported as an

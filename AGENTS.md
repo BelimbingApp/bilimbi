@@ -9,14 +9,20 @@ Read this file and `DESIGN.md` before making changes. The source Belimbing
 project is the reference for business meaning and schema compatibility, not a
 template for copying Laravel implementation details.
 
+`docs/architecture/database.md` is the normative source of truth for database
+ownership, dependency categories, migrations, schema contracts, verification,
+adoption, and seeding. Read it before changing persistent behavior; do not
+create a second hand-maintained database dependency registry.
+
 Compatibility is a one-direction replacement contract. Bilimbi must be able
 to adopt an existing Belimbing database and replace the Belimbing application;
 Belimbing is not required to consume Bilimbi source, UI, routes, migrations,
 or a database after Bilimbi-only evolution. Preserve durable business and data
 contracts deliberately. Do not retain Laravel framework details, legacy UI,
 internal route names, or other implementation artifacts merely to make a
-Bilimbi application reversible to Belimbing. ADR 0002 is authoritative for
-schema baseline and adoption mechanics.
+Bilimbi application reversible to Belimbing. ADR 0002 records the baseline and
+adoption decision; the current operating rules are centralized in
+`docs/architecture/database.md`.
 
 ## 1. Project context
 

@@ -44,6 +44,9 @@ The first major compatibility target is the existing Belimbing PostgreSQL
 schema. Bilimbi maps that schema accurately instead of creating a second,
 similar data model. Belimbing remains the reference for table names, durable
 identities, existing data, and business meaning while the port is underway.
+The normative ownership, dependency, migration, verification, adoption, and
+seeding rules are centralized in
+[Database Architecture](./docs/architecture/database.md).
 
 Belimbing is the reference, but is not perfect. When we discover
 inconsistencies, mistakes, or entropy during development, we do not blindly
@@ -299,6 +302,7 @@ Base Audit preserves Belimbing's `base_audit_mutations` and
 |---|---|
 | Agent and coding rules | [AGENTS.md](./AGENTS.md) |
 | Product and interface design | [DESIGN.md](./DESIGN.md) |
+| Database architecture | [Database Architecture](./docs/architecture/database.md) |
 | Original Mix umbrella topology | [ADR 0001](./docs/architecture/decisions/0001-mix-umbrella-topology.md) |
 | Compatible schema baselines | [ADR 0002](./docs/architecture/decisions/0002-compatible-schema-baselines.md) |
 | Physical deep-module packages | [ADR 0003](./docs/architecture/decisions/0003-physical-deep-module-packages.md) |

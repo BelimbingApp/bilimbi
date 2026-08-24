@@ -4,7 +4,11 @@
 **Status:** Accepted
 **Agents:** antigravity
 **Scope:** Core Employee Type tenancy ownership, partial index constraints, migration disposition, and administration APIs
-**Last Updated:** 2026-08-17
+**Last Updated:** 2026-08-24
+
+> This ADR records the Employee compatibility evolution decision. Current
+> database ownership, migration-disposition, verification, and adoption rules
+> are centralized in [Bilimbi Database Architecture](../database.md).
 
 ## Context
 

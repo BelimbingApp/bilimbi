@@ -5,7 +5,11 @@
 **Agents:** codex/sol-high
 **Scope:** Laravel framework tables, schema adoption, caching, and durable
 background jobs
-**Last Updated:** 2026-08-13
+**Last Updated:** 2026-08-24
+
+> This ADR records framework-table ownership decisions. Current database
+> ownership, migration, verification, adoption, and seeding rules are
+> centralized in [Bilimbi Database Architecture](../database.md).
 
 ## Context
 
