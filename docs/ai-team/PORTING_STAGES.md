@@ -2,11 +2,13 @@
 
 **Document Type:** Team delivery roadmap
 **Status:** Provisional and stage-gated
-**Last Updated:** 2026-08-12
+**Last Updated:** 2026-08-24
 
 The AI team ports capabilities in dependency order, not by translating files
 or racing through a module list. Each stage exits only when its contracts,
 schema, tests, documentation, and operational path are coherent in Bilimbi.
+Database ownership, dependency, migration, verification, and adoption follow
+the normative [Database Architecture](../architecture/database.md).
 
 ## Per-capability pipeline
 

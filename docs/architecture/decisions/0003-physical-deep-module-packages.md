@@ -6,7 +6,11 @@
 **Scope:** Deep-module filesystem boundaries, descriptor-driven Mix
 composition, nested Git distribution, tests, documentation, assets, and
 migration ownership
-**Last Updated:** 2026-08-13
+**Last Updated:** 2026-08-24
+
+> This ADR records the physical packaging decision. Current database ownership,
+> dependency categories, migration, contract, and ledger rules are centralized
+> in [Bilimbi Database Architecture](../database.md).
 
 ## Context
 

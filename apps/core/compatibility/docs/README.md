@@ -1,5 +1,10 @@
 # Core Compatibility
 
+The normative migration, verification, adoption, and ownership rules live in
+[Bilimbi Database Architecture](../../../../docs/architecture/database.md).
+This module document describes Core Compatibility's owned coordinator behavior;
+it does not define a second database architecture.
+
 `apps/core/compatibility/` is the complete physical boundary for the required
 `core/compatibility` module. Its public API is `Bilimbi.Core.Compatibility`.
 
