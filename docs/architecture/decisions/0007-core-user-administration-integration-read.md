@@ -5,11 +5,7 @@
 **Agents:** codex/terra-user-admin-adr-1
 **Scope:** Ownership, dependency direction, persistence access, bounded query,
 route transfer, and enforcement for the Users administration index
-**Last Updated:** 2026-08-24
-
-> This ADR records one proposed exceptional private-relation read. The current
-> general dependency and database-access rules are centralized in
-> [Bilimbi Database Architecture](../database.md).
+**Last Updated:** 2026-08-14
 
 ## Context
 
