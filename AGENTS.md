@@ -9,6 +9,15 @@ Read this file and `DESIGN.md` before making changes. The source Belimbing
 project is the reference for business meaning and schema compatibility, not a
 template for copying Laravel implementation details.
 
+Compatibility is a one-direction replacement contract. Bilimbi must be able
+to adopt an existing Belimbing database and replace the Belimbing application;
+Belimbing is not required to consume Bilimbi source, UI, routes, migrations,
+or a database after Bilimbi-only evolution. Preserve durable business and data
+contracts deliberately. Do not retain Laravel framework details, legacy UI,
+internal route names, or other implementation artifacts merely to make a
+Bilimbi application reversible to Belimbing. ADR 0002 is authoritative for
+schema baseline and adoption mechanics.
+
 ## 1. Project context
 
 Bilimbi is built with:
@@ -178,8 +187,10 @@ descriptor is missing.
 
 ## 5. Stable identities and schema compatibility
 
-Belimbing is the reference for durable business meaning and PostgreSQL schema.
-Compatibility includes more than table names:
+Belimbing is the reference for durable business meaning and the PostgreSQL
+schema that Bilimbi must initially adopt. It is not permanent authority over
+Bilimbi-only evolution after that boundary. Compatibility includes more than
+table names:
 
 - column names and nullability;
 - primary and foreign keys;
@@ -197,7 +208,9 @@ Elixir module name.
 
 ### Existing database rules
 
-- Treat Belimbing's schema as canonical during the port.
+- Treat Belimbing's schema as canonical while defining and adopting the
+  compatible baseline. Evolve beyond it through explicit Bilimbi-only
+  migrations; reverse execution by Belimbing is not a requirement.
 - Do not invent a replacement table merely because its Ecto schema would be
   cleaner.
 - Do not rename existing tables or columns without an explicit compatibility

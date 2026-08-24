@@ -2,10 +2,11 @@
 
 **Document Type:** Architecture Decision Record
 **Status:** Accepted
-**Agents:** codex/sol-high
-**Scope:** Bilimbi migration ownership, Belimbing schema compatibility,
-installation, adoption, and explicit tenant/company identity
-**Last Updated:** 2026-08-13
+**Agents:** codex/sol-high, codex/gpt-5.6-sol
+**Scope:** Bilimbi migration ownership, one-direction Belimbing replacement,
+schema compatibility, installation, adoption, and explicit tenant/company
+identity
+**Last Updated:** 2026-08-24
 
 ## Context
 
@@ -52,6 +53,28 @@ The resulting cross-module contract is:
   ported.
 
 ## Decision
+
+### Direction of compatibility
+
+Compatibility is a one-direction replacement contract. Bilimbi must be able
+to verify and adopt an existing Belimbing database, preserve its durable
+business meaning and identifiers, and then replace the Belimbing application.
+After adoption, Bilimbi owns its source, migration ledger, runtime, UI, and
+future evolution.
+
+This contract does not promise that Belimbing can run against a database after
+Bilimbi-only migrations, consume Bilimbi source or features, or reproduce
+Bilimbi internal routes and presentation. Reverse migration, dual-running, and
+framework-level compatibility are separate requirements and are not implied by
+schema adoption. A durable external contract still requires an explicit
+compatibility decision; an internal Laravel or Bilimbi implementation name
+does not become durable merely because it exists.
+
+The pinned Belimbing schema remains canonical for the compatible baseline.
+Bilimbi may diverge deliberately after that boundary through owned
+`:bilimbi_only` migrations and Bilimbi-native capabilities. Verification and
+adoption must protect the incoming Belimbing database; they must not prevent
+Bilimbi from progressing once the replacement boundary has been crossed.
 
 ### Bilimbi migration history
 
@@ -236,6 +259,9 @@ numbers as roles is not.
 - Bilimbi can create a fresh, explicit-tenancy Company foundation without
   Laravel.
 - Existing Belimbing databases require deliberate, drift-sensitive adoption.
+- Adoption is one-way replacement: Bilimbi preserves the incoming compatible
+  state, but Belimbing compatibility is not promised after Bilimbi-only
+  migrations or capabilities are applied.
 - Base Database owns the shared Repo, each module owns its compatibility
   contract and migrations, and Core Compatibility discovers and coordinates
   all installed contributions into the current Platform Baseline.

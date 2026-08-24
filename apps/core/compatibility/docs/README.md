@@ -9,6 +9,13 @@ tables or migrations: each module ships its own migration path, while
 Compatibility orders those paths through `Bilimbi.Base.Repo` and the shared
 `bilimbi_schema_migrations` ledger.
 
+This is a one-direction replacement boundary. Bilimbi verifies and adopts an
+existing Belimbing database so Bilimbi can replace the Belimbing application.
+After adoption, Bilimbi-only migrations and capabilities may evolve the
+database without preserving the ability to run Belimbing again. Compatibility
+protects durable incoming data and business meaning; it does not require
+reverse migration, dual-running, or parity with Laravel source, routes, or UI.
+
 Every owned migration version is explicitly classified by its descriptor.
 Adoption records only verified compatible baselines and leaves Bilimbi-only
 migrations pending. Recorded versions must be installed, and the recorded
