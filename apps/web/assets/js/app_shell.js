@@ -63,10 +63,6 @@ const AppShell = {
 
   updated() {
     this.apply()
-    // A LiveView patch re-renders title pins with the server default
-    // aria-pressed="false"; re-sync pressed state, dataset, and titles from
-    // the stored entries whenever the DOM under this hook changes (#685).
-    this.renderPinnedItems()
   },
 
   destroyed() {
@@ -534,7 +530,7 @@ const AppShell = {
       unpin.title = `Unpin ${pinLabel}`
       unpin.setAttribute("aria-label", `Unpin ${pinLabel}`)
       unpin.className =
-        "app-pinned-unpin grid size-4 shrink-0 place-items-center rounded-sm text-muted opacity-0 transition hover:bg-surface-subtle hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        "app-pinned-unpin grid size-6 shrink-0 place-items-center rounded-sm text-muted opacity-0 transition hover:bg-surface-subtle hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
 
       const pinIcon = item?.parentElement?.querySelector("[data-nav-pin] svg")?.cloneNode(true)
       if (pinIcon) unpin.append(pinIcon)
