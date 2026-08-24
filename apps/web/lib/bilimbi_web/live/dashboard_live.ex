@@ -713,7 +713,7 @@ defmodule BilimbiWeb.DashboardLive do
             phx-click="move-up"
             phx-value-id={@id}
             title="Move up"
-            class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
           >
             <.icon name="hero-chevron-up" class="size-3" />
           </button>
@@ -723,7 +723,7 @@ defmodule BilimbiWeb.DashboardLive do
             phx-click="move-down"
             phx-value-id={@id}
             title="Move down"
-            class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
           >
             <.icon name="hero-chevron-down" class="size-3" />
           </button>
@@ -733,7 +733,7 @@ defmodule BilimbiWeb.DashboardLive do
             phx-click="remove-widget"
             phx-value-id={@id}
             title="Remove widget"
-            class="ml-1 grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+            class="ml-1 grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
           >
             <.icon name="hero-x-mark" class="size-3" />
           </button>

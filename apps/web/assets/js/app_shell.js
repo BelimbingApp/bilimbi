@@ -63,6 +63,10 @@ const AppShell = {
 
   updated() {
     this.apply()
+    // A LiveView patch re-renders title pins with the server default
+    // aria-pressed="false"; re-sync pressed state, dataset, and titles from
+    // the stored entries whenever the DOM under this hook changes (#685).
+    this.renderPinnedItems()
   },
 
   destroyed() {
