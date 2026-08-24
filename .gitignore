@@ -19,7 +19,7 @@ erl_crash.dump
 # Also ignore archive artifacts (built via "mix archive.build").
 *.ez
 
-# Temporary files, for example, from tests.
+# Repo-local temp (tests, screenshot captures, etc.)
 /tmp
 
 # Ignore package tarball (built via "mix hex.build").
@@ -38,7 +38,8 @@ npm-debug.log
 /assets/node_modules
 /apps/web/assets/node_modules
 
-# Screenshot harness (#615): Playwright lives in the driver dir, captures under /tmp
+# Screenshot harness for AI visual-review-lane: Playwright in the driver dir;
+# PNGs under repo-root tmp/ (see /tmp ignore above).
 /apps/web/priv/screenshot/node_modules
 /apps/web/priv/screenshot/package-lock.json
 
@@ -48,8 +49,10 @@ npm-debug.log
 # Claude is part of the project AI team; only personal overrides stay local.
 /.claude/settings.local.json
 
-# Convenient store for human and AI agents
-/docs/scratch
+# Local scratch for humans and AI agents. Each file starts with three lines:
+# author, datetime, purpose. Any file can be deleted except subfolders,
+# which are managed by their creators.
+/.scratchpad
 
 # Base, Core, and Web belong to the Platform repository. Domains and Extensions
 # mount as independent nested repositories directly below `apps/`, so ignore

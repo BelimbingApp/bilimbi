@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Playwright driver for `mix bilimbi.screenshot` — the #614 visual-review-lane harness. Reviewer tooling, not a CI gate.",
+  "description": "Playwright driver for `mix bilimbi.screenshot` — visual-review-lane harness. AI reviewer tooling, not a CI gate.",
   "dependencies": {
     "playwright-core": "^1.62.0"
   }
