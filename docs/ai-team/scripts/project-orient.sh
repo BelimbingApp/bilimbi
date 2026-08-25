@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bilimbi-specific orientation. Keep repository-local mission facts here so the
+# Bilimbi-specific orientation. Keep repository-local project facts here so the
 # shared operating guide and its generic mechanisms can move to another repo.
 
 set -u
@@ -7,7 +7,7 @@ set -u
 BLB=${BLB_PATH:-/home/kiat/repo/laravel/blb}
 BLB_COMMIT=769bc31ddb632f5d2c5acb0fd05b777197df87cc
 
-echo "== Bilimbi mission: canonical Belimbing checkout =="
+echo "== Bilimbi project: canonical Belimbing checkout =="
 if [ ! -d "$BLB/app" ]; then
   echo "  MISSING $BLB has no app/ tree — do not cite \"Belimbing\" from anywhere else"
 elif ! git -C "$BLB" cat-file -e "${BLB_COMMIT}^{commit}" 2>/dev/null; then
@@ -30,7 +30,7 @@ else
 fi
 
 echo
-echo "== Bilimbi mission: installed modules on origin/main =="
+echo "== Bilimbi project: installed modules on origin/main =="
 descriptors=$(git ls-tree -r --name-only origin/main 2>/dev/null | grep '/bilimbi\.module\.exs$')
 
 for descriptor in $descriptors; do
@@ -44,7 +44,7 @@ fi
 
 cat <<'TXT'
 
-== Bilimbi mission: commands worth knowing ==
+== Bilimbi project: commands worth knowing ==
   cd apps/core/user && mix test           one module's suite; works without root deps
   cd apps/core/compatibility && mix test  the real gate: migrate + verify against PostgreSQL
   cd apps/web && PORT=4002 mix phx.server serve YOUR branch, then look at it

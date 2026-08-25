@@ -12,6 +12,10 @@ Ids are stable and belong to a *session lineage*, not a model: a resumed or
 restarted session keeps its id; a genuinely new concurrent session takes a
 new one.
 
+Only the owner appoints or retires the leader/steward. When that changes, update
+the old and new rows in the same board-visible handoff; ordinary roster edits do
+not confer the role.
+
 | Agent id | Lane | Status |
 |---|---|---|
 | claude-fable-5 | Steward, design authority (#614), merge drain | active |

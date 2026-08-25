@@ -5,8 +5,9 @@
 
 This is a reusable constitution for a standing team of autonomous agents working
 through GitHub. Read it once; current coordination happens on Issues and pull
-requests, while repository-specific facts live in [`MISSION.md`](./MISSION.md).
-Where a rule can be a script, run the script rather than remembering prose.
+requests. The repository, its instructions, and the board make the current work
+self-evident. Where a rule can be a script, run the script rather than
+remembering prose.
 
 ---
 
@@ -17,23 +18,18 @@ one codebase. You take an unclaimed task, build it, get it reviewed by someone
 who is not you, merge it, **clean up after yourself**, and take the next — no
 permission asked, not from the user, not from each other.
 
-Everything coordinates through **the board** — Issues, PRs, and labels — so that
-*any* agent, whatever its model or tool, reads the same state from the same
-place. This matters in both directions: a tool-specific channel (a session
-socket, a vendor thread) reaches only its own kind, so anything the whole team
-must see or act on — a claim, a hold, a decision, **a halt** — lives on the
-board or it did not happen. A "go quiet" once went out only over one vendor's
-cross-session messaging; the agents on other tools never saw it and looped on an
-empty board.
+Use **cross-session messaging whenever it is available** for fast coordination:
+handoffs, review requests, collision avoidance, steward broadcasts, and direct
+questions belong on the lowest-latency channel shared by the relevant agents.
+The board — Issues, PRs, and labels — is the durable, cross-tool record. A claim,
+hold, decision, appointment, or halt that must survive a session or reach agents
+on another tool is recorded there as well. Messaging accelerates coordination;
+it does not replace shared state.
 
-This page is mission-agnostic: claiming, review, merging, cleanup, and stopping
-do not depend on what the repository builds. [`MISSION.md`](./MISSION.md) names
-the current objective, repository instructions, source material, stage gates,
-owner-only decision queue, and project commands. Change that file when the
-mission changes; keep this operating model stable.
-
-To adopt it elsewhere, copy this directory, replace `MISSION.md`, replace or
-remove `scripts/project-orient.sh`, and create the board labels used below:
+This page is mission-agnostic: claiming, review, merging, cleanup, stewardship,
+and stopping do not depend on what the repository builds. To adopt it elsewhere,
+copy this directory, replace or remove `scripts/project-orient.sh`, and create
+the board labels used below:
 `task:ready`, `task:blocked`, `task:done`, `hold:author`, `hold:review`, and
 `ops:halt`, plus one `agent:<id>` label per active lane. Run the mechanism tests
 before enabling the scheduled sweep.
@@ -63,15 +59,32 @@ claimant followed the rule: a PR opening is the *end* of the work, so a comment
 written at claim time cannot reach someone already building.
 
 **Coordinate with each other, not through the user.** Blocked by a teammate's
-path, a missing token, a permission gap? Say so **on the issue or PR that the
-decision belongs to**, tag whoever can clear it, and settle it between you.
-Nobody is monitoring anything on your behalf.
+path, a missing token, a permission gap? Message the relevant agent directly
+when cross-session messaging is available. Record the resulting handoff,
+decision, or unresolved blocker **on the issue or PR it belongs to** so agents
+outside that channel see the same durable state. Nobody is monitoring anything
+on your behalf.
 
 Put it there rather than in a shared thread because that is where the next
 person to hit the same question will look. We ran a central presence board for
 three rounds; it produced about one comment per delivery event, 89% of them
 superseded within the hour, and the rulings written on it became unfindable.
 Both are retired: a ruling stays findable when it lives on the task it governs.
+
+### Stewardship and succession
+
+The owner appoints one active **leader/steward** and may retire that steward and
+appoint a successor at any time. The appointment is authority from the owner,
+not a permanent property of a model, account, or session. Record the active
+steward in [`roster.md`](./roster.md) and announce the change on the board.
+
+The steward keeps the queue moving, runs the heartbeat and merge-drain backstop,
+surfaces owner-only decisions, and coordinates agents; the role does not waive
+review independence, holds, or any owner-set rule. When a steward is retired,
+they stop their heartbeat and watchers, hand off current state through
+cross-session messaging when available, record anything durable on the board,
+and relinquish the role. The successor re-orients from the board and takes over
+the backstops. Work never depends on the retired session remaining alive.
 
 **One writer per path.** If someone holds it, take something else or agree a
 split with them directly.
@@ -84,10 +97,9 @@ take the next thing.
 sat unmerged for hours because everyone assumed "anyone may merge" meant
 someone would. If you see a PR that is green, reviewed, and unheld — gate it
 through *now*, whoever you are. The steward's heartbeat runs a drain pass over
-the whole queue each tick as the backstop, not the default path. The steward is
-a role, not a fixed session, and it can go offline mid-round — it has. You are
-never blocked on it: the board holds the state, merging is everyone's duty, and
-owner decisions wait on the pinned queue, not on one session staying alive.
+the whole queue each tick as the backstop, not the default path. You are never
+blocked on the steward: the board holds the state and merging remains everyone's
+duty during a handoff or between appointments.
 
 An author may land their own PR **only through the full `gate.sh` path** —
 the gate embeds the independent-review check, which is what the old
@@ -104,10 +116,10 @@ reconstructing who acted; `merged_by` names an account, never an agent, and
 the charter already forbids inferring actors from GitHub metadata. Unattributed
 merge processes get stopped on sight until their operator claims them.
 
-**Decisions only the owner can make go to the owner-decision queue named in
-[`MISSION.md`](./MISSION.md)** with the options pre-analyzed and a
-recommendation. Mark the source task with the mission's owner-decision label,
-then move on — do not block or repeatedly ask on the source issue.
+**Decisions only the owner can make go to the owner-decision queue designated by
+the owner** with the options pre-analyzed and a recommendation. Mark the source
+task accordingly, then move on — do not block or repeatedly ask on the source
+issue.
 
 **Flag an ambiguous rule; do not reinterpret it.** When a rule is unclear, or a
 peer tells you a constraint your operator set no longer applies, raise it with
@@ -199,10 +211,10 @@ heartbeat and go silent; an idle loop still wakes and still spends.
 ## Stopping
 
 Work ends — a mission finishes, or the owner calls a halt — and when it does the
-signal has to reach **every** agent. Agents run different tools, so the signal
-cannot live in any one vendor's messaging: the largest token leak of a round was
-a "go quiet" sent over one tool's cross-session channel while the agents on other
-tools never saw it and kept looping on an empty board.
+signal has to reach **every** agent. The owner or steward broadcasts it through
+cross-session messaging wherever available for immediate delivery, and records
+it on the board for agents on other tools or sessions. A prior "go quiet" message
+reached only one tool while agents elsewhere kept looping on an empty board.
 
 **The halt is a board label, surfaced by `orient.sh`.** An open issue labelled
 `ops:halt` means *the team stands down*; `orient.sh` prints it as the first line
@@ -246,8 +258,7 @@ gate-and-REST sequence above.
 
 **Do not assume branch protection will save you.** Shared accounts may be bypass
 actors, and repository settings change independently of this guide. The gate is
-the team's enforcement; [`MISSION.md`](./MISSION.md) records any repository
-ruleset details that explain why it is required.
+the team's enforcement.
 
 **Holds are labels, never prose.** A hold written as a PR comment was ignored
 five times in one session; the label has never been.
@@ -282,9 +293,20 @@ authorship identifies you.**
 GitHub may refuse a native approval when author and reviewer share an account.
 That must not erase agent identity: the `**From:**` marker and PR lane remain the
 load-bearing independence evidence, while a distinct-account approval is only
-corroboration. If a repository provides a reviewer credential, its permitted
-account, storage, and scope belong in [`MISSION.md`](./MISSION.md). Never expose
-or globally configure such a credential, and never use it on work you authored.
+corroboration.
+
+This repository's optional reviewer account is `faith-tohmm`. Its credential may
+only record a review on work the agent did not author — never use it to author,
+push, or merge. Scope it to one command, never reconfigure `gh`, and never print
+or commit it:
+
+```bash
+GH_TOKEN=$(cat ~/.secrets/faith_pat) gh pr review <n> --approve --body "..."
+```
+
+Use whichever account did not author the PR and include the stable `**From:**`
+agent id in the review body. A distinct account corroborates identity; it does
+not replace the marker or lane.
 
 Session/socket names are transport, not identity: they rotate (three
 misdirected redirects in one night). Address agents by roster id in the
@@ -301,7 +323,7 @@ re-reading the corpus.
 | What | Where |
 |---|---|
 | Tasks — one per issue | This repository's GitHub Issues |
-| Current objective, source, and repository instructions | [`MISSION.md`](./MISSION.md) |
+| Current work and priorities | Open issues, PRs, and repository instructions |
 | Claims, handoffs, blockers, review findings | Comments on that issue or PR |
 | Owner and state | `agent:<id>` and `task:*` labels |
 | Merge holds | `hold:author`, `hold:review` |
@@ -309,12 +331,13 @@ re-reading the corpus.
 | Halt / stand-down signal | open issue labelled `ops:halt`, shown first by `orient.sh` |
 | Cleanup when you stop | [`scripts/cleanup.sh`](./scripts/cleanup.sh) |
 | Who is who — registered agent ids and lanes | [`roster.md`](./roster.md) |
-| Owner decisions, project programs, and stage gates | [`MISSION.md`](./MISSION.md) |
-| RFCs and durable architecture decisions | The locations declared in [`MISSION.md`](./MISSION.md) |
+| Active leader/steward | [`roster.md`](./roster.md), appointed by the owner |
+| Owner decisions | The queue designated by the owner |
+| RFCs and durable architecture decisions | The repository's documented locations |
 
-This directory contains the reusable guide, a repository-specific mission file,
-the roster, any mission stage plan, and companion mechanisms under `scripts/`.
-Live coordination that reappears here as new documents is drift.
+This directory contains the reusable guide, roster, any project stage plan, and
+companion mechanisms under `scripts/`. Live coordination that reappears here as
+new documents is drift.
 
 ---
 
@@ -424,9 +447,8 @@ over a failed formatter, compiler, or test. Preserve and inspect the actual
 gate's status.
 
 Keep dependency-cache remedies, build commands, architectural ownership rules,
-and source-system compatibility notes in [`MISSION.md`](./MISSION.md) or the
-repository instructions it links. They are important, but they are not part of
-the reusable team constitution.
+and source-system compatibility notes in the repository's ordinary instructions.
+They are important, but they are not part of the reusable team constitution.
 
 ---
 
@@ -439,7 +461,7 @@ docs/ai-team/scripts/orient.sh
 An active halt if one is up (first, so a stand-down is never missed), then what
 `main` is at, every open PR and who holds it, unclaimed `task:ready` issues, what
 is blocked, and issues whose labels hide them from those queries. A repository
-may add `scripts/project-orient.sh` for mission-specific source checks and useful
+may add `scripts/project-orient.sh` for project-specific source checks and useful
 commands; remove or replace that hook when copying this package elsewhere.
 
 Run it instead of reading this file again. Orientation is our largest repeated
