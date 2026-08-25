@@ -29,10 +29,10 @@ it does not replace shared state.
 This page is mission-agnostic: claiming, review, merging, cleanup, stewardship,
 and stopping do not depend on what the repository builds. To adopt it elsewhere,
 copy this directory, replace or remove `scripts/project-orient.sh`, and create
-the board labels used below:
+the fixed board labels used below:
 `task:ready`, `task:blocked`, `task:done`, `hold:author`, `hold:review`, and
-`ops:halt`, plus one `agent:<id>` label per active lane. Run the mechanism tests
-before enabling the scheduled sweep.
+`ops:halt`, `ops:steward`. The claim mechanism creates `agent:<id>` labels as
+lanes appear. Run the mechanism tests before enabling the scheduled sweep.
 
 ---
 
@@ -75,8 +75,11 @@ Both are retired: a ruling stays findable when it lives on the task it governs.
 
 The owner appoints one active **leader/steward** and may retire that steward and
 appoint a successor at any time. The appointment is authority from the owner,
-not a permanent property of a model, account, or session. Record the active
-steward in [`roster.md`](./roster.md) and announce the change on the board.
+not a permanent property of a model, account, or session. The appointment lives
+on one open issue carrying `ops:steward` and exactly one `agent:<id>` label.
+Retirement removes `ops:steward` from the old appointment; appointment adds it
+to the successor's issue. Only the owner makes either change, and there must
+never be two active steward issues.
 
 The steward keeps the queue moving, runs the heartbeat and merge-drain backstop,
 surfaces owner-only decisions, and coordinates agents; the role does not waive
@@ -279,14 +282,13 @@ Anyone may merge a green, reviewed PR they did not author unless a hold is on it
 Shared human accounts post for every agent, so **neither assignee nor
 authorship identifies you.**
 
-- Your id must be **registered in [`roster.md`](./roster.md)** and unique —
-  two concurrent sessions sharing one id caused a false-impersonation
-  investigation and made the pair mutually unreviewable to the gate (a marker
-  matching the PR's lane is refused as self-review). Starting a session under
-  an id the roster shows active elsewhere: pick a suffixed id and register it.
-- Mark ownership with the `agent:<id>` label — **on the pull request as well as
-  the issue.** Across the first run all 120 PRs carried none, and anything
-  reasoning about PR ownership was blind.
+- Your stable id is the `agent:<id>` label on your open issues and PRs. Before
+  first use, search those live labels; if another active lineage uses the id,
+  choose a suffix (`-b`, `-c`, …). Two concurrent sessions sharing one id become
+  mutually unreviewable because the gate treats a marker matching the PR lane as
+  self-review.
+- Mark ownership with the same `agent:<id>` label **on the pull request and its
+  issue**. The claim script creates a missing label and applies it to both.
 - Name yourself in every claim, handoff and review: `**From:** <your-agent-id>`.
 - Never infer who did something from GitHub metadata.
 
@@ -309,8 +311,8 @@ agent id in the review body. A distinct account corroborates identity; it does
 not replace the marker or lane.
 
 Session/socket names are transport, not identity: they rotate (three
-misdirected redirects in one night). Address agents by roster id in the
-message body and let the recipient disclaim; only `**From:**` lines and
+misdirected redirects in one night). Address agents by their `agent:<id>` label
+in the message body and let the recipient disclaim; only `**From:**` lines and
 `agent:*` labels identify anyone.
 
 Sub-agents inherit their parent's label and a brief from the parent rather than
@@ -330,14 +332,15 @@ re-reading the corpus.
 | Gates, sweeps, orientation, and cleanup | [`scripts/`](./scripts/) |
 | Halt / stand-down signal | open issue labelled `ops:halt`, shown first by `orient.sh` |
 | Cleanup when you stop | [`scripts/cleanup.sh`](./scripts/cleanup.sh) |
-| Who is who — registered agent ids and lanes | [`roster.md`](./roster.md) |
-| Active leader/steward | [`roster.md`](./roster.md), appointed by the owner |
+| Agent identity and current ownership | `agent:<id>` labels on open issues and PRs |
+| Active leader/steward | one owner-controlled open issue labelled `ops:steward` and `agent:<id>` |
 | Owner decisions | The queue designated by the owner |
 | RFCs and durable architecture decisions | The repository's documented locations |
 
-This directory contains the reusable guide, roster, any project stage plan, and
-companion mechanisms under `scripts/`. Live coordination that reappears here as
-new documents is drift.
+This directory contains the reusable guide, any project stage plan, and
+companion mechanisms under `scripts/`. Live identity or coordination that
+reappears here as new documents is drift; labels on Issues and PRs are the
+registry.
 
 ---
 

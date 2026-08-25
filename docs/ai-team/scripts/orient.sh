@@ -31,6 +31,26 @@ halt_status=$?
 [ "$halt_status" -eq 0 ] || exit "$halt_status"
 
 echo
+echo "== active leader/steward =="
+stewards=$(gh issue list --repo "$REPO" --state open --label "ops:steward" \
+  --json number,title,labels \
+  --jq '.[] | ([.labels[].name | select(startswith("agent:"))] | join(", ")) as $agents
+        | "  #\(.number) [\(if $agents == "" then "MISSING agent label" else $agents end)] \(.title)"' \
+  2>/dev/null)
+steward_status=$?
+if [ "$steward_status" -ne 0 ]; then
+  echo "  unavailable — inspect the board before relying on steward backstops"
+elif [ -z "$stewards" ]; then
+  echo "  none appointed"
+else
+  printf '%s\n' "$stewards"
+  steward_count=$(printf '%s\n' "$stewards" | wc -l | tr -d ' ')
+  if [ "$steward_count" -ne 1 ]; then
+    echo "  WARNING expected exactly one active ops:steward issue"
+  fi
+fi
+
+echo
 echo "== main =="
 git fetch -q origin main 2>/dev/null
 echo "  origin/main  $(git log origin/main --oneline -1)"

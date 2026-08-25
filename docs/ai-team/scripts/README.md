@@ -1,8 +1,7 @@
 # AI-team mechanisms
 
 These scripts enforce the reusable operating guide. Copy this directory with
-`../README.md` and `../roster.md` when adopting the model in another GitHub
-repository.
+`../README.md` when adopting the model in another GitHub repository.
 
 Most scripts are repository-independent and resolve the current GitHub
 repository through `gh`. `project-orient.sh` is the deliberate exception: it is
