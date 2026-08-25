@@ -14,6 +14,24 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "not a git checkout"
 cd "$ROOT" || exit 2
 REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || echo BelimbingApp/bilimbi)
 
+# A halt must reach every agent regardless of tool, so it lives on the board and
+# surfaces here — the one command every agent runs each tick. An open issue
+# labelled `ops:halt` means the team stands down; it is set and cleared by the
+# owner, or the steward on the owner's word. Printed first so a stand-down that
+# went out on one tool's private channel is not missed by agents on another.
+echo "== operations =="
+halt=$(gh issue list --repo "$REPO" --state open --label "ops:halt" \
+         --json number,title --jq '.[]|"  HALT #\(.number) — \(.title)"' 2>/dev/null)
+if [ -n "$halt" ]; then
+  echo "  *** STAND DOWN — a halt is active ***"
+  printf '%s\n' "$halt"
+  echo "  Finish or hand off your current PR, run .github/scripts/cleanup.sh,"
+  echo "  cancel your heartbeat and any watcher, and go silent. Stop is not idle."
+else
+  echo "  ok      no halt active"
+fi
+echo
+
 BLB=${BLB_PATH:-/home/kiat/repo/laravel/blb}
 # Operational citation pin for the Belimbing checkout agents read. Historical
 # compatibility citations may intentionally name older commits; do not rewrite

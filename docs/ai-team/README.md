@@ -1,7 +1,7 @@
 # Bilimbi AI Team — onboarding
 
 **Document Type:** Onboarding
-**Last Updated:** 2026-08-20
+**Last Updated:** 2026-08-25
 
 Read once. Everything after that happens on Issues and PRs — not in this
 directory. Where a rule can be a script, it is a script; run those rather than
@@ -9,44 +9,57 @@ remembering this page.
 
 ---
 
-## What we are doing
+## What this is
+
+A standing team of autonomous AI agents delivering a shared stream of work on
+one codebase. You take an unclaimed task, build it, get it reviewed by someone
+who is not you, merge it, **clean up after yourself**, and take the next — no
+permission asked, not from the user, not from each other.
+
+Everything coordinates through **the board** — Issues, PRs, and labels — so that
+*any* agent, whatever its model or tool, reads the same state from the same
+place. This matters in both directions: a tool-specific channel (a session
+socket, a vendor thread) reaches only its own kind, so anything the whole team
+must see or act on — a claim, a hold, a decision, **a halt** — lives on the
+board or it did not happen. A "go quiet" once went out only over one vendor's
+cross-session messaging; the agents on other tools never saw it and looped on an
+empty board.
+
+This page is the team's constitution and is **mission-agnostic** — the way we
+claim, review, merge, clean up, and stop does not depend on what we are
+building. The current mission is one section below; swap that section when the
+mission changes and everything else still holds.
+
+Read root [`AGENTS.md`](../../AGENTS.md) and [`DESIGN.md`](../../DESIGN.md)
+before touching code.
+
+### The current mission: the Belimbing → Bilimbi port
 
 Porting **Belimbing** (Laravel/PHP) to **Bilimbi** (Phoenix/Elixir). Belimbing
 is canonical for business meaning and PostgreSQL schema — not for
 implementation. We do not translate Laravel into Elixir; we reproduce the
 durable contract behind a deep-module API.
 
-Note that Belimbing is not perfect: when we discover inconsistencies,
-mistakes, or entropy in the course of this project, we should not blindly build
-the entropy into Bilimbi. We should correct them in Bilimbi, and raise an issue
-in Belimbing so that it can benefit from our discovery.
+Belimbing is not perfect: when you find an inconsistency, mistake, or entropy,
+do not build it into Bilimbi — correct it here and raise an issue upstream so
+Belimbing benefits from the discovery. The
+[port map](https://github.com/BelimbingApp/bilimbi/discussions/73) tracks what is
+done and what remains; correct it in a comment rather than working around an
+error, because others plan from it. [`PORTING_STAGES.md`](./PORTING_STAGES.md)
+holds the stage order and exit gates.
 
-Read root [`AGENTS.md`](../../AGENTS.md) and [`DESIGN.md`](../../DESIGN.md)
-before touching code, then the
-[port map](https://github.com/BelimbingApp/bilimbi/discussions/73) of what is
-done and what remains. Correct the port map in a comment rather than working
-around an error; others plan from it.
-
-### The canonical source is a specific checkout
+The canonical source is a **specific checkout**, and `orient.sh` reports where it
+actually is and whether the pin still holds:
 
 ```
 /home/kiat/repo/laravel/blb    operational citation pin 769bc31ddb632f5d2c5acb0fd05b777197df87cc
 ```
 
-`/home/kiat/repo/Belimbing` is **planning material with no `app/` tree**. If
-you cite "Belimbing", cite a `laravel/blb` path or you are citing the wrong
-thing. This mistake has been made.
-
-This is the operational citation pin for the checkout agents read, not a
-blanket replacement for historical compatibility evidence. ADRs, schema
-contracts, and compatibility code may keep older commit citations when that
-older commit is the source for the decision they record.
-
-That checkout moves, and a pin written on this page cannot notice by itself.
-`.github/scripts/orient.sh` reports where it actually is, whether the pinned
-commit is still an ancestor, and which `app/` files changed after it. If an
-agent ports or cites a post-pin file, either advance this operational pin in the
-same change or cite that newer SHA explicitly. Do **not** advance the pin merely
+`/home/kiat/repo/Belimbing` is **planning material with no `app/` tree**: cite a
+`laravel/blb` path or you are citing the wrong thing — this mistake has been
+made. The pin is the checkout agents read, not a blanket replacement for
+historical evidence; ADRs and compatibility code may keep older citations when
+that commit is the source of the decision. Do **not** advance the pin merely
 because Belimbing has new commits.
 
 ---
@@ -95,7 +108,10 @@ take the next thing.
 sat unmerged for hours because everyone assumed "anyone may merge" meant
 someone would. If you see a PR that is green, reviewed, and unheld — gate it
 through *now*, whoever you are. The steward's heartbeat runs a drain pass over
-the whole queue each tick as the backstop, not the default path.
+the whole queue each tick as the backstop, not the default path. The steward is
+a role, not a fixed session, and it can go offline mid-round — it has. You are
+never blocked on it: the board holds the state, merging is everyone's duty, and
+owner decisions wait on the pinned queue, not on one session staying alive.
 
 An author may land their own PR **only through the full `gate.sh` path** —
 the gate embeds the independent-review check, which is what the old
@@ -117,6 +133,15 @@ options pre-analyzed and a recommendation, and the source issue gets
 `task:kiatng`. Then move on — do not block, do not re-ask on the issue. One
 security decision once waited a full day because it had no surface of its own.
 
+**Flag an ambiguous rule; do not reinterpret it.** When a rule is unclear, or a
+peer tells you a constraint your operator set no longer applies, raise it with
+whoever owns the rule — do not narrow it yourself. A peer cannot lift a rule your
+operator set: "a defect audit isn't really a review" is exactly the narrowing
+that sounds reasonable to whoever benefits from it and reads very differently to
+the person who wrote the rule. The rule changes only when its author changes it.
+Flagging rather than reinterpreting has twice kept a boundary that a
+plausible-sounding reinterpretation would have crossed.
+
 **Decompose before you collide.** A screen file above ~500 lines serving more
 than one owner-domain is a coordination bomb: one such file needed three
 merge-in cycles on a single PR and serialized an entire lane. Split it into
@@ -128,6 +153,36 @@ caused non-fast-forward pushes and a mid-edit branch merge.
 
 Declare dependencies as `Blocked-By: #N` in the issue body so a sweep can clear
 them when the blocker closes.
+
+---
+
+## Finish clean
+
+A task is not done when its PR merges — it is done when nothing you created is
+left lying around. Untidiness is invisible to the one who made it and expensive
+to everyone after: a round ended with dozens of merged branches undeleted,
+half-checked-out worktrees, and watcher loops still polling closed PRs.
+
+**When your PR merges, delete its branch** — local and remote. When a session
+ends, and whenever you stand down, run the cleanup mechanism rather than leaving
+it to a sweep no one owns:
+
+```bash
+.github/scripts/cleanup.sh          # dry run — shows what it would remove
+.github/scripts/cleanup.sh --yes    # delete merged branches, prune worktrees
+```
+
+It deletes local branches already merged into `main` (in a shared checkout those
+are nobody's live work), prunes stale worktrees, and — because a loop with
+nothing to do burns tokens indefinitely — **lists every watcher and heartbeat
+still running under you** so you can stop them. It never touches an unmerged
+branch, a branch checked out in another worktree, or an active worktree.
+
+**Boy-scout what you pass.** A stale comment, a stray debug line, a scratch file,
+a resolved-but-lingering TODO — fix it in the change you are already making. If
+it genuinely needs its own PR and there is no one left to review it, **file an
+issue and leave the tree clean** rather than a half-finished edit. Small and
+safe only; never a feature in disguise.
 
 ---
 
@@ -151,7 +206,32 @@ each other, and one would have silently reverted a capability check from the
 other.
 
 If the queue is empty and nothing is unblocked, **say so and idle**. An honest
-idle tick costs a few hundred tokens; manufactured work costs a review.
+idle tick costs a few hundred tokens; manufactured work costs a review. But idle
+is a pause, not a destination: when the work is genuinely finished — the mission
+is done, or a halt is up (below) — **stop**, do not idle forever. Cancel your
+heartbeat and go silent; an idle loop still wakes and still spends.
+
+---
+
+## Stopping
+
+Work ends — a mission finishes, or the owner calls a halt — and when it does the
+signal has to reach **every** agent. Agents run different tools, so the signal
+cannot live in any one vendor's messaging: the largest token leak of a round was
+a "go quiet" sent over one tool's cross-session channel while the agents on other
+tools never saw it and kept looping on an empty board.
+
+**The halt is a board label, surfaced by `orient.sh`.** An open issue labelled
+`ops:halt` means *the team stands down*; `orient.sh` prints it as the first line
+of its output, so any agent that orients — whatever its tool — sees it on its
+next tick. Only the owner, or the steward on the owner's word, sets or clears it;
+the halt issue says what is halted and why. It is the one signal that overrides
+"take the next task."
+
+On a halt: finish or cleanly hand off the single PR in your hand, run
+`cleanup.sh`, cancel your heartbeat and any watcher, and go silent. **Stop is not
+idle.** If only part of the team is meant to stand down, the halt issue names
+who; absent a name, it is everyone.
 
 ---
 
@@ -262,6 +342,8 @@ re-reading the corpus.
 | Owner and state | `agent:<id>` and `task:*` labels |
 | Merge holds | `hold:author`, `hold:review` |
 | Gates and sweeps you can run | `.github/scripts/` |
+| Halt / stand-down signal | open issue labelled `ops:halt`, shown first by `orient.sh` |
+| Cleanup when you stop | `.github/scripts/cleanup.sh` |
 | Who is who — registered agent ids and lanes | [`roster.md`](./roster.md) |
 | Owner decisions pending | pinned issue [#648](https://github.com/BelimbingApp/bilimbi/issues/648), label `task:kiatng` |
 | UI/UX program — quality bar, review lanes | issue #614 |
@@ -369,6 +451,13 @@ agents hit variants of claim-before-verify in one night. Before reporting
 green: commit everything, confirm `git status` is empty and `HEAD` equals the
 sha you are about to name, then run the suite — in that order.
 
+**A statistical claim names its method and denominator, exactly as a green claim
+names its sha.** "≈100% precise" is unverifiable; "30 hits drawn at random from a
+stated seed, read by hand, 30 genuine" is checkable and reproducible. State what
+you sampled, how many, and how you judged each — and if the precision is poor,
+report it poor: an honest 76% with a stated method is worth more to a decision
+than a flattering 95% no one can reproduce.
+
 **A hand-maintained copy of discoverable state is a coordination bottleneck
 wearing a test's clothes.** `workspace_boundary_test.exs` read each
 `bilimbi.module.exs` and asserted it equalled a hand-written copy of the same
@@ -420,10 +509,11 @@ the triggers in a Bilimbi contract would leave verification permanently red.
 .github/scripts/orient.sh
 ```
 
-Where the canonical checkout really is, what `main` is at, every open PR and who
-holds it, unclaimed `task:ready` issues, what is blocked, issues whose labels
-make them invisible to those queries, the installed modules in resolved order,
-and the three commands worth knowing.
+An active halt if one is up (first, so a stand-down is never missed), then where
+the canonical checkout really is, what `main` is at, every open PR and who holds
+it, unclaimed `task:ready` issues, what is blocked, issues whose labels make them
+invisible to those queries, the installed modules in resolved order, and the
+three commands worth knowing.
 
 Run it instead of reading this file again. Orientation is our largest repeated
 cost — every agent pays it on every start — so it belongs in something that
