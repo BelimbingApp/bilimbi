@@ -2,15 +2,17 @@
 #
 # cleanup.sh — leave the checkout clean when you stop.
 #
-#   .github/scripts/cleanup.sh          dry run: shows what it would remove
-#   .github/scripts/cleanup.sh --yes    delete merged branches, prune worktrees
+#   docs/ai-team/scripts/cleanup.sh          dry run: shows what it would remove
+#   docs/ai-team/scripts/cleanup.sh --yes    delete merged branches, prune worktrees
 #
 # A task is done when nothing you created is left lying around, and untidiness is
 # invisible to whoever made it. This removes only what is provably finished:
 # local branches fully merged into origin/main, and stale worktree admin refs. It
 # never touches an unmerged branch or an active worktree. Background loops and
 # heartbeats it only *lists* — a shell cannot cancel your tool's scheduler; stop
-# those where you started them (your heartbeat cron, your watcher).
+# those where you started them (your heartbeat cron, your watcher). Remote branch
+# deletion remains explicit because a shared checkout cannot infer which remote
+# branches belong to the caller.
 #
 set -u
 
@@ -20,7 +22,10 @@ apply=0
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "not a git checkout" >&2; exit 2; }
 cd "$ROOT" || exit 2
 
-git fetch -q origin main 2>/dev/null
+if ! git fetch -q origin main 2>/dev/null; then
+  echo "cannot refresh origin/main; cleanup stopped without deleting anything" >&2
+  exit 2
+fi
 
 echo "== merged local branches (every commit already in origin/main) =="
 current=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)   # "HEAD" when detached

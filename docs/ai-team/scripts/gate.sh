@@ -3,12 +3,13 @@
 # Gate a pull request merge. Prints every verdict and exits non-zero unless all
 # of them pass.
 #
-#   .github/scripts/gate.sh <pr-number> [<reviewed-sha>]
+#   docs/ai-team/scripts/gate.sh <pr-number> [<reviewed-sha>]
 #
 # Run it as its OWN command and chain the merge to it:
 #
-#   .github/scripts/gate.sh 408 abc1234 \
-#     && gh api -X PUT repos/BelimbingApp/bilimbi/pulls/408/merge -f merge_method=merge
+#   REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+#   docs/ai-team/scripts/gate.sh 408 abc1234 \
+#     && gh api -X PUT "repos/$REPO/pulls/408/merge" -f merge_method=merge
 #
 # Never put the checks and the merge inside one compound command where the merge
 # can still run when a check fails. That is exactly how #382 reached main while
