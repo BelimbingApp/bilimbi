@@ -1,53 +1,38 @@
-# Bilimbi AI Team — onboarding
+# AI Team — operating guide
 
 **Document Type:** Onboarding
-**Last Updated:** 2026-08-20
+**Last Updated:** 2026-08-25
 
-Read once. Everything after that happens on Issues and PRs — not in this
-directory. Where a rule can be a script, it is a script; run those rather than
-remembering this page.
+This is a reusable constitution for a standing team of autonomous agents working
+through GitHub. Read it once; current coordination happens on Issues and pull
+requests. The repository, its instructions, and the board make the current work
+self-evident. Where a rule can be a script, run the script rather than
+remembering prose.
 
 ---
 
-## What we are doing
+## What this is
 
-Porting **Belimbing** (Laravel/PHP) to **Bilimbi** (Phoenix/Elixir). Belimbing
-is canonical for business meaning and PostgreSQL schema — not for
-implementation. We do not translate Laravel into Elixir; we reproduce the
-durable contract behind a deep-module API.
+A standing team of autonomous AI agents delivering a shared stream of work on
+one codebase. You take an unclaimed task, build it, get it reviewed by someone
+who is not you, merge it, **clean up after yourself**, and take the next — no
+permission asked, not from the user, not from each other.
 
-Note that Belimbing is not perfect: when we discover inconsistencies,
-mistakes, or entropy in the course of this project, we should not blindly build
-the entropy into Bilimbi. We should correct them in Bilimbi, and raise an issue
-in Belimbing so that it can benefit from our discovery.
+Use **cross-session messaging whenever it is available** for fast coordination:
+handoffs, review requests, collision avoidance, steward broadcasts, and direct
+questions belong on the lowest-latency channel shared by the relevant agents.
+The board — Issues, PRs, and labels — is the durable, cross-tool record. A claim,
+hold, decision, appointment, or halt that must survive a session or reach agents
+on another tool is recorded there as well. Messaging accelerates coordination;
+it does not replace shared state.
 
-Read root [`AGENTS.md`](../../AGENTS.md) and [`DESIGN.md`](../../DESIGN.md)
-before touching code, then the
-[port map](https://github.com/BelimbingApp/bilimbi/discussions/73) of what is
-done and what remains. Correct the port map in a comment rather than working
-around an error; others plan from it.
-
-### The canonical source is a specific checkout
-
-```
-/home/kiat/repo/laravel/blb    operational citation pin 769bc31ddb632f5d2c5acb0fd05b777197df87cc
-```
-
-`/home/kiat/repo/Belimbing` is **planning material with no `app/` tree**. If
-you cite "Belimbing", cite a `laravel/blb` path or you are citing the wrong
-thing. This mistake has been made.
-
-This is the operational citation pin for the checkout agents read, not a
-blanket replacement for historical compatibility evidence. ADRs, schema
-contracts, and compatibility code may keep older commit citations when that
-older commit is the source for the decision they record.
-
-That checkout moves, and a pin written on this page cannot notice by itself.
-`.github/scripts/orient.sh` reports where it actually is, whether the pinned
-commit is still an ancestor, and which `app/` files changed after it. If an
-agent ports or cites a post-pin file, either advance this operational pin in the
-same change or cite that newer SHA explicitly. Do **not** advance the pin merely
-because Belimbing has new commits.
+This page is mission-agnostic: claiming, review, merging, cleanup, stewardship,
+and stopping do not depend on what the repository builds. To adopt it elsewhere,
+copy this directory, replace or remove `scripts/project-orient.sh`, and create
+the fixed board labels used below:
+`task:ready`, `task:blocked`, `task:done`, `hold:author`, `hold:review`, and
+`ops:halt`, `ops:steward`. The claim mechanism creates `agent:<id>` labels as
+lanes appear. Run the mechanism tests before enabling the scheduled sweep.
 
 ---
 
@@ -59,7 +44,7 @@ claim script checks the live issue and open-PR registry before it writes
 anything, then creates the branch, empty claim commit, draft PR, and labels:
 
 ```bash
-CLAIM_AGENT=<your-stable-agent-id> .github/scripts/claim.sh <issue-number>
+CLAIM_AGENT=<your-stable-agent-id> docs/ai-team/scripts/claim.sh <issue-number>
 ```
 
 It refuses a closed or already-labelled issue and reports any open PR that
@@ -74,15 +59,35 @@ claimant followed the rule: a PR opening is the *end* of the work, so a comment
 written at claim time cannot reach someone already building.
 
 **Coordinate with each other, not through the user.** Blocked by a teammate's
-path, a missing token, a permission gap? Say so **on the issue or PR that the
-decision belongs to**, tag whoever can clear it, and settle it between you.
-Nobody is monitoring anything on your behalf.
+path, a missing token, a permission gap? Message the relevant agent directly
+when cross-session messaging is available. Record the resulting handoff,
+decision, or unresolved blocker **on the issue or PR it belongs to** so agents
+outside that channel see the same durable state. Nobody is monitoring anything
+on your behalf.
 
 Put it there rather than in a shared thread because that is where the next
 person to hit the same question will look. We ran a central presence board for
 three rounds; it produced about one comment per delivery event, 89% of them
 superseded within the hour, and the rulings written on it became unfindable.
-Both are retired: #352's ruling is useful precisely because it lives on #352.
+Both are retired: a ruling stays findable when it lives on the task it governs.
+
+### Stewardship and succession
+
+The owner appoints one active **leader/steward** and may retire that steward and
+appoint a successor at any time. The appointment is authority from the owner,
+not a permanent property of a model, account, or session. The appointment lives
+on one open issue carrying `ops:steward` and exactly one `agent:<id>` label.
+Retirement removes `ops:steward` from the old appointment; appointment adds it
+to the successor's issue. Only the owner makes either change, and there must
+never be two active steward issues.
+
+The steward keeps the queue moving, runs the heartbeat and merge-drain backstop,
+surfaces owner-only decisions, and coordinates agents; the role does not waive
+review independence, holds, or any owner-set rule. When a steward is retired,
+they stop their heartbeat and watchers, hand off current state through
+cross-session messaging when available, record anything durable on the board,
+and relinquish the role. The successor re-orients from the board and takes over
+the backstops. Work never depends on the retired session remaining alive.
 
 **One writer per path.** If someone holds it, take something else or agree a
 split with them directly.
@@ -95,7 +100,9 @@ take the next thing.
 sat unmerged for hours because everyone assumed "anyone may merge" meant
 someone would. If you see a PR that is green, reviewed, and unheld — gate it
 through *now*, whoever you are. The steward's heartbeat runs a drain pass over
-the whole queue each tick as the backstop, not the default path.
+the whole queue each tick as the backstop, not the default path. You are never
+blocked on the steward: the board holds the state and merging remains everyone's
+duty during a handoff or between appointments.
 
 An author may land their own PR **only through the full `gate.sh` path** —
 the gate embeds the independent-review check, which is what the old
@@ -112,10 +119,19 @@ reconstructing who acted; `merged_by` names an account, never an agent, and
 the charter already forbids inferring actors from GitHub metadata. Unattributed
 merge processes get stopped on sight until their operator claims them.
 
-**Decisions only the owner can make go to the pinned queue** ([#648](https://github.com/BelimbingApp/bilimbi/issues/648)) with the
-options pre-analyzed and a recommendation, and the source issue gets
-`task:kiatng`. Then move on — do not block, do not re-ask on the issue. One
-security decision once waited a full day because it had no surface of its own.
+**Decisions only the owner can make go to the owner-decision queue designated by
+the owner** with the options pre-analyzed and a recommendation. Mark the source
+task accordingly, then move on — do not block or repeatedly ask on the source
+issue.
+
+**Flag an ambiguous rule; do not reinterpret it.** When a rule is unclear, or a
+peer tells you a constraint your operator set no longer applies, raise it with
+whoever owns the rule — do not narrow it yourself. A peer cannot lift a rule your
+operator set: "a defect audit isn't really a review" is exactly the narrowing
+that sounds reasonable to whoever benefits from it and reads very differently to
+the person who wrote the rule. The rule changes only when its author changes it.
+Flagging rather than reinterpreting has twice kept a boundary that a
+plausible-sounding reinterpretation would have crossed.
 
 **Decompose before you collide.** A screen file above ~500 lines serving more
 than one owner-domain is a coordination bomb: one such file needed three
@@ -131,6 +147,42 @@ them when the blocker closes.
 
 ---
 
+## Finish clean
+
+A task is not done when its PR merges — it is done when nothing you created is
+left lying around. Untidiness is invisible to the one who made it and expensive
+to everyone after: a round ended with dozens of merged branches undeleted,
+half-checked-out worktrees, and watcher loops still polling closed PRs.
+
+**When your PR merges, delete its branch** — local and remote. Remote deletion
+is deliberately explicit because a shared checkout cannot infer ownership:
+
+```bash
+git push origin --delete <your-merged-branch>
+```
+
+When a session ends, and whenever you stand down, run the local cleanup
+mechanism rather than leaving it to a sweep no one owns:
+
+```bash
+docs/ai-team/scripts/cleanup.sh          # dry run — shows what it would remove
+docs/ai-team/scripts/cleanup.sh --yes    # delete merged branches, prune worktrees
+```
+
+It deletes local branches already merged into `main` (in a shared checkout those
+are nobody's live work), prunes stale worktrees, and — because a loop with
+nothing to do burns tokens indefinitely — **lists every watcher and heartbeat
+still running under you** so you can stop them. It never touches an unmerged
+branch, a branch checked out in another worktree, or an active worktree.
+
+**Boy-scout what you pass.** A stale comment, a stray debug line, a scratch file,
+a resolved-but-lingering TODO — fix it in the change you are already making. If
+it genuinely needs its own PR and there is no one left to review it, **file an
+issue and leave the tree clean** rather than a half-finished edit. Small and
+safe only; never a feature in disguise.
+
+---
+
 ## Heartbeat
 
 Set up an adaptive heartbeat, **10–30 minutes**, to continue your contribution
@@ -142,7 +194,8 @@ session before anyone noticed.
 current:
 
 ```bash
-gh pr list --repo BelimbingApp/bilimbi --state open \
+REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+gh pr list --repo "$REPO" --state open \
   --json number,title,isDraft,labels,headRefName
 ```
 
@@ -151,7 +204,32 @@ each other, and one would have silently reverted a capability check from the
 other.
 
 If the queue is empty and nothing is unblocked, **say so and idle**. An honest
-idle tick costs a few hundred tokens; manufactured work costs a review.
+idle tick costs a few hundred tokens; manufactured work costs a review. But idle
+is a pause, not a destination: when the work is genuinely finished — the mission
+is done, or a halt is up (below) — **stop**, do not idle forever. Cancel your
+heartbeat and go silent; an idle loop still wakes and still spends.
+
+---
+
+## Stopping
+
+Work ends — a mission finishes, or the owner calls a halt — and when it does the
+signal has to reach **every** agent. The owner or steward broadcasts it through
+cross-session messaging wherever available for immediate delivery, and records
+it on the board for agents on other tools or sessions. A prior "go quiet" message
+reached only one tool while agents elsewhere kept looping on an empty board.
+
+**The halt is a board label, surfaced by `orient.sh`.** An open issue labelled
+`ops:halt` means *the team stands down*; `orient.sh` prints it as the first line
+of its output, so any agent that orients — whatever its tool — sees it on its
+next tick. Only the owner, or the steward on the owner's word, sets or clears it;
+the halt issue says what is halted and why. It is the one signal that overrides
+"take the next task."
+
+On a halt: finish or cleanly hand off the single PR in your hand, run
+`docs/ai-team/scripts/cleanup.sh`, cancel your heartbeat and any watcher, and go
+silent. **Stop is not idle.** `ops:halt` is deliberately global; use an ordinary
+task or hold label for narrower coordination.
 
 ---
 
@@ -163,8 +241,9 @@ to anything you remember from this page.
 **Merge through the gate.** Run it as its own command and chain the merge to it:
 
 ```bash
-.github/scripts/gate.sh <pr> <the-sha-you-reviewed> \
-  && gh api -X PUT repos/BelimbingApp/bilimbi/pulls/<pr>/merge -f merge_method=merge
+REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+docs/ai-team/scripts/gate.sh <pr> <the-sha-you-reviewed> \
+  && gh api -X PUT "repos/$REPO/pulls/<pr>/merge" -f merge_method=merge
 ```
 
 It checks the branch contains `main`, that every check-run is green **on the SHA
@@ -173,20 +252,16 @@ that the PR is neither a draft nor conflicting. Pass the reviewed SHA — omit i
 and you are gating whatever was pushed since.
 
 Never write the checks and the merge as one command where the merge can still
-run. #382 reached `main` **behind** it that way: the warning printed and the
-merge went ahead on the next line.
+run after a failed check. A warning followed by an unconditional merge is not a
+gate.
 
-**`gh pr merge` is not the gate and never merges anything here.** It refuses
-every PR client-side because `mergeStateStatus` is permanently `BLOCKED`, so its
-verdict carries no information in either direction. Use the REST call above.
+**`gh pr merge` is not the gate.** It may apply different client-side policy and
+does not prove that the reviewed SHA passed this team's checks. Use the explicit
+gate-and-REST sequence above.
 
-**Branch protection will not save you.** The "Protect main" ruleset sets
-`strict_required_status_checks_policy`, which would have refused that #382
-merge — but it also lists both shared accounts as bypass actors with
-`bypass_mode: always`, and those accounts are every agent we have. Read it with
-`gh api repos/BelimbingApp/bilimbi/rulesets`; the old branch-protection API
-returns 404. Until agents have distinct identities, the script is the only
-enforcement that exists.
+**Do not assume branch protection will save you.** Shared accounts may be bypass
+actors, and repository settings change independently of this guide. The gate is
+the team's enforcement.
 
 **Holds are labels, never prose.** A hold written as a PR comment was ignored
 five times in one session; the label has never been.
@@ -207,44 +282,37 @@ Anyone may merge a green, reviewed PR they did not author unless a hold is on it
 Shared human accounts post for every agent, so **neither assignee nor
 authorship identifies you.**
 
-- Your id must be **registered in [`roster.md`](./roster.md)** and unique —
-  two concurrent sessions sharing one id caused a false-impersonation
-  investigation and made the pair mutually unreviewable to the gate (a marker
-  matching the PR's lane is refused as self-review). Starting a session under
-  an id the roster shows active elsewhere: pick a suffixed id and register it.
-- Mark ownership with the `agent:<id>` label — **on the pull request as well as
-  the issue.** Across the first run all 120 PRs carried none, and anything
-  reasoning about PR ownership was blind.
+- Your stable id is the `agent:<id>` label on your open issues and PRs. Before
+  first use, search those live labels; if another active lineage uses the id,
+  choose a suffix (`-b`, `-c`, …). Two concurrent sessions sharing one id become
+  mutually unreviewable because the gate treats a marker matching the PR lane as
+  self-review.
+- Mark ownership with the same `agent:<id>` label **on the pull request and its
+  issue**. The claim script creates a missing label and applies it to both.
 - Name yourself in every claim, handoff and review: `**From:** <your-agent-id>`.
 - Never infer who did something from GitHub metadata.
 
-**The recording token.** A reviewer PAT (account `faith-tohmm`) lets a review
-*record* — and post a GitHub-native `APPROVED` — on a PR authored under the
-shared default account, where GitHub otherwise refuses a same-account verdict.
-Since [ADR 0015](../architecture/decisions/0015-review-gate-independence-by-marker-identity.md)
-it is **optional corroboration, not load-bearing**: independence is judged on
-your `**From:**` marker versus the PR's lane, so a review counts on the marker
-alone even under the shared account, and a distinct account only earns the
-"corroborated by distinct account" tier. Its policy is unchanged, exactly the
-`GH_DISCUSSION_TOKEN` shape: scope it per command, never reconfigure `gh`
-globally, never print or commit it, and use it **only** to record a review
-(`gh pr review`) on a PR **your agent did not author** — never to author,
-push, or merge.
+GitHub may refuse a native approval when author and reviewer share an account.
+That must not erase agent identity: the `**From:**` marker and PR lane remain the
+load-bearing independence evidence, while a distinct-account approval is only
+corroboration.
+
+This repository's optional reviewer account is `faith-tohmm`. Its credential may
+only record a review on work the agent did not author — never use it to author,
+push, or merge. Scope it to one command, never reconfigure `gh`, and never print
+or commit it:
 
 ```bash
 GH_TOKEN=$(cat ~/.secrets/faith_pat) gh pr review <n> --approve --body "..."
 ```
 
-The token buys independence only against the *default-account* author.
-External agents author as `faith-tohmm` too (#635 was), and there the PAT
-records a self-review the gate rejects — record from the default account
-instead. Rule of thumb: **review from whichever account did not author the
-PR**; the gate's verdict line names both sides, so a mistake is visible, not
-silent.
+Use whichever account did not author the PR and include the stable `**From:**`
+agent id in the review body. A distinct account corroborates identity; it does
+not replace the marker or lane.
 
 Session/socket names are transport, not identity: they rotate (three
-misdirected redirects in one night). Address agents by roster id in the
-message body and let the recipient disclaim; only `**From:**` lines and
+misdirected redirects in one night). Address agents by their `agent:<id>` label
+in the message body and let the recipient disclaim; only `**From:**` lines and
 `agent:*` labels identify anyone.
 
 Sub-agents inherit their parent's label and a brief from the parent rather than
@@ -256,21 +324,23 @@ re-reading the corpus.
 
 | What | Where |
 |---|---|
-| Tasks — one per issue | [Issues](https://github.com/BelimbingApp/bilimbi/issues) |
-| Port map — what is done, what remains | [Discussion #73](https://github.com/BelimbingApp/bilimbi/discussions/73) |
+| Tasks — one per issue | This repository's GitHub Issues |
+| Current work and priorities | Open issues, PRs, and repository instructions |
 | Claims, handoffs, blockers, review findings | Comments on that issue or PR |
 | Owner and state | `agent:<id>` and `task:*` labels |
 | Merge holds | `hold:author`, `hold:review` |
-| Gates and sweeps you can run | `.github/scripts/` |
-| Who is who — registered agent ids and lanes | [`roster.md`](./roster.md) |
-| Owner decisions pending | pinned issue [#648](https://github.com/BelimbingApp/bilimbi/issues/648), label `task:kiatng` |
-| UI/UX program — quality bar, review lanes | issue #614 |
-| RFCs and open questions | [Discussions](https://github.com/BelimbingApp/bilimbi/discussions) |
-| Durable architecture decisions | `docs/architecture/decisions/` |
-| Stage order and exit gates | [`PORTING_STAGES.md`](./PORTING_STAGES.md) |
+| Gates, sweeps, orientation, and cleanup | [`scripts/`](./scripts/) |
+| Halt / stand-down signal | open issue labelled `ops:halt`, shown first by `orient.sh` |
+| Cleanup when you stop | [`scripts/cleanup.sh`](./scripts/cleanup.sh) |
+| Agent identity and current ownership | `agent:<id>` labels on open issues and PRs |
+| Active leader/steward | one owner-controlled open issue labelled `ops:steward` and `agent:<id>` |
+| Owner decisions | The queue designated by the owner |
+| RFCs and durable architecture decisions | The repository's documented locations |
 
-`docs/ai-team/` is these three files and nothing else. Coordination that
-reappears here as new files is drift.
+This directory contains the reusable guide, any project stage plan, and
+companion mechanisms under `scripts/`. Live identity or coordination that
+reappears here as new documents is drift; labels on Issues and PRs are the
+registry.
 
 ---
 
@@ -302,14 +372,13 @@ on the first.
 
 **Review after the merge when you did not get there first.** Teammates merge
 within minutes and that is working as intended — a post-hoc review is a normal
-step here, not a failure. It is how the escalation test in #393 was caught
-asserting a flash where it should have asserted the store.
+step here, not a failure. Post-hoc review still catches tests that assert an
+incidental response instead of the durable outcome.
 
-**A review of a PR opened under your own account silently degrades to
-`COMMENTED`.** GitHub blocks self-approval and we share two accounts, so the
-review still costs full inference but cannot be recorded as an approval. If a
-PR looks stuck with nothing actionable, check this before assuming the board is
-quiet.
+**A review of a PR opened under the same GitHub account silently degrades to
+`COMMENTED`.** GitHub blocks self-approval, so teams using shared accounts can
+perform a full review that cannot be recorded as an approval. If a PR looks
+stuck with nothing actionable, check this before assuming the board is quiet.
 
 ---
 
@@ -332,23 +401,18 @@ exist. **Cite the function that produces a fact, never prose near it**; a
 comment block listing five examples sat beside a function returning six
 patterns.
 
-**Green CI is not evidence that your module runs.** Core User merged, passed
-CI, and was **inert** — its migration never ran, because it was missing from
-Compatibility's dependency closure and `ModuleRegistry` discovers from
-`Application.loaded_applications/0`. The module's own suite passed because it
-builds temporary tables and never needs the migration. A test that builds its
-own tables is not coverage of migration behaviour.
+**Green CI is not evidence that a component participates in the assembled
+system.** A component-local suite can pass while its migrations, routes,
+registration, or startup path remain undiscovered. Add an integration proof for
+the mechanism that actually assembles production behavior.
 
-**A fixture that invents a constraint name stops testing the real one.** A
-temporary table declared `email varchar UNIQUE` gets PostgreSQL's
-`users_email_key`, while the migration creates `users_email_unique`. The
-changeset error became a raised `ConstraintError`. Name constraints in fixtures
-exactly as the migration does.
+**A fixture that invents a durable identifier stops testing the real one.** Use
+the exact production constraint names, types, status values, and payload shapes
+when behavior depends on them.
 
-**Never pipe a command whose exit code you are about to read.** `mix compile
---warnings-as-errors | tail` reports `tail`'s zero, and a broken commit was
-pushed over exactly that. Paid three separate times in one round, once by the
-review gate itself. Capture output to a file or a variable; check `$?` bare.
+**Never pipe a command whose exit code you are about to read.** A formatter or
+compiler piped into `tail` reports the final command's status, not necessarily
+the gate's. Capture output to a file or variable and check the gate directly.
 
 **A capture is truthful only about its own branch.** Audit-environment
 screenshots composite whatever fixes that worktree carries — one showed an
@@ -369,61 +433,39 @@ agents hit variants of claim-before-verify in one night. Before reporting
 green: commit everything, confirm `git status` is empty and `HEAD` equals the
 sha you are about to name, then run the suite — in that order.
 
+**A statistical claim names its method and denominator, exactly as a green claim
+names its sha.** "≈100% precise" is unverifiable; "30 hits drawn at random from a
+stated seed, read by hand, 30 genuine" is checkable and reproducible. State what
+you sampled, how many, and how you judged each — and if the precision is poor,
+report it poor: an honest 76% with a stated method is worth more to a decision
+than a flattering 95% no one can reproduce.
+
 **A hand-maintained copy of discoverable state is a coordination bottleneck
-wearing a test's clothes.** `workspace_boundary_test.exs` read each
-`bilimbi.module.exs` and asserted it equalled a hand-written copy of the same
-descriptor further up the file. It caught nothing, and it made every new module
-edit one file owned by someone else: 17 commits, and on one night three
-unrelated PRs each needing the same single line. Assert **invariants derived
-from discovery**, never a mirror of the values.
+wearing a test's clothes.** It catches no more than the source it mirrors and
+makes every addition edit a shared registry. Assert **invariants derived from
+discovery**, never a second copy of discovered values.
 
-**Never pipe a gate command.** `mix format --check-formatted | tail` reports
-`tail`'s exit status, so it prints success over failure. This masked a real
-failure twice.
+**Never pipe a gate command.** The last process in a pipeline may print success
+over a failed formatter, compiler, or test. Preserve and inspect the actual
+gate's status.
 
-**`missing plug dependency` in Geonames is a stale build artifact, not a bug.**
-`apps/core/geonames` uses Req's plug adapter to stub HTTP, and
-`deps/req/lib/req/plug.ex:1` is `if Code.ensure_loaded?(Plug) do` — evaluated at
-*Req's* compile time. If Req compiled before `plug` (declared `only: :test`)
-was available, a stub that raises is baked in and persists. Fix:
-
-```bash
-cd apps/core/geonames && MIX_ENV=test mix deps.compile req --force
-```
-
-Do not "fix" the source — there is nothing wrong with it. Suspect this whenever
-a dependency's optional feature is missing despite being in `mix.lock` and
-`deps/`.
-
-**Root `mix` needs deps first.** `credo`, `sobelow`, `dialyxir` and `mix_audit`
-are pinned but not fetched, so root `mix format` and `mix precommit` fail until
-`mix deps.get`. Module-level `mix test` works without it — run
-`cd apps/<layer>/<module> && mix test`.
-
-The normative database rules and dependency categories live in
-[Database Architecture](../architecture/database.md).
-
-**Cross-module foreign keys belong to the *depending* module's migration**, and
-the owning module declares them as an `optional_groups` entry. Add every member
-of a group in one migration; a partly-present group is reported as an
-incomplete contribution.
-
-**Check the driver branch before copying a constraint.** Belimbing's Authz
-ownership rule is a `CHECK` on PostgreSQL and *triggers* on SQLite. Requiring
-the triggers in a Bilimbi contract would leave verification permanently red.
+Keep dependency-cache remedies, build commands, architectural ownership rules,
+and source-system compatibility notes in the repository's ordinary instructions.
+They are important, but they are not part of the reusable team constitution.
 
 ---
 
 ## Fast orientation
 
 ```bash
-.github/scripts/orient.sh
+docs/ai-team/scripts/orient.sh
 ```
 
-Where the canonical checkout really is, what `main` is at, every open PR and who
-holds it, unclaimed `task:ready` issues, what is blocked, issues whose labels
-make them invisible to those queries, the installed modules in resolved order,
-and the three commands worth knowing.
+An active halt if one is up (first, so a stand-down is never missed), then what
+`main` is at, every open PR and who holds it, unclaimed `task:ready` issues, what
+is blocked, and issues whose labels hide them from those queries. A repository
+may add `scripts/project-orient.sh` for project-specific source checks and useful
+commands; remove or replace that hook when copying this package elsewhere.
 
 Run it instead of reading this file again. Orientation is our largest repeated
 cost — every agent pays it on every start — so it belongs in something that

@@ -6,7 +6,7 @@ on:
   # until the next cron fired, in a run nobody is watching.
   pull_request:
     paths:
-      - ".github/scripts/**"
+      - "docs/ai-team/scripts/**"
       - ".github/workflows/blocked-by-sweep.yml"
   schedule:
     - cron: "17,47 * * * *"
@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Test Blocked-By sweep
-        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+        run: python3 -m unittest discover -s docs/ai-team/scripts -p 'test_*.py'
 
   sweep:
     name: Unblock resolved tasks
@@ -53,4 +53,4 @@ jobs:
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: python3 .github/scripts/blocked_by_sweep.py
+        run: python3 docs/ai-team/scripts/blocked_by_sweep.py

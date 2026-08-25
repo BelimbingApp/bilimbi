@@ -4,7 +4,7 @@
 # mechanism: no write occurs until both the issue and the open-PR registry say
 # that the task is available.
 #
-#   CLAIM_AGENT=<stable-agent-id> .github/scripts/claim.sh <issue-number>
+#   CLAIM_AGENT=<stable-agent-id> docs/ai-team/scripts/claim.sh <issue-number>
 #
 # Optional: CLAIM_BRANCH=<branch>, CLAIM_TITLE=<PR title>. The defaults make a
 # branch that is easy for this script to recognise on later claim attempts.
@@ -92,6 +92,20 @@ if [[ $(jq length <<<"$matches") -gt 0 ]]; then
   exit 1
 fi
 
+# Labels on live Issues and PRs are the identity registry. Create the lane label
+# only after the claim has passed all availability checks, and before creating a
+# branch or PR that would need it.
+agent_label="agent:$agent"
+labels=$(gh label list --repo "$repo" --limit 1000 --json name 2>/dev/null) || {
+  echo "cannot read labels from $repo" >&2
+  exit 2
+}
+
+if ! jq -e --arg label "$agent_label" 'any(.name == $label)' <<<"$labels" >/dev/null; then
+  gh label create "$agent_label" --repo "$repo" --color "5319e7" \
+    --description "AI-team identity and ownership: $agent"
+fi
+
 branch="${CLAIM_BRANCH:-agent/${agent}-issue-${issue}}"
 title="${CLAIM_TITLE:-$(jq -r .title <<<"$issue_json") (#${issue})}"
 
@@ -108,7 +122,7 @@ git push -u origin "$branch"
 
 body=$(mktemp)
 trap 'rm -f "$body"' EXIT
-printf '**From:** %s\n\nClaiming #%s through .github/scripts/claim.sh.\n' "$agent" "$issue" >"$body"
+printf '**From:** %s\n\nClaiming #%s through docs/ai-team/scripts/claim.sh.\n' "$agent" "$issue" >"$body"
 
 pr_url=$(gh pr create --repo "$repo" --draft --title "$title" --body-file "$body")
 pr=${pr_url##*/}
