@@ -334,17 +334,14 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
         <.header>
           Employees
           <:title_actions>
-            <button
-              type="button"
+            <.icon_button
+              icon="bilimbi-pin"
+              label="Pin Employees to sidebar"
+              context={:inline}
               id="employees-pin"
               data-nav-pin="nav-admin-employee"
-              title="Pin Employees to sidebar"
-              aria-label="Pin Employees to sidebar"
               aria-pressed="false"
-              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-            >
-              <.icon name="bilimbi-pin" class="size-3.5" />
-            </button>
+            />
           </:title_actions>
           <:subtitle>People employed by {@current_scope.user["company_name"]}</:subtitle>
 
@@ -368,48 +365,49 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
           </:actions>
         </.header>
 
-        <.card id="employees-card" inner_class="p-0">
-          <h2 id="employees-table-title" class="sr-only">Employees</h2>
-          <.form
-            for={@filters_form}
-            id="employees-filters"
-            phx-change="filters"
-            class="p-2 mb-2"
-          >
-            <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)]">
-              <div class="relative">
-                <.icon
-                  name="hero-magnifying-glass"
-                  class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-                />
-                <.input
-                  field={@filters_form[:search]}
-                  id="employees-search"
-                  type="search"
-                  phx-debounce="300"
-                  maxlength="255"
-                  label="Search employees"
-                  label_class="sr-only"
-                  wrapper_class="mb-0"
-                  placeholder="Search by name, employee number, email, designation, or job description..."
-                  class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
-                />
-              </div>
+        <.form
+          for={@filters_form}
+          id="employees-filters"
+          phx-change="filters"
+          class="mb-2"
+        >
+          <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)]">
+            <div class="relative">
+              <.icon
+                name="hero-magnifying-glass"
+                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              />
               <.input
-                field={@filters_form[:type_filter]}
-                id="employees-type-filter"
-                type="select"
-                label="Type filter"
+                field={@filters_form[:search]}
+                id="employees-search"
+                type="search"
+                phx-debounce="300"
+                maxlength="255"
+                label="Search employees"
                 label_class="sr-only"
                 wrapper_class="mb-0"
-                options={[
-                  {"All types", "all"},
-                  {"Human only", "human"},
-                  {"Agent only", "agent"}
-                ]}
+                placeholder="Search by name, employee number, email, designation, or job description..."
+                class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
               />
             </div>
-          </.form>
+            <.input
+              field={@filters_form[:type_filter]}
+              id="employees-type-filter"
+              type="select"
+              label="Type filter"
+              label_class="sr-only"
+              wrapper_class="mb-0"
+              options={[
+                {"All types", "all"},
+                {"Human only", "human"},
+                {"Agent only", "agent"}
+              ]}
+            />
+          </div>
+        </.form>
+
+        <.card id="employees-card" inner_class="p-0">
+          <h2 id="employees-table-title" class="sr-only">Employees</h2>
 
           <.table
             id="employees"
@@ -462,26 +460,23 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
 
             <:action :let={employee}>
               <div class="flex items-center justify-end gap-3">
-                <.link
+                <.icon_button
                   :if={allowed?(@current_scope, "admin.employee.update")}
+                  icon="hero-pencil"
+                  label={"Edit #{employee.full_name}"}
                   id={"employee-#{employee.id}-edit"}
                   navigate={~p"/employees/#{employee.id}/edit"}
-                  class="text-xs font-semibold text-action hover:underline"
-                >
-                  Edit
-                </.link>
-                <button
+                />
+                <.icon_button
                   :if={allowed?(@current_scope, "admin.employee.delete")}
+                  icon="hero-trash"
+                  label={"Delete #{employee.full_name}"}
+                  kind={:danger}
                   id={"employee-#{employee.id}-delete"}
-                  type="button"
                   phx-click="delete"
                   phx-value-id={employee.id}
                   data-confirm={"Are you sure you want to delete #{employee.full_name}?"}
-                  title="Delete employee"
-                  class="rounded-md border border-danger-line bg-danger-surface px-2.5 py-1.5 text-xs font-semibold text-danger-ink transition hover:bg-danger"
-                >
-                  Delete
-                </button>
+                />
               </div>
             </:action>
 

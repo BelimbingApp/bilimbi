@@ -3,17 +3,14 @@
     <.header>
       Tenants
       <:title_actions>
-        <button
-          type="button"
+        <.icon_button
+          icon="bilimbi-pin"
+          label="Pin Tenants to sidebar"
+          context={:inline}
           id="tenants-pin"
           data-nav-pin="nav-admin-tenancy-tenant"
-          title="Pin Tenants to sidebar"
-          aria-label="Pin Tenants to sidebar"
           aria-pressed="false"
-          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-        >
-          <.icon name="bilimbi-pin" class="size-3.5" />
-        </button>
+        />
       </:title_actions>
       <:subtitle>Each tenant is an isolated customer of this instance</:subtitle>
       <:actions>

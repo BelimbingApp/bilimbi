@@ -429,60 +429,51 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
             </:col>
             <:action :let={dept}>
               <div class="flex items-center gap-2">
-                <button
+                <.icon_button
                   :if={@can_update?}
-                  type="button"
+                  icon="hero-user-plus"
+                  label={"Set head for #{dept.type.name}"}
                   id={"edit-dept-head-#{dept.id}"}
                   phx-click="edit_head"
                   phx-value-id={dept.id}
-                  class="text-xs text-action hover:underline"
-                >
-                  Set Head
-                </button>
-                <button
+                />
+                <.icon_button
                   :if={@can_update? and dept.status != "active"}
-                  type="button"
+                  icon="hero-check-circle"
+                  label={"Activate #{dept.type.name}"}
                   id={"activate-dept-#{dept.id}"}
                   phx-click="update_status"
                   phx-value-id={dept.id}
                   phx-value-status="active"
-                  class="text-xs text-action hover:underline"
-                >
-                  Activate
-                </button>
-                <button
+                />
+                <.icon_button
                   :if={@can_update? and dept.status != "suspended"}
-                  type="button"
+                  icon="hero-pause-circle"
+                  label={"Suspend #{dept.type.name}"}
                   id={"suspend-dept-#{dept.id}"}
                   phx-click="update_status"
                   phx-value-id={dept.id}
                   phx-value-status="suspended"
-                  class="text-xs text-warning hover:underline"
-                >
-                  Suspend
-                </button>
-                <button
+                />
+                <.icon_button
                   :if={@can_update? and dept.status != "inactive"}
-                  type="button"
+                  icon="hero-x-circle"
+                  label={"Deactivate #{dept.type.name}"}
                   id={"deactivate-dept-#{dept.id}"}
                   phx-click="update_status"
                   phx-value-id={dept.id}
                   phx-value-status="inactive"
-                  class="text-xs text-ink-subtle hover:underline"
-                >
-                  Deactivate
-                </button>
-                <button
+                />
+                <.icon_button
                   :if={@can_update?}
-                  type="button"
+                  icon="hero-trash"
+                  label={"Remove #{dept.type.name}"}
+                  kind={:danger}
                   id={"delete-dept-#{dept.id}"}
                   phx-click="delete"
                   phx-value-id={dept.id}
                   data-confirm="Are you sure you want to remove this department?"
-                  class="text-xs text-danger hover:underline ml-2"
-                >
-                  Remove
-                </button>
+                />
               </div>
             </:action>
             <:empty :if={@departments_count == 0}>

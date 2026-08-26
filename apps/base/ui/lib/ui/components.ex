@@ -178,11 +178,14 @@ defmodule Bilimbi.Base.UI.Components do
     # a color defined in both the shared base and a variant is resolved by
     # stylesheet order, not by this list's order (#619's invisible button).
     variants = %{
-      "primary" => "bg-action text-action-ink hover:bg-action-hover focus-visible:ring-action/25",
-      "danger" => "bg-danger text-ink-inverse hover:bg-danger-hover focus-visible:ring-danger/30",
+      "primary" =>
+        "bg-action text-action-ink hover:bg-action-hover shadow-sm focus-visible:ring-brand-strong/30",
+      "danger" =>
+        "text-danger hover:bg-danger-surface hover:text-danger-ink hover:underline " <>
+          "focus-visible:ring-brand-strong/30",
       nil =>
-        "border border-high-contrast-line bg-surface text-ink hover:bg-surface-sunken " <>
-          "focus-visible:ring-action/25"
+        "border border-high-contrast-line bg-surface text-ink hover:bg-surface-sunken shadow-sm " <>
+          "focus-visible:ring-brand-strong/30"
     }
 
     # A caller-supplied class extends the button; it must not replace the
@@ -191,7 +194,7 @@ defmodule Bilimbi.Base.UI.Components do
     assigns =
       assign(assigns, :class, [
         "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
-        "shadow-sm transition focus-visible:outline-none focus-visible:ring-2",
+        "transition focus-visible:outline-none focus-visible:ring-2",
         "focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
         "disabled:cursor-not-allowed disabled:opacity-50",
         Map.fetch!(variants, assigns[:variant]),
@@ -208,6 +211,65 @@ defmodule Bilimbi.Base.UI.Components do
       ~H"""
       <button class={@class} {@rest}>
         {render_slot(@inner_block)}
+      </button>
+      """
+    end
+  end
+
+  @doc """
+  Renders a compact icon-only action.
+
+  Use `context={:inline}` beside a heading or label, and the default
+  `context={:table}` for repeated table and toolbar actions. Icon-only actions
+  are for familiar operations where the label is still available to assistive
+  technology and as a tooltip. Keep primary or unfamiliar actions as text
+  buttons.
+  """
+  attr(:icon, :string, required: true)
+  attr(:label, :string, required: true)
+  attr(:context, :atom, values: [:inline, :table], default: :table)
+  attr(:kind, :atom, values: [:neutral, :danger], default: :neutral)
+  attr(:class, :any, default: nil)
+
+  attr(:rest, :global,
+    include: ~w(href navigate patch method download disabled type name value title)
+  )
+
+  def icon_button(%{rest: rest} = assigns) do
+    assigns =
+      assigns
+      |> assign(:control_class, [
+        "grid shrink-0 place-items-center transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
+        assigns.context == :inline && "size-5 rounded-sm",
+        assigns.context == :table && "size-7 rounded-md",
+        assigns.kind == :neutral &&
+          "text-ink-muted hover:bg-surface-sunken hover:text-ink disabled:text-ink-faint",
+        assigns.kind == :danger &&
+          "text-danger hover:bg-danger-surface hover:text-danger-ink disabled:text-ink-faint",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        assigns.class
+      ])
+      |> assign(:icon_class, if(assigns.context == :inline, do: "size-3.5", else: "size-4"))
+      |> assign(:title, rest[:title] || assigns.label)
+      |> assign(:control_type, rest[:type] || "button")
+      |> assign(:control_rest, Map.drop(rest, [:title, :type]))
+
+    if rest[:href] || rest[:navigate] || rest[:patch] do
+      ~H"""
+      <.link aria-label={@label} title={@title} class={@control_class} {@control_rest}>
+        <.icon name={@icon} class={@icon_class} />
+      </.link>
+      """
+    else
+      ~H"""
+      <button
+        type={@control_type}
+        aria-label={@label}
+        title={@title}
+        class={@control_class}
+        {@control_rest}
+      >
+        <.icon name={@icon} class={@icon_class} />
       </button>
       """
     end
@@ -349,7 +411,7 @@ defmodule Bilimbi.Base.UI.Components do
           checked={@checked}
           class={
             @class ||
-              "size-4 shrink-0 rounded border-high-contrast-line accent-action focus:outline-none focus:ring-2 focus:ring-action/20"
+              "size-4 shrink-0 rounded border-high-contrast-line accent-action focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
           }
           {@rest}
         />{@label}
@@ -463,9 +525,9 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   defp field_base_class do
-    "block w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink shadow-xs " <>
-      "transition placeholder:text-ink-faint focus:border-action focus:outline-none " <>
-      "focus:ring-2 focus:ring-action/20 disabled:cursor-not-allowed " <>
+    "block w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-ink shadow-xs " <>
+      "transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none " <>
+      "focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed " <>
       "disabled:bg-surface-sunken disabled:text-ink-subtle"
   end
 
@@ -611,7 +673,7 @@ defmodule Bilimbi.Base.UI.Components do
           |> JS.toggle_class("rotate-180", to: "##{@id}-chevron")
         }
         class={[
-          "flex w-full items-center justify-between gap-3 rounded-lg border border-line bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20",
+          "flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30",
           @class
         ]}
         {@rest}
@@ -649,7 +711,7 @@ defmodule Bilimbi.Base.UI.Components do
             name={@input_name}
             value={opt_value}
             checked={opt_value in @selected_values}
-            class="size-4 shrink-0 rounded border-line text-action accent-action focus:ring-2 focus:ring-action/20"
+            class="size-4 shrink-0 rounded border-line text-action accent-action focus:ring-2 focus:ring-brand-strong/30"
           />
           <span class="truncate font-normal">{opt_label}</span>
         </label>
@@ -1145,7 +1207,7 @@ defmodule Bilimbi.Base.UI.Components do
               {render_slot(col, @row_item.(row))}
             </td>
             <td :if={@action != []} class="w-0 px-2 py-0.5 font-semibold">
-              <div class="flex gap-4">
+              <div class="flex items-center justify-end gap-1">
                 <%= for action <- @action do %>
                   {render_slot(action, @row_item.(row))}
                 <% end %>
@@ -1250,7 +1312,7 @@ defmodule Bilimbi.Base.UI.Components do
       phx-click={@sort_event}
       phx-value-sort={@col[:sort]}
       class={[
-        "inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25",
+        "inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/30",
         @col[:align] == :right && "ml-auto",
         @col[:align] != :right && "text-left"
       ]}

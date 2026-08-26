@@ -800,20 +800,17 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         <.header>
           {@company.name}
           <:title_actions>
-            <button
-              type="button"
+            <.icon_button
+              icon="bilimbi-pin"
+              label="Pin this company to sidebar"
+              context={:inline}
               id="company-pin"
               data-nav-pin="record"
               data-nav-pin-record="true"
               data-nav-pin-label={"Administration / Companies / #{@company.name}"}
               data-nav-pin-url={~p"/companies/#{@company.id}"}
-              title="Pin this company to sidebar"
-              aria-label="Pin this company to sidebar"
               aria-pressed="false"
-              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-            >
-              <.icon name="bilimbi-pin" class="size-3.5" />
-            </button>
+              />
           </:title_actions>
           <:subtitle>
             <%!-- Belimbing: title=name, subtitle=legal_name. Repeating the
@@ -1010,7 +1007,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 value={@new_activity}
                 phx-change="update_new_activity"
                 placeholder="e.g. manufacturing"
-                class="w-64 rounded-xl border border-line px-3 py-1.5 text-sm bg-surface text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-1 focus:ring-action"
+                class="w-64 rounded-md border border-line px-3 py-1.5 text-sm bg-surface text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
               />
               <.button type="submit" class="text-xs">
                 Add activity
@@ -1056,7 +1053,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 name="metadata"
                 id="company-metadata-json"
                 rows="5"
-                class="w-full rounded-xl border border-line bg-surface p-3 text-xs font-mono text-ink focus:outline-none focus:ring-1 focus:ring-action"
+                class="w-full rounded-md border border-line bg-surface p-3 text-xs font-mono text-ink focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
                 placeholder='{"employee_count": 120, "founded_year": 2014}'
               >{@metadata_input}</textarea>
               <div class="flex items-center gap-2">

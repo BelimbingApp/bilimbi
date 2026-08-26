@@ -3,64 +3,63 @@
     <.header>
       Decision Logs
       <:title_actions>
-        <button
-          type="button"
+        <.icon_button
+          icon="bilimbi-pin"
+          label="Pin Decision Logs to sidebar"
+          context={:inline}
           id="decision-logs-pin"
           data-nav-pin="nav-admin-authz-decision-log"
-          title="Pin Decision Logs to sidebar"
-          aria-label="Pin Decision Logs to sidebar"
           aria-pressed="false"
-          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-        >
-          <.icon name="bilimbi-pin" class="size-3.5" />
-        </button>
+          />
       </:title_actions>
       <:subtitle>Every authorization decision this tenant has recorded, newest first</:subtitle>
     </.header>
 
-    <.card id="decision-logs-card" inner_class="p-0">
-      <.form
-        for={%{}}
-        as={:filters}
-        id="logs-filters"
-        phx-change="filter"
-        phx-submit="filter"
-        class="p-2 mb-2"
-      >
-        <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
-          <div class="relative">
-            <.icon
-              name="hero-magnifying-glass"
-              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-            />
-            <.input
-              type="search"
-              id="logs-search"
-              name="search"
-              value={@state.search}
-              placeholder="Search capability, reason or resource"
-              phx-debounce="300"
-              autocomplete="off"
-              label="Search decisions"
-              label_class="sr-only"
-              wrapper_class="mb-0"
-              class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
-            />
-          </div>
+    <.form
+      for={%{}}
+      as={:filters}
+      id="logs-filters"
+      phx-change="filter"
+      phx-submit="filter"
+      class="mb-2"
+    >
+      <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
+        <div class="relative">
+          <.icon
+            name="hero-magnifying-glass"
+            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+          />
           <.input
-            type="select"
-            id="logs-result"
-            name="result"
-            value={@state.result}
-            label="Filter by result"
+            type="search"
+            id="logs-search"
+            name="search"
+            value={@state.search}
+            placeholder="Search capability, reason or resource"
+            phx-debounce="300"
+            autocomplete="off"
+            label="Search decisions"
             label_class="sr-only"
             wrapper_class="mb-0"
-            prompt="All results"
-            options={[{"Allowed", "allowed"}, {"Denied", "denied"}]}
-            class="h-[2.125rem] w-full rounded-lg border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+            class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
           />
         </div>
-      </.form>
+        <.input
+          type="select"
+          id="logs-result"
+          name="result"
+          value={@state.result}
+          label="Filter by result"
+          label_class="sr-only"
+          wrapper_class="mb-0"
+          prompt="All results"
+          options={[{"Allowed", "allowed"}, {"Denied", "denied"}]}
+          class="h-[2.125rem] w-full rounded-md border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
+        />
+      </div>
+    </.form>
+
+    <.card id="decision-logs-card" inner_class="p-0">
+
 
       <.table
         id="decision-logs"

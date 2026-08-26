@@ -286,27 +286,24 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
                 >
                   {if type.is_active, do: "Deactivate", else: "Activate"}
                 </button>
-                <button
+                <.icon_button
                   :if={@can_update?}
-                  type="button"
+                  icon="hero-pencil"
+                  label={"Edit #{type.name}"}
                   id={"edit-type-#{type.id}"}
                   phx-click="edit"
                   phx-value-id={type.id}
-                  class="text-xs text-action hover:underline"
-                >
-                  Edit
-                </button>
-                <button
+                />
+                <.icon_button
                   :if={@can_delete?}
-                  type="button"
+                  icon="hero-trash"
+                  label={"Delete #{type.name}"}
+                  kind={:danger}
                   id={"delete-type-#{type.id}"}
                   phx-click="delete"
                   phx-value-id={type.id}
                   data-confirm="Are you sure you want to delete this legal entity type?"
-                  class="text-xs text-danger hover:underline"
-                >
-                  Delete
-                </button>
+                />
               </div>
             </:action>
             <:empty :if={@types_count == 0}>

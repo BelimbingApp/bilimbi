@@ -107,10 +107,10 @@ Validation: A human can inspect the current design, compare each open variation 
 Goal: Turn human decisions into one coherent Bilimbi default.
 
 - [x] Record the choice for `T01`.
-- [ ] Record the choices for `C01`–`C06`.
-- [ ] Update shared components and affected screens so rejected variations no longer drift in production.
+- [x] Record the choices for `C01`–`C06`.
+- [x] Update shared components and affected screens so rejected variations no longer drift in production.
 - [x] Move `T01` to Design Spec under the same number.
-- [ ] Move each accepted component choice to Design Spec under the same number.
+- [x] Move each accepted component choice to Design Spec under the same number.
 - [ ] Continue the audit across the remaining application screens and add numbered decisions only where human judgment is needed.
 - [ ] Give each changeable design fact one owner in the smallest useful default-library structure.
 - [ ] Create a small Design Library agent skill for inspection, focused edits, browser review and validation.

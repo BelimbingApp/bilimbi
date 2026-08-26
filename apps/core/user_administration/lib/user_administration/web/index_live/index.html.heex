@@ -3,17 +3,14 @@
     <.header>
       User Management
       <:title_actions>
-        <button
-          type="button"
+        <.icon_button
+          icon="bilimbi-pin"
+          label="Pin Users to sidebar"
+          context={:inline}
           id="users-pin"
           data-nav-pin="nav-admin-user"
-          title="Pin Users to sidebar"
-          aria-label="Pin Users to sidebar"
           aria-pressed="false"
-          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-        >
-          <.icon name="bilimbi-pin" class="size-3.5" />
-        </button>
+        />
       </:title_actions>
       <:subtitle>Search, filter, and manage the accounts in this workspace.</:subtitle>
       <:actions>
@@ -28,45 +25,46 @@
       </:actions>
     </.header>
 
-    <.card id="users-card" inner_class="p-0">
-      <h2 id="users-table-title" class="sr-only">Workspace users</h2>
-      <.form
-        for={@filters_form}
-        id="users-filters"
-        phx-change="filters"
-        class="p-2 mb-2"
-      >
-        <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_16rem]">
-          <div class="relative">
-            <.icon
-              name="hero-magnifying-glass"
-              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-            />
-            <.input
-              field={@filters_form[:search]}
-              id="users-search"
-              type="search"
-              phx-debounce="300"
-              maxlength="255"
-              label="Search users"
-              label_class="sr-only"
-              wrapper_class="mb-0"
-              placeholder="Search by name or email..."
-              class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
-            />
-          </div>
-          <.multi_select
-            field={@filters_form[:roleIds]}
-            id="users-role-filter"
-            placeholder="All roles"
-            selection_label=":count role selected|:count roles selected"
-            label="Roles"
+    <.form
+      for={@filters_form}
+      id="users-filters"
+      phx-change="filters"
+      class="mb-2"
+    >
+      <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_16rem]">
+        <div class="relative">
+          <.icon
+            name="hero-magnifying-glass"
+            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+          />
+          <.input
+            field={@filters_form[:search]}
+            id="users-search"
+            type="search"
+            phx-debounce="300"
+            maxlength="255"
+            label="Search users"
             label_class="sr-only"
             wrapper_class="mb-0"
-            options={@role_options}
+            placeholder="Search by name or email..."
+            class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
           />
         </div>
-      </.form>
+        <.multi_select
+          field={@filters_form[:roleIds]}
+          id="users-role-filter"
+          placeholder="All roles"
+          selection_label=":count role selected|:count roles selected"
+          label="Roles"
+          label_class="sr-only"
+          wrapper_class="mb-0"
+          options={@role_options}
+        />
+      </div>
+    </.form>
+
+    <.card id="users-card" inner_class="p-0">
+      <h2 id="users-table-title" class="sr-only">Workspace users</h2>
 
       <.table
         id="users"
@@ -141,34 +139,31 @@
         </:col>
         <:action :let={user}>
           <div class="flex items-center justify-end">
-            <.link
+            <.icon_button
               :if={
                 allowed?(@current_scope, "admin.user.impersonate") and
                   not user.company_archived and
                   user.id != @current_scope.user["user_id"] and
                   is_nil(@current_scope.impersonator)
               }
+              icon="bilimbi-impersonate"
+              label={gettext("Impersonate %{name}", name: user.name)}
+              title={gettext("Impersonate this user")}
               id={"user-#{user.id}-impersonate"}
               href={~p"/admin/impersonate/#{user.id}"}
               method="post"
-              aria-label={gettext("Impersonate %{name}", name: user.name)}
-              title={gettext("Impersonate this user")}
-              class="grid size-7 place-items-center rounded-md text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
-            >
-              <.icon name="bilimbi-impersonate" class="size-4" />
-              <span class="sr-only">{gettext("Impersonate")}</span>
-            </.link>
-            <button
+            />
+            <.icon_button
               :if={
                 allowed?(@current_scope, "admin.user.impersonate") and
                   (user.company_archived or
                      user.id == @current_scope.user["user_id"] or
                      not is_nil(@current_scope.impersonator))
               }
+              icon="bilimbi-impersonate"
+              label={gettext("Impersonate %{name}", name: user.name)}
               id={"user-#{user.id}-impersonate"}
-              type="button"
               disabled
-              aria-label={gettext("Impersonate %{name}", name: user.name)}
               title={
                 cond do
                   user.id == @current_scope.user["user_id"] ->
@@ -184,48 +179,38 @@
                     gettext("Impersonate this user")
                 end
               }
-              class="grid size-7 place-items-center rounded-md text-ink-muted opacity-40 cursor-not-allowed"
-            >
-              <.icon name="bilimbi-impersonate" class="size-4" />
-              <span class="sr-only">{gettext("Impersonate")}</span>
-            </button>
-            <button
+            />
+            <.icon_button
               :if={
                 allowed?(@current_scope, "admin.user.delete") and
                   user.id != @current_scope.user["user_id"] and
                   not user.company_archived
               }
+              icon="hero-trash"
+              label={gettext("Delete %{name}", name: user.name)}
+              title={gettext("Delete user")}
+              kind={:danger}
               id={"user-#{user.id}-delete"}
-              type="button"
               phx-click="delete"
               phx-value-id={user.id}
               data-confirm="Are you sure you want to delete this user?"
-              aria-label={gettext("Delete %{name}", name: user.name)}
-              title={gettext("Delete user")}
-              class="grid size-7 place-items-center rounded-md text-danger-ink transition hover:bg-danger-surface focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-danger/40"
-            >
-              <.icon name="hero-trash" class="size-4" />
-              <span class="sr-only">{gettext("Delete")}</span>
-            </button>
-            <button
+            />
+            <.icon_button
               :if={
                 allowed?(@current_scope, "admin.user.delete") and
                   (user.id == @current_scope.user["user_id"] or user.company_archived)
               }
+              icon="hero-trash"
+              label={gettext("Delete %{name}", name: user.name)}
+              kind={:danger}
               id={"user-#{user.id}-delete"}
-              type="button"
               disabled
-              aria-label={gettext("Delete %{name}", name: user.name)}
               title={
                 if user.id == @current_scope.user["user_id"],
                   do: gettext("You cannot delete your own account"),
                   else: gettext("Archived-company users cannot be deleted from this list")
               }
-              class="grid size-7 place-items-center rounded-md text-ink-muted opacity-40 cursor-not-allowed"
-            >
-              <.icon name="hero-trash" class="size-4" />
-              <span class="sr-only">{gettext("Delete")}</span>
-            </button>
+            />
           </div>
         </:action>
         <:empty :if={@users_page.entries == []}>

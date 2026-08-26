@@ -7,66 +7,65 @@
     <.header>
       Principal Capabilities
       <:title_actions>
-        <button
-          type="button"
+        <.icon_button
+          icon="bilimbi-pin"
+          label="Pin Principal Capabilities to sidebar"
+          context={:inline}
           id="principal-capabilities-pin"
           data-nav-pin="nav-admin-authz-principal-capability"
-          title="Pin Principal Capabilities to sidebar"
-          aria-label="Pin Principal Capabilities to sidebar"
           aria-pressed="false"
-          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-        >
-          <.icon name="bilimbi-pin" class="size-3.5" />
-        </button>
+          />
       </:title_actions>
       <:subtitle>
         Capabilities granted or denied directly, outside any role. A direct denial outranks a role's grant.
       </:subtitle>
     </.header>
 
-    <.card id="principal-capabilities-card" inner_class="p-0">
-      <.form
-        for={%{}}
-        as={:filters}
-        id="grants-filters"
-        phx-change="filter"
-        phx-submit="filter"
-        class="p-2 mb-2"
-      >
-        <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
-          <div class="relative">
-            <.icon
-              name="hero-magnifying-glass"
-              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-            />
-            <.input
-              type="search"
-              id="grants-search"
-              name="search"
-              value={@state.search}
-              placeholder="Search by capability key or principal name"
-              phx-debounce="300"
-              autocomplete="off"
-              label="Search capabilities"
-              label_class="sr-only"
-              wrapper_class="mb-0"
-              class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
-            />
-          </div>
+    <.form
+      for={%{}}
+      as={:filters}
+      id="grants-filters"
+      phx-change="filter"
+      phx-submit="filter"
+      class="mb-2"
+    >
+      <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
+        <div class="relative">
+          <.icon
+            name="hero-magnifying-glass"
+            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+          />
           <.input
-            type="select"
-            id="grants-result"
-            name="result"
-            value={@state.result}
-            label="Filter by grant or denial"
+            type="search"
+            id="grants-search"
+            name="search"
+            value={@state.search}
+            placeholder="Search by capability key or principal name"
+            phx-debounce="300"
+            autocomplete="off"
+            label="Search capabilities"
             label_class="sr-only"
             wrapper_class="mb-0"
-            prompt="Granted and denied"
-            options={[{"Granted", "allowed"}, {"Denied", "denied"}]}
-            class="h-[2.125rem] w-full rounded-lg border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+            class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
           />
         </div>
-      </.form>
+        <.input
+          type="select"
+          id="grants-result"
+          name="result"
+          value={@state.result}
+          label="Filter by grant or denial"
+          label_class="sr-only"
+          wrapper_class="mb-0"
+          prompt="Granted and denied"
+          options={[{"Granted", "allowed"}, {"Denied", "denied"}]}
+          class="h-[2.125rem] w-full rounded-md border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
+        />
+      </div>
+    </.form>
+
+    <.card id="principal-capabilities-card" inner_class="p-0">
+
 
       <.table
         id="principal-capabilities"

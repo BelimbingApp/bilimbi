@@ -2,8 +2,8 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   @moduledoc """
   Human review surface for the design Bilimbi currently uses.
 
-  The development review shows production components and visible variations.
-  Accepted choices are recorded separately in Design Spec.
+  Components shows the production catalogue. Accepted choices are recorded in
+  Design Spec.
   """
 
   use Bilimbi.Base.UI, :live_view
@@ -47,11 +47,21 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
     sample_data = %{
       "text_field" => "Sample text value",
       "search_field" => "Search query",
+      "email_field" => "hello@example.com",
+      "tel_field" => "+60 12-345 6789",
+      "url_field" => "https://bilimbi.test",
+      "number_field" => "25",
+      "password_field" => "secret-value",
       "select_field" => "standard",
+      "roles" => ["admin", "reviewer"],
       "checkbox_field" => "true",
+      "radio_field" => "system",
       "textarea_field" => "Multi-line sample content demonstrating textarea rendering.",
       "date_field" => "2026-08-17",
-      "time_field" => "14:30"
+      "time_field" => "14:30",
+      "datetime_field" => "2026-08-17T14:30",
+      "month_field" => "2026-08",
+      "week_field" => "2026-W34"
     }
 
     error_data = %{
@@ -92,6 +102,11 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   end
 
   @impl true
+  def handle_event("sample_change", %{"sample" => sample_data}, socket) do
+    {:noreply, assign(socket, :sample_form, to_form(sample_data, as: :sample))}
+  end
+
+  @impl true
   def handle_event("preview-inline-edit", %{"value" => value}, socket) do
     {:noreply,
      socket
@@ -111,8 +126,8 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   defp area_details(:components) do
     {
       gettext("Components"),
-      gettext("Compare current UI choices, then review every shared component in use."),
-      gettext("6 decisions"),
+      gettext("Choose a component family, then review its current behaviour and states."),
+      gettext("Current library"),
       "admin.system.design-library.components"
     }
   end

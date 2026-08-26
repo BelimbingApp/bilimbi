@@ -558,20 +558,17 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
         <.header>
           {Employee.Summary.display_name(@employee)}
           <:title_actions>
-            <button
-              type="button"
+            <.icon_button
+              icon="bilimbi-pin"
+              label="Pin this employee to sidebar"
+              context={:inline}
               id="employee-pin"
               data-nav-pin="record"
               data-nav-pin-record="true"
               data-nav-pin-label={"Administration / Employees / #{Employee.Summary.display_name(@employee)}"}
               data-nav-pin-url={~p"/employees/#{@employee.id}"}
-              title="Pin this employee to sidebar"
-              aria-label="Pin this employee to sidebar"
               aria-pressed="false"
-              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-            >
-              <.icon name="bilimbi-pin" class="size-3.5" />
-            </button>
+            />
           </:title_actions>
           <:subtitle>
             {@employee.designation || @employee.job_description || @employee.employee_number}
@@ -807,7 +804,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                             name="department_id"
                             phx-mounted={JS.focus()}
                             phx-blur="cancel_edit_field"
-                            class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                            class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                           >
                             <option value="" selected={is_nil(@employee.department_id)}>None</option>
 
@@ -854,7 +851,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                             name="supervisor_id"
                             phx-mounted={JS.focus()}
                             phx-blur="cancel_edit_field"
-                            class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                            class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                           >
                             <option value="" selected={is_nil(@employee.supervisor_id)}>None</option>
 
@@ -900,7 +897,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                             name="employee_type"
                             phx-mounted={JS.focus()}
                             phx-blur="cancel_edit_field"
-                            class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                            class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                           >
                             <optgroup label="Human">
                               <%= for type <- Enum.reject(@employee_types, &(&1.code == "agent")) do %>
@@ -954,7 +951,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                             name="status"
                             phx-mounted={JS.focus()}
                             phx-blur="cancel_edit_field"
-                            class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                            class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                           >
                             <option value="pending" selected={@employee.status == "pending"}>
                               Pending
@@ -1047,7 +1044,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                         <select
                           id="employee-subordinate-select"
                           name="subordinate_id"
-                          class="min-w-48 rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                          class="min-w-48 rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                         >
                           <option value="">Select employee...</option>
 

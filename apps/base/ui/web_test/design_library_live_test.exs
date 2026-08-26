@@ -77,20 +77,19 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#nav-admin-system-design-library-theme[aria-current='page']")
   end
 
-  test "Components presents numbered choices before the full component inventory", %{
+  test "Components presents the current catalogue without resolved alternatives", %{
     conn: conn
   } do
     {:ok, view, _html} = open(conn, "/system/design-library/components")
 
-    assert has_element?(view, "#development-review")
-
     for number <- 1..6 do
-      assert has_element?(view, "#decision-c0#{number}", "C0#{number}")
+      refute has_element?(view, "#decision-c0#{number}")
     end
 
-    assert has_element?(view, "#component-decisions-forms", "Forms")
-    assert has_element?(view, "#component-decisions-actions", "Actions")
-    assert has_element?(view, "#component-decisions-lists", "Operational lists")
+    assert has_element?(view, "#component-catalog", "Component catalogue")
+    assert has_element?(view, "#component-input-guidance", "Choice guidance")
+    assert has_element?(view, "#component-input-live-state", "Live state")
+    assert has_element?(view, "#component-icon-button", "Compact icon actions")
 
     for area <- ~w(components component-patterns component-states) do
       assert has_element?(view, "##{area}")
@@ -107,6 +106,28 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#sample-table", "Acme Holdings")
     assert has_element?(view, "#sample-table", "Globex Corporation")
     assert has_element?(view, "#nav-admin-system-design-library-components[aria-current='page']")
+  end
+
+  test "Components input examples update their visible state", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    view
+    |> form("#design-library-fields", %{
+      "sample" => %{
+        "text_field" => "Bilimbi Holdings",
+        "search_field" => "company",
+        "select_field" => "advanced",
+        "roles" => ["operator"],
+        "checkbox_field" => "true",
+        "radio_field" => "dark",
+        "datetime_field" => "2026-08-26T14:30"
+      }
+    })
+    |> render_change()
+
+    assert has_element?(view, "#component-input-live-state", "Bilimbi Holdings")
+    assert has_element?(view, "#component-input-live-state", "operator")
+    assert has_element?(view, "#component-input-live-state", "dark")
   end
 
   test "Graphic shows the Bilimbi mark and icons in current use", %{conn: conn} do
@@ -127,6 +148,12 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#spec-d01")
     assert has_element?(view, "#spec-d06")
     assert has_element?(view, "#spec-t01", "Theme contrast stays distinct")
+    assert has_element?(view, "#spec-components", "Components")
+
+    for number <- 1..6 do
+      assert has_element?(view, "#spec-c0#{number}", "C0#{number}")
+    end
+
     assert has_element?(view, "#spec-theme", "Theme")
     assert has_element?(view, "#spec-structure-data", "Structure and data")
     assert has_element?(view, "#spec-experience", "Experience")

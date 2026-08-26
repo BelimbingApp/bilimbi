@@ -168,7 +168,7 @@ defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
                 <select
                   id="employee-user"
                   name="user_id"
-                  class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                  class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                 >
                   <option value="" selected={is_nil(@linked_user)}>None</option>
 

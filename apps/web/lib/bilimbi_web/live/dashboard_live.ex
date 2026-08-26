@@ -584,36 +584,31 @@ defmodule BilimbiWeb.DashboardLive do
                       Open company
                     </.link>
                     <div :if={@layout_editing} class="flex gap-0.5">
-                      <button
+                      <.icon_button
+                        icon="hero-chevron-up"
+                        label="Move current company up"
+                        context={:inline}
                         id="move-section-up-current-company"
-                        type="button"
                         phx-click="move-section-up"
                         phx-value-id="current-company"
-                        title="Move up"
-                        class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-                      >
-                        <.icon name="hero-chevron-up" class="size-3" />
-                      </button>
-                      <button
+                      />
+                      <.icon_button
+                        icon="hero-chevron-down"
+                        label="Move current company down"
+                        context={:inline}
                         id="move-section-down-current-company"
-                        type="button"
                         phx-click="move-section-down"
                         phx-value-id="current-company"
-                        title="Move down"
-                        class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-                      >
-                        <.icon name="hero-chevron-down" class="size-3" />
-                      </button>
-                      <button
+                      />
+                      <.icon_button
+                        icon="hero-x-mark"
+                        label="Remove current company section"
+                        context={:inline}
+                        kind={:danger}
                         id="remove-section-current-company"
-                        type="button"
                         phx-click="remove-section"
                         phx-value-id="current-company"
-                        class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-                        title="Remove section"
-                      >
-                        <.icon name="hero-x-mark" class="size-3" />
-                      </button>
+                      />
                     </div>
                   </div>
                 </div>
@@ -630,36 +625,31 @@ defmodule BilimbiWeb.DashboardLive do
                     All users
                   </.link>
                   <div :if={@layout_editing} class="flex gap-0.5">
-                    <button
+                    <.icon_button
+                      icon="hero-chevron-up"
+                      label="Move people section up"
+                      context={:inline}
                       id="move-section-up-recent-users"
-                      type="button"
                       phx-click="move-section-up"
                       phx-value-id="recent-users"
-                      title="Move up"
-                      class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-                    >
-                      <.icon name="hero-chevron-up" class="size-3" />
-                    </button>
-                    <button
+                    />
+                    <.icon_button
+                      icon="hero-chevron-down"
+                      label="Move people section down"
+                      context={:inline}
                       id="move-section-down-recent-users"
-                      type="button"
                       phx-click="move-section-down"
                       phx-value-id="recent-users"
-                      title="Move down"
-                      class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-                    >
-                      <.icon name="hero-chevron-down" class="size-3" />
-                    </button>
-                    <button
+                    />
+                    <.icon_button
+                      icon="hero-x-mark"
+                      label="Remove people section"
+                      context={:inline}
+                      kind={:danger}
                       id="remove-section-recent-users"
-                      type="button"
                       phx-click="remove-section"
                       phx-value-id="recent-users"
-                      class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-                      title="Remove section"
-                    >
-                      <.icon name="hero-x-mark" class="size-3" />
-                    </button>
+                    />
                   </div>
                 </div>
                 <.table
@@ -695,48 +685,46 @@ defmodule BilimbiWeb.DashboardLive do
     ~H"""
     <div class="relative" id={"widget-#{@id}"} data-widget-id={@id}>
       <div :if={@layout_editing} class="absolute right-1 top-1 z-10 flex gap-0.5">
-        <button
+        <.icon_button
+          icon="hero-bars-3"
+          label={"Drag to reorder #{@widget.label}"}
+          context={:inline}
           id={"drag-#{@id}"}
-          type="button"
           draggable="true"
           data-role="drag-handle"
           title="Drag to reorder. Changes save when dropped."
-          aria-label={"Drag to reorder #{@widget.label}"}
-          class="grid size-5 cursor-grab touch-none place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong active:cursor-grabbing"
-        >
-          <.icon name="hero-bars-3" class="size-3" />
-        </button>
+          class="cursor-grab touch-none active:cursor-grabbing"
+        />
         <div class="flex gap-0.5">
-          <button
+          <.icon_button
+            icon="hero-chevron-up"
+            label={"Move #{@widget.label} up"}
+            context={:inline}
             id={"move-up-#{@id}"}
-            type="button"
             phx-click="move-up"
             phx-value-id={@id}
             title="Move up"
-            class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-          >
-            <.icon name="hero-chevron-up" class="size-3" />
-          </button>
-          <button
+          />
+          <.icon_button
+            icon="hero-chevron-down"
+            label={"Move #{@widget.label} down"}
+            context={:inline}
             id={"move-down-#{@id}"}
-            type="button"
             phx-click="move-down"
             phx-value-id={@id}
             title="Move down"
-            class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-          >
-            <.icon name="hero-chevron-down" class="size-3" />
-          </button>
-          <button
+          />
+          <.icon_button
+            icon="hero-x-mark"
+            label={"Remove #{@widget.label}"}
+            context={:inline}
+            kind={:danger}
             id={"remove-#{@id}"}
-            type="button"
             phx-click="remove-widget"
             phx-value-id={@id}
             title="Remove widget"
-            class="ml-1 grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-          >
-            <.icon name="hero-x-mark" class="size-3" />
-          </button>
+            class="ml-1"
+          />
         </div>
       </div>
 

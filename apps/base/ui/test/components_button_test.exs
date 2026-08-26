@@ -41,7 +41,7 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
     refute html =~ "bg-brand"
   end
 
-  test "renders danger button with danger background and inverse ink" do
+  test "renders danger button as a calm text action" do
     html =
       render_component(
         fn assigns ->
@@ -53,9 +53,11 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
       )
 
     assert html =~ ~s(id="danger-btn")
-    assert html =~ "bg-danger text-ink-inverse hover:bg-danger-hover"
-    assert html =~ "focus-visible:ring-danger/30"
-    refute html =~ "bg-surface"
+    assert html =~ "text-danger hover:bg-danger-surface"
+    assert html =~ "hover:underline"
+    assert html =~ "focus-visible:ring-brand-strong/30"
+    refute html =~ "bg-danger text-ink-inverse"
+    refute html =~ "shadow-sm"
   end
 
   test "each variant defines the focus ring color exactly once" do
@@ -70,9 +72,45 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
           %{variant: variant}
         )
 
-      ring_colors = Regex.scan(~r/focus-visible:ring-(?:action|danger)\/\d+/, html)
+      ring_colors = Regex.scan(~r/focus-visible:ring-brand-strong\/\d+/, html)
       assert length(ring_colors) == 1, "variant #{inspect(variant)}: #{inspect(ring_colors)}"
     end
+  end
+
+  test "icon buttons use context size and keep their accessible label" do
+    inline =
+      render_component(
+        fn assigns ->
+          ~H"""
+          <.icon_button
+            id="pin-btn"
+            icon="bilimbi-pin"
+            label="Pin page"
+            context={:inline}
+          />
+          """
+        end,
+        %{}
+      )
+
+    table =
+      render_component(
+        fn assigns ->
+          ~H"""
+          <.icon_button id="delete-btn" icon="hero-trash" label="Delete row" kind={:danger} />
+          """
+        end,
+        %{}
+      )
+
+    assert inline =~ ~s(aria-label="Pin page")
+    assert inline =~ ~s(title="Pin page")
+    assert inline =~ "size-5 rounded-sm"
+    assert inline =~ "size-3.5"
+
+    assert table =~ "size-7 rounded-md"
+    assert table =~ "size-4"
+    assert table =~ "text-danger hover:bg-danger-surface"
   end
 
   test "caller-supplied class extends variant styling" do

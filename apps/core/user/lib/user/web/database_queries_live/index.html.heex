@@ -18,28 +18,27 @@
       </:actions>
     </.header>
 
-    <.card id="database-queries-card">
-      <div class="mb-4 flex items-center gap-4 flex-wrap">
-        <div class="flex-1 min-w-[240px]">
-          <form id="database-queries-search-form" phx-change="search" phx-submit="search">
-            <.input
-              type="text"
-              name="search"
-              id="search-input"
-              value={@search}
-              placeholder="Search by name or description..."
-              wrapper_class="mb-0"
-            />
-          </form>
-        </div>
-      </div>
+    <form id="database-queries-search-form" phx-change="search" phx-submit="search" class="mb-2">
+      <.input
+        type="search"
+        name="search"
+        id="search-input"
+        value={@search}
+        label="Search database queries"
+        label_class="sr-only"
+        placeholder="Search by name or description..."
+        wrapper_class="mb-0"
+      />
+    </form>
 
+    <.card id="database-queries-card" inner_class="p-0">
       <.table
         id="database-queries-table"
         rows={@queries}
         row_id={fn query -> "query-row-#{query.id}" end}
         sort_by={@sort_by}
         sort_dir={@sort_dir}
+        framed={false}
       >
         <:col :let={query} label="Name" sort="name">
           <.link
@@ -70,29 +69,22 @@
             :if={allowed?(@current_scope, "admin.system.database-table.edit")}
             class="inline-flex items-center gap-1.5"
           >
-            <button
-              type="button"
+            <.icon_button
+              icon="hero-document-duplicate"
+              label="Duplicate query"
               id={"duplicate-query-#{query.id}"}
               phx-click="duplicate"
               phx-value-id={query.id}
-              title="Duplicate"
-              aria-label="Duplicate query"
-              class="rounded-md p-1 text-ink-subtle transition hover:bg-surface-sunken hover:text-ink"
-            >
-              <.icon name="hero-document-duplicate" class="size-4" />
-            </button>
-            <button
-              type="button"
+            />
+            <.icon_button
+              icon="hero-trash"
+              label="Delete query"
+              kind={:danger}
               id={"delete-query-#{query.id}"}
               phx-click="delete"
               phx-value-id={query.id}
               data-confirm="Are you sure you want to delete this query?"
-              title="Delete"
-              aria-label="Delete query"
-              class="rounded-md p-1 text-danger transition hover:bg-danger-surface hover:text-danger-ink"
-            >
-              <.icon name="hero-trash" class="size-4" />
-            </button>
+            />
           </div>
         </:action>
 

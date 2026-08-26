@@ -125,17 +125,14 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
         <.header>
           Countries
           <:title_actions>
-            <button
-              type="button"
+            <.icon_button
+              icon="bilimbi-pin"
+              label="Pin Countries to sidebar"
+              context={:inline}
               id="countries-pin"
               data-nav-pin="nav-admin-geonames-country"
-              title="Pin Countries to sidebar"
-              aria-label="Pin Countries to sidebar"
               aria-pressed="false"
-              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-            >
-              <.icon name="bilimbi-pin" class="size-3.5" />
-            </button>
+              />
           </:title_actions>
           <:actions>
             <.button
@@ -156,31 +153,33 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
           </:actions>
         </.header>
 
+        <.form
+          for={@filters_form}
+          id="countries-filters"
+          phx-change="filters"
+          class="mb-2"
+        >
+          <div class="relative">
+            <.icon
+              name="hero-magnifying-glass"
+              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+            />
+            <.input
+              field={@filters_form[:search]}
+              id="countries-search"
+              type="search"
+              phx-debounce="300"
+              label="Search countries"
+              label_class="sr-only"
+              wrapper_class="mb-0"
+              placeholder="Search by country name or ISO code..."
+              class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
+            />
+          </div>
+        </.form>
+
         <.card id="countries-card" inner_class="p-0">
-          <.form
-            for={@filters_form}
-            id="countries-filters"
-            phx-change="filters"
-            class="p-2 mb-2"
-          >
-            <div class="relative">
-              <.icon
-                name="hero-magnifying-glass"
-                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-              />
-              <.input
-                field={@filters_form[:search]}
-                id="countries-search"
-                type="search"
-                phx-debounce="300"
-                label="Search countries"
-                label_class="sr-only"
-                wrapper_class="mb-0"
-                placeholder="Search by country name or ISO code..."
-                class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
-              />
-            </div>
-          </.form>
+
 
           <.table
             id="countries-table"

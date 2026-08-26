@@ -337,7 +337,11 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
     assert has_element?(postcodes, "#postcodes-new", "New Postcode")
     assert has_element?(postcodes, "#postcode-#{source.id}-place-name")
-    assert has_element?(postcodes, "#postcode-#{source.id}-edit", "Edit details")
+
+    assert has_element?(
+             postcodes,
+             "#postcode-#{source.id}-edit[aria-label='Edit #{source.postcode}']"
+           )
 
     postcodes
     |> element("#postcode-#{source.id}-place-name")

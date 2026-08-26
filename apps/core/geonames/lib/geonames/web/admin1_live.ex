@@ -79,59 +79,58 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
         <.header>
           Admin1 Divisions
           <:title_actions>
-            <button
-              type="button"
+            <.icon_button
+              icon="bilimbi-pin"
+              label="Pin Admin1 Divisions to sidebar"
+              context={:inline}
               id="admin1-pin"
               data-nav-pin="nav-admin-geonames-admin1-division"
-              title="Pin Admin1 Divisions to sidebar"
-              aria-label="Pin Admin1 Divisions to sidebar"
               aria-pressed="false"
-              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-            >
-              <.icon name="bilimbi-pin" class="size-3.5" />
-            </button>
+              />
           </:title_actions>
           <:subtitle>States, provinces, and top-level administrative divisions</:subtitle>
         </.header>
 
-        <.card id="admin1-card" inner_class="p-0">
-          <.form
-            for={@filters_form}
-            id="admin1-filters"
-            phx-change="filters"
-            class="p-2 mb-2"
-          >
-            <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_16rem]">
-              <div class="relative">
-                <.icon
-                  name="hero-magnifying-glass"
-                  class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-                />
-                <.input
-                  field={@filters_form[:search]}
-                  id="admin1-search"
-                  type="search"
-                  phx-debounce="300"
-                  label="Search Admin1 divisions"
-                  label_class="sr-only"
-                  wrapper_class="mb-0"
-                  placeholder="Search by name, code, or country..."
-                  class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
-                />
-              </div>
+        <.form
+          for={@filters_form}
+          id="admin1-filters"
+          phx-change="filters"
+          class="mb-2"
+        >
+          <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_16rem]">
+            <div class="relative">
+              <.icon
+                name="hero-magnifying-glass"
+                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              />
               <.input
-                field={@filters_form[:countryIso]}
-                id="admin1-country-filter"
-                type="select"
-                label="Country"
+                field={@filters_form[:search]}
+                id="admin1-search"
+                type="search"
+                phx-debounce="300"
+                label="Search Admin1 divisions"
                 label_class="sr-only"
                 wrapper_class="mb-0"
-                prompt="All Countries"
-                options={country_options(@filter_countries)}
-                class="h-[2.125rem] w-full rounded-lg border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+                placeholder="Search by name, code, or country..."
+                class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
               />
             </div>
-          </.form>
+            <.input
+              field={@filters_form[:countryIso]}
+              id="admin1-country-filter"
+              type="select"
+              label="Country"
+              label_class="sr-only"
+              wrapper_class="mb-0"
+              prompt="All Countries"
+              options={country_options(@filter_countries)}
+              class="h-[2.125rem] w-full rounded-md border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
+            />
+          </div>
+        </.form>
+
+        <.card id="admin1-card" inner_class="p-0">
+
 
           <.table
             id="admin1-table"

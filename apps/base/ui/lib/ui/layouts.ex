@@ -223,16 +223,13 @@ defmodule Bilimbi.Base.UI.Layouts do
                 </p>
                 <p class="truncate text-xs text-muted">{@current_scope.user["email"]}</p>
               </div>
-              <.link
+              <.icon_button
+                icon="hero-arrow-right-on-rectangle"
+                label="Log out"
                 href={~p"/session"}
                 method="delete"
                 id="app-logout"
-                class="grid size-6 shrink-0 place-items-center rounded-sm text-muted transition hover:bg-surface-muted hover:text-ink"
-                aria-label="Log out"
-                title="Log out"
-              >
-                <.icon name="hero-arrow-right-on-rectangle" class="size-4" />
-              </.link>
+              />
             </div>
           </div>
         </aside>
@@ -410,7 +407,7 @@ defmodule Bilimbi.Base.UI.Layouts do
           aria-expanded={to_string(@expanded?)}
           aria-label={"Toggle " <> @node.item.label}
           title={@node.item.label}
-          class="app-nav-toggle grid size-4 shrink-0 place-items-center rounded-sm text-link transition hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          class="app-nav-toggle grid size-5 shrink-0 place-items-center rounded-sm text-link transition hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
         >
           <span
             class="app-nav-caret text-[11px] shrink-0 w-3 text-center select-none"
@@ -482,16 +479,14 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   defp nav_pin(assigns) do
     ~H"""
-    <button
-      type="button"
+    <.icon_button
+      icon="bilimbi-pin"
+      label={"Pin " <> @label <> " to sidebar"}
+      context={:inline}
       id={"nav-pin-" <> String.trim_leading(@item_id, "nav-")}
       data-nav-pin={@item_id}
-      title={"Pin " <> @label <> " to sidebar"}
-      aria-label={"Pin " <> @label <> " to sidebar"}
-      class="app-nav-pin grid size-4 shrink-0 place-items-center rounded-sm text-ink-faint opacity-0 transition hover:bg-surface hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-    >
-      <.icon name="bilimbi-pin" class="size-3" />
-    </button>
+      class="app-nav-pin opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+    />
     """
   end
 

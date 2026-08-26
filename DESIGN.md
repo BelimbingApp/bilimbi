@@ -99,6 +99,18 @@ renders at the `:form` width — related field pairs may share a row inside it
 (the company create screen is the exemplar), but the page never widens to
 fit more columns.
 
+### Input controls
+
+- **Geometry:** Fields use `rounded-md`, compact `py-1.5` vertical padding,
+  and the smallest width that still fits their content. This applies equally
+  to forms, filters, and inline work.
+- **Focus:** Keyboard focus uses `brand-strong` for the border and ring. Focus
+  is orientation, so it stays consistent across control types and themes.
+- **Choice:** Use the simplest control that fits the value: text for genuinely
+  open values, select for one short fixed list, multi-select for several listed
+  choices, checkbox for one independent setting, and radio for two to five
+  exclusive choices that should remain visible.
+
 ## Data tables & row density
 
 Operational tables use compact, dense geometry for high-information density
@@ -109,7 +121,9 @@ during long operational sessions:
 - **Header background:** `bg-surface-sunken`.
 - **Header typography:** Proper case `text-xs font-semibold text-muted` (`text-ink-subtle`).
 - **Body typography:** `text-sm text-ink`, with `tabular-nums text-muted` (`text-ink-muted`) for codes, IDs, currencies, phones, populations, dates, and measurements.
-- **Search & filter cards:** Search inputs live in an outer `<.card>` container with `p-2` and a distinct bottom gap (`mb-2`) before the table headers begin, preventing search inputs from gluing directly to table headers.
+- **Search & filter toolbar:** Search and filters sit together in an open
+  toolbar with `mb-2` above the table surface. Do not wrap the toolbar in a
+  second card; the list is the common region.
 - **Pagination controls:** Rows per page selector uses compact geometry (`w-auto`, `h-7`, `pl-2 pr-6`) — sized to its content, because the options run to three digits and a fixed `w-14` clipped even `25` behind the dropdown arrow (#304) with accent focus styling (`focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30`). Navigation buttons use `size-7` with accent focus rings (`focus-visible:ring-1 focus-visible:ring-brand-strong/40`) and active page highlight (`border-selection-line bg-brand-surface text-brand-ink`).
 
 ## Inline editing
@@ -119,7 +133,8 @@ table view:
 
 - **Display mode:** Shows the field value in `text-ink` alongside a subtle hover pencil icon (`size-3.5 text-muted opacity-0 group-hover:opacity-100 transition-opacity`).
 - **Activation:** Clicking the cell or pressing Enter when focused activates edit mode.
-- **Editing mode:** Replaces the cell with an inline `<input>` styled with `border-action` / `border-brand-strong`, autofocusing and selecting the text.
+- **Editing mode:** Replaces the cell with an inline `<input>` styled with
+  `border-brand-strong`, autofocusing and selecting the text.
 - **Save & Cancel:** Pressing `Enter` or blurring saves the field, updates the LiveView stream item (`stream_insert/3`), clears edit state, and flashes feedback (`"<Entity> saved."`). Pressing `Escape` cancels editing and reverts to display mode.
 
 ## Subtle depth and motion
@@ -141,6 +156,12 @@ layouts.
 
 Use the shared `<.icon>` component for icons. Do not call Heroicons modules
 directly from templates.
+
+Use `<.icon_button>` for familiar repeated secondary actions where words would
+create table or toolbar noise. Inline controls are `size-5`; table and toolbar
+controls are `size-7`. Every icon-only action has an accessible label and title.
+Keep primary and unfamiliar actions as words. Destructive actions use calm
+danger text with quiet hover feedback, never a solid red button.
 
 Use the shared `<.input>` and `<.form>` components for forms where available.
 Keep forms driven by a `to_form/2` assign and give important forms and controls

@@ -8,7 +8,7 @@
             id="query-name-input"
             value={@name}
             name="name"
-            class="bg-transparent text-xl font-bold text-ink border-0 border-b border-transparent hover:border-high-contrast-line focus:border-brand focus:ring-0 px-1 py-0.5"
+            class="bg-transparent text-xl font-bold text-ink border-0 border-b border-transparent hover:border-high-contrast-line focus:border-brand-strong focus:ring-0 px-1 py-0.5"
             placeholder="Untitled Query"
           />
         </form>
@@ -26,7 +26,7 @@
             value={@description}
             name="description"
             placeholder="Add a description..."
-            class="w-full bg-transparent text-sm text-ink-subtle border-0 border-b border-transparent hover:border-high-contrast-line focus:border-brand focus:ring-0 px-1 py-0.5"
+            class="w-full bg-transparent text-sm text-ink-subtle border-0 border-b border-transparent hover:border-high-contrast-line focus:border-brand-strong focus:ring-0 px-1 py-0.5"
           />
         </form>
       </:subtitle>
@@ -46,16 +46,15 @@
               <.icon name="hero-document-duplicate" class="size-4 mr-1.5" />
               Duplicate
             </.button>
-            <button
-              type="button"
+            <.button
+              variant="danger"
               id="btn-delete-query"
               phx-click="delete"
               data-confirm="Are you sure you want to delete this query?"
-              class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition border border-danger-line bg-surface text-danger hover:bg-danger-surface"
             >
               <.icon name="hero-trash" class="size-4 mr-1.5" />
               Delete
-            </button>
+            </.button>
           <% else %>
             <button
               type="button"
@@ -93,7 +92,7 @@
             name="prompt"
             rows="2"
             placeholder="Describe the data or query in natural language..."
-            class="block w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            class="block w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
           >{@prompt}</textarea>
         </form>
       </.card>
@@ -122,7 +121,7 @@
             name="sql_query"
             rows="5"
             placeholder="SELECT * FROM users WHERE id = :id LIMIT 25;"
-            class="block w-full rounded-lg border border-line bg-surface-sunken font-mono text-xs text-ink px-3 py-2 placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            class="block w-full rounded-md border border-line bg-surface-sunken font-mono text-xs text-ink px-3 py-1.5 placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
           >{@sql_query}</textarea>
         </form>
 
@@ -145,7 +144,7 @@
                       name={param}
                       value={Map.get(@param_values, param, "")}
                       placeholder={"Value for :#{param}"}
-                      class="block w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+                      class="block w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
                     />
                   </div>
                 <% end %>

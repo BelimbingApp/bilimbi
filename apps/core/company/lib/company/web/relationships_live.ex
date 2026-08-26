@@ -304,27 +304,24 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
             </:col>
             <:action :let={item}>
               <div class="flex items-center gap-2">
-                <button
+                <.icon_button
                   :if={@can_update?}
-                  type="button"
+                  icon="hero-pencil"
+                  label="Edit relationship dates"
                   id={"edit-rel-#{item.id}"}
                   phx-click="edit"
                   phx-value-id={item.id}
-                  class="text-xs text-action hover:underline"
-                >
-                  Edit Dates
-                </button>
-                <button
+                />
+                <.icon_button
                   :if={@can_update?}
-                  type="button"
+                  icon="hero-link-slash"
+                  label="Remove relationship"
+                  kind={:danger}
                   id={"delete-rel-#{item.id}"}
                   phx-click="delete"
                   phx-value-id={item.id}
                   data-confirm="Are you sure you want to remove this relationship?"
-                  class="text-xs text-danger hover:underline"
-                >
-                  Remove
-                </button>
+                />
               </div>
             </:action>
             <:empty :if={@relationships_count == 0}>
