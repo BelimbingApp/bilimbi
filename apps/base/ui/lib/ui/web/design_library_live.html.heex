@@ -331,76 +331,122 @@
     <% end %>
 
     <%= if @area == :components do %>
-      <section id="components" class="space-y-9">
-        <nav
-          class="flex flex-wrap gap-x-4 gap-y-2 border-b border-line pb-3 text-sm"
-          aria-label="Component sections"
+      <section
+        id="components"
+        class="grid items-start gap-6 sm:grid-cols-[13rem_minmax(0,1fr)]"
+      >
+        <aside
+          id="component-secondary-menu"
+          class="rounded-xl border border-line bg-surface-muted p-2 shadow-xs sm:sticky sm:top-4"
         >
-          <a href="#component-structure" class="text-link hover:text-ink">Page structure</a>
-          <a href="#component-actions" class="text-link hover:text-ink">Actions</a>
-          <a href="#component-inputs" class="text-link hover:text-ink">Inputs</a>
-          <a href="#component-feedback" class="text-link hover:text-ink">Feedback</a>
-          <a href="#component-states" class="text-link hover:text-ink">States</a>
-          <a href="#component-data" class="text-link hover:text-ink">Data display</a>
-          <a href="#component-patterns" class="text-link hover:text-ink">Interaction patterns</a>
-        </nav>
+          <nav aria-label="Component sections" class="space-y-3">
+            <div id="component-menu-structure">
+              <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                Structure
+              </p>
+              <a
+                href="#component-structure"
+                class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+              >
+                <.icon name="hero-rectangle-group" class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong" />
+                <span>
+                  <span class="block text-[0.8125rem] leading-5">Page structure</span>
+                  <span class="block text-xs leading-4 text-ink-muted">Headers, cards, menus, and tabs</span>
+                </span>
+              </a>
+            </div>
 
-        <section id="component-catalog" class="space-y-3">
-          <div>
-            <h2 class="text-base font-semibold text-ink-strong">Component catalogue</h2>
-            <p class="text-sm text-ink-muted">
-              Start with the family that matches the work. Each example below is the current Bilimbi component, not an alternative design.
-            </p>
-          </div>
-          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <a
-              href="#component-inputs"
-              class="rounded-xl border border-line bg-surface p-3 hover:border-brand-line hover:bg-brand-surface"
-            >
-              <span class="text-sm font-semibold text-ink">Inputs</span>
-              <span class="mt-1 block text-xs text-ink-muted">Text, choices, time, and validation.</span>
-            </a>
-            <a
-              href="#component-actions"
-              class="rounded-xl border border-line bg-surface p-3 hover:border-brand-line hover:bg-brand-surface"
-            >
-              <span class="text-sm font-semibold text-ink">Actions</span>
-              <span class="mt-1 block text-xs text-ink-muted">Primary, secondary, destructive, and compact actions.</span>
-            </a>
-            <a
-              href="#component-feedback"
-              class="rounded-xl border border-line bg-surface p-3 hover:border-brand-line hover:bg-brand-surface"
-            >
-              <span class="text-sm font-semibold text-ink">Feedback</span>
-              <span class="mt-1 block text-xs text-ink-muted">Alerts, status, loading, and recovery.</span>
-            </a>
-            <a
-              href="#component-structure"
-              class="rounded-xl border border-line bg-surface p-3 hover:border-brand-line hover:bg-brand-surface"
-            >
-              <span class="text-sm font-semibold text-ink">Page structure</span>
-              <span class="mt-1 block text-xs text-ink-muted">Headers, cards, navigation, and tabs.</span>
-            </a>
-            <a
-              href="#component-data"
-              class="rounded-xl border border-line bg-surface p-3 hover:border-brand-line hover:bg-brand-surface"
-            >
-              <span class="text-sm font-semibold text-ink">Data display</span>
-              <span class="mt-1 block text-xs text-ink-muted">Tables, lists, badges, and pagination.</span>
-            </a>
-            <a
-              href="#component-patterns"
-              class="rounded-xl border border-line bg-surface p-3 hover:border-brand-line hover:bg-brand-surface"
-            >
-              <span class="text-sm font-semibold text-ink">Interaction patterns</span>
-              <span class="mt-1 block text-xs text-ink-muted">Filters, inline editing, and complete flows.</span>
-            </a>
-          </div>
-        </section>
+            <div id="component-menu-controls">
+              <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                Controls
+              </p>
+              <div class="space-y-0.5">
+                <a
+                  href="#component-inputs"
+                  class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+                >
+                  <.icon name="hero-pencil-square" class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong" />
+                  <span>
+                    <span class="block text-[0.8125rem] leading-5">Inputs</span>
+                    <span class="block text-xs leading-4 text-ink-muted">Text, choices, time, and validation</span>
+                  </span>
+                </a>
+                <a
+                  href="#component-actions"
+                  class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+                >
+                  <.icon name="hero-cursor-arrow-rays" class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong" />
+                  <span>
+                    <span class="block text-[0.8125rem] leading-5">Actions</span>
+                    <span class="block text-xs leading-4 text-ink-muted">Buttons and compact actions</span>
+                  </span>
+                </a>
+              </div>
+            </div>
+
+            <div id="component-menu-communication">
+              <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                Communication
+              </p>
+              <div class="space-y-0.5">
+                <a
+                  href="#component-feedback"
+                  class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+                >
+                  <.icon name="hero-chat-bubble-bottom-center-text" class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong" />
+                  <span>
+                    <span class="block text-[0.8125rem] leading-5">Feedback</span>
+                    <span class="block text-xs leading-4 text-ink-muted">Alerts, status, and recovery</span>
+                  </span>
+                </a>
+                <a
+                  href="#component-states"
+                  class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+                >
+                  <.icon name="hero-signal" class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong" />
+                  <span>
+                    <span class="block text-[0.8125rem] leading-5">States</span>
+                    <span class="block text-xs leading-4 text-ink-muted">Empty, blocked, and interrupted</span>
+                  </span>
+                </a>
+              </div>
+            </div>
+
+            <div id="component-menu-workflows">
+              <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                Workflows
+              </p>
+              <div class="space-y-0.5">
+                <a
+                  href="#component-data"
+                  class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+                >
+                  <.icon name="hero-table-cells" class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong" />
+                  <span>
+                    <span class="block text-[0.8125rem] leading-5">Data display</span>
+                    <span class="block text-xs leading-4 text-ink-muted">Tables, facts, dates, and pagination</span>
+                  </span>
+                </a>
+                <a
+                  href="#component-patterns"
+                  class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+                >
+                  <.icon name="hero-arrow-path-rounded-square" class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong" />
+                  <span>
+                    <span class="block text-[0.8125rem] leading-5">Interaction patterns</span>
+                    <span class="block text-xs leading-4 text-ink-muted">Filters, editing, and complete flows</span>
+                  </span>
+                </a>
+              </div>
+            </div>
+          </nav>
+        </aside>
+
+        <div id="component-content" class="min-w-0 space-y-9">
 
         <section id="component-structure" class="scroll-mt-4 space-y-4">
           <div>
-            <h2 class="text-base font-semibold text-ink-strong">Structure</h2><p class="text-sm text-ink-muted">
+            <h2 class="text-base font-semibold text-ink-strong">Page structure</h2><p class="text-sm text-ink-muted">
               Page widths, headings, cards, menus, and tabs.
             </p>
           </div>
@@ -717,7 +763,7 @@
         </section>
         <section id="component-feedback" class="scroll-mt-4 space-y-4">
           <div>
-            <h2 class="text-base font-semibold text-ink-strong">Feedback and status</h2><p class="text-sm text-ink-muted">
+            <h2 class="text-base font-semibold text-ink-strong">Feedback</h2><p class="text-sm text-ink-muted">
               Short-lived messages, inline guidance, and persistent record status.
             </p>
           </div>
@@ -755,9 +801,7 @@
 
         <section id="component-states" class="scroll-mt-4 space-y-4">
           <div>
-            <h2 class="text-base font-semibold text-ink-strong">
-              Empty, blocked, and interrupted
-            </h2><p class="text-sm text-ink-muted">
+            <h2 class="text-base font-semibold text-ink-strong">States</h2><p class="text-sm text-ink-muted">
               These states are part of the product, not exceptions to its design.
             </p>
           </div>
@@ -782,7 +826,7 @@
 
         <section id="component-data" class="scroll-mt-4 space-y-4">
           <div>
-            <h2 class="text-base font-semibold text-ink-strong">Data and display</h2><p class="text-sm text-ink-muted">
+            <h2 class="text-base font-semibold text-ink-strong">Data display</h2><p class="text-sm text-ink-muted">
               Tables, inline editing, pagination, key facts, and dates.
             </p>
           </div>
@@ -859,7 +903,7 @@
 
         <section id="component-patterns" class="scroll-mt-4 space-y-4">
           <div>
-            <h2 class="text-base font-semibold text-ink-strong">Operational list</h2><p class="text-sm text-ink-muted">
+            <h2 class="text-base font-semibold text-ink-strong">Interaction patterns</h2><p class="text-sm text-ink-muted">
               The current shared composition for search, rows, status, dates, and pagination.
             </p>
           </div>
@@ -894,6 +938,7 @@
             />
           </.card>
         </section>
+        </div>
       </section>
     <% end %>
 

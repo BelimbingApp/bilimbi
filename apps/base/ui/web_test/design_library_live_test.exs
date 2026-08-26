@@ -77,7 +77,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#nav-admin-system-design-library-theme[aria-current='page']")
   end
 
-  test "Components presents the current catalogue without resolved alternatives", %{
+  test "Components uses a grouped secondary menu without resolved alternatives", %{
     conn: conn
   } do
     {:ok, view, _html} = open(conn, "/system/design-library/components")
@@ -86,7 +86,20 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
       refute has_element?(view, "#decision-c0#{number}")
     end
 
-    assert has_element?(view, "#component-catalog", "Component catalogue")
+    assert has_element?(view, "#component-secondary-menu nav[aria-label='Component sections']")
+    assert has_element?(view, "#component-menu-structure", "Structure")
+    assert has_element?(view, "#component-menu-controls", "Controls")
+    assert has_element?(view, "#component-menu-communication", "Communication")
+    assert has_element?(view, "#component-menu-workflows", "Workflows")
+
+    for section <- ~w(structure inputs actions feedback states data patterns) do
+      assert has_element?(
+               view,
+               "#component-secondary-menu a[href='#component-#{section}']"
+             )
+    end
+
+    refute has_element?(view, "#component-catalog")
     assert has_element?(view, "#component-input-guidance", "Choice guidance")
     assert has_element?(view, "#component-input-live-state", "Live state")
     assert has_element?(view, "#component-icon-button", "Compact icon actions")
