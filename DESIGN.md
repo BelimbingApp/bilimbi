@@ -48,15 +48,22 @@ Keep color tokens and reusable theme rules in the shared web foundation. A
 module may add a semantic role only when its workflow genuinely needs one.
 
 - **`canvas` / `surface` / `surface-sidebar`**: Warm stone operational base.
-- **`surface-sunken` (`#eaebe4`)**: Muted sunken surface used for table headers, code blocks, and subtle containers.
-- **`brand-surface` (`#f3f5e8`)**: Subtle warm brand tint used on the pinned
-  navigation surface and highlight containers.
-- **`link` (`#544c43`) / `muted` (`#6b6057`) / `ink` (`#2c2418`)**: Warm font
-  hierarchy for navigation links, secondary labels, and active hover text.
+- **`surface-sunken`**: Muted sunken surface used for table headers, code
+  blocks, and subtle containers.
+- **`brand-surface`**: Subtle warm brand tint used on the pinned navigation
+  surface and highlight containers.
+- **`link` (`stone-700` light / `stone-300` dark) / `muted` (`stone-600`
+  light / `stone-400` dark) / `ink`**: Warm font hierarchy for navigation
+  links, secondary labels, and active hover text. Links remain visibly stronger
+  than muted text in both themes.
 - **`brand-strong` (`lime-600`)**: Orientation accent for active navigation,
   ascended parent branches, and brand selection.
-- **`action` (`#2c3801`) / `action-hover` (`var(--color-brand-strong)`) / `action-ink` (`#f5fcdc`)**:
-  Confident primary action colors used for primary buttons and page `<h1>` headings, with high-contrast text and standard accent hover.
+- **`high-contrast-line` / `line` / `low-contrast-line`**: Neutral structural
+  lines derived from `ink` at decreasing transparency. Their contrast remains
+  ordered against canvas, surface, sunken, muted, and sidebar backgrounds.
+- **`action` / `action-hover` / `action-ink`**: Confident primary action
+  colours used for primary buttons and page `<h1>` headings. The base remains
+  distinct from its brighter hover in both themes.
 
 ## Compact typography
 
@@ -65,7 +72,8 @@ competent typography with enough contrast and line height for long sessions.
 Use tabular numerals where users compare amounts, dates, counts, or measurements.
 
 - **Global font:** `Instrument Sans` across all app views, forms, tables, and chrome.
-- **Page headings:** `<h1>` titles use `text-action` (`#2c3801`) to anchor the screen's operational scope with the platform's primary action color.
+- **Page headings:** `<h1>` titles use `text-action` to anchor the screen's
+  operational scope with the platform's primary action colour.
 - **Menu typography:** Scoped compact styling with thinner weight (`350` / `400`),
   `0.8125rem` (`13px`) font size, and `1.25rem` line height.
 - Typography should support scanning before reading. Avoid decorative type that
@@ -98,11 +106,11 @@ during long operational sessions:
 
 - **Row padding:** `py-0.5` (`0.125rem` / `2px`), `px-2` (`0.5rem` / `8px`) horizontal cell padding.
 - **Header padding:** `py-1.5` (`0.375rem` / `6px`), `px-2` horizontal header padding.
-- **Header background:** `bg-surface-sunken` (`#eaebe4`).
+- **Header background:** `bg-surface-sunken`.
 - **Header typography:** Proper case `text-xs font-semibold text-muted` (`text-ink-subtle`).
 - **Body typography:** `text-sm text-ink`, with `tabular-nums text-muted` (`text-ink-muted`) for codes, IDs, currencies, phones, populations, dates, and measurements.
 - **Search & filter cards:** Search inputs live in an outer `<.card>` container with `p-2` and a distinct bottom gap (`mb-2`) before the table headers begin, preventing search inputs from gluing directly to table headers.
-- **Pagination controls:** Rows per page selector uses compact geometry (`w-auto`, `h-7`, `pl-2 pr-6`) — sized to its content, because the options run to three digits and a fixed `w-14` clipped even `25` behind the dropdown arrow (#304) with accent focus styling (`focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30`). Navigation buttons use `size-7` with accent focus rings (`focus-visible:ring-1 focus-visible:ring-brand-strong/40`) and active page highlight (`border-brand-line bg-brand-surface text-brand-ink`).
+- **Pagination controls:** Rows per page selector uses compact geometry (`w-auto`, `h-7`, `pl-2 pr-6`) — sized to its content, because the options run to three digits and a fixed `w-14` clipped even `25` behind the dropdown arrow (#304) with accent focus styling (`focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30`). Navigation buttons use `size-7` with accent focus rings (`focus-visible:ring-1 focus-visible:ring-brand-strong/40`) and active page highlight (`border-selection-line bg-brand-surface text-brand-ink`).
 
 ## Inline editing
 
@@ -125,8 +133,8 @@ in flight, waiting, blocked, or complete.
 
 ## Reuse components
 
-Reuse shared `BilimbiWeb.CoreComponents` and layout components before inventing
-new markup. Shared components belong in the web foundation; workflow-specific
+Reuse shared `Bilimbi.Base.UI.Components` and layout components before inventing
+new markup. Shared components belong in Base UI; workflow-specific
 presentation, documentation, and optional assets belong inside the owning
 deep-module directory even when the Phoenix host adapts them into routes or
 layouts.
@@ -160,8 +168,9 @@ Two shells exist and each stays minimal:
 
 ### Navigation menu conventions
 
-- **Typography & Font:** `Instrument Sans`, `0.8125rem` (`13px`), normal/light weight (`350`),
-  `text-link` (`#544c43`), hover `text-ink` (`#2c2418`).
+- **Typography & Font:** `Instrument Sans`, `0.8125rem` (`13px`), normal/light
+  weight (`350`), `text-link` (`stone-700` light / `stone-300` dark), hover
+  `text-ink`.
 - **Chevrons:** Triangular chevrons `&#x2BC8;` (`⯈`) for collapsed branches,
   `&#x2BC6;` (`⯆`) for expanded branches, with figure space `&#8199;` indentation
   for leaf items.
@@ -169,8 +178,9 @@ Two shells exist and each stays minimal:
   lime accent text (`text-brand-strong`), no bolding, and no spine border.
 - **Parent Ascent:** All ancestor parent branches containing the active page accent
   their labels, toggles, and chevrons in `text-brand-strong`.
-- **Pinned Surface:** Pinned container uses `bg-brand-surface` (`#f3f5e8`) with
-  `rounded-sm` and `text-muted` (`#6b6057`) uppercase section header.
+- **Pinned Surface:** Pinned container uses `bg-brand-surface` with `rounded-sm`
+  and `text-muted` (`stone-600` light / `stone-400` dark) uppercase section
+  header.
 - **Ordering:** Menu roots and submenus are sorted strictly alphabetically ascending
   (`ASC`, case-insensitive).
 

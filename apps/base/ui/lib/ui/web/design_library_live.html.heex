@@ -1,0 +1,1200 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
+  <.page id="design-library" class="space-y-6">
+    <.header>
+      {@area_title}
+      <:subtitle>{@area_description}</:subtitle>
+      <:actions>
+        <span
+          id="design-library-stage"
+          class="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink-muted"
+        >
+          <.icon name="hero-eye" class="size-3.5" />
+          {@area_stage}
+        </span>
+      </:actions>
+    </.header>
+
+    <%= if @area == :theme do %>
+      <section id="foundations" class="space-y-8">
+        <section id="theme-surfaces-lines" class="space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Surfaces &amp; Lines</h2>
+            <p class="text-sm text-ink-muted">
+              Background surfaces and the structural lines drawn on them.
+            </p>
+          </div>
+
+          <div class="space-y-5 rounded-xl border border-line bg-surface p-4 shadow-xs">
+            <div>
+              <h3 class="mb-2 text-sm font-semibold text-ink">Surfaces and line contrast</h3>
+              <div id="theme-line-contrast" class="mb-3 space-y-2">
+                <p class="text-xs text-ink-muted">
+                  Each surface below is paired with all three line contrasts, from high to low.
+                </p>
+                <div id="theme-structure" class="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <p class="text-sm text-ink">High-contrast line</p>
+                    <p class="text-xs text-ink-muted">Clear separation from the surface</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-ink">Standard line</p>
+                    <p class="text-xs text-ink-muted">Everyday separation from the surface</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-ink">Low-contrast line</p>
+                    <p class="text-xs text-ink-muted">Quiet separation from the surface</p>
+                  </div>
+                </div>
+              </div>
+              <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                <div class="overflow-hidden rounded-lg border border-line">
+                  <div class="flex h-16 flex-col justify-between bg-canvas p-3">
+                    <span class="h-px bg-high-contrast-line"></span>
+                    <span class="h-px bg-line"></span>
+                    <span class="h-px bg-low-contrast-line"></span>
+                  </div>
+                  <div class="border-t border-line bg-surface p-2">
+                    <p class="text-sm font-medium text-ink">Canvas</p>
+                    <p class="text-xs text-ink-muted">Page background</p>
+                  </div>
+                </div>
+                <div class="overflow-hidden rounded-lg border border-line">
+                  <div class="flex h-16 flex-col justify-between bg-surface p-3">
+                    <span class="h-px bg-high-contrast-line"></span>
+                    <span class="h-px bg-line"></span>
+                    <span class="h-px bg-low-contrast-line"></span>
+                  </div>
+                  <div class="border-t border-line bg-surface p-2">
+                    <p class="text-sm font-medium text-ink">Surface</p>
+                    <p class="text-xs text-ink-muted">Cards and controls</p>
+                  </div>
+                </div>
+                <div class="overflow-hidden rounded-lg border border-line">
+                  <div class="flex h-16 flex-col justify-between bg-surface-sunken p-3">
+                    <span class="h-px bg-high-contrast-line"></span>
+                    <span class="h-px bg-line"></span>
+                    <span class="h-px bg-low-contrast-line"></span>
+                  </div>
+                  <div class="border-t border-line bg-surface p-2">
+                    <p class="text-sm font-medium text-ink">Sunken</p>
+                    <p class="text-xs text-ink-muted">Table heads and wells</p>
+                  </div>
+                </div>
+                <div class="overflow-hidden rounded-lg border border-line">
+                  <div class="flex h-16 flex-col justify-between bg-surface-muted p-3">
+                    <span class="h-px bg-high-contrast-line"></span>
+                    <span class="h-px bg-line"></span>
+                    <span class="h-px bg-low-contrast-line"></span>
+                  </div>
+                  <div class="border-t border-line bg-surface p-2">
+                    <p class="text-sm font-medium text-ink">Muted</p>
+                    <p class="text-xs text-ink-muted">Quiet grouping</p>
+                  </div>
+                </div>
+                <div class="overflow-hidden rounded-lg border border-line">
+                  <div class="flex h-16 flex-col justify-between bg-surface-sidebar p-3">
+                    <span class="h-px bg-high-contrast-line"></span>
+                    <span class="h-px bg-line"></span>
+                    <span class="h-px bg-low-contrast-line"></span>
+                  </div>
+                  <div class="border-t border-line bg-surface p-2">
+                    <p class="text-sm font-medium text-ink">Sidebar</p>
+                    <p class="text-xs text-ink-muted">Navigation</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="theme-line-thickness" class="border-t border-line pt-4">
+              <h3 class="mb-2 text-sm font-semibold text-ink">Line thickness</h3>
+              <div class="grid gap-3 sm:grid-cols-3">
+                <div class="rounded-lg bg-canvas p-3">
+                  <div class="mb-2 flex items-center gap-3">
+                    <span class="text-sm text-ink">Hairline</span>
+                    <span class="h-px flex-1 bg-line"></span>
+                    <span class="text-xs tabular-nums text-ink-muted">1px</span>
+                  </div>
+                  <p class="text-xs text-ink-muted">Structural borders and dividers</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="theme-identity" class="space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Identity &amp; Action</h2>
+            <p class="text-sm text-ink-muted">Primary action, selection, and brand roles.</p>
+          </div>
+          <div class="grid gap-2 rounded-xl border border-line bg-surface p-4 shadow-xs sm:grid-cols-3">
+            <div class="space-y-2">
+              <div class="rounded-lg bg-action p-3 text-action-ink">
+                <p class="text-sm font-semibold">Primary action</p>
+                <p class="text-xs opacity-80">The next committed step</p>
+              </div>
+              <div id="theme-primary-line" class="flex items-center gap-2 px-1">
+                <span class="shrink-0 text-xs text-ink-muted">Primary line</span>
+                <span class="h-px flex-1 bg-primary-line"></span>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <div class="rounded-lg border border-selection-line bg-brand-surface p-3 text-brand-ink">
+                <p class="text-sm font-semibold">Selection</p>
+                <p class="text-xs opacity-80">Current place or choice</p>
+              </div>
+              <div id="theme-selection-line" class="flex items-center gap-2 px-1">
+                <span class="shrink-0 text-xs text-ink-muted">Selection line</span>
+                <span class="h-px flex-1 bg-selection-line"></span>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <div class="rounded-lg bg-brand p-3 text-brand-ink">
+                <p class="text-sm font-semibold">Brand accent</p>
+                <p class="text-xs opacity-80">Bilimbi identity</p>
+              </div>
+              <div id="theme-brand-line" class="flex items-center gap-2 px-1">
+                <span class="shrink-0 text-xs text-ink-muted">Brand line</span>
+                <span class="h-px flex-1 bg-brand-line"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="theme-feedback" class="space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Feedback</h2>
+            <p class="text-sm text-ink-muted">Success, warning, and danger roles.</p>
+          </div>
+          <div class="grid gap-2 rounded-xl border border-line bg-surface p-4 shadow-xs sm:grid-cols-3">
+            <div class="space-y-2">
+              <div class="rounded-lg border border-success-line bg-success-surface p-3 text-success-ink">
+                <p class="text-sm font-semibold">Success</p>
+                <p class="text-xs opacity-80">Completed as intended</p>
+              </div>
+              <div id="theme-success-line" class="flex items-center gap-2 px-1">
+                <span class="shrink-0 text-xs text-ink-muted">Success line</span>
+                <span class="h-px flex-1 bg-success-line"></span>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <div class="rounded-lg border border-warning-line bg-warning-surface p-3 text-warning-ink">
+                <p class="text-sm font-semibold">Warning</p>
+                <p class="text-xs opacity-80">Attention is needed</p>
+              </div>
+              <div id="theme-warning-line" class="flex items-center gap-2 px-1">
+                <span class="shrink-0 text-xs text-ink-muted">Warning line</span>
+                <span class="h-px flex-1 bg-warning-line"></span>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <div class="rounded-lg border border-danger-line bg-danger-surface p-3 text-danger-ink">
+                <p class="text-sm font-semibold">Danger</p>
+                <p class="text-xs opacity-80">Failure or destructive work</p>
+              </div>
+              <div id="theme-danger-line" class="flex items-center gap-2 px-1">
+                <span class="shrink-0 text-xs text-ink-muted">Danger line</span>
+                <span class="h-px flex-1 bg-danger-line"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="theme-typography" class="space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Typography</h2>
+            <p class="text-sm text-ink-muted">Ink hierarchy and Instrument Sans throughout Bilimbi.</p>
+          </div>
+          <div class="space-y-5 rounded-xl border border-line bg-surface p-4 shadow-xs">
+            <div id="theme-text">
+              <h3 class="mb-2 text-sm font-semibold text-ink">Ink hierarchy</h3>
+              <div class="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <p class="text-sm font-semibold text-ink-strong">Strong ink</p>
+                  <p class="text-xs text-ink-muted">Headings and emphasis</p>
+                </div>
+                <div>
+                  <p class="text-sm text-ink">Primary ink</p>
+                  <p class="text-xs text-ink-muted">Everyday reading</p>
+                </div>
+                <div>
+                  <p class="text-sm text-ink-muted">Muted ink</p>
+                  <p class="text-xs text-ink-subtle">Supporting context</p>
+                </div>
+                <div>
+                  <p class="text-sm text-ink-subtle">Subtle ink</p>
+                  <p class="text-xs text-ink-muted">Secondary detail</p>
+                </div>
+                <div>
+                  <p class="text-sm text-ink-faint">Faint ink</p>
+                  <p class="text-xs text-ink-muted">Placeholder and disabled detail</p>
+                </div>
+                <div class="rounded-md bg-danger px-2 py-1.5">
+                  <p class="text-sm text-ink-inverse">Inverse ink</p>
+                  <p class="text-xs text-ink-inverse/70">Text on danger actions</p>
+                </div>
+              </div>
+
+              <div class="mt-4">
+                <h4 class="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                  Navigation text
+                </h4>
+                <div
+                  id="theme-navigation-text"
+                  class="grid gap-3 rounded-lg bg-surface-sidebar p-3 sm:grid-cols-3"
+                >
+                  <div>
+                    <p class="text-sm text-link">Link</p>
+                    <p class="text-xs text-ink-muted">Default navigation and links</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-muted">Muted</p>
+                    <p class="text-xs text-ink-muted">Pinned headings and secondary detail</p>
+                  </div>
+                  <div>
+                    <p class="text-sm text-brand-strong">Active</p>
+                    <p class="text-xs text-ink-muted">Current navigation choice</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="theme-type" class="border-t border-line pt-4">
+              <h3 class="mb-3 text-sm font-semibold text-ink">Type</h3>
+              <div class="grid gap-3 lg:grid-cols-2">
+                <div class="space-y-4">
+                  <div>
+                    <p class="text-xs text-ink-muted">Page heading</p>
+                    <p class="text-lg font-semibold leading-8 tracking-tight text-action">
+                      Company directory
+                    </p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-ink-muted">Section heading</p>
+                    <p class="text-base font-semibold text-ink-strong">Contact information</p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-ink-muted">Body</p>
+                    <p class="text-sm text-ink">Clear operational text for long working sessions.</p>
+                  </div>
+                </div>
+                <div class="space-y-4">
+                  <div>
+                    <p class="text-xs text-ink-muted">Label</p>
+                    <p class="text-sm font-medium text-ink">Company name</p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-ink-muted">Supporting text</p>
+                    <p class="text-sm text-ink-muted">This appears below the primary information.</p>
+                  </div>
+                  <div>
+                    <p class="text-xs text-ink-muted">Numbers and dates</p>
+                    <p class="text-sm tabular-nums text-ink">24/08/2026 · 1,024 · 99.50</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="theme-shape" class="space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Shape &amp; Density</h2>
+            <p class="text-sm text-ink-muted">
+              Current shared shapes. Unresolved control differences are listed under Components.
+            </p>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-3">
+            <div class="rounded-lg border border-line bg-surface p-4">
+              <div class="mb-3 h-9 rounded-lg border border-line bg-surface shadow-xs"></div>
+              <p class="text-sm font-medium text-ink">Standard field</p>
+              <p class="text-xs text-ink-muted">Comfortable form entry</p>
+            </div>
+            <div class="rounded-lg border border-line bg-surface p-4">
+              <div class="mb-3 h-7 rounded-md border border-line bg-surface"></div>
+              <p class="text-sm font-medium text-ink">Compact control</p>
+              <p class="text-xs text-ink-muted">Dense navigation and tables</p>
+            </div>
+            <div class="rounded-xl border border-line bg-surface p-4 shadow-xs">
+              <div class="mb-3 h-7 rounded-lg bg-surface-sunken"></div>
+              <p class="text-sm font-medium text-ink">Grouped surface</p>
+              <p class="text-xs text-ink-muted">Related work stays together</p>
+            </div>
+          </div>
+        </section>
+      </section>
+    <% end %>
+
+    <%= if @area == :components do %>
+      <section id="components" class="space-y-9">
+        <nav
+          class="flex flex-wrap gap-x-4 gap-y-2 border-b border-line pb-3 text-sm"
+          aria-label="Component sections"
+        >
+          <a href="#development-review" class="font-medium text-link hover:text-ink">Decisions</a>
+          <a href="#component-structure" class="text-link hover:text-ink">Structure</a>
+          <a href="#component-actions" class="text-link hover:text-ink">Actions</a>
+          <a href="#component-inputs" class="text-link hover:text-ink">Forms</a>
+          <a href="#component-feedback" class="text-link hover:text-ink">Feedback</a>
+          <a href="#component-states" class="text-link hover:text-ink">States</a>
+          <a href="#component-data" class="text-link hover:text-ink">Data</a>
+          <a href="#component-patterns" class="text-link hover:text-ink">Patterns</a>
+        </nav>
+
+        <section id="development-review" class="scroll-mt-4 space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Decisions</h2>
+            <p class="text-sm text-ink-muted">
+              These different treatments are in Bilimbi now. Use the decision number and option letter when recording a choice, for example C01 A.
+            </p>
+          </div>
+
+          <div id="component-decisions-forms" class="space-y-4">
+            <h3 class="text-sm font-semibold text-ink">Forms</h3>
+
+            <article
+              id="decision-c01"
+              class="overflow-hidden rounded-xl border border-high-contrast-line bg-surface shadow-xs"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-surface-sunken px-4 py-3">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-ink-muted">C01</p><h4 class="text-base font-semibold text-ink">
+                    Field shape and density
+                  </h4>
+                </div>
+                <.badge>Decision required</.badge>
+              </div>
+              <div class="space-y-4 p-4">
+                <p class="text-sm text-ink">
+                  Choose one treatment, or keep both with a clear form-versus-filter rule.
+                </p>
+                <div class="grid gap-3 lg:grid-cols-2">
+                  <div class="rounded-lg border border-line bg-canvas p-3">
+                    <p class="mb-3 text-sm font-semibold text-ink">
+                      <span class="mr-2 text-action">A</span>Standard field
+                    </p>
+                    <.input
+                      name="c01-standard"
+                      label="Company name"
+                      value="Acme Holdings"
+                      wrapper_class="mb-0"
+                    />
+                    <p class="mt-3 text-xs text-ink-muted">
+                      Seen in
+                      <a href="/companies/create" class="text-link hover:underline">company forms</a>
+                      and <a href="/users/new" class="text-link hover:underline">user forms</a>.
+                    </p>
+                  </div>
+                  <div class="rounded-lg border border-line bg-canvas p-3">
+                    <p class="mb-3 text-sm font-semibold text-ink">
+                      <span class="mr-2 text-action">B</span>Compact filter
+                    </p>
+                    <label for="c01-compact" class="sr-only">Search actions</label>
+                    <input
+                      id="c01-compact"
+                      type="search"
+                      value=""
+                      placeholder="Search actions…"
+                      class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none"
+                    />
+                    <p class="mt-3 text-xs text-ink-muted">
+                      Seen in
+                      <a href="/audit/actions" class="text-link hover:underline">Audit Actions</a>
+                      and <a href="/system/schedule" class="text-link hover:underline">Schedule</a>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article
+              id="decision-c02"
+              class="overflow-hidden rounded-xl border border-high-contrast-line bg-surface shadow-xs"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-surface-sunken px-4 py-3">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-ink-muted">C02</p><h4 class="text-base font-semibold text-ink">
+                    Focus colour
+                  </h4>
+                </div>
+                <.badge>Decision required</.badge>
+              </div>
+              <div class="space-y-4 p-4">
+                <p class="text-sm text-ink">
+                  Choose what keyboard focus should look like everywhere.
+                </p>
+                <div class="grid gap-3 lg:grid-cols-2">
+                  <div class="rounded-lg border border-line bg-canvas p-3">
+                    <p class="mb-3 text-sm font-semibold text-ink">
+                      <span class="mr-2 text-action">A</span>Action focus
+                    </p>
+                    <input
+                      value="Focused field"
+                      aria-label="Action focus example"
+                      class="w-full rounded-lg border border-action bg-surface px-3 py-2 text-sm text-ink outline-none ring-2 ring-action/20"
+                    />
+                    <p class="mt-3 text-xs text-ink-muted">
+                      Seen in shared fields, Company, User, and Schedule.
+                    </p>
+                  </div>
+                  <div class="rounded-lg border border-line bg-canvas p-3">
+                    <p class="mb-3 text-sm font-semibold text-ink">
+                      <span class="mr-2 text-action">B</span>Brand focus
+                    </p>
+                    <input
+                      value="Focused field"
+                      aria-label="Brand focus example"
+                      class="w-full rounded-lg border border-brand-strong bg-surface px-3 py-2 text-sm text-ink outline-none ring-2 ring-brand-strong/30"
+                    />
+                    <p class="mt-3 text-xs text-ink-muted">
+                      Seen in pagination, inline editing, Audit, and detail screens.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div id="component-decisions-actions" class="space-y-4">
+            <h3 class="text-sm font-semibold text-ink">Actions</h3>
+
+            <article
+              id="decision-c03"
+              class="overflow-hidden rounded-xl border border-high-contrast-line bg-surface shadow-xs"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-surface-sunken px-4 py-3">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-ink-muted">C03</p><h4 class="text-base font-semibold text-ink">
+                    Destructive actions
+                  </h4>
+                </div>
+                <.badge>Decision required</.badge>
+              </div>
+              <div class="space-y-4 p-4">
+                <p class="text-sm text-ink">
+                  Choose one treatment, or define which level of risk uses each treatment.
+                </p>
+                <div class="grid gap-3 sm:grid-cols-3">
+                  <div class="rounded-lg border border-line bg-canvas p-3">
+                    <p class="mb-3 text-sm font-semibold text-ink">
+                      <span class="mr-2 text-action">A</span>Solid
+                    </p><.button variant="danger">Delete record</.button><p class="mt-3 text-xs text-ink-muted">
+                      Shared danger button.
+                    </p>
+                  </div>
+                  <div class="rounded-lg border border-line bg-canvas p-3">
+                    <p class="mb-3 text-sm font-semibold text-ink">
+                      <span class="mr-2 text-action">B</span>Outlined compact
+                    </p><button
+                      type="button"
+                      class="rounded-md border border-danger-line bg-danger-surface px-2.5 py-1.5 text-xs font-semibold text-danger-ink transition hover:bg-danger hover:text-ink-inverse"
+                    >Archive employee</button><p class="mt-3 text-xs text-ink-muted">
+                      Seen in Employee lists.
+                    </p>
+                  </div>
+                  <div class="rounded-lg border border-line bg-canvas p-3">
+                    <p class="mb-3 text-sm font-semibold text-ink">
+                      <span class="mr-2 text-action">C</span>Text
+                    </p><button
+                      type="button"
+                      class="text-xs font-medium text-danger hover:underline"
+                    >Remove relationship</button><p class="mt-3 text-xs text-ink-muted">
+                      Seen in Company setup.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article
+              id="decision-c06"
+              class="overflow-hidden rounded-xl border border-high-contrast-line bg-surface shadow-xs"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-surface-sunken px-4 py-3">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-ink-muted">C06</p><h4 class="text-base font-semibold text-ink">
+                    Icon-control size
+                  </h4>
+                </div>
+                <.badge>Decision required</.badge>
+              </div>
+              <div class="space-y-4 p-4">
+                <p class="text-sm text-ink">
+                  Choose one size, or confirm a small inline and larger table rule.
+                </p>
+                <div class="flex flex-wrap gap-3">
+                  <div class="flex min-w-48 items-center justify-between rounded-lg border border-line bg-canvas p-3">
+                    <div>
+                      <p class="text-sm font-semibold text-ink">
+                        <span class="mr-2 text-action">A</span>Small inline
+                      </p><p class="text-xs text-ink-muted">20px, subtle corner</p>
+                    </div><button
+                      type="button"
+                      aria-label="Pin"
+                      class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink"
+                    ><.icon name="bilimbi-pin" class="size-3.5" /></button>
+                  </div>
+                  <div class="flex min-w-48 items-center justify-between rounded-lg border border-line bg-canvas p-3">
+                    <div>
+                      <p class="text-sm font-semibold text-ink">
+                        <span class="mr-2 text-action">B</span>Table control
+                      </p><p class="text-xs text-ink-muted">28px, medium corner</p>
+                    </div><button
+                      type="button"
+                      aria-label="Next"
+                      class="grid size-7 place-items-center rounded-md border border-line bg-surface text-ink transition hover:bg-surface-sunken"
+                    ><.icon name="hero-chevron-right" class="size-3.5" /></button>
+                  </div>
+                </div>
+                <p class="text-xs text-ink-muted">
+                  Small appears in headings and the sidebar; larger appears in pagination and row actions.
+                </p>
+              </div>
+            </article>
+          </div>
+
+          <div id="component-decisions-lists" class="space-y-4">
+            <h3 class="text-sm font-semibold text-ink">Operational lists</h3>
+
+            <article
+              id="decision-c04"
+              class="overflow-hidden rounded-xl border border-high-contrast-line bg-surface shadow-xs"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-surface-sunken px-4 py-3">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-ink-muted">C04</p><h4 class="text-base font-semibold text-ink">
+                    Filter framing
+                  </h4>
+                </div>
+                <.badge>Decision required</.badge>
+              </div>
+              <div class="space-y-4 p-4">
+                <p class="text-sm text-ink">
+                  Choose how filters should sit above an operational list.
+                </p>
+                <div class="grid gap-3 lg:grid-cols-2">
+                  <div>
+                    <p class="mb-2 text-sm font-semibold text-ink">
+                      <span class="mr-2 text-action">A</span>Inside the list card
+                    </p>
+                    <.card inner_class="p-2">
+                      <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
+                        <.input
+                          name="c04-card-search"
+                          type="search"
+                          value=""
+                          label="Search companies"
+                          label_class="sr-only"
+                          wrapper_class="mb-0"
+                          placeholder="Search companies…"
+                        /><.input
+                          name="c04-card-status"
+                          type="select"
+                          value=""
+                          label="Status"
+                          label_class="sr-only"
+                          wrapper_class="mb-0"
+                          options={[{"All statuses", ""}, {"Active", "active"}]}
+                        />
+                      </div>
+                    </.card>
+                    <p class="mt-2 text-xs text-ink-muted">
+                      Seen in <a href="/companies" class="text-link hover:underline">Companies</a>
+                      and <a href="/users" class="text-link hover:underline">Users</a>.
+                    </p>
+                  </div>
+                  <div>
+                    <p class="mb-2 text-sm font-semibold text-ink">
+                      <span class="mr-2 text-action">B</span>Open toolbar
+                    </p>
+                    <div class="flex flex-wrap gap-2 py-2">
+                      <input
+                        type="search"
+                        aria-label="Search audit actions"
+                        placeholder="Search actions…"
+                        class="min-w-48 flex-1 rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none"
+                      /><select
+                        aria-label="Filter event"
+                        class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
+                      ><option>All events</option><option>Authentication</option></select>
+                    </div>
+                    <p class="mt-2 text-xs text-ink-muted">
+                      Seen in
+                      <a href="/audit/actions" class="text-link hover:underline">Audit Actions</a>
+                      and <a href="/system/schedule" class="text-link hover:underline">Schedule</a>.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article
+              id="decision-c05"
+              class="overflow-hidden rounded-xl border border-high-contrast-line bg-surface shadow-xs"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-surface-sunken px-4 py-3">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-ink-muted">C05</p><h4 class="text-base font-semibold text-ink">
+                    Table row actions
+                  </h4>
+                </div>
+                <.badge>Decision required</.badge>
+              </div>
+              <div class="space-y-4 p-4">
+                <p class="text-sm text-ink">
+                  Choose whether common row actions should be words or icons.
+                </p>
+                <div class="grid gap-3 lg:grid-cols-2">
+                  <div class="flex items-center justify-between rounded-lg border border-line bg-canvas p-3">
+                    <div>
+                      <p class="text-sm font-medium text-ink">Acme Holdings</p><p class="text-xs text-ink-muted">
+                        Company table
+                      </p>
+                    </div><a
+                      href="/companies"
+                      class="text-sm font-semibold text-link hover:underline"
+                    ><span class="mr-2 text-action">A</span>Edit</a>
+                  </div>
+                  <div class="flex items-center justify-between rounded-lg border border-line bg-canvas p-3">
+                    <div>
+                      <p class="text-sm font-medium text-ink">Ada Lovelace</p><p class="text-xs text-ink-muted">
+                        User table
+                      </p>
+                    </div><button
+                      type="button"
+                      aria-label="Delete user"
+                      title="Delete user"
+                      class="grid size-7 place-items-center rounded-md text-danger-ink transition hover:bg-danger-surface focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-danger/40"
+                    ><.icon name="hero-trash" class="size-4" /></button>
+                  </div>
+                </div>
+                <p class="text-xs text-ink-muted">
+                  Words appear in shared table examples; icons appear in User Management.
+                </p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section id="component-structure" class="scroll-mt-4 space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Structure</h2><p class="text-sm text-ink-muted">
+              Page widths, headings, cards, menus, and tabs.
+            </p>
+          </div>
+          <div class="grid gap-3 lg:grid-cols-2">
+            <.card id="component-header" title="Page header" inner_class="p-4">
+              <.header>
+                Company settings<:subtitle>Manage identity and regional defaults.</:subtitle><:actions>
+                  <.button variant="primary">Save changes</.button>
+                </:actions>
+              </.header>
+            </.card>
+            <.card id="component-page" title="Page widths" inner_class="space-y-3 p-4">
+              <div>
+                <div class="h-2 w-full rounded-full bg-brand-strong"></div><p class="mt-1 text-xs text-ink-muted">
+                  List — wide for filters and tables
+                </p>
+              </div>
+              <div>
+                <div class="mx-auto h-2 w-1/2 rounded-full bg-brand-strong"></div><p class="mt-1 text-xs text-ink-muted">
+                  Form — narrow for focused entry
+                </p>
+              </div>
+              <div>
+                <div class="mx-auto h-2 w-2/3 rounded-full bg-brand-strong"></div><p class="mt-1 text-xs text-ink-muted">
+                  Detail — medium for a record or dashboard
+                </p>
+              </div>
+            </.card>
+          </div>
+          <div class="grid gap-3 lg:grid-cols-2">
+            <.card id="component-navigation" title="Navigation" inner_class="p-3">
+              <div class="max-w-xs rounded-lg bg-surface-sidebar p-2 text-[0.8125rem] text-link">
+                <div class="px-2 py-1">Companies</div><div class="px-2 py-1 text-brand-strong">
+                  System
+                </div><div class="rounded-sm bg-surface px-2 py-1 text-brand-strong">
+                  Design Library
+                </div><div class="mt-1 rounded-sm bg-brand-surface px-2 py-1">Pinned item</div>
+              </div>
+            </.card>
+            <.card id="component-tabs" title="Tabs" inner_class="p-3">
+              <nav class="flex gap-1 border-b border-line" aria-label="Example views">
+                <a
+                  href="#component-tabs"
+                  aria-current="page"
+                  class="-mb-px border-b-2 border-brand-strong px-3 py-2 text-sm font-medium text-ink-strong"
+                >Overview</a><a
+                  href="#component-tabs"
+                  class="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-ink-muted hover:text-ink"
+                >History</a><a
+                  href="#component-tabs"
+                  class="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-ink-muted hover:text-ink"
+                >Settings</a>
+              </nav>
+            </.card>
+          </div>
+        </section>
+
+        <section id="component-actions" class="scroll-mt-4 space-y-4">
+          <div>
+            <h2 id="component-button" class="text-base font-semibold text-ink-strong">Actions</h2><p class="text-sm text-ink-muted">
+              Primary, secondary, destructive, disabled, navigation, and in-flight examples.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-4 shadow-xs">
+            <.button>Secondary</.button><.button variant="primary">Primary</.button><.button variant="danger">Danger</.button><.button disabled>Disabled</.button><.button navigate={
+              ~p"/system/design-library"
+            }>Navigation</.button><.button
+              phx-click="test_click"
+              variant="primary"
+              phx-disable-with="Working…"
+            >Clicked: {@click_count}</.button>
+          </div>
+        </section>
+
+        <section id="component-inputs" class="scroll-mt-4 space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Forms</h2><p class="text-sm text-ink-muted">
+              All shared field families and the choice controls already used by Bilimbi.
+            </p>
+          </div>
+          <div class="grid gap-3 lg:grid-cols-2">
+            <.card title="Text and choice fields" inner_class="p-4">
+              <.form
+                for={@sample_form}
+                id="design-library-fields"
+                class="grid gap-x-3 sm:grid-cols-2"
+              >
+                <.input
+                  field={@sample_form[:text_field]}
+                  label="Text"
+                  placeholder="Enter a value"
+                />
+                <.input
+                  field={@sample_form[:search_field]}
+                  type="search"
+                  label="Search"
+                  placeholder="Search…"
+                />
+                <.input
+                  field={@sample_form[:select_field]}
+                  type="select"
+                  label="Select"
+                  options={[{"Standard", "standard"}, {"Advanced", "advanced"}]}
+                />
+                <.multi_select
+                  field={@sample_form[:roles]}
+                  id="design-library-multi-select"
+                  label="Multi-select"
+                  options={[
+                    {"Administrator", "admin"},
+                    {"Operator", "operator"},
+                    {"Reviewer", "reviewer"}
+                  ]}
+                  value={["admin", "reviewer"]}
+                  selection_label=":count role selected|:count roles selected"
+                />
+                <.input field={@sample_form[:date_field]} type="date" label="Date" />
+                <.input field={@sample_form[:time_field]} type="time" label="Time" />
+                <.input
+                  field={@sample_form[:textarea_field]}
+                  type="textarea"
+                  label="Textarea"
+                  wrapper_class="mb-4 sm:col-span-2"
+                />
+                <.input
+                  field={@sample_form[:checkbox_field]}
+                  type="checkbox"
+                  label="Enable synchronization"
+                  wrapper_class="mb-0 sm:col-span-2"
+                />
+              </.form>
+            </.card>
+            <.card title="Help, error, and locked states" inner_class="p-4">
+              <.input
+                name="field-with-help"
+                label="Company code"
+                value="acme"
+                hint="Used in URLs and exports."
+              />
+              <.input
+                field={@error_form[:invalid_text]}
+                label="Required value"
+                placeholder="Enter a value"
+              />
+              <.input
+                name="disabled-field"
+                label="System value"
+                value="Managed by Bilimbi"
+                disabled
+              />
+              <div class="space-y-2">
+                <p class="text-sm font-medium text-ink">Appearance choice</p><label class="flex items-center gap-2 text-sm text-ink"><input
+                  type="radio"
+                  name="appearance-example"
+                  value="system"
+                  checked
+                  class="accent-action"
+                /> System</label><label class="flex items-center gap-2 text-sm text-ink"><input
+                  type="radio"
+                  name="appearance-example"
+                  value="light"
+                  class="accent-action"
+                /> Light</label><label class="flex items-center gap-2 text-sm text-ink"><input
+                  type="radio"
+                  name="appearance-example"
+                  value="dark"
+                  class="accent-action"
+                /> Dark</label>
+              </div>
+            </.card>
+          </div>
+        </section>
+
+        <section id="component-feedback" class="scroll-mt-4 space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Feedback and status</h2><p class="text-sm text-ink-muted">
+              Short-lived messages, inline guidance, and persistent record status.
+            </p>
+          </div>
+          <div
+            id="component-flash"
+            class="relative min-h-28 overflow-hidden rounded-xl border border-line bg-canvas transform-gpu"
+          >
+            <.flash
+              id="design-library-flash"
+              kind={:info}
+              flash={%{"info" => "Your changes were saved."}}
+              title="Saved"
+            />
+          </div>
+          <div id="component-alert" class="grid gap-2 lg:grid-cols-2">
+            <.alert kind={:info}>This change affects future records.</.alert><.alert kind={
+              :success
+            }>
+              The company was created.
+            </.alert><.alert kind={:warning}>
+              Review the missing address before continuing.
+            </.alert><.alert kind={:error}>The record could not be saved.</.alert>
+          </div>
+          <div
+            id="component-badge"
+            class="flex flex-wrap gap-2 rounded-xl border border-line bg-surface p-4 shadow-xs"
+          >
+            <.badge>Archived</.badge><.badge kind={:success}>Active</.badge><.badge kind={
+              :warning
+            }>
+              Pending
+            </.badge><.badge kind={:danger}>Suspended</.badge>
+          </div>
+        </section>
+
+        <section id="component-states" class="scroll-mt-4 space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">
+              Empty, blocked, and interrupted
+            </h2><p class="text-sm text-ink-muted">
+              These states are part of the product, not exceptions to its design.
+            </p>
+          </div>
+          <div class="grid gap-3 lg:grid-cols-3">
+            <.card title="Empty workspace" inner_class="p-4 text-center">
+              <.icon name="hero-building-office-2" class="mx-auto size-6 text-ink-faint" /><p class="mt-2 text-sm font-medium text-ink">
+                No companies yet
+              </p><p class="mt-1 text-xs text-ink-muted">
+                Create the first company to establish this workspace.
+              </p><.button variant="primary" class="mt-3">Create company</.button>
+            </.card><.card title="Permission denied" inner_class="p-4">
+              <.alert kind={:error}>
+                You cannot view this area. Ask an operator to review your role.
+              </.alert>
+            </.card><.card title="Connection interrupted" inner_class="p-4">
+              <.alert kind={:warning}>
+                Bilimbi is reconnecting. Your work has not been submitted twice.
+              </.alert>
+            </.card>
+          </div>
+        </section>
+
+        <section id="component-data" class="scroll-mt-4 space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Data and display</h2><p class="text-sm text-ink-muted">
+              Tables, inline editing, pagination, key facts, and dates.
+            </p>
+          </div>
+          <div id="component-table" class="space-y-2">
+            <.table id="sample-table" rows={@sample_rows} caption="Example companies">
+              <:col :let={row} label="Company">
+                <span class="font-medium text-ink-strong">{row.name}</span>
+              </:col><:col :let={row} label="Code">{row.code}</:col><:col
+                :let={row}
+                label="Status"
+              >
+                <.badge kind={row.kind}>{row.status}</.badge>
+              </:col><:col :let={row} label="Updated">
+                <.datetime id={"sample-updated-#{row.id}"} value={row.updated_at} format={:date} />
+              </:col><:action :let={row}>
+                <a href={"/companies/#{row.id}"} class="text-link hover:underline">View</a>
+              </:action>
+            </.table>
+            <.pagination
+              id="design-library-pagination"
+              page={@pagination_sample_page}
+              filters_form={@pagination_sample_form}
+            />
+          </div>
+          <.card id="component-inline-edit" title="Inline edit" inner_class="p-4">
+            <p class="mb-2 text-xs text-ink-muted">
+              Click the value, type, then press Enter or leave the field.
+            </p><.inline_edit
+              id="design-library-inline-edit"
+              value={@inline_value}
+              save_event="preview-inline-edit"
+              label="Edit company name"
+            />
+          </.card>
+          <div class="grid gap-3 lg:grid-cols-2">
+            <.card id="component-list" title="Record facts" inner_class="px-4">
+              <.list>
+                <:item title="Company">Acme Holdings</:item><:item title="Status">
+                  <.badge kind={:success}>Active</.badge>
+                </:item><:item title="Jurisdiction">Malaysia</:item>
+              </.list>
+            </.card>
+            <.card id="component-datetime" title="Date and time" inner_class="space-y-3 p-4">
+              <div class="flex justify-between gap-4 text-sm">
+                <span class="text-ink-muted">Date and time</span><.datetime
+                  id="design-library-date-time"
+                  value={@sample_datetime}
+                />
+              </div><div class="flex justify-between gap-4 text-sm">
+                <span class="text-ink-muted">Date</span><.datetime
+                  id="design-library-date"
+                  value={@sample_datetime}
+                  format={:date}
+                />
+              </div><div class="flex justify-between gap-4 text-sm">
+                <span class="text-ink-muted">Time</span><.datetime
+                  id="design-library-time"
+                  value={@sample_datetime}
+                  format={:time}
+                />
+              </div><div class="flex justify-between gap-4 text-sm">
+                <span class="text-ink-muted">Not set</span><.datetime
+                  id="design-library-date-empty"
+                  value={nil}
+                />
+              </div>
+            </.card>
+          </div>
+        </section>
+
+        <section id="component-patterns" class="scroll-mt-4 space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Operational list</h2><p class="text-sm text-ink-muted">
+              The current shared composition for search, rows, status, dates, and pagination.
+            </p>
+          </div>
+          <.card inner_class="p-0">
+            <.form for={@pattern_form} id="design-library-pattern-search" class="mb-2 p-2">
+              <.input
+                field={@pattern_form[:search]}
+                type="search"
+                label="Search companies"
+                label_class="sr-only"
+                wrapper_class="mb-0"
+                placeholder="Search companies…"
+              />
+            </.form><.table
+              id="design-library-pattern-table"
+              rows={@sample_rows}
+              caption="Companies"
+              framed={false}
+            >
+              <:col :let={row} label="Company">{row.name}</:col><:col :let={row} label="Code">
+                {row.code}
+              </:col><:col :let={row} label="Status">
+                <.badge kind={row.kind}>{row.status}</.badge>
+              </:col><:col :let={row} label="Updated">
+                <.datetime id={"pattern-updated-#{row.id}"} value={row.updated_at} format={:date} />
+              </:col>
+            </.table><.pagination
+              id="design-library-pattern-pagination"
+              page={@pagination_sample_page}
+              filters_form={@pattern_pagination_form}
+            />
+          </.card>
+        </section>
+      </section>
+    <% end %>
+
+    <%= if @area == :graphic do %>
+      <section id="graphics" class="space-y-8">
+        <section id="graphic-mark" class="space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Bilimbi mark</h2><p class="text-sm text-ink-muted">
+              One mark, shown at the sizes and surfaces currently in use.
+            </p>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-3">
+            <div class="grid min-h-36 place-items-center rounded-xl border border-line bg-canvas p-4">
+              <div class="text-center">
+                <img src={~p"/images/logo.svg"} alt="Bilimbi" class="mx-auto size-12" /><p class="mt-3 text-xs text-ink-muted">
+                  Sign in · 48px
+                </p>
+              </div>
+            </div>
+            <div class="grid min-h-36 place-items-center rounded-xl border border-line bg-surface-sidebar p-4">
+              <div class="text-center">
+                <img src={~p"/images/logo.svg"} alt="Bilimbi" class="mx-auto size-6" /><p class="mt-3 text-xs text-ink-muted">
+                  App bar · 24px
+                </p>
+              </div>
+            </div>
+            <div class="grid min-h-36 place-items-center rounded-xl border border-line bg-surface p-4 shadow-xs">
+              <div class="text-center">
+                <img src={~p"/favicon.svg"} alt="Bilimbi favicon" class="mx-auto size-8" /><p class="mt-3 text-xs text-ink-muted">
+                  Browser icon · 32px
+                </p>
+              </div>
+            </div>
+          </div>
+          <div class="rounded-xl border border-line bg-surface p-4 shadow-xs">
+            <h3 class="mb-2 text-sm font-semibold text-ink">Bilimbi-specific icons</h3>
+            <div class="flex flex-wrap gap-5">
+              <div class="flex items-center gap-2">
+                <.icon name="bilimbi-pin" class="size-5 text-action" /><span class="text-sm text-ink">Pin to sidebar</span>
+              </div><div class="flex items-center gap-2">
+                <.icon name="bilimbi-impersonate" class="size-5 text-action" /><span class="text-sm text-ink">Impersonate user</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="graphic-icons" class="space-y-4">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Icons</h2><p class="text-sm text-ink-muted">
+              Outline icons are the current default. Their meaning comes from the label and the task around them.
+            </p>
+          </div>
+          <div class="space-y-5 rounded-xl border border-line bg-surface p-4 shadow-xs">
+            <div>
+              <h3 class="mb-2 text-sm font-semibold text-ink">Navigation</h3><div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="flex items-center gap-3 rounded-lg bg-canvas p-3">
+                  <.icon name="hero-building-office-2" class="size-5 text-action" /><span class="text-sm text-ink">Companies</span>
+                </div><div class="flex items-center gap-3 rounded-lg bg-canvas p-3">
+                  <.icon name="hero-users" class="size-5 text-action" /><span class="text-sm text-ink">Users</span>
+                </div><div class="flex items-center gap-3 rounded-lg bg-canvas p-3">
+                  <.icon name="hero-shield-check" class="size-5 text-action" /><span class="text-sm text-ink">Authorization</span>
+                </div><div class="flex items-center gap-3 rounded-lg bg-canvas p-3">
+                  <.icon name="hero-cog-6-tooth" class="size-5 text-action" /><span class="text-sm text-ink">System</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3 class="mb-2 text-sm font-semibold text-ink">Actions</h3><div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink"
+                ><.icon name="hero-plus" /> Add</button><button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink"
+                ><.icon name="hero-pencil" /> Edit</button><button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink"
+                ><.icon name="hero-magnifying-glass" /> Search</button><button
+                  type="button"
+                  class="inline-flex items-center gap-2 rounded-md border border-danger-line bg-danger-surface px-3 py-2 text-sm text-danger-ink"
+                ><.icon name="hero-trash" /> Delete</button>
+              </div>
+            </div>
+            <div>
+              <h3 class="mb-2 text-sm font-semibold text-ink">Status</h3><div class="flex flex-wrap gap-5">
+                <div class="flex items-center gap-2 text-success-ink">
+                  <.icon name="hero-check-circle" class="size-5" /><span class="text-sm">Completed</span>
+                </div><div class="flex items-center gap-2 text-warning-ink">
+                  <.icon name="hero-exclamation-triangle" class="size-5" /><span class="text-sm">Attention</span>
+                </div><div class="flex items-center gap-2 text-danger-ink">
+                  <.icon name="hero-exclamation-circle" class="size-5" /><span class="text-sm">Failed</span>
+                </div><div class="flex items-center gap-2 text-ink-muted">
+                  <.icon name="hero-information-circle" class="size-5" /><span class="text-sm">Information</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    <% end %>
+
+    <%= if @area == :design_spec do %>
+      <section id="specifications" class="space-y-8">
+        <section id="accepted-design" class="space-y-6">
+          <div>
+            <h2 class="text-base font-semibold text-ink-strong">Accepted choices</h2><p class="text-sm text-ink-muted">
+              These are the current rules for Bilimbi.
+            </p>
+          </div>
+          <section id="spec-theme" class="space-y-3">
+            <h3 class="text-sm font-semibold text-ink">Theme</h3>
+            <div class="grid gap-3 lg:grid-cols-2">
+              <.card id="spec-t01" inner_class="p-4">
+                <h4 class="text-sm font-semibold text-ink">T01 · Theme contrast stays distinct</h4>
+                <p class="mt-2 text-sm text-ink">
+                  Links read stronger than muted text. Dark surfaces retain separate depth, and dark primary actions brighten on hover.
+                </p>
+              </.card>
+              <.card id="spec-d01" inner_class="p-4">
+                <h4 class="text-sm font-semibold text-ink">D01 · Colour has meaning</h4>
+                <p class="mt-2 text-sm text-ink">
+                  Brand, action, selection, and status each have a separate meaning. Green, amber, and red report status only.
+                </p>
+              </.card>
+              <.card id="spec-d02" inner_class="p-4">
+                <h4 class="text-sm font-semibold text-ink">D02 · Type stays quiet</h4>
+                <p class="mt-2 text-sm text-ink">
+                  Instrument Sans is used throughout. Headings establish hierarchy without making operational screens loud.
+                </p>
+              </.card>
+            </div>
+          </section>
+
+          <section id="spec-structure-data" class="space-y-3">
+            <h3 class="text-sm font-semibold text-ink">Structure and data</h3>
+            <div class="grid gap-3 lg:grid-cols-2">
+              <.card id="spec-d03" inner_class="p-4">
+                <h4 class="text-sm font-semibold text-ink">D03 · Width follows the work</h4>
+                <p class="mt-2 text-sm text-ink">
+                  Lists are wide, forms are narrow, and record details sit between them.
+                </p>
+              </.card>
+              <.card id="spec-d04" inner_class="p-4">
+                <h4 class="text-sm font-semibold text-ink">D04 · Data stays compact</h4>
+                <p class="mt-2 text-sm text-ink">
+                  Tables favour scanning: compact rows, quiet dividers, proper-case headings, and tabular numbers.
+                </p>
+              </.card>
+            </div>
+          </section>
+
+          <section id="spec-experience" class="space-y-3">
+            <h3 class="text-sm font-semibold text-ink">Experience</h3>
+            <div class="grid gap-3 lg:grid-cols-2">
+              <.card id="spec-d05" inner_class="p-4">
+                <h4 class="text-sm font-semibold text-ink">D05 · Copy is for the user</h4>
+                <p class="mt-2 text-sm text-ink">
+                  Labels say what a person can understand and act on. Internal history and implementation details stay out of the interface.
+                </p>
+              </.card>
+              <.card id="spec-d06" inner_class="p-4">
+                <h4 class="text-sm font-semibold text-ink">D06 · Every state is designed</h4>
+                <p class="mt-2 text-sm text-ink">
+                  Empty, loading, success, failure, permission, and recovery states receive the same care as the happy path.
+                </p>
+              </.card>
+            </div>
+          </section>
+        </section>
+      </section>
+    <% end %>
+  </.page>
+</Layouts.app>

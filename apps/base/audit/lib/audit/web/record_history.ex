@@ -30,7 +30,7 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
       <details class="group">
         <summary
           id={"#{@id}-toggle"}
-          class="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas [&::-webkit-details-marker]:hidden"
+          class="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-high-contrast-line bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas [&::-webkit-details-marker]:hidden"
         >
           <.icon name="hero-clipboard-document-list" class="size-4" />
           <span>History</span>

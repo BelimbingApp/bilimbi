@@ -21,7 +21,7 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
       )
 
     assert html =~ ~s(id="default-btn")
-    assert html =~ "border border-line-strong bg-surface text-ink hover:bg-surface-sunken"
+    assert html =~ "border border-high-contrast-line bg-surface text-ink hover:bg-surface-sunken"
     assert html =~ "Save"
   end
 

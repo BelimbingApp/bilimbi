@@ -8,7 +8,7 @@
             id="query-name-input"
             value={@name}
             name="name"
-            class="bg-transparent text-xl font-bold text-ink border-0 border-b border-transparent hover:border-line-strong focus:border-brand focus:ring-0 px-1 py-0.5"
+            class="bg-transparent text-xl font-bold text-ink border-0 border-b border-transparent hover:border-high-contrast-line focus:border-brand focus:ring-0 px-1 py-0.5"
             placeholder="Untitled Query"
           />
         </form>
@@ -26,7 +26,7 @@
             value={@description}
             name="description"
             placeholder="Add a description..."
-            class="w-full bg-transparent text-sm text-ink-subtle border-0 border-b border-transparent hover:border-line-strong focus:border-brand focus:ring-0 px-1 py-0.5"
+            class="w-full bg-transparent text-sm text-ink-subtle border-0 border-b border-transparent hover:border-high-contrast-line focus:border-brand focus:ring-0 px-1 py-0.5"
           />
         </form>
       </:subtitle>
@@ -61,7 +61,7 @@
               type="button"
               id="btn-discard-query"
               phx-click="delete"
-              class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition border border-line-strong bg-surface text-ink hover:bg-surface-sunken"
+              class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition border border-high-contrast-line bg-surface text-ink hover:bg-surface-sunken"
             >
               <.icon name="hero-x-mark" class="size-4 mr-1.5" />
               Discard
@@ -173,7 +173,7 @@
 
           <div class="overflow-x-auto rounded-lg border border-line max-h-[500px]">
             <table id="query-results-table" class="w-full text-left font-mono text-xs text-ink">
-              <thead class="sticky top-0 border-b border-line bg-surface-subtle text-xs font-semibold uppercase text-ink-subtle">
+              <thead class="sticky top-0 border-b border-line bg-surface-muted text-xs font-semibold uppercase text-ink-subtle">
                 <tr>
                   <%= for col <- @results.columns do %>
                     <th
@@ -200,7 +200,7 @@
                   </tr>
                 <% else %>
                   <%= for {row, row_idx} <- Enum.with_index(@results.rows) do %>
-                    <tr id={"result-row-#{row_idx}"} class="hover:bg-surface-subtle/50 transition">
+                    <tr id={"result-row-#{row_idx}"} class="hover:bg-surface-muted/50 transition">
                       <%= for col <- @results.columns do %>
                         <td class="px-3 py-2 whitespace-nowrap max-w-sm truncate text-ink">
                           <% val = Map.get(row, col) %>

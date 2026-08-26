@@ -579,7 +579,7 @@ defmodule BilimbiWeb.DashboardLive do
                       }
                       navigate={~p"/companies/#{@current_company.id}"}
                       id="dashboard-company-open"
-                      class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
+                      class="text-xs font-medium text-ink-muted underline decoration-high-contrast-line underline-offset-2 hover:text-ink"
                     >
                       Open company
                     </.link>
@@ -625,7 +625,7 @@ defmodule BilimbiWeb.DashboardLive do
                   <.link
                     :if={!@layout_editing and UserAuth.allowed?(@current_scope, "admin.user.list")}
                     navigate={~p"/users"}
-                    class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
+                    class="text-xs font-medium text-ink-muted underline decoration-high-contrast-line underline-offset-2 hover:text-ink"
                   >
                     All users
                   </.link>
@@ -819,7 +819,7 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
       <div class="flex items-center justify-between gap-3">
         <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
@@ -885,7 +885,7 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
       <div class="flex items-center justify-between gap-3">
         <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
@@ -951,7 +951,7 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
       <div class="flex items-center justify-between gap-3">
         <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">Users</p>
@@ -1021,7 +1021,7 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
       <div class="flex items-center justify-between gap-3">
         <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">

@@ -554,15 +554,17 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   `aria-sort`, and page, search, filters, sort, and page size stay in URL
   state. Use `<.datetime>` for timestamps and `<.icon>` for all icons (put
   product-only SVGs in `Bilimbi.Base.UI.IconRegistry`). Primary actions use
-  `<.button variant="primary">` with deep olive base (`bg-action` `#2c3801`),
-  high-contrast text (`text-action-ink` `#f5fcdc`), and standard lime accent hover
-  (`hover:bg-action-hover` `var(--color-brand-strong)` / `lime-600`). Lime `brand`
+  `<.button variant="primary">` with deep olive base (`bg-action`, `lime-950`
+  light / `lime-600` dark), high-contrast text (`text-action-ink`, `lime-50`
+  light / `lime-950` dark), and a brighter lime hover
+  (`hover:bg-action-hover`, `lime-600` light / `lime-500` dark). Lime `brand`
   is reserved for orientation and selection, never an action or status. Async actions
   must show in-flight state, reject duplicate work, and truthfully report the data
   outcome and recovery.
 - **Data tables & inline editing:** Tables use compact density (`py-0.5` row
-  cells, `py-1.5` header cells, `px-2` cell horizontal padding, `bg-surface-sunken`
-  `#eaebe4` header background, proper case `text-xs font-semibold text-muted` headers,
+  cells, `py-1.5` header cells, `px-2` cell horizontal padding,
+  `bg-surface-sunken` header background, proper case
+  `text-xs font-semibold text-muted` headers,
   tabular numbers for numeric/code/date columns). Search filters live in `<.card>` with
   `p-2` and an `mb-2` gap before table headers. Inline editing uses `<.inline_edit>` with
   subtle hover pencil icon, click/focus activation, Enter/blur save, Escape cancel, and
@@ -572,13 +574,14 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   `assets/css/app.css`.
 - The platform uses `Instrument Sans` globally via `--font-sans` in `@theme`.
 - **Navigation & menu design:** Navigation items use `Instrument Sans` with compact
-  styling (`font-weight: 350`, `0.8125rem`/13px, `line-height: 1.25rem`). Default link
-  text is `text-link` (`#544c43`), hover is `text-ink` (`#2c2418`), pinned headers and
-  grips are `text-muted` (`#6b6057`). Active navigation uses `bg-surface text-brand-strong`
+  styling (`font-weight: 350`, `0.8125rem`/13px, `line-height: 1.25rem`). Default
+  link text is `text-link` (`stone-700` light / `stone-300` dark), hover is
+  `text-ink`, and pinned headers and grips are `text-muted` (`stone-600` light /
+  `stone-400` dark). Active navigation uses `bg-surface text-brand-strong`
   without bolding or spine borders. Parent branches of active items ascend with
   `text-brand-strong`. Chevrons use triangle characters `&#x2BC8;` (`⯈`) and `&#x2BC6;`
   (`⯆`) with figure space indentation for leaf items. Menu items and submenus are sorted
-  alphabetically ascending (`ASC`). Pinned items sit in `bg-brand-surface` (`#f3f5e8`).
+  alphabetically ascending (`ASC`). Pinned items sit in `bg-brand-surface`.
 - Do not use `@apply` in raw CSS.
 - Build the design system with hand-written Tailwind-based components. Do not
   make daisyUI or another component library the product design system.
