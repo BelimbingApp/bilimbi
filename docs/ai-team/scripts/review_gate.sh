@@ -7,8 +7,15 @@
 # CI check. Keeping those two callers behind this file prevents a valid review
 # in one place from being invisible in the other.
 #
-#   scripts/review_gate.sh <pr-number> [<reviewed-full-sha>]
-#   REVIEW_GATE_INPUT=<fixture.json> scripts/review_gate.sh
+#   package/scripts/review_gate.sh <pr-number> [<reviewed-full-sha>]
+#   REVIEW_GATE_REPOSITORY=<owner/repo> package/scripts/review_gate.sh <pr> [<sha>]
+#   REVIEW_GATE_INPUT=<fixture.json> package/scripts/review_gate.sh
+#
+# In an adopter those paths start with docs/ai-team/scripts/. A standalone copy
+# downloaded by the trusted workflow has no sibling helper or Git checkout, so
+# live workflow callers pass REVIEW_GATE_REPOSITORY explicitly. A packaged or
+# mounted copy has the helper and always treats origin as authoritative; an
+# inherited override cannot split review reads from gate.sh's repository.
 #
 # Fixture input has `reviewed`, `labels`, and `reviews` fields. `labels` may be
 # an array of label names or GitHub label objects; `reviews` uses the API shape.
@@ -19,12 +26,20 @@
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-# shellcheck source=docs/ai-team/scripts/_default_branch.sh
-# shellcheck disable=SC1091
-source "$here/_default_branch.sh"
-
 input="${REVIEW_GATE_INPUT:-}"
-cleanup_input=""
+cleanup_paths=()
+
+cleanup() {
+  local path
+  for path in "${cleanup_paths[@]}"; do
+    [[ -n "$path" ]] && rm -f -- "$path"
+  done
+}
+
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 if [[ -z "$input" ]]; then
   pr="${1:-}"
@@ -34,34 +49,69 @@ if [[ -z "$input" ]]; then
     exit 2
   fi
 
-  repo=$(ai_team_origin_repo) || {
-    echo "ERROR: cannot resolve this repository from origin" >&2
+  helper="$here/_default_branch.sh"
+  if [[ -r "$helper" ]]; then
+    # Fixture mode never reaches this source. A local package or mounted gate
+    # must share gate.sh's origin repository even if the caller inherited a
+    # REVIEW_GATE_REPOSITORY intended for some other command.
+    # shellcheck source=docs/ai-team/scripts/_default_branch.sh
+    # shellcheck disable=SC1091
+    source "$helper"
+    repo=$(ai_team_origin_repo) || {
+      echo "ERROR: cannot resolve this repository from origin" >&2
+      exit 2
+    }
+  else
+    # The trusted workflow downloads only this script, not its sibling helper.
+    # That standalone shape has no origin and must receive the repository from
+    # the trusted workflow context.
+    repo="${REVIEW_GATE_REPOSITORY:-}"
+    if [[ -z "$repo" ]]; then
+      echo "ERROR: REVIEW_GATE_REPOSITORY is required when the origin helper is unavailable" >&2
+      exit 2
+    fi
+  fi
+  if [[ ! "$repo" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    echo "ERROR: REVIEW_GATE_REPOSITORY must be an owner/repository name" >&2
+    exit 2
+  fi
+  pr_json_file=$(mktemp) || {
+    echo "ERROR: cannot create temporary review input" >&2
     exit 2
   }
-  [[ -n "$repo" ]] || { echo "ERROR: cannot resolve this repository from origin" >&2; exit 2; }
-  pr_json=$(gh pr view "$pr" --repo "$repo" --json headRefOid,labels 2>/dev/null) || {
+  cleanup_paths+=("$pr_json_file")
+  if ! gh pr view "$pr" --repo "$repo" --json headRefOid,labels >"$pr_json_file" 2>/dev/null; then
     echo "ERROR: cannot read PR #$pr from $repo" >&2
     exit 2
-  }
+  fi
   if [[ -z "$reviewed" ]]; then
-    reviewed=$(jq -r '.headRefOid // ""' <<<"$pr_json")
+    reviewed=$(jq -r '.headRefOid // ""' "$pr_json_file")
   fi
   if [[ ! "$reviewed" =~ ^[0-9a-f]{40}$ ]]; then
     echo "ERROR: reviewed SHA must be a full 40-character lowercase SHA" >&2
     exit 2
   fi
-  reviews=$(gh api "repos/$repo/pulls/$pr/reviews" --paginate 2>/dev/null \
-    | jq -s 'add // []' 2>/dev/null) || {
-    echo "ERROR: cannot read reviews for PR #$pr from $repo" >&2
+
+  reviews_file=$(mktemp) || {
+    echo "ERROR: cannot create temporary review input" >&2
     exit 2
   }
-  input=$(mktemp)
-  cleanup_input="$input"
-  trap 'rm -f "$cleanup_input"' EXIT
+  cleanup_paths+=("$reviews_file")
+  if ! gh api "repos/$repo/pulls/$pr/reviews" --paginate 2>/dev/null \
+    | jq -s 'add // []' >"$reviews_file" 2>/dev/null; then
+    echo "ERROR: cannot read reviews for PR #$pr from $repo" >&2
+    exit 2
+  fi
+
+  input=$(mktemp) || {
+    echo "ERROR: cannot create temporary review input" >&2
+    exit 2
+  }
+  cleanup_paths+=("$input")
   jq -n --arg reviewed "$reviewed" \
-    --argjson labels "$(jq -c '.labels // []' <<<"$pr_json")" \
-    --argjson reviews "$reviews" \
-    '{reviewed: $reviewed, labels: $labels, reviews: $reviews}' >"$input"
+    --slurpfile pr "$pr_json_file" \
+    --slurpfile reviews "$reviews_file" \
+    '{reviewed: $reviewed, labels: ($pr[0].labels // []), reviews: ($reviews[0] // [])}' >"$input"
 fi
 
 result=$(jq -r '
