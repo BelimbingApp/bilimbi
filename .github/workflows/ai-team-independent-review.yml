@@ -76,7 +76,12 @@ jobs:
       - name: Verify independent review of this exact head
         env:
           GH_TOKEN: ${{ github.token }}
-          REVIEW_GATE_REPOSITORY: ${{ github.repository }}
+          # GH_REPO, not REVIEW_GATE_REPOSITORY: the root helper runs
+          # `gh pr view "$1"` with no --repo, and this job deliberately does
+          # not check out, so gh has no repository to infer from a working
+          # tree. GH_REPO is the variable gh itself honours. Without it the
+          # first live run fails before evaluating a single review.
+          GH_REPO: ${{ github.repository }}
           REVIEW_GATE_PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           # The root helper's interface is `review_gate.sh <pr-number>`; it
