@@ -13,7 +13,7 @@ snapshot lifecycle, and validation rules are defined in
 `Bilimbi.Base.ModuleRegistry.ContributionProvider` and administered by
 `ContributionRegistry`.
 
-Bilimbi needs a widget-based dashboard (`docs/ai-team/PORTING_STAGES.md` S3).
+Bilimbi needs a widget-based dashboard (`docs/PORTING_STAGES.md` S3).
 Belimbing provides a dashboard widget system that registers widgets through its
 module configuration files (`app/Base/Dashboard/`), with user-customizable
 layout persisted in the `ui.dashboard.layout` setting.
