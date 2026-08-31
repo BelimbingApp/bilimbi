@@ -1,0 +1,90 @@
+name: independent review
+
+# Bootstrap bridge (#699). This runs the trusted independent-review grammar
+# BEFORE the AI-Team package is mounted, so the new checks exist on main and
+# can gate the cutover (#701) and the mount itself (PR #698).
+#
+# It is the upstream adopter template with one difference: the grammar it
+# fetches is this repository's existing root `scripts/review_gate.sh`, whose
+# interface takes the pull-request number alone. When the mount lands, this
+# file is replaced by the mounted template pointing at
+# `docs/ai-team/scripts/review_gate.sh`.
+#
+# `pull_request_target` loads this workflow from the trusted base repository,
+# and the grammar is fetched from the exact commit that supplied it — never a
+# moving branch, never the pull request under review, and never via checkout.
+on:
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  review-gate:
+    name: Independent review
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Materialize trusted review grammar
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_GATE_REPOSITORY: ${{ github.repository }}
+          REVIEW_GATE_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          REVIEW_GATE_PATH: scripts/review_gate.sh
+        run: |
+          set -euo pipefail
+          [[ "$REVIEW_GATE_REPOSITORY" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$ ]]
+          [[ "$REVIEW_GATE_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$REVIEW_GATE_PATH" == "scripts/review_gate.sh" ]]
+
+          response="$RUNNER_TEMP/review_gate.json"
+          script="$RUNNER_TEMP/review_gate.sh"
+          gh api --method GET \
+            -H "Accept: application/vnd.github+json" \
+            "repos/$REVIEW_GATE_REPOSITORY/contents/$REVIEW_GATE_PATH" \
+            -f "ref=$REVIEW_GATE_WORKFLOW_SHA" >"$response"
+
+          jq -e --arg path "$REVIEW_GATE_PATH" '
+            type == "object"
+            and .type == "file"
+            and .path == $path
+            and .encoding == "base64"
+            and ((.content | type) == "string")
+            and ((.content | length) > 0)
+            and ((.size | type) == "number")
+            and (.size > 0 and .size <= 1048576)
+            and ((.sha | type) == "string")
+            and (.sha | test("^[0-9a-f]{40}$"))
+          ' "$response" >/dev/null
+
+          expected_size=$(jq -r '.size' "$response")
+          expected_sha=$(jq -r '.sha' "$response")
+          jq -r '.content' "$response" \
+            | tr -d '\r\n' \
+            | base64 --decode >"$script"
+
+          actual_size=$(wc -c <"$script" | tr -d '[:space:]')
+          [[ "$actual_size" == "$expected_size" ]]
+          [[ "$(git hash-object --no-filters "$script")" == "$expected_sha" ]]
+          [[ "$(head -n 1 "$script")" == '#!/usr/bin/env bash' ]]
+          bash -n "$script"
+          chmod 700 "$script"
+
+      - name: Verify independent review of this exact head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # GH_REPO, not REVIEW_GATE_REPOSITORY: the root helper runs
+          # `gh pr view "$1"` with no --repo, and this job deliberately does
+          # not check out, so gh has no repository to infer from a working
+          # tree. GH_REPO is the variable gh itself honours. Without it the
+          # first live run fails before evaluating a single review.
+          GH_REPO: ${{ github.repository }}
+          REVIEW_GATE_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # The root helper's interface is `review_gate.sh <pr-number>`; it
+          # derives the head itself. Passing a second argument would make it
+          # print usage and exit non-zero, failing every PR.
+          "$RUNNER_TEMP/review_gate.sh" "$REVIEW_GATE_PR_NUMBER"
