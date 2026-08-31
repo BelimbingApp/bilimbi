@@ -7,7 +7,7 @@
 #
 # A task is done when nothing you created is left lying around, and untidiness is
 # invisible to whoever made it. This removes only what is provably finished:
-# local branches fully merged into origin/main, and stale worktree admin refs. It
+# local branches fully merged into the default branch, and stale worktree refs. It
 # never touches an unmerged branch or an active worktree. Background loops and
 # heartbeats it only *lists* — a shell cannot cancel your tool's scheduler; stop
 # those where you started them (your heartbeat cron, your watcher). Remote branch
@@ -16,27 +16,33 @@
 #
 set -u
 
+CLEANUP_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
+# shellcheck source=docs/ai-team/scripts/_default_branch.sh
+# shellcheck disable=SC1091
+source "$CLEANUP_DIR/_default_branch.sh"
+BASE=$(ai_team_default_branch)
+
 apply=0
 [ "${1:-}" = "--yes" ] && apply=1
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "not a git checkout" >&2; exit 2; }
 cd "$ROOT" || exit 2
 
-if ! git fetch -q origin main 2>/dev/null; then
-  echo "cannot refresh origin/main; cleanup stopped without deleting anything" >&2
+if ! git fetch -q origin "$BASE" 2>/dev/null; then
+  echo "cannot refresh origin/$BASE; cleanup stopped without deleting anything" >&2
   exit 2
 fi
 
-echo "== merged local branches (every commit already in origin/main) =="
+echo "== merged local branches (every commit already in origin/$BASE) =="
 current=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)   # "HEAD" when detached
 any=0
 while IFS= read -r b; do
   [ -z "$b" ] && continue
-  [ "$b" = "main" ] && continue
-  git merge-base --is-ancestor "$b" origin/main 2>/dev/null || continue
+  [ "$b" = "$BASE" ] && continue
+  git merge-base --is-ancestor "$b" "origin/$BASE" 2>/dev/null || continue
   any=1
   if [ "$b" = "$current" ]; then
-    echo "  $b — current branch; detach (git checkout --detach origin/main) then re-run"
+    echo "  $b — current branch; detach (git checkout --detach origin/$BASE) then re-run"
   elif [ "$apply" -eq 1 ]; then
     if git branch -D "$b" >/dev/null 2>&1; then
       echo "  deleted $b"
@@ -53,8 +59,8 @@ echo
 echo "== unmerged local branches (left alone — verify before deleting by hand) =="
 any=0
 while IFS= read -r b; do
-  [ -z "$b" ] || [ "$b" = "main" ] && continue
-  git merge-base --is-ancestor "$b" origin/main 2>/dev/null && continue
+  [ -z "$b" ] || [ "$b" = "$BASE" ] && continue
+  git merge-base --is-ancestor "$b" "origin/$BASE" 2>/dev/null && continue
   echo "  $b"
   any=1
 done < <(git for-each-ref --format='%(refname:short)' refs/heads/)

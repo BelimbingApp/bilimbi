@@ -1,322 +1,417 @@
 # AI Team — operating guide
 
-**Document Type:** Onboarding
-**Last Updated:** 2026-08-25
+**Document type:** onboarding
+**Last updated:** 2026-08-30
 
-This is a reusable constitution for a standing team of autonomous agents working
-through GitHub. Read it once; current coordination happens on Issues and pull
-requests. The repository, its instructions, and the board make the current work
-self-evident. Where a rule can be a script, run the script rather than
-remembering prose.
+AI Team is a standing group of autonomous agents delivering through GitHub.
+Read this guide once; then use repository instructions, Issues, pull requests,
+labels, and scripts as the current source of truth. Where a script can enforce
+a rule, run it instead of relying on memory.
 
----
+The board is the durable record. Use direct agent messaging when the runtime
+offers it for fast coordination, but record every durable claim, hold, decision,
+appointment, halt, and blocker on its owning Issue or pull request.
 
-## What this is
+This repository's own scripts live at `package/scripts/`. A `package-split`
+workflow republishes `package/` as the standalone `package-mount` branch on
+every push to `main` — an adopter mounts *that* branch, not `main`, so this
+repository's own root-level CI, hook, and `AGENTS.md` never enter the mount.
+In an adopter, the mounted scripts are at `docs/ai-team/scripts/`. For
+project-specific orientation, copy `package/templates/project-orient.sh` (from the
+mount, so `docs/ai-team/templates/project-orient.sh`) to the adopter-owned
+`.ai-team/project-orient.sh`; it sits outside the mount, so package updates do
+not overwrite it.
 
-A standing team of autonomous AI agents delivering a shared stream of work on
-one codebase. You take an unclaimed task, build it, get it reviewed by someone
-who is not you, merge it, **clean up after yourself**, and take the next — no
-permission asked, not from the user, not from each other.
-
-Use **cross-session messaging whenever it is available** for fast coordination:
-handoffs, review requests, collision avoidance, steward broadcasts, and direct
-questions belong on the lowest-latency channel shared by the relevant agents.
-The board — Issues, PRs, and labels — is the durable, cross-tool record. A claim,
-hold, decision, appointment, or halt that must survive a session or reach agents
-on another tool is recorded there as well. Messaging accelerates coordination;
-it does not replace shared state.
-
-This page is mission-agnostic: claiming, review, merging, cleanup, stewardship,
-and stopping do not depend on what the repository builds. To adopt it elsewhere,
-copy this directory, replace or remove `scripts/project-orient.sh`, and create
-the fixed board labels used below:
-`task:ready`, `task:blocked`, `task:done`, `hold:author`, `hold:review`, and
-`ops:halt`, `ops:steward`. The claim mechanism creates `agent:<id>` labels as
-lanes appear. Run the mechanism tests before enabling the scheduled sweep.
-
----
-
-## How we work
-
-**Take any unclaimed task. Do not ask permission — not from the user, not from
-each other.** Claim it by opening a **draft PR before you write code**. The
-claim script checks the live issue and open-PR registry before it writes
-anything, then creates the branch, empty claim commit, draft PR, and labels:
+Mount the package with:
 
 ```bash
-CLAIM_AGENT=<your-stable-agent-id> docs/ai-team/scripts/claim.sh <issue-number>
+git subtree add --prefix=docs/ai-team \
+  https://github.com/BelimbingApp/ai-team.git package-mount --squash
 ```
 
-It refuses a closed or already-labelled issue and reports any open PR that
-already references the issue or carries its claim branch. `CLAIM_BRANCH` and
-`CLAIM_TITLE` may override the generated branch and issue-title PR title.
+At the same mount-time change, copy the adopter-owned workflow templates into
+the host repository. They are intentionally outside the subtree so each
+adopter controls its own triggers and permissions:
 
-Claim in the draft PR rather than an issue comment because that is the surface
-everyone already queries — `gh pr list` is how each of us finds work, so the
-claim registry comes free and nobody has to poll anything extra. Claims posted
-as issue comments collided three times in one evening, including once where the
-claimant followed the rule: a PR opening is the *end* of the work, so a comment
-written at claim time cannot reach someone already building.
+```bash
+mkdir -p .github/workflows
+cp docs/ai-team/templates/mechanisms.yml .github/workflows/ai-team-mechanisms.yml
+cp docs/ai-team/templates/blocked-by-sweep.yml .github/workflows/ai-team-blocked-by-sweep.yml
+cp docs/ai-team/templates/independent-review.yml .github/workflows/ai-team-independent-review.yml
+```
 
-**Coordinate with each other, not through the user.** Blocked by a teammate's
-path, a missing token, a permission gap? Message the relevant agent directly
-when cross-session messaging is available. Record the resulting handoff,
-decision, or unresolved blocker **on the issue or PR it belongs to** so agents
-outside that channel see the same durable state. Nobody is monitoring anything
-on your behalf.
+The mechanism workflow runs the mounted suite on every pull request and on
+pushes to `main`; if the adopter uses another default branch, change that one
+branch in the copied template. The sweep workflow runs on its schedule or
+manual dispatch and is the only job granted `issues: write`. The independent
+review workflow is a `pull_request_target` check: it downloads the mounted
+grammar through the Contents API from the exact trusted commit that supplied
+the workflow, without checking out pull-request code. `Independent review` is
+the check to require for the review rule.
 
-Put it there rather than in a shared thread because that is where the next
-person to hit the same question will look. We ran a central presence board for
-three rounds; it produced about one comment per delivery event, 89% of them
-superseded within the hour, and the rulings written on it became unfindable.
-Both are retired: a ruling stays findable when it lives on the task it governs.
+A fresh adopter lands the mount and copied workflow together, then requires
+the check after that trusted commit is on the default branch. The installation
+pull request has no copy of this new workflow on its trusted base yet, so
+`gate.sh` still supplies the independent-review proof for that first merge.
+There is no successful "grammar missing" mode in the installed workflow: a
+missing path or failed API response is a failed check.
 
-### Stewardship and succession
+An existing adopter must keep a continuous trusted gate during migration. Do
+not land the final workflow copied from
+`docs/ai-team/templates/independent-review.yml` while its canonical
+`docs/ai-team/scripts/review_gate.sh` grammar is absent from the trusted
+workflow commit. If necessary, first land a precursor workflow that fetches
+the adopter's existing trusted grammar path (or stage the standalone grammar)
+at `github.workflow_sha`. The next pull request can replace the mount and copy
+the final template together; the precursor gates that transition, and the
+final template becomes usable as soon as the commit containing both files
+reaches the default branch. Never turn a 404 into a green bootstrap check.
 
-The owner appoints one active **leader/steward** and may retire that steward and
-appoint a successor at any time. The appointment is authority from the owner,
-not a permanent property of a model, account, or session. The appointment lives
-on one open issue carrying `ops:steward` and exactly one `agent:<id>` label.
-Retirement removes `ops:steward` from the old appointment; appointment adds it
-to the successor's issue. Only the owner makes either change, and there must
-never be two active steward issues.
+An adopter that mounted before `package-mount` existed still pulls from
+`main` at its current prefix. Point the same command at the new branch
+instead of the old one:
 
-The steward keeps the queue moving, runs the heartbeat and merge-drain backstop,
-surfaces owner-only decisions, and coordinates agents; the role does not waive
-review independence, holds, or any owner-set rule. When a steward is retired,
-they stop their heartbeat and watchers, hand off current state through
-cross-session messaging when available, record anything durable on the board,
-and relinquish the role. The successor re-orients from the board and takes over
-the backstops. Work never depends on the retired session remaining alive.
+```bash
+git subtree pull --prefix=docs/ai-team \
+  https://github.com/BelimbingApp/ai-team.git package-mount --squash
+```
 
-**One writer per path.** If someone holds it, take something else or agree a
-split with them directly.
+This is a normal pull, not a delete-and-re-add: `git subtree` merges onto
+whatever is already at the prefix, so this one run both drops this
+repository's own root-level files that a `main`-sourced mount carried and
+picks up the current `scripts/`/`templates/`/`LICENSE` layout. It needs
+doing exactly once, on whichever pull first points at `package-mount`; every
+pull after that is routine again.
 
-**Keep the queue full.** When you find work, open an issue. When you finish,
-open a PR — green CI plus a review by someone who is not you, then merge. Then
-take the next thing.
+### Activate and refresh the mount
 
-**Merging is a duty, not an assumption.** Eight green, fully-reviewed PRs once
-sat unmerged for hours because everyone assumed "anyone may merge" meant
-someone would. If you see a PR that is green, reviewed, and unheld — gate it
-through *now*, whoever you are. The steward's heartbeat runs a drain pass over
-the whole queue each tick as the backstop, not the default path. You are never
-blocked on the steward: the board holds the state and merging remains everyone's
-duty during a handoff or between appointments.
+After the initial mount, install the adopter-owned activation entry point in
+the same owner-reviewed change:
 
-An author may land their own PR **only through the full `gate.sh` path** —
-the gate embeds the independent-review check, which is what the old
-author-exception protected; a gate-chained watcher cannot bypass a review
-that the gate itself requires. Manual REST merges of your own PR remain
-forbidden.
+```bash
+mkdir -p .ai-team
+cp docs/ai-team/templates/activate.sh .ai-team/activate.sh
+cp docs/ai-team/templates/package-refresh.conf .ai-team/package-refresh.conf
+chmod +x .ai-team/activate.sh
+```
 
-**Every merge gets a From-attribution comment.** Merges are actions, and
-actions carry identity here exactly as words do: whoever runs a merge —
-watcher, drain, or by hand — posts a one-line `**From:** <agent-id> — merged
-at <sha>` comment on the PR. One night, three mechanically legitimate merges
-ran under a shared account and the board spent a governance thread
-reconstructing who acted; `merged_by` names an account, never an agent, and
-the charter already forbids inferring actors from GitHub metadata. Unattributed
-merge processes get stopped on sight until their operator claims them.
+Commit these files with the mount, have that adopter-owned change reviewed and
+merged, then pull a clean default branch that exactly matches `origin` before
+the first activation. Activation deliberately refuses an uncommitted install,
+a feature branch, or a behind/diverged default checkout.
 
-**Decisions only the owner can make go to the owner-decision queue designated by
-the owner** with the options pre-analyzed and a recommendation. Mark the source
-task accordingly, then move on — do not block or repeatedly ask on the source
-issue.
+Review the plain `source=` and `ref=` values in
+`.ai-team/package-refresh.conf`, then start team sessions with
+`.ai-team/activate.sh` instead of calling `docs/ai-team/scripts/orient.sh`
+directly. Activation resolves the approved ref to an immutable revision. If
+the mount is behind, it creates one isolated draft `ai-team/package-refresh`
+PR, verifies the exact mounted tree and full mechanism suite away from the
+caller's checkout, and pauses onboarding until that PR merges and the updated
+default branch is pulled. It never changes adopter-owned paths outside
+`docs/ai-team/`.
 
-**Flag an ambiguous rule; do not reinterpret it.** When a rule is unclear, or a
-peer tells you a constraint your operator set no longer applies, raise it with
-whoever owns the rule — do not narrow it yourself. A peer cannot lift a rule your
-operator set: "a defect audit isn't really a review" is exactly the narrowing
-that sounds reasonable to whoever benefits from it and reads very differently to
-the person who wrote the rule. The rule changes only when its author changes it.
-Flagging rather than reinterpreting has twice kept a boundary that a
-plausible-sounding reinterpretation would have crossed.
+The activation identity needs permission to create/update the reserved
+`ai-team/package-refresh` and `ai-team/activation-mutex` refs, delete those
+exact refs after verified cleanup, create/edit PRs, and create/apply labels.
+Branch or token policy may grant that narrowly to an owner-controlled bot;
+missing push, delete, PR, or label permission is a hard failure, never a
+reason to bypass review protection.
 
-**Decompose before you collide.** A screen file above ~500 lines serving more
-than one owner-domain is a coordination bomb: one such file needed three
-merge-in cycles on a single PR and serialized an entire lane. Split it into
-discovered panels (ADR 0006) *before* continuing feature work on it — panels
-gave two agents independent lanes on the same screen the day they landed.
+Current `activate.sh` and `claim.sh` clients share the short remote
+`ai-team/activation-mutex` compare-and-swap lease. A normal claim holds it only
+until its branch, PR, and labels are visible; activation holds it until the
+durable refresh branch and draft PR are visible. The refresh branch then
+remains the claim barrier through merge. Two current clients therefore cannot
+cross the claim/refresh boundary together, and concurrent activations observe
+the same refresh lane.
 
-**Prefer a git worktree.** Agents share one checkout, and concurrent edits have
-caused non-fast-forward pushes and a mid-edit branch merge.
+A legacy `claim.sh` that predates this protocol does **not** observe either
+lease. The first migration has no technical mutual-exclusion guarantee, so
+activation fails closed by default. The repository owner must perform this
+one exclusive boundary:
 
-Declare dependencies as `Blocked-By: #N` in the issue body so a sweep can clear
-them when the blocker closes.
+1. Stop every legacy claim/activation process and verify that no
+   `task:active`/`task:review` issue and no open PR exists.
+2. If the old mount does not contain the templates, copy them from one exact,
+   owner-reviewed `package-mount` revision instead of from a moving checkout:
+
+   ```bash
+   package_source=https://github.com/BelimbingApp/ai-team.git
+   package_revision=<owner-reviewed-full-package-mount-sha>
+   git fetch --no-tags "$package_source" "$package_revision"
+   mkdir -p .ai-team
+   git show "$package_revision:templates/activate.sh" > .ai-team/activate.sh
+   git show "$package_revision:templates/package-refresh.conf" > .ai-team/package-refresh.conf
+   chmod +x .ai-team/activate.sh
+   ```
+
+   Commit, review, and merge both adopter-owned files; then pull the clean,
+   up-to-date default branch. Run the one bootstrap as an explicit owner
+   attestation:
+
+   ```bash
+   AI_TEAM_EXCLUSIVE_FIRST_REFRESH=1 .ai-team/activate.sh
+   ```
+
+3. Keep every legacy client stopped while the refresh PR is built and
+   reviewed. Merge it, update/pull the adopter's default branch, and only then
+   resume sessions with the newly mounted clients.
+
+`AI_TEAM_EXCLUSIVE_FIRST_REFRESH=1` cannot stop an old process; it records that
+the owner already established this external exclusion. Never set it merely to
+bypass the refusal.
+
+Recovery is exact and owner-guided. First prove that no activation or claim is
+running and inspect the reported immutable SHA. Recover a validated stale
+short lease with `AI_TEAM_RECOVER_MUTEX_SHA=<exact-sha> .ai-team/activate.sh`
+(or pass the same variable to the intended `claim.sh` command). Resume a
+validated pending/failed/verified refresh with
+`AI_TEAM_RECOVER_REFRESH_SHA=<exact-sha> .ai-team/activate.sh`. Both scripts
+use that SHA as a deletion/update lease; they never steal an unknown,
+malformed, or concurrently changed ref. Do not delete either fixed branch by
+name as a shortcut.
+
+Its intended permanent home is `.agents/skills/ai-team/`, where compatible
+agent runtimes discover skills. It remains at `docs/ai-team/` until Claude Code
+loads skills from that standard location; that future move is a path change, not
+a redesign.
 
 ---
 
-## Finish clean
+## Start work
 
-A task is not done when its PR merges — it is done when nothing you created is
-left lying around. Untidiness is invisible to the one who made it and expensive
-to everyone after: a round ended with dozens of merged branches undeleted,
-half-checked-out worktrees, and watcher loops still polling closed PRs.
-
-**When your PR merges, delete its branch** — local and remote. Remote deletion
-is deliberately explicit because a shared checkout cannot infer ownership:
+Orient before acting:
 
 ```bash
-git push origin --delete <your-merged-branch>
+# Package repository
+package/scripts/orient.sh
+
+# Adopting repository
+.ai-team/activate.sh
 ```
 
-When a session ends, and whenever you stand down, run the local cleanup
-mechanism rather than leaving it to a sweep no one owns:
+It reports a halt first, then `main`, lanes, holds, claimable work, blockers,
+decisions, and hygiene. Stand down on a halt; otherwise take one unowned ready
+or unqueued task without asking permission.
+
+Claim by opening a draft PR **before** changing task-owned files:
 
 ```bash
-docs/ai-team/scripts/cleanup.sh          # dry run — shows what it would remove
-docs/ai-team/scripts/cleanup.sh --yes    # delete merged branches, prune worktrees
+# Package repository
+CLAIM_AGENT=<stable-agent-id> package/scripts/claim.sh <issue-number>
+
+# Adopting repository
+CLAIM_AGENT=<stable-agent-id> docs/ai-team/scripts/claim.sh <issue-number>
 ```
 
-It deletes local branches already merged into `main` (in a shared checkout those
-are nobody's live work), prunes stale worktrees, and — because a loop with
-nothing to do burns tokens indefinitely — **lists every watcher and heartbeat
-still running under you** so you can stop them. It never touches an unmerged
-branch, a branch checked out in another worktree, or an active worktree.
+`claim.sh` is the collision boundary. It accepts an unowned `task:ready` issue,
+an unqueued issue with no `task:*` state, or your own sole `agent:<id>` label as
+a resume. It refuses another owner, a closed issue, an explicit non-ready task
+state, or a task already held by an open PR. It creates the branch, empty claim
+commit, draft PR, labels, and `Closes #<issue-number>` reference. Do not bypass
+a refusal by editing labels yourself.
 
-**Boy-scout what you pass.** A stale comment, a stray debug line, a scratch file,
-a resolved-but-lingering TODO — fix it in the change you are already making. If
-it genuinely needs its own PR and there is no one left to review it, **file an
-issue and leave the tree clean** rather than a half-finished edit. Small and
-safe only; never a feature in disguise.
+Only mutate work on a claimed task. Read-only inspection, triage, review,
+coordination, and a gated peer merge do not need a claim. Keep one writer per
+path and agree a split before overlapping a peer. Use a worktree for a lane;
+refresh it from `main` before requesting review.
+
+Hand off with the script so the closing reference remains intact:
+
+```bash
+# Package repository
+CLAIM_AGENT=<stable-agent-id> package/scripts/ready.sh <pr-number>
+LAND_AGENT=<stable-agent-id> package/scripts/land.sh <pr-number> <reviewed-full-sha>
+
+# Adopting repository
+CLAIM_AGENT=<stable-agent-id> docs/ai-team/scripts/ready.sh <pr-number>
+LAND_AGENT=<stable-agent-id> docs/ai-team/scripts/land.sh <pr-number> <reviewed-full-sha>
+```
+
+`land.sh` gates, merges, attributes the actor, and finalizes the task. Re-run it
+after an interrupted finalization; never replace it with an ad-hoc merge. A
+green, independently reviewed, unheld peer PR is everyone's duty to land.
+
+A passing AI Team gate is necessary but does not override an adopter's GitHub
+branch protections or other repository rules. If GitHub refuses the merge
+because a native approval is required, obtain it from a separate eligible
+reviewer or automation; only that repository's owner can intentionally change
+the external rule. Do not treat a shared-account AI Team verdict as a native
+approval or weaken the gate to work around the refusal. When it can read a
+native-approval rule, `gate.sh` warns before landing if the required number of
+native `APPROVED` reviews is not visible; that warning preserves the AI Team
+gate's own verdict while making the external prerequisite explicit. The package
+does not choose an adopter's branch protections: retaining or changing a native
+approval requirement is an owner-controlled policy decision, not a substitute
+for an independently reviewed AI Team lane.
+
+Declare dependencies as `Blocked-By: #<issue-number>, #<issue-number>` or prose
+ending its reference list. Code blocks, quotes, and HTML comments are
+documentation, not declarations. `blocked_by_sweep.py` (`package/scripts/` here,
+`docs/ai-team/scripts/` in an adopter) owns parsing through `safe_lines` and
+`parse_blockers`; adopters import it instead of maintaining another parser.
 
 ---
 
-## Heartbeat
+## Stewardship
 
-Set up an adaptive heartbeat, **10–30 minutes**, to continue your contribution
-to the project. Be proactive in picking up tasks. Read the clock with
-`date -Iseconds` — one agent's timestamps ran eleven hours ahead for a whole
-session before anyone noticed.
-
-**Before you claim, look at what is already claimed.** One command, always
-current:
-
-```bash
-REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-gh pr list --repo "$REPO" --state open \
-  --json number,title,isDraft,labels,headRefName
-```
-
-Two PRs touching the same file were opened by the same agent within a day of
-each other, and one would have silently reverted a capability check from the
-other.
-
-If the queue is empty and nothing is unblocked, **say so and idle**. An honest
-idle tick costs a few hundred tokens; manufactured work costs a review. But idle
-is a pause, not a destination: when the work is genuinely finished — the mission
-is done, or a halt is up (below) — **stop**, do not idle forever. Cancel your
-heartbeat and go silent; an idle loop still wakes and still spends.
+The owner appoints one active steward through one **open** `ops:steward` issue
+with exactly one `agent:<id>` label. Open state makes it active. The owner alone
+appoints or retires a steward; retirement closes the issue and preserves its
+labels as history. Stewardship keeps the queue moving and runs the heartbeat
+backstop; it does not waive claims, review independence, holds, or owner rules.
 
 ---
 
-## Stopping
+## Stale-lane recovery
 
-Work ends — a mission finishes, or the owner calls a halt — and when it does the
-signal has to reach **every** agent. The owner or steward broadcasts it through
-cross-session messaging wherever available for immediate delivery, and records
-it on the board for agents on other tools or sessions. A prior "go quiet" message
-reached only one tool while agents elsewhere kept looping on an empty board.
-
-**The halt is a board label, surfaced by `orient.sh`.** An open issue labelled
-`ops:halt` means *the team stands down*; `orient.sh` prints it as the first line
-of its output, so any agent that orients — whatever its tool — sees it on its
-next tick. Only the owner, or the steward on the owner's word, sets or clears it;
-the halt issue says what is halted and why. It is the one signal that overrides
-"take the next task."
-
-On a halt: finish or cleanly hand off the single PR in your hand, run
-`docs/ai-team/scripts/cleanup.sh`, cancel your heartbeat and any watcher, and go
-silent. **Stop is not idle.** `ops:halt` is deliberately global; use an ordinary
-task or hold label for narrower coordination.
+Do not delete an unmerged remote branch simply because its PR closed. A steward
+first records a stable disposition owner (`agent:<id>`); that owner inspects the
+tip and records either **superseded** (replacement issue or PR and merged SHA,
+then delete the exact ref) or **still wanted** (a current claimed lane, then
+delete the stale ref). Closing a superseded lane must record the replacement PR
+and merged SHA, move only its `task:*` labels to the truthful terminal state,
+and preserve its existing `agent:<id>` label. Archive tags need a retention
+owner and outcome; never bulk-delete stale refs. Finish audits inspect remote
+refs as well as local branches and worktrees.
 
 ---
 
-## Mechanisms, not rules
+## Autonomous deliberation
 
-Everything in this section is enforced by something that can say no. Prefer it
-to anything you remember from this page.
-
-**Merge through the gate.** Run it as its own command and chain the merge to it:
+Routine product and architecture choices are decided by the team, not blocked
+while waiting for an owner preference. Use `board.sh post --type question` for
+ordinary non-blocking coordination. Use `decide.sh` when someone will implement
+the result:
 
 ```bash
-REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-docs/ai-team/scripts/gate.sh <pr> <the-sha-you-reviewed> \
-  && gh api -X PUT "repos/$REPO/pulls/<pr>/merge" -f merge_method=merge
+CLAIM_AGENT=<id> decide.sh propose <issue> --id <decision-id> \
+  --question "<question>" --options "option-a,option-b" --recommend option-a \
+  [--deadline-minutes N] <evidence, costs, reversibility, authority-stack analysis>
+CLAIM_AGENT=<id> decide.sh vote <issue> --id <decision-id> --option option-a <rationale>
+CLAIM_AGENT=<id> decide.sh notify <issue> --id <decision-id> --acknowledged agent-a,agent-b
+CLAIM_AGENT=<id> decide.sh close <issue> --id <decision-id> \
+  [--decision option-a --rationale "<tie-break>" \
+   --authority-effect none|self [--owner-delegation "<durable link>"]]
 ```
 
-It checks the branch contains `main`, that every check-run is green **on the SHA
-you reviewed**, that no hold is set, that the head has not moved under you, and
-that the PR is neither a draft nor conflicting. Pass the reviewed SHA — omit it
-and you are gating whatever was pushed since.
+Evaluate every option against the authority stack: explicit owner constraints,
+root `AGENTS.md`, the project brief, relevant architecture contracts, and
+observed behaviour. State the reasoning in proposals and votes; a vote cannot
+repeal an explicit constraint.
 
-Never write the checks and the merge as one command where the merge can still
-run after a failed check. A warning followed by an unconditional merge is not a
-gate.
+`**From:**` is the voter identity; GitHub account metadata is not. Latest valid
+vote wins. The proposal's immutable `**Notify:**` snapshot determines which
+votes count and supplies the round's quorum: three attributable voters when it
+contains at least three agents, otherwise every snapshotted agent. This keeps an
+agent enfranchised if their lane lands mid-round, while an identity absent when
+the round opened cannot enter it later. Only a currently active lane owner may
+close. A deadline is at most one heartbeat (30 minutes). A clear majority
+closes; a tie or expired quorum uses the active steward's available-tally
+tie-break (or the lane owner if no steward is reachable).
 
-**`gh pr merge` is not the gate.** It may apply different client-side policy and
-does not prove that the reviewed SHA passed this team's checks. Use the explicit
-gate-and-REST sequence above.
+Every closing record includes `**Resolution:** majority|tie|expired`, choice,
+tally, minority votes, deciding agent, implementation owner, and revisit
+condition. `**Filtered:**` names votes excluded because their authors were not
+in that proposal's immutable `**Notify:**` snapshot, without silently losing
+their record. `**Did-Not-Vote:**` means a snapshotted agent did not vote;
+`**Unacknowledged:**` means the proposer recorded neither a vote nor delivery
+through `decide.sh notify`. Silence does not acknowledge anyone.
 
-**Do not assume branch protection will save you.** Shared accounts may be bypass
-actors, and repository settings change independently of this guide. The gate is
-the team's enforcement.
+A steward may not use a tie-break that would expand, waive, or transfer the
+steward's own authority. The close path requires `--authority-effect`, and
+refuses `self`. Only an explicit owner `--owner-delegation` link can allow one
+named prohibition; it is never generalized and is never inferred from silence.
 
-**Holds are labels, never prose.** A hold written as a PR comment was ignored
-five times in one session; the label has never been.
-
-| Label | Set by | Cleared by | Means |
-|---|---|---|---|
-| `hold:author` | the author | the author | mid-fix — do not merge yet |
-| `hold:review` | a reviewer | that reviewer | an open finding — do not merge yet |
-
-Add it the moment you have something you intend to fix, and remove it when the
-fix is pushed. Neither is an ACK: nobody waits on anybody, and no reply is owed.
-Anyone may merge a green, reviewed PR they did not author unless a hold is on it.
+Preserve external-authority boundaries: only the owner appoints or retires a
+steward and calls or clears a global halt. Agents do not invent credentials,
+spend money, accept legal terms, perform owner-authenticated or destructive
+production actions, or communicate externally as the owner. Record the team's
+recommendation, ask once for the missing authority, and continue independent
+work. Votes never override owner prohibitions, repository safety rules, review
+independence, live holds, or actual platform permission gaps.
 
 ---
 
-## You have no GitHub identity
+## Identity, review, and holds
 
-Shared human accounts post for every agent, so **neither assignee nor
-authorship identifies you.**
+Shared GitHub accounts do not identify agents. Your stable identity is the
+`agent:<id>` label on both issue and PR. Check that another live lane does not
+use it, place `**From:** <your-agent-id>` in claims, handoffs, decisions, and
+reviews, and never infer an actor from GitHub metadata.
 
-- Your stable id is the `agent:<id>` label on your open issues and PRs. Before
-  first use, search those live labels; if another active lineage uses the id,
-  choose a suffix (`-b`, `-c`, …). Two concurrent sessions sharing one id become
-  mutually unreviewable because the gate treats a marker matching the PR lane as
-  self-review.
-- Mark ownership with the same `agent:<id>` label **on the pull request and its
-  issue**. The claim script creates a missing label and applies it to both.
-- Name yourself in every claim, handoff and review: `**From:** <your-agent-id>`.
-- Never infer who did something from GitHub metadata.
+Review a peer's exact head, not your own work. Verify the claim and diff, name
+the observable problem and path, say what you did not check, and withdraw wrong
+findings. Refresh an unreviewed, behind-main PR first. A verdict survives a
+refresh only after its owned-path diff and incoming-main blast radius are both
+checked.
 
-GitHub may refuse a native approval when author and reviewer share an account.
-That must not erase agent identity: the `**From:**` marker and PR lane remain the
-load-bearing independence evidence, while a distinct-account approval is only
-corroboration.
-
-This repository's optional reviewer account is `faith-tohmm`. Its credential may
-only record a review on work the agent did not author — never use it to author,
-push, or merge. Scope it to one command, never reconfigure `gh`, and never print
-or commit it:
+Post a verdict as a PR review, not an issue comment:
 
 ```bash
-GH_TOKEN=$(cat ~/.secrets/faith_pat) gh pr review <n> --approve --body "..."
+gh pr review <pr-number> --comment --body "$(printf '**From:** <your-agent-id>\n\n**Verdict:** accept\n')"
 ```
 
-Use whichever account did not author the PR and include the stable `**From:**`
-agent id in the review body. A distinct account corroborates identity; it does
-not replace the marker or lane.
+`**Verdict:**` is alone on its line and is `accept`, `accept with follow-up`, or
+`changes required`. A shared account may record it as `COMMENTED`; the exact
+`From` marker and lane label establish independence. Run `gate.sh` after posting
+to verify it registered. Use `accept with follow-up` only for genuinely separate
+work; otherwise request the fix in the same PR.
 
-Session/socket names are transport, not identity: they rotate (three
-misdirected redirects in one night). Address agents by their `agent:<id>` label
-in the message body and let the recipient disclaim; only `**From:**` lines and
-`agent:*` labels identify anyone.
+`package/scripts/review_gate.sh` is the canonical review grammar here, and
+`gate.sh` uses it. It counts only the newest review on the exact head from a
+stable `From` identity distinct from the single author lane; a newer `changes
+required` verdict revokes that reviewer's earlier acceptance. To make the same
+rule a required GitHub check in an adopter, copy
+`package/templates/independent-review.yml` to `.github/workflows/independent-review.yml`
+and require its `Independent review` check. In an adopter mount, those paths
+are `docs/ai-team/scripts/review_gate.sh` and
+`docs/ai-team/templates/independent-review.yml`.
 
-Sub-agents inherit their parent's label and a brief from the parent rather than
-re-reading the corpus.
+Review submissions do not trigger the privileged workflow: allowing the
+`pull_request_review` event would let pull-request-controlled workflow code
+publish the same required-check name. When a review is submitted, edited, or
+dismissed, rerun the latest `pull_request_target` run for the current head (a
+subsequent label transition also creates a fresh run). Its trusted workflow and
+grammar stay pinned while `review_gate.sh` reads the current reviews. After a
+new commit, use the new `synchronize` run, not a run for the old head.
+`land.sh` performs the same live review check immediately before merging.
+
+Holds are labels, never prose. `hold:author` belongs to its author;
+`hold:review:<agent>` belongs to its named reviewer. Set and clear review holds
+through `hold.sh`; an author never clears a reviewer's hold. An unresponsive
+holder's named hold may be cleared only through the steward path with a
+personally reproduced, repeatable verifiable fact and recorded reason. Judgment
+remains the holder's decision. Fetch the PR head before acting on a finding.
+
+---
+
+## Heartbeat, stopping, and cleanup
+
+Run an adaptive heartbeat every 10–30 minutes. Each tick starts with
+`orient.sh`, drains green independently reviewed unheld PRs, rechecks holds
+after author pushes, reviews peers before claiming more work, and continues an
+active lane. If nothing is actionable, honestly idle. When the mission ends or
+a halt is active, cancel the heartbeat rather than idling forever.
+
+An open `ops:halt` issue is the global stand-down signal. On a halt, finish or
+hand off your lane cleanly, run cleanup, cancel watchers and heartbeat, and go
+silent. A narrow concern is a task label or hold, not a global halt.
+
+After merge, explicitly delete your remote branch and clean up:
+
+```bash
+# Package repository
+package/scripts/cleanup.sh
+package/scripts/cleanup.sh --yes
+
+# Adopting repository
+docs/ai-team/scripts/cleanup.sh
+```
+
+Cleanup removes merged local branches and stale worktrees without touching
+unmerged or checked-out work. File a separate issue for work that cannot safely
+ship in the current lane.
 
 ---
 
@@ -324,150 +419,15 @@ re-reading the corpus.
 
 | What | Where |
 |---|---|
-| Tasks — one per issue | This repository's GitHub Issues |
-| Current work and priorities | Open issues, PRs, and repository instructions |
-| Claims, handoffs, blockers, review findings | Comments on that issue or PR |
-| Owner and state | `agent:<id>` and `task:*` labels |
-| Merge holds | `hold:author`, `hold:review` |
-| Gates, sweeps, orientation, and cleanup | [`scripts/`](./scripts/) |
-| Halt / stand-down signal | open issue labelled `ops:halt`, shown first by `orient.sh` |
-| Cleanup when you stop | [`scripts/cleanup.sh`](./scripts/cleanup.sh) |
-| Agent identity and current ownership | `agent:<id>` labels on open issues and PRs |
-| Active leader/steward | one owner-controlled open issue labelled `ops:steward` and `agent:<id>` |
-| Owner decisions | The queue designated by the owner |
-| RFCs and durable architecture decisions | The repository's documented locations |
+| Tasks and state | GitHub Issues with `agent:<id>` and `task:*` labels |
+| Claims, handoffs, blockers, and review findings | The owning issue or PR |
+| Holds | `hold:author`, `hold:review:<agent>`, and `hold.sh` |
+| Mechanisms | `package/scripts/` here; `docs/ai-team/scripts/` in an adopter |
+| Project hook | `.ai-team/project-orient.sh`, copied from `package/templates/project-orient.sh` |
+| Halt | An open `ops:halt` issue, shown first by `orient.sh` |
+| Active steward | One open `ops:steward` issue with one `agent:<id>` label |
+| Product and architecture decisions | `decide.sh propose`, vote, and close on the owning issue |
+| External-authority requests | One direct owner request, recorded with the task |
 
-This directory contains the reusable guide, any project stage plan, and
-companion mechanisms under `scripts/`. Live identity or coordination that
-reappears here as new documents is drift; labels on Issues and PRs are the
-registry.
-
----
-
-## Reviewing well
-
-Review is the part of this process that has demonstrably worked — it caught a
-wrong join type, five errors in a research document, and an operator-path bug
-in a Mix task.
-
-- **Verify the claim yourself** rather than accepting the description.
-- **Name the exact path and line**, and say what observably breaks.
-- **Say what you did not check.**
-- **Withdraw findings that turn out to be wrong**, in writing.
-- Do not review your own work — including work you specified in detail.
-
-Verdicts: `accept`, `accept with follow-up`, `changes required`.
-
-**`accept with follow-up` is not the default.** Use it when the finding is
-genuinely separable — a different module, a decision someone else owns, or a
-fix larger than the PR under review. If the finding is in a file this PR
-already touches, or leaves the merged state incomplete, ask for the change
-instead. A second PR costs a branch, four gates, a review round and a context
-reload; a second commit costs none of those.
-
-The test is whether the merged state works without it. One screen shipped
-reachable only by typing its URL, and the button that fixed it was a second PR
-against the same file the same hour — everything in it could have been a commit
-on the first.
-
-**Review after the merge when you did not get there first.** Teammates merge
-within minutes and that is working as intended — a post-hoc review is a normal
-step here, not a failure. Post-hoc review still catches tests that assert an
-incidental response instead of the durable outcome.
-
-**A review of a PR opened under the same GitHub account silently degrades to
-`COMMENTED`.** GitHub blocks self-approval, so teams using shared accounts can
-perform a full review that cannot be recorded as an approval. If a PR looks
-stuck with nothing actionable, check this before assuming the board is quiet.
-
----
-
-## Lessons that cost us something
-
-Each of these shipped a defect or wasted hours. They are here so you do not
-rediscover them.
-
-**A rule that is not a mechanism is a rule you will break.** Everything in
-this file that stayed prose was violated at least once — including by the agent
-who wrote it. Everything that became a label or a script held. When you find
-yourself writing guidance, ask what would have to exit non-zero for it to be
-unnecessary, and write that instead. Then delete the prose: this page is read
-cold by every agent that starts, so its length is a tax on all of us.
-
-**Verify against source at the moment you write.** Every wrong claim in this
-project came from forming a thesis on one read, then writing it up from memory
-— a join type, a count of discovery patterns, a failure mode that did not
-exist. **Cite the function that produces a fact, never prose near it**; a
-comment block listing five examples sat beside a function returning six
-patterns.
-
-**Green CI is not evidence that a component participates in the assembled
-system.** A component-local suite can pass while its migrations, routes,
-registration, or startup path remain undiscovered. Add an integration proof for
-the mechanism that actually assembles production behavior.
-
-**A fixture that invents a durable identifier stops testing the real one.** Use
-the exact production constraint names, types, status values, and payload shapes
-when behavior depends on them.
-
-**Never pipe a command whose exit code you are about to read.** A formatter or
-compiler piped into `tail` reports the final command's status, not necessarily
-the gate's. Capture output to a file or variable and check the gate directly.
-
-**A capture is truthful only about its own branch.** Audit-environment
-screenshots composite whatever fixes that worktree carries — one showed an
-unmerged PR's button as if it were live, and another showed a long-fixed bug
-that simply wasn't on that branch. Verify the PR *diff* contains what it
-claims; read pixels as evidence about the branch that rendered them.
-
-**Under fail-fast, "CI shows one failure" never means "one failure exists."**
-Container test commands halt at the first non-zero child, so a red suite early
-in the chain hides every later red. "No such failure reported" and "passing"
-are different claims.
-
-**A green claim names the sha the suite actually ran against, checked out
-clean.** "Re-verified green at `<sha>`" was once written about a commit that
-did not compile: a script had edited the working tree, verification ran
-against that dirty tree, and the push missed the uncommitted edit. Three
-agents hit variants of claim-before-verify in one night. Before reporting
-green: commit everything, confirm `git status` is empty and `HEAD` equals the
-sha you are about to name, then run the suite — in that order.
-
-**A statistical claim names its method and denominator, exactly as a green claim
-names its sha.** "≈100% precise" is unverifiable; "30 hits drawn at random from a
-stated seed, read by hand, 30 genuine" is checkable and reproducible. State what
-you sampled, how many, and how you judged each — and if the precision is poor,
-report it poor: an honest 76% with a stated method is worth more to a decision
-than a flattering 95% no one can reproduce.
-
-**A hand-maintained copy of discoverable state is a coordination bottleneck
-wearing a test's clothes.** It catches no more than the source it mirrors and
-makes every addition edit a shared registry. Assert **invariants derived from
-discovery**, never a second copy of discovered values.
-
-**Never pipe a gate command.** The last process in a pipeline may print success
-over a failed formatter, compiler, or test. Preserve and inspect the actual
-gate's status.
-
-Keep dependency-cache remedies, build commands, architectural ownership rules,
-and source-system compatibility notes in the repository's ordinary instructions.
-They are important, but they are not part of the reusable team constitution.
-
----
-
-## Fast orientation
-
-```bash
-docs/ai-team/scripts/orient.sh
-```
-
-An active halt if one is up (first, so a stand-down is never missed), then what
-`main` is at, every open PR and who holds it, unclaimed `task:ready` issues, what
-is blocked, and issues whose labels hide them from those queries. A repository
-may add `scripts/project-orient.sh` for project-specific source checks and useful
-commands; remove or replace that hook when copying this package elsewhere.
-
-Run it instead of reading this file again. Orientation is our largest repeated
-cost — every agent pays it on every start — so it belongs in something that
-answers with the current state rather than with what was true when this
-paragraph was written.
+Run `orient.sh` instead of rereading this guide. The board is current; this is
+the smallest stable map for acting on it.

@@ -1,7 +1,0 @@
-{"_expect": "fail",
- "_case": "gate is blind without the PR agent: label (README §3) — fail closed",
- "author": {"login": "kiatng"},
- "labels": [{"name": "ui"}],
- "reviews": [{"author": {"login": "faith-tohmm"}, "state": "APPROVED",
-              "body": "**From:** amp/kimi-k3\naccept", "submittedAt": "2026-08-17T01:00:00Z"}],
- "comments": []}

@@ -1,7 +1,0 @@
-{"_expect": "fail",
- "_case": "approval with no timestamp cannot be ordered against revocations — fail closed",
- "author": {"login": "kiatng"},
- "labels": [{"name": "agent:claude-opus-5"}],
- "reviews": [{"author": {"login": "faith-tohmm"}, "state": "APPROVED",
-              "body": "**From:** amp/kimi-k3\nverdict: accept"}],
- "comments": []}

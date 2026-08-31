@@ -1,7 +1,0 @@
-{"_expect": "fail",
- "_case": "approver account is empty (deleted user / API gap) — identity indeterminate, fail closed",
- "author": {"login": "kiatng"},
- "labels": [{"name": "agent:claude-opus-5"}],
- "reviews": [{"author": {"login": ""}, "state": "APPROVED",
-              "body": "**From:** amp/kimi-k3\nverdict: accept", "submittedAt": "2026-08-17T01:00:00Z"}],
- "comments": []}

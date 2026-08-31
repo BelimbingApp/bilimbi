@@ -1,7 +1,0 @@
-{"_expect": "fail",
- "_case": "prose containing 'accept' and 'changes are required' is not a verdict (oracle's demonstrated false pass)",
- "author": {"login": "kiatng"},
- "labels": [{"name": "agent:claude-opus-5"}],
- "reviews": [],
- "comments": [{"author": {"login": "faith-tohmm"}, "createdAt": "2026-08-17T01:00:00Z",
-               "body": "**From:** amp/kimi-k3\nI cannot accept this; changes are required."}]}

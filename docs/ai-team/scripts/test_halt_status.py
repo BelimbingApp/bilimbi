@@ -6,6 +6,8 @@ import textwrap
 import unittest
 from pathlib import Path
 
+from _test_support import run_with_bash_path
+
 
 SCRIPT = Path(__file__).with_name("halt_status.sh")
 
@@ -30,9 +32,9 @@ class HaltStatusTest(unittest.TestCase):
             gh.chmod(gh.stat().st_mode | stat.S_IXUSR)
             env = os.environ.copy()
             env["HALT_TEST_MODE"] = mode
-            env["PATH"] = f"{directory}{os.pathsep}{env['PATH']}"
-            return subprocess.run(
+            return run_with_bash_path(
                 ["bash", str(SCRIPT), "example/repository"],
+                stub_directory=Path(directory),
                 env=env,
                 text=True,
                 capture_output=True,
