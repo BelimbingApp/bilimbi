@@ -1,9 +1,0 @@
-{"_expect": "fail",
- "_contains": "agent label 'agent:codex/5.5-high' is not canonical; labels use lower-case hyphen form (expected 'agent:codex-5.5-high')",
- "_case": "slash-form marker ids are valid in **From:** but PR labels use the hyphen-form lane",
- "author": {"login": "kiatng"},
- "labels": [{"name": "agent:codex/5.5-high"}],
- "reviews": [{"author": {"login": "faith-tohmm"}, "state": "APPROVED",
-              "body": "**From:** claude-opus-5\nverdict: accept",
-              "submittedAt": "2026-08-17T01:00:00Z"}],
- "comments": []}

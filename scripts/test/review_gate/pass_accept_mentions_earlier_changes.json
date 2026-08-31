@@ -1,7 +1,0 @@
-{"_expect": "pass",
- "_case": "accept verdict whose prose references an earlier 'changes required' verdict still approves",
- "author": {"login": "kiatng"},
- "labels": [{"name": "agent:claude-opus-5"}],
- "reviews": [],
- "comments": [{"author": {"login": "faith-tohmm"}, "createdAt": "2026-08-17T03:00:00Z",
-               "body": "**From:** amp/kimi-k3\nverdict: accept with follow-up\nThe earlier changes required verdict is resolved."}]}

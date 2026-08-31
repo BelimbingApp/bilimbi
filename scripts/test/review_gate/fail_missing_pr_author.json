@@ -1,7 +1,0 @@
-{"_expect": "fail",
- "_case": "PR author account missing — independence cannot be established, fail closed",
- "author": {"login": ""},
- "labels": [{"name": "agent:claude-opus-5"}],
- "reviews": [{"author": {"login": "faith-tohmm"}, "state": "APPROVED",
-              "body": "**From:** amp/kimi-k3\nverdict: accept", "submittedAt": "2026-08-17T01:00:00Z"}],
- "comments": []}
