@@ -3,17 +3,14 @@
     <.header>
       Performance
       <:title_actions>
-        <button
-          type="button"
+        <.icon_button
+          icon="bilimbi-pin"
+          label="Pin Performance to sidebar"
+          context={:inline}
           id="performance-pin"
           data-nav-pin="nav-admin-system-performance"
-          title="Pin Performance to sidebar"
-          aria-label="Pin Performance to sidebar"
           aria-pressed="false"
-          class="grid size-5 place-items-center rounded-md text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-        >
-          <.icon name="bilimbi-pin" class="size-3.5" />
-        </button>
+          />
       </:title_actions>
       <:subtitle>Redacted route and background-job diagnostics</:subtitle>
     </.header>
@@ -51,19 +48,19 @@
       </.table>
     </.card>
 
-    <.card id="performance-history" inner_class="p-0">
-      <.form
-        for={@filters_form}
-        id="performance-filters"
-        phx-change="filter"
-        phx-submit="filter"
-        class="mb-2 grid gap-2 p-2 sm:grid-cols-3"
-      >
-        <.input type="search" id="performance-identity" field={@filters_form[:identity]} label="Route or worker" placeholder="Exact identity" phx-debounce="300" />
-        <.input type="select" id="performance-kind" field={@filters_form[:kind]} label="Kind" options={[{"All", ""}, {"Request", "request"}, {"LiveView", "liveview"}, {"Job", "job"}, {"Runtime", "runtime"}]} />
-        <.input type="select" id="performance-outcome" field={@filters_form[:outcome]} label="Outcome" options={[{"All", ""}, {"OK", "ok"}, {"Error", "error"}, {"Cancelled", "cancelled"}, {"Discarded", "discarded"}]} />
-      </.form>
+    <.form
+      for={@filters_form}
+      id="performance-filters"
+      phx-change="filter"
+      phx-submit="filter"
+      class="mb-2 grid gap-2 sm:grid-cols-3"
+    >
+      <.input type="search" id="performance-identity" field={@filters_form[:identity]} label="Route or worker" placeholder="Exact identity" phx-debounce="300" />
+      <.input type="select" id="performance-kind" field={@filters_form[:kind]} label="Kind" options={[{"All", ""}, {"Request", "request"}, {"LiveView", "liveview"}, {"Job", "job"}, {"Runtime", "runtime"}]} />
+      <.input type="select" id="performance-outcome" field={@filters_form[:outcome]} label="Outcome" options={[{"All", ""}, {"OK", "ok"}, {"Error", "error"}, {"Cancelled", "cancelled"}, {"Discarded", "discarded"}]} />
+    </.form>
 
+    <.card id="performance-history" inner_class="p-0">
       <.table id="performance-sample-table" rows={@streams.samples} row_id={fn {id, _sample} -> id end} row_item={fn {_id, sample} -> sample end} framed={false}>
         <:col :let={sample} label="Observed"><.datetime id={"performance-observed-#{sample.id}"} value={sample.observed_at} /></:col>
         <:col :let={sample} label="Kind">{sample.kind}</:col>

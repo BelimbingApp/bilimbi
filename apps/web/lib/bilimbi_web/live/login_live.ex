@@ -235,7 +235,7 @@ defmodule BilimbiWeb.LoginLive do
         <div
           id="login-workspace"
           data-state={@workspace_state}
-          class="flex items-center justify-center gap-2 border-t border-line-subtle pt-4 text-xs text-ink-subtle"
+          class="flex items-center justify-center gap-2 border-t border-low-contrast-line pt-4 text-xs text-ink-subtle"
         >
           <%= if @workspace_state == :ready do %>
             <span class="size-1.5 rounded-full bg-success"></span>

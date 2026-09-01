@@ -31,7 +31,7 @@
     id="app-notifications-dropdown"
     class="absolute right-0 top-full mt-1 w-80 rounded-lg border border-line bg-surface shadow-lg z-50 overflow-hidden"
   >
-    <div class="flex items-center justify-between border-b border-line px-3 py-2 bg-surface-subtle/50">
+    <div class="flex items-center justify-between border-b border-line px-3 py-2 bg-surface-muted/50">
       <span class="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
         Notifications
       </span>
@@ -68,7 +68,7 @@
           phx-target={@myself}
           class={[
             "w-full flex items-start gap-2.5 px-3 py-2 text-left transition hover:bg-surface-sunken cursor-pointer",
-            if(Bilimbi.Core.User.Notification.unread?(item), do: "bg-surface", else: "bg-surface-subtle/30")
+            if(Bilimbi.Core.User.Notification.unread?(item), do: "bg-surface", else: "bg-surface-muted/30")
           ]}
         >
           <span
@@ -96,7 +96,7 @@
       </li>
     </ul>
 
-    <div class="border-t border-line bg-surface-subtle/30 px-3 py-1.5 text-center">
+    <div class="border-t border-line bg-surface-muted/30 px-3 py-1.5 text-center">
       <.link
         navigate={~p"/notifications"}
         class="text-xs font-medium text-brand hover:underline"

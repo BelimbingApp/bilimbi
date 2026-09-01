@@ -1,198 +1,143 @@
 # Base UI Design Library
 
-**Status:** Proposed
+**Status:** In progress
 **Last Updated:** 2026-08-24
-**Sources:** Issue #689; Root `AGENTS.md`; `DESIGN.md`; `docs/plans/AGENTS.md`; ADR 0002; `docs/architecture/0010_composition-model.md`; ADR 0004; `apps/base/ui/`; `apps/web/assets/css/app.css`; existing Base UI reference implementation; `.design_library/bilimbi/` generated TraeWork export; visual inspection of TraeWork's custom and built-in Design Library on 2026-08-23
-**Agents:** codex/gpt-5.6-sol
+**Tracking:** [Issue #691](https://github.com/BelimbingApp/bilimbi/issues/691)
+**Owner:** `agent:kiatng-sol-medium`
 
-## Problem Essence
+## Problem
 
-Bilimbi's design is spread across text guidance, theme CSS, Base UI components, application screens, and a live UI Reference. A human cannot validate the experience from text, while AI coding agents can interpret the same guidance differently and preserve old decisions as the design evolves.
+Bilimbi's design is visible in the product, but its choices are spread across theme CSS, shared components and individual screens. Text alone cannot show whether the result feels coherent. It also cannot expose two different treatments that both look reasonable in code.
 
-Bilimbi needs a fast loop in which a human sees and uses the real design, asks an agent to change it, and immediately validates the result. The resulting design must remain portable and must let Bilimbi evolve through Git without overwriting an adopter's custom brand.
+The Design Library must let a human see Bilimbi as it exists, compare contradictions and decide what becomes the design. It must not read like developer documentation or explain repository history inside the product.
 
 ## Desired Outcome
 
-The checked-out Design Library files are the design Bilimbi uses and the single source of truth for changeable design facts. A project-owned agent skill acts as the design workbench: it helps a coding agent understand, change, inspect, and validate the library. **Admin > System > Design Library** renders those same files through real production components so a human can review the design and interactions.
+**Admin > System > Design Library** is the human review surface for Bilimbi's design.
 
-Git provides experiments, history, review, approval and rollback. Bilimbi does not add another draft, release, versioning or activation system.
+It has two simple stages:
 
-Bilimbi ships a default library. An adopter keeps a complete custom library in adopter-owned source and configures Bilimbi to use it. Updating Bilimbi through Git may change the platform, design contract and default library, but it never changes the adopter library. An incompatible custom library fails validation and requires an explicit adopter change; Bilimbi never fills it with new defaults or silently replaces it.
+1. **Development review** — Theme, Components and Graphic show the current build as it really is. When Bilimbi contains different treatments for the same design problem, the page shows each treatment live, names the screens where it appears and gives the choice a stable number.
+2. **Accepted design** — Design Spec records only the choices accepted for Bilimbi. An open choice does not become a rule by accident.
 
-The product principle is: the adopter owns the brand; Bilimbi owns semantic truth and interaction integrity.
+The current checked-out source is what Bilimbi uses. Git owns experiments, review, history and rollback. There is no Design Library database, release record, contract version, activation workflow or source metadata card.
 
-## Top-Level Components
+The future default library will follow the same rule: what is checked out is what Bilimbi builds. An adopter's custom library will live in adopter-owned source. Updating Bilimbi through Git may change Bilimbi's default, but must never overwrite, regenerate or silently fill the adopter's library.
 
-### Design Library Files
+## Product Shape
 
-The library is a Git-owned source directory containing the design Bilimbi compiles: its identity, contract compatibility, foundations, graphics, component presentation, patterns, flows and design specifications. The exact file layout should be the smallest shape proven by the default library and one contrasting custom library.
+Design Library is one navigation branch with four pages:
 
-The current files are current truth. A library has a stable `library_id` and `contract_version`, but no separately maintained release version. A fingerprint may be generated for build caching and diagnostics; humans do not edit it. The Git commit identifies the exact historical state.
+- **Theme** at `/system/design-library` — surfaces, lines, identity, feedback,
+  typography, shape and density.
+- **Components** at `/system/design-library/components` — numbered design decisions followed by the full shared component and pattern inventory.
+- **Graphic** at `/system/design-library/graphic` — the Bilimbi mark, icons and other product graphics.
+- **Design Spec** at `/system/design-library/design-spec` — accepted choices and links back to open decisions.
 
-The default library and every adopter library are complete and independent. An adopter may copy the default as a starting point, but the copy receives a new identity and does not inherit live values from the moving default.
+The pages render real production components and interactions. They do not show code examples, issue numbers, Git details, old provenance, agent instructions or internal ownership language.
 
-### Design Library Agent Skill
+## Review Loop
 
-The project-owned skill is the workbench for AI coding agents. It tells an agent how to:
+1. Audit the current build without assuming the current Design Library is correct.
+2. List every shared design element in a live state.
+3. Where different treatments exist, show them together and note the product screens where each appears.
+4. Give each open choice a stable number such as `C01` and each option a letter.
+5. The human records a choice using that reference.
+6. A coding change removes the rejected production variation or defines the accepted context rule.
+7. The same decision number moves to Design Spec as accepted design.
+8. Browser review and normal project validation confirm the result before commit.
 
-- locate the selected library and its contract;
-- understand the visual and interaction intent;
-- inspect the live Design Library page;
-- change the library rather than scatter local screen overrides;
-- run focused validation;
-- review affected components, patterns, flows and first-impression screens; and
-- report what changed and what still needs human judgment.
+This loop is the workbench. A small project-owned agent skill may later make the audit-and-change workflow repeatable, but the skill is a tool, not another design source.
 
-The skill may use small deterministic scripts for discovery, validation and context assembly. It is a tool that changes the source of truth; it is not itself the source of truth and Bilimbi does not depend on a particular AI model at runtime.
+## Current Audit
 
-### Admin > System > Design Library
+The current review has seven open choices:
 
-The existing UI Reference implementation becomes the visual and interactive projection of the selected library. Reuse its production component rendering, route contribution, authorization and reflection-based component coverage instead of building a parallel area. Rename the route, navigation identity, authorization capability, LiveView, tests and page consistently around **Design Library**. The canonical route is `/system/design-library`; do not keep `/system/ui-reference` as an alias.
+- `T01` — replace custom colour values with their nearest Tailwind palette steps;
+- `C01` — field shape and density;
+- `C02` — focus colour;
+- `C03` — destructive actions;
+- `C04` — filter framing;
+- `C05` — table row actions; and
+- `C06` — icon-control size.
 
-The page is read-only with respect to design source. It allows a human to interact with components and review:
+These are open decisions. The page presents the live alternatives and their screen sources. It does not choose for the human.
 
-- Foundations: semantic colors, typography, spacing, size, radius, density, borders and motion.
-- Components: real variants, states, focus, keyboard behaviour and pending work.
-- Patterns: navigation, page structure, forms, filters, tables, empty states and feedback.
-- Flows: login, password recovery, dashboard arrival, operational work, permission denial, failure and recovery.
-- Graphics: logos, product marks, icons and locally bundled assets.
-- Specifications: intent, usage, accessibility, source ownership and prohibited variations.
+The inventory also covers the current shared structure, navigation, tabs, buttons, form fields, multi-select, choice controls, inline editing, flash messages, alerts, badges, tables, pagination, record facts, dates, operational lists, empty states, permission states, recovery states, the Bilimbi mark and icons.
 
-Useful controls include supported themes, realistic short and long content, interactive states, reduced motion, and desktop/mobile examples. The page shows the selected library ID, contract version and generated fingerprint so the human and agent know which source they are reviewing.
+## Rules
 
-The Design Library page is itself important UI. It uses the selected library and must meet the same design, interaction and accessibility standards as the rest of Bilimbi.
-
-### Base UI and Web Integration
-
-Base UI owns the stable semantic component and interaction contract. Feature modules express meanings such as primary action, destructive action, status, selection, loading, failure and recovery through Base UI; they do not depend on a library ID, raw palette, library asset path or private implementation detail.
-
-Web owns the host asset build and delivery needed by the selected library. Library validation happens before a build or deployment can succeed. Bilimbi loads no arbitrary remote CSS, JavaScript or templates at runtime.
-
-### Human and Agent Loop
-
-The working loop is deliberately small:
-
-1. The human asks a separate coding agent to explore or change part of the design.
-2. The agent uses the Design Library skill and edits the selected library on the current Git branch.
-3. **Admin > System > Design Library** renders the changed files through production UI.
-4. The human interacts with the result and gives further direction.
-5. The agent validates the library and affected application screens.
-6. The accepted design is committed and deployed through the normal Git workflow.
-
-## Design Decisions
-
-### Files are the authority
-
-The checked-out Design Library is the only authority for changeable design facts. The admin page is its visual projection, the agent skill is its editing workflow, and production UI is its execution. `DESIGN.md` and `AGENTS.md` retain enduring intent, ownership and hard rules without repeating volatile library values.
-
-### Git is the lifecycle
-
-Branches and working trees hold experiments, commits hold accepted states, diffs show changes, and revert provides rollback. There is no Design Library database, draft registry, datetime release version, activation workflow or previous-release store.
-
-### One selected library per installation
-
-Bilimbi selects one trusted library from the checked-out source during build. The default is used only when no adopter library is configured. Per-tenant selection, runtime installation and a library marketplace are outside the initial architecture.
-
-### The page validates; the skill changes
-
-**Admin > System > Design Library** remains focused on seeing and using the design. Design source changes happen through coding agents using the skill and normal repository tools. Bilimbi does not build an embedded AI agent or visual design editor.
-
-### Libraries are platform design inputs
-
-A Design Library is governed by Base UI. It is not a Domain, Extension or merged module contribution. This keeps one coherent product design and follows the composition principle that a company selects trusted source and compiles its own application.
-
-### Belimbing compatibility is one direction
-
-The Design Library is a Bilimbi-native capability and does not need a Belimbing counterpart. Bilimbi compatibility means Bilimbi can adopt and replace Belimbing while preserving required durable data and business meaning. It does not require Belimbing to consume Bilimbi features or Bilimbi to preserve legacy internal UI and route names. New Bilimbi concepts use truthful Bilimbi names from the beginning.
-
-## Public Contract
-
-- The selected, checked-out Design Library files are what Bilimbi compiles and renders.
-- A library declares a stable ID and contract version. Git owns historical versioning; an optional fingerprint is generated from content.
-- Exactly one complete library is selected for an installation.
-- A configured but missing, incomplete, unsafe or incompatible library fails before deployment. Bilimbi does not silently fall back to the default.
-- The supported source layout keeps Bilimbi's upstream-owned default separate from adopter-owned custom libraries.
-- A Git update may change Bilimbi's default and design contract but never writes to, merges into, regenerates, resets or replaces an adopter library.
-- An adopter library does not inherit unresolved values from the default. Adopting a new default decision is an explicit Git change owned by the adopter.
-- Feature modules use Base UI semantic APIs and remain independent of the selected library.
-- A library may change presentation and approved interaction design, but it cannot change authorization, tenancy, business rules, durable data meaning or the truth of user feedback.
-- Status, action, brand, selection, focus and neutral information remain distinct semantic roles.
-- Library fonts, styles, icons and graphics are local, licensed, bundled and compatible with Bilimbi's content-security rules.
-- The Design Library page renders production components and behaviour, not screenshots or separately reconstructed examples.
-- The Design Library page and its route use the canonical `design-library` name throughout; no `ui-reference` compatibility alias remains.
-- The agent skill reads and changes library source but does not become a second design specification.
-- The generated `.design_library/bilimbi/` TraeWork export remains research evidence only; Bilimbi does not adopt its format or require TraeWork.
+- The Design Library is for human visual and interaction review.
+- Production UI is the evidence. Old text and legacy provenance do not override what the product actually renders.
+- Every public Base UI component appears in the Design Library in a meaningful state.
+- A variation needing human judgment is shown, not silently normalized during the audit.
+- Source notes name recognisable product screens and routes.
+- Accepted decisions retain their review number so the decision can be traced without exposing development history in normal UI.
+- Feature screens use Base UI semantic meaning rather than library identity, raw palette or private asset paths.
+- A design change cannot change authorization, tenancy, business rules, durable data meaning or the truth of feedback.
+- `/system/design-library` is the canonical name. There is no `/system/ui-reference` alias.
+- Bilimbi replaces Belimbing in one direction. New Bilimbi design capabilities do not need old internal names or a reverse compatibility path.
 
 ## Initial Boundaries
 
-The first implementation covers the browser product: unauthenticated entry, authenticated shell, Base UI components, shared patterns, critical flows, responsive examples, supported themes and locally served graphics.
+The first implementation is read-only with respect to design source. It shows the authenticated shell, visual foundations, shared components, common patterns, important states and local graphics.
 
-Do not initially build per-tenant libraries, runtime library installation, a marketplace, an in-browser editor, an embedded AI agent, database-managed drafts, release management, visual page composition, or branded email and document rendering.
+Do not initially build an in-browser editor, embedded AI, database drafts, library releases, runtime library installation, a marketplace, per-tenant selection or visual page composition.
 
 ## Phases
 
-### Phase 0 — Usable design loop
+### Phase 0 — Current design review
 
-Goal: Give the human and a coding agent a complete see-change-review loop before expanding the library architecture.
+Goal: Make the current Bilimbi design visible and decidable.
 
-- [ ] Establish the minimum default-library identity and contract needed to describe the current Bilimbi design without intentionally changing it.
-- [ ] Rename the existing reference route, navigation identity, authorization capability, LiveView, templates and tests consistently to **Design Library**, with `/system/design-library` as the only route and no compatibility alias.
-- [ ] Organise the page into Foundations, Components, Patterns, Flows, Graphics and Specifications while continuing to render real Base UI code.
-- [ ] Cover current public components, their meaningful interactive states and the first-impression flows needed to judge trust in Bilimbi.
-- [ ] Show the selected library ID, contract version and generated fingerprint.
-- [ ] Create the first project-owned Design Library agent skill with instructions for inspection, focused edits, browser review and validation.
-- [ ] Prove one complete iteration: human direction, agent library change, live visual review, correction, validation and Git commit.
+- [x] Rename UI Reference to Design Library across routes, menu, capability, LiveViews and tests.
+- [x] Split Design Library into Theme, Components, Graphic and Design Spec.
+- [x] Remove library identity, contract version and source metadata from the implementation and UI.
+- [x] Rewrite the UI for a human product reviewer.
+- [x] Audit the current build and present the first six conflicting treatments as numbered decisions with screen sources.
+- [x] Present the shared component, pattern, state, mark and icon inventory using production UI.
+- [x] Separate accepted design from open decisions.
+- [x] Complete focused tests and desktop/mobile browser review.
+- [x] Record the implementation evidence on issue #691.
 
-Validation: A human can ask a separate coding agent for a design change, refresh the Design Library page, interact with the real result and decide whether it is right.
+Validation: A human can inspect the current design, compare each open variation and answer with a short reference such as `C01 A`.
 
-### Phase 1 — Consolidate the default library
+### Phase 1 — Resolve and consolidate the default design
 
-Goal: Move changeable design facts behind one library boundary while preserving the reviewed Bilimbi experience.
+Goal: Turn human decisions into one coherent Bilimbi default.
 
-- [ ] Inventory current facts across `DESIGN.md`, root `AGENTS.md`, Base UI, Web theme CSS, application screens, graphics and UI Reference prose; give each fact one owner.
-- [ ] Consolidate foundations, graphics, component presentation, patterns, flows and specifications into the smallest coherent default-library structure.
-- [ ] Resolve contradictions through human review on the Design Library page rather than choosing between stale prose and code silently.
-- [ ] Keep Base UI's semantic API stable and remove library-specific decisions from feature modules.
-- [ ] Add deterministic library discovery, contract validation and fingerprint generation without creating runtime registry state.
-- [ ] Move volatile values out of `DESIGN.md` and `AGENTS.md` only after their library authority and visual projection are working.
+- [x] Record the choice for `T01`.
+- [x] Record the choices for `C01`–`C06`.
+- [x] Update shared components and affected screens so rejected variations no longer drift in production.
+- [x] Move `T01` to Design Spec under the same number.
+- [x] Move each accepted component choice to Design Spec under the same number.
+- [ ] Continue the audit across the remaining application screens and add numbered decisions only where human judgment is needed.
+- [ ] Give each changeable design fact one owner in the smallest useful default-library structure.
+- [ ] Create a small Design Library agent skill for inspection, focused edits, browser review and validation.
 
-Validation: The default library reproduces the approved design, and changing one library fact reaches every conforming preview and screen without manual duplication.
+Validation: The accepted default design is reproduced by the production UI, and the Design Library no longer shows resolved options as if both remain valid.
 
 ### Phase 2 — Drop-in adopter library
 
-Goal: Prove that an adopter can own a distinct brand and continue updating Bilimbi through Git.
+Goal: Let an adopter bring its own brand without losing it during a Bilimbi update.
 
-- [ ] Define a non-overlapping Git ownership layout for the upstream default, adopter libraries and installation selection.
-- [ ] Create one deliberately contrasting custom library as contract evidence, not as another Bilimbi default.
-- [ ] Prove the custom library changes the recognisable brand across authentication, shell, components, representative screens and first-impression flows without feature-module edits.
-- [ ] Prove that a representative Bilimbi Git update can change the default while leaving custom-library files and fingerprint unchanged.
-- [ ] Make an incompatible custom library fail with precise migration guidance before build or deployment; never fill missing design facts from the default.
-- [ ] Document how an adopter explicitly takes a desired newer default decision into its own library through a normal reviewed Git change.
+- [ ] Separate Bilimbi's upstream-owned default from adopter-owned custom library source.
+- [ ] Build one deliberately different complete custom library as proof.
+- [ ] Select exactly one checked-out library per installation without runtime release state.
+- [ ] Prove the custom library changes authentication, shell, components and representative screens without feature-module edits.
+- [ ] Prove a Git update changes the Bilimbi default while leaving adopter files unchanged.
+- [ ] Fail clearly when an adopter library no longer satisfies a required design shape; never silently fill from the default.
 
-Validation: Bilimbi renders the selected custom library coherently, and updating upstream Bilimbi neither changes it nor silently falls back to the default.
+Validation: Updating Bilimbi does not modify the adopter's design, and the running product never mixes an adopter library with a moving default.
 
-### Phase 3 — Conformance and drift prevention
+### Phase 3 — Drift prevention
 
-Goal: Let design evolve quickly while making local bypasses and broken experiences visible.
+Goal: Let Bilimbi evolve quickly while making inconsistency visible.
 
-- [ ] Validate library completeness, compatibility, local assets, licensing, contrast, focus, keyboard behaviour, reduced motion and content security.
-- [ ] Retain and strengthen reflection-based coverage so every public Base UI component appears on the Design Library page.
-- [ ] Add production-backed visual evidence for first-impression flows, representative components, patterns, themes and desktop/mobile examples.
-- [ ] Test pending work, duplicate rejection, truthful outcomes, failure, recovery and reconnect behaviour.
-- [ ] Guard against raw palette use, library-specific classes or assets in feature modules, duplicated shared markup and unregistered icons.
-- [ ] Make the agent skill run the same validators used by normal project verification rather than implementing weaker parallel checks.
+- [ ] Keep reflection-based coverage for every public Base UI component.
+- [ ] Add checks for local assets, contrast, focus, keyboard use, reduced motion and content security.
+- [ ] Add desktop and mobile evidence for first-impression screens and representative workflows.
+- [ ] Guard against raw palette use, duplicated shared markup, local component forks and unregistered icons.
+- [ ] Make the Design Library skill run the same project validators used by normal development.
 
-Validation: A deliberate design bypass or incomplete library fails with useful provenance, while an approved library change propagates through the shared system.
-
-### Phase 4 — Documentation and adoption
-
-Goal: Contributors and adopters can use the design loop without reviving parallel sources of truth.
-
-- [ ] Rewrite `DESIGN.md` around enduring intent and navigation to the live Design Library rather than resolved values.
-- [ ] Update root and scoped `AGENTS.md` guidance to require the Design Library skill, Base UI semantic APIs and visual validation.
-- [ ] Document library creation, selection, validation, Git update, explicit custom-library migration and failure recovery.
-- [ ] Document ownership across Base UI, Web asset integration, feature modules and adopter source.
-- [ ] Migrate remaining product screens to conforming components and patterns, recording genuine temporary exceptions with owners.
-- [ ] Revisit deferred runtime or tenant-specific capabilities only when a real adopter requirement justifies them.
-
-Validation: A new contributor can use the skill, inspect the live Design Library, change a representative design object and verify the result without consulting another manually synchronised design specification.
+Validation: A new design variation is either a deliberate numbered decision or a failing drift check; it cannot hide as an unexplained local override.

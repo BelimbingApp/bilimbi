@@ -500,7 +500,7 @@ const AppShell = {
       const link = document.createElement("a")
       link.href = url
       link.className =
-        "app-pinned-link flex min-w-0 flex-1 items-center rounded-none px-1 py-px text-sm font-normal text-link transition hover:bg-surface-subtle hover:text-ink"
+        "app-pinned-link flex min-w-0 flex-1 items-center rounded-none px-1 py-px text-sm font-normal text-link transition hover:bg-surface-muted hover:text-ink"
 
       for (const attribute of ["data-phx-link", "data-phx-link-state"]) {
         if (item?.hasAttribute(attribute)) link.setAttribute(attribute, item.getAttribute(attribute))
@@ -530,7 +530,7 @@ const AppShell = {
       unpin.title = `Unpin ${pinLabel}`
       unpin.setAttribute("aria-label", `Unpin ${pinLabel}`)
       unpin.className =
-        "app-pinned-unpin grid size-4 shrink-0 place-items-center rounded-sm text-muted opacity-0 transition hover:bg-surface-subtle hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        "app-pinned-unpin grid size-4 shrink-0 place-items-center rounded-sm text-muted opacity-0 transition hover:bg-surface-muted hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
 
       const pinIcon = item?.parentElement?.querySelector("[data-nav-pin] svg")?.cloneNode(true)
       if (pinIcon) unpin.append(pinIcon)

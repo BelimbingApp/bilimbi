@@ -32,7 +32,7 @@
             "rounded-md px-3 py-1.5 text-xs font-medium transition",
             if(@current_filter == :all,
               do: "bg-surface-sunken text-ink font-semibold",
-              else: "text-ink-subtle hover:text-ink hover:bg-surface-subtle"
+              else: "text-ink-subtle hover:text-ink hover:bg-surface-muted"
             )
           ]}
         >
@@ -45,7 +45,7 @@
             "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition",
             if(@current_filter == :unread,
               do: "bg-surface-sunken text-ink font-semibold",
-              else: "text-ink-subtle hover:text-ink hover:bg-surface-subtle"
+              else: "text-ink-subtle hover:text-ink hover:bg-surface-muted"
             )
           ]}
         >
@@ -65,7 +65,7 @@
             "rounded-md px-3 py-1.5 text-xs font-medium transition",
             if(@current_filter == :read,
               do: "bg-surface-sunken text-ink font-semibold",
-              else: "text-ink-subtle hover:text-ink hover:bg-surface-subtle"
+              else: "text-ink-subtle hover:text-ink hover:bg-surface-muted"
             )
           ]}
         >
@@ -99,7 +99,7 @@
           "group flex items-start justify-between gap-3 p-4 transition",
           if(Bilimbi.Core.User.Notification.unread?(notification),
             do: "bg-surface",
-            else: "bg-surface-subtle/40"
+            else: "bg-surface-muted/40"
           )
         ]}
       >

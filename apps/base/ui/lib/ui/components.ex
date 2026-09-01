@@ -48,13 +48,13 @@ defmodule Bilimbi.Base.UI.Components do
         Welcome Back!
       </.flash>
   """
-  attr :id, :string, doc: "the optional id of flash container"
-  attr :flash, :map, default: %{}, doc: "the map of flash messages to display"
-  attr :title, :string, default: nil
-  attr :kind, :atom, values: [:info, :error], doc: "used for styling and flash lookup"
-  attr :rest, :global, doc: "the arbitrary HTML attributes to add to the flash container"
+  attr(:id, :string, doc: "the optional id of flash container")
+  attr(:flash, :map, default: %{}, doc: "the map of flash messages to display")
+  attr(:title, :string, default: nil)
+  attr(:kind, :atom, values: [:info, :error], doc: "used for styling and flash lookup")
+  attr(:rest, :global, doc: "the arbitrary HTML attributes to add to the flash container")
 
-  slot :inner_block, doc: "the optional inner block that renders the flash message"
+  slot(:inner_block, doc: "the optional inner block that renders the flash message")
 
   def flash(assigns) do
     assigns = assign_new(assigns, :id, fn -> "flash-#{assigns.kind}" end)
@@ -98,10 +98,10 @@ defmodule Bilimbi.Base.UI.Components do
 
       <.alert kind={:warning}>Your session expired. Sign in again to continue.</.alert>
   """
-  attr :kind, :atom, values: [:info, :success, :warning, :error], default: :info
-  attr :class, :any, default: nil
-  attr :rest, :global
-  slot :inner_block, required: true
+  attr(:kind, :atom, values: [:info, :success, :warning, :error], default: :info)
+  attr(:class, :any, default: nil)
+  attr(:rest, :global)
+  slot(:inner_block, required: true)
 
   def alert(assigns) do
     ~H"""
@@ -138,9 +138,9 @@ defmodule Bilimbi.Base.UI.Components do
   as `"active"` or `"archived"`. Neutral by default; pass `kind` for a
   status color.
   """
-  attr :kind, :atom, values: [:neutral, :success, :warning, :danger], default: :neutral
-  attr :class, :any, default: nil
-  slot :inner_block, required: true
+  attr(:kind, :atom, values: [:neutral, :success, :warning, :danger], default: :neutral)
+  attr(:class, :any, default: nil)
+  slot(:inner_block, required: true)
 
   def badge(assigns) do
     ~H"""
@@ -167,22 +167,25 @@ defmodule Bilimbi.Base.UI.Components do
       <.button phx-click="go" variant="primary">Send!</.button>
       <.button navigate={~p"/"}>Home</.button>
   """
-  attr :rest, :global, include: ~w(href navigate patch method download name value disabled type)
+  attr(:rest, :global, include: ~w(href navigate patch method download name value disabled type))
 
-  attr :class, :any
-  attr :variant, :string, values: ~w(primary danger)
-  slot :inner_block, required: true
+  attr(:class, :any)
+  attr(:variant, :string, values: ~w(primary danger))
+  slot(:inner_block, required: true)
 
   def button(%{rest: rest} = assigns) do
     # Each variant owns every color property it sets, including the focus ring;
     # a color defined in both the shared base and a variant is resolved by
     # stylesheet order, not by this list's order (#619's invisible button).
     variants = %{
-      "primary" => "bg-action text-action-ink hover:bg-action-hover focus-visible:ring-action/25",
-      "danger" => "bg-danger text-ink-inverse hover:bg-danger-hover focus-visible:ring-danger/30",
+      "primary" =>
+        "bg-action text-action-ink hover:bg-action-hover shadow-sm focus-visible:ring-brand-strong/30",
+      "danger" =>
+        "text-danger hover:bg-danger-surface hover:text-danger-ink hover:underline " <>
+          "focus-visible:ring-brand-strong/30",
       nil =>
-        "border border-line-strong bg-surface text-ink hover:bg-surface-sunken " <>
-          "focus-visible:ring-action/25"
+        "border border-high-contrast-line bg-surface text-ink hover:bg-surface-sunken shadow-sm " <>
+          "focus-visible:ring-brand-strong/30"
     }
 
     # A caller-supplied class extends the button; it must not replace the
@@ -191,7 +194,7 @@ defmodule Bilimbi.Base.UI.Components do
     assigns =
       assign(assigns, :class, [
         "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
-        "shadow-sm transition focus-visible:outline-none focus-visible:ring-2",
+        "transition focus-visible:outline-none focus-visible:ring-2",
         "focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
         "disabled:cursor-not-allowed disabled:opacity-50",
         Map.fetch!(variants, assigns[:variant]),
@@ -208,6 +211,65 @@ defmodule Bilimbi.Base.UI.Components do
       ~H"""
       <button class={@class} {@rest}>
         {render_slot(@inner_block)}
+      </button>
+      """
+    end
+  end
+
+  @doc """
+  Renders a compact icon-only action.
+
+  Use `context={:inline}` beside a heading or label, and the default
+  `context={:table}` for repeated table and toolbar actions. Icon-only actions
+  are for familiar operations where the label is still available to assistive
+  technology and as a tooltip. Keep primary or unfamiliar actions as text
+  buttons.
+  """
+  attr(:icon, :string, required: true)
+  attr(:label, :string, required: true)
+  attr(:context, :atom, values: [:inline, :table], default: :table)
+  attr(:kind, :atom, values: [:neutral, :danger], default: :neutral)
+  attr(:class, :any, default: nil)
+
+  attr(:rest, :global,
+    include: ~w(href navigate patch method download disabled type name value title)
+  )
+
+  def icon_button(%{rest: rest} = assigns) do
+    assigns =
+      assigns
+      |> assign(:control_class, [
+        "grid shrink-0 place-items-center transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
+        assigns.context == :inline && "size-5 rounded-sm",
+        assigns.context == :table && "size-7 rounded-md",
+        assigns.kind == :neutral &&
+          "text-ink-muted hover:bg-surface-sunken hover:text-ink disabled:text-ink-faint",
+        assigns.kind == :danger &&
+          "text-danger hover:bg-danger-surface hover:text-danger-ink disabled:text-ink-faint",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        assigns.class
+      ])
+      |> assign(:icon_class, if(assigns.context == :inline, do: "size-3.5", else: "size-4"))
+      |> assign(:title, rest[:title] || assigns.label)
+      |> assign(:control_type, rest[:type] || "button")
+      |> assign(:control_rest, Map.drop(rest, [:title, :type]))
+
+    if rest[:href] || rest[:navigate] || rest[:patch] do
+      ~H"""
+      <.link aria-label={@label} title={@title} class={@control_class} {@control_rest}>
+        <.icon name={@icon} class={@icon_class} />
+      </.link>
+      """
+    else
+      ~H"""
+      <button
+        type={@control_type}
+        aria-label={@label}
+        title={@title}
+        class={@control_class}
+        {@control_rest}
+      >
+        <.icon name={@icon} class={@icon_class} />
       </button>
       """
     end
@@ -253,33 +315,36 @@ defmodule Bilimbi.Base.UI.Components do
   For more information on what kind of data can be passed to `options` see
   [`options_for_select`](https://phoenix-html.hexdocs.pm/Phoenix.HTML.Form.html#options_for_select/2).
   """
-  attr :id, :any, default: nil
-  attr :name, :any
-  attr :label, :string, default: nil
-  attr :value, :any
+  attr(:id, :any, default: nil)
+  attr(:name, :any)
+  attr(:label, :string, default: nil)
+  attr(:value, :any)
 
-  attr :type, :string,
+  attr(:type, :string,
     default: "text",
     values: ~w(checkbox color date datetime-local email file month number password
                search select multi_select tel text textarea time url week hidden)
+  )
 
-  attr :field, Phoenix.HTML.FormField,
+  attr(:field, Phoenix.HTML.FormField,
     doc: "a form field struct retrieved from the form, for example: @form[:email]"
+  )
 
-  attr :errors, :list, default: []
-  attr :checked, :boolean, doc: "the checked flag for checkbox inputs"
-  attr :prompt, :string, default: nil, doc: "the prompt for select inputs"
-  attr :options, :list, doc: "the options to pass to Phoenix.HTML.Form.options_for_select/2"
-  attr :multiple, :boolean, default: false, doc: "the multiple flag for select inputs"
+  attr(:errors, :list, default: [])
+  attr(:checked, :boolean, doc: "the checked flag for checkbox inputs")
+  attr(:prompt, :string, default: nil, doc: "the prompt for select inputs")
+  attr(:options, :list, doc: "the options to pass to Phoenix.HTML.Form.options_for_select/2")
+  attr(:multiple, :boolean, default: false, doc: "the multiple flag for select inputs")
 
-  attr :size, :integer,
+  attr(:size, :integer,
     default: nil,
     doc: "visible rows for a `multiple` select; defaults to 5 so no row is half-painted"
+  )
 
-  attr :class, :any, default: nil, doc: "the input class to use over defaults"
-  attr :error_class, :any, default: nil, doc: "the input error class to use over defaults"
+  attr(:class, :any, default: nil, doc: "the input class to use over defaults")
+  attr(:error_class, :any, default: nil, doc: "the input error class to use over defaults")
 
-  attr :hint, :string,
+  attr(:hint, :string,
     default: nil,
     doc: """
     helper text rendered inside the field wrapper, below the control.
@@ -289,13 +354,15 @@ defmodule Bilimbi.Base.UI.Components do
     compensating with four different spacings -- `mt-1`, `mt-1 mb-4`, `mt-0.5`
     and even `-mt-2 mb-4` (#279).
     """
+  )
 
-  attr :wrapper_class, :any, default: nil, doc: "the class for the control wrapper"
-  attr :label_class, :any, default: nil, doc: "the class for the control label"
+  attr(:wrapper_class, :any, default: nil, doc: "the class for the control wrapper")
+  attr(:label_class, :any, default: nil, doc: "the class for the control label")
 
-  attr :rest, :global,
+  attr(:rest, :global,
     include: ~w(accept autocomplete capture cols disabled form list max maxlength min minlength
                 multiple pattern placeholder readonly required rows size step)
+  )
 
   def input(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
     errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
@@ -344,7 +411,7 @@ defmodule Bilimbi.Base.UI.Components do
           checked={@checked}
           class={
             @class ||
-              "size-4 shrink-0 rounded border-line-strong accent-action focus:outline-none focus:ring-2 focus:ring-action/20"
+              "size-4 shrink-0 rounded border-high-contrast-line accent-action focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
           }
           {@rest}
         />{@label}
@@ -450,7 +517,7 @@ defmodule Bilimbi.Base.UI.Components do
       class || field_base_class(),
       is_nil(class) && extra,
       if errors == [] do
-        "border-line-strong"
+        "border-high-contrast-line"
       else
         error_class || "border-danger focus:border-danger focus:ring-danger/20"
       end
@@ -458,9 +525,9 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   defp field_base_class do
-    "block w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink shadow-xs " <>
-      "transition placeholder:text-ink-faint focus:border-action focus:outline-none " <>
-      "focus:ring-2 focus:ring-action/20 disabled:cursor-not-allowed " <>
+    "block w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-ink shadow-xs " <>
+      "transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none " <>
+      "focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed " <>
       "disabled:bg-surface-sunken disabled:text-ink-subtle"
   end
 
@@ -481,31 +548,34 @@ defmodule Bilimbi.Base.UI.Components do
         options={@role_options}
       />
   """
-  attr :id, :any, default: nil
-  attr :name, :any, default: nil
-  attr :label, :string, default: nil
-  attr :label_class, :any, default: nil
-  attr :wrapper_class, :any, default: nil
-  attr :class, :any, default: nil
+  attr(:id, :any, default: nil)
+  attr(:name, :any, default: nil)
+  attr(:label, :string, default: nil)
+  attr(:label_class, :any, default: nil)
+  attr(:wrapper_class, :any, default: nil)
+  attr(:class, :any, default: nil)
 
-  attr :field, Phoenix.HTML.FormField,
+  attr(:field, Phoenix.HTML.FormField,
     doc: "a form field struct retrieved from the form, for example @form[:role_ids]"
+  )
 
-  attr :errors, :list, default: []
+  attr(:errors, :list, default: [])
 
-  attr :options, :list,
+  attr(:options, :list,
     default: [],
     doc: "the options to display, list of {label, value} tuples, maps, or strings"
+  )
 
-  attr :value, :any, default: nil, doc: "the selected values (if not using field)"
-  attr :placeholder, :string, default: "All options", doc: "label when 0 items selected"
+  attr(:value, :any, default: nil, doc: "the selected values (if not using field)")
+  attr(:placeholder, :string, default: "All options", doc: "label when 0 items selected")
 
-  attr :selection_label, :string,
+  attr(:selection_label, :string,
     default: ":count option selected|:count options selected",
     doc: "singular|plural template string for selection count"
+  )
 
-  attr :hint, :string, default: nil
-  attr :rest, :global, doc: "arbitrary HTML attributes for the button"
+  attr(:hint, :string, default: nil)
+  attr(:rest, :global, doc: "arbitrary HTML attributes for the button")
 
   def multi_select(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
     errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
@@ -603,7 +673,7 @@ defmodule Bilimbi.Base.UI.Components do
           |> JS.toggle_class("rotate-180", to: "##{@id}-chevron")
         }
         class={[
-          "flex w-full items-center justify-between gap-3 rounded-lg border border-line bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-subtle focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20",
+          "flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30",
           @class
         ]}
         {@rest}
@@ -641,7 +711,7 @@ defmodule Bilimbi.Base.UI.Components do
             name={@input_name}
             value={opt_value}
             checked={opt_value in @selected_values}
-            class="size-4 shrink-0 rounded border-line text-action accent-action focus:ring-2 focus:ring-action/20"
+            class="size-4 shrink-0 rounded border-line text-action accent-action focus:ring-2 focus:ring-brand-strong/30"
           />
           <span class="truncate font-normal">{opt_label}</span>
         </label>
@@ -682,19 +752,19 @@ defmodule Bilimbi.Base.UI.Components do
   controls (previous, numbers, next) are rendered only when there are multiple
   pages (`total_pages > 1`).
   """
-  attr :id, :string, required: true
-  attr :page, :any, required: true
-  attr :page_sizes, :list, default: [25, 50, 100, 300]
-  attr :filters_form, :any, required: true
-  attr :filters_event, :string, default: "filters"
-  attr :page_event, :string, default: "page"
+  attr(:id, :string, required: true)
+  attr(:page, :any, required: true)
+  attr(:page_sizes, :list, default: [25, 50, 100, 300])
+  attr(:filters_form, :any, required: true)
+  attr(:filters_event, :string, default: "filters")
+  attr(:page_event, :string, default: "page")
 
   def pagination(assigns) do
     ~H"""
     <nav
       id={@id}
       aria-label="Pagination"
-      class="flex flex-col gap-2 border-t border-line-subtle px-2 py-2 sm:flex-row sm:items-center sm:justify-between"
+      class="flex flex-col gap-2 border-t border-low-contrast-line px-2 py-2 sm:flex-row sm:items-center sm:justify-between"
     >
       <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <p :if={@page.total_pages > 0} id={"#{@id}-summary"} class="text-xs text-ink-muted">
@@ -749,7 +819,7 @@ defmodule Bilimbi.Base.UI.Components do
             aria-label={"Page #{step}"}
             class={[
               "grid size-7 place-items-center rounded-md border text-xs tabular-nums transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
-              step == @page.page && "border-brand-line bg-brand-surface text-brand-ink",
+              step == @page.page && "border-selection-line bg-brand-surface text-brand-ink",
               step != @page.page && "border-line bg-surface text-ink hover:bg-surface-sunken"
             ]}
           >
@@ -826,14 +896,15 @@ defmodule Bilimbi.Base.UI.Components do
   With no context stored, `:local` — the pre-policy behavior, and the
   truthful no-JavaScript fallback in every mode is the server text itself.
   """
-  attr :id, :string, required: true
-  attr :value, :any, default: nil
-  attr :format, :atom, values: [:date, :time, :datetime], default: :datetime
-  attr :class, :any, default: nil
+  attr(:id, :string, required: true)
+  attr(:value, :any, default: nil)
+  attr(:format, :atom, values: [:date, :time, :datetime], default: :datetime)
+  attr(:class, :any, default: nil)
 
-  attr :display, :any,
+  attr(:display, :any,
     default: nil,
     doc: "explicit display context; defaults to the process context"
+  )
 
   def datetime(assigns) do
     display = assigns.display || Bilimbi.Base.UI.DateTimeDisplay.get()
@@ -910,7 +981,7 @@ defmodule Bilimbi.Base.UI.Components do
     do: Calendar.strftime(value, "%d/%m/%Y, %H:%M ") <> value.zone_abbr
 
   # Helper used by inputs to generate form errors
-  slot :inner_block, required: true
+  slot(:inner_block, required: true)
 
   defp error(assigns) do
     ~H"""
@@ -924,12 +995,12 @@ defmodule Bilimbi.Base.UI.Components do
   @doc """
   Renders a card container with subtle border and rounded corners (Belimbing's `x-ui.card` counterpart).
   """
-  attr :id, :string, default: nil
-  attr :title, :string, default: nil
-  attr :class, :any, default: nil
-  attr :inner_class, :any, default: nil
-  attr :rest, :global
-  slot :inner_block, required: true
+  attr(:id, :string, default: nil)
+  attr(:title, :string, default: nil)
+  attr(:class, :any, default: nil)
+  attr(:inner_class, :any, default: nil)
+  attr(:rest, :global)
+  slot(:inner_block, required: true)
 
   def card(assigns) do
     ~H"""
@@ -972,12 +1043,12 @@ defmodule Bilimbi.Base.UI.Components do
         ...
       </.page>
   """
-  attr :id, :string, default: nil
-  attr :variant, :atom, default: :list, values: [:list, :form, :detail]
-  attr :class, :any, default: nil
-  attr :rest, :global
+  attr(:id, :string, default: nil)
+  attr(:variant, :atom, default: :list, values: [:list, :form, :detail])
+  attr(:class, :any, default: nil)
+  attr(:rest, :global)
 
-  slot :inner_block, required: true
+  slot(:inner_block, required: true)
 
   def page(assigns) do
     ~H"""
@@ -994,10 +1065,10 @@ defmodule Bilimbi.Base.UI.Components do
   @doc """
   Renders a header with title.
   """
-  slot :inner_block, required: true
-  slot :subtitle
-  slot :title_actions
-  slot :actions
+  slot(:inner_block, required: true)
+  slot(:subtitle)
+  slot(:title_actions)
+  slot(:actions)
 
   def header(assigns) do
     ~H"""
@@ -1044,39 +1115,43 @@ defmodule Bilimbi.Base.UI.Components do
         <:col :let={user} label="Count" sort="count" align={:right}>{user.count}</:col>
       </.table>
   """
-  attr :id, :string, required: true
-  attr :rows, :any, required: true
-  attr :row_id, :any, default: nil, doc: "the function for generating the row id"
-  attr :row_click, :any, default: nil, doc: "the function for handling phx-click on each row"
+  attr(:id, :string, required: true)
+  attr(:rows, :any, required: true)
+  attr(:row_id, :any, default: nil, doc: "the function for generating the row id")
+  attr(:row_click, :any, default: nil, doc: "the function for handling phx-click on each row")
 
-  attr :row_item, :any,
+  attr(:row_item, :any,
     default: &Function.identity/1,
     doc: "the function for mapping each row before calling the :col and :action slots"
+  )
 
-  attr :sort_by, :any, default: nil, doc: "active sort key; compared to each column's `sort`"
-  attr :sort_dir, :any, default: nil, doc: "`\"asc\"`/`\"desc\"` or `:asc`/`:desc`"
+  attr(:sort_by, :any, default: nil, doc: "active sort key; compared to each column's `sort`")
+  attr(:sort_dir, :any, default: nil, doc: "`\"asc\"`/`\"desc\"` or `:asc`/`:desc`")
 
-  attr :sort_event, :string,
+  attr(:sort_event, :string,
     default: "sort",
     doc: "the event name pushed when a column sort button is clicked"
+  )
 
-  attr :framed, :boolean,
+  attr(:framed, :boolean,
     default: true,
     doc: "when false, omit the outer card chrome so the table can sit in an existing panel"
+  )
 
-  attr :caption, :string,
+  attr(:caption, :string,
     default: nil,
     doc: "sr-only caption that names the table for assistive tech"
+  )
 
   slot :col, required: true do
-    attr :label, :string
-    attr :sort, :string, doc: "sort key pushed as phx-value-sort"
-    attr :sort_id, :string, doc: "DOM id for the sort button"
-    attr :align, :atom, values: [:right], doc: "right-align header and cells (numeric columns)"
+    attr(:label, :string)
+    attr(:sort, :string, doc: "sort key pushed as phx-value-sort")
+    attr(:sort_id, :string, doc: "DOM id for the sort button")
+    attr(:align, :atom, values: [:right], doc: "right-align header and cells (numeric columns)")
   end
 
-  slot :action, doc: "the slot for showing user actions in the last table column"
-  slot :empty, doc: "row shown in a sibling tbody when the caller decides the table is empty"
+  slot(:action, doc: "the slot for showing user actions in the last table column")
+  slot(:empty, doc: "row shown in a sibling tbody when the caller decides the table is empty")
 
   def table(assigns) do
     assigns =
@@ -1117,7 +1192,7 @@ defmodule Bilimbi.Base.UI.Components do
         <tbody
           id={@id}
           phx-update={is_struct(@rows, Phoenix.LiveView.LiveStream) && "stream"}
-          class="divide-y divide-line-subtle"
+          class="divide-y divide-low-contrast-line"
         >
           <tr :for={row <- @rows} id={@row_id && @row_id.(row)} class="hover:bg-surface-sunken">
             <td
@@ -1132,7 +1207,7 @@ defmodule Bilimbi.Base.UI.Components do
               {render_slot(col, @row_item.(row))}
             </td>
             <td :if={@action != []} class="w-0 px-2 py-0.5 font-semibold">
-              <div class="flex gap-4">
+              <div class="flex items-center justify-end gap-1">
                 <%= for action <- @action do %>
                   {render_slot(action, @row_item.(row))}
                 <% end %>
@@ -1174,15 +1249,15 @@ defmodule Bilimbi.Base.UI.Components do
         label="Country name"
       />
   """
-  attr :id, :string, required: true
-  attr :value, :string, required: true
-  attr :id_value, :any, default: nil
-  attr :save_event, :string, default: "save"
-  attr :name, :string, default: "value"
-  attr :label, :string, default: "Edit value"
-  attr :class, :any, default: nil
-  attr :input_class, :any, default: nil
-  attr :rest, :global
+  attr(:id, :string, required: true)
+  attr(:value, :string, required: true)
+  attr(:id_value, :any, default: nil)
+  attr(:save_event, :string, default: "save")
+  attr(:name, :string, default: "value")
+  attr(:label, :string, default: "Edit value")
+  attr(:class, :any, default: nil)
+  attr(:input_class, :any, default: nil)
+  attr(:rest, :global)
 
   def inline_edit(assigns) do
     ~H"""
@@ -1223,11 +1298,11 @@ defmodule Bilimbi.Base.UI.Components do
     """
   end
 
-  attr :col, :map, required: true
-  attr :table_id, :string, required: true
-  attr :sort_by, :any, required: true
-  attr :sort_dir, :any, required: true
-  attr :sort_event, :string, default: "sort"
+  attr(:col, :map, required: true)
+  attr(:table_id, :string, required: true)
+  attr(:sort_by, :any, required: true)
+  attr(:sort_dir, :any, required: true)
+  attr(:sort_event, :string, default: "sort")
 
   defp table_sort_heading(assigns) do
     ~H"""
@@ -1237,7 +1312,7 @@ defmodule Bilimbi.Base.UI.Components do
       phx-click={@sort_event}
       phx-value-sort={@col[:sort]}
       class={[
-        "inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/25",
+        "inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/30",
         @col[:align] == :right && "ml-auto",
         @col[:align] != :right && "text-left"
       ]}
@@ -1291,12 +1366,12 @@ defmodule Bilimbi.Base.UI.Components do
       </.list>
   """
   slot :item, required: true do
-    attr :title, :string, required: true
+    attr(:title, :string, required: true)
   end
 
   def list(assigns) do
     ~H"""
-    <dl class="divide-y divide-line-subtle text-sm">
+    <dl class="divide-y divide-low-contrast-line text-sm">
       <div :for={item <- @item} class="flex items-baseline justify-between gap-6 py-2.5">
         <dt class="font-medium text-ink-subtle">{item.title}</dt>
         <dd class="text-right text-ink">{render_slot(item)}</dd>
@@ -1323,8 +1398,8 @@ defmodule Bilimbi.Base.UI.Components do
       <.icon name="hero-x-mark" />
       <.icon name="hero-arrow-path" class="ml-1 size-3 motion-safe:animate-spin" />
   """
-  attr :name, :string, required: true
-  attr :class, :any, default: "size-4"
+  attr(:name, :string, required: true)
+  attr(:class, :any, default: "size-4")
 
   def icon(assigns) do
     case IconRegistry.fetch(assigns.name) do

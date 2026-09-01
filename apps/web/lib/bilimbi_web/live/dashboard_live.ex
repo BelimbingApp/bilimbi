@@ -579,41 +579,36 @@ defmodule BilimbiWeb.DashboardLive do
                       }
                       navigate={~p"/companies/#{@current_company.id}"}
                       id="dashboard-company-open"
-                      class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
+                      class="text-xs font-medium text-ink-muted underline decoration-high-contrast-line underline-offset-2 hover:text-ink"
                     >
                       Open company
                     </.link>
                     <div :if={@layout_editing} class="flex gap-0.5">
-                      <button
+                      <.icon_button
+                        icon="hero-chevron-up"
+                        label="Move current company up"
+                        context={:inline}
                         id="move-section-up-current-company"
-                        type="button"
                         phx-click="move-section-up"
                         phx-value-id="current-company"
-                        title="Move up"
-                        class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-                      >
-                        <.icon name="hero-chevron-up" class="size-3" />
-                      </button>
-                      <button
+                      />
+                      <.icon_button
+                        icon="hero-chevron-down"
+                        label="Move current company down"
+                        context={:inline}
                         id="move-section-down-current-company"
-                        type="button"
                         phx-click="move-section-down"
                         phx-value-id="current-company"
-                        title="Move down"
-                        class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-                      >
-                        <.icon name="hero-chevron-down" class="size-3" />
-                      </button>
-                      <button
+                      />
+                      <.icon_button
+                        icon="hero-x-mark"
+                        label="Remove current company section"
+                        context={:inline}
+                        kind={:danger}
                         id="remove-section-current-company"
-                        type="button"
                         phx-click="remove-section"
                         phx-value-id="current-company"
-                        class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-                        title="Remove section"
-                      >
-                        <.icon name="hero-x-mark" class="size-3" />
-                      </button>
+                      />
                     </div>
                   </div>
                 </div>
@@ -625,41 +620,36 @@ defmodule BilimbiWeb.DashboardLive do
                   <.link
                     :if={!@layout_editing and UserAuth.allowed?(@current_scope, "admin.user.list")}
                     navigate={~p"/users"}
-                    class="text-xs font-medium text-ink-muted underline decoration-line-strong underline-offset-2 hover:text-ink"
+                    class="text-xs font-medium text-ink-muted underline decoration-high-contrast-line underline-offset-2 hover:text-ink"
                   >
                     All users
                   </.link>
                   <div :if={@layout_editing} class="flex gap-0.5">
-                    <button
+                    <.icon_button
+                      icon="hero-chevron-up"
+                      label="Move people section up"
+                      context={:inline}
                       id="move-section-up-recent-users"
-                      type="button"
                       phx-click="move-section-up"
                       phx-value-id="recent-users"
-                      title="Move up"
-                      class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-                    >
-                      <.icon name="hero-chevron-up" class="size-3" />
-                    </button>
-                    <button
+                    />
+                    <.icon_button
+                      icon="hero-chevron-down"
+                      label="Move people section down"
+                      context={:inline}
                       id="move-section-down-recent-users"
-                      type="button"
                       phx-click="move-section-down"
                       phx-value-id="recent-users"
-                      title="Move down"
-                      class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-                    >
-                      <.icon name="hero-chevron-down" class="size-3" />
-                    </button>
-                    <button
+                    />
+                    <.icon_button
+                      icon="hero-x-mark"
+                      label="Remove people section"
+                      context={:inline}
+                      kind={:danger}
                       id="remove-section-recent-users"
-                      type="button"
                       phx-click="remove-section"
                       phx-value-id="recent-users"
-                      class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-                      title="Remove section"
-                    >
-                      <.icon name="hero-x-mark" class="size-3" />
-                    </button>
+                    />
                   </div>
                 </div>
                 <.table
@@ -695,48 +685,46 @@ defmodule BilimbiWeb.DashboardLive do
     ~H"""
     <div class="relative" id={"widget-#{@id}"} data-widget-id={@id}>
       <div :if={@layout_editing} class="absolute right-1 top-1 z-10 flex gap-0.5">
-        <button
+        <.icon_button
+          icon="hero-bars-3"
+          label={"Drag to reorder #{@widget.label}"}
+          context={:inline}
           id={"drag-#{@id}"}
-          type="button"
           draggable="true"
           data-role="drag-handle"
           title="Drag to reorder. Changes save when dropped."
-          aria-label={"Drag to reorder #{@widget.label}"}
-          class="grid size-5 cursor-grab touch-none place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong active:cursor-grabbing"
-        >
-          <.icon name="hero-bars-3" class="size-3" />
-        </button>
+          class="cursor-grab touch-none active:cursor-grabbing"
+        />
         <div class="flex gap-0.5">
-          <button
+          <.icon_button
+            icon="hero-chevron-up"
+            label={"Move #{@widget.label} up"}
+            context={:inline}
             id={"move-up-#{@id}"}
-            type="button"
             phx-click="move-up"
             phx-value-id={@id}
             title="Move up"
-            class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-          >
-            <.icon name="hero-chevron-up" class="size-3" />
-          </button>
-          <button
+          />
+          <.icon_button
+            icon="hero-chevron-down"
+            label={"Move #{@widget.label} down"}
+            context={:inline}
             id={"move-down-#{@id}"}
-            type="button"
             phx-click="move-down"
             phx-value-id={@id}
             title="Move down"
-            class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-          >
-            <.icon name="hero-chevron-down" class="size-3" />
-          </button>
-          <button
+          />
+          <.icon_button
+            icon="hero-x-mark"
+            label={"Remove #{@widget.label}"}
+            context={:inline}
+            kind={:danger}
             id={"remove-#{@id}"}
-            type="button"
             phx-click="remove-widget"
             phx-value-id={@id}
             title="Remove widget"
-            class="ml-1 grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-danger-surface hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-          >
-            <.icon name="hero-x-mark" class="size-3" />
-          </button>
+            class="ml-1"
+          />
         </div>
       </div>
 
@@ -819,7 +807,7 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
       <div class="flex items-center justify-between gap-3">
         <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
@@ -885,7 +873,7 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
       <div class="flex items-center justify-between gap-3">
         <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
@@ -951,7 +939,7 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
       <div class="flex items-center justify-between gap-3">
         <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">Users</p>
@@ -1021,7 +1009,7 @@ defmodule BilimbiWeb.DashboardLive do
     <.link
       navigate={@navigate}
       id={@id}
-      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-line-strong hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
       <div class="flex items-center justify-between gap-3">
         <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">

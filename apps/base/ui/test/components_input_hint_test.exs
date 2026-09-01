@@ -65,4 +65,14 @@ defmodule Bilimbi.Base.UI.ComponentsInputHintTest do
 
     assert hint_at < error_at
   end
+
+  test "fields use the compact shape and brand focus" do
+    html = render_component(&field/1, hint: nil, errors: [])
+
+    assert html =~ "rounded-md"
+    assert html =~ "py-1.5"
+    assert html =~ "focus:border-brand-strong"
+    assert html =~ "focus:ring-brand-strong/30"
+    refute html =~ "focus:border-action"
+  end
 end

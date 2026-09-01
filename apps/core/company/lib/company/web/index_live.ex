@@ -257,17 +257,14 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
         <.header>
           Companies
           <:title_actions>
-            <button
-              type="button"
+            <.icon_button
+              icon="bilimbi-pin"
+              label="Pin Companies to sidebar"
+              context={:inline}
               id="companies-pin"
               data-nav-pin="nav-admin-company"
-              title="Pin Companies to sidebar"
-              aria-label="Pin Companies to sidebar"
               aria-pressed="false"
-              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-            >
-              <.icon name="bilimbi-pin" class="size-3.5" />
-            </button>
+              />
           </:title_actions>
           <:subtitle>Every live company in this tenant</:subtitle>
           <:actions>
@@ -288,45 +285,47 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
           </:actions>
         </.header>
 
-        <.card id="companies-card" inner_class="p-0">
-          <h2 id="companies-table-title" class="sr-only">Companies</h2>
-          <.form for={@filters_form} id="companies-filters" phx-change="filters" class="p-2 mb-2">
-            <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,13rem)]">
-              <div class="relative">
-                <.icon
-                  name="hero-magnifying-glass"
-                  class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-                />
-                <.input
-                  field={@filters_form[:search]}
-                  id="companies-search"
-                  type="search"
-                  phx-debounce="300"
-                  maxlength="255"
-                  label="Search companies"
-                  label_class="sr-only"
-                  wrapper_class="mb-0"
-                  placeholder="Search by name, code, legal name, email, or jurisdiction..."
-                  class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
-                />
-              </div>
+        <.form for={@filters_form} id="companies-filters" phx-change="filters" class="mb-2">
+          <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,13rem)]">
+            <div class="relative">
+              <.icon
+                name="hero-magnifying-glass"
+                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+              />
               <.input
-                field={@filters_form[:status_filter]}
-                id="companies-status-filter"
-                type="select"
-                label="Status filter"
+                field={@filters_form[:search]}
+                id="companies-search"
+                type="search"
+                phx-debounce="300"
+                maxlength="255"
+                label="Search companies"
                 label_class="sr-only"
                 wrapper_class="mb-0"
-                options={[
-                  {"All statuses", "all"},
-                  {"Active", "active"},
-                  {"Suspended", "suspended"},
-                  {"Pending", "pending"},
-                  {"Archived", "archived"}
-                ]}
+                placeholder="Search by name, code, legal name, email, or jurisdiction..."
+                class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
               />
             </div>
-          </.form>
+            <.input
+              field={@filters_form[:status_filter]}
+              id="companies-status-filter"
+              type="select"
+              label="Status filter"
+              label_class="sr-only"
+              wrapper_class="mb-0"
+              options={[
+                {"All statuses", "all"},
+                {"Active", "active"},
+                {"Suspended", "suspended"},
+                {"Pending", "pending"},
+                {"Archived", "archived"}
+              ]}
+            />
+          </div>
+        </.form>
+
+        <.card id="companies-card" inner_class="p-0">
+          <h2 id="companies-table-title" class="sr-only">Companies</h2>
+
 
           <.table
             id="companies"
@@ -385,12 +384,11 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
             <:action :let={company}>
               <div class="flex items-center justify-end gap-3">
                 <.badge :if={company.primary?} kind={:neutral}>Primary</.badge>
-                <.link
+                <.icon_button
+                  icon="hero-eye"
+                  label={"Open #{company.name}"}
                   navigate={~p"/companies/#{company.id}"}
-                  class="text-xs font-medium text-action hover:underline"
-                >
-                  Open
-                </.link>
+                />
               </div>
             </:action>
 

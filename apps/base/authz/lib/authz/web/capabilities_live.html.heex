@@ -7,66 +7,65 @@
     <.header>
       Capabilities
       <:title_actions>
-        <button
-          type="button"
+        <.icon_button
+          icon="bilimbi-pin"
+          label="Pin Capabilities to sidebar"
+          context={:inline}
           id="capabilities-pin"
           data-nav-pin="nav-admin-authz-capability"
-          title="Pin Capabilities to sidebar"
-          aria-label="Pin Capabilities to sidebar"
           aria-pressed="false"
-          class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-        >
-          <.icon name="bilimbi-pin" class="size-3.5" />
-        </button>
+          />
       </:title_actions>
       <:subtitle>
         All registered capability keys and their source modules
       </:subtitle>
     </.header>
 
-    <.card id="capabilities-card" inner_class="p-0">
-      <.form
-        for={%{}}
-        as={:filters}
-        id="capabilities-filters"
-        phx-change="filter"
-        phx-submit="filter"
-        class="p-2 mb-2"
-      >
-        <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
-          <div class="relative">
-            <.icon
-              name="hero-magnifying-glass"
-              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-            />
-            <.input
-              type="search"
-              id="capabilities-search"
-              name="search"
-              value={@state.search}
-              placeholder="Search by capability or module..."
-              phx-debounce="300"
-              autocomplete="off"
-              label="Search capabilities"
-              label_class="sr-only"
-              wrapper_class="mb-0"
-              class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
-            />
-          </div>
+    <.form
+      for={%{}}
+      as={:filters}
+      id="capabilities-filters"
+      phx-change="filter"
+      phx-submit="filter"
+      class="mb-2"
+    >
+      <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
+        <div class="relative">
+          <.icon
+            name="hero-magnifying-glass"
+            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+          />
           <.input
-            type="select"
-            id="filter-domain"
-            name="domain"
-            value={@state.domain}
-            label="Filter by domain"
+            type="search"
+            id="capabilities-search"
+            name="search"
+            value={@state.search}
+            placeholder="Search by capability or module..."
+            phx-debounce="300"
+            autocomplete="off"
+            label="Search capabilities"
             label_class="sr-only"
             wrapper_class="mb-0"
-            prompt="All Domains"
-            options={Enum.map(@domains, &{&1, &1})}
-            class="h-[2.125rem] w-full rounded-lg border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
+            class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
           />
         </div>
-      </.form>
+        <.input
+          type="select"
+          id="filter-domain"
+          name="domain"
+          value={@state.domain}
+          label="Filter by domain"
+          label_class="sr-only"
+          wrapper_class="mb-0"
+          prompt="All Domains"
+          options={Enum.map(@domains, &{&1, &1})}
+          class="h-[2.125rem] w-full rounded-md border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
+        />
+      </div>
+    </.form>
+
+    <.card id="capabilities-card" inner_class="p-0">
+
 
       <.table
         id="capabilities-table"

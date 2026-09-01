@@ -318,17 +318,14 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
         <.header>
           Employee Types
           <:title_actions>
-            <button
-              type="button"
+            <.icon_button
+              icon="bilimbi-pin"
+              label="Pin Employee Types to sidebar"
+              context={:inline}
               id="employee-types-pin"
               data-nav-pin="nav-admin-employee-type"
-              title="Pin Employee Types to sidebar"
-              aria-label="Pin Employee Types to sidebar"
               aria-pressed="false"
-              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-            >
-              <.icon name="bilimbi-pin" class="size-3.5" />
-            </button>
+            />
           </:title_actions>
           <:subtitle>Manage employee type reference data</:subtitle>
 
@@ -344,33 +341,34 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
           </:actions>
         </.header>
 
+        <.form
+          for={@filters_form}
+          id="employee-types-filters"
+          phx-change="filters"
+          class="mb-2"
+        >
+          <div class="relative">
+            <.icon
+              name="hero-magnifying-glass"
+              class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+            />
+            <.input
+              field={@filters_form[:search]}
+              id="employee-types-search"
+              type="search"
+              phx-debounce="300"
+              maxlength="255"
+              label="Search employee types"
+              label_class="sr-only"
+              wrapper_class="mb-0"
+              placeholder="Search by code or label..."
+              class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
+            />
+          </div>
+        </.form>
+
         <.card id="employee-types-card" inner_class="p-0">
           <h2 id="employee-types-table-title" class="sr-only">Employee Types</h2>
-          <.form
-            for={@filters_form}
-            id="employee-types-filters"
-            phx-change="filters"
-            class="p-2 mb-2"
-          >
-            <div class="relative">
-              <.icon
-                name="hero-magnifying-glass"
-                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-              />
-              <.input
-                field={@filters_form[:search]}
-                id="employee-types-search"
-                type="search"
-                phx-debounce="300"
-                maxlength="255"
-                label="Search employee types"
-                label_class="sr-only"
-                wrapper_class="mb-0"
-                placeholder="Search by code or label..."
-                class="block w-full rounded-lg border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-action focus:outline-none focus:ring-2 focus:ring-action/20"
-              />
-            </div>
-          </.form>
 
           <.table
             id="employee-types"
@@ -406,27 +404,24 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
 
             <:action :let={type}>
               <div :if={not type.is_system} class="flex items-center justify-end gap-3">
-                <.link
+                <.icon_button
                   :if={allowed?(@current_scope, "admin.employee-type.update")}
+                  icon="hero-pencil"
+                  label={"Edit #{type.label}"}
                   id={"employee-type-edit-#{type.id}"}
                   navigate={~p"/employee-types/#{type.id}/edit"}
-                  class="text-xs font-semibold text-action hover:underline"
-                >
-                  Edit
-                </.link>
-                <button
+                />
+                <.icon_button
                   :if={allowed?(@current_scope, "admin.employee-type.delete")}
+                  icon="hero-trash"
+                  label={"Delete #{type.label}"}
+                  kind={:danger}
                   id={"employee-type-delete-#{type.id}"}
-                  type="button"
                   phx-click="delete"
                   phx-value-id={type.id}
                   phx-disable-with="Deleting…"
                   data-confirm={"Are you sure you want to delete #{type.label}?"}
-                  title="Delete employee type"
-                  class="rounded-md border border-danger-line bg-danger-surface px-2.5 py-1.5 text-xs font-semibold text-danger-ink transition hover:bg-danger disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Delete
-                </button>
+                />
               </div>
               <%!-- The Kind column's System badge already says what this row
                    is; the actions cell is w-0, so prose here wraps word-per-

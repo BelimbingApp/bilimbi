@@ -13,15 +13,15 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   Navigation sidebar conventions:
 
-    * Typography: `Instrument Sans` compact font styling with warm `#544c43`
-      link text and `#2c2418` hover state.
+    * Typography: `Instrument Sans` compact font styling with warm semantic
+      link text and stronger ink on hover.
     * Carets: Triangle glyphs (`&#x2BC8;` and `&#x2BC6;`) for expandable nodes
       and figure-space indentation for leaf items.
     * Active state: Selected items use `bg-surface text-brand-strong` without
       bolding or right spine lines.
     * Parent ascent: All parent branches containing the active item accent in
       `text-brand-strong`.
-    * Pinned items: Rendered in `bg-brand-surface` (`#f3f5e8`) with `rounded-sm`.
+    * Pinned items: Rendered in `bg-brand-surface` with `rounded-sm`.
     * Collation: Nav roots and submenus sort alphabetically ascending (`ASC`).
 
   No authenticated screen is context-free.
@@ -213,7 +213,7 @@ defmodule Bilimbi.Base.UI.Layouts do
           </nav>
 
           <div id="app-user" class="border-t border-line px-0.5 py-0.5">
-            <div class="flex items-center gap-2 rounded-none px-1 py-0.5 text-sm font-normal text-link transition hover:bg-surface-subtle">
+            <div class="flex items-center gap-2 rounded-none px-1 py-0.5 text-sm font-normal text-link transition hover:bg-surface-muted">
               <span class="grid size-7 shrink-0 place-items-center rounded-full bg-action text-xs font-medium text-action-ink">
                 {user_initials(@current_scope.user["name"])}
               </span>
@@ -223,23 +223,20 @@ defmodule Bilimbi.Base.UI.Layouts do
                 </p>
                 <p class="truncate text-xs text-muted">{@current_scope.user["email"]}</p>
               </div>
-              <.link
+              <.icon_button
+                icon="hero-arrow-right-on-rectangle"
+                label="Log out"
                 href={~p"/session"}
                 method="delete"
                 id="app-logout"
-                class="grid size-6 shrink-0 place-items-center rounded-sm text-muted transition hover:bg-surface-subtle hover:text-ink"
-                aria-label="Log out"
-                title="Log out"
-              >
-                <.icon name="hero-arrow-right-on-rectangle" class="size-4" />
-              </.link>
+              />
             </div>
           </div>
         </aside>
 
         <div
           id="app-sidebar-drag"
-          class="app-sidebar-drag relative z-20 hidden w-2 shrink-0 cursor-col-resize hover:bg-surface-subtle lg:block"
+          class="app-sidebar-drag relative z-20 hidden w-2 shrink-0 cursor-col-resize hover:bg-surface-muted lg:block"
           role="separator"
           aria-orientation="vertical"
           aria-label="Resize sidebar"
@@ -319,7 +316,7 @@ defmodule Bilimbi.Base.UI.Layouts do
         class={[
           "app-nav-item relative flex min-w-0 flex-1 items-center rounded-none px-1 py-px text-sm font-normal transition",
           @active && "bg-surface text-brand-strong",
-          !@active && "text-link hover:bg-surface-subtle hover:text-ink"
+          !@active && "text-link hover:bg-surface-muted hover:text-ink"
         ]}
       >
         <span
@@ -375,7 +372,7 @@ defmodule Bilimbi.Base.UI.Layouts do
       class="app-nav-branch"
     >
       <div class={[
-        "app-nav-parent group flex min-w-0 items-center px-1 py-px text-sm font-normal transition hover:bg-surface-subtle",
+        "app-nav-parent group flex min-w-0 items-center px-1 py-px text-sm font-normal transition hover:bg-surface-muted",
         (@active? or @has_active_child?) && "text-brand-strong",
         !(@active? or @has_active_child?) && "text-link hover:text-ink"
       ]}>
@@ -410,7 +407,7 @@ defmodule Bilimbi.Base.UI.Layouts do
           aria-expanded={to_string(@expanded?)}
           aria-label={"Toggle " <> @node.item.label}
           title={@node.item.label}
-          class="app-nav-toggle grid size-4 shrink-0 place-items-center rounded-sm text-link transition hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          class="app-nav-toggle grid size-5 shrink-0 place-items-center rounded-sm text-link transition hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
         >
           <span
             class="app-nav-caret text-[11px] shrink-0 w-3 text-center select-none"
@@ -482,16 +479,14 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   defp nav_pin(assigns) do
     ~H"""
-    <button
-      type="button"
+    <.icon_button
+      icon="bilimbi-pin"
+      label={"Pin " <> @label <> " to sidebar"}
+      context={:inline}
       id={"nav-pin-" <> String.trim_leading(@item_id, "nav-")}
       data-nav-pin={@item_id}
-      title={"Pin " <> @label <> " to sidebar"}
-      aria-label={"Pin " <> @label <> " to sidebar"}
-      class="app-nav-pin grid size-4 shrink-0 place-items-center rounded-sm text-ink-faint opacity-0 transition hover:bg-surface hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-    >
-      <.icon name="bilimbi-pin" class="size-3" />
-    </button>
+      class="app-nav-pin opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+    />
     """
   end
 

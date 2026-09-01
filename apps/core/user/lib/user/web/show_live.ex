@@ -883,20 +883,17 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         <.header>
           {@user.name}
           <:title_actions>
-            <button
-              type="button"
+            <.icon_button
+              icon="bilimbi-pin"
+              label="Pin this user to sidebar"
+              context={:inline}
               id="user-pin"
               data-nav-pin="record"
               data-nav-pin-record="true"
               data-nav-pin-label={"Administration / Users / #{@user.name}"}
               data-nav-pin-url={~p"/users/#{@user.id}"}
-              title="Pin this user to sidebar"
-              aria-label="Pin this user to sidebar"
               aria-pressed="false"
-              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-            >
-              <.icon name="bilimbi-pin" class="size-3.5" />
-            </button>
+              />
           </:title_actions>
           <:subtitle>
             <%= if @company_name do %>
@@ -999,7 +996,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       <select
                         id="user-company-select"
                         name="company_id"
-                        class="rounded-lg border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                        class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                       >
                         <option value="" selected={is_nil(@user.company_id)}>None</option>
                         <option
@@ -1102,19 +1099,18 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
                     >
                       <span>{assignment.role_name}</span>
-                      <button
+                      <.icon_button
                         :if={@can_manage?}
-                        type="button"
+                        icon="hero-x-mark"
+                        label="Remove role"
+                        context={:inline}
+                        kind={:danger}
                         id={"remove-role-#{assignment.id}"}
                         phx-click="remove_role"
                         phx-value-assignment-id={assignment.id}
                         phx-value-role-id={assignment.role_id}
-                        class="ml-0.5 text-ink-muted hover:text-danger transition-colors cursor-pointer"
-                        title="Remove role"
-                        aria-label="Remove role"
-                      >
-                        <.icon name="hero-x-mark" class="size-3" />
-                      </button>
+                        class="-mr-1"
+                      />
                     </span>
                   </div>
                 <% end %>
@@ -1147,7 +1143,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       phx-input="search_roles"
                       placeholder="Search roles..."
                       value={@role_search}
-                      class="w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none"
+                      class="w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none"
                     />
                   </div>
                   <form
@@ -1169,7 +1165,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                           name="role_ids[]"
                           value={role.id}
                           checked={to_string(role.id) in @selected_role_ids}
-                          class="rounded border-line-strong accent-action focus:ring-action"
+                          class="rounded border-high-contrast-line accent-action focus:ring-brand-strong/30"
                         />
                         <span class="truncate" title={role.name}>{role.name}</span>
                       </label>
@@ -1255,30 +1251,26 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                           <span>{cap}</span>
                           <%= if @can_manage? do %>
                             <%= if is_direct do %>
-                              <button
-                                type="button"
+                              <.icon_button
+                                icon="hero-x-mark"
+                                label="Remove direct grant"
+                                context={:inline}
+                                kind={:danger}
                                 id={"remove-direct-cap-#{String.replace(cap, ".", "-")}"}
                                 phx-click="remove_capability"
                                 phx-value-grant-id={@direct_grant_ids[cap]}
-                                class="ml-1 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-                                title="Remove direct grant"
-                                aria-label="Remove direct grant"
-                              >
-                                <.icon name="hero-x-mark" class="size-3.5 stroke-[2.5]" />
-                              </button>
+                              />
                             <% else %>
                               <%= if not is_nil(@user.company_id) do %>
-                                <button
-                                  type="button"
+                                <.icon_button
+                                  icon="hero-x-mark"
+                                  label="Deny this capability"
+                                  context={:inline}
+                                  kind={:danger}
                                   id={"deny-cap-#{String.replace(cap, ".", "-")}"}
                                   phx-click="deny_capability"
                                   phx-value-capability-key={cap}
-                                  class="ml-1 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-                                  title="Deny this capability"
-                                  aria-label="Deny this capability"
-                                >
-                                  <.icon name="hero-x-mark" class="size-3.5 stroke-[2.5]" />
-                                </button>
+                                />
                               <% end %>
                             <% end %>
                           <% end %>
@@ -1312,18 +1304,16 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                         class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border border-danger-line bg-danger-surface text-danger-ink"
                       >
                         <span>{cap}</span>
-                        <button
+                        <.icon_button
                           :if={@can_manage?}
-                          type="button"
+                          icon="hero-x-mark"
+                          label="Remove deny"
+                          context={:inline}
+                          kind={:danger}
                           id={"remove-denial-#{String.replace(cap, ".", "-")}"}
                           phx-click="remove_capability"
                           phx-value-grant-id={@direct_deny_ids[cap]}
-                          class="ml-1 opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-                          title="Remove deny"
-                          aria-label="Remove deny"
-                        >
-                          <.icon name="hero-x-mark" class="size-3.5 stroke-[2.5]" />
-                        </button>
+                        />
                       </span>
                     </div>
                   </div>
@@ -1347,7 +1337,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     phx-input="search_capabilities"
                     placeholder="Search capabilities..."
                     value={@capability_search}
-                    class="w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none mb-2"
+                    class="w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none mb-2"
                   />
                   <form
                     phx-change="select_capabilities"
@@ -1368,7 +1358,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                             name="capability_keys[]"
                             value={cap}
                             checked={cap in @selected_capability_keys}
-                            class="rounded border-line-strong accent-action focus:ring-action"
+                            class="rounded border-high-contrast-line accent-action focus:ring-brand-strong/30"
                           />
                           <span class="truncate" title={cap}>{cap}</span>
                         </label>
@@ -1425,7 +1415,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     required
                     autocomplete="new-password"
                     placeholder="Enter new password"
-                    class="block w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/20"
+                    class="block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-2 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/20"
                   />
                   <p
                     :if={@password_errors[:password]}
@@ -1448,7 +1438,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     required
                     autocomplete="new-password"
                     placeholder="Confirm new password"
-                    class="block w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/20"
+                    class="block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-2 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/20"
                   />
                   <p
                     :if={@password_errors[:password_confirmation]}
@@ -1545,18 +1535,16 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 </span>
               </:col>
               <:action :let={emp}>
-                <.button
+                <.icon_button
                   :if={@can_manage?}
-                  type="button"
+                  icon="hero-link-slash"
+                  label={"Unlink #{emp.full_name}"}
+                  kind={:danger}
                   id={"unlink-employee-#{emp.id}"}
                   phx-click="unlink_employee"
                   phx-value-employee-id={emp.id}
                   data-confirm="Unlink this employee record from the user?"
-                  class="text-xs text-danger-ink hover:text-danger cursor-pointer"
-                >
-                  <.icon name="hero-link-slash" class="size-3.5" />
-                  <span>Unlink</span>
-                </.button>
+                />
               </:action>
               <:empty :if={@employees == []}>
                 No employee records.
@@ -1593,7 +1581,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <select
                     name="employee_id"
                     id="link-employee-select"
-                    class="w-64 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                    class="w-64 rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
                   >
                     <option value="">Search employee...</option>
                     <option
@@ -1752,7 +1740,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   name="company_id"
                   id="new-emp-company"
                   required
-                  class="mt-1 block w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                  class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
                 >
                   <option
                     :for={company <- @companies}
@@ -1776,7 +1764,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     id="new-emp-number"
                     required
                     value={@new_employee_form[:employee_number].value}
-                    class="mt-1 block w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                    class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
                   />
                   <p :if={@new_employee_errors[:employee_number]} class="mt-1 text-xs text-danger-ink">
                     {@new_employee_errors[:employee_number]}
@@ -1790,7 +1778,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     id="new-emp-name"
                     required
                     value={@new_employee_form[:full_name].value}
-                    class="mt-1 block w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                    class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
                   />
                   <p :if={@new_employee_errors[:full_name]} class="mt-1 text-xs text-danger-ink">
                     {@new_employee_errors[:full_name]}
@@ -1807,7 +1795,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     id="new-emp-designation"
                     placeholder="Job title"
                     value={@new_employee_form[:designation].value}
-                    class="mt-1 block w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                    class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
                   />
                 </div>
                 <div>
@@ -1817,7 +1805,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     name="employment_start"
                     id="new-emp-start"
                     value={@new_employee_form[:employment_start].value}
-                    class="mt-1 block w-full rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                    class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
                   />
                 </div>
               </div>
