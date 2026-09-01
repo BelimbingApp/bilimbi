@@ -568,7 +568,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
               title="Pin this employee to sidebar"
               aria-label="Pin this employee to sidebar"
               aria-pressed="false"
-              class="grid size-5 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+              class="grid size-6 place-items-center rounded-sm text-ink-faint transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
             >
               <.icon name="bilimbi-pin" class="size-3.5" />
             </button>
