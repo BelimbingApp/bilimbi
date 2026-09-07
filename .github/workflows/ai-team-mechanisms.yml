@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out the adopter
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Run the mounted mechanism suite
         run: python3 -m unittest discover -s docs/ai-team/scripts -p 'test_*.py'
@@ -35,7 +35,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out the adopter
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Run shellcheck over the mounted mechanisms
         run: shellcheck --severity=error docs/ai-team/scripts/*.sh
