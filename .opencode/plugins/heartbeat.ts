@@ -1,4 +1,4 @@
-// Bilimbi AI-team heartbeat for opencode agents (docs/ai-team/README.md).
+// Bilimbi AI-team heartbeat for opencode agents.
 //
 // Mechanism: opencode has no timer hook, but plugins receive `session.idle`
 // events. On idle we arm a timer (10–30 min, adaptive); when it fires we run
