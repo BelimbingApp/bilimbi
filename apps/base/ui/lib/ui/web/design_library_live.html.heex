@@ -505,29 +505,32 @@
               </p>
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
-              <.card id="component-header" title="Page header" inner_class="p-4">
-                <.header>
-                  Company settings<:subtitle>Manage identity and regional defaults.</:subtitle><:actions>
-                    <.button variant="primary">Save changes</.button>
-                  </:actions>
-                </.header>
+              <.card id="component-header" title="Page header" inner_class="space-y-5 p-4">
+                <div id="component-header-default">
+                  <p class="mb-2 text-xs text-ink-muted">Title, subtitle, and trailing action</p>
+                  <.header>
+                    Company settings<:subtitle>Manage identity and regional defaults.</:subtitle><:actions>
+                      <.button variant="primary">Save changes</.button>
+                    </:actions>
+                  </.header>
+                </div>
+                <div id="component-header-title-action" class="border-t border-line pt-4">
+                  <p class="mb-2 text-xs text-ink-muted">Title action without a trailing action</p>
+                  <.header>
+                    Company details<:title_actions><.icon_button icon="hero-pencil" label="Edit company" /></:title_actions>
+                  </.header>
+                </div>
               </.card>
               <.card id="component-page" title="Page widths" inner_class="space-y-3 p-4">
-                <div>
-                  <div class="h-2 w-full rounded-full bg-brand-strong"></div><p class="mt-1 text-xs text-ink-muted">
-                    List — wide for filters and tables
-                  </p>
-                </div>
-                <div>
-                  <div class="mx-auto h-2 w-1/2 rounded-full bg-brand-strong"></div><p class="mt-1 text-xs text-ink-muted">
-                    Form — narrow for focused entry
-                  </p>
-                </div>
-                <div>
-                  <div class="mx-auto h-2 w-2/3 rounded-full bg-brand-strong"></div><p class="mt-1 text-xs text-ink-muted">
-                    Detail — medium for a record or dashboard
-                  </p>
-                </div>
+                <.page id="component-page-list" variant={:list} class="rounded-md border border-dashed border-line p-2">
+                  <p class="text-xs text-ink-muted">List variant — wide for filters and tables</p>
+                </.page>
+                <.page id="component-page-form" variant={:form} class="rounded-md border border-dashed border-line p-2">
+                  <p class="text-xs text-ink-muted">Form variant — narrow for focused entry</p>
+                </.page>
+                <.page id="component-page-detail" variant={:detail} class="rounded-md border border-dashed border-line p-2">
+                  <p class="text-xs text-ink-muted">Detail variant — medium for a record or dashboard</p>
+                </.page>
               </.card>
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
@@ -825,13 +828,19 @@
             </div>
             <div
               id="component-flash"
-              class="relative min-h-28 overflow-hidden rounded-xl border border-line bg-canvas transform-gpu"
+              class="relative min-h-36 overflow-hidden rounded-xl border border-line bg-canvas transform-gpu"
             >
               <.flash
                 id="design-library-flash"
                 kind={:info}
                 flash={%{"info" => "Your changes were saved."}}
                 title="Saved"
+              />
+              <.flash
+                id="design-library-flash-error"
+                kind={:error}
+                flash={%{"error" => "The changes could not be saved."}}
+                title="Save failed"
               />
             </div>
             <div id="component-alert" class="grid gap-2 lg:grid-cols-2">
@@ -933,12 +942,20 @@
               />
             </.card>
             <div class="grid gap-3 lg:grid-cols-2">
-              <.card id="component-list" title="Record facts" inner_class="px-4">
-                <.list>
-                  <:item title="Company">Acme Holdings</:item><:item title="Status">
+              <.card id="component-list" title="Record facts" inner_class="space-y-4 px-4">
+                <div id="component-list-populated">
+                  <p class="mb-1 text-xs text-ink-muted">Required item slot with record facts</p>
+                  <.list>
+                    <:item title="Company">Acme Holdings</:item><:item title="Status">
                     <.badge kind={:success}>Active</.badge>
-                  </:item><:item title="Jurisdiction">Malaysia</:item>
-                </.list>
+                    </:item><:item title="Jurisdiction">Malaysia</:item>
+                  </.list>
+                </div>
+                <div id="component-list-boundary" class="border-t border-line pt-3">
+                  <p class="text-xs text-ink-muted">
+                    This component has no loading, empty, or error state; callers provide items.
+                  </p>
+                </div>
               </.card>
               <.card id="component-datetime" title="Date and time" inner_class="space-y-3 p-4">
                 <div class="flex justify-between gap-4 text-sm">
@@ -1109,6 +1126,30 @@
                   <.icon name="information" class="size-5" /><span class="text-sm">Information</span>
                 </div>
               </div>
+            </div>
+            <div id="graphic-icon-variants" class="border-t border-line pt-4">
+              <h3 class="mb-2 text-sm font-semibold text-ink">Available treatments</h3>
+              <div class="flex flex-wrap items-end gap-6">
+                <div class="text-center">
+                  <.icon name="hero-check-circle" class="mx-auto size-5 text-success" />
+                  <p class="mt-1 text-xs text-ink-muted">Outline · 20px</p>
+                </div>
+                <div class="text-center">
+                  <.icon name="hero-check-circle-solid" class="mx-auto size-5 text-success" />
+                  <p class="mt-1 text-xs text-ink-muted">Solid · 20px</p>
+                </div>
+                <div class="text-center">
+                  <.icon name="hero-check-circle-mini" class="mx-auto size-4 text-success" />
+                  <p class="mt-1 text-xs text-ink-muted">Mini · 16px</p>
+                </div>
+                <div class="text-center">
+                  <.icon name="hero-check-circle" class="mx-auto size-7 text-muted" />
+                  <p class="mt-1 text-xs text-ink-muted">Custom size/color</p>
+                </div>
+              </div>
+              <p class="mt-3 text-xs text-ink-muted">
+                Icons have no built-in interaction or disabled state; their treatment comes from the supplied name and class.
+              </p>
             </div>
           </div>
         </section>

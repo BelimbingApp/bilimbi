@@ -103,6 +103,19 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-input-guidance", "Choice guidance")
     assert has_element?(view, "#component-input-live-state", "Live state")
     assert has_element?(view, "#component-icon-button", "Compact icon actions")
+    assert has_element?(view, "#component-page-list", "List variant")
+    assert has_element?(view, "#component-page-form", "Form variant")
+    assert has_element?(view, "#component-page-detail", "Detail variant")
+    assert has_element?(view, "#component-header-default", "Title, subtitle, and trailing action")
+
+    assert has_element?(
+             view,
+             "#component-header-title-action",
+             "Title action without a trailing action"
+           )
+
+    assert has_element?(view, "#component-flash", "Save failed")
+    assert has_element?(view, "#component-list-boundary", "no loading, empty, or error state")
 
     for area <- ~w(components component-patterns component-states) do
       assert has_element?(view, "##{area}")
@@ -261,6 +274,10 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#graphics")
     assert has_element?(view, "#graphic-mark img[alt='Bilimbi']")
     assert has_element?(view, "#graphic-icons")
+    assert has_element?(view, "#graphic-icon-variants", "Outline")
+    assert has_element?(view, "#graphic-icon-variants", "Solid")
+    assert has_element?(view, "#graphic-icon-variants", "Mini")
+    assert has_element?(view, "#graphic-icon-variants", "Custom size/color")
     refute has_element?(view, "#components")
     assert has_element?(view, "#nav-admin-system-design-library-graphic[aria-current='page']")
   end
