@@ -4,13 +4,16 @@ defmodule BilimbiWeb.ThemeController do
 
   alias Bilimbi.Core.User.DisplayPreferences
 
-  def update(conn, %{"theme" => theme}) when theme in ["light", "dark", "system"] do
+  def update(conn, %{"theme" => theme}) do
     case DisplayPreferences.save(conn.assigns.current_scope, "theme", theme) do
       :ok ->
         json(conn, %{theme: theme})
 
       {:error, :impersonating} ->
         conn |> put_status(:forbidden) |> json(%{error: "impersonating"})
+
+      {:error, :invalid_preference} ->
+        conn |> put_status(:unprocessable_entity) |> json(%{error: "invalid_theme"})
 
       {:error, _reason} ->
         conn |> put_status(:service_unavailable) |> json(%{error: "save_failed"})

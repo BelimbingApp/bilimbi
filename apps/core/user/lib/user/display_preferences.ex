@@ -20,9 +20,13 @@ defmodule Bilimbi.Core.User.DisplayPreferences do
 
   @theme_key "ui.theme"
   @themes ["light", "dark", "system"]
-  @modes ["company", "local", "utc"]
 
-  @doc "The account's resolved theme and timestamp display metadata."
+  @doc """
+  The account's resolved theme and timestamp display metadata.
+
+  `modes` is `Bilimbi.Base.DateTime.modes/0`, carried so the shell and the
+  appearance form offer the canonical set without restating it.
+  """
   def presentation(current_scope) do
     user = current_scope.user
 
@@ -39,7 +43,13 @@ defmodule Bilimbi.Core.User.DisplayPreferences do
 
     display = DateTimePolicy.display(settings_scope(current_scope), company_scope(current_scope))
 
-    %{theme: theme, mode: display.mode, timezone: display.timezone, tz_db: display.tz_db}
+    %{
+      theme: theme,
+      mode: display.mode,
+      modes: DateTimePolicy.modes(),
+      timezone: display.timezone,
+      tz_db: display.tz_db
+    }
   end
 
   @doc """
@@ -96,9 +106,10 @@ defmodule Bilimbi.Core.User.DisplayPreferences do
     end
   end
 
-  defp write(current_scope, "timezone", mode) when mode in @modes do
+  defp write(current_scope, "timezone", mode) do
     case DateTimePolicy.put_mode(settings_scope(current_scope), mode) do
       {:ok, _mode} -> :ok
+      {:error, :invalid_mode} -> {:error, :invalid_preference}
       {:error, _reason} = error -> error
     end
   end

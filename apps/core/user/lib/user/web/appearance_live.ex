@@ -20,16 +20,12 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
   alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy.Scope, as: TenancyScope
+  alias Bilimbi.Base.UI.ShellComponents
   alias Bilimbi.Core.User.DisplayPreferences
 
   @impl true
   def mount(_params, _session, socket) do
     current_scope = socket.assigns.current_scope
-    locale_scope = locale_scope(current_scope)
-
-    locale =
-      if Locale.overridden?(locale_scope), do: Locale.locale(locale_scope), else: ""
-
     installation_locale = Locale.locale(nil)
 
     locale_options =
@@ -39,10 +35,10 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
 
     {:ok,
      assign(socket,
-       locale: locale,
+       locale: stored_locale(locale_scope(current_scope)),
        locale_options: locale_options,
        installation_locale: Locale.label(installation_locale),
-       timezone_mode_options: timezone_mode_options()
+       timezone_mode_options: timezone_mode_options(current_scope)
      )}
   end
 
@@ -50,52 +46,71 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
   def handle_event("save", %{"appearance" => appearance}, socket) when is_map(appearance) do
     current_scope = socket.assigns.current_scope
     preferences = current_scope.shell_preferences
-    theme = Map.get(appearance, "theme", preferences.theme)
-    locale = Map.get(appearance, "locale", socket.assigns.locale)
-    timezone_mode = Map.get(appearance, "timezone_mode", to_string(preferences.mode))
 
-    save_appearance(socket, current_scope, theme, locale, timezone_mode)
+    refused =
+      [
+        {"Theme",
+         DisplayPreferences.save(
+           current_scope,
+           "theme",
+           Map.get(appearance, "theme", preferences.theme)
+         )},
+        {"Time zone display",
+         DisplayPreferences.save(
+           current_scope,
+           "timezone",
+           Map.get(appearance, "timezone_mode", to_string(preferences.mode))
+         )},
+        {"Language",
+         save_locale(current_scope, Map.get(appearance, "locale", socket.assigns.locale))}
+      ]
+      |> Enum.filter(&match?({_field, {:error, _reason}}, &1))
+
+    {:noreply,
+     socket
+     |> assign(:current_scope, DisplayPreferences.refresh(current_scope))
+     |> assign(:locale, stored_locale(locale_scope(current_scope)))
+     |> report(refused)}
   end
 
   def handle_event("save", _params, socket) do
     {:noreply, socket}
   end
 
-  defp save_appearance(socket, current_scope, theme, locale, timezone_mode) do
-    with :ok <- validate_locale(locale),
-         :ok <- DisplayPreferences.save(current_scope, "theme", theme),
-         :ok <- DisplayPreferences.save(current_scope, "timezone", timezone_mode),
-         :ok <- persist_locale(locale_scope(current_scope), locale) do
-      {:noreply,
-       socket
-       |> assign(:current_scope, DisplayPreferences.refresh(current_scope))
-       |> assign(:locale, locale)
-       |> put_flash(:info, "Appearance settings saved.")}
+  defp report(socket, []), do: put_flash(socket, :info, "Appearance settings saved.")
+
+  defp report(socket, refused) do
+    message =
+      refused
+      |> Enum.group_by(fn {_field, {:error, reason}} -> reason end, &elem(&1, 0))
+      |> Enum.map_join(" ", fn {reason, fields} ->
+        "Not saved — #{Enum.join(fields, ", ")}. #{refusal(reason)}"
+      end)
+
+    put_flash(socket, :error, message)
+  end
+
+  defp refusal(:impersonating),
+    do: "Display preferences belong to the account you are viewing."
+
+  defp refusal(:invalid_preference), do: "Choose a supported value."
+  defp refusal(_reason), do: "The change could not be saved."
+
+  defp save_locale(current_scope, ""), do: Locale.delete(locale_scope(current_scope))
+
+  defp save_locale(current_scope, locale) do
+    if Locale.supports?(locale) do
+      case Locale.put(locale_scope(current_scope), locale) do
+        {:ok, _locale} -> :ok
+        {:error, _reason} = error -> error
+      end
     else
-      {:error, :impersonating} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "Display preferences belong to the account you are viewing and were not changed."
-         )}
-
-      {:error, :invalid_preference} ->
-        {:noreply,
-         put_flash(socket, :error, "Choose a supported theme, locale, and time zone display.")}
-
-      {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, "Could not save appearance settings.")}
+      {:error, :invalid_preference}
     end
   end
 
-  defp persist_locale(scope, ""), do: Locale.delete(scope)
-
-  defp persist_locale(scope, locale) do
-    case Locale.put(scope, locale) do
-      {:ok, _locale} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
+  defp stored_locale(scope) do
+    if Locale.overridden?(scope), do: Locale.locale(scope), else: ""
   end
 
   defp locale_scope(current_scope) do
@@ -106,18 +121,11 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
     )
   end
 
-  defp timezone_mode_options do
-    [
-      {"Company time", "company"},
-      {"This device's local time", "local"},
-      {"Stored UTC", "utc"}
-    ]
-  end
-
-  defp validate_locale(""), do: :ok
-
-  defp validate_locale(locale) do
-    if Locale.supports?(locale), do: :ok, else: {:error, :invalid_preference}
+  defp timezone_mode_options(current_scope) do
+    Enum.map(
+      current_scope.shell_preferences.modes,
+      &{ShellComponents.mode_choice_label(&1), to_string(&1)}
+    )
   end
 
   defp extract_user_id(%{user: %{"user_id" => id}}), do: id

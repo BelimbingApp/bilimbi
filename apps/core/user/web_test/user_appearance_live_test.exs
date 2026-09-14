@@ -167,7 +167,7 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     assert has_element?(view, "#appearance-locale option[value=''][selected]")
   end
 
-  test "rejects a forged unsupported locale without changing either preference", %{conn: conn} do
+  test "a forged unsupported locale is refused by name while the rest still save", %{conn: conn} do
     locale_scope = SettingsScope.user(91, 73, 41)
     {:ok, view, _html} = open(conn)
 
@@ -177,9 +177,10 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     })
 
     refute Locale.overridden?(locale_scope)
+    assert has_element?(view, "#flash-group", "Not saved — Language. Choose a supported value.")
 
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
-    assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+    assert {:ok, "dark"} = User.get_user_preference(scope, 73, 91, "ui.theme")
   end
 
   test "the form and the top bar select from the same three time displays", %{conn: conn} do
@@ -221,7 +222,9 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     assert has_element?(view, "#appearance-timezone-mode option[value='utc'][selected]")
   end
 
-  test "an impersonated session cannot write display preferences from this form", %{conn: conn} do
+  test "an impersonated session is refused the display preferences but still saves language", %{
+    conn: conn
+  } do
     UserFixtures.insert_user!(%{
       id: 92,
       company_id: 73,
@@ -238,23 +241,37 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
       |> live(~p"/settings/appearance")
 
     view
-    |> form("#appearance-form", %{"appearance" => %{"theme" => "dark"}})
+    |> form("#appearance-form", %{"appearance" => %{"theme" => "dark", "locale" => "de-CH"}})
     |> render_change()
 
-    assert has_element?(view, "#flash-group", "belong to the account you are viewing")
+    assert has_element?(
+             view,
+             "#flash-group",
+             "Not saved — Theme, Time zone display. Display preferences belong to the account you are viewing."
+           )
+
+    locale_scope = SettingsScope.user(91, 73, 41)
+    assert Locale.overridden?(locale_scope)
+    assert Locale.locale(locale_scope) == "de-CH"
+    assert has_element?(view, "#appearance-locale option[value='de-CH'][selected]")
 
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
     assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
   end
 
-  test "rejects a forged time zone mode without persisting it", %{conn: conn} do
+  test "rejects a forged time zone mode by name without persisting it", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
     # "galactic" is never a rendered option; forging the event is the point.
     view
     |> render_change("save", %{"appearance" => %{"timezone_mode" => "galactic"}})
 
-    assert has_element?(view, "#flash-group", "Choose a supported theme, locale, and time zone display.")
+    assert has_element?(
+             view,
+             "#flash-group",
+             "Not saved — Time zone display. Choose a supported value."
+           )
+
     refute Bilimbi.Base.DateTime.mode_overridden?(SettingsScope.user(91, 73, 41))
   end
 end

@@ -148,22 +148,16 @@ defmodule Bilimbi.Base.UI.ShellComponents do
           aria-label="Time display"
         >
           <button
-            :for={
-              {value, label} <- [
-                {"company", "Company time"},
-                {"local", "This device's local time"},
-                {"utc", "Stored UTC"}
-              ]
-            }
+            :for={mode <- @preferences.modes}
             type="button"
-            id={@id <> "-" <> value}
+            id={@id <> "-" <> to_string(mode)}
             data-preference-kind="timezone"
-            data-preference-value={value}
-            aria-pressed={to_string(to_string(@preferences.mode) == value)}
+            data-preference-value={to_string(mode)}
+            aria-pressed={to_string(@preferences.mode == mode)}
             class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-link hover:bg-surface-muted aria-pressed:bg-brand-surface aria-pressed:text-brand-strong focus-visible:ring-2 focus-visible:ring-brand-strong disabled:opacity-50"
           >
             <.icon name={IconRegistry.shell(:clock)} class="size-4" />
-            <span>{label}<span :if={value == "company"} class="block text-muted">{@preferences.timezone}</span></span>
+            <span>{mode_choice_label(mode)}<span :if={mode == :company} class="block text-muted">{@preferences.timezone}</span></span>
           </button>
         </div>
       </div>
@@ -183,9 +177,20 @@ defmodule Bilimbi.Base.UI.ShellComponents do
     """
   end
 
-  defp mode_label(:company), do: "Company"
-  defp mode_label(:local), do: "Local"
-  defp mode_label(:utc), do: "UTC"
+  @doc "The compact label the top bar shows for the active time display."
+  def mode_label(:company), do: "Company"
+  def mode_label(:local), do: "Local"
+  def mode_label(:utc), do: "UTC"
+
+  @doc """
+  The full label a chooser shows for a time display.
+
+  Every surface that offers the choice — the top-bar clock and the appearance
+  screen — renders these, so the two cannot describe the same mode differently.
+  """
+  def mode_choice_label(:company), do: "Company time"
+  def mode_choice_label(:local), do: "This device's local time"
+  def mode_choice_label(:utc), do: "Stored UTC"
 
   defp initials(name),
     do:
