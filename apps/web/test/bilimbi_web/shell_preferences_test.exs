@@ -10,6 +10,9 @@ defmodule BilimbiWeb.ShellPreferencesTest do
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
+  @controls Path.expand("../../assets/js/shell_controls.js", __DIR__)
+  @theme_css Path.expand("../../assets/css/app.css", __DIR__)
+
   setup do
     UserFixtures.create_user_tables!()
     CompanyFixtures.insert_tenant!(%{id: 41})
@@ -122,5 +125,75 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     assert has_element?(view, "#app-user-password[href='/settings/password']", "Change password")
     assert has_element?(view, "#app-user-logout[data-method='delete']", "Sign out")
     refute has_element?(view, "#app-tenant")
+  end
+
+  test "a refused save leaves the feedback region asserting the danger colour and nothing else",
+       %{conn: conn} do
+    {:ok, view, _} = conn |> log_in_as() |> live(~p"/dashboard")
+
+    rendered =
+      view
+      |> render()
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.query("#app-preference-feedback")
+      |> LazyHTML.attribute("class")
+      |> hd()
+
+    %{"failed" => failed, "saved" => saved} = feedback_states(rendered)
+
+    # Two colour roles on one element are settled by stylesheet order rather
+    # than by the hook, so a second role here means the failure notice may
+    # render in ordinary ink. The region inherits `text-ink` from <body>.
+    assert colour_roles(failed) == ["text-danger"]
+    assert colour_roles(saved) == []
+  end
+
+  # Drives the real hook over the region's real rendered classes and reports
+  # what each outcome leaves on the element.
+  defp feedback_states(class_attribute) do
+    source = @controls |> File.read!() |> Base.encode64()
+
+    script = """
+    const {default: ShellControls} = await import('data:text/javascript;base64,#{source}')
+    const classes = new Set(#{Jason.encode!(class_attribute)}.split(/\\s+/).filter(Boolean))
+    const region = {
+      hidden: true,
+      textContent: '',
+      classList: {toggle(name, on) { on ? classes.add(name) : classes.delete(name) }},
+    }
+    const button = {dataset: {preferenceKind: 'theme', preferenceValue: 'dark'}, focus() {}}
+    const root = {
+      dataset: {themeChoice: 'light'},
+      querySelectorAll: selector => selector === '[data-preference-kind]' ? [button] : [],
+      querySelector: () => region,
+    }
+    globalThis.document = {documentElement: {dataset: {}}, addEventListener() {}, removeEventListener() {}}
+    globalThis.window = {addEventListener() {}, removeEventListener() {}}
+    const replies = []
+    const controls = new ShellControls({el: root, pushEvent(e, p, reply) { replies.push(reply) }})
+    const states = {}
+    controls.save('theme', 'dark', button)
+    replies[0]({ok: false})
+    states.failed = [...classes]
+    controls.save('theme', 'dark', button)
+    replies[1]({ok: true})
+    states.saved = [...classes]
+    controls.destroy()
+    console.log(JSON.stringify(states))
+    """
+
+    {out, 0} = System.cmd("node", ["--input-type=module", "-e", script], stderr_to_stdout: true)
+    Jason.decode!(out)
+  end
+
+  # The `text-*` utilities that carry a semantic colour, read from the roles
+  # the theme actually declares.
+  defp colour_roles(classes) do
+    declared =
+      ~r/--color-([a-z0-9-]+)\s*:/
+      |> Regex.scan(File.read!(@theme_css))
+      |> MapSet.new(fn [_, role] -> "text-" <> role end)
+
+    Enum.filter(classes, &MapSet.member?(declared, &1))
   end
 end

@@ -155,12 +155,15 @@ defmodule Bilimbi.Base.UI.Layouts do
       </header>
 
       <ShellComponents.scope_warning id="app-scope-warning" current_scope={@current_scope} />
+      <%!-- No text colour here: ShellControls marks a failure with `text-danger`,
+      and a second colour role on the same element would outrank it. Ordinary
+      notices inherit `text-ink` from the document body. --%>
       <div
         id="app-preference-feedback"
         hidden
         role="status"
         aria-live="polite"
-        class="shrink-0 border-b border-line bg-surface px-3 py-1 text-xs text-ink"
+        class="shrink-0 border-b border-line bg-surface px-3 py-1 text-xs"
       >
       </div>
 
