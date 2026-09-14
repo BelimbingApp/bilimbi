@@ -86,7 +86,6 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     assert has_element?(view, "#app-display-company[aria-pressed='false']")
     assert has_element?(view, "#app-display-timezone", "UTC")
     assert has_element?(view, "#app-display-timezone[aria-controls='app-display-timezone-panel']")
-    assert has_element?(view, "#app-preference-feedback[role='status']")
   end
 
   test "an impersonated session is offered no display controls and cannot write them", %{

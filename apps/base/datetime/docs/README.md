@@ -49,6 +49,7 @@ module travels inside `%Display{}` as a value, so Base UI needs no dependency
 on the package.
 
 The authenticated shell changes the existing user mode through the Web edge.
-A saved mode re-renders the page from the server, so every instant follows the
-new mode without the browser rewriting server text. `:local` keeps its browser
-hook; calendar dates remain zone-free.
+A saved mode re-arms the per-process display context and patches the shell in
+place; the browser never rewrites server text. An instant that takes `display`
+from a tracked assign follows at once, and the rest follow as the page next
+renders them. `:local` keeps its browser hook; calendar dates remain zone-free.

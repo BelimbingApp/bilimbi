@@ -94,7 +94,7 @@
         id="appearance-timezone-mode"
         name="appearance[timezone_mode]"
         type="select"
-        value={@timezone_mode}
+        value={to_string(@current_scope.shell_preferences.mode)}
         label="Time zone display"
         options={@timezone_mode_options}
         hint="How dates and times render for this account: your company's time zone, this device's local time zone, or stored UTC."

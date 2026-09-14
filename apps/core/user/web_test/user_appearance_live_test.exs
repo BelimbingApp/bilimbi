@@ -182,11 +182,11 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
   end
 
-  test "stores and clears the signed-in account's time zone display mode", %{conn: conn} do
+  test "the form and the top bar select from the same three time displays", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
-    assert has_element?(view, "#appearance-timezone-mode option[value='']")
-    assert has_element?(view, "#appearance-timezone-mode option[value='utc']")
+    refute has_element?(view, "#appearance-timezone-mode option[value='']")
+    assert has_element?(view, "#appearance-timezone-mode option[value='company'][selected]")
 
     view
     |> form("#appearance-form", %{"appearance" => %{"timezone_mode" => "utc"}})
@@ -194,14 +194,57 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
 
     scope = SettingsScope.user(91, 73, 41)
     assert Bilimbi.Base.DateTime.mode(scope) == :utc
-    assert Bilimbi.Base.DateTime.mode_overridden?(scope)
+    assert has_element?(view, "#appearance-timezone-mode option[value='utc'][selected]")
 
     view
-    |> form("#appearance-form", %{"appearance" => %{"timezone_mode" => ""}})
+    |> form("#appearance-form", %{"appearance" => %{"timezone_mode" => "company"}})
     |> render_change()
 
-    refute Bilimbi.Base.DateTime.mode_overridden?(scope)
     assert Bilimbi.Base.DateTime.mode(scope) == :company
+    assert has_element?(view, "#appearance-timezone-mode option[value='company'][selected]")
+  end
+
+  test "a top-bar time display survives the next unrelated form change", %{conn: conn} do
+    {:ok, view, _html} = open(conn)
+    scope = SettingsScope.user(91, 73, 41)
+
+    render_hook(view, "shell:preference", %{kind: "timezone", value: "utc"})
+    assert Bilimbi.Base.DateTime.mode(scope) == :utc
+    assert has_element?(view, "#appearance-timezone-mode option[value='utc'][selected]")
+
+    view
+    |> form("#appearance-form", %{"appearance" => %{"theme" => "dark"}})
+    |> render_change()
+
+    assert Bilimbi.Base.DateTime.mode(scope) == :utc
+    assert has_element?(view, "#app-display-utc[aria-pressed='true']")
+    assert has_element?(view, "#appearance-timezone-mode option[value='utc'][selected]")
+  end
+
+  test "an impersonated session cannot write display preferences from this form", %{conn: conn} do
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_as()
+      |> Plug.Test.init_test_session(%{
+        "impersonation" => %{"original_user_id" => 92, "original_user_name" => "Grace Hopper"}
+      })
+      |> live(~p"/settings/appearance")
+
+    view
+    |> form("#appearance-form", %{"appearance" => %{"theme" => "dark"}})
+    |> render_change()
+
+    assert has_element?(view, "#flash-group", "belong to the account you are viewing")
+
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+    assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
   end
 
   test "rejects a forged time zone mode without persisting it", %{conn: conn} do

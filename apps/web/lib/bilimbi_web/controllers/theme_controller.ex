@@ -2,8 +2,10 @@ defmodule BilimbiWeb.ThemeController do
   @moduledoc "Authenticated HTTP adapter for the same theme write used by the shell."
   use BilimbiWeb, :controller
 
+  alias Bilimbi.Core.User.DisplayPreferences
+
   def update(conn, %{"theme" => theme}) when theme in ["light", "dark", "system"] do
-    case BilimbiWeb.ShellPreferences.save(conn.assigns.current_scope, "theme", theme) do
+    case DisplayPreferences.save(conn.assigns.current_scope, "theme", theme) do
       :ok ->
         json(conn, %{theme: theme})
 

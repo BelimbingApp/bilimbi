@@ -656,7 +656,9 @@ defmodule BilimbiWeb.UserAuth do
         },
         operator_company_missing: operator_company_missing?(scope)
       }
-      |> then(&Map.put(&1, :shell_preferences, BilimbiWeb.ShellPreferences.presentation(&1)))
+      |> then(
+        &Map.put(&1, :shell_preferences, Bilimbi.Core.User.DisplayPreferences.presentation(&1))
+      )
     else
       _ -> nil
     end
