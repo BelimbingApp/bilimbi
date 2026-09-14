@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # AGENTS.md declares these defect classes greppable; this gate makes the greps
-# mechanisms (docs/ai-team/README.md: a rule that is not a mechanism is a rule
+# mechanisms (a rule that is not a mechanism is a rule
 # you will break). Run from the repository root: .github/scripts/mandates.sh
 #
 # Output is captured per check and the exit code is computed explicitly, so no

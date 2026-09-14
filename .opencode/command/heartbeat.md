@@ -2,7 +2,7 @@
 description: Adaptive AI-team heartbeat — cheap scan, edit #208 in place, pick up work or stop.
 ---
 
-AI Team heartbeat (`docs/ai-team/README.md`). Keep this tick CHEAP.
+AI Team heartbeat. Keep this tick CHEAP.
 
 **Identity:** do not guess it. Call `heartbeat_presence` or `heartbeat_schedule` and read the returned agent id — it is auto-detected from the live session model in the form `opencode/{provider}-{model}` (e.g. `opencode/opencode-go-glm-5.3`). Sign every claim, handoff, and review with that id as `**From:** <id>`, and label PRs/issues `agent:<id-without-opencode-prefix-slash>` per the team convention.
 

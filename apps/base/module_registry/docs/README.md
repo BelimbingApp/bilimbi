@@ -1,5 +1,10 @@
 # Base Module Registry
 
+Module descriptors are the machine-readable authority for installed database
+contributors. Their database meaning and relationship to migrations, schema
+contracts, and ledgers are defined in
+[Bilimbi Database Architecture](../../../../docs/architecture/database.md).
+
 `apps/base/module_registry/` owns both sides of module composition. Its
 `mix/module_discovery.exs` helper discovers and validates source packages while
 Mix resolves dependencies. `mix/compile_bilimbi_graph.exs` fingerprints the

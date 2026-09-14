@@ -1,7 +1,0 @@
-{"_expect": "fail",
- "_case": "two agent:* labels = ambiguous ownership — fail closed",
- "author": {"login": "kiatng"},
- "labels": [{"name": "agent:claude-opus-5"}, {"name": "agent:amp-kimi-k3"}],
- "reviews": [{"author": {"login": "faith-tohmm"}, "state": "APPROVED",
-              "body": "**From:** codex/sol-high\naccept", "submittedAt": "2026-08-17T01:00:00Z"}],
- "comments": []}

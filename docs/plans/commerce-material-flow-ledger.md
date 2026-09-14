@@ -5,7 +5,7 @@
 **Sources:** Client meeting notes, LDPE foam plant (2026-08-15);
 `docs/architecture/0010_composition-model.md`;
 `docs/plans/domain-extension-layer-rollout.md`;
-`docs/ai-team/PORTING_STAGES.md` (S5); `AGENTS.md` §"Future Domains and
+`docs/PORTING_STAGES.md` (S5); `AGENTS.md` §"Future Domains and
 Extensions", §5 schema compatibility; Belimbing
 `app/Domains/Commerce/Inventory` (item master, 3 models)
 **Agents:** claude/claude-opus-5, amp/medium-sol

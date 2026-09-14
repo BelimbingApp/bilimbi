@@ -8,6 +8,10 @@ schema compatibility, installation, adoption, and explicit tenant/company
 identity
 **Last Updated:** 2026-08-24
 
+> This ADR records the compatibility and adoption decision. The current
+> normative operating rules are centralized in
+> [Bilimbi Database Architecture](../database.md).
+
 ## Context
 
 Bilimbi must do more than map Ecto schemas onto tables created by Laravel. It

@@ -1,5 +1,10 @@
 # Base Database
 
+The normative platform-wide database rules live in
+[Bilimbi Database Architecture](../../../../docs/architecture/database.md).
+This module document describes Base Database's owned implementation and
+operational contracts; it does not define a second database architecture.
+
 `apps/base/database/` is the complete physical boundary for the required
 `base/database` module. It owns the shared Ecto Repo, compatible JSON type, and
 schema-verification machinery used by higher modules.

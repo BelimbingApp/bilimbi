@@ -57,7 +57,7 @@ Install those versions with mise, then run:
 
 ```bash
 mix setup
-mix phx.server
+mix bilimbi.server
 ```
 
 Open [http://localhost:4000](http://localhost:4000).
@@ -73,7 +73,7 @@ instead of running fresh creation migrations:
 ```bash
 mix bilimbi.schema.verify
 mix bilimbi.schema.adopt
-mix phx.server
+mix bilimbi.server
 ```
 
 Adoption refuses schema drift and records the verified baselines in
@@ -111,8 +111,14 @@ mix bilimbi.migrations
 mix bilimbi.schema.verify
 mix help bilimbi.platform.provision
 mix help bilimbi.tenant.provision
+mix help bilimbi.server
 mix precommit
 ```
+
+`mix bilimbi.server` checks the compiled module metadata before starting
+Phoenix. If it finds stale or missing workspace-graph metadata, it rebuilds
+the dependencies once and retries; other startup errors are reported without
+automatic recovery.
 
 `mix precommit` is the required final check for a change. It compiles with
 warnings as errors, unlocks unused dependencies, formats the project, and runs
@@ -299,6 +305,7 @@ Base Audit preserves Belimbing's `base_audit_mutations` and
 |---|---|
 | Agent and coding rules | [AGENTS.md](./AGENTS.md) |
 | Product and interface design | [DESIGN.md](./DESIGN.md) |
+| Database architecture | [Database Architecture](./docs/architecture/database.md) |
 | Original Mix umbrella topology | [ADR 0001](./docs/architecture/decisions/0001-mix-umbrella-topology.md) |
 | Compatible schema baselines | [ADR 0002](./docs/architecture/decisions/0002-compatible-schema-baselines.md) |
 | Physical deep-module packages | [ADR 0003](./docs/architecture/decisions/0003-physical-deep-module-packages.md) |

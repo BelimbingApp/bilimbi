@@ -5,7 +5,7 @@
 **Architecture ID:** 0010 (reserved; do not reuse for an ADR)
 **Agents:** claude/claude-opus-5, amp/medium-sol
 **Scope:** Platform, Domain, Extension, composition, and nested-Git rules
-**Last Updated:** 2026-08-16
+**Last Updated:** 2026-08-24
 
 ## Purpose
 
@@ -173,6 +173,11 @@ Selected modules may contribute routes, migrations, schema contracts, settings,
 authorization definitions, menus, and other supported metadata. Generic
 Platform tooling consumes them without naming or depending on optional
 capabilities.
+
+The composition graph declares database contributors and their dependencies;
+the ownership, migration, verification, and adoption semantics are defined in
+[Database Architecture](./database.md). Do not create a separate database
+dependency graph beside the module descriptors.
 
 Web hosts selected presentation contributions without knowing Domain or
 Extension names. Contributors retain ownership of their business rules and
