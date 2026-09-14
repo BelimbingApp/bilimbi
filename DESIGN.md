@@ -26,17 +26,12 @@ product than a pile of components.
 
 ## Product character
 
-Two choices define the Bilimbi look:
-
-1. **The workspace strip.** No screen is context-free. The login card names
-   the platform workspace being entered (live provisioning state included);
-   the authenticated shell's top strip always names the company and tenant
-   the screen acts on. Tenancy is visible product truth, not hidden plumbing.
-2. **Ledger geometry.** Compact scale with `rounded-md` controls and
+The defining Bilimbi visual choice is **ledger geometry**: compact scale with
+`rounded-md` controls and
    `rounded-xl` surfaces, hairline rules, and tabular numerals for IDs and
    counts. The lime `brand` marks orientation only — the card's top edge,
    the active navigation highlighting, selection — and never reports status.
-   The surface is ruled paper with a bookmark.
+The surface is ruled paper with a bookmark.
 
 ## Semantic color roles
 
@@ -176,16 +171,25 @@ split markup into another file.
 Two shells exist and each stays minimal:
 
 - **`Layouts.auth`** — the centered credential layout for sign-in and password
-  recovery. One quiet card with the brand bar, the wordmark above it, and the
-  workspace strip below. No navigation, no marketing.
+  recovery. One quiet card with the brand bar and the wordmark above it. Name
+  a workspace only when the user is genuinely choosing or entering a distinct
+  workspace. No navigation, no marketing.
 - **`Layouts.app`** — the authenticated workspace shell: a compact full-width
-  top bar (sidebar toggle, transparent `size-6` brand mark, Bilimbi wordmark,
-  tenant on the right), a left menu sidebar, and a persistent status bar
+  top bar (sidebar toggle, transparent `size-6` brand mark and Bilimbi
+  wordmark), a left menu sidebar, and a persistent status bar
   (application version). In development only, the status bar shows `dev` plus
   the listen address. Wide screens keep the rail; the collapsed rail hides
-  labels and logout, leaving the user initials. Below `lg`, the menu is an
-  off-canvas drawer. The logo is the product mark on a transparent background
-  — never a brand tile.
+  labels, leaving the user initials. The bottom-left user circle remains the
+  account entry point in both states. Activating it opens a compact menu with
+  the signed-in name and identifier, current company and tenant, change
+  password, and sign out. Offer scope switching only when the user has more
+  than one permitted scope. Below `lg`, the menu is an off-canvas drawer. The
+  logo is the product mark on a transparent background — never a brand tile.
+
+Ordinary users do not need company and tenant repeated in the top strip. Show
+an always-visible scope warning outside the account menu when context is
+unusual or safety-critical, including platform-operator access, impersonation,
+or cross-company work where acting in the wrong scope could cause harm.
 
 ### Navigation menu conventions
 

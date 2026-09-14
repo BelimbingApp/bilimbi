@@ -33,12 +33,11 @@ The identity baseline records the characteristics that parity work must preserve
 | K02 | Bilimbi geometry | Keep `rounded-xl` primary surfaces, the control hierarchy defined by the current root guidance, and hairline ledger structure. Resolve current radius drift once in the baseline. |
 | K03 | Compact operational density | Preserve fast scanning, dense tables, compact controls and restrained spacing without becoming cramped. |
 | K04 | Instrument Sans hierarchy | Preserve the current typeface, compact navigation scale and tabular numerals for comparable data. |
-| K05 | Workspace context | Keep company and tenant context visible in the authenticated shell and workspace context visible at entry. |
-| K06 | Brand means orientation | Lime identifies selection, focus, active navigation and location; it never represents status. |
-| K07 | Calm action language | Keep the deep-olive primary action, scarce emphasis and calm treatment of destructive work. |
-| K08 | Bilimbi mark and wordmark | Keep the product mark, wordmark and local graphic identity. |
-| K09 | Ledger page archetypes | Keep one shared width and hierarchy for list, form and detail pages. |
-| K10 | Trustworthy behavior and voice | Feedback is truthful, accessible and recoverable; copy remains plain, calm and operational. |
+| K05 | Brand means orientation | Lime identifies selection, focus, active navigation and location; it never represents status. |
+| K06 | Calm action language | Keep the deep-olive primary action, scarce emphasis and calm treatment of destructive work. |
+| K07 | Bilimbi mark and wordmark | Keep the product mark, wordmark and local graphic identity. |
+| K08 | Ledger page archetypes | Keep one shared width and hierarchy for list, form and detail pages. |
+| K09 | Trustworthy behavior and voice | Feedback is truthful, accessible and recoverable; copy remains plain, calm and operational. |
 
 ### Parity Capability Catalog
 
@@ -53,7 +52,7 @@ The catalog is organized by what a human is trying to review, not by Laravel or 
 | FND-05 | Focus, motion and reduced motion | Partial | Define consistent focus visibility, transition purpose and reduced-motion behavior. |
 | FND-06 | Icon language and catalog | Registry exists; review is limited | Add searchable visual review, empty result, copy and copied feedback. |
 | LAY-01 | Authentication shell | Exists | Compare first impression, responsive behavior, errors and recovery. |
-| LAY-02 | Application shell and status strip | Exists | Keep workspace identity; match the best collapse, drawer and navigation-continuity behavior. |
+| LAY-02 | Application shell and account footer | Exists | Remove persistent company and tenant repetition. Keep the user circle at the bottom left as the account and scope entry point; show an always-visible warning only for unusual or safety-critical scope. Match the best collapse, drawer and navigation-continuity behavior. |
 | LAY-03 | Page width and page header | Shared primitives exist | Cover title, subtitle, action, pin, contextual help and narrow states. |
 | LAY-04 | Secondary side panel | Bespoke Design Library example | Establish one responsive page-local navigation pattern with desktop rail and mobile access. |
 | LAY-05 | Index, form and detail geometry | Partial conventions | Define complete assemblies rather than leaving every screen to compose them differently. |
@@ -61,6 +60,7 @@ The catalog is organized by what a human is trying to review, not by Laravel or 
 | NAV-02 | Tabs | Example markup only | Provide shared semantics, keyboard navigation, active state and URL/history rules. |
 | NAV-03 | Link dictionary and related-link groups | No shared contract | Adopt internal, anchor, external, new-tab and download behavior; mutations remain buttons. |
 | NAV-04 | Pagination | Shared component exists | Compare narrow layout, disabled states, page-size control, URL state and accessible labels. |
+| NAV-05 | User account and scope menu | Partial user footer exists | On user-circle activation, show signed-in name and identifier, current company and tenant, change password and sign out. Show scope switching only when more than one permitted scope exists. |
 | ACT-01 | Buttons | Primary, secondary and destructive basics | Cover emphasis, compact size, disabled, loading, navigation and truthful completion. |
 | ACT-02 | Icon actions and groups | Basic icon button exists | Add grouping, context sizing, disabled/loading behavior and accessible tooltips. |
 | ACT-03 | Destructive entry and acknowledgement | Inconsistent screen patterns | Standardize consequence copy, confirmation and typed acknowledgement where risk requires it. |
@@ -141,10 +141,15 @@ A text-only inventory is easy for agents but impossible to validate visually. A 
 
 One serial agent would be slow, while several agents concurrently changing theme and shared component files would recreate drift through merge conflict. The recommended direction is staged parallelism: audit families concurrently, use one integration owner for shared Base UI and design authority, then migrate independent module screens concurrently after each shared contract stabilizes.
 
+### Account and tenancy context are disclosed when useful
+
+Keeping company and tenant in the top strip makes known context compete with the current task. Hiding scope everywhere is also unsafe for platform operators, impersonation and cross-company work. The recommended direction is progressive disclosure: the bottom-left user circle opens one account menu containing identity, company, tenant and account actions. A switcher appears only for users who can switch. Unusual or safety-critical scope remains visible outside the menu as a persistent warning.
+
 ## Public Contract
 
 - Belimbing is reference evidence, not visual or implementation authority.
-- Bilimbi identity IDs `K01`–`K10` cannot be changed by a parity work item unless the human explicitly reopens that identity decision.
+- Bilimbi identity IDs `K01`–`K09` cannot be changed by a parity work item unless the human explicitly reopens that identity decision.
+- Ordinary company and tenant context is available through the bottom-left user account menu, not repeated in the top strip. Platform-operator, impersonated and other safety-critical scope remains visibly disclosed while active.
 - Every parity issue names the catalog IDs it owns, its dependencies, affected routes, owned files and acceptance evidence.
 - A catalog item is complete only when its disposition is recorded, the real component is shown in the Design Library, applicable states and keyboard behavior are tested, narrow and theme behavior are reviewed, and one production screen adopts it.
 - Decision-required items are not implemented as accepted design before human selection.
@@ -163,7 +168,7 @@ Goal: Establish one current identity and catalog before any parity implementatio
 - [x] Bring the branch onto the current `main` history at merge commit `3a4d918`. `{agent:kiatng-sol-medium}`
 - [ ] Resolve plan, `AGENTS.md`, `DESIGN.md` and implementation conflicts deliberately.
 - [ ] Reconcile the latest root guidance with the current Design Spec, especially control geometry, filter framing, destructive actions and compact icon actions.
-- [ ] Review and approve or amend identity IDs `K01`–`K10`.
+- [ ] Review and approve or amend identity IDs `K01`–`K09`.
 - [ ] Verify every catalog row against the current Bilimbi build and Belimbing reference.
 - [ ] Give each row its initial disposition and dependency without treating component existence as acceptance.
 - [ ] Create one parent GitHub issue for the parity campaign and child issues only after the catalog boundaries are approved.
