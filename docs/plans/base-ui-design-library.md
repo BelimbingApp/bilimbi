@@ -1,9 +1,10 @@
 # Base UI Design Library
 
 **Status:** In progress
-**Last Updated:** 2026-08-24
+**Last Updated:** 2026-09-14
 **Tracking:** [Issue #691](https://github.com/BelimbingApp/bilimbi/issues/691)
 **Owner:** `agent:kiatng-sol-medium`
+**Related:** `docs/plans/base-ui-design-parity.md`
 
 ## Problem
 
@@ -51,17 +52,7 @@ This loop is the workbench. A small project-owned agent skill may later make the
 
 ## Current Audit
 
-The current review has seven open choices:
-
-- `T01` — replace custom colour values with their nearest Tailwind palette steps;
-- `C01` — field shape and density;
-- `C02` — focus colour;
-- `C03` — destructive actions;
-- `C04` — filter framing;
-- `C05` — table row actions; and
-- `C06` — icon-control size.
-
-These are open decisions. The page presents the live alternatives and their screen sources. It does not choose for the human.
+`T01` and `C01`–`C06` were resolved on the current draft branch, implemented in production UI and moved to Design Spec. The parity baseline in `docs/plans/base-ui-design-parity.md` will reconcile those branch decisions with the latest root guidance before treating them as enduring identity.
 
 The inventory also covers the current shared structure, navigation, tabs, buttons, form fields, multi-select, choice controls, inline editing, flash messages, alerts, badges, tables, pagination, record facts, dates, operational lists, empty states, permission states, recovery states, the Bilimbi mark and icons.
 
@@ -111,7 +102,7 @@ Goal: Turn human decisions into one coherent Bilimbi default.
 - [x] Update shared components and affected screens so rejected variations no longer drift in production.
 - [x] Move `T01` to Design Spec under the same number.
 - [x] Move each accepted component choice to Design Spec under the same number.
-- [ ] Continue the audit across the remaining application screens and add numbered decisions only where human judgment is needed.
+- [ ] Complete the approved catalog and parity campaign in `docs/plans/base-ui-design-parity.md`; that plan owns the detailed IDs, agent lanes and acceptance evidence.
 - [ ] Give each changeable design fact one owner in the smallest useful default-library structure.
 - [ ] Create a small Design Library agent skill for inspection, focused edits, browser review and validation.
 
