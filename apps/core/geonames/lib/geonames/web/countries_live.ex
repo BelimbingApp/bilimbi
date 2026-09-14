@@ -145,7 +145,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
               class="px-3 py-1.5"
             >
               <.icon
-                name="hero-arrow-path"
+                name="refresh"
                 class={["size-4", @updating_countries? && "animate-spin"]}
               />
               <span>{if @updating_countries?, do: "Updating…", else: "Update"}</span>
@@ -161,7 +161,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
         >
           <div class="relative">
             <.icon
-              name="hero-magnifying-glass"
+              name="search"
               class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
             />
             <.input

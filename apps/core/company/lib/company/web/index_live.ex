@@ -274,7 +274,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
               variant="primary"
               navigate={~p"/companies/create"}
             >
-              <.icon name="hero-plus" class="size-4" /> Add Company
+              <.icon name="create" class="size-4" /> Add Company
             </.button>
             <.button navigate={~p"/companies/department-types"} class="text-xs">
               Department Types
@@ -289,7 +289,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
           <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,13rem)]">
             <div class="relative">
               <.icon
-                name="hero-magnifying-glass"
+                name="search"
                 class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
               />
               <.input
@@ -385,7 +385,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
               <div class="flex items-center justify-end gap-3">
                 <.badge :if={company.primary?} kind={:neutral}>Primary</.badge>
                 <.icon_button
-                  icon="hero-eye"
+                  icon="view"
                   label={"Open #{company.name}"}
                   navigate={~p"/companies/#{company.id}"}
                 />

@@ -559,8 +559,10 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   `rounded-md`; surfaces are `rounded-xl`. Operational lists default to 25
   rows and only offer 25, 50, 100, or 300; their sortable headers expose
   `aria-sort`, and page, search, filters, sort, and page size stay in URL
-  state. Use `<.datetime>` for timestamps and `<.icon>` for all icons (put
-  product-only SVGs in `Bilimbi.Base.UI.IconRegistry`). Primary actions use
+  state. Use `<.datetime>` for timestamps and `<.icon>` for all icons.
+  Name user-facing actions through `Bilimbi.Base.UI.IconRegistry` rather than
+  raw `hero-*` strings; put product-only SVGs in the same registry. Logout
+  keeps `hero-arrow-right-on-rectangle`. Primary actions use
   `<.button variant="primary">` with deep olive base (`bg-action`, `lime-950`
   light / `lime-600` dark), high-contrast text (`text-action-ink`, `lime-50`
   light / `lime-950` dark), and a brighter lime hover
@@ -744,3 +746,10 @@ Orbs receive two GitHub credentials with different capabilities:
 
 Never print, log, or commit either token value. Do not reconfigure `gh` auth
 globally to the discussion token; keep the override scoped per command.
+
+## Maintaining this file
+
+Keep this file for knowledge useful to almost every future agent session in this project.
+Do not repeat what the codebase already shows; point to the authoritative file or command instead.
+Prefer rewriting or pruning existing entries over appending new ones.
+When updating this file, preserve this bar for all agents and keep entries concise.

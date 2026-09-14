@@ -601,7 +601,7 @@ defmodule BilimbiWeb.DashboardLive do
                         phx-value-id="current-company"
                       />
                       <.icon_button
-                        icon="hero-x-mark"
+                        icon="close"
                         label="Remove current company section"
                         context={:inline}
                         kind={:danger}
@@ -642,7 +642,7 @@ defmodule BilimbiWeb.DashboardLive do
                       phx-value-id="recent-users"
                     />
                     <.icon_button
-                      icon="hero-x-mark"
+                      icon="close"
                       label="Remove people section"
                       context={:inline}
                       kind={:danger}
@@ -715,7 +715,7 @@ defmodule BilimbiWeb.DashboardLive do
             title="Move down"
           />
           <.icon_button
-            icon="hero-x-mark"
+            icon="close"
             label={"Remove #{@widget.label}"}
             context={:inline}
             kind={:danger}

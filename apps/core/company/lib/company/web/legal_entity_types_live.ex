@@ -288,7 +288,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
                 </button>
                 <.icon_button
                   :if={@can_update?}
-                  icon="hero-pencil"
+                  icon="edit"
                   label={"Edit #{type.name}"}
                   id={"edit-type-#{type.id}"}
                   phx-click="edit"
@@ -296,7 +296,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
                 />
                 <.icon_button
                   :if={@can_delete?}
-                  icon="hero-trash"
+                  icon="delete"
                   label={"Delete #{type.name}"}
                   kind={:danger}
                   id={"delete-type-#{type.id}"}

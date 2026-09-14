@@ -3,8 +3,9 @@
 **Stable module ID:** `base/ui` · **Layer:** Base · required
 
 Owns the shared presentation contracts every UI-bearing module needs:
-layouts, core components, the `use Bilimbi.Base.UI, :live_view` facade, and
-`RouteContract` for compile-time `~p` verification.
+layouts, core components, the `use Bilimbi.Base.UI, :live_view` facade,
+`Bilimbi.Base.UI.IconRegistry` for named action icons and product glyphs,
+and `RouteContract` for compile-time `~p` verification.
 
 The LiveView and LiveComponent facades wrap `handle_event/3` so an unexpected
 action exception is logged and shown as an honest error flash without replacing
@@ -15,3 +16,8 @@ propagate. Rendering and other lifecycle callbacks are not recovered.
 This package is dependency-light. It depends on Phoenix libraries and
 `base/module_registry` only — never on Tenancy, Authz, Session, or `:web`.
 Authentication `on_mount` hooks stay in `BilimbiWeb.UserAuth`.
+
+Call sites name user-facing actions through `IconRegistry` (`create`, `edit`,
+`delete`, …) rather than raw `hero-*` strings. Logout is the exception and
+keeps `hero-arrow-right-on-rectangle`. Destination navigation has no single
+action glyph; menu contributions keep their own icons.

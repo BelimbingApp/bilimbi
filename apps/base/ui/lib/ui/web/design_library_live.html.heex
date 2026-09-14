@@ -8,7 +8,7 @@
           id="design-library-stage"
           class="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs font-medium text-ink-muted"
         >
-          <.icon name="hero-eye" class="size-3.5" />
+          <.icon name="view" class="size-3.5" />
           {@area_stage}
         </span>
       </:actions>
@@ -420,7 +420,7 @@
                   class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
                 >
                   <.icon
-                    name="hero-signal"
+                    name="status"
                     class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
                   />
                   <span>
@@ -586,8 +586,8 @@
                   />
                 </div>
                 <div class="flex items-center gap-2 text-sm text-ink-muted">
-                  Table <.icon_button icon="hero-pencil" label="Edit company" />
-                  <.icon_button icon="hero-trash" label="Delete company" kind={:danger} />
+                  Table <.icon_button icon="edit" label="Edit company" />
+                  <.icon_button icon="delete" label="Delete company" kind={:danger} />
                 </div>
               </div>
               <p class="mt-3 text-xs text-ink-muted">
@@ -906,7 +906,7 @@
                   />
                 </:col><:action :let={row}>
                   <.icon_button
-                    icon="hero-eye"
+                    icon="view"
                     id={"sample-preview-#{row.id}"}
                     label={"Preview #{row.name}"}
                     phx-click="preview-company"
@@ -1072,7 +1072,7 @@
         <section id="graphic-icons" class="space-y-4">
           <div>
             <h2 class="text-base font-semibold text-ink-strong">Icons</h2><p class="text-sm text-ink-muted">
-              Outline icons are the current default. Their meaning comes from the label and the task around them.
+              Outline icons are the current default. Familiar actions share one named glyph so the mapping cannot drift.
             </p>
           </div>
           <div class="space-y-5 rounded-xl border border-line bg-surface p-4 shadow-xs">
@@ -1091,22 +1091,22 @@
             </div>
             <div>
               <h3 class="mb-2 text-sm font-semibold text-ink">Actions</h3><div class="flex flex-wrap gap-2">
-                <.button><.icon name="hero-plus" /> Add</.button>
-                <.button><.icon name="hero-pencil" /> Edit</.button>
-                <.button><.icon name="hero-magnifying-glass" /> Search</.button>
-                <.button variant="danger"><.icon name="hero-trash" /> Delete</.button>
+                <.button><.icon name="create" /> Add</.button>
+                <.button><.icon name="edit" /> Edit</.button>
+                <.button><.icon name="search" /> Search</.button>
+                <.button variant="danger"><.icon name="delete" /> Delete</.button>
               </div>
             </div>
             <div>
               <h3 class="mb-2 text-sm font-semibold text-ink">Status</h3><div class="flex flex-wrap gap-5">
                 <div class="flex items-center gap-2 text-success-ink">
-                  <.icon name="hero-check-circle" class="size-5" /><span class="text-sm">Completed</span>
+                  <.icon name="success" class="size-5" /><span class="text-sm">Completed</span>
                 </div><div class="flex items-center gap-2 text-warning-ink">
-                  <.icon name="hero-exclamation-triangle" class="size-5" /><span class="text-sm">Attention</span>
+                  <.icon name="warning" class="size-5" /><span class="text-sm">Attention</span>
                 </div><div class="flex items-center gap-2 text-danger-ink">
-                  <.icon name="hero-exclamation-circle" class="size-5" /><span class="text-sm">Failed</span>
+                  <.icon name="error" class="size-5" /><span class="text-sm">Failed</span>
                 </div><div class="flex items-center gap-2 text-ink-muted">
-                  <.icon name="hero-information-circle" class="size-5" /><span class="text-sm">Information</span>
+                  <.icon name="information" class="size-5" /><span class="text-sm">Information</span>
                 </div>
               </div>
             </div>

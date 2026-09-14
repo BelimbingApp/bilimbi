@@ -73,15 +73,15 @@ defmodule Bilimbi.Base.UI.Components do
         @kind == :info && "border-success-line bg-success-surface/95 text-success-ink",
         @kind == :error && "border-danger-line bg-danger-surface/95 text-danger-ink"
       ]}>
-        <.icon :if={@kind == :info} name="hero-information-circle" class="size-5 shrink-0" />
-        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5 shrink-0" />
+        <.icon :if={@kind == :info} name="information" class="size-5 shrink-0" />
+        <.icon :if={@kind == :error} name="error" class="size-5 shrink-0" />
         <div>
           <p :if={@title} class="font-semibold">{@title}</p>
           <p>{msg}</p>
         </div>
         <div class="flex-1" />
         <button type="button" class="group self-start cursor-pointer" aria-label={gettext("close")}>
-          <.icon name="hero-x-mark" class="size-5 opacity-40 group-hover:opacity-70" />
+          <.icon name="close" class="size-5 opacity-40 group-hover:opacity-70" />
         </button>
       </div>
     </div>
@@ -120,10 +120,10 @@ defmodule Bilimbi.Base.UI.Components do
       <.icon
         name={
           case @kind do
-            :info -> "hero-information-circle"
-            :success -> "hero-check-circle"
-            :warning -> "hero-exclamation-triangle"
-            :error -> "hero-exclamation-circle"
+            :info -> "information"
+            :success -> "success"
+            :warning -> "warning"
+            :error -> "error"
           end
         }
         class="mt-0.5 size-4 shrink-0"
@@ -805,7 +805,7 @@ defmodule Bilimbi.Base.UI.Components do
           title="Previous page"
           class="grid size-7 place-items-center rounded-md border border-line bg-surface text-ink transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <.icon name="hero-chevron-left" class="size-3.5" />
+          <.icon name="page-previous" class="size-3.5" />
         </button>
         <%= for step <- pagination_steps(@page) do %>
           <span :if={step == :ellipsis} class="px-1 text-xs text-ink-subtle" aria-hidden="true">…</span>
@@ -836,7 +836,7 @@ defmodule Bilimbi.Base.UI.Components do
           title="Next page"
           class="grid size-7 place-items-center rounded-md border border-line bg-surface text-ink transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <.icon name="hero-chevron-right" class="size-3.5" />
+          <.icon name="page-next" class="size-3.5" />
         </button>
       </div>
     </nav>
@@ -990,7 +990,7 @@ defmodule Bilimbi.Base.UI.Components do
   defp error(assigns) do
     ~H"""
     <p class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink">
-      <.icon name="hero-exclamation-circle" class="size-4 shrink-0 text-danger" />
+      <.icon name="error" class="size-4 shrink-0 text-danger" />
       {render_slot(@inner_block)}
     </p>
     """
@@ -1282,7 +1282,7 @@ defmodule Bilimbi.Base.UI.Components do
       >
         <span data-role="text" class="text-ink">{@value}</span>
         <.icon
-          name="hero-pencil"
+          name="edit"
           class="size-3.5 text-ink-muted opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity"
         />
       </button>
@@ -1343,10 +1343,10 @@ defmodule Bilimbi.Base.UI.Components do
 
   defp table_sort_icon(sort, sort_by, sort_dir) do
     cond do
-      not table_sort_active?(sort, sort_by) -> "hero-chevron-up-down"
-      table_sort_dir(sort_dir) == :asc -> "hero-chevron-up"
-      table_sort_dir(sort_dir) == :desc -> "hero-chevron-down"
-      true -> "hero-chevron-up-down"
+      not table_sort_active?(sort, sort_by) -> "sort"
+      table_sort_dir(sort_dir) == :asc -> "sort-asc"
+      table_sort_dir(sort_dir) == :desc -> "sort-desc"
+      true -> "sort"
     end
   end
 
@@ -1385,7 +1385,12 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
-  Renders a [Heroicon](https://heroicons.com).
+  Renders a named action icon or a [Heroicon](https://heroicons.com).
+
+  Prefer a name from `Bilimbi.Base.UI.IconRegistry` so the action meaning is
+  explicit. Unknown names beginning with `hero-` still pass through to
+  generated Heroicons. Custom product glyphs such as `bilimbi-pin` render as
+  inline SVG.
 
   Heroicons come in three styles – outline, solid, and mini.
   By default, the outline style is used, but solid and mini may
@@ -1399,15 +1404,16 @@ defmodule Bilimbi.Base.UI.Components do
 
   ## Examples
 
-      <.icon name="hero-x-mark" />
-      <.icon name="hero-arrow-path" class="ml-1 size-3 motion-safe:animate-spin" />
+      <.icon name="close" />
+      <.icon name="refresh" class="ml-1 size-3 motion-safe:animate-spin" />
   """
   attr(:name, :string, required: true)
   attr(:class, :any, default: "size-4")
 
   def icon(assigns) do
-    case IconRegistry.fetch(assigns.name) do
-      {:ok, icon} -> registered_icon(assign(assigns, :icon, icon))
+    case IconRegistry.lookup(assigns.name) do
+      {:svg, icon} -> registered_icon(assign(assigns, :icon, icon))
+      {:hero, hero_name} -> hero_icon(assign(assigns, :name, hero_name))
       :error -> hero_icon(assigns)
     end
   end

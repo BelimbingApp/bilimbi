@@ -349,7 +349,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
         >
           <div class="relative">
             <.icon
-              name="hero-magnifying-glass"
+              name="search"
               class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
             />
             <.input
@@ -406,14 +406,14 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
               <div :if={not type.is_system} class="flex items-center justify-end gap-3">
                 <.icon_button
                   :if={allowed?(@current_scope, "admin.employee-type.update")}
-                  icon="hero-pencil"
+                  icon="edit"
                   label={"Edit #{type.label}"}
                   id={"employee-type-edit-#{type.id}"}
                   navigate={~p"/employee-types/#{type.id}/edit"}
                 />
                 <.icon_button
                   :if={allowed?(@current_scope, "admin.employee-type.delete")}
-                  icon="hero-trash"
+                  icon="delete"
                   label={"Delete #{type.label}"}
                   kind={:danger}
                   id={"employee-type-delete-#{type.id}"}

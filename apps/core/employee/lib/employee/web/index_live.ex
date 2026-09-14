@@ -374,7 +374,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
           <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(12rem,16rem)]">
             <div class="relative">
               <.icon
-                name="hero-magnifying-glass"
+                name="search"
                 class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
               />
               <.input
@@ -462,14 +462,14 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
               <div class="flex items-center justify-end gap-3">
                 <.icon_button
                   :if={allowed?(@current_scope, "admin.employee.update")}
-                  icon="hero-pencil"
+                  icon="edit"
                   label={"Edit #{employee.full_name}"}
                   id={"employee-#{employee.id}-edit"}
                   navigate={~p"/employees/#{employee.id}/edit"}
                 />
                 <.icon_button
                   :if={allowed?(@current_scope, "admin.employee.delete")}
-                  icon="hero-trash"
+                  icon="delete"
                   label={"Delete #{employee.full_name}"}
                   kind={:danger}
                   id={"employee-#{employee.id}-delete"}

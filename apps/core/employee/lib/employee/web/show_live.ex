@@ -535,7 +535,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     >
       {render_slot(@display)}
       <.icon
-        name="hero-pencil"
+        name="edit"
         class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
       />
     </button>

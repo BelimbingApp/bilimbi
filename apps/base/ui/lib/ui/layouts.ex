@@ -251,7 +251,7 @@ defmodule Bilimbi.Base.UI.Layouts do
             id="app-operator-company-missing"
             class="inline-flex items-center gap-1 font-medium text-danger hover:underline"
           >
-            <.icon name="hero-exclamation-triangle" class="size-3.5" />
+            <.icon name={Bilimbi.Base.UI.IconRegistry.shell(:warning)} class="size-3.5" />
             <span>{gettext("Operator company not set")}</span>
           </.link>
         </div>
