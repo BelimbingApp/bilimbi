@@ -147,7 +147,11 @@ defmodule Bilimbi.Base.UI.Layouts do
           <div class="flex min-w-0 flex-1 items-center justify-end gap-3">
             {render_slot(@topbar_actions)}
 
-            <ShellComponents.display_controls id="app-display" preferences={@preferences} />
+            <ShellComponents.display_controls
+              id="app-display"
+              preferences={@preferences}
+              impersonating={@current_scope[:impersonator] != nil}
+            />
           </div>
         </div>
       </header>

@@ -71,6 +71,31 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     assert has_element?(view, "#app-display-system[aria-pressed='true']")
   end
 
+  test "an impersonated session is offered no display controls and cannot write them", %{
+    conn: conn,
+    scope: scope
+  } do
+    conn =
+      conn
+      |> log_in_as()
+      |> Plug.Test.init_test_session(%{
+        "impersonation" => %{"original_user_id" => 92, "original_user_name" => "Grace Hopper"}
+      })
+
+    {:ok, view, _} = live(conn, ~p"/dashboard")
+
+    assert has_element?(view, "#app-scope-warning", "Viewing as Ada Lovelace")
+    assert has_element?(view, "#app-display-locked", "Company time")
+    refute has_element?(view, "#app-display-dark")
+    refute has_element?(view, "#app-display-utc")
+
+    render_hook(view, "shell:preference", %{kind: "theme", value: "dark"})
+    render_hook(view, "shell:preference", %{kind: "timezone", value: "utc"})
+
+    assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+    assert DateTimePolicy.mode(SettingsScope.user(91, 73, 41)) == :company
+  end
+
   test "the account menu exposes real account actions for the signed-in identity", %{conn: conn} do
     {:ok, view, _} = conn |> log_in_as() |> live(~p"/dashboard")
     assert has_element?(view, "#app-user-toggle[aria-controls='app-user-panel']")

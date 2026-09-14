@@ -30,6 +30,7 @@ defmodule BilimbiWeb.ShellPreferences do
     # Rehydrate the durable session before a self-service write, just as the
     # HTTP preference endpoint does. A revoked session cannot keep writing.
     with {:ok, current_scope} <- BilimbiWeb.UserAuth.refresh_scope(socket.assigns.current_scope),
+         :ok <- own_account(current_scope),
          :ok <- save(current_scope, kind, value) do
       preferences =
         case kind do
@@ -94,6 +95,9 @@ defmodule BilimbiWeb.ShellPreferences do
   end
 
   def save(_scope, _kind, _value), do: {:error, :invalid_preference}
+
+  defp own_account(%{impersonator: nil}), do: :ok
+  defp own_account(%{impersonator: _impersonator}), do: {:error, :impersonating}
 
   defp mode("company"), do: :company
   defp mode("local"), do: :local

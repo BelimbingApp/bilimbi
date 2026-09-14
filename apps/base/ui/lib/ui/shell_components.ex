@@ -127,11 +127,22 @@ defmodule Bilimbi.Base.UI.ShellComponents do
 
   attr :id, :string, required: true
   attr :preferences, :map, required: true
+  attr :impersonating, :boolean, required: true
 
   def display_controls(assigns) do
     ~H"""
     <div id={@id} class="flex shrink-0 items-center gap-1" data-display-controls>
-      <div class="relative" data-timezone-menu>
+      <p
+        :if={@impersonating}
+        id={@id <> "-locked"}
+        class="inline-flex min-w-0 items-center gap-1.5 text-xs text-muted"
+      >
+        <.icon name={IconRegistry.shell(:clock)} class="size-4 shrink-0" />
+        <span class="truncate">
+          {mode_label(@preferences.mode)} time · display preferences are not editable while viewing as another user
+        </span>
+      </p>
+      <div :if={!@impersonating} class="relative" data-timezone-menu>
         <button
           type="button"
           id={@id <> "-timezone"}
@@ -173,7 +184,7 @@ defmodule Bilimbi.Base.UI.ShellComponents do
           </button>
         </div>
       </div>
-      <div class="flex items-center" role="group" aria-label="Theme">
+      <div :if={!@impersonating} class="flex items-center" role="group" aria-label="Theme">
         <.icon_button
           :for={{value, icon} <- [{"light", :light}, {"dark", :dark}, {"system", :system}]}
           id={@id <> "-" <> value}
@@ -189,9 +200,9 @@ defmodule Bilimbi.Base.UI.ShellComponents do
     """
   end
 
-  defp mode_label(mode) when mode in [:local, "local"], do: "Local"
-  defp mode_label(mode) when mode in [:utc, "utc"], do: "UTC"
-  defp mode_label(_mode), do: "Company"
+  defp mode_label(:company), do: "Company"
+  defp mode_label(:local), do: "Local"
+  defp mode_label(:utc), do: "UTC"
 
   defp initials(name),
     do:
