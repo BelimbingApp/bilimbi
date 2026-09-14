@@ -7,7 +7,6 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   """
 
   use Bilimbi.Base.UI, :live_view
-  alias Bilimbi.Base.UI.ShellComponents
 
   @sample_rows [
                  %{

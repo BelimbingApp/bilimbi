@@ -3,6 +3,7 @@ defmodule BilimbiWeb.ShellPreferences do
 
   alias Bilimbi.Base.DateTime, as: DateTimePolicy
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
+  alias Bilimbi.Base.UI.DateTimeDisplay
   alias Bilimbi.Core.User
 
   @doc """
@@ -30,28 +31,15 @@ defmodule BilimbiWeb.ShellPreferences do
     %{theme: theme, mode: display.mode, timezone: display.timezone, tz_db: display.tz_db}
   end
 
-  def attach(socket) do
-    socket
-    |> Phoenix.LiveView.attach_hook(:shell_preferences_path, :handle_params, &handle_params/3)
-    |> Phoenix.LiveView.attach_hook(:shell_preferences, :handle_event, &handle_event/3)
-  end
-
-  defp handle_params(_params, uri, socket),
-    do: {:cont, Phoenix.Component.assign(socket, :shell_path, relative_reference(uri))}
-
-  defp relative_reference(uri) do
-    case URI.parse(uri) do
-      %URI{path: path, query: nil} -> path
-      %URI{path: path, query: query} -> path <> "?" <> query
-    end
-  end
+  def attach(socket),
+    do: Phoenix.LiveView.attach_hook(socket, :shell_preferences, :handle_event, &handle_event/3)
 
   def handle_event("shell:preference", %{"kind" => kind, "value" => value}, socket) do
     # Rehydrate the durable session before a self-service write, just as the
     # HTTP preference endpoint does. A revoked session cannot keep writing.
     with {:ok, current_scope} <- BilimbiWeb.UserAuth.refresh_scope(socket.assigns.current_scope),
          :ok <- save(current_scope, kind, value) do
-      {:halt, %{ok: true}, confirm(socket, current_scope, kind, value)}
+      {:halt, %{ok: true}, confirm(socket, current_scope)}
     else
       {:error, _reason} -> {:halt, %{ok: false}, socket}
     end
@@ -112,8 +100,9 @@ defmodule BilimbiWeb.ShellPreferences do
 
   defp write(_scope, _kind, _value), do: {:error, :invalid_preference}
 
-  defp confirm(socket, current_scope, "theme", theme) do
-    preferences = %{current_scope.shell_preferences | theme: theme}
+  defp confirm(socket, current_scope) do
+    preferences = presentation(current_scope)
+    DateTimeDisplay.put(preferences)
 
     Phoenix.Component.assign(
       socket,
@@ -121,9 +110,6 @@ defmodule BilimbiWeb.ShellPreferences do
       Map.put(current_scope, :shell_preferences, preferences)
     )
   end
-
-  defp confirm(socket, _current_scope, "timezone", _mode),
-    do: Phoenix.LiveView.push_navigate(socket, to: socket.assigns.shell_path)
 
   defp own_account(%{impersonator: nil}), do: :ok
   defp own_account(%{impersonator: _impersonator}), do: {:error, :impersonating}

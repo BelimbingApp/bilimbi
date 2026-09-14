@@ -21,6 +21,7 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
   alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy.Scope, as: TenancyScope
+  alias Bilimbi.Base.UI.DateTimeDisplay
   alias Bilimbi.Core.User
 
   @theme_key "ui.theme"
@@ -88,7 +89,7 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
          :ok <- persist_timezone_mode(locale_scope(current_scope), timezone_mode) do
       {:noreply,
        socket
-       |> assign(:current_scope, put_theme(current_scope, theme))
+       |> assign(:current_scope, refreshed_scope(current_scope, theme))
        |> assign(locale: locale, timezone_mode: timezone_mode)
        |> put_flash(:info, "Appearance settings saved.")}
     else
@@ -99,13 +100,16 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
 
   defp current_theme(socket), do: socket.assigns.current_scope.shell_preferences.theme
 
-  defp put_theme(current_scope, theme),
-    do:
-      Map.put(
-        current_scope,
-        :shell_preferences,
-        %{current_scope.shell_preferences | theme: theme}
-      )
+  defp refreshed_scope(current_scope, theme) do
+    preferences = %{
+      current_scope.shell_preferences
+      | theme: theme,
+        mode: DateTimePolicy.mode(locale_scope(current_scope))
+    }
+
+    DateTimeDisplay.put(preferences)
+    Map.put(current_scope, :shell_preferences, preferences)
+  end
 
   defp persist_theme(scope, company_id, user_id, "system") do
     User.delete_user_preference(scope, company_id, user_id, @theme_key)

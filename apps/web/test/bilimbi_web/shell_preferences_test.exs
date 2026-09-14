@@ -38,11 +38,10 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     assert {:ok, "system"} = User.get_user_preference(scope, 73, 92, "ui.theme")
     assert has_element?(view, "#app-display-dark[aria-pressed='true']")
 
-    assert {:error, {:live_redirect, %{to: "/dashboard"}}} =
-             render_hook(view, "shell:preference", %{kind: "timezone", value: "utc"})
-
+    render_hook(view, "shell:preference", %{kind: "timezone", value: "utc"})
     assert DateTimePolicy.mode(SettingsScope.user(91, 73, 41)) == :utc
     assert DateTimePolicy.mode(SettingsScope.user(92, 73, 41)) == :company
+
     {:ok, remounted, _} = live(conn, ~p"/dashboard")
     assert has_element?(remounted, "#app-display-timezone", "UTC")
     assert has_element?(remounted, "#app-display-dark[aria-pressed='true']")
@@ -73,11 +72,21 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     assert has_element?(view, "#app-display-system[aria-pressed='true']")
   end
 
-  test "a saved time display returns to the same filtered page", %{conn: conn} do
+  test "a keyboard-only time display save confirms in place without leaving the page", %{
+    conn: conn
+  } do
     {:ok, view, _} = conn |> log_in_as() |> live(~p"/dashboard?search=ada&sort=name&page=3")
 
-    assert {:error, {:live_redirect, %{to: "/dashboard?search=ada&sort=name&page=3"}}} =
-             render_hook(view, "shell:preference", %{kind: "timezone", value: "utc"})
+    assert has_element?(view, "#app-display-company[aria-pressed='true']")
+
+    render_hook(view, "shell:preference", %{kind: "timezone", value: "utc"})
+
+    assert DateTimePolicy.mode(SettingsScope.user(91, 73, 41)) == :utc
+    assert has_element?(view, "#app-display-utc[aria-pressed='true']")
+    assert has_element?(view, "#app-display-company[aria-pressed='false']")
+    assert has_element?(view, "#app-display-timezone", "UTC")
+    assert has_element?(view, "#app-display-timezone[aria-controls='app-display-timezone-panel']")
+    assert has_element?(view, "#app-preference-feedback[role='status']")
   end
 
   test "an impersonated session is offered no display controls and cannot write them", %{

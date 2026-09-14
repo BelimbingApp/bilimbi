@@ -60,4 +60,51 @@ defmodule BilimbiWeb.ShellControlsJsTest do
     assert {"ok\n", 0} =
              System.cmd("node", ["--input-type=module", "-e", script], stderr_to_stdout: true)
   end
+
+  test "a confirmed time display save closes the panel, confirms and returns focus to the trigger" do
+    source = @controls |> File.read!() |> Base.encode64()
+
+    script = """
+    import assert from 'node:assert/strict'
+    const {default: ShellControls} = await import('data:text/javascript;base64,#{source}')
+    let focused = null
+    const trigger = {
+      id: 'app-display-timezone',
+      focus() { focused = this },
+      setAttribute(name, value) { this[name] = value },
+    }
+    const panel = {id: 'app-display-timezone-panel', hidden: false}
+    const option = {dataset: {preferenceKind: 'timezone', preferenceValue: 'utc'}, focus() { focused = this }}
+    const feedback = {hidden: true, classList: {toggle() {}}}
+    const root = {
+      dataset: {themeChoice: 'light'},
+      querySelectorAll(selector) {
+        if (selector === '[data-account-panel], [data-timezone-panel]') return [panel]
+        if (selector === '[data-preference-kind]') return [option]
+        return []
+      },
+      querySelector(selector) {
+        return selector === '[aria-controls="app-display-timezone-panel"]' ? trigger : feedback
+      },
+    }
+    globalThis.document = {documentElement: {dataset: {}}, addEventListener() {}, removeEventListener() {}}
+    globalThis.window = {addEventListener() {}, removeEventListener() {}}
+    const calls = []
+    const controls = new ShellControls({el: root, pushEvent(e, params, callback) { calls.push(callback) }})
+    controls.save('timezone', 'utc', option)
+    assert.equal(option.disabled, true)
+    calls[0]({ok: true})
+    assert.equal(panel.hidden, true)
+    assert.equal(trigger['aria-expanded'], 'false')
+    assert.equal(feedback.hidden, false)
+    assert.equal(feedback.textContent, 'Time display saved.')
+    assert.equal(option.disabled, false)
+    assert.equal(focused, trigger)
+    controls.destroy()
+    console.log('ok')
+    """
+
+    assert {"ok\n", 0} =
+             System.cmd("node", ["--input-type=module", "-e", script], stderr_to_stdout: true)
+  end
 end

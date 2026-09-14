@@ -71,6 +71,25 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     assert has_element?(view, "#app-shell[data-theme-choice='light']")
   end
 
+  test "a time display saved from the form updates the top bar clock at once", %{conn: conn} do
+    {:ok, view, _html} = open(conn)
+
+    assert has_element?(view, "#app-display-company[aria-pressed='true']")
+    assert has_element?(view, "#app-display-timezone", "Company")
+
+    view
+    |> form("#appearance-form", %{
+      "appearance" => %{"theme" => "system", "timezone_mode" => "utc"}
+    })
+    |> render_change()
+
+    assert Bilimbi.Base.DateTime.mode(SettingsScope.user(91, 73, 41)) == :utc
+    assert has_element?(view, "#appearance-timezone-mode option[value='utc'][selected]")
+    assert has_element?(view, "#app-display-utc[aria-pressed='true']")
+    assert has_element?(view, "#app-display-company[aria-pressed='false']")
+    assert has_element?(view, "#app-display-timezone", "UTC")
+  end
+
   test "a form save updates the top bar without a second theme copy", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
