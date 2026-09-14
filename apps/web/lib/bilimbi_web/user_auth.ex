@@ -251,9 +251,10 @@ defmodule BilimbiWeb.UserAuth do
   identity in the `@impersonation_key` cookie payload. Updates the durable session
   row in place without leaving stranded authentication records.
 
-  The switch is audited before it happens: a retained `impersonation.started`
-  action names the operator as the actor and the target as the subject. An
-  impersonation that cannot be recorded does not start.
+  The switch is recorded once it has happened: a retained `impersonation.started`
+  action names the operator as the actor and the target as the subject. The
+  record is best-effort, so a trail that cannot be written never undoes a
+  switch that already took effect.
   """
   def impersonate_user(
         conn,
@@ -262,18 +263,19 @@ defmodule BilimbiWeb.UserAuth do
       )
       when is_integer(original_user_id) and is_binary(original_user_name) do
     current_id = current_session_id(conn)
+    scope = conn.assigns[:current_scope] && conn.assigns[:current_scope].scope
 
-    with %{scope: %Scope{} = scope} <- conn.assigns[:current_scope],
+    with %Scope{} <- scope,
          {:ok, _target_session_user} <- session_user(target_user),
-         {:ok, _action} <-
-           record_impersonation(scope, "impersonation.started", %{
-             operator_id: original_user_id,
-             company_id: original_user["company_id"],
-             target_id: target_user.id,
-             summary: "Started impersonating #{target_user.name}"
-           }),
          {:ok, session_id} <-
            persist_durable_session(conn, target_user.id, target_user.company_id, current_id) do
+      record_impersonation(scope, "impersonation.started", %{
+        operator_id: original_user_id,
+        company_id: original_user["company_id"],
+        target_id: target_user.id,
+        summary: "Started impersonating #{target_user.name}"
+      })
+
       conn
       |> configure_session(renew: true)
       |> put_session(@impersonation_key, %{
@@ -319,7 +321,12 @@ defmodule BilimbiWeb.UserAuth do
                  original_user.company_id,
                  current_id
                ) do
-          record_impersonation_stopped(scope, original_user, impersonated_user_id)
+          record_impersonation(scope, "impersonation.stopped", %{
+            operator_id: original_user.id,
+            company_id: original_user.company_id,
+            target_id: impersonated_user_id,
+            summary: "Stopped impersonating"
+          })
 
           conn
           |> configure_session(renew: true)
@@ -347,31 +354,17 @@ defmodule BilimbiWeb.UserAuth do
     end
   end
 
-  defp record_impersonation_stopped(scope, %Summary{} = original_user, impersonated_user_id) do
-    case record_impersonation(scope, "impersonation.stopped", %{
-           operator_id: original_user.id,
-           company_id: original_user.company_id,
-           target_id: impersonated_user_id,
-           summary: "Stopped impersonating"
-         }) do
-      {:ok, _action} ->
-        :ok
-
-      {:error, changeset} ->
-        Logger.warning(
-          "impersonation.stopped audit action was not recorded: #{inspect(changeset.errors)}"
-        )
-
-        :ok
-    end
-  end
-
   # Belimbing's `ImpersonationManager` records both transitions as retained
   # semantic actions, and its recorder payload shape is mirrored here so both
   # trails read the same. The operator acts as themselves at each transition,
   # so `impersonator_id` is an explicit nil rather than inherited from the
   # request context — which, on stop, still names the operator as impersonator.
   # Request facts come from that same context, set by `fetch_current_scope/2`.
+  #
+  # Both transitions have already taken effect by the time they are recorded,
+  # so recording is best-effort: a rejected changeset is logged, and a missing
+  # actions table is the pre-canonical state `MutationCapture.insert_capture/1`
+  # also tolerates. Neither ever fails the transition back out to the caller.
   defp record_impersonation(%Scope{} = scope, event, %{
          operator_id: operator_id,
          company_id: company_id,
@@ -380,28 +373,46 @@ defmodule BilimbiWeb.UserAuth do
        }) do
     context = AuditContext.get()
 
-    Audit.record_action(scope, %{
-      company_id: company_id,
-      actor_type: "user",
-      actor_id: operator_id,
-      impersonator_id: nil,
-      ip_address: context.ip_address,
-      url: context.url,
-      user_agent: context.user_agent && String.slice(context.user_agent, 0, 80),
-      trace_id: context.trace_id && String.slice(context.trace_id, 0, 12),
-      event: event,
-      payload: %{
-        "semantic" => true,
-        "source" => "Impersonation",
-        "summary" => summary,
-        "surface" => "admin.impersonate",
-        "subject" => %{"name" => "user", "id" => target_id, "label" => "User##{target_id}"},
-        "context" => %{"impersonator_id" => operator_id, "target_id" => target_id},
-        "result" => "succeeded"
-      },
-      is_retained: true,
-      occurred_at: NaiveDateTime.utc_now()
-    })
+    result =
+      Audit.record_action(scope, %{
+        company_id: company_id,
+        actor_type: "user",
+        actor_id: operator_id,
+        impersonator_id: nil,
+        ip_address: context.ip_address,
+        url: context.url,
+        user_agent: context.user_agent && String.slice(context.user_agent, 0, 80),
+        trace_id: context.trace_id && String.slice(context.trace_id, 0, 12),
+        event: event,
+        payload: %{
+          "semantic" => true,
+          "source" => "Impersonation",
+          "summary" => summary,
+          "surface" => "admin.impersonate",
+          "subject" => %{"name" => "user", "id" => target_id, "label" => "User##{target_id}"},
+          "context" => %{"impersonator_id" => operator_id, "target_id" => target_id},
+          "result" => "succeeded"
+        },
+        is_retained: true,
+        occurred_at: NaiveDateTime.utc_now()
+      })
+
+    case result do
+      {:ok, _action} ->
+        :ok
+
+      {:error, changeset} ->
+        Logger.warning("#{event} audit action was not recorded: #{inspect(changeset.errors)}")
+
+        :ok
+    end
+  rescue
+    error in Postgrex.Error ->
+      if match?(%{postgres: %{code: :undefined_table}}, error) do
+        :ok
+      else
+        reraise error, __STACKTRACE__
+      end
   end
 
   # ------------------------------------------------------------------
