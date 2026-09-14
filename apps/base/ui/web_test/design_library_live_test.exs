@@ -103,6 +103,16 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-input-guidance", "Choice guidance")
     assert has_element?(view, "#component-input-live-state", "Live state")
     assert has_element?(view, "#component-icon-button", "Compact icon actions")
+    assert has_element?(view, "#example-nav[aria-label='Example menu']")
+    assert has_element?(view, "#example-nav [aria-current='page']", "Design Library")
+    assert has_element?(view, "#example-nav-states [aria-disabled='true']", "Disabled")
+    assert has_element?(view, "#example-tabs[aria-label='Example views']")
+    assert has_element?(view, "#example-tabs [aria-current='page']", "Overview")
+    assert has_element?(view, "#example-tabs-states [aria-disabled='true']", "Disabled")
+    assert has_element?(view, "#component-radio-group")
+    assert has_element?(view, "#component-radio-group-system[checked]")
+    assert has_element?(view, "#component-radio-disabled[disabled]")
+    assert has_element?(view, "#component-radio-disabled-system[checked][disabled]")
 
     assert has_element?(
              view,

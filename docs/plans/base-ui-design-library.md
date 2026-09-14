@@ -3,7 +3,7 @@
 **Status:** Foundation merged; shell parity continues in Issue #710
 **Last Updated:** 2026-09-15
 **Tracking:** [Issue #691](https://github.com/BelimbingApp/bilimbi/issues/691)
-**Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`
+**Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`; `fm/parity-designlib-specimens/grok-4.6`
 **Related:** `docs/plans/base-ui-design-parity.md`
 
 ## Problem
@@ -57,6 +57,8 @@ Routine design decisions do not pause for user approval. Escalate only a new bus
 `T01` and `C01`–`C06` were resolved in the merged foundation, implemented in production UI and moved to Design Spec. Root guidance and the parity baseline now preserve those decisions and the intentional content-sized pagination correction from #304. The subsequent #694 integration preserves 24px inline icon targets through the shared component, with table/toolbar controls still 28px, and retains status-first company actions and the pin-state regression test.
 
 The inventory also covers the current shared structure, navigation, tabs, buttons, form fields, multi-select, choice controls, inline editing, flash messages, alerts, badges, tables, pagination, record facts, dates, operational lists, empty states, permission states, recovery states, the Bilimbi mark and icons.
+
+Navigation, tabs, and radio group are shared `Bilimbi.Base.UI.Components` entries. The Components page renders those components in default, selected/active, disabled, and focus-visible states. Schedule uses `<.tabs>` for its Tasks / History / Settings views so the strip is not library-only markup.
 
 ## Rules
 
@@ -125,6 +127,7 @@ Goal: Turn accepted decisions into one coherent Bilimbi default.
 - [x] Move `T01` to Design Spec under the same number.
 - [x] Move each accepted component choice to Design Spec under the same number.
 - [x] Issue #720 — give the components shown in only one presentation their real states: the three page widths as live page calls on one wide stage, a header whose action sits beside the title, cards with and without a title, an error flash under the info flash, and the outline, solid and mini icon treatments each drawn at its own natural size, above a separate pair showing that size and colour are chosen where the icon is used. Where the component has no further state — card, record facts and icon — the specimen says so instead of inventing one. `{fm/parity-designlib-states/opus-5}`
+- [x] Replace Design Library fake Navigation, Tabs, and Radio group specimens with shared Base UI components, including default, selected, disabled, and focus-visible states, and adopt tabs on the Schedule board. `{fm/parity-designlib-specimens/grok-4.6}`
 - [ ] Complete the approved catalog and parity campaign in `docs/plans/base-ui-design-parity.md`; that plan owns the detailed IDs, agent lanes and acceptance evidence.
 - [ ] Give each changeable design fact one owner in the smallest useful default-library structure.
 - [ ] Create a small Design Library agent skill for inspection, focused edits, browser review and validation.

@@ -293,8 +293,8 @@ defmodule Bilimbi.Base.UI.Components do
     * For live file uploads, see `Phoenix.Component.live_file_input/1`
 
   See https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input
-  for more information. Unsupported types, such as radio, are best
-  written directly in your templates.
+  for more information. For two to five exclusive choices that should stay
+  visible, use `radio_group/1` rather than a single input.
 
   ## Examples
 
@@ -744,6 +744,115 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Renders a radio group for two to five exclusive choices that stay visible.
+
+  A `Phoenix.HTML.FormField` may be passed to retrieve the name, id, and
+  selected value. Otherwise pass `name`, `id`, and `value` explicitly.
+
+  ## Examples
+
+      <.radio_group
+        field={@form[:appearance]}
+        label="Appearance"
+        options={[{"System", "system"}, {"Light", "light"}, {"Dark", "dark"}]}
+      />
+  """
+  attr(:id, :any, default: nil)
+  attr(:name, :any)
+  attr(:label, :string, default: nil)
+  attr(:value, :any)
+
+  attr(:field, Phoenix.HTML.FormField,
+    doc: "a form field struct retrieved from the form, for example: @form[:appearance]"
+  )
+
+  attr(:errors, :list, default: [])
+
+  attr(:options, :list,
+    required: true,
+    doc: "the options to display, list of {label, value} tuples, maps, or strings"
+  )
+
+  attr(:hint, :string, default: nil)
+  attr(:disabled, :boolean, default: false)
+  attr(:class, :any, default: nil)
+  attr(:wrapper_class, :any, default: nil)
+  attr(:label_class, :any, default: nil)
+  attr(:rest, :global, include: ~w(form required))
+
+  def radio_group(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
+    errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
+
+    assigns
+    |> assign(field: nil, id: assigns.id || field.id)
+    |> assign(:errors, Enum.map(errors, &translate_error(&1)))
+    |> assign_new(:name, fn -> field.name end)
+    |> assign_new(:value, fn -> field.value end)
+    |> radio_group()
+  end
+
+  def radio_group(%{id: nil, name: name} = assigns) when is_binary(name) do
+    assigns |> assign(:id, name) |> radio_group()
+  end
+
+  def radio_group(assigns) do
+    assigns =
+      assigns
+      |> assign(:normalized_options, Enum.map(assigns.options, &normalize_choice/1))
+      |> assign(:selected, radio_value(assigns[:value]))
+
+    ~H"""
+    <fieldset
+      id={@id}
+      disabled={@disabled}
+      class={@wrapper_class || "mb-4"}
+      {@rest}
+    >
+      <legend :if={@label} class={["mb-1.5 text-sm font-medium text-ink", @label_class]}>
+        {@label}
+      </legend>
+      <div class="space-y-2">
+        <label
+          :for={{opt_label, opt_value} <- @normalized_options}
+          for={"#{@id}-#{opt_value}"}
+          class={[
+            "flex items-center gap-2 text-sm text-ink",
+            @disabled && "cursor-not-allowed opacity-50",
+            !@disabled && "cursor-pointer"
+          ]}
+        >
+          <input
+            type="radio"
+            id={"#{@id}-#{opt_value}"}
+            name={@name}
+            value={opt_value}
+            checked={opt_value == @selected}
+            disabled={@disabled}
+            class={
+              @class ||
+                "size-4 shrink-0 accent-action focus:outline-none focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed"
+            }
+          />
+          {opt_label}
+        </label>
+      </div>
+      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={msg <- @errors}>{msg}</.error>
+    </fieldset>
+    """
+  end
+
+  defp normalize_choice({label, value}), do: {to_string(label), to_string(value)}
+  defp normalize_choice([label, value]), do: {to_string(label), to_string(value)}
+  defp normalize_choice(%{label: label, value: value}), do: {to_string(label), to_string(value)}
+
+  defp normalize_choice(value) when is_binary(value) or is_atom(value) or is_integer(value),
+    do: {to_string(value), to_string(value)}
+
+  defp radio_value(nil), do: nil
+  defp radio_value(value), do: to_string(value)
+
+  @doc """
   Renders pagination controls matching Belimbing design parity.
 
   Follows Belimbing's pagination contract with single-page optimization:
@@ -1097,6 +1206,234 @@ defmodule Bilimbi.Base.UI.Components do
       <div :if={@actions != []} class="flex-none">{render_slot(@actions)}</div>
     </header>
     """
+  end
+
+  @doc """
+  Renders a compact sidebar-style navigation list.
+
+  Follows the application rail's orientation language: `text-link` by default,
+  lime `brand-strong` for the current page and its ancestors, `bg-surface` for
+  the active item, and `brand-surface` for pinned items. Lime marks
+  orientation, never status.
+
+  ## Examples
+
+      <.navigation id="example-nav" aria-label="Example menu">
+        <:item>Companies</:item>
+        <:item ancestor>System</:item>
+        <:item current nested>Design Library</:item>
+        <:item pinned>Pinned item</:item>
+        <:item disabled>Disabled</:item>
+      </.navigation>
+  """
+  attr(:id, :string, default: nil)
+  attr(:class, :any, default: nil)
+  attr(:rest, :global)
+
+  slot :item, required: true do
+    attr(:id, :string)
+    attr(:href, :string)
+    attr(:navigate, :string)
+    attr(:patch, :string)
+    attr(:current, :boolean)
+    attr(:ancestor, :boolean)
+    attr(:pinned, :boolean)
+    attr(:nested, :boolean)
+    attr(:disabled, :boolean)
+  end
+
+  def navigation(assigns) do
+    ~H"""
+    <nav
+      id={@id}
+      class={["rounded-lg bg-surface-sidebar p-2 text-[0.8125rem] leading-5 text-link", @class]}
+      {@rest}
+    >
+      <div class="space-y-0.5">
+        <.navigation_item :for={item <- @item} item={item} />
+      </div>
+    </nav>
+    """
+  end
+
+  attr(:item, :map, required: true)
+
+  defp navigation_item(assigns) do
+    item = assigns.item
+    disabled? = item[:disabled] == true
+    linked? = not disabled? and choice_linked?(item)
+
+    assigns =
+      assigns
+      |> assign(:disabled?, disabled?)
+      |> assign(:linked?, linked?)
+      |> assign(:item_class, navigation_item_class(item))
+
+    ~H"""
+    <.link
+      :if={@linked?}
+      href={@item[:href]}
+      navigate={@item[:navigate]}
+      patch={@item[:patch]}
+      id={@item[:id]}
+      class={@item_class}
+      aria-current={@item[:current] && "page"}
+    >
+      <.navigation_item_label item={@item} />
+    </.link>
+    <span
+      :if={not @linked?}
+      id={@item[:id]}
+      class={@item_class}
+      aria-current={@item[:current] && "page"}
+      aria-disabled={@disabled? && "true"}
+    >
+      <.navigation_item_label item={@item} />
+    </span>
+    """
+  end
+
+  attr(:item, :map, required: true)
+
+  defp navigation_item_label(assigns) do
+    ~H"""
+    <span
+      :if={@item[:ancestor]}
+      class="mr-0.5 inline-block w-3 shrink-0 select-none text-center text-[11px]"
+      aria-hidden="true"
+    >&#x2BC6;</span>
+    <span
+      :if={@item[:nested]}
+      class="mr-0.5 inline-block w-3 shrink-0 select-none text-center text-[11px]"
+      aria-hidden="true"
+    >&#8199;</span>
+    <span class="min-w-0 truncate">{render_slot(@item)}</span>
+    """
+  end
+
+  defp navigation_item_class(item) do
+    [
+      "flex min-w-0 items-center rounded-sm px-2 py-1 transition",
+      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
+      item[:pinned] == true && "mt-1",
+      navigation_item_state_class(item)
+    ]
+  end
+
+  defp navigation_item_state_class(item) do
+    cond do
+      item[:disabled] == true ->
+        "cursor-not-allowed text-ink-subtle opacity-50"
+
+      item[:current] == true ->
+        "bg-surface text-brand-strong"
+
+      item[:ancestor] == true ->
+        "text-brand-strong hover:bg-surface-muted"
+
+      item[:pinned] == true ->
+        "bg-brand-surface text-link hover:text-ink"
+
+      true ->
+        "text-link hover:bg-surface-muted hover:text-ink"
+    end
+  end
+
+  @doc """
+  Renders a compact tab strip for sibling views of the same page.
+
+  The selected tab uses the lime `brand-strong` underline. Unselected tabs stay
+  muted and darken on hover. Disabled tabs remain visible but cannot be
+  activated.
+
+  ## Examples
+
+      <.tabs id="example-tabs" aria-label="Example views">
+        <:tab href="#overview" current>Overview</:tab>
+        <:tab href="#history">History</:tab>
+        <:tab disabled>Settings</:tab>
+      </.tabs>
+  """
+  attr(:id, :string, required: true)
+  attr(:class, :any, default: nil)
+  attr(:rest, :global)
+
+  slot :tab, required: true do
+    attr(:id, :string)
+    attr(:href, :string)
+    attr(:navigate, :string)
+    attr(:patch, :string)
+    attr(:current, :boolean)
+    attr(:disabled, :boolean)
+    attr(:click, :string)
+    attr(:value, :string)
+  end
+
+  def tabs(assigns) do
+    ~H"""
+    <nav id={@id} class={["flex gap-1 border-b border-line", @class]} {@rest}>
+      <.tab_item :for={tab <- @tab} tab={tab} />
+    </nav>
+    """
+  end
+
+  attr(:tab, :map, required: true)
+
+  defp tab_item(assigns) do
+    tab = assigns.tab
+    disabled? = tab[:disabled] == true
+    linked? = not disabled? and choice_linked?(tab)
+
+    assigns =
+      assigns
+      |> assign(:disabled?, disabled?)
+      |> assign(:linked?, linked?)
+      |> assign(:tab_class, tab_class(tab))
+
+    ~H"""
+    <.link
+      :if={@linked?}
+      href={@tab[:href]}
+      navigate={@tab[:navigate]}
+      patch={@tab[:patch]}
+      id={@tab[:id]}
+      class={@tab_class}
+      aria-current={@tab[:current] && "page"}
+    >
+      {render_slot(@tab)}
+    </.link>
+    <button
+      :if={not @linked? and not @disabled?}
+      type="button"
+      id={@tab[:id]}
+      class={@tab_class}
+      aria-current={@tab[:current] && "page"}
+      phx-click={@tab[:click]}
+      phx-value-tab={@tab[:value]}
+    >
+      {render_slot(@tab)}
+    </button>
+    <span :if={@disabled?} id={@tab[:id]} class={@tab_class} aria-disabled="true">
+      {render_slot(@tab)}
+    </span>
+    """
+  end
+
+  defp tab_class(tab) do
+    current? = tab[:current] == true
+    disabled? = tab[:disabled] == true
+
+    [
+      "-mb-px border-b-2 px-3 py-2 text-sm transition",
+      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
+      current? && "border-brand-strong font-medium text-ink-strong",
+      (not current? and not disabled?) && "border-transparent text-ink-muted hover:text-ink",
+      disabled? && "cursor-not-allowed border-transparent text-ink-subtle opacity-50"
+    ]
+  end
+
+  defp choice_linked?(item) do
+    is_binary(item[:href]) or is_binary(item[:navigate]) or is_binary(item[:patch])
   end
 
   @doc """
