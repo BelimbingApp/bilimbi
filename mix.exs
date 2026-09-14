@@ -40,6 +40,7 @@ defmodule Bilimbi.Umbrella.MixProject do
   defp aliases do
     [
       setup: ["cmd mix setup", "bilimbi.migrate"],
+      "bilimbi.server": [&prepare_bilimbi_server/1, "bilimbi.server"],
       "ecto.setup": ["ecto.create -r Bilimbi.Base.Repo", "bilimbi.migrate"],
       "ecto.reset": ["ecto.drop -r Bilimbi.Base.Repo", "ecto.setup"],
       precommit: [
@@ -51,6 +52,11 @@ defmodule Bilimbi.Umbrella.MixProject do
       ],
       "precommit.test": &precommit_test/1
     ]
+  end
+
+  defp prepare_bilimbi_server(_args) do
+    Mix.shell().info("Checking and fetching locked dependencies before starting Bilimbi.")
+    Mix.Task.run("deps.get")
   end
 
   defp precommit_test(_args) do
