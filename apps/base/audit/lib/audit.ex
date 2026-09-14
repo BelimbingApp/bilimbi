@@ -8,12 +8,23 @@ defmodule Bilimbi.Base.Audit do
   are caller-assigned because rows outlive their subjects and have no foreign
   keys. Listing is tenant-scoped: a scope is required, and null-tenant rows
   are invisible to every tenant.
+
+  ## Impersonation
+
+  `actor_id` always names the account an action was performed as. When an
+  operator acts while impersonating another user, `impersonator_id` names the
+  operator, on both mutations and actions. Captured mutations take it from
+  the per-process `Bilimbi.Base.Audit.Context`; explicit `record_mutation/2`
+  and `record_action/2` calls inherit it from that same context unless the
+  attributes carry an `impersonator_id` key themselves (an explicit nil
+  records the actor acting as themselves).
   """
 
   import Ecto.Query
 
   alias Bilimbi.Base.Audit.Action
   alias Bilimbi.Base.Audit.ActionSchema
+  alias Bilimbi.Base.Audit.Context
   alias Bilimbi.Base.Audit.Mutation
   alias Bilimbi.Base.Audit.MutationSchema
   alias Bilimbi.Base.Audit.Page
@@ -41,21 +52,43 @@ defmodule Bilimbi.Base.Audit do
   @spec record_mutation(Scope.t() | :unscoped, map()) ::
           {:ok, Mutation.t()} | {:error, Ecto.Changeset.t()}
   def record_mutation(%Scope{} = scope, attributes) when is_map(attributes) do
-    persist_mutation(attributes, Scope.tenant_id(scope))
+    persist_mutation(with_context_impersonator(attributes), Scope.tenant_id(scope))
   end
 
   def record_mutation(:unscoped, attributes) when is_map(attributes) do
-    persist_mutation(attributes, nil)
+    persist_mutation(with_context_impersonator(attributes), nil)
   end
 
   @spec record_action(Scope.t() | :unscoped, map()) ::
           {:ok, Action.t()} | {:error, Ecto.Changeset.t()}
   def record_action(%Scope{} = scope, attributes) when is_map(attributes) do
-    persist_action(attributes, Scope.tenant_id(scope))
+    persist_action(with_context_impersonator(attributes), Scope.tenant_id(scope))
   end
 
   def record_action(:unscoped, attributes) when is_map(attributes) do
-    persist_action(attributes, nil)
+    persist_action(with_context_impersonator(attributes), nil)
+  end
+
+  # The impersonator is a property of the session, not of the caller's actor
+  # knowledge: a domain module recording an explicit row knows who it acts
+  # as, not who is behind the session. The process context does. A caller
+  # that names the key (even as nil) is believed; an absent key inherits.
+  # The key follows the attributes' own key style so a string-keyed map
+  # never reaches `cast/3` mixed.
+  defp with_context_impersonator(attributes) do
+    cond do
+      Map.has_key?(attributes, :impersonator_id) or Map.has_key?(attributes, "impersonator_id") ->
+        attributes
+
+      is_nil(Context.get().impersonator_id) ->
+        attributes
+
+      Enum.any?(Map.keys(attributes), &is_binary/1) ->
+        Map.put(attributes, "impersonator_id", Context.get().impersonator_id)
+
+      true ->
+        Map.put(attributes, :impersonator_id, Context.get().impersonator_id)
+    end
   end
 
   @doc "Lists all mutations for the scope without pagination."

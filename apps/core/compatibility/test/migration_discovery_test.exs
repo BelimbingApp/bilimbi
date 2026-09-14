@@ -74,7 +74,8 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Core.Geonames.Migrations.CreatePostcodeOverrides,
              Bilimbi.Base.Schedule.Migrations.CreateOccurrenceRuntime,
              Bilimbi.Base.Perf.Migrations.CreateSamples,
-             Bilimbi.Core.User.Migrations.AddUserAccountForeignKeyIndexes
+             Bilimbi.Core.User.Migrations.AddUserAccountForeignKeyIndexes,
+             Bilimbi.Base.Audit.Migrations.AddImpersonatorToAuditRows
            ]
 
     assert Enum.map(entries, &elem(&1, 2)) == [
@@ -90,6 +91,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              :compatible_baseline,
              :compatible_baseline,
              :compatible_baseline,
+             :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,

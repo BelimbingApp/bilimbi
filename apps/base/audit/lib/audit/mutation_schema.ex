@@ -6,7 +6,7 @@ defmodule Bilimbi.Base.Audit.MutationSchema do
   import Ecto.Changeset
 
   @actor_types ~w(user agent guest console scheduler queue)
-  @assigned [:company_id, :actor_type, :actor_id]
+  @assigned [:company_id, :actor_type, :actor_id, :impersonator_id]
   @cast_fields [
     :actor_role,
     :ip_address,
@@ -42,6 +42,7 @@ defmodule Bilimbi.Base.Audit.MutationSchema do
     field :actor_type, :string
     field :actor_id, :id
     field :actor_role, :string
+    field :impersonator_id, :id
     field :ip_address, Bilimbi.Base.Audit.Inet
     field :url, :string
     field :user_agent, :string
@@ -72,6 +73,7 @@ defmodule Bilimbi.Base.Audit.MutationSchema do
     |> validate_inclusion(:actor_type, @actor_types)
     |> validate_length(:actor_type, max: 40)
     |> validate_length(:actor_role, max: 100)
+    |> validate_number(:impersonator_id, greater_than: 0)
     |> validate_length(:user_agent, max: 80)
     |> validate_length(:auditable_type, max: 255)
     |> validate_length(:auditable_id, max: 128)
@@ -83,7 +85,7 @@ defmodule Bilimbi.Base.Audit.MutationSchema do
     |> validate_length(:trace_id, max: 12)
   end
 
-  # Company and actor identity arrive from the recording caller, never from a form cast.
+  # Company, actor, and impersonator identity arrive from the recording caller, never from a form cast.
   # Tenant identity is supplied by the public API from a Scope or :unscoped, never the map.
   defp put_assigned(changeset, attributes) do
     Enum.reduce(@assigned, changeset, fn field, acc ->

@@ -3,10 +3,12 @@ defmodule Bilimbi.Base.AuditTest do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Audit.Action
+  alias Bilimbi.Base.Audit.Context
   alias Bilimbi.Base.Audit.Mutation
   alias Bilimbi.Base.Audit.SchemaContract
   alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.Tenancy
+  alias Ecto.Adapters.SQL
 
   import Bilimbi.Base.Audit.TestFixtures
   import Bilimbi.Base.Tenancy.TestFixtures
@@ -20,6 +22,20 @@ defmodule Bilimbi.Base.AuditTest do
   test "verifies both table contracts against the compatible temporary tables" do
     assert :ok =
              SchemaVerifier.verify(Repo, SchemaContract.tables(), prefix: temporary_schema!())
+  end
+
+  test "the impersonation contribution is all-or-nothing: a column without its index is drift" do
+    prefix = temporary_schema!()
+
+    SQL.query!(
+      Repo,
+      "DROP INDEX \"#{prefix}\".base_audit_actions_impersonator_id_index",
+      []
+    )
+
+    assert {:error, errors} = SchemaVerifier.verify(Repo, SchemaContract.tables(), prefix: prefix)
+
+    assert "base_audit_actions: incomplete optional contribution base/audit impersonation operator" in errors
   end
 
   test "records a mutation with jsonb payloads, inet, and an unscoped tenant" do
@@ -170,6 +186,65 @@ defmodule Bilimbi.Base.AuditTest do
              )
 
     assert Enum.map(entries, & &1.id) == [newer.id, older.id]
+  end
+
+  describe "impersonation" do
+    setup do
+      on_exit(fn -> Context.put(nil) end)
+      :ok
+    end
+
+    test "records the impersonator on mutations and actions and reads it back" do
+      insert_tenant!(%{id: 41})
+      {:ok, scope} = Tenancy.scope(41)
+
+      assert {:ok, %Mutation{actor_id: 92, impersonator_id: 91}} =
+               Audit.record_mutation(scope, mutation_attrs(%{actor_id: 92, impersonator_id: 91}))
+
+      assert {:ok, %Action{actor_id: 92, impersonator_id: 91}} =
+               Audit.record_action(scope, action_attrs(%{actor_id: 92, impersonator_id: 91}))
+
+      assert {:ok, [%Mutation{impersonator_id: 91}]} = Audit.list_mutations(scope)
+      assert {:ok, [%Action{impersonator_id: 91}]} = Audit.list_actions(scope)
+    end
+
+    test "explicit records inherit the impersonator from the process context" do
+      Context.put(%Context{actor_type: "user", actor_id: 92, impersonator_id: 91})
+
+      assert {:ok, %Mutation{impersonator_id: 91}} =
+               Audit.record_mutation(:unscoped, mutation_attrs(%{actor_id: 92}))
+
+      assert {:ok, %Action{impersonator_id: 91}} =
+               Audit.record_action(:unscoped, action_attrs(%{actor_id: 92}))
+
+      # String-keyed attributes inherit through a string key so cast stays unmixed.
+      string_attrs =
+        Map.new(action_attrs(%{actor_id: 92}), fn {key, value} -> {Atom.to_string(key), value} end)
+
+      assert {:ok, %Action{impersonator_id: 91}} = Audit.record_action(:unscoped, string_attrs)
+    end
+
+    test "a caller that names the key is believed over the process context" do
+      Context.put(%Context{actor_type: "user", actor_id: 92, impersonator_id: 91})
+
+      assert {:ok, %Action{impersonator_id: nil}} =
+               Audit.record_action(:unscoped, action_attrs(%{impersonator_id: nil}))
+
+      assert {:ok, %Mutation{impersonator_id: 7}} =
+               Audit.record_mutation(:unscoped, mutation_attrs(%{impersonator_id: 7}))
+    end
+
+    test "no context means no impersonator" do
+      assert {:ok, %Action{impersonator_id: nil}} =
+               Audit.record_action(:unscoped, action_attrs(%{}))
+    end
+
+    test "rejects a non-positive impersonator" do
+      assert {:error, changeset} =
+               Audit.record_action(:unscoped, action_attrs(%{impersonator_id: 0}))
+
+      assert %{impersonator_id: ["must be greater than 0"]} = errors_on(changeset)
+    end
   end
 
   test "rejects unknown actor_type, missing required fields, and explicit nil defaults" do

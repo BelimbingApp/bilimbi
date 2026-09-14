@@ -28,8 +28,19 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
         old_values jsonb,
         new_values jsonb,
         trace_id varchar(12),
-        occurred_at timestamp(0) without time zone NOT NULL
+        occurred_at timestamp(0) without time zone NOT NULL,
+        impersonator_id bigint
       ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      """
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_impersonator_id_index
+        ON base_audit_mutations (impersonator_id)
+        WHERE impersonator_id IS NOT NULL
       """,
       []
     )
@@ -169,8 +180,19 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
         payload jsonb,
         trace_id varchar(12),
         is_retained boolean NOT NULL DEFAULT false,
-        occurred_at timestamp(0) without time zone NOT NULL
+        occurred_at timestamp(0) without time zone NOT NULL,
+        impersonator_id bigint
       ) ON COMMIT PRESERVE ROWS
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      """
+      CREATE INDEX IF NOT EXISTS base_audit_actions_impersonator_id_index
+        ON base_audit_actions (impersonator_id)
+        WHERE impersonator_id IS NOT NULL
       """,
       []
     )

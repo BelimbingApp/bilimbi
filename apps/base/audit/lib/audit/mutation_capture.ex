@@ -7,7 +7,8 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
   successful struct write; this module owns the policy:
 
     * actor columns come from the per-process `Audit.Context`, guest/0 when
-      absent — the source's `PrincipalType::GUEST` default;
+      absent — the source's `PrincipalType::GUEST` default — and so does
+      `impersonator_id`, the operator behind an impersonated session;
     * `tenant_id` prefers the mutated row's own `tenant_id` attribute over
       the context — the row is ground truth, as in the source;
     * updates record changed fields only, with their originals; creates
@@ -56,6 +57,7 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
             actor_type: context.actor_type,
             actor_id: context.actor_id,
             actor_role: context.actor_role,
+            impersonator_id: context.impersonator_id,
             ip_address: context.ip_address,
             url: context.url,
             user_agent: bounded(context.user_agent, 80),
