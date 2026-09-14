@@ -30,8 +30,8 @@ defmodule Bilimbi.Core.User.Web.SettingsComponents do
               navigate={~p"/settings/profile"}
               class={[
                 "rounded-lg px-4 py-2 text-sm transition-colors",
-                @current_page == :profile && "bg-surface-subtle font-medium text-action",
-                @current_page != :profile && "text-muted hover:bg-surface-subtle hover:text-ink"
+                @current_page == :profile && "bg-surface-muted font-medium text-action",
+                @current_page != :profile && "text-muted hover:bg-surface-muted hover:text-ink"
               ]}
             >
               Profile
@@ -41,8 +41,8 @@ defmodule Bilimbi.Core.User.Web.SettingsComponents do
               navigate={~p"/settings/password"}
               class={[
                 "rounded-lg px-4 py-2 text-sm transition-colors",
-                @current_page == :password && "bg-surface-subtle font-medium text-action",
-                @current_page != :password && "text-muted hover:bg-surface-subtle hover:text-ink"
+                @current_page == :password && "bg-surface-muted font-medium text-action",
+                @current_page != :password && "text-muted hover:bg-surface-muted hover:text-ink"
               ]}
             >
               Password
@@ -52,8 +52,8 @@ defmodule Bilimbi.Core.User.Web.SettingsComponents do
               navigate={~p"/settings/appearance"}
               class={[
                 "rounded-lg px-4 py-2 text-sm transition-colors",
-                @current_page == :appearance && "bg-surface-subtle font-medium text-action",
-                @current_page != :appearance && "text-muted hover:bg-surface-subtle hover:text-ink"
+                @current_page == :appearance && "bg-surface-muted font-medium text-action",
+                @current_page != :appearance && "text-muted hover:bg-surface-muted hover:text-ink"
               ]}
             >
               Appearance

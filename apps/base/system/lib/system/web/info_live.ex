@@ -36,7 +36,7 @@ defmodule Bilimbi.Base.System.Web.InfoLive do
   """
   def fact_list(assigns) do
     ~H"""
-    <dl id={"system-info-#{@id}-facts"} class="divide-y divide-line-subtle text-sm">
+    <dl id={"system-info-#{@id}-facts"} class="divide-y divide-low-contrast-line text-sm">
       <div
         :for={fact <- @facts}
         id={"system-info-#{@id}-#{slug(fact.label)}"}

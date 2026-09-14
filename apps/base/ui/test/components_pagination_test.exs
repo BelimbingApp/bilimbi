@@ -45,7 +45,7 @@ defmodule Bilimbi.Base.UI.ComponentsPaginationTest do
     assert html =~
              ~s(id="test-pagination-page-2" type="button" phx-click="page" phx-value-page="2" aria-current="page")
 
-    assert html =~ "border-brand-line bg-brand-surface text-brand-ink"
+    assert html =~ "border-selection-line bg-brand-surface text-brand-ink"
   end
 
   test "disables previous button on first page" do

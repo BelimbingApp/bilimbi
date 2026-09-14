@@ -50,14 +50,14 @@
   /* Surfaces — a warm operational base. */
   --color-canvas: var(--color-stone-50);
   --color-surface: var(--color-white);
-  --color-surface-sunken: #eaebe4;
+  --color-surface-sunken: var(--color-stone-200);
   --color-surface-muted: var(--color-stone-100);
   --color-surface-sidebar: var(--color-stone-100);
 
   /* Structure. */
-  --color-line: var(--color-stone-200);
-  --color-line-subtle: var(--color-stone-100);
-  --color-line-strong: var(--color-stone-300);
+  --color-high-contrast-line: color-mix(in srgb, var(--color-ink) 20%, transparent);
+  --color-line: color-mix(in srgb, var(--color-ink) 12%, transparent);
+  --color-low-contrast-line: color-mix(in srgb, var(--color-ink) 6%, transparent);
 
   /* Text, strongest first. */
   --color-ink-strong: var(--color-stone-950);
@@ -66,23 +66,25 @@
   --color-ink-subtle: var(--color-stone-500);
   --color-ink-faint: var(--color-stone-400);
   --color-ink-inverse: var(--color-white);
-  --color-link: #544c43;
-  --color-muted: #6b6057;
+  --color-link: var(--color-stone-700);
+  --color-muted: var(--color-stone-600);
 
   /* Primary action — confident and quiet. Operational software, not a CTA. */
-  --color-action: #2c3801;
+  --color-action: var(--color-lime-950);
+  --color-primary-line: var(--color-action);
   --color-action-hover: var(--color-brand-strong);
-  --color-action-ink: #f5fcdc;
+  --color-action-ink: var(--color-lime-50);
 
   /* Product identity. Never used for status: a color that also means "good"
    * cannot report anything. */
   --color-brand: var(--color-lime-300);
-  --color-brand-surface: #f3f5e8;
-  --color-brand-line: var(--color-lime-300);
+  --color-brand-surface: var(--color-lime-50);
+  --color-brand-line: var(--color-brand);
   --color-brand-strong: var(--color-lime-600);
-  --color-brand-hover: var(--color-lime-700);
   --color-brand-ink: var(--color-lime-950);
-  --color-brand-action-ink: var(--color-yellow-100);
+
+  /* Selection — current place or choice. */
+  --color-selection-line: var(--color-lime-300);
 
   /* Status — honest feedback only. */
   --color-success: var(--color-emerald-600);
@@ -114,88 +116,88 @@
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --color-canvas: #0c0a09;
-    --color-surface: #1c1917;
-    --color-surface-sunken: #24221c;
-    --color-surface-muted: #292524;
-    --color-surface-sidebar: #171412;
-    --color-line: #292524;
-    --color-line-subtle: #211e1b;
-    --color-line-strong: #44403c;
-    --color-ink-strong: #fafaf9;
-    --color-ink: #f5f5f4;
-    --color-ink-muted: #a8a29e;
-    --color-ink-subtle: #79716b;
-    --color-ink-faint: #57534e;
-    --color-ink-inverse: #0c0a09;
-    --color-link: #b3a89d;
-    --color-muted: #948a80;
-    --color-action: #97b83b;
-    --color-action-hover: #84cc16;
-    --color-action-ink: #141a00;
-    --color-brand: #a3e635;
-    --color-brand-surface: #232a14;
-    --color-brand-line: #3f6212;
-    --color-brand-strong: #84cc16;
-    --color-brand-hover: #a3e635;
-    --color-brand-ink: #ecfccb;
-    --color-brand-action-ink: #fef9c3;
-    --color-success: #10b981;
-    --color-success-surface: #052e22;
-    --color-success-line: #065f46;
-    --color-success-ink: #a7f3d0;
-    --color-warning: #fbbf24;
-    --color-warning-surface: #422006;
-    --color-warning-line: #b45309;
-    --color-warning-ink: #fde68a;
-    --color-danger: #ef4444;
-    --color-danger-hover: #f87171;
-    --color-danger-surface: #450a0a;
-    --color-danger-line: #991b1b;
-    --color-danger-ink: #fecaca;
+    --color-canvas: var(--color-stone-950);
+    --color-surface: var(--color-stone-900);
+    --color-surface-sunken: color-mix(in srgb, var(--color-stone-800) 70%, var(--color-stone-900));
+    --color-surface-muted: var(--color-stone-800);
+    --color-surface-sidebar: color-mix(in srgb, var(--color-stone-900) 70%, var(--color-stone-950));
+    --color-high-contrast-line: color-mix(in srgb, var(--color-ink) 20%, transparent);
+    --color-line: color-mix(in srgb, var(--color-ink) 12%, transparent);
+    --color-low-contrast-line: color-mix(in srgb, var(--color-ink) 6%, transparent);
+    --color-ink-strong: var(--color-stone-50);
+    --color-ink: var(--color-stone-100);
+    --color-ink-muted: var(--color-stone-400);
+    --color-ink-subtle: var(--color-stone-500);
+    --color-ink-faint: var(--color-stone-600);
+    --color-ink-inverse: var(--color-stone-950);
+    --color-link: var(--color-stone-300);
+    --color-muted: var(--color-stone-400);
+    --color-action: var(--color-lime-600);
+    --color-primary-line: var(--color-action);
+    --color-action-hover: var(--color-lime-500);
+    --color-action-ink: var(--color-lime-950);
+    --color-brand: var(--color-lime-400);
+    --color-brand-surface: var(--color-lime-950);
+    --color-brand-line: var(--color-brand);
+    --color-brand-strong: var(--color-lime-500);
+    --color-brand-ink: var(--color-lime-100);
+    --color-selection-line: var(--color-lime-800);
+    --color-success: var(--color-emerald-500);
+    --color-success-surface: var(--color-emerald-950);
+    --color-success-line: var(--color-emerald-800);
+    --color-success-ink: var(--color-emerald-200);
+    --color-warning: var(--color-amber-400);
+    --color-warning-surface: var(--color-amber-950);
+    --color-warning-line: var(--color-amber-700);
+    --color-warning-ink: var(--color-amber-200);
+    --color-danger: var(--color-red-500);
+    --color-danger-hover: var(--color-red-400);
+    --color-danger-surface: var(--color-red-950);
+    --color-danger-line: var(--color-red-800);
+    --color-danger-ink: var(--color-red-200);
   }
 }
 
 :root[data-theme='dark'] {
-  --color-canvas: #0c0a09;
-  --color-surface: #1c1917;
-  --color-surface-sunken: #24221c;
-  --color-surface-muted: #292524;
-  --color-surface-sidebar: #171412;
-  --color-line: #292524;
-  --color-line-subtle: #211e1b;
-  --color-line-strong: #44403c;
-  --color-ink-strong: #fafaf9;
-  --color-ink: #f5f5f4;
-  --color-ink-muted: #a8a29e;
-  --color-ink-subtle: #79716b;
-  --color-ink-faint: #57534e;
-  --color-ink-inverse: #0c0a09;
-  --color-link: #b3a89d;
-  --color-muted: #948a80;
-  --color-action: #97b83b;
-  --color-action-hover: #84cc16;
-  --color-action-ink: #141a00;
-  --color-brand: #a3e635;
-  --color-brand-surface: #232a14;
-  --color-brand-line: #3f6212;
-  --color-brand-strong: #84cc16;
-  --color-brand-hover: #a3e635;
-  --color-brand-ink: #ecfccb;
-  --color-brand-action-ink: #fef9c3;
-  --color-success: #10b981;
-  --color-success-surface: #052e22;
-  --color-success-line: #065f46;
-  --color-success-ink: #a7f3d0;
-  --color-warning: #fbbf24;
-  --color-warning-surface: #422006;
-  --color-warning-line: #b45309;
-  --color-warning-ink: #fde68a;
-  --color-danger: #ef4444;
-  --color-danger-hover: #f87171;
-  --color-danger-surface: #450a0a;
-  --color-danger-line: #991b1b;
-  --color-danger-ink: #fecaca;
+  --color-canvas: var(--color-stone-950);
+  --color-surface: var(--color-stone-900);
+  --color-surface-sunken: color-mix(in srgb, var(--color-stone-800) 70%, var(--color-stone-900));
+  --color-surface-muted: var(--color-stone-800);
+  --color-surface-sidebar: color-mix(in srgb, var(--color-stone-900) 70%, var(--color-stone-950));
+  --color-high-contrast-line: color-mix(in srgb, var(--color-ink) 20%, transparent);
+  --color-line: color-mix(in srgb, var(--color-ink) 12%, transparent);
+  --color-low-contrast-line: color-mix(in srgb, var(--color-ink) 6%, transparent);
+  --color-ink-strong: var(--color-stone-50);
+  --color-ink: var(--color-stone-100);
+  --color-ink-muted: var(--color-stone-400);
+  --color-ink-subtle: var(--color-stone-500);
+  --color-ink-faint: var(--color-stone-600);
+  --color-ink-inverse: var(--color-stone-950);
+  --color-link: var(--color-stone-300);
+  --color-muted: var(--color-stone-400);
+  --color-action: var(--color-lime-600);
+  --color-primary-line: var(--color-action);
+  --color-action-hover: var(--color-lime-500);
+  --color-action-ink: var(--color-lime-950);
+  --color-brand: var(--color-lime-400);
+  --color-brand-surface: var(--color-lime-950);
+  --color-brand-line: var(--color-brand);
+  --color-brand-strong: var(--color-lime-500);
+  --color-brand-ink: var(--color-lime-100);
+  --color-selection-line: var(--color-lime-800);
+  --color-success: var(--color-emerald-500);
+  --color-success-surface: var(--color-emerald-950);
+  --color-success-line: var(--color-emerald-800);
+  --color-success-ink: var(--color-emerald-200);
+  --color-warning: var(--color-amber-400);
+  --color-warning-surface: var(--color-amber-950);
+  --color-warning-line: var(--color-amber-700);
+  --color-warning-ink: var(--color-amber-200);
+  --color-danger: var(--color-red-500);
+  --color-danger-hover: var(--color-red-400);
+  --color-danger-surface: var(--color-red-950);
+  --color-danger-line: var(--color-red-800);
+  --color-danger-ink: var(--color-red-200);
 }
 
 @custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);

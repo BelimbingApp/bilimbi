@@ -71,7 +71,7 @@ defmodule Bilimbi.Core.User.Web.CompanyUsersPanel do
         for={@filters_form}
         id="company-users-filters"
         phx-change="users_filters"
-        class="p-2 mb-2 rounded-xl border border-line bg-surface-muted"
+        class="mb-2"
       >
         <div class="relative">
           <.icon
@@ -88,7 +88,7 @@ defmodule Bilimbi.Core.User.Web.CompanyUsersPanel do
             label_class="sr-only"
             wrapper_class="mb-0"
             placeholder="Search by name or email..."
-            class="rounded-lg pl-8"
+            class="block w-full rounded-md border border-high-contrast-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-ink-subtle"
           />
         </div>
       </.form>

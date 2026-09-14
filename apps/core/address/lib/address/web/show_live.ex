@@ -805,7 +805,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                   <dd class="mt-1">
                     <pre
                       id="address-view-raw-input"
-                      class="overflow-x-auto rounded-xl border border-line bg-surface-subtle p-3 font-mono text-xs text-ink"
+                      class="overflow-x-auto rounded-xl border border-line bg-surface-muted p-3 font-mono text-xs text-ink"
                     >{@address.raw_input}</pre>
                   </dd>
                 </div>

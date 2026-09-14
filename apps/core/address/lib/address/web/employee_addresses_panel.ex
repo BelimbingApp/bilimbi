@@ -728,7 +728,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                 <select
                   id="employee-attach-address"
                   name="address[address_id]"
-                  class="w-full rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                  class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                 >
                   <option value="">Select an address...</option>
 
@@ -794,7 +794,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                   name="address[priority]"
                   value="0"
                   min="0"
-                  class="w-24 rounded-lg border border-line bg-surface px-3 py-2 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                  class="w-24 rounded-md border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                 />
                 <p class="text-xs text-ink-subtle mt-1">
                   Lower number = higher priority. Used to order addresses of the same kind (0 = top).
