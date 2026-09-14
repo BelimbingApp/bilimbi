@@ -47,48 +47,63 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
     current_scope = socket.assigns.current_scope
     preferences = current_scope.shell_preferences
 
-    refused =
+    attempted =
       [
-        {"Theme",
-         DisplayPreferences.save(
-           current_scope,
-           "theme",
-           Map.get(appearance, "theme", preferences.theme)
-         )},
-        {"Time zone display",
-         DisplayPreferences.save(
-           current_scope,
-           "timezone",
-           Map.get(appearance, "timezone_mode", to_string(preferences.mode))
-         )},
-        {"Language",
-         save_locale(current_scope, Map.get(appearance, "locale", socket.assigns.locale))}
+        {"Theme", "theme", Map.get(appearance, "theme", preferences.theme), preferences.theme},
+        {"Time zone display", "timezone",
+         Map.get(appearance, "timezone_mode", to_string(preferences.mode)),
+         to_string(preferences.mode)},
+        {"Language", "locale", Map.get(appearance, "locale", socket.assigns.locale),
+         socket.assigns.locale}
       ]
-      |> Enum.filter(&match?({_field, {:error, _reason}}, &1))
+      |> Enum.reject(fn {_field, _kind, submitted, stored} -> submitted == stored end)
+      |> Enum.map(fn {field, kind, submitted, _stored} ->
+        {field, write_field(current_scope, kind, submitted)}
+      end)
 
     {:noreply,
      socket
      |> assign(:current_scope, DisplayPreferences.refresh(current_scope))
      |> assign(:locale, stored_locale(locale_scope(current_scope)))
-     |> report(refused)}
+     |> report(attempted)}
   end
 
   def handle_event("save", _params, socket) do
     {:noreply, socket}
   end
 
-  defp report(socket, []), do: put_flash(socket, :info, "Appearance settings saved.")
+  defp write_field(current_scope, "locale", locale), do: save_locale(current_scope, locale)
 
-  defp report(socket, refused) do
-    message =
-      refused
-      |> Enum.group_by(fn {_field, {:error, reason}} -> reason end, &elem(&1, 0))
-      |> Enum.map_join(" ", fn {reason, fields} ->
-        "Not saved — #{Enum.join(fields, ", ")}. #{refusal(reason)}"
-      end)
+  defp write_field(current_scope, "theme", theme),
+    do: DisplayPreferences.save(current_scope, "theme", theme)
 
-    put_flash(socket, :error, message)
+  defp write_field(current_scope, "timezone", mode),
+    do: DisplayPreferences.save(current_scope, "timezone", mode)
+
+  defp report(socket, []), do: socket
+
+  defp report(socket, attempted) do
+    {saved, refused} = Enum.split_with(attempted, &match?({_field, :ok}, &1))
+
+    case refused do
+      [] ->
+        put_flash(socket, :info, "Appearance settings saved.")
+
+      refused ->
+        put_flash(socket, :error, Enum.join(saved_note(saved) ++ refusal_notes(refused), " "))
+    end
   end
+
+  defp saved_note([]), do: []
+  defp saved_note(saved), do: ["Saved — #{names(saved)}."]
+
+  defp refusal_notes(refused) do
+    refused
+    |> Enum.group_by(fn {_field, {:error, reason}} -> reason end)
+    |> Enum.map(fn {reason, fields} -> "Not saved — #{names(fields)}. #{refusal(reason)}" end)
+  end
+
+  defp names(entries), do: Enum.map_join(entries, ", ", &elem(&1, 0))
 
   defp refusal(:impersonating),
     do: "Display preferences belong to the account you are viewing."

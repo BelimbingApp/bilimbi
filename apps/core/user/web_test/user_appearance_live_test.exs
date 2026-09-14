@@ -177,7 +177,12 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     })
 
     refute Locale.overridden?(locale_scope)
-    assert has_element?(view, "#flash-group", "Not saved — Language. Choose a supported value.")
+
+    assert has_element?(
+             view,
+             "#flash-group",
+             "Saved — Theme. Not saved — Language. Choose a supported value."
+           )
 
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
     assert {:ok, "dark"} = User.get_user_preference(scope, 73, 91, "ui.theme")
@@ -247,7 +252,7 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     assert has_element?(
              view,
              "#flash-group",
-             "Not saved — Theme, Time zone display. Display preferences belong to the account you are viewing."
+             "Saved — Language. Not saved — Theme. Display preferences belong to the account you are viewing."
            )
 
     locale_scope = SettingsScope.user(91, 73, 41)

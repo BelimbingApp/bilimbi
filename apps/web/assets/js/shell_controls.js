@@ -1,12 +1,16 @@
 // Shared shell disclosures. Authorization, preference writes and every
 // rendered preference state stay at the authenticated LiveView edge; the
-// browser owns theme projection, focus and in-flight feedback.
+// browser owns theme projection, disclosure state, focus and in-flight
+// feedback, and re-applies its own state after each server patch.
 export default class ShellControls {
   constructor(hook) {
     this.hook = hook
     this.root = hook.el
     this.pending = false
     this.online = true
+    this.openPanelId = null
+    this.message = null
+    this.messageError = false
     this.onClick = event => this.click(event)
     this.onKey = event => this.key(event)
     document.addEventListener("click", this.onClick)
@@ -21,22 +25,23 @@ export default class ShellControls {
   }
 
   panels() { return [...this.root.querySelectorAll("[data-account-panel], [data-timezone-panel]")] }
+  openPanel() { return this.panels().find(panel => panel.id === this.openPanelId) || null }
   trigger(panel) { return this.root.querySelector(`[aria-controls="${panel.id}"]`) }
   close(panel, restore = false) {
-    panel.hidden = true
-    this.trigger(panel)?.setAttribute("aria-expanded", "false")
+    if (this.openPanelId === panel.id) this.openPanelId = null
+    this.apply()
     if (restore) this.trigger(panel)?.focus()
   }
   closeAll(restore = false) {
-    for (const panel of this.panels()) if (!panel.hidden) this.close(panel, restore)
+    const open = this.openPanel()
+    if (open) this.close(open, restore)
   }
   toggle(button) {
     const panel = document.getElementById(button.getAttribute("aria-controls"))
-    const open = panel.hidden
-    this.closeAll()
-    panel.hidden = !open
-    button.setAttribute("aria-expanded", String(open))
-    if (open) panel.querySelector("a[href], button:not([disabled])")?.focus()
+    const opening = this.openPanelId !== panel.id
+    this.openPanelId = opening ? panel.id : null
+    this.apply()
+    if (opening) panel.querySelector("a[href], button:not([disabled])")?.focus()
   }
   click(event) {
     const button = event.target.closest("button")
@@ -50,12 +55,11 @@ export default class ShellControls {
         return
       }
     }
-    for (const panel of this.panels()) {
-      if (!panel.hidden && !panel.contains(event.target)) this.close(panel)
-    }
+    const open = this.openPanel()
+    if (open && !open.contains(event.target)) this.close(open)
   }
   key(event) {
-    const panel = this.panels().find(panel => !panel.hidden)
+    const panel = this.openPanel()
     if (!panel) return
     if (event.key === "Escape") {
       event.preventDefault()
@@ -69,11 +73,9 @@ export default class ShellControls {
     }
   }
   feedback(message, error = false) {
-    const region = this.root.querySelector("#app-preference-feedback")
-    if (!region) return
-    region.hidden = false
-    region.textContent = message
-    region.classList.toggle("text-danger", error)
+    this.message = message
+    this.messageError = error
+    this.apply()
   }
   connection(online) {
     this.online = online
@@ -86,10 +88,9 @@ export default class ShellControls {
   }
   save(kind, value, origin) {
     if (this.pending || !this.online) return
-    const open = this.panels().find(panel => !panel.hidden)
-    const restore = (open && this.trigger(open)) || origin
+    const open = this.openPanel()
+    const restore = (open && open.contains(origin) && this.trigger(open)) || origin
     this.pending = true
-    this.apply()
     this.feedback("Saving display preference…")
     this.timer = setTimeout(() => {
       this.feedback("Save could not be confirmed. Reconnect or reload to check your saved preference.", true)
@@ -103,7 +104,6 @@ export default class ShellControls {
       } else {
         this.feedback("Could not save display preference. Your previous choice is still selected. Try again.", true)
       }
-      this.apply()
       restore?.focus()
     })
   }
@@ -113,6 +113,17 @@ export default class ShellControls {
     else document.documentElement.dataset.theme = theme
     for (const button of this.root.querySelectorAll("[data-preference-kind]")) {
       button.disabled = this.pending || !this.online
+    }
+    for (const panel of this.panels()) {
+      const open = panel.id === this.openPanelId
+      panel.hidden = !open
+      this.trigger(panel)?.setAttribute("aria-expanded", String(open))
+    }
+    const region = this.root.querySelector("#app-preference-feedback")
+    if (region && this.message !== null) {
+      region.hidden = false
+      region.textContent = this.message
+      region.classList.toggle("text-danger", this.messageError)
     }
   }
 }
