@@ -1,8 +1,8 @@
 # Base UI Design Parity
 
-**Status:** Authorized; foundation closeout in PR #696, parity implementation next
+**Status:** In progress — application shell slice, Issue #710
 **Last Updated:** 2026-09-14
-**Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; draft PR #696; `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
+**Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
 **Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra` (autonomous design steward)
 
 ## Problem Essence
@@ -19,9 +19,9 @@ The campaign is structured so audits and production adoption can run in parallel
 
 ## Current Baseline
 
-PR #696 integrates `main` through `d93feb1`, including #694's status-first company actions and 24px icon hit targets. Its accepted decisions retain compact `rounded-md` fields, brand focus, open filter toolbars and calm destructive actions. Inline icon controls retain their small glyphs within 24px targets; table and toolbar controls remain 28px. Pagination uses content-sized `w-auto`, `h-7`, `pl-2 pr-6` geometry so three-digit options clear the dropdown arrow, preserving the intentional #304 correction in both root guidance and `DESIGN.md`.
+The foundation at https://github.com/BelimbingApp/bilimbi/pull/696 merged on 2026-09-14 at 07:02:16 UTC with all seven checks passing. It integrates `main` through `d93feb1`, including #694's status-first company actions and 24px icon hit targets. Its accepted decisions retain compact `rounded-md` fields, brand focus, open filter toolbars and calm destructive actions. Inline icon controls retain their small glyphs within 24px targets; table and toolbar controls remain 28px. Pagination uses content-sized `w-auto`, `h-7`, `pl-2 pr-6` geometry so three-digit options clear the dropdown arrow, preserving the intentional #304 correction in both root guidance and `DESIGN.md`.
 
-Close PR #696 as the Design Library foundation after specimen interactions, browser review and `mix precommit` are verified. The account menu, top-bar utilities, icon parity and wider catalog are subsequent implementation slices; their recorded design contract does not claim they already ship. No agent should treat accidental branch state, a Belimbing value or an isolated production screen as design authority.
+The foundation completed specimen interactions, browser review and `mix precommit`; its closeout evidence is recorded in the Design Library plan. The account menu, top-bar utilities, icon parity and wider catalog are subsequent implementation slices; their recorded design contract does not claim they already ship. No agent should treat accidental branch state, a Belimbing value or an isolated production screen as design authority.
 
 ## Top-Level Components
 
@@ -264,3 +264,20 @@ Goal: Close the campaign with evidence that remains useful as Bilimbi evolves.
 - [ ] Record the accepted catalog IDs in Design Spec and close the execution issues with browser evidence.
 
 Validation: Bilimbi matches or exceeds the useful design capability of Belimbing, preserves its own identity, and makes later drift visible before it reaches users.
+
+### Application shell slice — Issue #710
+
+Goal: Make account context accessible without routine top-bar repetition and make display utilities immediately useful on every authenticated screen.
+
+Affected pages: `/dashboard`, `/companies`, all four `/system/design-library` routes, `/settings/password`.
+
+- [x] Verify the merged foundation and create child issue #710 under #709 with the exact campaign label. `{crewmate/gpt-6}`
+- [x] Inspect the live starting shells and existing preference and identity contracts. `{crewmate/gpt-6}`
+- [ ] Implement the shared account menu, safety warning, display utilities and responsive shell.
+- [ ] Demonstrate real shared controls and meaningful states in Design Library and record accepted Design Spec.
+- [ ] Verify production adoption, keyboard, desktop/collapsed/narrow, light/dark, persistence and failure recovery.
+- [ ] Run focused checks and `mix precommit`; record final evidence.
+
+Initial evidence: Bilimbi's authenticated dashboard repeats tenant name and ID in the top strip and presents platform-operator access as ordinary text; timezone/theme controls are absent. The footer exposes loose identity and logout. Belimbing's dashboard provides clock, sun, moon and computer-desktop utilities; its top-bar source resolves Company/Local/UTC display modes and per-user theme settings. Its account circle links to profile rather than fulfilling Bilimbi's accepted disclosure contract.
+
+Scope-switching disposition: Adopt adapted, conditional on trusted permitted-scope choices. Current identity resolves exactly one company through `User.get_user/3` and `UserAuth.current_scope_from/2`, so switching is correctly hidden. Firstmate's decision `shell-permitted-scopes` confirms this satisfies the conditional requirement; no new authorization policy or tenant provisioning belongs to this slice. A future multi-scope access policy remains a separate captain decision tracked from #710; presentation must never infer permission from the existence of other companies.
