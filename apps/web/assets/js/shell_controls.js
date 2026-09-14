@@ -11,6 +11,7 @@ export default class ShellControls {
     this.openPanelId = null
     this.message = null
     this.messageError = false
+    this.messageUnresolved = false
     this.onClick = event => this.click(event)
     this.onKey = event => this.key(event)
     document.addEventListener("click", this.onClick)
@@ -72,17 +73,23 @@ export default class ShellControls {
       }, 0)
     }
   }
-  feedback(message, error = false) {
+  feedback(message, error = false, unresolved = false) {
     this.message = message
     this.messageError = error
+    this.messageUnresolved = unresolved
     this.apply()
   }
   connection(online) {
     this.online = online
-    if (!online && this.pending) this.feedback("Connection lost. Save could not be confirmed. Reconnect to check your saved preference.", true)
+    if (!online && this.pending) this.feedback("Connection lost. Save could not be confirmed. Reconnect to check your saved preference.", true, true)
     if (online) {
       clearTimeout(this.timer)
       this.pending = false
+      if (this.messageUnresolved) {
+        this.message = null
+        this.messageError = false
+        this.messageUnresolved = false
+      }
     }
     this.apply()
   }
@@ -91,9 +98,9 @@ export default class ShellControls {
     const open = this.openPanel()
     const restore = (open && open.contains(origin) && this.trigger(open)) || origin
     this.pending = true
-    this.feedback("Saving display preference…")
+    this.feedback("Saving display preference…", false, true)
     this.timer = setTimeout(() => {
-      this.feedback("Save could not be confirmed. Reconnect or reload to check your saved preference.", true)
+      this.feedback("Save could not be confirmed. Reconnect or reload to check your saved preference.", true, true)
     }, 12000)
     this.hook.pushEvent("shell:preference", {kind, value}, reply => {
       clearTimeout(this.timer)
@@ -120,9 +127,9 @@ export default class ShellControls {
       this.trigger(panel)?.setAttribute("aria-expanded", String(open))
     }
     const region = this.root.querySelector("#app-preference-feedback")
-    if (region && this.message !== null) {
-      region.hidden = false
-      region.textContent = this.message
+    if (region) {
+      region.hidden = this.message === null
+      region.textContent = this.message ?? ""
       region.classList.toggle("text-danger", this.messageError)
     }
   }

@@ -58,7 +58,7 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
       ]
       |> Enum.reject(fn {_field, _kind, submitted, stored} -> submitted == stored end)
       |> Enum.map(fn {field, kind, submitted, _stored} ->
-        {field, write_field(current_scope, kind, submitted)}
+        {field, DisplayPreferences.save(current_scope, kind, submitted)}
       end)
 
     {:noreply,
@@ -71,14 +71,6 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
   def handle_event("save", _params, socket) do
     {:noreply, socket}
   end
-
-  defp write_field(current_scope, "locale", locale), do: save_locale(current_scope, locale)
-
-  defp write_field(current_scope, "theme", theme),
-    do: DisplayPreferences.save(current_scope, "theme", theme)
-
-  defp write_field(current_scope, "timezone", mode),
-    do: DisplayPreferences.save(current_scope, "timezone", mode)
 
   defp report(socket, []), do: socket
 
@@ -106,23 +98,10 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
   defp names(entries), do: Enum.map_join(entries, ", ", &elem(&1, 0))
 
   defp refusal(:impersonating),
-    do: "Display preferences belong to the account you are viewing."
+    do: "Appearance settings belong to the account you are viewing."
 
   defp refusal(:invalid_preference), do: "Choose a supported value."
   defp refusal(_reason), do: "The change could not be saved."
-
-  defp save_locale(current_scope, ""), do: Locale.delete(locale_scope(current_scope))
-
-  defp save_locale(current_scope, locale) do
-    if Locale.supports?(locale) do
-      case Locale.put(locale_scope(current_scope), locale) do
-        {:ok, _locale} -> :ok
-        {:error, _reason} = error -> error
-      end
-    else
-      {:error, :invalid_preference}
-    end
-  end
 
   defp stored_locale(scope) do
     if Locale.overridden?(scope), do: Locale.locale(scope), else: ""

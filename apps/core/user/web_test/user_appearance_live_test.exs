@@ -227,7 +227,7 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     assert has_element?(view, "#appearance-timezone-mode option[value='utc'][selected]")
   end
 
-  test "an impersonated session is refused the display preferences but still saves language", %{
+  test "an impersonated session cannot write any appearance preference of the viewed account", %{
     conn: conn
   } do
     UserFixtures.insert_user!(%{
@@ -252,13 +252,12 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     assert has_element?(
              view,
              "#flash-group",
-             "Saved — Language. Not saved — Theme. Display preferences belong to the account you are viewing."
+             "Not saved — Theme, Language. Appearance settings belong to the account you are viewing."
            )
 
     locale_scope = SettingsScope.user(91, 73, 41)
-    assert Locale.overridden?(locale_scope)
-    assert Locale.locale(locale_scope) == "de-CH"
-    assert has_element?(view, "#appearance-locale option[value='de-CH'][selected]")
+    refute Locale.overridden?(locale_scope)
+    assert has_element?(view, "#appearance-locale option[value=''][selected]")
 
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
     assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")

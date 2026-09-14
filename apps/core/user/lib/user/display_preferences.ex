@@ -1,6 +1,6 @@
 defmodule Bilimbi.Core.User.DisplayPreferences do
   @moduledoc """
-  The signed-in account's theme and timestamp display preferences.
+  The signed-in account's theme, timestamp display and language preferences.
 
   One resolved snapshot and one durable write serve every surface that shows
   them: the shell's top-bar controls, the appearance screen and the HTTP
@@ -14,6 +14,7 @@ defmodule Bilimbi.Core.User.DisplayPreferences do
   """
 
   alias Bilimbi.Base.DateTime, as: DateTimePolicy
+  alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.UI.DateTimeDisplay
   alias Bilimbi.Core.User
@@ -65,11 +66,11 @@ defmodule Bilimbi.Core.User.DisplayPreferences do
   end
 
   @doc """
-  Stores one display preference for the authenticated account.
+  Stores one appearance preference for the authenticated account.
 
-  `kind` is `"theme"` or `"timezone"`. An unsupported kind or value is
-  refused rather than guessed, and a session that is impersonating cannot
-  write the preferences of the account it is viewing.
+  `kind` is `"theme"`, `"timezone"` or `"locale"`. An unsupported kind or
+  value is refused rather than guessed, and a session that is impersonating
+  cannot write any of them for the account it is viewing.
   """
   def save(current_scope, kind, value) do
     case own_account(current_scope) do
@@ -111,6 +112,19 @@ defmodule Bilimbi.Core.User.DisplayPreferences do
       {:ok, _mode} -> :ok
       {:error, :invalid_mode} -> {:error, :invalid_preference}
       {:error, _reason} = error -> error
+    end
+  end
+
+  defp write(current_scope, "locale", ""), do: Locale.delete(settings_scope(current_scope))
+
+  defp write(current_scope, "locale", locale) do
+    if Locale.supports?(locale) do
+      case Locale.put(settings_scope(current_scope), locale) do
+        {:ok, _locale} -> :ok
+        {:error, _reason} = error -> error
+      end
+    else
+      {:error, :invalid_preference}
     end
   end
 

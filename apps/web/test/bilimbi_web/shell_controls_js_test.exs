@@ -195,4 +195,55 @@ defmodule BilimbiWeb.ShellControlsJsTest do
     assert {"ok\n", 0} =
              System.cmd("node", ["--input-type=module", "-e", script], stderr_to_stdout: true)
   end
+
+  test "a reconnect clears an unresolved save notice but keeps a settled outcome" do
+    source = @controls |> File.read!() |> Base.encode64()
+
+    script = """
+    import assert from 'node:assert/strict'
+    const {default: ShellControls} = await import('data:text/javascript;base64,#{source}')
+    const button = {dataset: {preferenceKind: 'theme', preferenceValue: 'dark'}, focus() {}}
+    const feedback = {hidden: true, textContent: '', classList: {toggle() {}}}
+    const root = {
+      dataset: {themeChoice: 'light'},
+      querySelectorAll(selector) { return selector === '[data-preference-kind]' ? [button] : [] },
+      querySelector() { return feedback },
+    }
+    globalThis.document = {documentElement: {dataset: {}}, addEventListener() {}, removeEventListener() {}}
+    globalThis.window = {addEventListener() {}, removeEventListener() {}}
+    const calls = []
+    const controls = new ShellControls({el: root, pushEvent(e, params, callback) { calls.push(callback) }})
+
+    // The socket drops before the reply lands.
+    controls.save('theme', 'dark', button)
+    controls.connection(false)
+    assert.equal(feedback.hidden, false)
+    assert.match(feedback.textContent, /Connection lost/)
+
+    // Rejoining re-renders the true saved state, so the notice must not survive.
+    controls.connection(true)
+    assert.equal(feedback.hidden, true)
+    assert.equal(feedback.textContent, '')
+    controls.apply()
+    assert.equal(feedback.hidden, true)
+
+    // A settled outcome is different: it survives patches and a later reconnect.
+    controls.save('theme', 'dark', button)
+    calls[1]({ok: true})
+    assert.equal(feedback.textContent, 'Theme saved.')
+    feedback.hidden = true
+    feedback.textContent = ''
+    controls.apply()
+    assert.equal(feedback.hidden, false)
+    assert.equal(feedback.textContent, 'Theme saved.')
+    controls.connection(false)
+    controls.connection(true)
+    assert.equal(feedback.textContent, 'Theme saved.')
+    controls.destroy()
+    console.log('ok')
+    """
+
+    assert {"ok\n", 0} =
+             System.cmd("node", ["--input-type=module", "-e", script], stderr_to_stdout: true)
+  end
 end
