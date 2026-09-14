@@ -40,6 +40,12 @@ Rendering semantics, preserved from the source:
 The no-JavaScript fallback in every mode is the server text itself.
 Compatible `NaiveDateTime` values are explicitly interpreted as UTC.
 
+The authenticated shell changes the existing user mode through the Web edge.
+A saved mode re-arms the per-process display context and patches the shell in
+place; the browser never rewrites server text. An instant that takes `display`
+from a tracked assign follows at once, and the rest follow as the page next
+renders them. `:local` keeps its browser hook; calendar dates remain zone-free.
+
 ## Time zone database
 
 Validation and shifting run against `TimeZoneInfo.TimeZoneDatabase`, the
@@ -47,9 +53,3 @@ explicit-database idiom `base/schedule` established. Elixir's default
 UTC-only database cannot convert zones and is never assumed to. The database
 module travels inside `%Display{}` as a value, so Base UI needs no dependency
 on the package.
-
-The authenticated shell changes the existing user mode through the Web edge.
-A saved mode re-arms the per-process display context and patches the shell in
-place; the browser never rewrites server text. An instant that takes `display`
-from a tracked assign follows at once, and the rest follow as the page next
-renders them. `:local` keeps its browser hook; calendar dates remain zone-free.

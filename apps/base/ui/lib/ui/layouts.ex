@@ -8,7 +8,8 @@ defmodule Bilimbi.Base.UI.Layouts do
       reset). Compact card on the warm canvas with the Bilimbi brand bar;
       the page is otherwise quiet so the form reads first.
     * `app/1` — the authenticated workspace shell: a full-width top bar,
-      a left menu sidebar, and a persistent status bar. Account context is disclosed from the bottom-left circle; safety warnings stay visible.
+      a left menu sidebar, and a persistent status bar. Account context is
+      disclosed from the bottom-left circle; safety warnings stay visible.
 
   Navigation sidebar conventions:
 

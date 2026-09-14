@@ -1,11 +1,14 @@
 defmodule Bilimbi.Core.User.Web.AppearanceLive do
   @moduledoc """
-  The signed-in account's self-service theme and locale settings screen.
+  The signed-in account's self-service theme, time display and language screen.
 
   Ports Belimbing's `app/Core/User/Livewire/Settings/Appearance.php`.
-  Identity comes only from the authenticated scope. Submitted values cannot
-  name another user, and locale persistence stays behind Base Locale's public
-  explicit-scope API.
+  Identity comes only from the authenticated scope, and every write goes
+  through `Bilimbi.Core.User.DisplayPreferences`, the one owner of these three
+  preferences: submitted values cannot name another user, and an impersonating
+  session is refused there rather than here. Only fields whose submitted value
+  differs from the stored one are written, and the flash names what did and
+  did not save.
   """
 
   use Bilimbi.Base.UI, :live_view

@@ -38,6 +38,7 @@ and reset-token hashes never leave the module; account reads return
 | `reset_password(email, token, password)` | Consume a 60-minute token and rotate `remember_token` |
 | `issue_email_verification_token(...)` / `verify_email(...)` | Signed 60-minute verification bound to the current email |
 | `user_preferences(...)` and preference get/put/delete | Scoped access to the four module-owned settings |
+| `DisplayPreferences.presentation/1`, `refresh/1`, `save/3` | The signed-in account's theme, timestamp display and language — one resolved snapshot, one durable write, refused for a session impersonating another account |
 | `notifiable_identity()` | The durable Laravel polymorphic string |
 
 ## Tables
