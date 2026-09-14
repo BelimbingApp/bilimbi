@@ -530,7 +530,7 @@ const AppShell = {
       unpin.title = `Unpin ${pinLabel}`
       unpin.setAttribute("aria-label", `Unpin ${pinLabel}`)
       unpin.className =
-        "app-pinned-unpin grid size-4 shrink-0 place-items-center rounded-sm text-muted opacity-0 transition hover:bg-surface-subtle hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+        "app-pinned-unpin grid size-6 shrink-0 place-items-center rounded-sm text-muted opacity-0 transition hover:bg-surface-subtle hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
 
       const pinIcon = item?.parentElement?.querySelector("[data-nav-pin] svg")?.cloneNode(true)
       if (pinIcon) unpin.append(pinIcon)
