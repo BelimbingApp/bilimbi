@@ -1,9 +1,9 @@
 # Base UI Design Parity
 
-**Status:** In progress — application shell slice, Issue #710
+**Status:** In progress — application shell implemented and validated; independent review pending for Issue #710
 **Last Updated:** 2026-09-14
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra` (autonomous design steward)
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward)
 
 ## Problem Essence
 
@@ -184,7 +184,7 @@ Goal: Establish one current identity and catalog before any parity implementatio
 - [x] Preserve identity IDs `K01`–`K09` and delegate routine acceptance to Astra under the user's instruction. `{astra_pr_gate/gpt-6-astra}`
 - [ ] Verify every catalog row against the current Bilimbi build and Belimbing reference.
 - [ ] Give each row its initial disposition and dependency without treating component existence as acceptance.
-- [ ] Create one parent GitHub issue for the parity campaign and child issues as Astra verifies each slice's catalog boundaries.
+- [x] Create campaign #709 and shell child #710; create subsequent children when their slice boundaries are verified. `{crewmate/gpt-6}`
 
 Validation: A new agent can tell what must remain Bilimbi, what is being compared, what is already equivalent, what Astra decides and which business/security/data-contract questions require escalation.
 
@@ -273,11 +273,38 @@ Affected pages: `/dashboard`, `/companies`, all four `/system/design-library` ro
 
 - [x] Verify the merged foundation and create child issue #710 under #709 with the exact campaign label. `{crewmate/gpt-6}`
 - [x] Inspect the live starting shells and existing preference and identity contracts. `{crewmate/gpt-6}`
-- [ ] Implement the shared account menu, safety warning, display utilities and responsive shell.
-- [ ] Demonstrate real shared controls and meaningful states in Design Library and record accepted Design Spec.
-- [ ] Verify production adoption, keyboard, desktop/collapsed/narrow, light/dark, persistence and failure recovery.
-- [ ] Run focused checks and `mix precommit`; record final evidence.
+- [x] Implement the shared account menu, safety warning, display utilities and responsive shell. `{crewmate/gpt-6}`
+- [x] Demonstrate real shared controls and meaningful states in Design Library and record accepted Design Spec. `{crewmate/gpt-6}`
+- [x] Verify production adoption, keyboard, desktop/collapsed/narrow, light/dark, persistence and failure recovery. `{crewmate/gpt-6}`
+- [x] Run focused checks and `mix precommit`; record final evidence. `{crewmate/gpt-6}`
 
 Initial evidence: Bilimbi's authenticated dashboard repeats tenant name and ID in the top strip and presents platform-operator access as ordinary text; timezone/theme controls are absent. The footer exposes loose identity and logout. Belimbing's dashboard provides clock, sun, moon and computer-desktop utilities; its top-bar source resolves Company/Local/UTC display modes and per-user theme settings. Its account circle links to profile rather than fulfilling Bilimbi's accepted disclosure contract.
 
-Scope-switching disposition: Adopt adapted, conditional on trusted permitted-scope choices. Current identity resolves exactly one company through `User.get_user/3` and `UserAuth.current_scope_from/2`, so switching is correctly hidden. Firstmate's decision `shell-permitted-scopes` confirms this satisfies the conditional requirement; no new authorization policy or tenant provisioning belongs to this slice. A future multi-scope access policy remains a separate captain decision tracked from #710; presentation must never infer permission from the existence of other companies.
+Scope-switching disposition: Adopt adapted, conditional on trusted permitted-scope choices. Current identity resolves exactly one company through `User.get_user/3` and `UserAuth.current_scope_from/2`, so switching is correctly hidden. Firstmate's decision `shell-permitted-scopes` confirms this satisfies the conditional requirement; no new authorization policy or tenant provisioning belongs to this slice. The captain subsequently clarified that whether a user should hold more than one company or tenant is undecided; if a need arises, “just have a selector to switch AFTER login”. This is deferred, not declined: the future selector belongs inside the authenticated account menu, as tracked in #710; presentation must never infer permission from the existence of other companies.
+
+
+Accepted dispositions (2026-09-14):
+
+| Item | Disposition | Reason and evidence |
+|---|---|---|
+| LAY-02 desktop, rail and drawer | Adopt adapted | Retain Bilimbi geometry, mark, semantic surfaces, compact navigation and existing pin/tree state. Adopt useful top-bar utilities and account organization. Desktop collapse preserves the bottom-left circle; the narrow drawer contains focus, makes the workspace inert and restores focus on close. |
+| NAV-05 account and scope | Adopt adapted | Belimbing exposes identity/profile and logout in its sidebar footer. Bilimbi's shared disclosure fulfills the accepted name, identifier, company, tenant, password and sign-out contract. Trusted multiple-choice presentation is component-tested; current single-company identity correctly hides switching. Multi-company membership policy remains deferred as described above. |
+| LAY-02 safety context | Adopt adapted | Routine scope moves into the account menu. Platform-operator and impersonated access remain above the workspace, including when the narrow drawer covers content. Existing warning surface/line/ink roles preserve contrast in both themes. Ordinary scope has no warning; impersonation retains its stop action. |
+| Top-bar timezone | Adopt adapted | Belimbing's Company/Local/Stored choices and clock meaning are useful. Bilimbi uses the existing Base DateTime preference contract and updates mounted and streamed timestamps in place after a confirmed save. Explicit per-element display and calendar dates remain independent. |
+| Top-bar theme | Adopt adapted | Preserve Light/Dark/System as three explicit choices. Existing Core User preference storage remains authoritative. System follows browser appearance; failed writes retain the saved choice and provide recovery feedback. |
+| FND-06 shell icons | Equivalent | Clock, sun, moon, computer desktop, navigation bars and password key use familiar meanings through `IconRegistry.shell/1`. The existing Bilimbi navigation registry and impersonation icon remain in use. The wider searchable icon catalog is outside this slice. |
+| FND-06 logout exception | Keep Bilimbi | Keep the existing rightward sign-out arrow meaning and label it “Sign out”; no Belimbing icon asset is copied. |
+
+Implementation and adoption: `Bilimbi.Base.UI.ShellComponents` supplies the account disclosure, access warning and display controls to `Layouts.app`. The authenticated Web hook resolves fresh session identity before preference writes and uses the existing User and DateTime APIs; no schema or preference-key migration was needed. Every authenticated route adopts the shell, with direct browser checks on `/dashboard`, `/companies`, `/settings/password` and all four Design Library routes. `/system/design-library/components#component-shell` renders the real controls, a live timestamp and an account-action specimen with truthful example feedback. `/system/design-library/design-spec#spec-shell` records the accepted user behavior.
+
+Validation evidence:
+
+- `mix precommit` passed on 2026-09-14: all Base/Core suites, 547 Web integration tests and six installed contribution snapshots. `mix format --check-formatted` and `git diff --check` passed. Meaningful coverage includes revoked-session rejection, per-user isolation, remount persistence, invalid input and failed HTTP writes, conditional scope presentation, ordinary/operator/impersonated warnings, duplicate-work prevention, disconnect/unknown-result feedback, and timestamp updates including explicit overrides and newly mounted rows.
+- Browser inspection used isolated `chrome-devtools-axi` sessions against shared Bilimbi at port 4000, the read-only Belimbing dashboard, and this branch's preview at port 4017. Reference source inspected: `resources/core/views/components/layouts/top-bar.blade.php` and sidebar components. Belimbing's timezone menu supports Company/Local/Stored with outside/Escape dismissal; theme icons are clock/sun/moon/computer-desktop. Its timezone save reloads the page and failed requests lack the explicit retry feedback implemented here. Reference appearance was changed only in page-local DOM for visual inspection; no reference preference writes were made.
+- Real pointer and keyboard input verified account open/close, password navigation, sign out and fresh sign-in. Escape returns account focus to the circle; a second Escape closes the narrow drawer and returns focus to the sidebar toggle. Forward/reverse Tab contain focus inside the drawer. Desktop expanded and 56px collapsed rail, 390×844 narrow layout, light and dark themes were inspected. Narrow shell and library have no document-level horizontal overflow. Existing operational table scrolling remains local to its workflow.
+- Actual timezone saves changed existing dashboard timestamps immediately between UTC and Asia/Kuala_Lumpur device time. The library timestamp also followed its own real display control. A deliberately invalid browser-side choice was rejected by the server, kept the previous theme selected and exposed “Could not save display preference…”; retry then succeeded. System theme followed light/dark media changes without a preference write. Fresh sign-in restored the saved theme and timezone mode.
+- The shared development database was not provisioned with extra scopes, per the clarified scope decision. The test account's original dark/company preferences were restored. The shared port-4000 process and configuration were not changed; port 4017 is the isolated worktree preview.
+
+Checked visual evidence: [expanded production shell, light](evidence/base-ui-shell/companies-expanded-light.png), [narrow account drawer, dark](evidence/base-ui-shell/narrow-account-dark-final.png), [live library disclosure, dark](evidence/base-ui-shell/library-shell-dark-final.png), [narrow library, light](evidence/base-ui-shell/library-narrow-light-final.png). Screenshots supplement the exercised controls and tests; they are not the interaction evidence by themselves.
+
+Delivery: https://github.com/BelimbingApp/bilimbi/pull/711 is the bounded draft for #710. Independent review and the Firstmate-directed no-mistakes shipping gate remain pending; this implementation does not claim those gates passed. Later catalog families, broad production-screen migration, searchable icon parity and drift guards remain open in the campaign phases above.
