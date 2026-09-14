@@ -18,7 +18,7 @@
 At the project root:
 ```bash
 mix setup # installs dependencies, creates the database if needed, and runs project setup tasks
-mix phx.server #starts the Phoenix web server in development mode
+mix bilimbi.server #starts the Phoenix web server in development mode
 ```
 
 When config changes, dependencies change, or the app stops responding after a code change:
@@ -27,7 +27,7 @@ Restart the server on the same Bash Terminal by pressing ctrl+c twice.
 ## Typical startup flow
 
 - Use `mix setup` once for the initial project setup and database bootstrapping.
-- Then use `mix phx.server` to run the app locally.
+- Then use `mix bilimbi.server` to run the app locally.
 - The usual dev URL is `http://localhost:4000` when the server starts successfully.
 
 ## Email in development
@@ -35,4 +35,3 @@ Restart the server on the same Bash Terminal by pressing ctrl+c twice.
 - Swoosh is the Elixir mailer library Phoenix apps use to send email. Read it on the bash terminal the server was started.
 - In local development, emails are often captured instead of sent to the real internet; this avoids accidental deliveries while testing.
 - Mailpit is a common local inbox for capturing Swoosh mail in development, usually viewed at `http://localhost:8025`.
-

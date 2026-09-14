@@ -26,6 +26,7 @@ defmodule Mix.Tasks.Bilimbi.Server do
         Mix.shell().info(format_issues(issues))
 
         Mix.Task.run("clean", ["--deps"])
+        Mix.Task.Compiler.reenable()
         Mix.Task.run("compile")
 
         case graph_status() do
