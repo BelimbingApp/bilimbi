@@ -9,31 +9,41 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   use Bilimbi.Base.UI, :live_view
 
   @sample_rows [
-    %{
-      id: 1,
-      name: "Acme Holdings",
-      code: "acme",
-      status: "active",
-      kind: :success,
-      updated_at: ~U[2026-08-17 12:00:00Z]
-    },
-    %{
-      id: 2,
-      name: "Globex Corporation",
-      code: "globex",
-      status: "pending",
-      kind: :warning,
-      updated_at: ~U[2026-08-16 15:30:00Z]
-    },
-    %{
-      id: 3,
-      name: "Initech LLC",
-      code: "initech",
-      status: "suspended",
-      kind: :danger,
-      updated_at: ~U[2026-08-15 09:15:00Z]
-    }
-  ]
+                 %{
+                   id: 1,
+                   name: "Acme Holdings",
+                   code: "acme",
+                   status: "active",
+                   kind: :success,
+                   updated_at: ~U[2026-08-17 12:00:00Z]
+                 },
+                 %{
+                   id: 2,
+                   name: "Globex Corporation",
+                   code: "globex",
+                   status: "pending",
+                   kind: :warning,
+                   updated_at: ~U[2026-08-16 15:30:00Z]
+                 },
+                 %{
+                   id: 3,
+                   name: "Initech LLC",
+                   code: "initech",
+                   status: "suspended",
+                   kind: :danger,
+                   updated_at: ~U[2026-08-15 09:15:00Z]
+                 }
+               ] ++
+                 (for id <- 4..120 do
+                    %{
+                      id: id,
+                      name: "Example Company #{id}",
+                      code: "example-#{id}",
+                      status: "active",
+                      kind: :success,
+                      updated_at: ~U[2026-08-17 12:00:00Z]
+                    }
+                  end)
 
   @impl true
   def mount(_params, _session, socket) do
@@ -76,21 +86,14 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> assign(:area_description, area_description)
      |> assign(:area_stage, area_stage)
      |> assign(:active_nav, active_nav)
-     |> assign(:sample_rows, @sample_rows)
      |> assign(:sample_form, to_form(sample_data, as: :sample))
      |> assign(:pattern_form, to_form(%{"search" => ""}, as: :pattern))
      |> assign(
        :error_form,
        to_form(error_data, as: :error_sample, errors: [invalid_text: {"can't be blank", []}])
      )
-     |> assign(:pagination_sample_page, %{
-       page: 2,
-       page_size: 25,
-       total_pages: 5,
-       total_entries: 120
-     })
-     |> assign(:pagination_sample_form, to_form(%{"perPage" => 25}, as: :filters))
-     |> assign(:pattern_pagination_form, to_form(%{"perPage" => 25}, as: :pattern_filters))
+     |> assign_preview_page(:sample, 1, 25)
+     |> assign_preview_page(:pattern, 1, 25)
      |> assign(:sample_datetime, ~U[2026-08-17 14:30:00Z])
      |> assign(:inline_value, "Editable entity value")
      |> assign(:click_count, 0)}
@@ -113,6 +116,87 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> assign(:inline_value, value)
      |> put_flash(:info, gettext("Preview value updated."))}
   end
+
+  def handle_event("preview-company", %{"id" => id}, socket) do
+    case Enum.find(@sample_rows, &(Integer.to_string(&1.id) == id)) do
+      nil ->
+        {:noreply, socket}
+
+      row ->
+        {:noreply,
+         put_flash(socket, :info, "Example only: #{row.name} · #{row.code} · #{row.status}")}
+    end
+  end
+
+  def handle_event(event, %{"page" => page}, socket)
+      when event in ["sample-page", "pattern-page"] do
+    {preview, current} = preview_page(event, socket)
+
+    {:noreply,
+     assign_preview_page(socket, preview, positive_integer(page, current.page), current.page_size)}
+  end
+
+  def handle_event(event, %{"filters" => %{"perPage" => value}}, socket)
+      when event in ["sample-page-size", "pattern-page-size"] do
+    {preview, current} = preview_page(event, socket)
+    page_size = positive_integer(value, current.page_size)
+    page_size = if page_size in [25, 50, 100, 300], do: page_size, else: current.page_size
+    {:noreply, assign_preview_page(socket, preview, 1, page_size)}
+  end
+
+  def handle_event("pattern-search", %{"pattern" => %{"search" => search}}, socket) do
+    {:noreply,
+     socket
+     |> assign(:pattern_form, to_form(%{"search" => search}, as: :pattern))
+     |> assign_preview_page(:pattern, 1, socket.assigns.pattern_page.page_size)}
+  end
+
+  defp preview_page(event, socket) when event in ["sample-page", "sample-page-size"],
+    do: {:sample, socket.assigns.sample_page}
+
+  defp preview_page(_event, socket), do: {:pattern, socket.assigns.pattern_page}
+
+  defp assign_preview_page(socket, preview, requested_page, page_size) do
+    rows = preview_rows(preview, socket)
+    total_entries = length(rows)
+    total_pages = ceil(total_entries / page_size)
+    page = requested_page |> max(1) |> min(max(total_pages, 1))
+
+    data = %{
+      page: page,
+      page_size: page_size,
+      total_pages: total_pages,
+      total_entries: total_entries
+    }
+
+    rows = Enum.slice(rows, (page - 1) * page_size, page_size)
+    form = to_form(%{"perPage" => page_size}, as: :filters)
+
+    case preview do
+      :sample -> assign(socket, sample_rows: rows, sample_page: data, sample_page_form: form)
+      :pattern -> assign(socket, pattern_rows: rows, pattern_page: data, pattern_page_form: form)
+    end
+  end
+
+  defp preview_rows(:sample, _socket), do: @sample_rows
+
+  defp preview_rows(:pattern, socket) do
+    search = socket.assigns.pattern_form[:search].value |> String.trim() |> String.downcase()
+
+    Enum.filter(
+      @sample_rows,
+      &String.contains?(String.downcase(&1.name <> " " <> &1.code), search)
+    )
+  end
+
+  defp positive_integer(value, fallback) when is_binary(value) do
+    case Integer.parse(value) do
+      {number, ""} when number > 0 -> number
+      _ -> fallback
+    end
+  end
+
+  defp positive_integer(_value, fallback), do: fallback
 
   defp area_details(:theme) do
     {

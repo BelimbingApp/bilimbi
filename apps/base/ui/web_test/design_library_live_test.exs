@@ -143,6 +143,118 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-input-live-state", "dark")
   end
 
+  test "both pagination specimens update their own rows and page size", %{conn: conn} do
+    for {pagination, table, other_table} <- [
+          {"design-library-pagination", "sample-table", "design-library-pattern-table"},
+          {"design-library-pattern-pagination", "design-library-pattern-table", "sample-table"}
+        ] do
+      {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+      assert has_element?(view, "##{pagination}-previous[disabled]")
+      assert has_element?(view, "##{table} tr:nth-child(25)")
+      refute has_element?(view, "##{table} tr:nth-child(26)")
+      view |> element("##{pagination}-next") |> render_click()
+
+      assert has_element?(view, "##{pagination}-summary", "Showing 26 to 50 of 120 results")
+      assert has_element?(view, "##{table}", "Example Company 26")
+      refute has_element?(view, "##{table}", "Acme Holdings")
+      assert has_element?(view, "##{other_table}", "Acme Holdings")
+
+      view |> element("##{pagination}-page-5") |> render_click()
+      assert has_element?(view, "##{pagination}-next[disabled]")
+      assert has_element?(view, "##{pagination}-summary", "Showing 101 to 120 of 120 results")
+      assert has_element?(view, "##{table} tr:nth-child(20)")
+      refute has_element?(view, "##{table} tr:nth-child(21)")
+
+      for size <- [50, 100, 300, 25] do
+        view
+        |> form("##{pagination}-page-size-form", %{"filters" => %{"perPage" => to_string(size)}})
+        |> render_change()
+
+        count = min(size, 120)
+
+        assert has_element?(
+                 view,
+                 "##{pagination}-summary",
+                 "Showing 1 to #{count} of 120 results"
+               )
+
+        assert has_element?(view, "##{table} tr:nth-child(#{count})")
+        refute has_element?(view, "##{table} tr:nth-child(#{count + 1})")
+        assert has_element?(view, "##{other_table} tr:nth-child(25)")
+        refute has_element?(view, "##{other_table} tr:nth-child(26)")
+      end
+    end
+  end
+
+  test "pattern search resets its page and recovers from empty results", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+    view |> element("#design-library-pattern-pagination-next") |> render_click()
+
+    view
+    |> form("#design-library-pattern-search", %{"pattern" => %{"search" => "Globex"}})
+    |> render_change()
+
+    assert has_element?(view, "#design-library-pattern-table", "Globex Corporation")
+
+    assert has_element?(
+             view,
+             "#design-library-pattern-pagination-summary",
+             "Showing 1 to 1 of 1 results"
+           )
+
+    refute has_element?(view, "#design-library-pattern-pagination-next")
+    assert has_element?(view, "#sample-table", "Acme Holdings")
+
+    view
+    |> form("#design-library-pattern-search", %{"pattern" => %{"search" => "no matching company"}})
+    |> render_submit()
+
+    assert has_element?(view, "#design-library-pattern-empty")
+    refute has_element?(view, "#design-library-pattern-pagination-summary")
+    assert has_element?(view, "#design-library-pattern-pagination-page-size")
+
+    view
+    |> form("#design-library-pattern-search", %{"pattern" => %{"search" => ""}})
+    |> render_change()
+
+    refute has_element?(view, "#design-library-pattern-empty")
+
+    assert has_element?(
+             view,
+             "#design-library-pattern-pagination-summary",
+             "Showing 1 to 25 of 120 results"
+           )
+  end
+
+  test "example actions preview fictional facts without linking to business records", %{
+    conn: conn
+  } do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    refute has_element?(view, "#sample-table a")
+    view |> element("#sample-preview-1") |> render_click()
+    assert has_element?(view, "#flash-info", "Acme Holdings")
+    assert has_element?(view, "#flash-info", "Example only")
+    assert has_element?(view, "#components")
+  end
+
+  test "preview pagination clamps stale pages and ignores invalid values", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    for {event, pagination} <- [
+          {"sample", "design-library-pagination"},
+          {"pattern", "design-library-pattern-pagination"}
+        ] do
+      render_click(view, "#{event}-page", %{"page" => "999"})
+      assert has_element?(view, "##{pagination}-summary", "Showing 101 to 120 of 120 results")
+      render_click(view, "#{event}-page", %{"page" => "invalid"})
+      assert has_element?(view, "##{pagination}-summary", "Showing 101 to 120 of 120 results")
+      render_change(view, "#{event}-page-size", %{"filters" => %{"perPage" => "5"}})
+      assert has_element?(view, "##{pagination}-summary", "Showing 1 to 25 of 120 results")
+    end
+  end
+
   test "Graphic shows the Bilimbi mark and icons in current use", %{conn: conn} do
     {:ok, view, _html} = open(conn, "/system/design-library/graphic")
 
