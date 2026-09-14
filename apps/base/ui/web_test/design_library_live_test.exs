@@ -103,9 +103,9 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-input-guidance", "Choice guidance")
     assert has_element?(view, "#component-input-live-state", "Live state")
     assert has_element?(view, "#component-icon-button", "Compact icon actions")
-    assert has_element?(view, "#component-page-list", "List variant")
-    assert has_element?(view, "#component-page-form", "Form variant")
-    assert has_element?(view, "#component-page-detail", "Detail variant")
+    assert has_element?(view, "#component-page-list.max-w-7xl", "List variant")
+    assert has_element?(view, "#component-page-form.max-w-2xl", "Form variant")
+    assert has_element?(view, "#component-page-detail.max-w-4xl", "Detail variant")
     assert has_element?(view, "#component-header-default", "Title, subtitle, and trailing action")
 
     assert has_element?(
@@ -114,7 +114,17 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
              "Title action without a trailing action"
            )
 
+    assert has_element?(
+             view,
+             "#component-header-title-action button.size-6[aria-label='Edit company']"
+           )
+
+    assert has_element?(view, "#component-flash > .transform-gpu > #design-library-flash")
+    assert has_element?(view, "#component-flash > .transform-gpu > #design-library-flash-error")
     assert has_element?(view, "#component-flash", "Save failed")
+    assert has_element?(view, "#component-card-titled .border-b h3", "Company profile")
+    refute has_element?(view, "#component-card-untitled h3")
+    assert has_element?(view, "#component-card-boundary", "no loading, empty, error, or disabled")
     assert has_element?(view, "#component-list-boundary", "no loading, empty, or error state")
 
     for area <- ~w(components component-patterns component-states) do
@@ -277,7 +287,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#graphic-icon-variants", "Outline")
     assert has_element?(view, "#graphic-icon-variants", "Solid")
     assert has_element?(view, "#graphic-icon-variants", "Mini")
-    assert has_element?(view, "#graphic-icon-variants", "Custom size/color")
+    assert has_element?(view, "#graphic-icon-variants", "Size and color come from the class")
     refute has_element?(view, "#components")
     assert has_element?(view, "#nav-admin-system-design-library-graphic[aria-current='page']")
   end

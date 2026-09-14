@@ -504,6 +504,35 @@
                 Page widths, headings, cards, menus, and tabs.
               </p>
             </div>
+            <.card id="component-page" title="Page widths" inner_class="space-y-3 p-4">
+              <.page
+                id="component-page-list"
+                variant={:list}
+                class="rounded-md border border-dashed border-line p-2"
+              >
+                <p class="text-xs text-ink-muted">
+                  List variant (max-w-7xl) — wide for filters and tables
+                </p>
+              </.page>
+              <.page
+                id="component-page-detail"
+                variant={:detail}
+                class="rounded-md border border-dashed border-line p-2"
+              >
+                <p class="text-xs text-ink-muted">
+                  Detail variant (max-w-4xl) — medium for a record or dashboard
+                </p>
+              </.page>
+              <.page
+                id="component-page-form"
+                variant={:form}
+                class="rounded-md border border-dashed border-line p-2"
+              >
+                <p class="text-xs text-ink-muted">
+                  Form variant (max-w-2xl) — narrow for focused entry
+                </p>
+              </.page>
+            </.card>
             <div class="grid gap-3 lg:grid-cols-2">
               <.card id="component-header" title="Page header" inner_class="space-y-5 p-4">
                 <div id="component-header-default">
@@ -517,20 +546,30 @@
                 <div id="component-header-title-action" class="border-t border-line pt-4">
                   <p class="mb-2 text-xs text-ink-muted">Title action without a trailing action</p>
                   <.header>
-                    Company details<:title_actions><.icon_button icon="hero-pencil" label="Edit company" /></:title_actions>
+                    Company details<:title_actions>
+                      <.icon_button icon="hero-pencil" label="Edit company" context={:inline} />
+                    </:title_actions>
                   </.header>
                 </div>
               </.card>
-              <.card id="component-page" title="Page widths" inner_class="space-y-3 p-4">
-                <.page id="component-page-list" variant={:list} class="rounded-md border border-dashed border-line p-2">
-                  <p class="text-xs text-ink-muted">List variant — wide for filters and tables</p>
-                </.page>
-                <.page id="component-page-form" variant={:form} class="rounded-md border border-dashed border-line p-2">
-                  <p class="text-xs text-ink-muted">Form variant — narrow for focused entry</p>
-                </.page>
-                <.page id="component-page-detail" variant={:detail} class="rounded-md border border-dashed border-line p-2">
-                  <p class="text-xs text-ink-muted">Detail variant — medium for a record or dashboard</p>
-                </.page>
+              <.card id="component-card" title="Card" inner_class="space-y-4 p-4">
+                <div id="component-card-titled">
+                  <p class="mb-2 text-xs text-ink-muted">With a title</p>
+                  <.card title="Company profile" inner_class="p-3">
+                    <p class="text-sm text-ink">A title adds the bordered heading strip.</p>
+                  </.card>
+                </div>
+                <div id="component-card-untitled">
+                  <p class="mb-2 text-xs text-ink-muted">Without a title</p>
+                  <.card inner_class="p-3">
+                    <p class="text-sm text-ink">Without one, the body stands alone.</p>
+                  </.card>
+                </div>
+                <div id="component-card-boundary" class="border-t border-line pt-3">
+                  <p class="text-xs text-ink-muted">
+                    This component has no loading, empty, error, or disabled state; those belong to the content composed inside it.
+                  </p>
+                </div>
               </.card>
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
@@ -826,22 +865,23 @@
                 Short-lived messages, inline guidance, and persistent record status.
               </p>
             </div>
-            <div
-              id="component-flash"
-              class="relative min-h-36 overflow-hidden rounded-xl border border-line bg-canvas transform-gpu"
-            >
-              <.flash
-                id="design-library-flash"
-                kind={:info}
-                flash={%{"info" => "Your changes were saved."}}
-                title="Saved"
-              />
-              <.flash
-                id="design-library-flash-error"
-                kind={:error}
-                flash={%{"error" => "The changes could not be saved."}}
-                title="Save failed"
-              />
+            <div id="component-flash" class="grid gap-3 lg:grid-cols-2">
+              <div class="relative min-h-28 overflow-hidden rounded-xl border border-line bg-canvas transform-gpu">
+                <.flash
+                  id="design-library-flash"
+                  kind={:info}
+                  flash={%{"info" => "Your changes were saved."}}
+                  title="Saved"
+                />
+              </div>
+              <div class="relative min-h-28 overflow-hidden rounded-xl border border-line bg-canvas transform-gpu">
+                <.flash
+                  id="design-library-flash-error"
+                  kind={:error}
+                  flash={%{"error" => "The changes could not be saved."}}
+                  title="Save failed"
+                />
+              </div>
             </div>
             <div id="component-alert" class="grid gap-2 lg:grid-cols-2">
               <.alert kind={:info}>This change affects future records.</.alert><.alert kind={
@@ -1128,23 +1168,33 @@
               </div>
             </div>
             <div id="graphic-icon-variants" class="border-t border-line pt-4">
-              <h3 class="mb-2 text-sm font-semibold text-ink">Available treatments</h3>
+              <h3 class="mb-2 text-sm font-semibold text-ink">Name suffix treatments</h3>
               <div class="flex flex-wrap items-end gap-6">
                 <div class="text-center">
                   <.icon name="hero-check-circle" class="mx-auto size-5 text-success" />
-                  <p class="mt-1 text-xs text-ink-muted">Outline · 20px</p>
+                  <p class="mt-1 text-xs text-ink-muted">Outline — default</p>
                 </div>
                 <div class="text-center">
                   <.icon name="hero-check-circle-solid" class="mx-auto size-5 text-success" />
-                  <p class="mt-1 text-xs text-ink-muted">Solid · 20px</p>
+                  <p class="mt-1 text-xs text-ink-muted">Solid — -solid</p>
                 </div>
                 <div class="text-center">
-                  <.icon name="hero-check-circle-mini" class="mx-auto size-4 text-success" />
-                  <p class="mt-1 text-xs text-ink-muted">Mini · 16px</p>
+                  <.icon name="hero-check-circle-mini" class="mx-auto size-5 text-success" />
+                  <p class="mt-1 text-xs text-ink-muted">Mini — -mini</p>
+                </div>
+              </div>
+              <p class="mt-3 text-xs text-ink-muted">
+                All three are drawn at the same <code>size-5</code>; the suffix picks the drawing, not the size.
+              </p>
+              <h3 class="mb-2 mt-4 text-sm font-semibold text-ink">Size and color come from the class</h3>
+              <div class="flex flex-wrap items-end gap-6">
+                <div class="text-center">
+                  <.icon name="hero-check-circle" class="mx-auto size-4 text-success" />
+                  <p class="mt-1 text-xs text-ink-muted">size-4 text-success</p>
                 </div>
                 <div class="text-center">
                   <.icon name="hero-check-circle" class="mx-auto size-7 text-muted" />
-                  <p class="mt-1 text-xs text-ink-muted">Custom size/color</p>
+                  <p class="mt-1 text-xs text-ink-muted">size-7 text-muted</p>
                 </div>
               </div>
               <p class="mt-3 text-xs text-ink-muted">
