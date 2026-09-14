@@ -49,6 +49,6 @@ module travels inside `%Display{}` as a value, so Base UI needs no dependency
 on the package.
 
 The authenticated shell changes the existing user mode through the Web edge.
-Base UI timestamp metadata and its browser hook update current and newly
-streamed instants without navigation; calendar dates remain zone-free. Every
-mode retains complete server-rendered fallback text.
+A saved mode re-renders the page from the server, so every instant follows the
+new mode without the browser rewriting server text. `:local` keeps its browser
+hook; calendar dates remain zone-free.

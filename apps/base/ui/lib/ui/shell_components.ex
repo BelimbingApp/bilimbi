@@ -11,7 +11,6 @@ defmodule Bilimbi.Base.UI.ShellComponents do
 
   attr :id, :string, required: true
   attr :current_scope, :map, required: true
-  attr :specimen, :boolean, default: false
 
   def account_menu(assigns) do
     ~H"""
@@ -57,7 +56,6 @@ defmodule Bilimbi.Base.UI.ShellComponents do
         </dl>
         <div class="space-y-1">
           <.link
-            :if={!@specimen}
             id={@id <> "-password"}
             navigate={~p"/settings/password"}
             class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
@@ -65,7 +63,6 @@ defmodule Bilimbi.Base.UI.ShellComponents do
             <.icon name={IconRegistry.shell(:password)} class="size-4" /> Change password
           </.link>
           <.link
-            :if={!@specimen}
             id={@id <> "-logout"}
             href={~p"/session"}
             method="delete"
@@ -73,20 +70,6 @@ defmodule Bilimbi.Base.UI.ShellComponents do
           >
             <.icon name={IconRegistry.shell(:logout)} class="size-4" /> Sign out
           </.link>
-          <button
-            :if={@specimen}
-            type="button"
-            data-example-account-action
-            id={@id <> "-password"}
-            class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-          ><.icon name={IconRegistry.shell(:password)} class="size-4" /> Change password</button>
-          <button
-            :if={@specimen}
-            type="button"
-            data-example-account-action
-            id={@id <> "-logout"}
-            class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
-          ><.icon name={IconRegistry.shell(:logout)} class="size-4" /> Sign out</button>
         </div>
       </section>
     </div>

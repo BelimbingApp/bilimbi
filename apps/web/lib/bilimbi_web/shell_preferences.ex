@@ -3,7 +3,6 @@ defmodule BilimbiWeb.ShellPreferences do
 
   alias Bilimbi.Base.DateTime, as: DateTimePolicy
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
-  alias Bilimbi.Base.UI.DateTimeDisplay
   alias Bilimbi.Core.User
 
   def presentation(current_scope) do
@@ -23,8 +22,13 @@ defmodule BilimbiWeb.ShellPreferences do
   end
 
   def attach(socket) do
-    Phoenix.LiveView.attach_hook(socket, :shell_preferences, :handle_event, &handle_event/3)
+    socket
+    |> Phoenix.LiveView.attach_hook(:shell_preferences_path, :handle_params, &handle_params/3)
+    |> Phoenix.LiveView.attach_hook(:shell_preferences, :handle_event, &handle_event/3)
   end
+
+  defp handle_params(_params, uri, socket),
+    do: {:cont, Phoenix.Component.assign(socket, :shell_path, URI.parse(uri).path)}
 
   def handle_event("shell:preference", %{"kind" => kind, "value" => value}, socket) do
     # Rehydrate the durable session before a self-service write, just as the
@@ -40,13 +44,11 @@ defmodule BilimbiWeb.ShellPreferences do
 
       current_scope = Map.put(current_scope, :shell_preferences, preferences)
 
-      DateTimeDisplay.put(%{
-        mode: preferences.mode,
-        timezone: preferences.timezone,
-        tz_db: DateTimePolicy.time_zone_database()
-      })
+      socket =
+        socket
+        |> Phoenix.Component.assign(:current_scope, current_scope)
+        |> rerender(kind)
 
-      socket = Phoenix.Component.assign(socket, :current_scope, current_scope)
       {:halt, %{ok: true, preferences: preferences}, socket}
     else
       {:error, _reason} -> {:halt, %{ok: false}, socket}
@@ -95,6 +97,11 @@ defmodule BilimbiWeb.ShellPreferences do
   end
 
   def save(_scope, _kind, _value), do: {:error, :invalid_preference}
+
+  defp rerender(socket, "timezone"),
+    do: Phoenix.LiveView.push_navigate(socket, to: socket.assigns.shell_path)
+
+  defp rerender(socket, "theme"), do: socket
 
   defp own_account(%{impersonator: nil}), do: :ok
   defp own_account(%{impersonator: _impersonator}), do: {:error, :impersonating}

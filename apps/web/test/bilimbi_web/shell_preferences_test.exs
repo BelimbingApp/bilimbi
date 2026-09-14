@@ -38,11 +38,13 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     assert {:ok, "system"} = User.get_user_preference(scope, 73, 92, "ui.theme")
     assert has_element?(view, "#app-display-dark[aria-pressed='true']")
 
-    render_hook(view, "shell:preference", %{kind: "timezone", value: "utc"})
+    assert {:error, {:live_redirect, %{to: "/dashboard"}}} =
+             render_hook(view, "shell:preference", %{kind: "timezone", value: "utc"})
+
     assert DateTimePolicy.mode(SettingsScope.user(91, 73, 41)) == :utc
     assert DateTimePolicy.mode(SettingsScope.user(92, 73, 41)) == :company
-    assert has_element?(view, "#app-shell[data-display-mode='utc']")
     {:ok, remounted, _} = live(conn, ~p"/dashboard")
+    assert has_element?(remounted, "#app-shell[data-display-mode='utc']")
     assert has_element?(remounted, "#app-display-dark[aria-pressed='true']")
     assert has_element?(remounted, "#app-display-utc[aria-pressed='true']")
 

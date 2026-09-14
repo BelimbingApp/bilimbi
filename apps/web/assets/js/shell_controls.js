@@ -54,11 +54,6 @@ export default class ShellControls {
         this.save(button.dataset.preferenceKind, button.dataset.preferenceValue)
         return
       }
-      if (button.matches("[data-example-account-action]")) {
-        this.feedback("Example only. Your account has not changed.")
-        this.closeAll(true)
-        return
-      }
     }
     for (const panel of this.panels()) {
       if (!panel.hidden && !panel.contains(event.target)) this.close(panel)
@@ -129,6 +124,5 @@ export default class ShellControls {
     }
     for (const label of this.root.querySelectorAll("[data-timezone-label]")) label.textContent = {company: "Company", local: "Local", utc: "UTC"}[mode]
     for (const button of this.root.querySelectorAll("[data-timezone-toggle]")) button.title = `Time display: ${{company: this.root.dataset.displayTimezone, local: "This device’s local time", utc: "UTC"}[mode]}`
-    window.dispatchEvent(new CustomEvent("bilimbi:display-changed"))
   }
 }

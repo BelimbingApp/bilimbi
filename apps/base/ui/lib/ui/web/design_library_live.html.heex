@@ -478,7 +478,7 @@
             <div class="rounded-xl border border-line bg-surface p-4">
               <h3 class="mb-2 text-sm font-semibold">Display controls</h3>
               <p class="mb-3 text-xs text-muted">
-                These controls change your own saved display preferences, just like the top bar. The timestamp below follows your choice.
+                These controls change your own saved display preferences, just like the top bar. Saving a time display re-renders the page, so the timestamp below follows your choice.
               </p>
               <ShellComponents.display_controls
                 id="library-display"
@@ -489,18 +489,11 @@
                 <.datetime id="library-shell-time" value={~U[2026-09-14 07:00:00Z]} />
               </p>
             </div>
-            <div class="rounded-xl border border-line bg-surface px-3 pt-3">
+            <div class="rounded-xl border border-line bg-surface p-4">
               <h3 class="text-sm font-semibold">Account disclosure</h3>
               <p class="mt-1 text-xs text-muted">
-                Open the circle below. The example account actions show feedback without changing your account.
+                The accepted disclosure is the circle at the bottom left of this page. Open it for your name, identifier, company, tenant, Change password and Sign out. It is the same component every authenticated screen uses; there is no separate copy here.
               </p>
-              <div class="mt-64 max-w-72">
-                <ShellComponents.account_menu
-                  id="library-account"
-                  current_scope={@current_scope}
-                  specimen
-                />
-              </div>
             </div>
             <p class="text-xs text-muted">
               Use the top-left toggle to compare the full sidebar and compact rail. On a narrow screen it opens a drawer; Escape closes the active menu first, then the drawer.
