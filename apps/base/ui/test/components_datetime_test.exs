@@ -5,8 +5,8 @@ defmodule Bilimbi.Base.UI.ComponentsDatetimeTest do
   The component honors the per-process `DateTimeDisplay` context the web
   edge sets, or an explicit `display` attr. `:local` keeps the truthful
   UTC-labelled server text plus the browser hook; `:company` and `:utc`
-  render final server text with no hook, so the no-JavaScript fallback is
-  the answer itself.
+  also render complete server text. Every instant carries the display hook
+  to follow shell changes; calendar dates stay zone-free.
   """
 
   use ExUnit.Case, async: false
@@ -87,11 +87,12 @@ defmodule Bilimbi.Base.UI.ComponentsDatetimeTest do
     assert html =~ ~s(datetime="2026-01-01T16:30:00Z")
   end
 
-  test "utc mode renders final stored-UTC text with no hook" do
+  test "utc mode renders stored-UTC fallback and live display metadata" do
     DateTimeDisplay.put(%{mode: :utc})
     html = render_datetime(%{})
     assert html =~ "01/01/2026, 16:30 UTC"
-    refute html =~ "phx-hook"
+    assert html =~ ~s(data-mode="utc")
+    assert html =~ ~s(phx-hook="DateTime")
   end
 
   test "company mode shifts through the provided database and labels the zone" do
@@ -103,7 +104,8 @@ defmodule Bilimbi.Base.UI.ComponentsDatetimeTest do
 
     html = render_datetime(%{})
     assert html =~ "02/01/2026, 00:30 +08"
-    refute html =~ "phx-hook"
+    assert html =~ ~s(data-mode="company")
+    assert html =~ ~s(phx-hook="DateTime")
     # The ISO value stays the stored UTC instant, not a rewritten one.
     assert html =~ ~s(datetime="2026-01-01T16:30:00Z")
   end

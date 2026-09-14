@@ -501,7 +501,7 @@ defmodule BilimbiWeb.UserAuth do
           end
         )
 
-      {:cont, socket}
+      {:cont, BilimbiWeb.ShellPreferences.attach(socket)}
     else
       {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}
     end
@@ -622,6 +622,18 @@ defmodule BilimbiWeb.UserAuth do
     Enum.each(@gettext_backends, &Gettext.put_locale(&1, language))
   end
 
+  @doc false
+  def refresh_scope(%{session_identity: identity, impersonator: impersonator}) do
+    impersonation =
+      if impersonator,
+        do: %{"original_user_id" => impersonator.id, "original_user_name" => impersonator.name}
+
+    case current_scope_from(identity, impersonation) do
+      nil -> {:error, :unauthenticated}
+      scope -> {:ok, scope}
+    end
+  end
+
   defp current_scope_from(
          %{
            "session_id" => session_id,
@@ -646,8 +658,15 @@ defmodule BilimbiWeb.UserAuth do
         actor: actor,
         capabilities: allowed,
         impersonator: extract_impersonator(impersonation),
+        session_identity: %{
+          "session_id" => session_id,
+          "user_id" => user_id,
+          "company_id" => company_id
+        },
+        permitted_scopes: [%{company_id: company_id, tenant_id: tenant_id}],
         operator_company_missing: operator_company_missing?(scope)
       }
+      |> then(&Map.put(&1, :shell_preferences, BilimbiWeb.ShellPreferences.presentation(&1)))
     else
       _ -> nil
     end

@@ -44,6 +44,21 @@ defmodule Bilimbi.Base.UI.IconRegistry do
     }
   }
 
+  @shell %{
+    clock: "hero-clock",
+    light: "hero-sun",
+    dark: "hero-moon",
+    system: "hero-computer-desktop",
+    navigation: "hero-bars-3",
+    chevron: "hero-chevron-down-mini",
+    password: "hero-key",
+    logout: "hero-arrow-right-on-rectangle",
+    warning: "hero-exclamation-triangle"
+  }
+
+  @doc "Accepted shell icon meanings; logout preserves Bilimbi's own treatment."
+  def shell(action), do: Map.fetch!(@shell, action)
+
   @spec fetch(String.t()) :: {:ok, icon()} | :error
   def fetch(name) when is_binary(name), do: Map.fetch(@icons, name)
   def fetch(_name), do: :error

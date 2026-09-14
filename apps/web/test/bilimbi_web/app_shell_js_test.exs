@@ -49,7 +49,12 @@ defmodule BilimbiWeb.AppShellJsTest do
   end
 
   test "a saved object-form navigation pin survives reload and renders" do
-    source = File.read!(@hook)
+    controls = File.read!(Path.join(Path.dirname(@hook), "shell_controls.js")) |> Base.encode64()
+
+    source =
+      File.read!(@hook)
+      |> String.replace("\"./shell_controls\"", "\"data:text/javascript;base64,#{controls}\"")
+
     encoded_source = Base.encode64(source)
 
     script = """
@@ -109,7 +114,12 @@ defmodule BilimbiWeb.AppShellJsTest do
     # default aria-pressed="false". The hook's single sync path —
     # updated() -> apply() -> renderPinnedItems() — must restore the stored
     # pressed state without any second render call.
-    source = File.read!(@hook)
+    controls = File.read!(Path.join(Path.dirname(@hook), "shell_controls.js")) |> Base.encode64()
+
+    source =
+      File.read!(@hook)
+      |> String.replace("\"./shell_controls\"", "\"data:text/javascript;base64,#{controls}\"")
+
     encoded_source = Base.encode64(source)
 
     script = """

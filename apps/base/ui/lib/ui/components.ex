@@ -889,9 +889,13 @@ defmodule Bilimbi.Base.UI.Components do
       the `DateTime` hook enhances it into the browser's time zone.
     * `:company` — the server shifts into the company IANA zone through the
       database module the context carries and renders final text labelled
-      with the zone abbreviation; no client enhancement. A zone that cannot
+      with the zone abbreviation as a complete fallback. A zone that cannot
       convert falls back to the truthful UTC text rather than guessing.
-    * `:utc` — the server renders the stored UTC value as final text.
+    * `:utc` — the server renders the stored UTC value.
+
+  Every instant carries display metadata and the `DateTime` hook, so a saved
+  shell choice also updates existing streamed rows without navigating away.
+  Calendar dates remain zone-free and carry no hook.
 
   With no context stored, `:local` — the pre-policy behavior, and the
   truthful no-JavaScript fallback in every mode is the server text itself.
@@ -924,20 +928,14 @@ defmodule Bilimbi.Base.UI.Components do
       {Calendar.strftime(@date, "%d/%m/%Y")}
     </time>
     <time
-      :if={@date_time && @mode == :local}
+      :if={@date_time}
       id={@id}
       datetime={DateTime.to_iso8601(@date_time)}
       data-format={@format}
+      data-mode={@mode}
+      data-zone={@resolved_display && Map.get(@resolved_display, :timezone)}
+      data-follow-shell={is_nil(@display) && "true"}
       phx-hook="DateTime"
-      phx-update="ignore"
-      class={["tabular-nums", @class]}
-    >
-      {server_datetime(@date_time, @format)}
-    </time>
-    <time
-      :if={@date_time && @mode != :local}
-      id={@id}
-      datetime={DateTime.to_iso8601(@date_time)}
       class={["tabular-nums", @class]}
     >
       {policy_datetime(@date_time, @format, @mode, @resolved_display)}
@@ -955,6 +953,8 @@ defmodule Bilimbi.Base.UI.Components do
 
   defp display_mode(%{mode: mode}) when mode in [:company, :local, :utc], do: mode
   defp display_mode(_display), do: :local
+
+  defp policy_datetime(value, format, :local, _display), do: server_datetime(value, format)
 
   defp policy_datetime(value, format, :utc, _display), do: server_datetime(value, format)
 

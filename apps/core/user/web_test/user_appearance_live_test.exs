@@ -71,7 +71,7 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
 
     # System (no stored preference): nothing stamped; prefers-color-scheme governs.
     conn = log_in_as(conn)
-    refute get(conn, ~p"/settings/appearance") |> html_response(200) =~ "data-theme"
+    refute get(conn, ~p"/settings/appearance") |> html_response(200) |> LazyHTML.from_document() |> LazyHTML.query("html[data-theme]") |> Enum.any?()
 
     {:ok, "dark"} = User.put_user_preference(scope, 73, 91, "ui.theme", "dark")
     assert get(conn, ~p"/settings/appearance") |> html_response(200) =~ ~s(data-theme="dark")
