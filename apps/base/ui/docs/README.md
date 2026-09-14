@@ -13,8 +13,8 @@ the mounted screen. Exceptions that carry deliberate framework outcomes, such
 as authorization denial, invalid changesets, and missing records, still
 propagate. Rendering and other lifecycle callbacks are not recovered.
 
-This package is dependency-light. It depends on Phoenix libraries and
-`base/module_registry` only — never on Tenancy, Authz, Session, or `:web`.
+This package is dependency-light. It depends on Phoenix libraries, `base/menu`,
+and `base/module_registry` only — never on Tenancy, Authz, Session, or `:web`.
 Authentication `on_mount` hooks stay in `BilimbiWeb.UserAuth`.
 
 Call sites name user-facing actions through `IconRegistry` (`create`, `edit`,

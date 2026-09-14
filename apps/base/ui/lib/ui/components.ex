@@ -1390,7 +1390,8 @@ defmodule Bilimbi.Base.UI.Components do
   Prefer a name from `Bilimbi.Base.UI.IconRegistry` so the action meaning is
   explicit. Unknown names beginning with `hero-` still pass through to
   generated Heroicons. Custom product glyphs such as `bilimbi-pin` render as
-  inline SVG.
+  inline SVG. A name that is neither registered nor `hero-`-prefixed falls back
+  to the generic `hero-square-3-stack-3d` glyph rather than failing.
 
   Heroicons come in three styles – outline, solid, and mini.
   By default, the outline style is used, but solid and mini may
