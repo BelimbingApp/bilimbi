@@ -7,6 +7,9 @@ defmodule BilimbiWeb.ThemeController do
       :ok ->
         json(conn, %{theme: theme})
 
+      {:error, :impersonating} ->
+        conn |> put_status(:forbidden) |> json(%{error: "impersonating"})
+
       {:error, _reason} ->
         conn |> put_status(:service_unavailable) |> json(%{error: "save_failed"})
     end

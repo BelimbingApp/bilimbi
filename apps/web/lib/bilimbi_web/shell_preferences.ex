@@ -5,20 +5,29 @@ defmodule BilimbiWeb.ShellPreferences do
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Core.User
 
+  @doc """
+  The one resolved display snapshot for a scope lifecycle: the account's theme
+  plus the `Bilimbi.Base.DateTime` display metadata. `UserAuth` carries it on
+  `current_scope.shell_preferences`, stamps the root layout from it and hands
+  it straight to `DateTimeDisplay`, so nothing re-reads these preferences.
+  """
   def presentation(current_scope) do
     user = current_scope.user
 
-    {:ok, theme} =
-      User.get_user_preference(
-        current_scope.scope,
-        user["company_id"],
-        user["user_id"],
-        "ui.theme"
-      )
+    theme =
+      case User.get_user_preference(
+             current_scope.scope,
+             user["company_id"],
+             user["user_id"],
+             "ui.theme"
+           ) do
+        {:ok, theme} when theme in ["light", "dark", "system"] -> theme
+        _other -> "system"
+      end
 
     display = DateTimePolicy.display(settings_scope(current_scope), company_scope(current_scope))
 
-    %{theme: theme || "system", mode: display.mode, timezone: display.timezone}
+    %{theme: theme, mode: display.mode, timezone: display.timezone, tz_db: display.tz_db}
   end
 
   def attach(socket) do
@@ -28,28 +37,21 @@ defmodule BilimbiWeb.ShellPreferences do
   end
 
   defp handle_params(_params, uri, socket),
-    do: {:cont, Phoenix.Component.assign(socket, :shell_path, URI.parse(uri).path)}
+    do: {:cont, Phoenix.Component.assign(socket, :shell_path, relative_reference(uri))}
+
+  defp relative_reference(uri) do
+    case URI.parse(uri) do
+      %URI{path: path, query: nil} -> path
+      %URI{path: path, query: query} -> path <> "?" <> query
+    end
+  end
 
   def handle_event("shell:preference", %{"kind" => kind, "value" => value}, socket) do
     # Rehydrate the durable session before a self-service write, just as the
     # HTTP preference endpoint does. A revoked session cannot keep writing.
     with {:ok, current_scope} <- BilimbiWeb.UserAuth.refresh_scope(socket.assigns.current_scope),
-         :ok <- own_account(current_scope),
          :ok <- save(current_scope, kind, value) do
-      preferences =
-        case kind do
-          "theme" -> %{current_scope.shell_preferences | theme: value}
-          "timezone" -> %{current_scope.shell_preferences | mode: mode(value)}
-        end
-
-      current_scope = Map.put(current_scope, :shell_preferences, preferences)
-
-      socket =
-        socket
-        |> Phoenix.Component.assign(:current_scope, current_scope)
-        |> rerender(kind)
-
-      {:halt, %{ok: true, preferences: preferences}, socket}
+      {:halt, %{ok: true}, confirm(socket, current_scope, kind, value)}
     else
       {:error, _reason} -> {:halt, %{ok: false}, socket}
     end
@@ -61,7 +63,19 @@ defmodule BilimbiWeb.ShellPreferences do
   def handle_event("shell:preference", _params, socket), do: {:halt, %{ok: false}, socket}
   def handle_event(_event, _params, socket), do: {:cont, socket}
 
-  def save(current_scope, "theme", theme) when theme in ["light", "dark", "system"] do
+  @doc """
+  The one durable write for a display preference, shared by the shell hook and
+  the HTTP adapter. An impersonated session is refused here, so no caller can
+  change the preferences of the account it is viewing.
+  """
+  def save(current_scope, kind, value) do
+    case own_account(current_scope) do
+      :ok -> write(current_scope, kind, value)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp write(current_scope, "theme", theme) when theme in ["light", "dark", "system"] do
     user = current_scope.user
 
     result =
@@ -89,26 +103,30 @@ defmodule BilimbiWeb.ShellPreferences do
     end
   end
 
-  def save(current_scope, "timezone", mode) when mode in ["company", "local", "utc"] do
+  defp write(current_scope, "timezone", mode) when mode in ["company", "local", "utc"] do
     case DateTimePolicy.put_mode(settings_scope(current_scope), mode) do
       {:ok, _mode} -> :ok
       {:error, _reason} = error -> error
     end
   end
 
-  def save(_scope, _kind, _value), do: {:error, :invalid_preference}
+  defp write(_scope, _kind, _value), do: {:error, :invalid_preference}
 
-  defp rerender(socket, "timezone"),
+  defp confirm(socket, current_scope, "theme", theme) do
+    preferences = %{current_scope.shell_preferences | theme: theme}
+
+    Phoenix.Component.assign(
+      socket,
+      :current_scope,
+      Map.put(current_scope, :shell_preferences, preferences)
+    )
+  end
+
+  defp confirm(socket, _current_scope, "timezone", _mode),
     do: Phoenix.LiveView.push_navigate(socket, to: socket.assigns.shell_path)
-
-  defp rerender(socket, "theme"), do: socket
 
   defp own_account(%{impersonator: nil}), do: :ok
   defp own_account(%{impersonator: _impersonator}), do: {:error, :impersonating}
-
-  defp mode("company"), do: :company
-  defp mode("local"), do: :local
-  defp mode("utc"), do: :utc
 
   defp settings_scope(%{user: user, scope: scope}),
     do: SettingsScope.user(user["user_id"], user["company_id"], scope.tenant.id)

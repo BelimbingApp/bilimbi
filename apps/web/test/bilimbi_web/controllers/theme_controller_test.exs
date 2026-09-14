@@ -61,6 +61,28 @@ defmodule BilimbiWeb.ThemeControllerTest do
     assert json_response(conn, 422) == %{"error" => "invalid_theme"}
   end
 
+  test "an impersonated session cannot write the viewed account's theme", %{conn: conn} do
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    conn =
+      conn
+      |> log_in_as()
+      |> Plug.Test.init_test_session(%{
+        "impersonation" => %{"original_user_id" => 92, "original_user_name" => "Grace Hopper"}
+      })
+      |> post(~p"/api/theme", %{"theme" => "dark"})
+
+    assert json_response(conn, 403) == %{"error" => "impersonating"}
+
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+    assert {:ok, "system"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+  end
+
   test "a failed user preference write does not report success", %{conn: conn} do
     authenticated = conn |> log_in_as() |> get(~p"/settings/appearance")
     current_scope = authenticated.assigns.current_scope

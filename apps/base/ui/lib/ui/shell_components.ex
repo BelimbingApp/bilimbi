@@ -137,7 +137,7 @@ defmodule Bilimbi.Base.UI.ShellComponents do
           class="inline-flex h-7 items-center gap-1 rounded-md px-1 text-xs text-link hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
         >
           <.icon name={IconRegistry.shell(:clock)} class="size-4" />
-          <span data-timezone-label class="max-w-28 truncate">{mode_label(@preferences.mode)}</span>
+          <span class="max-w-28 truncate">{mode_label(@preferences.mode)}</span>
           <.icon name={IconRegistry.shell(:chevron)} class="size-3" />
         </button>
         <div

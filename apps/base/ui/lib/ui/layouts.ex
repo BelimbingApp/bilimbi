@@ -109,8 +109,6 @@ defmodule Bilimbi.Base.UI.Layouts do
     <div
       id="app-shell"
       phx-hook="AppShell"
-      data-display-mode={@preferences.mode}
-      data-display-timezone={@preferences.timezone}
       data-theme-choice={@preferences.theme}
       data-sidebar-mode="desktop"
       data-sidebar-rail="false"

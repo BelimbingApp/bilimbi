@@ -16,8 +16,8 @@
           for="theme-light"
           class={[
             "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors",
-            @theme == "light" && "border-action bg-surface-muted",
-            @theme != "light" && "border-line hover:bg-surface-muted"
+            @current_scope.shell_preferences.theme == "light" && "border-action bg-surface-muted",
+            @current_scope.shell_preferences.theme != "light" && "border-line hover:bg-surface-muted"
           ]}
         >
           <input
@@ -25,7 +25,7 @@
             id="theme-light"
             name="appearance[theme]"
             value="light"
-            checked={@theme == "light"}
+            checked={@current_scope.shell_preferences.theme == "light"}
             class="mt-1"
           />
           <div>
@@ -38,8 +38,8 @@
           for="theme-dark"
           class={[
             "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors",
-            @theme == "dark" && "border-action bg-surface-muted",
-            @theme != "dark" && "border-line hover:bg-surface-muted"
+            @current_scope.shell_preferences.theme == "dark" && "border-action bg-surface-muted",
+            @current_scope.shell_preferences.theme != "dark" && "border-line hover:bg-surface-muted"
           ]}
         >
           <input
@@ -47,7 +47,7 @@
             id="theme-dark"
             name="appearance[theme]"
             value="dark"
-            checked={@theme == "dark"}
+            checked={@current_scope.shell_preferences.theme == "dark"}
             class="mt-1"
           />
           <div>
@@ -60,8 +60,8 @@
           for="theme-system"
           class={[
             "flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors",
-            @theme == "system" && "border-action bg-surface-muted",
-            @theme != "system" && "border-line hover:bg-surface-muted"
+            @current_scope.shell_preferences.theme == "system" && "border-action bg-surface-muted",
+            @current_scope.shell_preferences.theme != "system" && "border-line hover:bg-surface-muted"
           ]}
         >
           <input
@@ -69,7 +69,7 @@
             id="theme-system"
             name="appearance[theme]"
             value="system"
-            checked={@theme == "system"}
+            checked={@current_scope.shell_preferences.theme == "system"}
             class="mt-1"
           />
           <div>

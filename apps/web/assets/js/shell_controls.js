@@ -1,5 +1,6 @@
-// Shared shell disclosures. Authorization and preference writes remain at the
-// authenticated LiveView edge; the browser owns focus and in-flight feedback.
+// Shared shell disclosures. Authorization, preference writes and every
+// rendered preference state stay at the authenticated LiveView edge; the
+// browser owns theme projection, focus and in-flight feedback.
 export default class ShellControls {
   constructor(hook) {
     this.hook = hook
@@ -8,13 +9,8 @@ export default class ShellControls {
     this.online = true
     this.onClick = event => this.click(event)
     this.onKey = event => this.key(event)
-    this.onTheme = ({detail}) => {
-      this.root.dataset.themeChoice = detail.theme
-      this.apply()
-    }
     document.addEventListener("click", this.onClick)
     document.addEventListener("keydown", this.onKey)
-    window.addEventListener("phx:theme-changed", this.onTheme)
     this.apply()
   }
 
@@ -22,7 +18,6 @@ export default class ShellControls {
     clearTimeout(this.timer)
     document.removeEventListener("click", this.onClick)
     document.removeEventListener("keydown", this.onKey)
-    window.removeEventListener("phx:theme-changed", this.onTheme)
   }
 
   panels() { return [...this.root.querySelectorAll("[data-account-panel], [data-timezone-panel]")] }
@@ -51,7 +46,7 @@ export default class ShellControls {
         return
       }
       if (button.matches("[data-preference-kind]")) {
-        this.save(button.dataset.preferenceKind, button.dataset.preferenceValue)
+        this.save(button.dataset.preferenceKind, button.dataset.preferenceValue, button)
         return
       }
     }
@@ -89,8 +84,10 @@ export default class ShellControls {
     }
     this.apply()
   }
-  save(kind, value) {
+  save(kind, value, origin) {
     if (this.pending || !this.online) return
+    const open = this.panels().find(panel => !panel.hidden)
+    const restore = (open && this.trigger(open)) || origin
     this.pending = true
     this.apply()
     this.feedback("Saving display preference…")
@@ -101,28 +98,21 @@ export default class ShellControls {
       clearTimeout(this.timer)
       this.pending = false
       if (reply.ok) {
-        const preferences = reply.preferences
-        this.root.dataset.themeChoice = preferences.theme
-        this.root.dataset.displayMode = preferences.mode
-        this.root.dataset.displayTimezone = preferences.timezone
         this.feedback(kind === "theme" ? "Theme saved." : "Time display saved.")
-        this.closeAll(true)
+        this.closeAll()
       } else {
         this.feedback("Could not save display preference. Your previous choice is still selected. Try again.", true)
       }
       this.apply()
+      restore?.focus()
     })
   }
   apply() {
-    const theme = this.root.dataset.themeChoice || "system"
+    const theme = this.root.dataset.themeChoice
     if (theme === "system") delete document.documentElement.dataset.theme
     else document.documentElement.dataset.theme = theme
-    const mode = this.root.dataset.displayMode || "company"
     for (const button of this.root.querySelectorAll("[data-preference-kind]")) {
       button.disabled = this.pending || !this.online
-      button.setAttribute("aria-pressed", String(button.dataset.preferenceValue === (button.dataset.preferenceKind === "theme" ? theme : mode)))
     }
-    for (const label of this.root.querySelectorAll("[data-timezone-label]")) label.textContent = {company: "Company", local: "Local", utc: "UTC"}[mode]
-    for (const button of this.root.querySelectorAll("[data-timezone-toggle]")) button.title = `Time display: ${{company: this.root.dataset.displayTimezone, local: "This device’s local time", utc: "UTC"}[mode]}`
   }
 }

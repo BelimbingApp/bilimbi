@@ -50,7 +50,28 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     assert has_element?(view, "#appearance-locale option[value='de-CH']", "German (Switzerland)")
   end
 
-  test "updates theme to dark and dispatches theme-changed event", %{conn: conn} do
+  test "the top bar and this form render one theme, so neither reverts the other", %{conn: conn} do
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+    {:ok, "dark"} = User.put_user_preference(scope, 73, 91, "ui.theme", "dark")
+
+    {:ok, view, _html} = open(conn)
+    assert has_element?(view, "input[name='appearance[theme]'][value='dark'][checked]")
+
+    render_hook(view, "shell:preference", %{kind: "theme", value: "light"})
+
+    assert has_element?(view, "input[name='appearance[theme]'][value='light'][checked]")
+    assert has_element?(view, "#app-shell[data-theme-choice='light']")
+
+    view
+    |> form("#appearance-form", %{"appearance" => %{"theme" => "light", "locale" => "de-CH"}})
+    |> render_change()
+
+    assert {:ok, "light"} = User.get_user_preference(scope, 73, 91, "ui.theme")
+    assert has_element?(view, "input[name='appearance[theme]'][value='light'][checked]")
+    assert has_element?(view, "#app-shell[data-theme-choice='light']")
+  end
+
+  test "a form save updates the top bar without a second theme copy", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
     view
@@ -60,6 +81,7 @@ defmodule BilimbiWeb.UserAppearanceLiveTest do
     |> render_change()
 
     assert render(view) =~ "Appearance settings saved."
+    assert has_element?(view, "#app-shell[data-theme-choice='dark']")
 
     # Verify saved to User preference / settings
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)

@@ -28,18 +28,6 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
   @impl true
   def mount(_params, _session, socket) do
     current_scope = socket.assigns.current_scope
-    user_id = extract_user_id(current_scope)
-    company_id = extract_company_id(current_scope)
-    scope = current_scope.scope
-
-    theme =
-      with {:ok, saved_theme} <- User.get_user_preference(scope, company_id, user_id, @theme_key),
-           true <- saved_theme in ["light", "dark", "system"] do
-        saved_theme
-      else
-        _ -> "system"
-      end
-
     locale_scope = locale_scope(current_scope)
 
     locale =
@@ -63,7 +51,6 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
 
     {:ok,
      assign(socket,
-       theme: theme,
        locale: locale,
        locale_options: locale_options,
        installation_locale: Locale.label(installation_locale),
@@ -74,7 +61,7 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
 
   @impl true
   def handle_event("save", %{"appearance" => appearance}, socket) when is_map(appearance) do
-    theme = Map.get(appearance, "theme", socket.assigns.theme)
+    theme = Map.get(appearance, "theme", current_theme(socket))
     locale = Map.get(appearance, "locale", socket.assigns.locale)
     timezone_mode = Map.get(appearance, "timezone_mode", socket.assigns.timezone_mode)
 
@@ -101,14 +88,24 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
          :ok <- persist_timezone_mode(locale_scope(current_scope), timezone_mode) do
       {:noreply,
        socket
-       |> assign(theme: theme, locale: locale, timezone_mode: timezone_mode)
-       |> put_flash(:info, "Appearance settings saved.")
-       |> push_event("theme-changed", %{theme: theme})}
+       |> assign(:current_scope, put_theme(current_scope, theme))
+       |> assign(locale: locale, timezone_mode: timezone_mode)
+       |> put_flash(:info, "Appearance settings saved.")}
     else
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Could not save appearance settings.")}
     end
   end
+
+  defp current_theme(socket), do: socket.assigns.current_scope.shell_preferences.theme
+
+  defp put_theme(current_scope, theme),
+    do:
+      Map.put(
+        current_scope,
+        :shell_preferences,
+        %{current_scope.shell_preferences | theme: theme}
+      )
 
   defp persist_theme(scope, company_id, user_id, "system") do
     User.delete_user_preference(scope, company_id, user_id, @theme_key)
