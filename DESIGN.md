@@ -157,7 +157,7 @@ than copying assets or framework markup. Logout is the explicit exception and
 keeps Bilimbi's own treatment.
 
 Use `<.icon_button>` for familiar repeated secondary actions where words would
-create table or toolbar noise. Inline controls are `size-5`; table and toolbar
+create table or toolbar noise. Inline controls are `size-6` (24px targets); table and toolbar
 controls are `size-7`. Every icon-only action has an accessible label and title.
 Keep primary and unfamiliar actions as words. Destructive actions use calm
 danger text with quiet hover feedback, never a solid red button.

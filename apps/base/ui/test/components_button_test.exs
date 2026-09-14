@@ -105,7 +105,7 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
 
     assert inline =~ ~s(aria-label="Pin page")
     assert inline =~ ~s(title="Pin page")
-    assert inline =~ "size-5 rounded-sm"
+    assert inline =~ "size-6 rounded-sm"
     assert inline =~ "size-3.5"
 
     assert table =~ "size-7 rounded-md"

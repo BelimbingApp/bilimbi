@@ -569,7 +569,7 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   must show in-flight state, reject duplicate work, and truthfully report the data
   outcome and recovery.
 - **Compact actions:** Use `<.icon_button>` for familiar repeated secondary
-  actions in tables and toolbars. Inline icon controls are `size-5`; table and
+  actions in tables and toolbars. Inline icon controls are `size-6` (24px targets); table and
   toolbar icon controls are `size-7`. Every icon-only action has a truthful
   accessible label and title. Keep primary and unfamiliar actions as text.
   Destructive actions use calm danger text with quiet hover feedback, not a

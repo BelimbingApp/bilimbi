@@ -54,7 +54,7 @@ Routine design decisions do not pause for user approval. Escalate only a new bus
 
 ## Current Audit
 
-`T01` and `C01`–`C06` were resolved on the current draft branch, implemented in production UI and moved to Design Spec. Root guidance and the parity baseline now preserve those decisions and the intentional content-sized pagination correction from #304. `main` through `d105ebe` is integrated at `3840987`.
+`T01` and `C01`–`C06` were resolved on the current draft branch, implemented in production UI and moved to Design Spec. Root guidance and the parity baseline now preserve those decisions and the intentional content-sized pagination correction from #304. The subsequent #694 integration preserves 24px inline icon targets through the shared component, with table/toolbar controls still 28px, and retains status-first company actions and the pin-state regression test.
 
 The inventory also covers the current shared structure, navigation, tabs, buttons, form fields, multi-select, choice controls, inline editing, flash messages, alerts, badges, tables, pagination, record facts, dates, operational lists, empty states, permission states, recovery states, the Bilimbi mark and icons.
 
@@ -100,13 +100,16 @@ Validation: A reviewer can inspect the current design and compare each variation
 Goal: Merge a verified Design Library foundation before beginning the parity campaign.
 
 - [x] Integrate current `main` through `d105ebe` without destructive history rewriting. `{astra_pr_gate/gpt-6-astra}`
+- [x] Reconcile the later `d93feb1` merge with the shared icon component, preserving #694 behavior and updating the inline target size in Design Spec and guidance. `{astra_pr_gate/gpt-6-astra}`
 - [x] Give both pagination specimens independent in-memory results, working page and page-size controls, bounded pages and honest summaries. `{astra_pr_gate/gpt-6-astra}`
 - [x] Make the composite example search filter its own rows and recover from empty results. `{astra_pr_gate/gpt-6-astra}`
 - [x] Replace fabricated company navigation with local example previews. `{astra_pr_gate/gpt-6-astra}`
 - [x] Reconcile pagination geometry and delegate routine parity acceptance to Astra. `{astra_pr_gate/gpt-6-astra}`
 - [x] Complete focused interaction tests, formatting, browser review of all four routes and full `mix precommit` for the foundation closeout. `{astra_pr_gate/gpt-6-astra}`
 
-Evidence: `mix precommit` completed with 1,392 passing tests and six installed contribution snapshots verified. The final example-feedback adjustment was subsequently rechecked with all 14 Design Library LiveView tests passing. Asset build, `mix format --check-formatted`, focused strict Credo and `git diff --check` passed. Browser review covered Theme, Components, Graphic and Design Spec at 1440×900 and 390×844 in light and dark themes. It verified independent pagination, keyboard page changes, empty-search recovery, visible example-only feedback, contained table overflow and an unclipped three-digit page-size selector. The development account's original dark theme and the browser viewport were restored after review.
+Final closeout evidence: after integrating #694, `mix precommit` completed with 1,393 passing tests, including 538 Web tests, and six installed contribution snapshots verified. Focused shell/company/Design Library verification passed 79 tests; shared button verification passed seven tests. Asset build, `mix format --check-formatted`, the repository's deterministic mandates, focused strict Credo with CI's configured exclusions and `git diff --check` passed. Browser review covered Theme, Components, Graphic and Design Spec at 1440×900 and 390×844 in light and dark themes. It verified independent pagination, keyboard page changes, empty-search recovery, visible example-only feedback, contained table overflow and an unclipped three-digit page-size selector. Focused browser rechecks after the latest integration confirmed 24×24 inline and sidebar pin/unpin targets, 28×28 table actions and the company status-first action row. The development account's original dark theme and the browser viewport were restored after review.
+
+- [x] Repeat relevant verification after integrating #694, including shared icon sizing, shell pin-state behavior and full `mix precommit`. `{astra_pr_gate/gpt-6-astra}`
 
 The PR remains draft for CI on the pushed closeout and the merge decision; routine human design approval is no longer a closeout gate.
 

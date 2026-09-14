@@ -240,7 +240,7 @@ defmodule Bilimbi.Base.UI.Components do
       assigns
       |> assign(:control_class, [
         "grid shrink-0 place-items-center transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
-        assigns.context == :inline && "size-5 rounded-sm",
+        assigns.context == :inline && "size-6 rounded-sm",
         assigns.context == :table && "size-7 rounded-md",
         assigns.kind == :neutral &&
           "text-ink-muted hover:bg-surface-sunken hover:text-ink disabled:text-ink-faint",

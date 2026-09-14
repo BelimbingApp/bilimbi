@@ -821,12 +821,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               else: @company.code}
           </:subtitle>
           <:actions>
-            <.discovered_panel
-              key="record.history"
-              id="company-record-history"
-              current_scope={@current_scope}
-              opts={%{auditable_types: company_auditable_types(), auditable_id: @company.id}}
-            />
+            <%!-- Status is record metadata, not an action: it leads the row so
+                 the buttons (History onward) cluster after it (#685). --%>
             <.badge kind={
               case @company.status do
                 "active" -> :success
@@ -837,6 +833,12 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             }>
               {String.capitalize(@company.status)}
             </.badge>
+            <.discovered_panel
+              key="record.history"
+              id="company-record-history"
+              current_scope={@current_scope}
+              opts={%{auditable_types: company_auditable_types(), auditable_id: @company.id}}
+            />
             <.button
               navigate={~p"/companies/#{@company.id}/departments"}
               class="text-xs"
