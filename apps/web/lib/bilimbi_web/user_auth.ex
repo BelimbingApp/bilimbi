@@ -663,7 +663,6 @@ defmodule BilimbiWeb.UserAuth do
           "user_id" => user_id,
           "company_id" => company_id
         },
-        permitted_scopes: [%{company_id: company_id, tenant_id: tenant_id}],
         operator_company_missing: operator_company_missing?(scope)
       }
       |> then(&Map.put(&1, :shell_preferences, BilimbiWeb.ShellPreferences.presentation(&1)))

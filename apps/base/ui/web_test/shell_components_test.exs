@@ -12,38 +12,10 @@ defmodule Bilimbi.Base.UI.ShellComponentsTest do
           "company_name" => "Analytical Engines"
         },
         scope: %{tenant: %{name: "Research", id: 41, is_platform_operator: false}},
-        permitted_scopes: [%{company_id: 73, tenant_id: 41}],
         impersonator: nil
       },
       overrides
     )
-  end
-
-  test "one permitted scope hides switching; multiple trusted choices disclose it inside the account panel" do
-    single =
-      render_component(&ShellComponents.account_menu/1, id: "account", current_scope: scope())
-      |> LazyHTML.from_fragment()
-
-    assert Enum.empty?(LazyHTML.query(single, "#account-scope-switcher"))
-
-    multiple =
-      scope(%{
-        permitted_scopes: [
-          %{label: "Research", href: "/scope/research"},
-          %{label: "Operations", href: "/scope/operations"}
-        ]
-      })
-
-    html =
-      render_component(&ShellComponents.account_menu/1, id: "account", current_scope: multiple)
-      |> LazyHTML.from_fragment()
-
-    assert [_] =
-             LazyHTML.query(
-               html,
-               "#account-panel #account-scope-switcher a[href='/scope/operations']"
-             )
-             |> Enum.to_list()
   end
 
   test "ordinary context has no warning; operator and impersonation warnings remain outside account disclosure" do

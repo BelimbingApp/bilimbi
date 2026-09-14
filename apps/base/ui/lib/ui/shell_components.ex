@@ -14,8 +14,6 @@ defmodule Bilimbi.Base.UI.ShellComponents do
   attr :specimen, :boolean, default: false
 
   def account_menu(assigns) do
-    assigns = assign(assigns, :scopes, Map.get(assigns.current_scope, :permitted_scopes, []))
-
     ~H"""
     <div id={@id} class="relative border-t border-line p-1" data-account-menu>
       <button
@@ -57,21 +55,6 @@ defmodule Bilimbi.Base.UI.ShellComponents do
             </dd>
           </div>
         </dl>
-        <%!-- Only trusted edge-provided choices carry destinations. Current identity supplies one scope. --%>
-        <div
-          :if={length(@scopes) > 1}
-          id={@id <> "-scope-switcher"}
-          class="mb-2"
-          aria-label="Switch scope"
-        >
-          <p class="mb-1 text-muted">Switch scope</p>
-          <.link
-            :for={scope <- @scopes}
-            :if={scope[:href]}
-            href={scope.href}
-            class="block rounded-md px-2 py-1.5 hover:bg-surface-muted"
-          >{scope.label}</.link>
-        </div>
         <div class="space-y-1">
           <.link
             :if={!@specimen}

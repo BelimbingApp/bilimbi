@@ -103,14 +103,7 @@ defmodule Bilimbi.Base.UI.Layouts do
       assigns
       |> assign(:shell, shell_meta())
       |> assign(:nav, nav)
-      |> assign(
-        :preferences,
-        Map.get(assigns.current_scope, :shell_preferences, %{
-          theme: "system",
-          mode: :company,
-          timezone: "UTC"
-        })
-      )
+      |> assign(:preferences, assigns.current_scope.shell_preferences)
 
     ~H"""
     <div

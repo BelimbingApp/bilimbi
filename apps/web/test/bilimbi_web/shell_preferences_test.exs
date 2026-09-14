@@ -71,9 +71,7 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     assert has_element?(view, "#app-display-system[aria-pressed='true']")
   end
 
-  test "the account menu exposes real account actions and hides single-scope switching", %{
-    conn: conn
-  } do
+  test "the account menu exposes real account actions for the signed-in identity", %{conn: conn} do
     {:ok, view, _} = conn |> log_in_as() |> live(~p"/dashboard")
     assert has_element?(view, "#app-user-toggle[aria-controls='app-user-panel']")
     assert has_element?(view, "#app-user-panel", "Ada Lovelace")
@@ -81,7 +79,6 @@ defmodule BilimbiWeb.ShellPreferencesTest do
     assert has_element?(view, "#app-user-panel", "Tenant")
     assert has_element?(view, "#app-user-password[href='/settings/password']", "Change password")
     assert has_element?(view, "#app-user-logout[data-method='delete']", "Sign out")
-    refute has_element?(view, "#app-user-scope-switcher")
     refute has_element?(view, "#app-tenant")
   end
 end

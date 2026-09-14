@@ -30,7 +30,6 @@ defmodule BilimbiWeb.DashboardLiveTest do
     refute has_element?(view, "#app-tenant")
     assert has_element?(view, "#app-user-panel", "Bilimbi local development")
     assert has_element?(view, "#app-scope-warning", "Platform-operator access")
-    refute has_element?(view, "#app-user-scope-switcher")
 
     assert has_element?(view, "#stat-companies", "1")
     assert has_element?(view, "#stat-users", "1")
