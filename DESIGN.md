@@ -150,7 +150,11 @@ deep-module directory even when the Phoenix host adapts them into routes or
 layouts.
 
 Use the shared `<.icon>` component for icons. Do not call Heroicons modules
-directly from templates.
+directly from templates. For an action that has a direct Belimbing equivalent,
+use the same established icon choice so replacement does not make familiar
+actions harder to recognize. Render it through Bilimbi's icon registry rather
+than copying assets or framework markup. Logout is the explicit exception and
+keeps Bilimbi's own treatment.
 
 Use `<.icon_button>` for familiar repeated secondary actions where words would
 create table or toolbar noise. Inline controls are `size-5`; table and toolbar
@@ -176,7 +180,8 @@ Two shells exist and each stays minimal:
   workspace. No navigation, no marketing.
 - **`Layouts.app`** — the authenticated workspace shell: a compact full-width
   top bar (sidebar toggle, transparent `size-6` brand mark and Bilimbi
-  wordmark), a left menu sidebar, and a persistent status bar
+  wordmark, current timezone selector and light/dark theme selector), a left
+  menu sidebar, and a persistent status bar
   (application version). In development only, the status bar shows `dev` plus
   the listen address. Wide screens keep the rail; the collapsed rail hides
   labels, leaving the user initials. The bottom-left user circle remains the
@@ -190,6 +195,11 @@ Ordinary users do not need company and tenant repeated in the top strip. Show
 an always-visible scope warning outside the account menu when context is
 unusual or safety-critical, including platform-operator access, impersonation,
 or cross-company work where acting in the wrong scope could cause harm.
+
+The timezone and theme selectors are compact top-bar utilities, not settings
+navigation. A selection applies immediately and persists for the signed-in
+user. Timezone changes affect subsequent date and time rendering; theme
+changes affect the current page without a reload.
 
 ### Navigation menu conventions
 
@@ -211,8 +221,8 @@ or cross-company work where acting in the wrong scope could cause harm.
 
 The shell does not grow navigation items for pages that do not exist. A
 workflow joins the sidebar when its screen ships, not before. Notifications,
-theme, timezone, chat, and diagnostics controls appear only when a real
-route or API backs them.
+chat, and diagnostics controls appear only when a real route or API backs
+them.
 
 ## Gestalt grouping
 

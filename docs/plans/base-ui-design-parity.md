@@ -50,9 +50,9 @@ The catalog is organized by what a human is trying to review, not by Laravel or 
 | FND-03 | Spacing and density rhythm | Partly standardized | Define one compact rhythm across primitives and page assemblies. |
 | FND-04 | Shape, lines and elevation | Strong identity with local drift | Keep Bilimbi geometry; remove unexplained variations. |
 | FND-05 | Focus, motion and reduced motion | Partial | Define consistent focus visibility, transition purpose and reduced-motion behavior. |
-| FND-06 | Icon language and catalog | Registry exists; review is limited | Add searchable visual review, empty result, copy and copied feedback. |
+| FND-06 | Icon language and catalog | Registry exists; review is limited | Use Belimbing's established icon choices for equivalent actions, except logout, while rendering them through Bilimbi's icon component and registry. Add searchable visual review, empty result, copy and copied feedback. |
 | LAY-01 | Authentication shell | Exists | Compare first impression, responsive behavior, errors and recovery. |
-| LAY-02 | Application shell and account footer | Exists | Remove persistent company and tenant repetition. Keep the user circle at the bottom left as the account and scope entry point; show an always-visible warning only for unusual or safety-critical scope. Match the best collapse, drawer and navigation-continuity behavior. |
+| LAY-02 | Application shell and account footer | Exists | Remove persistent company and tenant repetition. Put the current timezone and light/dark theme selectors in the top bar. Keep the user circle at the bottom left as the account and scope entry point; show an always-visible warning only for unusual or safety-critical scope. Match the best collapse, drawer and navigation-continuity behavior. |
 | LAY-03 | Page width and page header | Shared primitives exist | Cover title, subtitle, action, pin, contextual help and narrow states. |
 | LAY-04 | Secondary side panel | Bespoke Design Library example | Establish one responsive page-local navigation pattern with desktop rail and mobile access. |
 | LAY-05 | Index, form and detail geometry | Partial conventions | Define complete assemblies rather than leaving every screen to compose them differently. |
@@ -100,7 +100,7 @@ The catalog is organized by what a human is trying to review, not by Laravel or 
 | CMP-05 | Authentication and first arrival | Implemented but not parity-audited | Treat login, recovery and dashboard arrival as first-impression acceptance surfaces. |
 | CMP-06 | Responsive and theme coverage | Ad hoc | Review representative assemblies at desktop/narrow widths and in light/dark themes. |
 | GFX-01 | Mark and wordmark | Present | Keep Bilimbi identity and verify size, surface and contrast uses. |
-| GFX-02 | Product and interface icons | Registry and Heroicons exist | Make supported icons searchable and verify size, alignment and meaning. |
+| GFX-02 | Product and interface icons | Registry and Heroicons exist | Make the approved FND-06 icon set searchable and verify size, alignment and meaning without copying Belimbing assets or framework markup. |
 | GFX-03 | Placeholder and empty-state graphics | Limited | Add only when graphics improve comprehension rather than decorate empty space. |
 
 ### Disposition Ledger
@@ -150,6 +150,8 @@ Keeping company and tenant in the top strip makes known context compete with the
 - Belimbing is reference evidence, not visual or implementation authority.
 - Bilimbi identity IDs `K01`–`K09` cannot be changed by a parity work item unless the human explicitly reopens that identity decision.
 - Ordinary company and tenant context is available through the bottom-left user account menu, not repeated in the top strip. Platform-operator, impersonated and other safety-critical scope remains visibly disclosed while active.
+- The top bar exposes the current timezone and light/dark theme selectors. A change applies immediately, persists for the signed-in user and truthfully affects subsequent date/time or theme rendering.
+- Equivalent actions use Belimbing's established icon choices through Bilimbi's icon registry, with logout as the explicit exception.
 - Every parity issue names the catalog IDs it owns, its dependencies, affected routes, owned files and acceptance evidence.
 - A catalog item is complete only when its disposition is recorded, the real component is shown in the Design Library, applicable states and keyboard behavior are tested, narrow and theme behavior are reviewed, and one production screen adopts it.
 - Decision-required items are not implemented as accepted design before human selection.
