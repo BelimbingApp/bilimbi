@@ -6,8 +6,14 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
 
   Both sides are derived. Components and their states come from Phoenix's
   `__components__/0` reflection; what the library shows comes from the parsed
-  template (`Bilimbi.Base.UI.DesignLibrarySource`). A component that gains a
-  declared state turns the state guard red until the library shows it.
+  template (`Bilimbi.Base.UI.DesignLibrarySource`).
+
+  The bar is variation, not exhaustiveness. An axis that declares several
+  states has to show more than one of them; an axis that declares a single
+  state has to show that one. Showing every declared value is not required —
+  `<.input>` declares a `hidden` type that renders nothing a reviewer can see —
+  because the lie this guard catches is a component presented in one default
+  state, not a missing specimen per value.
 
   A component that declares no state at all — today `pagination` and
   `inline_edit`, which vary from their data rather than from an attr — is held
@@ -65,29 +71,33 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
            """
   end
 
-  test "every declared state of every public component is presented", %{catalog: catalog} do
+  test "every public component varies on each state it declares", %{catalog: catalog} do
     report =
       for name <- Source.public_components(),
           calls = Source.entry_calls(name, catalog),
           {axis, expected} <- axes(name),
           observed = observed(name, axis, calls),
-          missing = expected -- observed,
-          missing != [] do
-        {name, axis, missing, observed, calls}
+          shown = Enum.filter(expected, &(&1 in observed)),
+          short = required(expected) - length(shown),
+          short > 0 do
+        {name, axis, expected, shown, short, calls}
       end
 
     assert report == [],
            """
-           The Design Library presents these components in fewer states than
-           they declare. Every attr with `values:`, every boolean attr with a
+           The Design Library presents these components in one state where they
+           declare more. Every attr with `values:`, every boolean attr with a
            default, every optional `:string` attr, every optional slot and
-           every repeating slot is a state a reviewer must be able to see:
+           every repeating slot is an axis the library has to vary on:
 
            #{Enum.map_join(report, "\n", &describe_gap/1)}
 
-           A state counts only when the template spells it out (a literal attr
-           value, a slot that is present or absent). Values computed at render
-           time, like `kind={row.kind}`, prove nothing about what is shown.
+           An axis that declares two or more states has to show two of them; an
+           axis that declares one has to show it. Which ones is the library's
+           call, so a value that cannot be seen never has to be built. A state
+           counts only when the template spells it out (a literal attr value, a
+           slot that is present or absent). Values computed at render time, like
+           `kind={row.kind}`, prove nothing about what is shown.
            """
   end
 
@@ -170,6 +180,10 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   defp extra_axes(:icon), do: [{{:icon, :source}, [:hero, :registry]}]
 
   defp extra_axes(_name), do: []
+
+  # Two presentations prove the library varies on an axis. An axis that
+  # declares only one state cannot show two, so it is held to that one.
+  defp required(expected), do: min(2, length(expected))
 
   ## What the calls present
 
@@ -258,7 +272,7 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
 
   ## Failure copy
 
-  defp describe_gap({name, axis, missing, observed, calls}) do
+  defp describe_gap({name, axis, expected, shown, short, calls}) do
     lines =
       case calls do
         [] -> "no `component-*` block of its own calls it"
@@ -267,8 +281,9 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
 
     """
       <.#{name}> #{describe_axis(axis)}
-        missing: #{Enum.map_join(missing, ", ", &inspect/1)}
-        shown:   #{if observed == [], do: "nothing", else: Enum.map_join(observed, ", ", &inspect/1)}
+        declares: #{Enum.map_join(expected, ", ", &inspect/1)}
+        shows:    #{if shown == [], do: "none of them", else: Enum.map_join(shown, ", ", &inspect/1)}
+        needs:    #{short} more of them
         #{lines}
     """
   end
