@@ -520,19 +520,19 @@ not call or recreate it elsewhere.
 - The Design Library (`/system/design-library`) presents only shared
   components, in every state they declare. A component is presented by an
   `id="component-<name>"` block of its own that calls `<.name>`; framing
-  another specimen is not presenting it. The only exempt anchors are the
-  grouping sections the sidebar menu links to, so a new grouping section is
-  linked from the menu or drops the prefix. An id-less `<.card>` in the
-  components area names nothing, so it is anchored, nested inside an anchored
-  block, or listed in that module's `@declared_specimens`. Hand-written control
-  markup and single-state specimens fail the guards in
-  `apps/base/ui/test/design_library_*_test.exs`, which read the template and
-  `Components.__components__/0`. Those guards are
-  tagged `:design_library_drift` and excluded from the default run until the
-  current specimens are corrected; run them with
-  `mix test --include design_library_drift`. The rules themselves live in
-  `Bilimbi.Base.UI.DesignLibrarySource` and are covered on fixtures by
-  `design_library_rules_test.exs`, which runs by default.
+  another specimen is not presenting it. The exempt anchors are the sidebar
+  menu, the grouping sections it links to and the wrapper around them, so a
+  new grouping section is linked from the menu or drops the prefix. An id-less
+  `<.card>` in the components area names nothing, so it is anchored, nested
+  inside an anchored block, or listed in the `@declared_specimens` of
+  `Bilimbi.Base.UI.DesignLibrarySource`, which owns the rules that read the
+  template. Hand-written control markup and single-state specimens fail the
+  guards in `apps/base/ui/test/design_library_*_test.exs`, which read it and
+  `Components.__components__/0`. Those guards are tagged
+  `:design_library_drift` and excluded from the default run until the current
+  specimens are corrected; run them with
+  `mix test --include design_library_drift`. The rules are covered on fixtures
+  by `design_library_rules_test.exs`, which runs by default.
 
 Templates may be colocated with their owning LiveView through `embed_templates`
 or a nearby `.html.heex` file. Colocation does not move the view into the
