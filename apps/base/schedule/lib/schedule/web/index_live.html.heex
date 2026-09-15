@@ -35,21 +35,16 @@
       </div>
     </section>
 
-    <nav id="schedule-tabs" class="mt-5 flex gap-1 border-b border-line" aria-label="Schedule views">
-      <.link
+    <.tabs id="schedule-tabs" class="mt-5" aria-label="Schedule views">
+      <:tab
         :for={{tab, label} <- [{"tasks", "Tasks"}, {"history", "History"}, {"settings", "Settings"}]}
         id={"schedule-tab-#{tab}"}
         patch={tab_path(@state, tab)}
-        aria-current={@state.tab == tab && "page"}
-        class={[
-          "-mb-px border-b-2 px-3 py-2 text-sm transition",
-          @state.tab == tab && "border-brand-strong font-medium text-ink-strong",
-          @state.tab != tab && "border-transparent text-ink-muted hover:text-ink"
-        ]}
+        current={@state.tab == tab}
       >
         {label}
-      </.link>
-    </nav>
+      </:tab>
+    </.tabs>
 
     <section :if={@state.tab == "tasks"} id="schedule-tasks-panel" aria-labelledby="schedule-tab-tasks">
       <.form

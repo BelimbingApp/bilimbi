@@ -178,7 +178,7 @@ defmodule Bilimbi.Base.UI.Layouts do
 
         <aside
           id="app-sidebar"
-          class="app-sidebar absolute inset-y-0 left-0 z-40 flex w-56 shrink-0 flex-col border-r border-line bg-surface-sidebar lg:static lg:inset-auto lg:top-auto lg:bottom-auto lg:z-auto lg:w-60"
+          class="app-sidebar app-nav-rail absolute inset-y-0 left-0 z-40 flex w-56 shrink-0 flex-col border-r border-line bg-surface-sidebar lg:static lg:inset-auto lg:top-auto lg:bottom-auto lg:z-auto lg:w-60"
           tabindex="-1"
           role="navigation"
           aria-label="Main navigation"
@@ -270,6 +270,7 @@ defmodule Bilimbi.Base.UI.Layouts do
   attr(:active, :boolean, default: false)
   attr(:id, :string, required: true)
   attr(:label, :string, required: true)
+  attr(:pinnable, :boolean, default: true)
 
   defp nav_item(assigns) do
     ~H"""
@@ -297,16 +298,35 @@ defmodule Bilimbi.Base.UI.Layouts do
         />
         <span class="app-nav-label min-w-0 truncate">{@label}</span>
       </.link>
-      <.nav_pin item_id={@id} label={@label} />
+      <.nav_pin :if={@pinnable} item_id={@id} label={@label} />
     </div>
     """
   end
 
+  @doc """
+  One sidebar navigation node: a leaf row, or a branch with its children.
+
+  Public so the Design Library renders the rail the shell actually ships rather
+  than a look-alike. `node` is a `Bilimbi.Base.UI.Nav` tree entry —
+  `%{item: %Bilimbi.Base.Menu.Item{}, children: [node]}` — and `active_nav` is
+  the menu id of the current page, which marks that row and accents its
+  ancestors.
+
+  Rows take their type scale, colours, icon suppression and caret direction
+  from the `.app-nav-rail` rules in `app.css`, so a container outside
+  `#app-sidebar` must carry that class to render what the shell renders.
+
+  `pinnable` is false outside the sidebar. `AppShell.resolvePinnedItem/1`
+  resolves a pinned id only against `#app-sidebar`, so a pin control anywhere
+  else stores an entry that the next render prunes — a control that looks
+  live and does nothing.
+  """
   attr(:node, :map, required: true)
   attr(:active_nav, :string, default: nil)
   attr(:depth, :integer, default: 0)
+  attr(:pinnable, :boolean, default: true)
 
-  defp nav_branch(assigns) do
+  def nav_branch(assigns) do
     item = assigns.node.item
     dom_id = nav_dom_id(item.id)
     branch? = assigns.node.children != []
@@ -329,6 +349,7 @@ defmodule Bilimbi.Base.UI.Layouts do
       active={@active?}
       id={"nav-" <> @dom_id}
       label={@node.item.label}
+      pinnable={@pinnable}
     />
 
     <section
@@ -408,7 +429,7 @@ defmodule Bilimbi.Base.UI.Layouts do
           <span class="app-nav-label min-w-0 truncate">{@node.item.label}</span>
         </.link>
         <.nav_pin
-          :if={@node.item.route}
+          :if={@pinnable and @node.item.route}
           item_id={"nav-" <> @dom_id}
           label={@node.item.label}
         />
@@ -424,6 +445,7 @@ defmodule Bilimbi.Base.UI.Layouts do
           node={child}
           active_nav={@active_nav}
           depth={@depth + 1}
+          pinnable={@pinnable}
         />
       </div>
     </section>

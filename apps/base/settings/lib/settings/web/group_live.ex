@@ -48,7 +48,7 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
   end
 
   @impl true
-  def handle_event("switch_tab", %{"group" => group}, socket) do
+  def handle_event("switch_tab", %{"tab" => group}, socket) do
     if group in socket.assigns.page.groups do
       {:noreply, assign(socket, :active_tab, group)}
     else

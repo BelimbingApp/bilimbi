@@ -582,29 +582,35 @@
               </.card>
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
-              <.card id="component-navigation" title="Navigation" inner_class="p-3">
-                <div class="max-w-xs rounded-lg bg-surface-sidebar p-2 text-[0.8125rem] text-link">
-                  <div class="px-2 py-1">Companies</div><div class="px-2 py-1 text-brand-strong">
-                    System
-                  </div><div class="rounded-sm bg-surface px-2 py-1 text-brand-strong">
-                    Design Library
-                  </div><div class="mt-1 rounded-sm bg-brand-surface px-2 py-1">Pinned item</div>
-                </div>
+              <.card id="component-navigation" title="Navigation" inner_class="space-y-2 p-3">
+                <nav
+                  id="example-nav"
+                  aria-label="Example menu"
+                  class="app-nav-rail max-w-xs rounded-lg bg-surface-sidebar px-0.5 py-0.5"
+                >
+                  <Layouts.nav_branch
+                    :for={node <- @nav_example}
+                    node={node}
+                    active_nav={@nav_example_active}
+                    pinnable={false}
+                  />
+                </nav>
+                <p class="text-xs text-ink-muted">
+                  The shell's own rail rows, over an example tree: a leaf, an expanded
+                  branch accented for the current page, and the selected child. Both rail
+                  behaviours belong to the sidebar rather than to these rows. Pinning is
+                  left out: the shell resolves a pinned row only from the sidebar, and
+                  draws pinned rows there with its hook rather than with a component. The
+                  branch toggle renders but does not collapse here: the shell listens for
+                  it only inside the sidebar.
+                </p>
               </.card>
               <.card id="component-tabs" title="Tabs" inner_class="p-3">
-                <nav class="flex gap-1 border-b border-line" aria-label="Example views">
-                  <a
-                    href="#component-tabs"
-                    aria-current="page"
-                    class="-mb-px border-b-2 border-brand-strong px-3 py-2 text-sm font-medium text-ink-strong"
-                  >Overview</a><a
-                    href="#component-tabs"
-                    class="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-ink-muted hover:text-ink"
-                  >History</a><a
-                    href="#component-tabs"
-                    class="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-ink-muted hover:text-ink"
-                  >Settings</a>
-                </nav>
+                <.tabs id="example-tabs" aria-label="Example views">
+                  <:tab href="#component-tabs" current={true}>Overview</:tab>
+                  <:tab href="#component-tabs">History</:tab>
+                  <:tab href="#component-tabs">Settings</:tab>
+                </.tabs>
               </.card>
             </div>
           </section>
@@ -752,30 +758,23 @@
                   type="checkbox"
                   label="Enable synchronization"
                 />
-                <fieldset>
-                  <legend class="mb-1.5 text-sm font-medium text-ink">Appearance</legend>
-                  <div class="space-y-2">
-                    <label
-                      :for={
-                        {label, value} <- [
-                          {"System", "system"},
-                          {"Light", "light"},
-                          {"Dark", "dark"}
-                        ]
-                      }
-                      class="flex items-center gap-2 text-sm text-ink"
-                    >
-                      <input
-                        type="radio"
-                        name={@sample_form[:radio_field].name}
-                        value={value}
-                        checked={@sample_form[:radio_field].value == value}
-                        class="size-4 accent-action focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-                      />
-                      {label}
-                    </label>
-                  </div>
-                </fieldset>
+                <.radio_group
+                  field={@sample_form[:radio_field]}
+                  id="component-radio-group"
+                  label="Appearance"
+                  options={[
+                    {"System", "system"},
+                    {"Light", "light"},
+                    {"Dark", "dark"}
+                  ]}
+                  wrapper_class="mb-1.5"
+                />
+                <p id="component-radio-group-gap" class="text-xs text-ink-muted">
+                  Appearance Settings still hand-writes its own radios. That screen puts
+                  each theme choice in a bordered card with a description, which this
+                  component does not express, so it is the one screen this entry does not
+                  describe.
+                </p>
               </.card>
 
               <.card title="Date, time, and secret inputs" inner_class="p-4">
@@ -865,6 +864,19 @@
                     disabled
                   />
                 </div>
+                <.radio_group
+                  id="component-radio-disabled"
+                  name="radio_disabled"
+                  label="Locked appearance"
+                  value="system"
+                  disabled
+                  options={[
+                    {"System", "system"},
+                    {"Light", "light"},
+                    {"Dark", "dark"}
+                  ]}
+                  wrapper_class="mb-0 mt-4"
+                />
               </.card>
             </.form>
           </section>

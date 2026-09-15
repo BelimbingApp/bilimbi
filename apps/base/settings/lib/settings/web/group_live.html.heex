@@ -15,28 +15,22 @@
       <:subtitle>{@page.subtitle}</:subtitle>
     </.header>
 
-    <nav
+    <.tabs
       :if={length(@page.groups) > 1}
       id="settings-tabs"
-      class="mt-5 flex gap-1 border-b border-line"
+      class="mt-5"
       aria-label="Settings groups"
     >
-      <button
+      <:tab
         :for={group <- @page.groups}
         id={"settings-tab-#{group}"}
-        type="button"
-        phx-click="switch_tab"
-        phx-value-group={group}
-        aria-current={group == @active_tab && "page"}
-        class={[
-          "-mb-px border-b-2 px-3 py-2 text-sm transition",
-          group == @active_tab && "border-brand-strong font-medium text-ink-strong",
-          group != @active_tab && "border-transparent text-ink-muted hover:text-ink"
-        ]}
+        current={group == @active_tab}
+        click="switch_tab"
+        value={group}
       >
         {group}
-      </button>
-    </nav>
+      </:tab>
+    </.tabs>
 
     <form id="settings-form" phx-submit="save" class="mt-5 space-y-5">
       <div

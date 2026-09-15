@@ -8,6 +8,39 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Menu.Item
+
+  # The Navigation entry renders `Layouts.nav_branch/1` -- the shell's own rail
+  # -- over a fixed tree, so the card cannot drift from what the sidebar does.
+  # Ids are namespaced away from the real menu because both trees share the page.
+  @nav_example [
+    %{
+      item: %Item{
+        id: "example.companies",
+        label: "Companies",
+        icon: "building-office-2",
+        route: "/system/design-library/components"
+      },
+      children: []
+    },
+    %{
+      item: %Item{id: "example.system", label: "System", icon: "cog-6-tooth"},
+      children: [
+        %{
+          item: %Item{
+            id: "example.system.design-library",
+            label: "Design Library",
+            icon: "paint-brush",
+            route: "/system/design-library/components"
+          },
+          children: []
+        }
+      ]
+    }
+  ]
+
+  @nav_example_active "example.system.design-library"
+
   @sample_rows [
                  %{
                    id: 1,
@@ -86,6 +119,8 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> assign(:area_description, area_description)
      |> assign(:area_stage, area_stage)
      |> assign(:active_nav, active_nav)
+     |> assign(:nav_example, @nav_example)
+     |> assign(:nav_example_active, @nav_example_active)
      |> assign(:sample_form, to_form(sample_data, as: :sample))
      |> assign(:pattern_form, to_form(%{"search" => ""}, as: :pattern))
      |> assign(

@@ -59,7 +59,7 @@ The catalog is organized by what a human is trying to review, not by Laravel or 
 | LAY-04 | Secondary side panel | Bespoke Design Library example | Establish one responsive page-local navigation pattern with desktop rail and mobile access. |
 | LAY-05 | Index, form and detail geometry | Partial conventions | Define complete assemblies rather than leaving every screen to compose them differently. |
 | NAV-01 | Main menu tree | Exists | Verify active ancestry, pinned items, reorder, collapse, mobile drawer and persistence. |
-| NAV-02 | Tabs | Example markup only | Provide shared semantics, keyboard navigation, active state and URL/history rules. |
+| NAV-02 | Tabs | Shared `<.tabs>` used by Schedule and Settings | Provide shared semantics, keyboard navigation, active state and URL/history rules. |
 | NAV-03 | Link dictionary and related-link groups | No shared contract | Adopt internal, anchor, external, new-tab and download behavior; mutations remain buttons. |
 | NAV-04 | Pagination | Shared component exists | Compare narrow layout, disabled states, page-size control, URL state and accessible labels. |
 | NAV-05 | User account and scope menu | Partial user footer exists | On user-circle activation, show signed-in name and identifier, current company and tenant, change password and sign out. Show scope switching only when more than one permitted scope exists. |
@@ -69,7 +69,7 @@ The catalog is organized by what a human is trying to review, not by Laravel or 
 | INP-01 | Shared field shell | Generic input has labels, hints and errors | Standardize required, help, error, disabled, read-only, prefix and suffix placement. |
 | INP-02 | Text, email, URL, telephone, number and textarea | Available through the generic input | Complete state and sizing contracts and validate realistic long content. |
 | INP-03 | Search | Generic search type | Add clear, empty, loading and result-update behavior. |
-| INP-04 | Select, multi-select, checkbox and radio | Partial shared coverage | Complete open/close, summary, no-options, outside-click, Escape and keyboard behavior. |
+| INP-04 | Select, multi-select, checkbox and radio | Shared components for all four, including `<.radio_group>`; state coverage partial | Complete open/close, summary, no-options, outside-click, Escape and keyboard behavior. |
 | INP-05 | Date, time, datetime and integer entry | Mostly native generic inputs | Define tabular display, step controls, validation and locale/timezone behavior. |
 | INP-06 | Secret input | Password field only | Distinguish saved mask, reveal, replacement and explicit clearing. |
 | INP-07 | Searchable and editable combobox | Missing | Adopt the useful Belimbing behavior with full keyboard, async, no-result and commit/cancel states. |

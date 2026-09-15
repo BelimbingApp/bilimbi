@@ -293,8 +293,8 @@ defmodule Bilimbi.Base.UI.Components do
     * For live file uploads, see `Phoenix.Component.live_file_input/1`
 
   See https://developer.mozilla.org/en-US/docs/Web/HTML/Element/input
-  for more information. Unsupported types, such as radio, are best
-  written directly in your templates.
+  for more information. For two to five exclusive choices that should stay
+  visible, use `radio_group/1` rather than a single input.
 
   ## Examples
 
@@ -744,6 +744,115 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Renders a radio group for two to five exclusive choices that stay visible.
+
+  A `Phoenix.HTML.FormField` may be passed to retrieve the name, id, and
+  selected value. Otherwise pass `name`, `id`, and `value` explicitly.
+
+  ## Examples
+
+      <.radio_group
+        field={@form[:appearance]}
+        label="Appearance"
+        options={[{"System", "system"}, {"Light", "light"}, {"Dark", "dark"}]}
+      />
+  """
+  attr(:id, :any, default: nil)
+  attr(:name, :any)
+  attr(:label, :string, default: nil)
+  attr(:value, :any)
+
+  attr(:field, Phoenix.HTML.FormField,
+    doc: "a form field struct retrieved from the form, for example: @form[:appearance]"
+  )
+
+  attr(:errors, :list, default: [])
+
+  attr(:options, :list,
+    required: true,
+    doc: "the options to display, list of {label, value} tuples, maps, or strings"
+  )
+
+  attr(:hint, :string, default: nil)
+  attr(:disabled, :boolean, default: false)
+  attr(:class, :any, default: nil)
+  attr(:wrapper_class, :any, default: nil)
+  attr(:label_class, :any, default: nil)
+  attr(:rest, :global)
+
+  def radio_group(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
+    errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
+
+    assigns
+    |> assign(field: nil, id: assigns.id || field.id)
+    |> assign(:errors, Enum.map(errors, &translate_error(&1)))
+    |> assign_new(:name, fn -> field.name end)
+    |> assign_new(:value, fn -> field.value end)
+    |> radio_group()
+  end
+
+  def radio_group(%{id: nil, name: name} = assigns) when is_binary(name) do
+    assigns |> assign(:id, name) |> radio_group()
+  end
+
+  def radio_group(assigns) do
+    assigns =
+      assigns
+      |> assign(:normalized_options, Enum.map(assigns.options, &normalize_choice/1))
+      |> assign(:selected, radio_value(assigns[:value]))
+
+    ~H"""
+    <fieldset
+      id={@id}
+      disabled={@disabled}
+      class={@wrapper_class || "mb-4"}
+      {@rest}
+    >
+      <legend :if={@label} class={["mb-1.5 text-sm font-medium text-ink", @label_class]}>
+        {@label}
+      </legend>
+      <div class="space-y-2">
+        <label
+          :for={{opt_label, opt_value} <- @normalized_options}
+          for={"#{@id}-#{opt_value}"}
+          class={[
+            "flex items-center gap-2 text-sm text-ink",
+            @disabled && "cursor-not-allowed opacity-50",
+            !@disabled && "cursor-pointer"
+          ]}
+        >
+          <input
+            type="radio"
+            id={"#{@id}-#{opt_value}"}
+            name={@name}
+            value={opt_value}
+            checked={opt_value == @selected}
+            disabled={@disabled}
+            class={
+              @class ||
+                "size-4 shrink-0 accent-action focus:outline-none focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed"
+            }
+          />
+          {opt_label}
+        </label>
+      </div>
+      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={msg <- @errors}>{msg}</.error>
+    </fieldset>
+    """
+  end
+
+  defp normalize_choice({label, value}), do: {to_string(label), to_string(value)}
+  defp normalize_choice([label, value]), do: {to_string(label), to_string(value)}
+  defp normalize_choice(%{label: label, value: value}), do: {to_string(label), to_string(value)}
+
+  defp normalize_choice(value) when is_binary(value) or is_atom(value) or is_integer(value),
+    do: {to_string(value), to_string(value)}
+
+  defp radio_value(nil), do: nil
+  defp radio_value(value), do: to_string(value)
+
+  @doc """
   Renders pagination controls matching Belimbing design parity.
 
   Follows Belimbing's pagination contract with single-page optimization:
@@ -1097,6 +1206,90 @@ defmodule Bilimbi.Base.UI.Components do
       <div :if={@actions != []} class="flex-none">{render_slot(@actions)}</div>
     </header>
     """
+  end
+
+  @doc """
+  Renders a compact tab strip for sibling views of the same page.
+
+  The selected tab uses the lime `brand-strong` underline. Unselected tabs stay
+  muted and darken on hover.
+
+  A tab that carries `href` or `patch` renders as a link; one that carries
+  `click` renders as a button so in-page switching still works.
+
+  ## Examples
+
+      <.tabs id="example-tabs" aria-label="Example views">
+        <:tab href="#overview" current>Overview</:tab>
+        <:tab href="#history">History</:tab>
+      </.tabs>
+  """
+  attr(:id, :string, required: true)
+  attr(:class, :any, default: nil)
+  attr(:rest, :global)
+
+  slot :tab, required: true do
+    attr(:id, :string)
+    attr(:href, :string)
+    attr(:patch, :string)
+    attr(:current, :boolean)
+    attr(:click, :string)
+    attr(:value, :string)
+  end
+
+  def tabs(assigns) do
+    ~H"""
+    <nav id={@id} class={["flex gap-1 border-b border-line", @class]} {@rest}>
+      <.tab_item :for={tab <- @tab} tab={tab} />
+    </nav>
+    """
+  end
+
+  attr(:tab, :map, required: true)
+
+  defp tab_item(assigns) do
+    tab = assigns.tab
+    linked? = is_binary(tab[:href]) or is_binary(tab[:patch])
+
+    assigns =
+      assigns
+      |> assign(:linked?, linked?)
+      |> assign(:tab_class, tab_class(tab))
+
+    ~H"""
+    <.link
+      :if={@linked?}
+      href={@tab[:href]}
+      patch={@tab[:patch]}
+      id={@tab[:id]}
+      class={@tab_class}
+      aria-current={@tab[:current] && "page"}
+    >
+      {render_slot(@tab)}
+    </.link>
+    <button
+      :if={not @linked?}
+      type="button"
+      id={@tab[:id]}
+      class={@tab_class}
+      aria-current={@tab[:current] && "page"}
+      phx-click={@tab[:click]}
+      phx-value-tab={@tab[:value]}
+    >
+      {render_slot(@tab)}
+    </button>
+    """
+  end
+
+  defp tab_class(tab) do
+    current? = tab[:current] == true
+
+    [
+      "-mb-px border-b-2 px-3 py-2 text-sm transition",
+      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
+      current? && "border-brand-strong font-medium text-ink-strong",
+      not current? && "border-transparent text-ink-muted hover:text-ink"
+    ]
   end
 
   @doc """
