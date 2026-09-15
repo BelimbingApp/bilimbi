@@ -107,10 +107,17 @@ defmodule Bilimbi.Base.UI.Layouts do
       |> assign(:preferences, assigns.current_scope.shell_preferences)
 
     ~H"""
+    <%!-- `data-display-mode` and `data-display-timezone` are published for
+         `<.datetime>`. They come from a tracked assign, so a saved mode change
+         patches them and every instant already on screen follows — including
+         rows a LiveView stream handed to the DOM, which the server never
+         re-renders. --%>
     <div
       id="app-shell"
       phx-hook="AppShell"
       data-theme-choice={@preferences.theme}
+      data-display-mode={@preferences.mode}
+      data-display-timezone={@preferences.timezone}
       data-sidebar-mode="desktop"
       data-sidebar-rail="false"
       data-sidebar-open="false"

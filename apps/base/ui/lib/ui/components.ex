@@ -889,15 +889,27 @@ defmodule Bilimbi.Base.UI.Components do
       the `DateTime` hook enhances it into the browser's time zone.
     * `:company` — the server shifts into the company IANA zone through the
       database module the context carries and renders final text labelled
-      with the zone abbreviation; no client enhancement. A zone that cannot
-      convert falls back to the truthful UTC text rather than guessing.
-    * `:utc` — the server renders the stored UTC value as final text.
+      with the zone abbreviation. A zone that cannot convert falls back to
+      the truthful UTC text rather than guessing.
+    * `:utc` — the server renders the stored UTC value.
 
-  A saved shell display mode re-arms the process context; the browser never
-  rewrites server text. Pass `display` from a tracked assign when an instant
-  must follow a mode change without navigating away.
+  ## Following a mode change already on screen
 
-  With no context stored, `:local` — the pre-policy behavior, and the
+  A saved shell mode must reach instants that are already rendered, including
+  rows handed to the DOM by a LiveView stream, which the server never
+  re-renders. So the element carries the server's own text for both modes the
+  server can decide — `data-text-company` and `data-text-utc` — and the
+  `DateTime` hook swaps to the matching one when `#app-shell` publishes a new
+  `data-display-mode`. For those two modes the browser copies a server string
+  and never formats one, so the two renderings cannot disagree.
+
+  `:local` is the one mode the server cannot decide, because it does not know
+  the browser's zone. The hook formats it under a pinned locale in the same
+  order and with the same zone label the server writes (see `date_time.js`).
+
+  The mechanism lives here rather than at the call sites, so a `<.datetime>`
+  added later follows a mode change without its author knowing the mechanism
+  exists. With no context stored, `:local` — the pre-policy behavior, and the
   truthful no-JavaScript fallback in every mode is the server text itself.
   """
   attr(:id, :string, required: true)
@@ -912,13 +924,23 @@ defmodule Bilimbi.Base.UI.Components do
 
   def datetime(assigns) do
     display = assigns.display || Bilimbi.Base.UI.DateTimeDisplay.get()
+    date_time = datetime_value(assigns.value)
+    mode = display_mode(display)
 
     assigns =
       assigns
-      |> assign(:date_time, datetime_value(assigns.value))
+      |> assign(:date_time, date_time)
       |> assign(:date, date_value(assigns.value))
-      |> assign(:mode, display_mode(display))
-      |> assign(:resolved_display, display)
+      |> assign(:mode, mode)
+      # Both server-decidable modes are rendered up front, whatever the
+      # current mode is, so the browser can follow a mode change by copying a
+      # server string instead of formatting one of its own.
+      |> assign(
+        :text_company,
+        date_time && policy_datetime(date_time, assigns.format, :company, display)
+      )
+      |> assign(:text_utc, date_time && server_datetime(date_time, assigns.format))
+      |> assign(:text, date_time && policy_datetime(date_time, assigns.format, mode, display))
 
     ~H"""
     <%!-- A calendar date is a zone-free fact: converting it through the
@@ -927,24 +949,22 @@ defmodule Bilimbi.Base.UI.Components do
     <time :if={@date} id={@id} datetime={Date.to_iso8601(@date)} class={["tabular-nums", @class]}>
       {Calendar.strftime(@date, "%d/%m/%Y")}
     </time>
+    <%!-- `phx-update="ignore"` is deliberately absent: the server has to be
+         able to refresh these strings when the value or the company zone
+         changes, and the hook re-applies the current mode on every patch. --%>
     <time
-      :if={@date_time && @mode == :local}
+      :if={@date_time}
       id={@id}
       datetime={DateTime.to_iso8601(@date_time)}
       data-format={@format}
+      data-mode={@mode}
+      data-text-company={@text_company}
+      data-text-utc={@text_utc}
+      data-follow-shell={is_nil(@display) && "true"}
       phx-hook="DateTime"
-      phx-update="ignore"
       class={["tabular-nums", @class]}
     >
-      {server_datetime(@date_time, @format)}
-    </time>
-    <time
-      :if={@date_time && @mode != :local}
-      id={@id}
-      datetime={DateTime.to_iso8601(@date_time)}
-      class={["tabular-nums", @class]}
-    >
-      {policy_datetime(@date_time, @format, @mode, @resolved_display)}
+      {@text}
     </time>
     <span :if={is_nil(@date_time) and is_nil(@date)} id={@id} class={@class}>—</span>
     """
@@ -959,6 +979,8 @@ defmodule Bilimbi.Base.UI.Components do
 
   defp display_mode(%{mode: mode}) when mode in [:company, :local, :utc], do: mode
   defp display_mode(_display), do: :local
+
+  defp policy_datetime(value, format, :local, _display), do: server_datetime(value, format)
 
   defp policy_datetime(value, format, :utc, _display), do: server_datetime(value, format)
 

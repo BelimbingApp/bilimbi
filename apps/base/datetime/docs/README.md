@@ -42,9 +42,15 @@ Compatible `NaiveDateTime` values are explicitly interpreted as UTC.
 
 The authenticated shell changes the existing user mode through the Web edge.
 A saved mode re-arms the per-process display context and patches the shell in
-place; the browser never rewrites server text. An instant that takes `display`
-from a tracked assign follows at once, and the rest follow as the page next
-renders them. `:local` keeps its browser hook; calendar dates remain zone-free.
+place, and every instant already on screen changes with it — including rows a
+LiveView stream handed to the DOM, which the server never re-renders.
+
+That reach is a property of `<.datetime>` rather than of its call sites: the
+element carries the server's own text for both modes the server can decide,
+and the browser swaps between those two strings rather than formatting one of
+its own, so the two renderings cannot disagree. `:local` is the one mode the
+browser formats, because the server does not know its zone; it is pinned to
+the server's field order and zone label. Calendar dates remain zone-free.
 
 ## Time zone database
 
