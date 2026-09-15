@@ -32,10 +32,10 @@ Rendering semantics, preserved from the source:
 - `nil` renders `—`;
 - `:local` keeps the truthful UTC-labelled server text and lets the browser
   hook enhance it into the device's zone;
-- `:company` shifts server-side into the company IANA zone and renders final
-  text labelled with the zone abbreviation — an unconvertible zone falls
-  back to the truthful UTC text rather than guessing;
-- `:utc` renders the stored UTC value as final text.
+- `:company` shifts server-side into the company IANA zone and renders text
+  labelled with the zone abbreviation — an unconvertible zone falls back to
+  the truthful UTC text rather than guessing;
+- `:utc` renders the stored UTC value.
 
 The no-JavaScript fallback in every mode is the server text itself.
 Compatible `NaiveDateTime` values are explicitly interpreted as UTC.
