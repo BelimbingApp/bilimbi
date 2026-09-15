@@ -69,7 +69,7 @@ The catalog is organized by what a human is trying to review, not by Laravel or 
 | INP-01 | Shared field shell | Generic input has labels, hints and errors | Standardize required, help, error, disabled, read-only, prefix and suffix placement. |
 | INP-02 | Text, email, URL, telephone, number and textarea | Available through the generic input | Complete state and sizing contracts and validate realistic long content. |
 | INP-03 | Search | Generic search type | Add clear, empty, loading and result-update behavior. |
-| INP-04 | Select, multi-select, checkbox and radio | Partial shared coverage | Complete open/close, summary, no-options, outside-click, Escape and keyboard behavior. |
+| INP-04 | Select, multi-select, checkbox and radio | Shared components for all four, including `<.radio_group>`; state coverage partial | Complete open/close, summary, no-options, outside-click, Escape and keyboard behavior. |
 | INP-05 | Date, time, datetime and integer entry | Mostly native generic inputs | Define tabular display, step controls, validation and locale/timezone behavior. |
 | INP-06 | Secret input | Password field only | Distinguish saved mask, reveal, replacement and explicit clearing. |
 | INP-07 | Searchable and editable combobox | Missing | Adopt the useful Belimbing behavior with full keyboard, async, no-result and commit/cancel states. |

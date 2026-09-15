@@ -60,7 +60,7 @@ The inventory also covers the current shared structure, navigation, tabs, button
 
 The Navigation entry renders `Layouts.nav_branch/1`, the shell's own rail, over an example tree rather than a second definition of it. The shell's nav rules moved from the `#app-sidebar` id to an `.app-nav-rail` class that the sidebar and the library card both carry, so the card cannot drift in type scale, colour, icon suppression or caret direction without the sidebar drifting with it. The card omits the pin control: the shell resolves a pinned row only from the sidebar, so a pin anywhere else is a control that looks live and does nothing. Tabs and radio group are shared `Bilimbi.Base.UI.Components` entries: Schedule uses `<.tabs>` for its Tasks / History / Settings views and Settings uses it for its group strip, so neither is library-only markup.
 
-Appearance Settings is the one screen `<.radio_group>` does not describe. It puts each theme choice in a bordered card with a description, which the component does not express, and converting it would redesign that screen. The Navigation card and the radio group entry both say so on the page.
+Appearance Settings is the one screen `<.radio_group>` does not describe. It puts each theme choice in a bordered card with a description, which the component does not express, and converting it would redesign that screen. The radio group entry says so on the page, as the Navigation card names the pin control it leaves out and the branch toggle that renders without collapsing outside the sidebar.
 
 ## Rules
 
