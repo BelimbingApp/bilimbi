@@ -106,6 +106,7 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
     # have to format one of them itself.
     assert before.attributes["data-text-company"] == @company_text
     assert before.attributes["data-text-utc"] == @utc_text
+    assert before.attributes["data-follow-shell"] == "true"
 
     # 2. Save Stored UTC through the shell control's own event.
     render_hook(view, "shell:preference", %{kind: "timezone", value: "utc"})
@@ -137,6 +138,20 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
 
     assert streamed_instant(render(view), mutation_id).text == @company_text
+  end
+
+  test "an instant pinned to its own display context ignores the shell mode", %{
+    conn: conn,
+    mutation_id: mutation_id
+  } do
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
+    row = streamed_instant(render(view), mutation_id)
+
+    # A caller that passes `display` has already decided what its instant
+    # shows, and the component omits `data-follow-shell` for it.
+    pinned = Map.delete(row.attributes, "data-follow-shell")
+
+    assert client_text(pinned, @company_text, "utc") == @company_text
   end
 
   test "a browser that cannot format the local zone reads stored UTC, not the old mode", %{

@@ -75,7 +75,10 @@ const DateTime = {
 
     if (Number.isNaN(value.getTime())) return
 
-    const mode = liveMode() || this.el.dataset.mode || "local"
+    // An instant given an explicit display context follows that context, not
+    // the shell: the caller has already decided what it is showing.
+    const shellMode = this.el.dataset.followShell === "true" ? liveMode() : null
+    const mode = shellMode || this.el.dataset.mode || "local"
 
     if (mode === "company" || mode === "utc") {
       // The server already rendered both. Copy, never re-format.

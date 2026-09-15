@@ -50,7 +50,8 @@ element carries the server's own text for both modes the server can decide,
 and the browser swaps between those two strings rather than formatting one of
 its own, so the two renderings cannot disagree. `:local` is the one mode the
 browser formats, because the server does not know its zone; it renders in the
-reader's own locale and hour cycle. Calendar dates remain zone-free.
+reader's own locale and hour cycle. An instant handed an explicit `display`
+is pinned to that context instead. Calendar dates remain zone-free.
 
 ## Time zone database
 

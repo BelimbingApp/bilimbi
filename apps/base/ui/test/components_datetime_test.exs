@@ -188,15 +188,19 @@ defmodule Bilimbi.Base.UI.ComponentsDatetimeTest do
       assert html =~ ~s(data-text-utc="01/01/2026, 16:30 UTC")
     end
 
-    test "an explicit display attr still carries both server-decided modes" do
-      # An explicit context decides the server text; it does not opt the
-      # instant out of following a saved mode change, because the shell mode
-      # is the one the reader is looking at.
+    test "an explicit display attr opts the instant out of following the shell" do
+      # The caller has already decided what this instant shows, so a shell
+      # mode change must not overwrite it.
       html = render_datetime(%{display: %{mode: :company, timezone: "Test/Cet", tz_db: FakeDb}})
 
+      refute html =~ "data-follow-shell"
       assert html =~ ~s(data-mode="company")
-      assert html =~ ~s(data-text-company="01/01/2026, 17:30 CET")
-      assert html =~ ~s(data-text-utc="01/01/2026, 16:30 UTC")
+    end
+
+    test "an instant with no explicit display follows the shell" do
+      DateTimeDisplay.put(%{mode: :utc})
+
+      assert render_datetime(%{}) =~ ~s(data-follow-shell="true")
     end
 
     test "a calendar date carries no mode metadata and no hook" do
@@ -210,8 +214,10 @@ defmodule Bilimbi.Base.UI.ComponentsDatetimeTest do
     end
 
     test "date and time formats carry the zone label in both server strings" do
-      # The label is part of the convention in every format. The client side
-      # dropped it for :date and :time once; both sides are pinned now.
+      # The label is part of the server's convention in every format, and the
+      # browser copies these two strings rather than writing its own. `:local`
+      # is the one the browser formats, and it names the zone on :datetime
+      # only — a deliberate divergence, pinned in date_time_js_test.exs.
       DateTimeDisplay.put(%{mode: :company, timezone: "Test/Plus8", tz_db: FakeDb})
 
       date = render_datetime(%{format: :date})

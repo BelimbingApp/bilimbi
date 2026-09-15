@@ -909,7 +909,10 @@ defmodule Bilimbi.Base.UI.Components do
 
   The mechanism lives here rather than at the call sites, so a `<.datetime>`
   added later follows a mode change without its author knowing the mechanism
-  exists. With no context stored, `:local` — the pre-policy behavior, and the
+  exists. An instant given an explicit `display` is pinned to that context
+  instead, because its caller has already decided what it is showing.
+
+  With no context stored, `:local` — the pre-policy behavior, and the
   truthful no-JavaScript fallback in every mode is the server text itself.
   """
   attr(:id, :string, required: true)
@@ -919,7 +922,7 @@ defmodule Bilimbi.Base.UI.Components do
 
   attr(:display, :any,
     default: nil,
-    doc: "explicit display context; defaults to the process context"
+    doc: "explicit display context that pins the instant to it; defaults to the process context"
   )
 
   def datetime(assigns) do
@@ -960,6 +963,7 @@ defmodule Bilimbi.Base.UI.Components do
       data-mode={@mode}
       data-text-company={@text_company}
       data-text-utc={@text_utc}
+      data-follow-shell={is_nil(@display) && "true"}
       phx-hook="DateTime"
       class={["tabular-nums", @class]}
     >
