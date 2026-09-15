@@ -504,34 +504,41 @@
                 Page widths, headings, cards, menus, and tabs.
               </p>
             </div>
-            <.card id="component-page" title="Page widths" inner_class="space-y-3 p-4">
-              <.page
-                id="component-page-list"
-                variant={:list}
-                class="rounded-md border border-dashed border-line p-2"
-              >
-                <p class="text-xs text-ink-muted">
-                  List variant (max-w-7xl) — wide for filters and tables
-                </p>
-              </.page>
-              <.page
-                id="component-page-detail"
-                variant={:detail}
-                class="rounded-md border border-dashed border-line p-2"
-              >
-                <p class="text-xs text-ink-muted">
-                  Detail variant (max-w-4xl) — medium for a record or dashboard
-                </p>
-              </.page>
-              <.page
-                id="component-page-form"
-                variant={:form}
-                class="rounded-md border border-dashed border-line p-2"
-              >
-                <p class="text-xs text-ink-muted">
-                  Form variant (max-w-2xl) — narrow for focused entry
-                </p>
-              </.page>
+            <.card id="component-page" title="Page widths" inner_class="space-y-2 p-4">
+              <div id="component-page-stage" class="overflow-x-auto">
+                <div class="w-[1280px] space-y-3">
+                  <.page
+                    id="component-page-list"
+                    variant={:list}
+                    class="rounded-md border border-dashed border-line p-2"
+                  >
+                    <p class="text-xs text-ink-muted">
+                      List variant (max-w-7xl) — wide for filters and tables
+                    </p>
+                  </.page>
+                  <.page
+                    id="component-page-detail"
+                    variant={:detail}
+                    class="rounded-md border border-dashed border-line p-2"
+                  >
+                    <p class="text-xs text-ink-muted">
+                      Detail variant (max-w-4xl) — medium for a record or dashboard
+                    </p>
+                  </.page>
+                  <.page
+                    id="component-page-form"
+                    variant={:form}
+                    class="rounded-md border border-dashed border-line p-2"
+                  >
+                    <p class="text-xs text-ink-muted">
+                      Form variant (max-w-2xl) — narrow for focused entry
+                    </p>
+                  </.page>
+                </div>
+              </div>
+              <p class="text-xs text-ink-muted">
+                Each variant is centred on a 1280px stage so it reaches its own width; scroll to follow the widest.
+              </p>
             </.card>
             <div class="grid gap-3 lg:grid-cols-2">
               <.card id="component-header" title="Page header" inner_class="space-y-5 p-4">
@@ -865,7 +872,7 @@
                 Short-lived messages, inline guidance, and persistent record status.
               </p>
             </div>
-            <div id="component-flash" class="grid gap-3 lg:grid-cols-2">
+            <div id="component-flash" class="space-y-3">
               <div class="relative min-h-28 overflow-hidden rounded-xl border border-line bg-canvas transform-gpu">
                 <.flash
                   id="design-library-flash"

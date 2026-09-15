@@ -103,9 +103,25 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-input-guidance", "Choice guidance")
     assert has_element?(view, "#component-input-live-state", "Live state")
     assert has_element?(view, "#component-icon-button", "Compact icon actions")
-    assert has_element?(view, "#component-page-list.max-w-7xl", "List variant")
-    assert has_element?(view, "#component-page-form.max-w-2xl", "Form variant")
-    assert has_element?(view, "#component-page-detail.max-w-4xl", "Detail variant")
+
+    assert has_element?(
+             view,
+             "#component-page-stage #component-page-list.max-w-7xl",
+             "List variant"
+           )
+
+    assert has_element?(
+             view,
+             "#component-page-stage #component-page-form.max-w-2xl",
+             "Form variant"
+           )
+
+    assert has_element?(
+             view,
+             "#component-page-stage #component-page-detail.max-w-4xl",
+             "Detail variant"
+           )
+
     assert has_element?(view, "#component-header-default", "Title, subtitle, and trailing action")
 
     assert has_element?(
