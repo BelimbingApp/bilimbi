@@ -888,9 +888,9 @@ defmodule Bilimbi.Base.UI.Components do
     * `:local` — the server-rendered text stays truthful, labelled UTC, and
       the `DateTime` hook enhances it into the browser's time zone.
     * `:company` — the server shifts into the company IANA zone through the
-      database module the context carries and renders final text labelled
-      with the zone abbreviation. A zone that cannot convert falls back to
-      the truthful UTC text rather than guessing.
+      database module the context carries and renders text labelled with the
+      zone abbreviation. A zone that cannot convert falls back to the
+      truthful UTC text rather than guessing.
     * `:utc` — the server renders the stored UTC value.
 
   ## Following a mode change already on screen
