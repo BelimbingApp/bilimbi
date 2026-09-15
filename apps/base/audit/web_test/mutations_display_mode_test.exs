@@ -97,7 +97,9 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
   } do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
 
-    # 1. The row is on screen in company time.
+    # 1. The row is on screen in company time. This is also the no-JavaScript
+    # contract: the server text is the complete answer, not a placeholder the
+    # hook fills in.
     assert has_element?(view, "#app-shell[data-display-mode='company']")
     before = streamed_instant(render(view), mutation_id)
     assert before.text == @company_text
@@ -128,16 +130,6 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
 
     # And back again, from the same markup.
     assert client_text(unchanged.attributes, @utc_text, "company") == @company_text
-  end
-
-  test "an instant renders truthfully with no JavaScript at all", %{
-    conn: conn,
-    mutation_id: mutation_id
-  } do
-    # The server text is the complete answer, not a placeholder for the hook.
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
-
-    assert streamed_instant(render(view), mutation_id).text == @company_text
   end
 
   test "an instant pinned to its own display context ignores the shell mode", %{

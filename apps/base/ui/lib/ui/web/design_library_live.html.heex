@@ -478,7 +478,7 @@
             <div class="rounded-xl border border-line bg-surface p-4">
               <h3 class="text-sm font-semibold">Display controls</h3>
               <p class="mt-1 text-xs text-muted">
-                The clock and theme controls live in the top bar of this page. They change your own saved display preferences. The timestamp below is an ordinary one with no special wiring, and it changes the moment you change the clock — as does every timestamp already on screen anywhere in the product, including rows of a long table you have already scrolled through.
+                The clock and theme controls live in the top bar of this page. They change your own saved display preferences. The timestamp below is an ordinary &lt;.datetime&gt; with no special wiring, and it changes the moment you change the clock — as does every other &lt;.datetime&gt; already on screen, including rows of a long table you have already scrolled through. A screen that formats its own instants instead keeps the text it rendered until it adopts the component.
               </p>
               <p class="mt-3 text-sm">
                 <.datetime id="library-shell-time" value={~U[2026-09-14 07:00:00Z]} />
@@ -1235,7 +1235,7 @@
               Account details belong behind the bottom-left circle. Platform-operator and impersonated access remain visible above the workspace. An account works in one company and tenant, so the menu shows the current scope and offers no switching.
             </p>
             <p class="text-sm text-muted">
-              The clock selects Company, Local or UTC time. Sun, moon and desktop select Light, Dark or System theme. A saved choice confirms in place, updates the controls and follows your account; every timestamp already on screen changes with it, without a reload and without losing your place, and every screen you open afterwards uses the new choice. While saving, controls prevent duplicate work; a failed save keeps the previous choice and explains how to retry. While you view as another user, the top bar reports the active time display and offers no controls, because those preferences belong to the account you are viewing.
+              The clock selects Company, Local or UTC time. Sun, moon and desktop select Light, Dark or System theme. A saved choice confirms in place, updates the controls and follows your account; every timestamp already rendered through &lt;.datetime&gt; changes with it, without a reload and without losing your place, and every screen you open afterwards uses the new choice. A screen that formats instants directly rather than through that component is unaffected until it adopts it. While saving, controls prevent duplicate work; a failed save keeps the previous choice and explains how to retry. While you view as another user, the top bar reports the active time display and offers no controls, because those preferences belong to the account you are viewing.
             </p>
             <p class="text-sm text-muted">
               Menus close on Escape or outside click and return keyboard focus to their trigger on Escape. The narrow drawer contains keyboard focus and returns it to the sidebar toggle when closed.

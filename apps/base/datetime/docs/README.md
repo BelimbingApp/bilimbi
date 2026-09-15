@@ -42,8 +42,10 @@ Compatible `NaiveDateTime` values are explicitly interpreted as UTC.
 
 The authenticated shell changes the existing user mode through the Web edge.
 A saved mode re-arms the per-process display context and patches the shell in
-place, and every instant already on screen changes with it — including rows a
-LiveView stream handed to the DOM, which the server never re-renders.
+place, and every instant `<.datetime>` has already rendered changes with it —
+including rows a LiveView stream handed to the DOM, which the server never
+re-renders. A screen that formats an instant itself keeps the text it wrote
+until it adopts the component.
 
 That reach is a property of `<.datetime>` rather than of its call sites: the
 element carries the server's own text for both modes the server can decide,
