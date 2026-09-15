@@ -107,19 +107,19 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(
              view,
              "#component-page-stage #component-page-list.max-w-7xl",
-             "List variant"
+             "wide for filters and tables"
            )
 
     assert has_element?(
              view,
              "#component-page-stage #component-page-form.max-w-2xl",
-             "Form variant"
+             "narrow for focused entry"
            )
 
     assert has_element?(
              view,
              "#component-page-stage #component-page-detail.max-w-4xl",
-             "Detail variant"
+             "medium for a record or dashboard"
            )
 
     assert has_element?(view, "#component-header-default", "Title, subtitle, and trailing action")
@@ -303,7 +303,13 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#graphic-icon-variants", "Outline")
     assert has_element?(view, "#graphic-icon-variants", "Solid")
     assert has_element?(view, "#graphic-icon-variants", "Mini")
-    assert has_element?(view, "#graphic-icon-variants", "Size and color come from the class")
+
+    assert has_element?(
+             view,
+             "#graphic-icon-variants",
+             "Size and color are set where the icon is used"
+           )
+
     refute has_element?(view, "#components")
     assert has_element?(view, "#nav-admin-system-design-library-graphic[aria-current='page']")
   end
