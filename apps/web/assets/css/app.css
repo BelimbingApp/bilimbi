@@ -315,65 +315,69 @@ body {
  * bar, persistent rail on wide screens, off-canvas drawer below `lg`.
  * The AppShell hook writes data attributes; reduced-motion skips the
  * drawer transform. Rail styles apply only at `lg+` — the mobile drawer
- * always shows labels, the same as Belimbing's honorRail=false copy. */
+ * always shows labels, the same as Belimbing's honorRail=false copy.
+ * Rail is a state of the sidebar, so every rule below stays keyed to
+ * `#app-sidebar`: `.app-nav-*` rows also render outside it (the Design
+ * Library shows the real rail), and collapsing the sidebar must not strip
+ * their labels and carets. */
 @media (min-width: 1024px) {
   #app-shell[data-sidebar-rail="true"] #app-sidebar {
     width: 3.5rem;
   }
 
-  #app-shell[data-sidebar-rail="true"] .app-nav-label,
-  #app-shell[data-sidebar-rail="true"] .app-nav-empty,
-  #app-shell[data-sidebar-rail="true"] .app-user-expanded,
-  #app-shell[data-sidebar-rail="true"] .app-nav-indent,
-  #app-shell[data-sidebar-rail="true"] .app-nav-caret,
-  #app-shell[data-sidebar-rail="true"] .app-nav-toggle,
-  #app-shell[data-sidebar-rail="true"] .app-nav-pin,
-  #app-shell[data-sidebar-rail="true"] .app-pinned-grip,
-  #app-shell[data-sidebar-rail="true"] .app-pinned-unpin,
-  #app-shell[data-sidebar-rail="true"] .app-pinned-heading,
-  #app-shell[data-sidebar-rail="true"] .app-pinned-divider {
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-label,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-empty,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-user-expanded,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-indent,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-caret,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-toggle,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-pin,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-grip,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-unpin,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-heading,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-divider {
     display: none;
   }
 
-  #app-shell[data-sidebar-rail="true"] .app-nav-item,
-  #app-shell[data-sidebar-rail="true"] .app-nav-parent,
-  #app-shell[data-sidebar-rail="true"] .app-nav-container,
-  #app-shell[data-sidebar-rail="true"] .app-nav-parent-link,
-  #app-shell[data-sidebar-rail="true"] .app-pinned-link {
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-item,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-parent,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-container,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-parent-link,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-link {
     justify-content: center;
   }
 
-  #app-shell[data-sidebar-rail="true"] .app-nav-item,
-  #app-shell[data-sidebar-rail="true"] .app-nav-parent {
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-item,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-parent {
     min-height: 2rem;
     padding-inline: 0;
   }
 
-  #app-shell[data-sidebar-rail="true"] .app-nav-container,
-  #app-shell[data-sidebar-rail="true"] .app-nav-parent-link,
-  #app-shell[data-sidebar-rail="true"] .app-pinned-link {
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-container,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-parent-link,
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-link {
     flex: none;
     width: 100%;
     padding-inline: 0;
   }
 
-  #app-shell[data-sidebar-rail="true"] .app-nav-children {
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-children {
     margin-left: 0;
   }
 
-  #app-shell[data-sidebar-rail="true"] .app-nav-icon {
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-icon {
     display: block;
   }
 
-  #app-shell[data-sidebar-rail="true"] .app-nav-active-spine {
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-nav-active-spine {
     inset-block: 0.25rem;
   }
 
-  #app-shell[data-sidebar-rail="true"] .app-pinned-row {
+  #app-shell[data-sidebar-rail="true"] #app-sidebar .app-pinned-row {
     min-height: 2rem;
   }
 
-  #app-shell[data-sidebar-rail="true"] #app-user > button {
+  #app-shell[data-sidebar-rail="true"] #app-sidebar #app-user > button {
     flex-direction: column;
   }
 }
