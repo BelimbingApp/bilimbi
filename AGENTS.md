@@ -517,6 +517,25 @@ not call or recreate it elsewhere.
 - Do not use `Enum.each/2` to generate template content; use a HEEx `for`.
 - Prefer function components for reusable markup. Avoid LiveComponents unless
   they need their own state and event lifecycle.
+- The Design Library (`/system/design-library`) presents only shared
+  components, and varies on the states they declare: an axis that declares two
+  or more states shows at least two of them, and an axis that declares a single
+  state shows that one. Showing every declared value is not required, so a
+  value that cannot be seen is never built. A component is presented by an
+  `id="component-<name>"` block of its own that calls `<.name>`; framing
+  another specimen is not presenting it. The exempt anchors are the sidebar
+  menu, the grouping sections it links to and the wrapper around them, so a
+  new grouping section is linked from the menu or drops the prefix. An id-less
+  `<.card>` in the components area names nothing, so it is anchored, nested
+  inside an anchored block, or listed in the `@declared_specimens` of
+  `Bilimbi.Base.UI.DesignLibrarySource`, which owns the rules that read the
+  template. Hand-written control markup and single-state specimens fail the
+  guards in `apps/base/ui/test/design_library_*_test.exs`, which read it and
+  `Components.__components__/0`. Those guards are tagged
+  `:design_library_drift` and excluded from the default run until the current
+  specimens are corrected; run them with
+  `mix test --include design_library_drift`. The rules are covered on fixtures
+  by `design_library_rules_test.exs`, which runs by default.
 
 Templates may be colocated with their owning LiveView through `embed_templates`
 or a nearby `.html.heex` file. Colocation does not move the view into the
