@@ -11,9 +11,9 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
     * **Areas** — the `if @area == :name do` blocks. Everything outside them
       is the library's own chrome (its page container, its header) and is not
       a presentation of anything.
-    * **Menu chrome** — raw layout inside an area whose anchors jump to the
-      library's own `<section>`s. That is the library navigating itself, not
-      a specimen, so it is skipped when looking for hand-written controls.
+    * **Menu chrome** — the `<aside>` the components area opens with, and
+      everything inside it. That is the library navigating itself, not a
+      specimen, so its subtree is skipped.
     * **Presented elements** — every element and component call inside an
       area, minus menu chrome. This is what a reviewer sees as "the library".
 
@@ -21,6 +21,10 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   spells a value out (a string, `{:info}`, `{false}`, a bare `disabled`) and
   `{:dynamic, code}` otherwise, so guards can tell a presented state from one
   computed at runtime.
+
+  Every node shape the parser can produce is matched explicitly. An unknown
+  one raises rather than being skipped, because a silently dropped subtree
+  would let the guards pass on a library they never read.
   """
 
   alias Phoenix.LiveView.TagEngine.Parser
@@ -72,10 +76,8 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   `area` and its `ancestors` (outermost first) so a guard can ask where it sits.
   """
   def presented(nodes \\ tree()) do
-    section_ids = section_ids(nodes)
-
     for {area, body} <- areas(nodes),
-        element <- flatten(body, area, [], section_ids),
+        element <- flatten(body, area, [], prune_chrome: true),
         do: element
   end
 
@@ -91,46 +93,25 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   """
   def anchored(nodes \\ tree()) do
     for {area, body} <- areas(nodes),
-        element <- flatten(body, area, [], MapSet.new(), prune_chrome: false),
+        element <- flatten(body, area, [], prune_chrome: false),
         is_binary(element.id),
         do: element
   end
 
-  @doc "Ids of every `<section>` in the template."
-  def section_ids(nodes \\ tree()) do
-    nodes
-    |> flatten(nil, [], MapSet.new(), prune_chrome: false)
-    |> Enum.filter(&(&1.kind == :tag and &1.name == "section" and is_binary(&1.id)))
-    |> MapSet.new(& &1.id)
-  end
-
   @doc """
-  Whether an element is menu chrome: raw markup, outside any component call
-  and wrapping no section itself, whose anchors jump to the library's own
-  sections.
+  Whether an element is the library's own sidebar menu, or sits inside it.
+
+  The menu is the `<aside>` an area opens with: raw layout, outside any
+  component call, whose job is navigating the library rather than presenting
+  anything. Nothing else is exempt.
   """
-  def menu_chrome?(%{kind: :tag, ancestors: ancestors} = element, section_ids) do
-    descendants = descendants(element)
-
-    Enum.all?(ancestors, &(&1.kind == :tag)) and
-      not Enum.any?(descendants, &(&1.kind == :tag and &1.name == "section")) and
-      Enum.any?(descendants, fn
-        %{kind: :tag, name: "a"} = anchor ->
-          case attr(anchor, "href") do
-            {:literal, "#" <> id} -> MapSet.member?(section_ids, id)
-            _ -> false
-          end
-
-        _ ->
-          false
-      end)
+  def menu_chrome?(%{ancestors: ancestors} = element) do
+    Enum.any?([element | ancestors], &menu_container?/1)
   end
-
-  def menu_chrome?(_element, _section_ids), do: false
 
   @doc "Every element nested under the given one, in source order."
   def descendants(%{children: children, area: area, ancestors: ancestors} = element) do
-    flatten(children, area, ancestors ++ [element], MapSet.new(), prune_chrome: false)
+    flatten(children, area, ancestors ++ [element], prune_chrome: false)
   end
 
   @doc "The normalised value of an attribute, or `nil` when it is not given."
@@ -161,6 +142,12 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
 
   ## Tree walking
 
+  defp menu_container?(%{kind: :tag, name: "aside", ancestors: ancestors}) do
+    Enum.all?(ancestors, &(&1.kind == :tag))
+  end
+
+  defp menu_container?(_element), do: false
+
   defp collect(nodes, acc, fun) when is_list(nodes) do
     Enum.reduce(nodes, acc, fn node, acc ->
       acc = acc ++ fun.(node)
@@ -168,35 +155,63 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
       case node do
         {:block, _, _, _, children, _, _} -> collect(children, acc, fun)
         {:eex_block, _, clauses, _} -> Enum.reduce(clauses, acc, &collect(elem(&1, 0), &2, fun))
-        _ -> acc
+        {:self_close, _, _, _, _} -> acc
+        {:text, _, _} -> acc
+        {:eex, _, _} -> acc
+        {:body_expr, _, _} -> acc
+        {:eex_comment, _, _} -> acc
+        other -> unknown_node!(other)
       end
     end)
   end
 
-  defp flatten(nodes, area, ancestors, section_ids, opts \\ [prune_chrome: true]) do
+  defp flatten(nodes, area, ancestors, opts) do
     prune? = Keyword.fetch!(opts, :prune_chrome)
 
     Enum.flat_map(nodes, fn
       {:block, type, name, attrs, children, meta, _} ->
         element = element(type, name, attrs, children, meta, area, ancestors)
 
-        if prune? and menu_chrome?(element, section_ids) do
+        if prune? and menu_chrome?(element) do
           []
         else
-          [element | flatten(children, area, ancestors ++ [element], section_ids, opts)]
+          [element | flatten(children, area, ancestors ++ [element], opts)]
         end
 
       {:self_close, type, name, attrs, meta} ->
         [element(type, name, attrs, [], meta, area, ancestors)]
 
       {:eex_block, _, clauses, _} ->
-        Enum.flat_map(clauses, fn {body, _, _} ->
-          flatten(body, area, ancestors, section_ids, opts)
-        end)
+        Enum.flat_map(clauses, fn {body, _, _} -> flatten(body, area, ancestors, opts) end)
 
-      _ ->
+      {:text, _, _} ->
         []
+
+      {:eex, _, _} ->
+        []
+
+      {:body_expr, _, _} ->
+        []
+
+      {:eex_comment, _, _} ->
+        []
+
+      other ->
+        unknown_node!(other)
     end)
+  end
+
+  defp unknown_node!(node) do
+    raise """
+    #{inspect(__MODULE__)} does not recognise this node of \
+    #{Path.relative_to_cwd(@path)}:
+
+        #{inspect(node)}
+
+    It walks Phoenix.LiveView.TagEngine.Parser output. Skipping an unknown \
+    shape would drop a subtree of the Design Library and let its drift guards \
+    pass on markup they never read, so teach this module the new shape instead.
+    """
   end
 
   defp element(type, name, attrs, children, meta, area \\ nil, ancestors \\ []) do

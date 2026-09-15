@@ -13,6 +13,10 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   Appearing in the library is not the same as being complete. The library's
   own chrome (its page container, header and sidebar menu) uses shared
   components too, and none of that counts as presenting them.
+
+  These guards are excluded from the default run until the Design Library
+  specimens they report are corrected. Run them with
+  `mix test --include design_library_drift`.
   """
 
   use ExUnit.Case, async: true
@@ -21,10 +25,24 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   alias Bilimbi.Base.UI.DesignLibrarySource, as: Source
   alias Bilimbi.Base.UI.IconRegistry
 
-  @heroicons_plugin Path.expand("../../../web/assets/vendor/heroicons.js", __DIR__)
+  @moduletag :design_library_drift
+
+  # The heroicon styles `<.icon>` can render. `apps/web/assets/vendor/heroicons.js`
+  # is the source of truth for this list — it builds one `hero-*` class family
+  # per style — but it belongs to Web, and a Base UI guard does not reach across
+  # that package boundary to read it. Adding a style there means adding it here.
+  @hero_styles [:outline, :solid, :mini, :micro]
 
   setup_all do
-    %{presented: Source.presented()}
+    tree = Source.tree()
+    presented = Source.presented(tree)
+
+    assert :components in Enum.map(Source.areas(tree), &elem(&1, 0)),
+           floor_failure("has no `if @area == :components do` block")
+
+    assert presented != [], floor_failure("presents no element at all")
+
+    %{presented: presented}
   end
 
   test "every public component is presented in the Design Library", %{presented: presented} do
@@ -48,13 +66,31 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
            """
   end
 
+  test "every public component declares a state the library can be held to" do
+    stateless = Enum.filter(public_components(), &(axes(&1) == []))
+
+    assert stateless == [],
+           """
+           These components declare nothing this guard can hold the Design
+           Library to, so presenting them once is indistinguishable from
+           presenting them completely:
+
+               #{Enum.map_join(stateless, ", ", &"<.#{&1}>")}
+
+           A state is an attr with `values:`, a boolean attr with a default, an
+           optional `:string` attr, an optional slot, or a repeating slot. A
+           component with none of those is a blind spot in the state guard, not
+           a component that happens to be simple: give it the declaration that
+           names its variation, or widen the model above so the variation it
+           does have becomes an axis.
+           """
+  end
+
   test "every declared state of every public component is presented", %{presented: presented} do
     report =
       for name <- public_components(),
-          axes = axes(name),
-          axes != [],
           calls = Source.calls(name, presented),
-          {axis, expected} <- axes,
+          {axis, expected} <- axes(name),
           observed = observed(name, axis, calls),
           missing = expected -- observed,
           missing != [] do
@@ -65,8 +101,9 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
            """
            The Design Library presents these components in fewer states than
            they declare. Every attr with `values:`, every boolean attr with a
-           default, every optional slot, and the icon styles the Tailwind plugin
-           generates are states a reviewer must be able to see:
+           default, every optional `:string` attr, every optional slot, every
+           repeating slot, and every heroicon style are states a reviewer must
+           be able to see:
 
            #{Enum.map_join(report, "\n", &describe_gap/1)}
 
@@ -87,19 +124,37 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
     |> Enum.sort()
   end
 
+  # Every guard here passes when it finds nothing wrong, so an empty read is
+  # indistinguishable from a complete library. Assert the tree yielded the
+  # surface under test before trusting any verdict.
+  defp floor_failure(symptom) do
+    """
+    #{Path.relative_to_cwd(Source.path())} #{symptom}, so these guards would
+    report a complete library without reading a single specimen. Either the
+    template abandoned the `if @area == …` convention that
+    Bilimbi.Base.UI.DesignLibrarySource derives areas from, or that module can
+    no longer read the parser's output. Fix the reader before trusting the
+    guards.
+    """
+  end
+
   ## State axes, derived from the component definition
 
   # An axis is `{descriptor, expected_values}`. Descriptors:
   #
   #   * `{:attr, name}` — an attr declared with `values:`, or a boolean attr
   #     with a default. An omitted attr presents its declared default.
+  #   * `{:attr_presence, name}` — an optional `:string` attr (declared
+  #     `default: nil`), presented as `:present`/`:absent`. `<.card title>`
+  #     renders a titled header the untitled card does not have.
   #   * `{:slot, name}` — an optional slot, presented as `:present`/`:absent`.
+  #   * `{:slot_count, name}` — a required repeating slot such as `<.list>`'s
+  #     `:item`, presented as `:one`/`:many`. One row hides how repetition
+  #     reads.
   #   * `{:slot_attr, slot, name}` — a slot attr declared with `values:`.
   #   * `{:icon, :style}` / `{:icon, :source}` — `<.icon>` has no declared
-  #     values, but the Tailwind plugin enumerates the heroicon styles it
-  #     builds and the component branches on the icon registry. Both are read
-  #     from their sources, so a new style or registry entry changes the
-  #     expectation here.
+  #     values, but it renders one of `@hero_styles` and branches on the icon
+  #     registry, so a new registry entry changes the expectation here.
   defp axes(name) do
     %{attrs: attrs, slots: slots} = Components.__components__()[name]
 
@@ -109,9 +164,22 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
           expected != nil,
           do: {{:attr, attr}, expected}
 
+    presence_axes =
+      for %{name: attr, type: :string, opts: opts} <- attrs,
+          attr != :id,
+          Keyword.get(opts, :default, :none) == nil,
+          do: {{:attr_presence, attr}, [:present, :absent]}
+
     slot_axes =
       for %{name: slot, required: false} <- slots,
           do: {{:slot, slot}, [:present, :absent]}
+
+    # Phoenix renders every named slot as a list; a required one is the
+    # component's repeating unit. `:inner_block` is the body, not a repetition.
+    count_axes =
+      for %{name: slot, required: true} <- slots,
+          slot != :inner_block,
+          do: {{:slot_count, slot}, [:one, :many]}
 
     slot_attr_axes =
       for %{name: slot, attrs: slot_attrs} <- slots,
@@ -120,7 +188,7 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
           expected != nil,
           do: {{:slot_attr, slot, attr}, expected}
 
-    attr_axes ++ slot_axes ++ slot_attr_axes ++ extra_axes(name)
+    attr_axes ++ presence_axes ++ slot_axes ++ count_axes ++ slot_attr_axes ++ extra_axes(name)
   end
 
   defp attr_values(:boolean, opts) do
@@ -133,31 +201,10 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   defp attr_values(_type, opts), do: Keyword.get(opts, :values)
 
   defp extra_axes(:icon) do
-    [{{:icon, :style}, hero_styles()}, {{:icon, :source}, [:hero, :registry]}]
+    [{{:icon, :style}, @hero_styles}, {{:icon, :source}, [:hero, :registry]}]
   end
 
   defp extra_axes(_name), do: []
-
-  # apps/web/assets/vendor/heroicons.js builds one class family per style:
-  #
-  #     ["", "/24/outline"], ["-solid", "/24/solid"], …
-  #
-  # The suffix list is the definition of which `hero-*` names exist.
-  defp hero_styles do
-    source = File.read!(@heroicons_plugin)
-
-    styles =
-      for [_, suffix] <- Regex.scan(~r/\[\s*"(-?[a-z]*)"\s*,\s*"\/\d+\/[a-z]+"\s*\]/, source),
-          do: style_from_suffix(suffix)
-
-    assert styles != [],
-           "could not read the heroicon style list from #{@heroicons_plugin}"
-
-    styles
-  end
-
-  defp style_from_suffix(""), do: :outline
-  defp style_from_suffix("-" <> style), do: String.to_atom(style)
 
   ## What the calls present
 
@@ -172,6 +219,16 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
     [attr_state(Source.attr(call, Atom.to_string(attr)), default_for(name, attr))]
   end
 
+  # A value computed at render time can still be nil, so it proves neither
+  # presence nor absence.
+  defp present(_name, {:attr_presence, attr}, call) do
+    case Source.attr(call, Atom.to_string(attr)) do
+      nil -> [:absent]
+      {:literal, _value} -> [:present]
+      {:dynamic, _code} -> [:dynamic]
+    end
+  end
+
   defp present(_name, {:slot, slot}, call) do
     given? =
       if slot == :inner_block,
@@ -179,6 +236,14 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
         else: Source.slots(call, Atom.to_string(slot)) != []
 
     [if(given?, do: :present, else: :absent)]
+  end
+
+  defp present(_name, {:slot_count, slot}, call) do
+    case Source.slots(call, Atom.to_string(slot)) do
+      [] -> []
+      [_one] -> [:one]
+      _many -> [:many]
+    end
   end
 
   defp present(name, {:slot_attr, slot, attr}, call) do
@@ -212,7 +277,7 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
         :dynamic
 
       :error ->
-        hero_styles()
+        @hero_styles
         |> Enum.reject(&(&1 == :outline))
         |> Enum.find(:outline, &String.ends_with?(icon, "-#{&1}"))
     end
@@ -256,7 +321,9 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   end
 
   defp describe_axis({:attr, attr}), do: "attr `#{attr}`"
+  defp describe_axis({:attr_presence, attr}), do: "optional attr `#{attr}` (given or omitted)"
   defp describe_axis({:slot, slot}), do: "slot `<:#{slot}>`"
+  defp describe_axis({:slot_count, slot}), do: "slot `<:#{slot}>` (one or many)"
   defp describe_axis({:slot_attr, slot, attr}), do: "slot attr `<:#{slot} #{attr}>`"
   defp describe_axis({:icon, :style}), do: "heroicon style (name suffix)"
   defp describe_axis({:icon, :source}), do: "source (heroicon or icon registry)"

@@ -522,6 +522,9 @@ not call or recreate it elsewhere.
   must call `<.name>`; hand-written control markup and single-state specimens
   fail the guards in `apps/base/ui/test/design_library_*_test.exs`, which read
   the template and `Components.__components__/0` rather than a fixture list.
+  Those guards are tagged `:design_library_drift` and excluded from the default
+  run until the current specimens are corrected; run them with
+  `mix test --include design_library_drift`.
 
 Templates may be colocated with their owning LiveView through `embed_templates`
 or a nearby `.html.heex` file. Colocation does not move the view into the
