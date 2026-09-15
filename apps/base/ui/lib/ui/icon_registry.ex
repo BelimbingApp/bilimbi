@@ -5,6 +5,11 @@ defmodule Bilimbi.Base.UI.IconRegistry do
   Heroicons continue to use the generated `hero-*` utilities. Add an entry
   here only when a product-specific glyph is needed so every caller can still
   render it through `<.icon>`.
+
+  `shell/1` is the other half of the registry: it names the accepted icon
+  meaning for each shell action, so the top bar, the account menu and Design
+  Library cannot drift apart on the same action. Its values are ordinary
+  `hero-*` names and need no `@icons` entry.
   """
 
   @type icon :: %{
@@ -43,6 +48,21 @@ defmodule Bilimbi.Base.UI.IconRegistry do
       ]
     }
   }
+
+  @shell %{
+    clock: "hero-clock",
+    light: "hero-sun",
+    dark: "hero-moon",
+    system: "hero-computer-desktop",
+    navigation: "hero-bars-3",
+    chevron: "hero-chevron-down-mini",
+    password: "hero-key",
+    logout: "hero-arrow-right-on-rectangle",
+    warning: "hero-exclamation-triangle"
+  }
+
+  @doc "Accepted shell icon meanings; logout preserves Bilimbi's own treatment."
+  def shell(action), do: Map.fetch!(@shell, action)
 
   @spec fetch(String.t()) :: {:ok, icon()} | :error
   def fetch(name) when is_binary(name), do: Map.fetch(@icons, name)

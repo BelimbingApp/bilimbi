@@ -325,9 +325,12 @@ defmodule BilimbiWeb.UserAuth do
 
   @doc """
   Loads `conn.assigns.current_scope` from live identity. The assign is a map
-  `%{user: map, scope: Scope.t(), actor: Authz.Actor.t(), capabilities: [String.t()], impersonator: map | nil, operator_company_missing: boolean()}`
-  or `nil`. Templates read `@current_scope.user["name"]`; module calls use
-  `@current_scope.scope`.
+  `%{user: map, scope: Scope.t(), actor: Authz.Actor.t(), capabilities: [String.t()],
+  impersonator: map | nil, session_identity: map, shell_preferences: map,
+  operator_company_missing: boolean()}` or `nil`. Templates read
+  `@current_scope.user["name"]`; module calls use `@current_scope.scope`.
+  `shell_preferences` is the single resolved theme and timestamp display
+  snapshot for the request or LiveView process.
 
   A cookie whose session, user, company, or tenant no longer proves out is
   dropped: the request falls through as unauthenticated.
@@ -358,16 +361,7 @@ defmodule BilimbiWeb.UserAuth do
   # The root layout stamps `data-theme` only for an explicit light/dark
   # choice; "system" (the default) stamps nothing so the stylesheet's
   # `prefers-color-scheme` block governs (#657).
-  defp ui_theme(%{
-         user: %{"user_id" => user_id, "company_id" => company_id},
-         scope: %Scope{} = scope
-       }) do
-    case Bilimbi.Core.User.get_user_preference(scope, company_id, user_id, "ui.theme") do
-      {:ok, theme} when theme in ["light", "dark"] -> theme
-      _ -> nil
-    end
-  end
-
+  defp ui_theme(%{shell_preferences: %{theme: theme}}) when theme in ["light", "dark"], do: theme
   defp ui_theme(_current_scope), do: nil
 
   defp maybe_clear_stale_session(conn) do
@@ -501,7 +495,7 @@ defmodule BilimbiWeb.UserAuth do
           end
         )
 
-      {:cont, socket}
+      {:cont, BilimbiWeb.ShellPreferences.attach(socket)}
     else
       {:halt, Phoenix.LiveView.redirect(socket, to: ~p"/")}
     end
@@ -561,21 +555,18 @@ defmodule BilimbiWeb.UserAuth do
 
   defp apply_locale(%{
          user: %{"user_id" => user_id, "company_id" => company_id},
-         scope: %Scope{} = scope
+         scope: %Scope{} = scope,
+         shell_preferences: shell_preferences
        }) do
-    tenant_id = Scope.tenant_id(scope)
-    user_settings_scope = SettingsScope.user(user_id, company_id, tenant_id)
-
-    user_settings_scope
+    SettingsScope.user(user_id, company_id, Scope.tenant_id(scope))
     |> Locale.resolve(locale_bootstrap())
     |> then(&put_gettext_locale(&1.language))
 
     # Timestamp display policy resolves in the same per-process lifecycle as
     # the locale, so no user's mode or company zone leaks into another
-    # request or LiveView process (#459).
-    DateTimeDisplay.put(
-      BaseDateTime.display(user_settings_scope, SettingsScope.company(company_id, tenant_id))
-    )
+    # request or LiveView process (#459). The scope already carries the one
+    # resolved snapshot; re-resolving it here would read the same rows twice.
+    DateTimeDisplay.put(shell_preferences)
   end
 
   # Platform-operator address facts feed one-time locale inference. The
@@ -622,6 +613,18 @@ defmodule BilimbiWeb.UserAuth do
     Enum.each(@gettext_backends, &Gettext.put_locale(&1, language))
   end
 
+  @doc false
+  def refresh_scope(%{session_identity: identity, impersonator: impersonator}) do
+    impersonation =
+      if impersonator,
+        do: %{"original_user_id" => impersonator.id, "original_user_name" => impersonator.name}
+
+    case current_scope_from(identity, impersonation) do
+      nil -> {:error, :unauthenticated}
+      scope -> {:ok, scope}
+    end
+  end
+
   defp current_scope_from(
          %{
            "session_id" => session_id,
@@ -646,8 +649,16 @@ defmodule BilimbiWeb.UserAuth do
         actor: actor,
         capabilities: allowed,
         impersonator: extract_impersonator(impersonation),
+        session_identity: %{
+          "session_id" => session_id,
+          "user_id" => user_id,
+          "company_id" => company_id
+        },
         operator_company_missing: operator_company_missing?(scope)
       }
+      |> then(
+        &Map.put(&1, :shell_preferences, Bilimbi.Core.User.DisplayPreferences.presentation(&1))
+      )
     else
       _ -> nil
     end

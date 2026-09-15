@@ -1,6 +1,6 @@
 # Base UI Design Library
 
-**Status:** Foundation verified locally; PR #696 awaits CI and merge decision
+**Status:** Foundation merged; shell parity continues in Issue #710
 **Last Updated:** 2026-09-14
 **Tracking:** [Issue #691](https://github.com/BelimbingApp/bilimbi/issues/691)
 **Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`
@@ -54,7 +54,7 @@ Routine design decisions do not pause for user approval. Escalate only a new bus
 
 ## Current Audit
 
-`T01` and `C01`–`C06` were resolved on the current draft branch, implemented in production UI and moved to Design Spec. Root guidance and the parity baseline now preserve those decisions and the intentional content-sized pagination correction from #304. The subsequent #694 integration preserves 24px inline icon targets through the shared component, with table/toolbar controls still 28px, and retains status-first company actions and the pin-state regression test.
+`T01` and `C01`–`C06` were resolved in the merged foundation, implemented in production UI and moved to Design Spec. Root guidance and the parity baseline now preserve those decisions and the intentional content-sized pagination correction from #304. The subsequent #694 integration preserves 24px inline icon targets through the shared component, with table/toolbar controls still 28px, and retains status-first company actions and the pin-state regression test.
 
 The inventory also covers the current shared structure, navigation, tabs, buttons, form fields, multi-select, choice controls, inline editing, flash messages, alerts, badges, tables, pagination, record facts, dates, operational lists, empty states, permission states, recovery states, the Bilimbi mark and icons.
 
@@ -95,7 +95,7 @@ Goal: Make the current Bilimbi design visible and decidable.
 
 Validation: A reviewer can inspect the current design and compare each variation using stable references such as `C01 A`.
 
-### Foundation closeout — Issue #691 / PR #696
+### Foundation closeout — Issue #691 / https://github.com/BelimbingApp/bilimbi/pull/696
 
 Goal: Merge a verified Design Library foundation before beginning the parity campaign.
 
@@ -111,7 +111,7 @@ Final closeout evidence: after integrating #694, `mix precommit` completed with 
 
 - [x] Repeat relevant verification after integrating #694, including shared icon sizing, shell pin-state behavior and full `mix precommit`. `{astra_pr_gate/gpt-6-astra}`
 
-The PR remains draft for CI on the pushed closeout and the merge decision; routine human design approval is no longer a closeout gate.
+The foundation merged at https://github.com/BelimbingApp/bilimbi/pull/696 on 2026-09-14 at 07:02:16 UTC with all seven checks passing.
 
 The shell account menu, top-bar timezone/theme controls and icon parity are recorded requirements for the next slice. The wider parity campaign, optional inspection skill and adopter-owned library are follow-up work and do not block this foundation's closeout.
 

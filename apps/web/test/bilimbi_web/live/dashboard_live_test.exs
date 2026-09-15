@@ -27,19 +27,9 @@ defmodule BilimbiWeb.DashboardLiveTest do
   test "shows the workspace identity and real counts", %{conn: conn} do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
-    assert has_element?(view, "#app-tenant", "41")
-    assert has_element?(view, "#app-tenant span.truncate", "Bilimbi local development")
-
-    assert has_element?(
-             view,
-             "#app-tenant span.whitespace-nowrap",
-             "· platform operator"
-           )
-
-    assert has_element?(
-             view,
-             "#app-tenant[title='Every screen in this shell acts on tenant Bilimbi local development']"
-           )
+    refute has_element?(view, "#app-tenant")
+    assert has_element?(view, "#app-user-panel", "Bilimbi local development")
+    assert has_element?(view, "#app-scope-warning", "Platform-operator access")
 
     assert has_element?(view, "#stat-companies", "1")
     assert has_element?(view, "#stat-users", "1")
@@ -84,7 +74,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
     refute has_element?(view, "#nav-admin-user")
     refute has_element?(view, "#dashboard-company-open")
     assert has_element?(view, "#app-user-name", "Ada Lovelace")
-    assert has_element?(view, "#app-logout")
+    assert has_element?(view, "#app-user-logout")
   end
 
   test "shows companies and users navigation when those capabilities are granted", %{conn: conn} do

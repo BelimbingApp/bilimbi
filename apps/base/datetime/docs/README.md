@@ -40,6 +40,12 @@ Rendering semantics, preserved from the source:
 The no-JavaScript fallback in every mode is the server text itself.
 Compatible `NaiveDateTime` values are explicitly interpreted as UTC.
 
+The authenticated shell changes the existing user mode through the Web edge.
+A saved mode re-arms the per-process display context and patches the shell in
+place; the browser never rewrites server text. An instant that takes `display`
+from a tracked assign follows at once, and the rest follow as the page next
+renders them. `:local` keeps its browser hook; calendar dates remain zone-free.
+
 ## Time zone database
 
 Validation and shifting run against `TimeZoneInfo.TimeZoneDatabase`, the

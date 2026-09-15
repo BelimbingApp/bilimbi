@@ -893,6 +893,10 @@ defmodule Bilimbi.Base.UI.Components do
       convert falls back to the truthful UTC text rather than guessing.
     * `:utc` — the server renders the stored UTC value as final text.
 
+  A saved shell display mode re-arms the process context; the browser never
+  rewrites server text. Pass `display` from a tracked assign when an instant
+  must follow a mode change without navigating away.
+
   With no context stored, `:local` — the pre-policy behavior, and the
   truthful no-JavaScript fallback in every mode is the server text itself.
   """

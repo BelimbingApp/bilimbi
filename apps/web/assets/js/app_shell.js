@@ -1,7 +1,10 @@
+import ShellControls from "./shell_controls"
+
 // Authenticated shell chrome. Owns only what the server cannot: the desktop
 // rail choice (localStorage), the mobile drawer, Escape/backdrop close, and
-// returning focus to the toggle. Navigation, capabilities, and status values
-// stay server-rendered.
+// returning focus to the toggle. The top-bar display controls and the account
+// disclosure belong to ShellControls, which this hook drives through the same
+// lifecycle. Navigation, capabilities, and status values stay server-rendered.
 const DESKTOP = "(min-width: 1024px)"
 const RAIL_WIDTH = 56
 const MIN_WIDTH = 180
@@ -58,14 +61,20 @@ const AppShell = {
     this.pinnedItems?.addEventListener("dragend", this.onPinnedDragEnd)
     window.addEventListener("keydown", this.onKey)
     this.mq.addEventListener("change", this.onMq)
+    this.controls = new ShellControls(this)
     this.apply()
   },
 
+  disconnected() { this.controls?.connection(false) },
+  reconnected() { this.controls?.connection(true) },
+
   updated() {
+    this.controls?.apply()
     this.apply()
   },
 
   destroyed() {
+    this.controls?.destroy()
     this.toggle?.removeEventListener("click", this.onToggle)
     this.backdrop?.removeEventListener("click", this.onBackdrop)
     this.root?.removeEventListener("click", this.onNav)
@@ -219,6 +228,7 @@ const AppShell = {
   closeDrawer() {
     if (this.desktop() || !this.drawerOpen) return
 
+    this.controls?.closeAll()
     this.drawerOpen = false
     this.apply()
     const restore = this.lastFocus || this.toggle
@@ -232,11 +242,13 @@ const AppShell = {
       this.lastFocus = null
     }
 
+    this.controls?.closeAll()
     this.apply()
   },
 
   onGlobalKey(event) {
     if (event.key === "Escape") {
+      if (this.controls?.panels().some(panel => !panel.hidden)) return
       this.closeDrawer()
       return
     }
@@ -576,7 +588,7 @@ const AppShell = {
     this.root.dataset.sidebarOpen = open ? "true" : "false"
 
     if (this.toggle) {
-      this.toggle.setAttribute("aria-expanded", open ? "true" : "false")
+      this.toggle.setAttribute("aria-expanded", (desktop ? !this.rail : open) ? "true" : "false")
     }
 
     const drawerOpen = !desktop && this.drawerOpen

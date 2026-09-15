@@ -8,8 +8,8 @@ defmodule Bilimbi.Base.UI.Layouts do
       reset). Compact card on the warm canvas with the Bilimbi brand bar;
       the page is otherwise quiet so the form reads first.
     * `app/1` — the authenticated workspace shell: a full-width top bar,
-      a left menu sidebar, and a persistent status bar. The top bar names the
-      tenant the screen acts on.
+      a left menu sidebar, and a persistent status bar. Account context is
+      disclosed from the bottom-left circle; safety warnings stay visible.
 
   Navigation sidebar conventions:
 
@@ -32,6 +32,7 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   import Phoenix.Controller, only: [get_csrf_token: 0]
   import Bilimbi.Base.UI.Components
+  alias Bilimbi.Base.UI.ShellComponents
 
   alias Phoenix.LiveView.JS
 
@@ -103,11 +104,13 @@ defmodule Bilimbi.Base.UI.Layouts do
       assigns
       |> assign(:shell, shell_meta())
       |> assign(:nav, nav)
+      |> assign(:preferences, assigns.current_scope.shell_preferences)
 
     ~H"""
     <div
       id="app-shell"
       phx-hook="AppShell"
+      data-theme-choice={@preferences.theme}
       data-sidebar-mode="desktop"
       data-sidebar-rail="false"
       data-sidebar-open="false"
@@ -126,7 +129,7 @@ defmodule Bilimbi.Base.UI.Layouts do
           aria-controls="app-sidebar"
           aria-expanded="false"
         >
-          <.icon name="hero-bars-3" class="size-5" />
+          <.icon name={Bilimbi.Base.UI.IconRegistry.shell(:navigation)} class="size-5" />
         </button>
 
         <div id="app-topbar-main" class="flex min-w-0 flex-1 items-center justify-between gap-3">
@@ -143,39 +146,39 @@ defmodule Bilimbi.Base.UI.Layouts do
           <div class="flex min-w-0 flex-1 items-center justify-end gap-3">
             {render_slot(@topbar_actions)}
 
-            <p
-              id="app-tenant"
-              class="flex min-w-0 max-w-[40vw] items-center gap-1.5 text-xs text-ink-subtle"
-              title={"Every screen in this shell acts on tenant #{@current_scope.scope.tenant.name}"}
-            >
-              <.icon name="hero-identification" class="size-3.5 shrink-0" />
-              <span class="hidden shrink-0 whitespace-nowrap sm:inline">Tenant</span>
-              <span class="min-w-0 truncate font-medium text-ink-muted">
-                {@current_scope.scope.tenant.name}
-              </span>
-              <span class="shrink-0 whitespace-nowrap tabular-nums">#{@current_scope.scope.tenant.id}</span>
-              <span
-                :if={@current_scope.scope.tenant.is_platform_operator}
-                class="hidden shrink-0 whitespace-nowrap text-ink-faint sm:inline"
-              >
-                · platform operator
-              </span>
-            </p>
+            <ShellComponents.display_controls
+              id="app-display"
+              preferences={@preferences}
+              impersonating={@current_scope[:impersonator] != nil}
+            />
           </div>
         </div>
       </header>
 
+      <ShellComponents.scope_warning id="app-scope-warning" current_scope={@current_scope} />
+      <%!-- No text colour here: ShellControls marks a failure with `text-danger`,
+      and a second colour role on the same element would outrank it. Ordinary
+      notices inherit `text-ink` from the document body. --%>
+      <div
+        id="app-preference-feedback"
+        hidden
+        role="status"
+        aria-live="polite"
+        class="shrink-0 border-b border-line bg-surface px-3 py-1 text-xs"
+      >
+      </div>
+
       <div id="app-workspace" class="relative flex min-h-0 flex-1 overflow-hidden">
         <div
           id="app-sidebar-backdrop"
-          class="app-sidebar-backdrop fixed inset-x-0 top-7 bottom-6 z-30 bg-ink/35 opacity-0 lg:hidden"
+          class="app-sidebar-backdrop absolute inset-0 z-30 bg-ink/35 opacity-0 lg:hidden"
           aria-hidden="true"
         >
         </div>
 
         <aside
           id="app-sidebar"
-          class="app-sidebar fixed top-7 bottom-6 left-0 z-40 flex w-56 shrink-0 flex-col border-r border-line bg-surface-sidebar lg:static lg:inset-auto lg:top-auto lg:bottom-auto lg:z-auto lg:w-60"
+          class="app-sidebar absolute inset-y-0 left-0 z-40 flex w-56 shrink-0 flex-col border-r border-line bg-surface-sidebar lg:static lg:inset-auto lg:top-auto lg:bottom-auto lg:z-auto lg:w-60"
           tabindex="-1"
           role="navigation"
           aria-label="Main navigation"
@@ -204,34 +207,11 @@ defmodule Bilimbi.Base.UI.Layouts do
               id="app-nav-empty"
               class="app-nav-empty px-2 py-3 text-xs leading-snug text-ink-subtle"
             >
-              No navigation is available for this account. An operator needs to
-              assign a role — in development, run
-              <code class="font-medium text-ink-muted">mix bilimbi.authz.reconcile</code>
-              then assign <code class="font-medium text-ink-muted">core_admin</code>
-              to this user.
+              No destinations are available for this account. Ask an operator to assign a role.
             </p>
           </nav>
 
-          <div id="app-user" class="border-t border-line px-0.5 py-0.5">
-            <div class="flex items-center gap-2 rounded-none px-1 py-0.5 text-sm font-normal text-link transition hover:bg-surface-muted">
-              <span class="grid size-7 shrink-0 place-items-center rounded-full bg-action text-xs font-medium text-action-ink">
-                {user_initials(@current_scope.user["name"])}
-              </span>
-              <div class="app-user-expanded min-w-0 flex-1">
-                <p id="app-user-name" class="truncate text-sm font-normal text-ink">
-                  {@current_scope.user["name"]}
-                </p>
-                <p class="truncate text-xs text-muted">{@current_scope.user["email"]}</p>
-              </div>
-              <.icon_button
-                icon="hero-arrow-right-on-rectangle"
-                label="Log out"
-                href={~p"/session"}
-                method="delete"
-                id="app-logout"
-              />
-            </div>
-          </div>
+          <ShellComponents.account_menu id="app-user" current_scope={@current_scope} />
         </aside>
 
         <div
@@ -264,18 +244,6 @@ defmodule Bilimbi.Base.UI.Layouts do
           >
             dev <span :if={@shell.listen_address} id="app-listen">{@shell.listen_address}</span>
           </span>
-
-          <.link
-            :if={@current_scope && Map.get(@current_scope, :impersonator)}
-            href={~p"/admin/impersonate/leave"}
-            method="post"
-            id="app-impersonation-stop"
-            class="inline-flex items-center gap-1 font-medium text-danger hover:underline"
-          >
-            <.icon name="hero-eye" class="size-3.5" />
-            <span>{gettext("Viewing as %{name}", name: @current_scope.user["name"])}</span>
-            <span class="font-semibold ml-1">{gettext("Stop")}</span>
-          </.link>
 
           <.link
             :if={operator_company_missing?(@current_scope)}
@@ -495,16 +463,6 @@ defmodule Bilimbi.Base.UI.Layouts do
   defp nav_icon(nil), do: "hero-square-3-stack-3d"
   defp nav_icon("hero-" <> _ = name), do: name
   defp nav_icon(name) when is_binary(name), do: "hero-" <> name
-
-  defp user_initials(name) when is_binary(name) do
-    name
-    |> String.split(~r/\s+/, trim: true)
-    |> Enum.take(2)
-    |> Enum.map_join(&String.first/1)
-    |> String.upcase()
-  end
-
-  defp user_initials(_), do: "?"
 
   attr(:size, :integer, required: true)
 

@@ -324,7 +324,6 @@ body {
   #app-shell[data-sidebar-rail="true"] .app-nav-label,
   #app-shell[data-sidebar-rail="true"] .app-nav-empty,
   #app-shell[data-sidebar-rail="true"] .app-user-expanded,
-  #app-shell[data-sidebar-rail="true"] #app-logout,
   #app-shell[data-sidebar-rail="true"] .app-nav-indent,
   #app-shell[data-sidebar-rail="true"] .app-nav-caret,
   #app-shell[data-sidebar-rail="true"] .app-nav-toggle,
@@ -374,7 +373,7 @@ body {
     min-height: 2rem;
   }
 
-  #app-shell[data-sidebar-rail="true"] #app-user > div {
+  #app-shell[data-sidebar-rail="true"] #app-user > button {
     flex-direction: column;
   }
 }

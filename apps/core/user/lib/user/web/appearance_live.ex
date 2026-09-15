@@ -1,11 +1,14 @@
 defmodule Bilimbi.Core.User.Web.AppearanceLive do
   @moduledoc """
-  The signed-in account's self-service theme and locale settings screen.
+  The signed-in account's self-service theme, time display and language screen.
 
   Ports Belimbing's `app/Core/User/Livewire/Settings/Appearance.php`.
-  Identity comes only from the authenticated scope. Submitted values cannot
-  name another user, and locale persistence stays behind Base Locale's public
-  explicit-scope API.
+  Identity comes only from the authenticated scope, and every write goes
+  through `Bilimbi.Core.User.DisplayPreferences`, the one owner of these three
+  preferences: submitted values cannot name another user, and an impersonating
+  session is refused there rather than here. Only fields whose submitted value
+  differs from the stored one are written, and the flash names what did and
+  did not save.
   """
 
   use Bilimbi.Base.UI, :live_view
@@ -17,34 +20,15 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
 
   import Bilimbi.Core.User.Web.SettingsComponents
 
-  alias Bilimbi.Base.DateTime, as: DateTimePolicy
   alias Bilimbi.Base.Locale
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy.Scope, as: TenancyScope
-  alias Bilimbi.Core.User
-
-  @theme_key "ui.theme"
+  alias Bilimbi.Base.UI.ShellComponents
+  alias Bilimbi.Core.User.DisplayPreferences
 
   @impl true
   def mount(_params, _session, socket) do
     current_scope = socket.assigns.current_scope
-    user_id = extract_user_id(current_scope)
-    company_id = extract_company_id(current_scope)
-    scope = current_scope.scope
-
-    theme =
-      with {:ok, saved_theme} <- User.get_user_preference(scope, company_id, user_id, @theme_key),
-           true <- saved_theme in ["light", "dark", "system"] do
-        saved_theme
-      else
-        _ -> "system"
-      end
-
-    locale_scope = locale_scope(current_scope)
-
-    locale =
-      if Locale.overridden?(locale_scope), do: Locale.locale(locale_scope), else: ""
-
     installation_locale = Locale.locale(nil)
 
     locale_options =
@@ -52,82 +36,78 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
       |> Enum.map(fn {code, %{label: label}} -> {"#{label} (#{code})", code} end)
       |> Enum.sort()
 
-    settings_scope = locale_scope(current_scope)
-
-    timezone_mode =
-      if DateTimePolicy.mode_overridden?(settings_scope) do
-        Atom.to_string(DateTimePolicy.mode(settings_scope))
-      else
-        ""
-      end
-
     {:ok,
      assign(socket,
-       theme: theme,
-       locale: locale,
+       locale: stored_locale(locale_scope(current_scope)),
        locale_options: locale_options,
        installation_locale: Locale.label(installation_locale),
-       timezone_mode: timezone_mode,
-       timezone_mode_options: timezone_mode_options()
+       timezone_mode_options: timezone_mode_options(current_scope)
      )}
   end
 
   @impl true
   def handle_event("save", %{"appearance" => appearance}, socket) when is_map(appearance) do
-    theme = Map.get(appearance, "theme", socket.assigns.theme)
-    locale = Map.get(appearance, "locale", socket.assigns.locale)
-    timezone_mode = Map.get(appearance, "timezone_mode", socket.assigns.timezone_mode)
+    current_scope = socket.assigns.current_scope
+    preferences = current_scope.shell_preferences
 
-    if valid_theme?(theme) and valid_locale?(locale) and valid_timezone_mode?(timezone_mode) do
-      save_appearance(socket, theme, locale, timezone_mode)
-    else
-      {:noreply,
-       put_flash(socket, :error, "Choose a supported theme, locale, and time zone display.")}
-    end
+    attempted =
+      [
+        {"Theme", "theme", Map.get(appearance, "theme", preferences.theme), preferences.theme},
+        {"Time zone display", "timezone",
+         Map.get(appearance, "timezone_mode", to_string(preferences.mode)),
+         to_string(preferences.mode)},
+        {"Language", "locale", Map.get(appearance, "locale", socket.assigns.locale),
+         socket.assigns.locale}
+      ]
+      |> Enum.reject(fn {_field, _kind, submitted, stored} -> submitted == stored end)
+      |> Enum.map(fn {field, kind, submitted, _stored} ->
+        {field, DisplayPreferences.save(current_scope, kind, submitted)}
+      end)
+
+    {:noreply,
+     socket
+     |> assign(:current_scope, DisplayPreferences.refresh(current_scope))
+     |> assign(:locale, stored_locale(locale_scope(current_scope)))
+     |> report(attempted)}
   end
 
   def handle_event("save", _params, socket) do
     {:noreply, socket}
   end
 
-  defp save_appearance(socket, theme, locale, timezone_mode) do
-    current_scope = socket.assigns.current_scope
-    user_id = extract_user_id(current_scope)
-    company_id = extract_company_id(current_scope)
-    scope = current_scope.scope
+  defp report(socket, []), do: socket
 
-    with :ok <- persist_theme(scope, company_id, user_id, theme),
-         :ok <- persist_locale(locale_scope(current_scope), locale),
-         :ok <- persist_timezone_mode(locale_scope(current_scope), timezone_mode) do
-      {:noreply,
-       socket
-       |> assign(theme: theme, locale: locale, timezone_mode: timezone_mode)
-       |> put_flash(:info, "Appearance settings saved.")
-       |> push_event("theme-changed", %{theme: theme})}
-    else
-      {:error, _reason} ->
-        {:noreply, put_flash(socket, :error, "Could not save appearance settings.")}
+  defp report(socket, attempted) do
+    {saved, refused} = Enum.split_with(attempted, &match?({_field, :ok}, &1))
+
+    case refused do
+      [] ->
+        put_flash(socket, :info, "Appearance settings saved.")
+
+      refused ->
+        put_flash(socket, :error, Enum.join(saved_note(saved) ++ refusal_notes(refused), " "))
     end
   end
 
-  defp persist_theme(scope, company_id, user_id, "system") do
-    User.delete_user_preference(scope, company_id, user_id, @theme_key)
+  defp saved_note([]), do: []
+  defp saved_note(saved), do: ["Saved — #{names(saved)}."]
+
+  defp refusal_notes(refused) do
+    refused
+    |> Enum.group_by(fn {_field, {:error, reason}} -> reason end)
+    |> Enum.map(fn {reason, fields} -> "Not saved — #{names(fields)}. #{refusal(reason)}" end)
   end
 
-  defp persist_theme(scope, company_id, user_id, theme) do
-    case User.put_user_preference(scope, company_id, user_id, @theme_key, theme) do
-      {:ok, _theme} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
-  end
+  defp names(entries), do: Enum.map_join(entries, ", ", &elem(&1, 0))
 
-  defp persist_locale(scope, ""), do: Locale.delete(scope)
+  defp refusal(:impersonating),
+    do: "Appearance settings belong to the account you are viewing."
 
-  defp persist_locale(scope, locale) do
-    case Locale.put(scope, locale) do
-      {:ok, _locale} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
+  defp refusal(:invalid_preference), do: "Choose a supported value."
+  defp refusal(_reason), do: "The change could not be saved."
+
+  defp stored_locale(scope) do
+    if Locale.overridden?(scope), do: Locale.locale(scope), else: ""
   end
 
   defp locale_scope(current_scope) do
@@ -138,30 +118,12 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
     )
   end
 
-  defp persist_timezone_mode(scope, ""), do: DateTimePolicy.delete_mode(scope)
-
-  defp persist_timezone_mode(scope, mode) do
-    case DateTimePolicy.put_mode(scope, mode) do
-      {:ok, _mode} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
+  defp timezone_mode_options(current_scope) do
+    Enum.map(
+      current_scope.shell_preferences.modes,
+      &{ShellComponents.mode_choice_label(&1), to_string(&1)}
+    )
   end
-
-  defp timezone_mode_options do
-    [
-      {"Use default (Company time)", ""},
-      {"Company time", "company"},
-      {"This device's local time", "local"},
-      {"Stored UTC", "utc"}
-    ]
-  end
-
-  defp valid_theme?(theme), do: theme in ["light", "dark", "system"]
-  defp valid_locale?(""), do: true
-  defp valid_locale?(locale), do: Locale.supports?(locale)
-
-  defp valid_timezone_mode?(""), do: true
-  defp valid_timezone_mode?(mode), do: DateTimePolicy.valid_mode?(mode)
 
   defp extract_user_id(%{user: %{"user_id" => id}}), do: id
   defp extract_user_id(%{user: %{user_id: id}}), do: id

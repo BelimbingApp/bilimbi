@@ -341,6 +341,10 @@
         >
           <nav aria-label="Component sections" class="space-y-3">
             <div id="component-menu-structure">
+              <a
+                href="#component-shell"
+                class="block rounded-md px-2 py-1.5 text-link hover:bg-surface"
+              >Application shell</a>
               <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                 Structure
               </p>
@@ -464,6 +468,36 @@
         </aside>
 
         <div id="component-content" class="min-w-0 space-y-9">
+          <section id="component-shell" class="scroll-mt-4 space-y-3">
+            <h2 class="text-base font-semibold text-ink">
+              Application shell <span class="text-xs text-muted">LAY-02 · NAV-05</span>
+            </h2>
+            <p class="text-sm text-muted">
+              Your account stays at the bottom left. Open it for company, tenant and account actions. Unusual access stays visible while you work.
+            </p>
+            <div class="rounded-xl border border-line bg-surface p-4">
+              <h3 class="text-sm font-semibold">Display controls</h3>
+              <p class="mt-1 text-xs text-muted">
+                The clock and theme controls live in the top bar of this page. They change your own saved display preferences. The timestamp below is handed your current choice directly, so it follows the clock at once. Timestamps elsewhere in the product are written when their screen renders, so they show the new choice the next time that screen renders.
+              </p>
+              <p class="mt-3 text-sm">
+                <.datetime
+                  id="library-shell-time"
+                  value={~U[2026-09-14 07:00:00Z]}
+                  display={@current_scope.shell_preferences}
+                />
+              </p>
+            </div>
+            <div class="rounded-xl border border-line bg-surface p-4">
+              <h3 class="text-sm font-semibold">Account disclosure</h3>
+              <p class="mt-1 text-xs text-muted">
+                The accepted disclosure is the circle at the bottom left of this page. Open it for your name, identifier, company, tenant, Change password and Sign out. Every authenticated screen shows the same circle in the same place.
+              </p>
+            </div>
+            <p class="text-xs text-muted">
+              Use the top-left toggle to compare the full sidebar and compact rail. On a narrow screen it opens a drawer; Escape closes the active menu first, then the drawer.
+            </p>
+          </section>
           <section id="component-structure" class="scroll-mt-4 space-y-4">
             <div>
               <h2 class="text-base font-semibold text-ink-strong">Page structure</h2><p class="text-sm text-ink-muted">
@@ -1089,6 +1123,20 @@
               These are the current rules for Bilimbi.
             </p>
           </div>
+          <section id="spec-shell" class="space-y-3">
+            <h2 class="text-base font-semibold text-ink">
+              Application shell · LAY-02 / NAV-05 / FND-06
+            </h2>
+            <p class="text-sm text-muted">
+              Account details belong behind the bottom-left circle. Platform-operator and impersonated access remain visible above the workspace. An account works in one company and tenant, so the menu shows the current scope and offers no switching.
+            </p>
+            <p class="text-sm text-muted">
+              The clock selects Company, Local or UTC time. Sun, moon and desktop select Light, Dark or System theme. A saved choice confirms in place, updates the controls and follows your account; timestamps already on screen follow as the page next renders them, and every screen you open afterwards uses the new choice. While saving, controls prevent duplicate work; a failed save keeps the previous choice and explains how to retry. While you view as another user, the top bar reports the active time display and offers no controls, because those preferences belong to the account you are viewing.
+            </p>
+            <p class="text-sm text-muted">
+              Menus close on Escape or outside click and return keyboard focus to their trigger on Escape. The narrow drawer contains keyboard focus and returns it to the sidebar toggle when closed.
+            </p>
+          </section>
           <section id="spec-theme" class="space-y-3">
             <h3 class="text-sm font-semibold text-ink">Theme</h3>
             <div class="grid gap-3 lg:grid-cols-2">
