@@ -1,6 +1,6 @@
 # Base UI Design Library
 
-**Status:** Foundation merged; shell parity continues in Issue #710
+**Status:** Foundation merged; the parity campaign continues under Issue #709
 **Last Updated:** 2026-09-15
 **Tracking:** [Issue #691](https://github.com/BelimbingApp/bilimbi/issues/691)
 **Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`; `fm/parity-designlib-specimens/grok-4.6`

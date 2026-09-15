@@ -78,11 +78,12 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     refute has_element?(countries, "#country-1-name")
 
     # Default display mode is :company (#459); with no company zone stored
-    # that resolves to UTC, rendered as final server text without the
-    # browser-localizing hook.
+    # that resolves to UTC. The server text is the final answer — the browser
+    # only ever swaps to one of the strings the server already rendered.
     assert has_element?(
              countries,
-             "#country-1-updated[datetime='2026-07-24T12:34:56Z']:not([phx-hook])",
+             "#country-1-updated[datetime='2026-07-24T12:34:56Z']" <>
+               "[data-text-company='24/07/2026 UTC'][data-text-utc='24/07/2026 UTC']",
              "24/07/2026 UTC"
            )
 

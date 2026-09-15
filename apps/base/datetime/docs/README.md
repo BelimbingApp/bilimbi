@@ -32,19 +32,28 @@ Rendering semantics, preserved from the source:
 - `nil` renders `—`;
 - `:local` keeps the truthful UTC-labelled server text and lets the browser
   hook enhance it into the device's zone;
-- `:company` shifts server-side into the company IANA zone and renders final
-  text labelled with the zone abbreviation — an unconvertible zone falls
-  back to the truthful UTC text rather than guessing;
-- `:utc` renders the stored UTC value as final text.
+- `:company` shifts server-side into the company IANA zone and renders text
+  labelled with the zone abbreviation — an unconvertible zone falls back to
+  the truthful UTC text rather than guessing;
+- `:utc` renders the stored UTC value.
 
 The no-JavaScript fallback in every mode is the server text itself.
 Compatible `NaiveDateTime` values are explicitly interpreted as UTC.
 
 The authenticated shell changes the existing user mode through the Web edge.
 A saved mode re-arms the per-process display context and patches the shell in
-place; the browser never rewrites server text. An instant that takes `display`
-from a tracked assign follows at once, and the rest follow as the page next
-renders them. `:local` keeps its browser hook; calendar dates remain zone-free.
+place, and every instant `<.datetime>` has already rendered changes with it —
+including rows a LiveView stream handed to the DOM, which the server never
+re-renders. A screen that formats an instant itself keeps the text it wrote
+until it adopts the component.
+
+That reach is a property of `<.datetime>` rather than of its call sites: the
+element carries the server's own text for both modes the server can decide,
+and the browser swaps between those two strings rather than formatting one of
+its own, so the two renderings cannot disagree. `:local` is the one mode the
+browser formats, because the server does not know its zone; it renders in the
+reader's own locale and hour cycle. An instant handed an explicit `display`
+is pinned to that context instead. Calendar dates remain zone-free.
 
 ## Time zone database
 

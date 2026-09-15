@@ -198,8 +198,11 @@ or cross-company work where acting in the wrong scope could cause harm.
 
 The timezone and theme selectors are compact top-bar utilities, not settings
 navigation. A selection applies immediately and persists for the signed-in
-user. Timezone changes affect subsequent date and time rendering; theme
-changes affect the current page without a reload.
+user. Both take effect on the current page without a reload: a theme change
+restyles it, and a timezone change re-renders every timestamp rendered through
+`<.datetime>`, streamed table rows included. Screens that format instants
+directly rather than through that component are unaffected until they adopt
+it.
 
 ### Navigation menu conventions
 

@@ -3,10 +3,16 @@ defmodule Bilimbi.Base.UI.ComponentsDatetimeTest do
   `<.datetime>` under the three display modes (#459).
 
   The component honors the per-process `DateTimeDisplay` context the web
-  edge sets, or an explicit `display` attr. `:local` keeps the truthful
-  UTC-labelled server text plus the browser hook; `:company` and `:utc`
-  render final server text with no hook, so the no-JavaScript fallback is
-  the answer itself.
+  edge sets, or an explicit `display` attr. The server text is the complete
+  answer in every mode, so the no-JavaScript fallback is the rendering
+  itself.
+
+  Every instant also carries the two modes the server can decide, so an
+  instant already on screen can follow a saved mode change without the
+  server re-rendering it — the case that matters is a LiveView stream, whose
+  rows the server hands to the DOM and then forgets. The hook only ever
+  copies one of those strings; see `date_time_js_test.exs` for the client
+  side of the same contract.
   """
 
   use ExUnit.Case, async: false
@@ -87,11 +93,10 @@ defmodule Bilimbi.Base.UI.ComponentsDatetimeTest do
     assert html =~ ~s(datetime="2026-01-01T16:30:00Z")
   end
 
-  test "utc mode renders final stored-UTC text with no hook" do
+  test "utc mode renders final stored-UTC text" do
     DateTimeDisplay.put(%{mode: :utc})
     html = render_datetime(%{})
-    assert html =~ "01/01/2026, 16:30 UTC"
-    refute html =~ "phx-hook"
+    assert html =~ ">\n  01/01/2026, 16:30 UTC\n<"
   end
 
   test "company mode shifts through the provided database and labels the zone" do
@@ -102,8 +107,7 @@ defmodule Bilimbi.Base.UI.ComponentsDatetimeTest do
     })
 
     html = render_datetime(%{})
-    assert html =~ "02/01/2026, 00:30 +08"
-    refute html =~ "phx-hook"
+    assert html =~ ">\n  02/01/2026, 00:30 +08\n<"
     # The ISO value stays the stored UTC instant, not a rewritten one.
     assert html =~ ~s(datetime="2026-01-01T16:30:00Z")
   end
@@ -138,5 +142,91 @@ defmodule Bilimbi.Base.UI.ComponentsDatetimeTest do
 
     assert render_datetime(%{format: :date}) =~ "02/01/2026 +08"
     assert render_datetime(%{format: :time}) =~ "00:30 +08"
+  end
+
+  describe "following a saved mode change" do
+    test "an instant carries both server-decided modes whatever mode is current" do
+      # The browser swaps between these two strings. It never formats them, so
+      # a streamed row can follow a mode change with no server round trip and
+      # no chance of the two renderings disagreeing.
+      DateTimeDisplay.put(%{mode: :company, timezone: "Test/Plus8", tz_db: FakeDb})
+
+      html = render_datetime(%{})
+
+      assert html =~ ~s(data-text-company="02/01/2026, 00:30 +08")
+      assert html =~ ~s(data-text-utc="01/01/2026, 16:30 UTC")
+      assert html =~ ~s(data-mode="company")
+      assert html =~ ~s(phx-hook="DateTime")
+    end
+
+    test "the same two strings are carried while the current mode is utc" do
+      DateTimeDisplay.put(%{mode: :utc, timezone: "Test/Plus8", tz_db: FakeDb})
+
+      html = render_datetime(%{})
+
+      assert html =~ ~s(data-text-company="02/01/2026, 00:30 +08")
+      assert html =~ ~s(data-text-utc="01/01/2026, 16:30 UTC")
+    end
+
+    test "the same two strings are carried while the current mode is local" do
+      DateTimeDisplay.put(%{mode: :local, timezone: "Test/Plus8", tz_db: FakeDb})
+
+      html = render_datetime(%{})
+
+      assert html =~ ~s(data-text-company="02/01/2026, 00:30 +08")
+      assert html =~ ~s(data-text-utc="01/01/2026, 16:30 UTC")
+      # Local keeps the truthful UTC-labelled text until the browser enhances.
+      assert html =~ ">\n  01/01/2026, 16:30 UTC\n<"
+    end
+
+    test "an unconvertible company zone carries the truthful UTC text in both" do
+      DateTimeDisplay.put(%{mode: :utc, timezone: "Atlantis/Sunken", tz_db: FakeDb})
+
+      html = render_datetime(%{})
+
+      assert html =~ ~s(data-text-company="01/01/2026, 16:30 UTC")
+      assert html =~ ~s(data-text-utc="01/01/2026, 16:30 UTC")
+    end
+
+    test "an explicit display attr opts the instant out of following the shell" do
+      # The caller has already decided what this instant shows, so a shell
+      # mode change must not overwrite it.
+      html = render_datetime(%{display: %{mode: :company, timezone: "Test/Cet", tz_db: FakeDb}})
+
+      refute html =~ "data-follow-shell"
+      assert html =~ ~s(data-mode="company")
+    end
+
+    test "an instant with no explicit display follows the shell" do
+      DateTimeDisplay.put(%{mode: :utc})
+
+      assert render_datetime(%{}) =~ ~s(data-follow-shell="true")
+    end
+
+    test "a calendar date carries no mode metadata and no hook" do
+      DateTimeDisplay.put(%{mode: :company, timezone: "Test/Plus8", tz_db: FakeDb})
+
+      html = render_datetime(%{value: ~D[2026-01-02], format: :date})
+
+      refute html =~ "phx-hook"
+      refute html =~ "data-text-company"
+      refute html =~ "data-mode"
+    end
+
+    test "date and time formats carry the zone label in both server strings" do
+      # The label is part of the server's convention in every format, and the
+      # browser copies these two strings rather than writing its own. `:local`
+      # is the one the browser formats, and it names the zone on :datetime
+      # only — a deliberate divergence, pinned in date_time_js_test.exs.
+      DateTimeDisplay.put(%{mode: :company, timezone: "Test/Plus8", tz_db: FakeDb})
+
+      date = render_datetime(%{format: :date})
+      assert date =~ ~s(data-text-company="02/01/2026 +08")
+      assert date =~ ~s(data-text-utc="01/01/2026 UTC")
+
+      time = render_datetime(%{format: :time})
+      assert time =~ ~s(data-text-company="00:30 +08")
+      assert time =~ ~s(data-text-utc="16:30 UTC")
+    end
   end
 end
