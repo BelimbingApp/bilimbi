@@ -220,78 +220,78 @@ body {
 }
 
 /* Menu typography & font colors matching Belimbing */
-#app-sidebar {
+.app-nav-rail {
   font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
   font-weight: 350;
   letter-spacing: -0.01em;
   color: var(--color-link);
 }
 
-#app-sidebar .app-nav-item,
-#app-sidebar .app-nav-parent,
-#app-sidebar .app-nav-container,
-#app-sidebar .app-nav-parent-link,
+.app-nav-rail .app-nav-item,
+.app-nav-rail .app-nav-parent,
+.app-nav-rail .app-nav-container,
+.app-nav-rail .app-nav-parent-link,
 #app-pinned .app-pinned-link {
   font-weight: 350;
   font-size: 0.8125rem;
   line-height: 1.25rem;
 }
 
-#app-sidebar .app-nav-item,
-#app-sidebar .app-nav-parent,
-#app-sidebar .app-nav-container,
-#app-sidebar .app-nav-parent-link,
+.app-nav-rail .app-nav-item,
+.app-nav-rail .app-nav-parent,
+.app-nav-rail .app-nav-container,
+.app-nav-rail .app-nav-parent-link,
 #app-pinned .app-pinned-link {
   color: var(--color-link);
 }
 
-#app-sidebar .app-nav-item:hover,
-#app-sidebar .app-nav-parent:hover,
-#app-sidebar .app-nav-container:hover,
-#app-sidebar .app-nav-parent-link:hover,
+.app-nav-rail .app-nav-item:hover,
+.app-nav-rail .app-nav-parent:hover,
+.app-nav-rail .app-nav-container:hover,
+.app-nav-rail .app-nav-parent-link:hover,
 #app-pinned .app-pinned-link:hover {
   color: var(--color-ink);
 }
 
 /* Active menu item styling */
-#app-sidebar .app-nav-item[aria-current="page"],
-#app-sidebar .app-nav-parent-link[aria-current="page"] {
+.app-nav-rail .app-nav-item[aria-current="page"],
+.app-nav-rail .app-nav-parent-link[aria-current="page"] {
   font-weight: 350;
   color: var(--color-brand-strong);
   background-color: var(--color-surface);
 }
 
 /* Parent branch ascent when it contains the active menu item */
-#app-sidebar .app-nav-parent.text-brand-strong,
-#app-sidebar .app-nav-parent.text-brand-strong .app-nav-container,
-#app-sidebar .app-nav-parent.text-brand-strong .app-nav-parent-link,
-#app-sidebar .app-nav-parent.text-brand-strong .app-nav-label,
-#app-sidebar .app-nav-parent.text-brand-strong .app-nav-caret,
-#app-sidebar .app-nav-branch:has([aria-current="page"]) > .app-nav-parent,
-#app-sidebar .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-container,
-#app-sidebar .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-parent-link,
-#app-sidebar .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-label,
-#app-sidebar .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-caret {
+.app-nav-rail .app-nav-parent.text-brand-strong,
+.app-nav-rail .app-nav-parent.text-brand-strong .app-nav-container,
+.app-nav-rail .app-nav-parent.text-brand-strong .app-nav-parent-link,
+.app-nav-rail .app-nav-parent.text-brand-strong .app-nav-label,
+.app-nav-rail .app-nav-parent.text-brand-strong .app-nav-caret,
+.app-nav-rail .app-nav-branch:has([aria-current="page"]) > .app-nav-parent,
+.app-nav-rail .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-container,
+.app-nav-rail .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-parent-link,
+.app-nav-rail .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-label,
+.app-nav-rail .app-nav-branch:has([aria-current="page"]) > .app-nav-parent .app-nav-caret {
   color: var(--color-brand-strong);
 }
 
-#app-sidebar .app-nav-icon {
+.app-nav-rail .app-nav-icon {
   display: none;
 }
 
-#app-sidebar .app-nav-caret-open {
+.app-nav-rail .app-nav-caret-open {
   display: none;
 }
 
-#app-sidebar .app-nav-caret-closed {
+.app-nav-rail .app-nav-caret-closed {
   display: inline;
 }
 
-#app-sidebar [data-nav-expanded="true"] > .app-nav-parent .app-nav-caret-open {
+.app-nav-rail [data-nav-expanded="true"] > .app-nav-parent .app-nav-caret-open {
   display: inline;
 }
 
-#app-sidebar [data-nav-expanded="true"] > .app-nav-parent .app-nav-caret-closed {
+.app-nav-rail [data-nav-expanded="true"] > .app-nav-parent .app-nav-caret-closed {
   display: none;
 }
 

@@ -586,19 +586,20 @@
                 <nav
                   id="example-nav"
                   aria-label="Example menu"
-                  class="max-w-xs rounded-lg bg-surface-sidebar px-0.5 py-0.5"
+                  class="app-nav-rail max-w-xs rounded-lg bg-surface-sidebar px-0.5 py-0.5"
                 >
                   <Layouts.nav_branch
                     :for={node <- @nav_example}
                     node={node}
                     active_nav={@nav_example_active}
+                    pinnable={false}
                   />
                 </nav>
                 <p class="text-xs text-ink-muted">
                   The shell's own rail rows, over an example tree: a leaf, an expanded
-                  branch accented for the current page, and the selected child. Hover a
-                  row for its pin control. Pinned rows themselves are drawn by the shell
-                  hook into the sidebar, so they have no component to show here.
+                  branch accented for the current page, and the selected child. Pinning is
+                  left out: the shell resolves a pinned row only from the sidebar itself,
+                  and pinned rows are drawn there by its hook rather than by a component.
                 </p>
               </.card>
               <.card id="component-tabs" title="Tabs" inner_class="p-3">

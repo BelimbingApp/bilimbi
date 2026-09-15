@@ -42,14 +42,14 @@ defmodule Bilimbi.Base.UI.LayoutsNavBranchTest do
     }
   end
 
-  defp render(node, active_nav) do
+  defp render(node, active_nav, opts \\ []) do
     render_component(
       fn assigns ->
         ~H"""
-        <Layouts.nav_branch node={@node} active_nav={@active_nav} />
+        <Layouts.nav_branch node={@node} active_nav={@active_nav} pinnable={@pinnable} />
         """
       end,
-      %{node: node, active_nav: active_nav}
+      %{node: node, active_nav: active_nav, pinnable: Keyword.get(opts, :pinnable, true)}
     )
   end
 
@@ -61,6 +61,16 @@ defmodule Bilimbi.Base.UI.LayoutsNavBranchTest do
     assert html =~ "Companies"
     assert html =~ ~s(data-nav-pin="nav-example-companies")
     refute html =~ ~s(aria-current="page")
+  end
+
+  test "pinnable false drops the pin control from every row in the tree" do
+    leaf_html = render(leaf(), nil, pinnable: false)
+    branch_html = render(branch(), "example.system.design-library", pinnable: false)
+
+    refute leaf_html =~ "data-nav-pin"
+    refute branch_html =~ "data-nav-pin"
+    assert leaf_html =~ "Companies"
+    assert branch_html =~ "Design Library"
   end
 
   test "the current leaf is marked and accented" do
