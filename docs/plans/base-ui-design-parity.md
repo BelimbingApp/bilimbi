@@ -1,9 +1,9 @@
 # Base UI Design Parity
 
-**Status:** In progress — application shell implemented and validated; independent review pending for Issue #710
-**Last Updated:** 2026-09-14
-**Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward)
+**Status:** In progress — application shell, impersonation audit actor and the named icon vocabulary are merged to `main`; Design Library specimen separation, state coverage, drift guards and live timestamp display are implemented and in review
+**Last Updated:** 2026-09-15
+**Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`
 
 ## Problem Essence
 
@@ -315,6 +315,47 @@ Checked visual evidence: [expanded production shell, light](evidence/base-ui-she
 
 Known limitation — live timestamp display. A saved time display updates the controls, the per-process display context and any `<.datetime>` handed the tracked snapshot through its `display` attribute. Timestamps that read the process context implicitly — every other call site today — keep their rendered text until their screen next renders, because LiveView re-renders only dynamics whose own assigns changed, and stream-rendered table rows are not re-rendered by any assign change at all. This matches `DESIGN.md` (“Timezone changes affect subsequent date and time rendering”) and is stated in `#spec-shell` and `apps/base/datetime/docs/README.md`. Closing it means either threading `display` through those call sites or re-rendering the page on save; that is the separate **datetime live display** follow-up task, tracked under the campaign umbrella [#709](https://github.com/BelimbingApp/bilimbi/issues/709) and deliberately out of this slice.
 
-Audit attribution while impersonating (a preference or mutation records the viewed account as actor) is tracked separately and is not changed by this slice; the shell simply refuses the durable display write.
+Audit attribution while impersonating (a preference or mutation recorded the viewed account as actor) was tracked separately and was not changed by this slice; the shell simply refuses the durable display write. That gap is now closed — see the impersonation audit actor slice below.
 
-Delivery: https://github.com/BelimbingApp/bilimbi/pull/711 is the bounded draft for #710. Independent review and the Firstmate-directed no-mistakes shipping gate remain pending; this implementation does not claim those gates passed. Later catalog families, broad production-screen migration, searchable icon parity and drift guards remain open in the campaign phases above.
+Delivery: https://github.com/BelimbingApp/bilimbi/pull/711 merged on 2026-09-15, closing #710, after independent review and the no-mistakes shipping gate. Later catalog families, broad production-screen migration, searchable icon parity and drift guards remain open in the campaign phases above.
+
+### Impersonation audit actor slice — Issue #712
+
+Goal: Record the real operator on every action taken while impersonating, so an audit row names who acted rather than who was viewed.
+
+- [x] Establish that impersonated preference and mutation rows recorded the viewed account as actor. `{claude-fable-audit-1/claude-fable-5-1}`
+- [x] Record the impersonating operator alongside the impersonated subject on audit rows. `{claude-fable-audit-1/claude-fable-5-1}`
+- [x] Cover the attribution with tests and run the shipping gate. `{claude-fable-audit-1/claude-fable-5-1}`
+
+Deferred: no test covers the impersonation label on the audit reader surfaces, so deleting it would not turn the suite red. Tracked as follow-up.
+
+Delivery: https://github.com/BelimbingApp/bilimbi/pull/714 merged on 2026-09-15, closing #712.
+
+### Icon vocabulary slice — Issue #713
+
+Goal: Give familiar actions named entries in the icon registry so call sites name the action rather than a raw `hero-*` string.
+
+- [x] Inventory Belimbing's action icons against Bilimbi's registry; 48 actions mapped, 44 of them gaps. `{codex-terra-icons-1/gpt-5.6-terra}`
+- [x] Populate `IconRegistry` with the named action vocabulary, keeping logout as the recorded Bilimbi exception. `{codex-terra-icons-1/gpt-5.6-terra}`
+- [x] Run the shipping gate and land the change. `{codex-terra-icons-1/gpt-5.6-terra}`
+
+`IconRegistry` now carries 73 glyph entries and 49 named actions on `main`, against three glyph entries before this slice.
+
+Not delivered by this slice, and still open under FND-06 and GFX-02: the searchable visual icon review with empty-result, copy and copied feedback. The registry holds the vocabulary; no review surface presents it yet.
+
+Deferred: registry names are never proven to resolve — the equality test restates the map rather than rendering each entry. Tracked as follow-up.
+
+Delivery: https://github.com/BelimbingApp/bilimbi/pull/715 merged on 2026-09-15, closing #713.
+
+### In review — not yet merged
+
+These four are implemented with open pull requests. Their catalog rows above stay unticked until they land.
+
+| Issue | Work | PR |
+|---|---|---|
+| #718 | Design Library drift guards | https://github.com/BelimbingApp/bilimbi/pull/722 |
+| #719 | Design Library specimen separation | https://github.com/BelimbingApp/bilimbi/pull/723 |
+| #720 | Design Library missing component states | https://github.com/BelimbingApp/bilimbi/pull/716 |
+| #721 | Shell display controls with live-following timestamps | https://github.com/BelimbingApp/bilimbi/pull/717 |
+
+The drift guards in #722 land excluded from the default test run and from `mix precommit`, because they report specimens #719 and #720 are still correcting. Moving them into the default run is tracked separately and is blocked on those two. #722 merging does not mean the guards are active.
