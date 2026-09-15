@@ -1,7 +1,7 @@
 defmodule Bilimbi.Base.UI.ComponentsTabsTest do
   @moduledoc """
-  Tests for the shared `<.tabs>` strip: selected, default, disabled, and
-  focus-visible states, plus button and link activation.
+  Tests for the shared `<.tabs>` strip: selected and default states, the
+  focus-visible ring, and button and link activation.
   """
 
   use ExUnit.Case, async: true
@@ -15,7 +15,7 @@ defmodule Bilimbi.Base.UI.ComponentsTabsTest do
     <.tabs id="example-tabs" aria-label="Example views">
       <:tab href="#overview" current={true}>Overview</:tab>
       <:tab href="#history">History</:tab>
-      <:tab disabled={true}>Settings</:tab>
+      <:tab href="#settings">Settings</:tab>
     </.tabs>
     """
   end
@@ -38,7 +38,7 @@ defmodule Bilimbi.Base.UI.ComponentsTabsTest do
     """
   end
 
-  test "selected, default, and disabled tabs keep their orientation language" do
+  test "selected and default tabs keep their orientation language" do
     html = render_component(&link_tabs/1, %{})
 
     assert html =~ ~s(id="example-tabs")
@@ -50,9 +50,6 @@ defmodule Bilimbi.Base.UI.ComponentsTabsTest do
     assert html =~ "aria-current=\"page\""
     assert html =~ "border-brand-strong font-medium text-ink-strong"
     assert html =~ "border-transparent text-ink-muted hover:text-ink"
-    assert html =~ ~s(aria-disabled="true")
-    assert html =~ "cursor-not-allowed"
-    assert html =~ "opacity-50"
   end
 
   test "tabs expose a brand-strong focus ring" do

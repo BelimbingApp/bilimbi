@@ -302,11 +302,20 @@ defmodule Bilimbi.Base.UI.Layouts do
     """
   end
 
+  @doc """
+  One sidebar navigation node: a leaf row, or a branch with its children.
+
+  Public so the Design Library renders the rail the shell actually ships rather
+  than a look-alike. `node` is a `Bilimbi.Base.UI.Nav` tree entry —
+  `%{item: %Bilimbi.Base.Menu.Item{}, children: [node]}` — and `active_nav` is
+  the menu id of the current page, which marks that row and accents its
+  ancestors.
+  """
   attr(:node, :map, required: true)
   attr(:active_nav, :string, default: nil)
   attr(:depth, :integer, default: 0)
 
-  defp nav_branch(assigns) do
+  def nav_branch(assigns) do
     item = assigns.node.item
     dom_id = nav_dom_id(item.id)
     branch? = assigns.node.children != []

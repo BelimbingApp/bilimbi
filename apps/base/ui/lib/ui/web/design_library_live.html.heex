@@ -582,31 +582,30 @@
               </.card>
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
-              <.card id="component-navigation" title="Navigation" inner_class="space-y-3 p-3">
-                <.navigation id="example-nav" class="max-w-xs" aria-label="Example menu">
-                  <:item href="#component-navigation">Companies</:item>
-                  <:item href="#component-navigation" ancestor={true}>System</:item>
-                  <:item href="#component-navigation" current={true} nested={true}>
-                    Design Library
-                  </:item>
-                  <:item href="#component-navigation" pinned={true}>Pinned item</:item>
-                </.navigation>
-                <.navigation id="example-nav-states" class="max-w-xs" aria-label="Navigation states">
-                  <:item href="#component-navigation">Default</:item>
-                  <:item href="#component-navigation" current={true}>Selected</:item>
-                  <:item disabled={true}>Disabled</:item>
-                </.navigation>
+              <.card id="component-navigation" title="Navigation" inner_class="space-y-2 p-3">
+                <nav
+                  id="example-nav"
+                  aria-label="Example menu"
+                  class="max-w-xs rounded-lg bg-surface-sidebar px-0.5 py-0.5"
+                >
+                  <Layouts.nav_branch
+                    :for={node <- @nav_example}
+                    node={node}
+                    active_nav={@nav_example_active}
+                  />
+                </nav>
+                <p class="text-xs text-ink-muted">
+                  The shell's own rail rows, over an example tree: a leaf, an expanded
+                  branch accented for the current page, and the selected child. Hover a
+                  row for its pin control. Pinned rows themselves are drawn by the shell
+                  hook into the sidebar, so they have no component to show here.
+                </p>
               </.card>
-              <.card id="component-tabs" title="Tabs" inner_class="space-y-4 p-3">
+              <.card id="component-tabs" title="Tabs" inner_class="p-3">
                 <.tabs id="example-tabs" aria-label="Example views">
                   <:tab href="#component-tabs" current={true}>Overview</:tab>
                   <:tab href="#component-tabs">History</:tab>
                   <:tab href="#component-tabs">Settings</:tab>
-                </.tabs>
-                <.tabs id="example-tabs-states" aria-label="Tab states">
-                  <:tab href="#component-tabs">Default</:tab>
-                  <:tab href="#component-tabs" current={true}>Selected</:tab>
-                  <:tab disabled={true}>Disabled</:tab>
                 </.tabs>
               </.card>
             </div>
@@ -764,7 +763,14 @@
                     {"Light", "light"},
                     {"Dark", "dark"}
                   ]}
+                  wrapper_class="mb-1.5"
                 />
+                <p id="component-radio-group-gap" class="text-xs text-ink-muted">
+                  Appearance Settings still hand-writes its own radios. That screen puts
+                  each theme choice in a bordered card with a description, which this
+                  component does not express, so it is the one screen this entry does not
+                  describe.
+                </p>
               </.card>
 
               <.card title="Date, time, and secret inputs" inner_class="p-4">

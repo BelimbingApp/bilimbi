@@ -778,7 +778,7 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:class, :any, default: nil)
   attr(:wrapper_class, :any, default: nil)
   attr(:label_class, :any, default: nil)
-  attr(:rest, :global, include: ~w(form required))
+  attr(:rest, :global, include: ~w(form))
 
   def radio_group(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
     errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
@@ -1209,149 +1209,19 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
-  Renders a compact sidebar-style navigation list.
-
-  Follows the application rail's orientation language: `text-link` by default,
-  lime `brand-strong` for the current page and its ancestors, `bg-surface` for
-  the active item, and `brand-surface` for pinned items. Lime marks
-  orientation, never status.
-
-  ## Examples
-
-      <.navigation id="example-nav" aria-label="Example menu">
-        <:item>Companies</:item>
-        <:item ancestor>System</:item>
-        <:item current nested>Design Library</:item>
-        <:item pinned>Pinned item</:item>
-        <:item disabled>Disabled</:item>
-      </.navigation>
-  """
-  attr(:id, :string, default: nil)
-  attr(:class, :any, default: nil)
-  attr(:rest, :global)
-
-  slot :item, required: true do
-    attr(:id, :string)
-    attr(:href, :string)
-    attr(:navigate, :string)
-    attr(:patch, :string)
-    attr(:current, :boolean)
-    attr(:ancestor, :boolean)
-    attr(:pinned, :boolean)
-    attr(:nested, :boolean)
-    attr(:disabled, :boolean)
-  end
-
-  def navigation(assigns) do
-    ~H"""
-    <nav
-      id={@id}
-      class={["rounded-lg bg-surface-sidebar p-2 text-[0.8125rem] leading-5 text-link", @class]}
-      {@rest}
-    >
-      <div class="space-y-0.5">
-        <.navigation_item :for={item <- @item} item={item} />
-      </div>
-    </nav>
-    """
-  end
-
-  attr(:item, :map, required: true)
-
-  defp navigation_item(assigns) do
-    item = assigns.item
-    disabled? = item[:disabled] == true
-    linked? = not disabled? and choice_linked?(item)
-
-    assigns =
-      assigns
-      |> assign(:disabled?, disabled?)
-      |> assign(:linked?, linked?)
-      |> assign(:item_class, navigation_item_class(item))
-
-    ~H"""
-    <.link
-      :if={@linked?}
-      href={@item[:href]}
-      navigate={@item[:navigate]}
-      patch={@item[:patch]}
-      id={@item[:id]}
-      class={@item_class}
-      aria-current={@item[:current] && "page"}
-    >
-      <.navigation_item_label item={@item} />
-    </.link>
-    <span
-      :if={not @linked?}
-      id={@item[:id]}
-      class={@item_class}
-      aria-current={@item[:current] && "page"}
-      aria-disabled={@disabled? && "true"}
-    >
-      <.navigation_item_label item={@item} />
-    </span>
-    """
-  end
-
-  attr(:item, :map, required: true)
-
-  defp navigation_item_label(assigns) do
-    ~H"""
-    <span
-      :if={@item[:ancestor]}
-      class="mr-0.5 inline-block w-3 shrink-0 select-none text-center text-[11px]"
-      aria-hidden="true"
-    >&#x2BC6;</span>
-    <span
-      :if={@item[:nested]}
-      class="mr-0.5 inline-block w-3 shrink-0 select-none text-center text-[11px]"
-      aria-hidden="true"
-    >&#8199;</span>
-    <span class="min-w-0 truncate">{render_slot(@item)}</span>
-    """
-  end
-
-  defp navigation_item_class(item) do
-    [
-      "flex min-w-0 items-center rounded-sm px-2 py-1 transition",
-      "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
-      item[:pinned] == true && "mt-1",
-      navigation_item_state_class(item)
-    ]
-  end
-
-  defp navigation_item_state_class(item) do
-    cond do
-      item[:disabled] == true ->
-        "cursor-not-allowed text-ink-subtle opacity-50"
-
-      item[:current] == true ->
-        "bg-surface text-brand-strong"
-
-      item[:ancestor] == true ->
-        "text-brand-strong hover:bg-surface-muted"
-
-      item[:pinned] == true ->
-        "bg-brand-surface text-link hover:text-ink"
-
-      true ->
-        "text-link hover:bg-surface-muted hover:text-ink"
-    end
-  end
-
-  @doc """
   Renders a compact tab strip for sibling views of the same page.
 
   The selected tab uses the lime `brand-strong` underline. Unselected tabs stay
-  muted and darken on hover. Disabled tabs remain visible but cannot be
-  activated.
+  muted and darken on hover.
+
+  A tab that carries `href`, `navigate`, or `patch` renders as a link; one that
+  carries `click` renders as a button so in-page switching still works.
 
   ## Examples
 
       <.tabs id="example-tabs" aria-label="Example views">
         <:tab href="#overview" current>Overview</:tab>
         <:tab href="#history">History</:tab>
-        <:tab disabled>Settings</:tab>
       </.tabs>
   """
   attr(:id, :string, required: true)
@@ -1364,7 +1234,6 @@ defmodule Bilimbi.Base.UI.Components do
     attr(:navigate, :string)
     attr(:patch, :string)
     attr(:current, :boolean)
-    attr(:disabled, :boolean)
     attr(:click, :string)
     attr(:value, :string)
   end
@@ -1381,12 +1250,10 @@ defmodule Bilimbi.Base.UI.Components do
 
   defp tab_item(assigns) do
     tab = assigns.tab
-    disabled? = tab[:disabled] == true
-    linked? = not disabled? and choice_linked?(tab)
+    linked? = is_binary(tab[:href]) or is_binary(tab[:navigate]) or is_binary(tab[:patch])
 
     assigns =
       assigns
-      |> assign(:disabled?, disabled?)
       |> assign(:linked?, linked?)
       |> assign(:tab_class, tab_class(tab))
 
@@ -1403,7 +1270,7 @@ defmodule Bilimbi.Base.UI.Components do
       {render_slot(@tab)}
     </.link>
     <button
-      :if={not @linked? and not @disabled?}
+      :if={not @linked?}
       type="button"
       id={@tab[:id]}
       class={@tab_class}
@@ -1413,27 +1280,18 @@ defmodule Bilimbi.Base.UI.Components do
     >
       {render_slot(@tab)}
     </button>
-    <span :if={@disabled?} id={@tab[:id]} class={@tab_class} aria-disabled="true">
-      {render_slot(@tab)}
-    </span>
     """
   end
 
   defp tab_class(tab) do
     current? = tab[:current] == true
-    disabled? = tab[:disabled] == true
 
     [
       "-mb-px border-b-2 px-3 py-2 text-sm transition",
       "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
       current? && "border-brand-strong font-medium text-ink-strong",
-      (not current? and not disabled?) && "border-transparent text-ink-muted hover:text-ink",
-      disabled? && "cursor-not-allowed border-transparent text-ink-subtle opacity-50"
+      not current? && "border-transparent text-ink-muted hover:text-ink"
     ]
-  end
-
-  defp choice_linked?(item) do
-    is_binary(item[:href]) or is_binary(item[:navigate]) or is_binary(item[:patch])
   end
 
   @doc """
