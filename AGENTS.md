@@ -518,7 +518,10 @@ not call or recreate it elsewhere.
 - Prefer function components for reusable markup. Avoid LiveComponents unless
   they need their own state and event lifecycle.
 - The Design Library (`/system/design-library`) presents only shared
-  components, in every state they declare. A component is presented by an
+  components, and varies on the states they declare: an axis that declares two
+  or more states shows at least two of them, and an axis that declares a single
+  state shows that one. Showing every declared value is not required, so a
+  value that cannot be seen is never built. A component is presented by an
   `id="component-<name>"` block of its own that calls `<.name>`; framing
   another specimen is not presenting it. The exempt anchors are the sidebar
   menu, the grouping sections it links to and the wrapper around them, so a
