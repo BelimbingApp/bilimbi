@@ -874,6 +874,12 @@
                 Short-lived messages, inline guidance, and persistent record status.
               </p>
             </div>
+            <%!--
+            The real flash is `position: fixed`, so `transform-gpu` on each wrapper
+            makes the wrapper its containing block and keeps the specimen inside the
+            page. The wrapper must stay unclipped: the panel is wider than the wrapper
+            at narrow widths, and a clipping class cuts off its left edge.
+            --%>
             <div id="component-flash" class="space-y-3">
               <div class="relative min-h-28 rounded-xl border border-line bg-canvas transform-gpu">
                 <.flash

@@ -124,7 +124,7 @@ Goal: Turn accepted decisions into one coherent Bilimbi default.
 - [x] Update shared components and affected screens so rejected variations no longer drift in production.
 - [x] Move `T01` to Design Spec under the same number.
 - [x] Move each accepted component choice to Design Spec under the same number.
-- [x] Give the components shown in only one presentation their real states: the three page widths as live page calls on one wide stage, a header whose action sits beside the title, cards with and without a title, an error flash under the info flash, and the outline, solid and mini icon treatments with size and colour chosen where the icon is used. Where the component has no further state — card, record facts and icon — the specimen says so instead of inventing one. `{fm/parity-designlib-states/opus-5}`
+- [x] Give the components shown in only one presentation their real states: the three page widths as live page calls on one wide stage, a header whose action sits beside the title, cards with and without a title, an error flash under the info flash, and the outline, solid and mini icon treatments each drawn at its own natural size, above a separate pair showing that size and colour are chosen where the icon is used. Where the component has no further state — card, record facts and icon — the specimen says so instead of inventing one. `{fm/parity-designlib-states/opus-5}`
 - [ ] Complete the approved catalog and parity campaign in `docs/plans/base-ui-design-parity.md`; that plan owns the detailed IDs, agent lanes and acceptance evidence.
 - [ ] Give each changeable design fact one owner in the smallest useful default-library structure.
 - [ ] Create a small Design Library agent skill for inspection, focused edits, browser review and validation.
