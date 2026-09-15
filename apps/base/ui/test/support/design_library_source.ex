@@ -333,12 +333,13 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
     entry_calls_within(entry_element(element), Atom.to_string(component)) != []
   end
 
-  # A nested anchor is its own entry. Excluding it, and everything under it,
-  # is what keeps a heading-anchored section from counting the cards that
-  # frame its neighbouring specimens as presentations of `card`.
+  # A nested anchor is its own entry, whether or not the component it claims
+  # exists. Excluding it, and everything under it, is what keeps a
+  # heading-anchored section from counting the cards that frame its
+  # neighbouring specimens as presentations of `card`.
   defp entry_calls_within(entry, name) do
     descendants = descendants(entry)
-    nested = for anchor <- descendants, catalog_anchor?(anchor), into: MapSet.new(), do: anchor.id
+    nested = for anchor <- descendants, anchor_claim?(anchor), into: MapSet.new(), do: anchor.id
 
     [entry | descendants]
     |> Enum.filter(&(&1.kind == :component and &1.name == name))
@@ -351,9 +352,6 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
       &(is_binary(&1.id) and MapSet.member?(nested, &1.id))
     )
   end
-
-  defp catalog_anchor?(%{id: "component-" <> slug}), do: component_for(slug) != nil
-  defp catalog_anchor?(_element), do: false
 
   # A heading carrying the anchor marks the section it heads; anything else
   # marks what it contains.

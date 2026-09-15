@@ -132,6 +132,18 @@ defmodule Bilimbi.Base.UI.DesignLibraryRulesTest do
       assert problem =~ "never calls it"
     end
 
+    test "a heading-anchored entry does not present a component through blocks that frame imitations" do
+      nodes =
+        area("""
+        <h2 id="component-card">Cards</h2>
+        <.card id="component-navigation" title="Navigation">
+          <div class="px-2 py-1">Companies</div>
+        </.card>
+        """)
+
+      assert Source.entry_calls(:card, Source.catalog(nodes)) == []
+    end
+
     test "a heading-anchored entry presents a component through a block that frames nothing else" do
       nodes =
         area("""
