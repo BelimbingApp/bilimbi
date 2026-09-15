@@ -517,6 +517,11 @@ not call or recreate it elsewhere.
 - Do not use `Enum.each/2` to generate template content; use a HEEx `for`.
 - Prefer function components for reusable markup. Avoid LiveComponents unless
   they need their own state and event lifecycle.
+- The Design Library (`/system/design-library`) presents only shared
+  components, in every state they declare. An `id="component-<name>"` block
+  must call `<.name>`; hand-written control markup and single-state specimens
+  fail the guards in `apps/base/ui/test/design_library_*_test.exs`, which read
+  the template and `Components.__components__/0` rather than a fixture list.
 
 Templates may be colocated with their owning LiveView through `embed_templates`
 or a nearby `.html.heex` file. Colocation does not move the view into the
