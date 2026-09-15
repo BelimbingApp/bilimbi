@@ -904,8 +904,8 @@ defmodule Bilimbi.Base.UI.Components do
   and never formats one, so the two renderings cannot disagree.
 
   `:local` is the one mode the server cannot decide, because it does not know
-  the browser's zone. The hook formats it under a pinned locale in the same
-  order and with the same zone label the server writes (see `date_time.js`).
+  the browser's zone. The hook formats it in the reader's own locale and hour
+  cycle, the way their device would (see `date_time.js`).
 
   The mechanism lives here rather than at the call sites, so a `<.datetime>`
   added later follows a mode change without its author knowing the mechanism
@@ -960,7 +960,6 @@ defmodule Bilimbi.Base.UI.Components do
       data-mode={@mode}
       data-text-company={@text_company}
       data-text-utc={@text_utc}
-      data-follow-shell={is_nil(@display) && "true"}
       phx-hook="DateTime"
       class={["tabular-nums", @class]}
     >

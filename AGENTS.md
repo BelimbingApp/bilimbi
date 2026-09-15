@@ -583,8 +583,7 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   raw `hero-*` strings; put product-only SVGs in the same registry. Logout
   keeps `hero-arrow-right-on-rectangle`. `<.datetime>` already follows a saved
   clock change on instants that are already on screen, streamed rows included;
-  do not thread a `display` assign to achieve that. Pass `display` only to pin
-  one instant to a context of your own. Primary actions use
+  do not thread a `display` assign. Primary actions use
   `<.button variant="primary">` with deep olive base (`bg-action`, `lime-950`
   light / `lime-600` dark), high-contrast text (`text-action-ink`, `lime-50`
   light / `lime-950` dark), and a brighter lime hover

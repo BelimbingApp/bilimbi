@@ -15,7 +15,11 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
        the stored-UTC text
 
   Step 4 runs the real hook in Node against the real server markup, because
-  `LiveViewTest` cannot execute a hook.
+  `LiveViewTest` cannot execute a hook. The same harness pins the one case
+  where the browser cannot finish the job: an engine that cannot format the
+  reader's own zone falls back to the server's stored-UTC text rather than
+  leaving the previous mode's string under a control that now reports a
+  different one.
   """
 
   use BilimbiWeb.ConnCase, async: false
@@ -102,7 +106,6 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
     # have to format one of them itself.
     assert before.attributes["data-text-company"] == @company_text
     assert before.attributes["data-text-utc"] == @utc_text
-    assert before.attributes["data-follow-shell"] == "true"
 
     # 2. Save Stored UTC through the shell control's own event.
     render_hook(view, "shell:preference", %{kind: "timezone", value: "utc"})
@@ -136,6 +139,21 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
     assert streamed_instant(render(view), mutation_id).text == @company_text
   end
 
+  test "a browser that cannot format the local zone reads stored UTC, not the old mode", %{
+    conn: conn,
+    mutation_id: mutation_id
+  } do
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
+    row = streamed_instant(render(view), mutation_id)
+
+    # The reader saves this device's local time while looking at company time.
+    # An engine that cannot build the formatter must not leave 18:00 +08
+    # standing under a control that now says Local: the text has to be one the
+    # server vouches for.
+    assert client_text(row.attributes, @company_text, "local", zone_unsupported: true) ==
+             @utc_text
+  end
+
   # The `<time>` the streamed row rendered, as the browser would receive it.
   defp streamed_instant(html, mutation_id) do
     [_whole, attributes, text] =
@@ -153,15 +171,14 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
   end
 
   # Runs the real hook over the real markup, with the shell publishing `mode`.
-  defp client_text(attributes, server_text, mode) do
+  defp client_text(attributes, server_text, mode, opts \\ []) do
     encoded_source = @hook |> File.read!() |> Base.encode64()
 
     payload =
       Jason.encode!(%{
         attributes: attributes,
         text: server_text,
-        mode: mode,
-        timezone: "Asia/Kuala_Lumpur"
+        mode: mode
       })
 
     script = """
@@ -173,7 +190,9 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
       disconnect() {}
     }
 
-    const shell = {dataset: {displayMode: input.mode, displayTimezone: input.timezone}}
+    #{unsupported_zone_stub(opts[:zone_unsupported])}
+
+    const shell = {dataset: {displayMode: input.mode}}
     globalThis.document = {
       querySelector: selector => (selector === "#app-shell" ? shell : null),
     }
@@ -204,4 +223,21 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
     {output, 0} = System.cmd("node", ["--input-type=module", "--eval", script])
     Jason.decode!(output)["text"]
   end
+
+  # An engine that resolves its own zone but cannot build a formatter for it,
+  # the shape a browser `Intl` gap takes: an unknown zone or an option the
+  # engine does not implement makes the constructor raise.
+  defp unsupported_zone_stub(true) do
+    """
+    const resolved = Intl.DateTimeFormat
+    globalThis.Intl = {
+      DateTimeFormat: function (...args) {
+        if (args.length === 0) return new resolved()
+        throw new RangeError("Invalid time zone specified")
+      },
+    }
+    """
+  end
+
+  defp unsupported_zone_stub(_other), do: ""
 end

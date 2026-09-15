@@ -188,19 +188,15 @@ defmodule Bilimbi.Base.UI.ComponentsDatetimeTest do
       assert html =~ ~s(data-text-utc="01/01/2026, 16:30 UTC")
     end
 
-    test "an explicit display attr opts the instant out of following the shell" do
-      # The caller has already decided what this instant shows, so a shell
-      # mode change must not overwrite it.
+    test "an explicit display attr still carries both server-decided modes" do
+      # An explicit context decides the server text; it does not opt the
+      # instant out of following a saved mode change, because the shell mode
+      # is the one the reader is looking at.
       html = render_datetime(%{display: %{mode: :company, timezone: "Test/Cet", tz_db: FakeDb}})
 
-      refute html =~ "data-follow-shell"
       assert html =~ ~s(data-mode="company")
-    end
-
-    test "an instant with no explicit display follows the shell" do
-      DateTimeDisplay.put(%{mode: :utc})
-
-      assert render_datetime(%{}) =~ ~s(data-follow-shell="true")
+      assert html =~ ~s(data-text-company="01/01/2026, 17:30 CET")
+      assert html =~ ~s(data-text-utc="01/01/2026, 16:30 UTC")
     end
 
     test "a calendar date carries no mode metadata and no hook" do
