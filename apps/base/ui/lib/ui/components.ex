@@ -778,7 +778,7 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:class, :any, default: nil)
   attr(:wrapper_class, :any, default: nil)
   attr(:label_class, :any, default: nil)
-  attr(:rest, :global, include: ~w(form))
+  attr(:rest, :global)
 
   def radio_group(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
     errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
@@ -1214,8 +1214,8 @@ defmodule Bilimbi.Base.UI.Components do
   The selected tab uses the lime `brand-strong` underline. Unselected tabs stay
   muted and darken on hover.
 
-  A tab that carries `href`, `navigate`, or `patch` renders as a link; one that
-  carries `click` renders as a button so in-page switching still works.
+  A tab that carries `href` or `patch` renders as a link; one that carries
+  `click` renders as a button so in-page switching still works.
 
   ## Examples
 
@@ -1231,7 +1231,6 @@ defmodule Bilimbi.Base.UI.Components do
   slot :tab, required: true do
     attr(:id, :string)
     attr(:href, :string)
-    attr(:navigate, :string)
     attr(:patch, :string)
     attr(:current, :boolean)
     attr(:click, :string)
@@ -1250,7 +1249,7 @@ defmodule Bilimbi.Base.UI.Components do
 
   defp tab_item(assigns) do
     tab = assigns.tab
-    linked? = is_binary(tab[:href]) or is_binary(tab[:navigate]) or is_binary(tab[:patch])
+    linked? = is_binary(tab[:href]) or is_binary(tab[:patch])
 
     assigns =
       assigns
@@ -1261,7 +1260,6 @@ defmodule Bilimbi.Base.UI.Components do
     <.link
       :if={@linked?}
       href={@tab[:href]}
-      navigate={@tab[:navigate]}
       patch={@tab[:patch]}
       id={@tab[:id]}
       class={@tab_class}
