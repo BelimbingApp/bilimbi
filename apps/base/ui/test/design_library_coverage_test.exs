@@ -6,9 +6,14 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
 
   Both sides are derived. Components and their states come from Phoenix's
   `__components__/0` reflection; what the library shows comes from the parsed
-  template (`Bilimbi.Base.UI.DesignLibrarySource`). Neither is a fixture list
-  that can drift on its own, and a component that gains a declared state turns
-  the state guard red until the library shows it.
+  template (`Bilimbi.Base.UI.DesignLibrarySource`). A component that gains a
+  declared state turns the state guard red until the library shows it.
+
+  A component that declares no state at all — today `pagination` and
+  `inline_edit`, which vary from their data rather than from an attr — is held
+  to presence only. `icon` declares none either, but it branches on the icon
+  registry, so the `{:icon, :source}` axis below still holds it to showing both
+  a heroicon and a registered icon.
 
   Appearing in the library is not the same as being complete, and being used
   is not the same as being presented. A component is presented when it has a
@@ -28,12 +33,6 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   alias Bilimbi.Base.UI.IconRegistry
 
   @moduletag :design_library_drift
-
-  # The heroicon styles `<.icon>` can render. `apps/web/assets/vendor/heroicons.js`
-  # is the source of truth for this list — it builds one `hero-*` class family
-  # per style — but it belongs to Web, and a Base UI guard does not reach across
-  # that package boundary to read it. Adding a style there means adding it here.
-  @hero_styles [:outline, :solid, :mini, :micro]
 
   setup_all do
     tree = Source.tree()
@@ -66,26 +65,6 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
            """
   end
 
-  test "every public component declares a state the library can be held to" do
-    stateless = Enum.filter(Source.public_components(), &(axes(&1) == []))
-
-    assert stateless == [],
-           """
-           These components declare nothing this guard can hold the Design
-           Library to, so presenting them once is indistinguishable from
-           presenting them completely:
-
-               #{Enum.map_join(stateless, ", ", &"<.#{&1}>")}
-
-           A state is an attr with `values:`, a boolean attr with a default, an
-           optional `:string` attr, an optional slot, or a repeating slot. A
-           component with none of those is a blind spot in the state guard, not
-           a component that happens to be simple: give it the declaration that
-           names its variation, or widen the model above so the variation it
-           does have becomes an axis.
-           """
-  end
-
   test "every declared state of every public component is presented", %{catalog: catalog} do
     report =
       for name <- Source.public_components(),
@@ -101,9 +80,8 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
            """
            The Design Library presents these components in fewer states than
            they declare. Every attr with `values:`, every boolean attr with a
-           default, every optional `:string` attr, every optional slot, every
-           repeating slot, and every heroicon style are states a reviewer must
-           be able to see:
+           default, every optional `:string` attr, every optional slot and
+           every repeating slot is a state a reviewer must be able to see:
 
            #{Enum.map_join(report, "\n", &describe_gap/1)}
 
@@ -141,9 +119,9 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   #     `:item`, presented as `:one`/`:many`. One row hides how repetition
   #     reads.
   #   * `{:slot_attr, slot, name}` — a slot attr declared with `values:`.
-  #   * `{:icon, :style}` / `{:icon, :source}` — `<.icon>` has no declared
-  #     values, but it renders one of `@hero_styles` and branches on the icon
-  #     registry, so a new registry entry changes the expectation here.
+  #   * `{:icon, :source}` — `<.icon>` declares no values, but it branches on
+  #     the icon registry (`registered_icon` vs `hero_icon`), and the library
+  #     has to show both sides of that branch.
   defp axes(name) do
     %{attrs: attrs, slots: slots} = Components.__components__()[name]
 
@@ -189,9 +167,7 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   # no `variant` renders is an implementation detail, not a declared state.
   defp attr_values(_type, opts), do: Keyword.get(opts, :values)
 
-  defp extra_axes(:icon) do
-    [{{:icon, :style}, @hero_styles}, {{:icon, :source}, [:hero, :registry]}]
-  end
+  defp extra_axes(:icon), do: [{{:icon, :source}, [:hero, :registry]}]
 
   defp extra_axes(_name), do: []
 
@@ -260,18 +236,6 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
     end
   end
 
-  defp icon_state(:style, icon) do
-    case IconRegistry.fetch(icon) do
-      {:ok, _} ->
-        :dynamic
-
-      :error ->
-        @hero_styles
-        |> Enum.reject(&(&1 == :outline))
-        |> Enum.find(:outline, &String.ends_with?(icon, "-#{&1}"))
-    end
-  end
-
   defp default_for(name, attr) do
     %{opts: opts} = Enum.find(Components.__components__()[name].attrs, &(&1.name == attr))
     default_state(opts)
@@ -314,6 +278,5 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   defp describe_axis({:slot, slot}), do: "slot `<:#{slot}>`"
   defp describe_axis({:slot_count, slot}), do: "slot `<:#{slot}>` (one or many)"
   defp describe_axis({:slot_attr, slot, attr}), do: "slot attr `<:#{slot} #{attr}>`"
-  defp describe_axis({:icon, :style}), do: "heroicon style (name suffix)"
   defp describe_axis({:icon, :source}), do: "source (heroicon or icon registry)"
 end

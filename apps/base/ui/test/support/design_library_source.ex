@@ -23,7 +23,15 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
       public component its slug names. A component is presented when it has a
       catalog entry of its own that calls it; using it to build some other
       specimen's container is not a presentation of it, for the same reason
-      the page chrome is not.
+      the page chrome is not. A call that is, or sits inside, a nested anchor
+      belongs to that nested entry, so an entry never counts the blocks that
+      frame its neighbours.
+    * **Declared specimens** — an id-less `<.card>` in the components area
+      claims to present something without saying what, and carries no control
+      markup to catch it. `@declared_specimens` is the library's admission of
+      the ones it already has; anything else has to be anchored or added
+      there, and a declaration that stops matching is reported so the list
+      cannot outlive its reason.
 
   Attribute values are normalised to `{:literal, term}` when the template
   spells a value out (a string, `{:info}`, `{false}`, a bare `disabled`) and
@@ -49,6 +57,20 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   # built from styled `<div>`s carries no control tag and is caught only here.
   @control_attrs ~w(aria-current aria-expanded aria-pressed aria-selected phx-change phx-click
                     phx-submit role tabindex)
+
+  # The id-less specimen cards the components area presents today, keyed by the
+  # card's literal `title`, or for an untitled card by the literal id of its
+  # first identified descendant. Keys are template facts, not line numbers, so
+  # moving a specimen does not churn this list while renaming one does.
+  @declared_specimens [
+    "Text and long-form inputs",
+    "Choice controls",
+    "Date, time, and secret inputs",
+    "Empty workspace",
+    "Permission denied",
+    "Connection interrupted",
+    "design-library-pattern-table"
+  ]
 
   @type element :: %{
           kind: :tag | :component | :remote_component | :slot,
@@ -158,12 +180,10 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   def entry_calls(component, catalog) when is_atom(component) do
     name = Atom.to_string(component)
 
-    catalog
-    |> Enum.flat_map(fn
-      {^component, entry} -> [entry | descendants(entry)]
+    Enum.flat_map(catalog, fn
+      {^component, entry} -> entry_calls_within(entry, name)
       _other -> []
     end)
-    |> Enum.filter(&(&1.kind == :component and &1.name == name))
   end
 
   @doc """
@@ -188,6 +208,29 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
     |> presented()
     |> Enum.filter(&(&1.kind == :tag and &1.area == :components))
     |> Enum.flat_map(&control_problem/1)
+  end
+
+  @doc """
+  Specimen cards the library presents without naming, and declarations that no
+  longer match one, as one sentence each.
+  """
+  def specimen_problems(nodes \\ tree()) do
+    entry_ids = nodes |> catalog() |> MapSet.new(fn {_component, entry} -> entry.id end)
+
+    candidates =
+      nodes
+      |> presented()
+      |> Enum.filter(&specimen_candidate?(&1, entry_ids))
+
+    declared = MapSet.new(candidates, &specimen_key/1)
+
+    undeclared =
+      for card <- candidates, specimen_key(card) not in @declared_specimens, do: undeclared(card)
+
+    stale =
+      for key <- @declared_specimens, not MapSet.member?(declared, key), do: stale(key)
+
+    undeclared ++ stale
   end
 
   @doc "Every element nested under the given one, in source order."
@@ -287,10 +330,30 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   end
 
   defp presents?(element, component) do
-    name = Atom.to_string(component)
-    entry = entry_element(element)
-    Enum.any?([entry | descendants(entry)], &(&1.kind == :component and &1.name == name))
+    entry_calls_within(entry_element(element), Atom.to_string(component)) != []
   end
+
+  # A nested anchor is its own entry. Excluding it, and everything under it,
+  # is what keeps a heading-anchored section from counting the cards that
+  # frame its neighbouring specimens as presentations of `card`.
+  defp entry_calls_within(entry, name) do
+    descendants = descendants(entry)
+    nested = for anchor <- descendants, catalog_anchor?(anchor), into: MapSet.new(), do: anchor.id
+
+    [entry | descendants]
+    |> Enum.filter(&(&1.kind == :component and &1.name == name))
+    |> Enum.reject(&framed_by?(&1, nested))
+  end
+
+  defp framed_by?(element, nested) do
+    Enum.any?(
+      [element | element.ancestors],
+      &(is_binary(&1.id) and MapSet.member?(nested, &1.id))
+    )
+  end
+
+  defp catalog_anchor?(%{id: "component-" <> slug}), do: component_for(slug) != nil
+  defp catalog_anchor?(_element), do: false
 
   # A heading carrying the anchor marks the section it heads; anything else
   # marks what it contains.
@@ -301,6 +364,38 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   end
 
   defp entry_element(element), do: element
+
+  ## Declared specimens
+
+  defp specimen_candidate?(element, entry_ids) do
+    element.kind == :component and element.name == "card" and element.area == :components and
+      not anchor_claim?(element) and
+      not Enum.any?(element.ancestors, &(is_binary(&1.id) and MapSet.member?(entry_ids, &1.id)))
+  end
+
+  defp anchor_claim?(%{id: "component-" <> _slug}), do: true
+  defp anchor_claim?(_element), do: false
+
+  defp specimen_key(card) do
+    case attr(card, "title") do
+      {:literal, title} when is_binary(title) -> title
+      _other -> card |> descendants() |> Enum.find_value(& &1.id)
+    end
+  end
+
+  defp undeclared(card) do
+    "<.card> at line #{card.line} (#{key_label(specimen_key(card))}) presents a specimen the " <>
+      "library never names: anchor it as a `component-<name>` entry, or declare it in " <>
+      "@declared_specimens"
+  end
+
+  defp stale(key) do
+    "declared specimen #{inspect(key)} matches no id-less <.card> in the components area; " <>
+      "drop the declaration"
+  end
+
+  defp key_label(nil), do: "no title and no identified content"
+  defp key_label(key), do: inspect(key)
 
   ## Control markup
 

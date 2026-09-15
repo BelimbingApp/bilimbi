@@ -116,6 +116,65 @@ defmodule Bilimbi.Base.UI.DesignLibraryRulesTest do
     end
   end
 
+  describe "the catalog" do
+    test "a heading-anchored entry does not present a component through blocks that frame others" do
+      nodes =
+        area("""
+        <h2 id="component-card">Cards</h2>
+        <.card id="component-badge" title="Badge">
+          <.badge kind={:success}>Active</.badge>
+        </.card>
+        """)
+
+      assert Source.entry_calls(:card, Source.catalog(nodes)) == []
+      assert [problem] = Source.anchor_problems(nodes)
+      assert problem =~ "#component-card"
+      assert problem =~ "never calls it"
+    end
+
+    test "a heading-anchored entry presents a component through a block that frames nothing else" do
+      nodes =
+        area("""
+        <h2 id="component-card">Cards</h2>
+        <.card title="A plain card">Body</.card>
+        """)
+
+      assert [_call] = Source.entry_calls(:card, Source.catalog(nodes))
+      assert Source.anchor_problems(nodes) == []
+    end
+  end
+
+  describe "the specimen rule" do
+    test "rejects an id-less card the library never names" do
+      nodes = area(~S|<.card title="Brand new specimen"><p>Bars</p></.card>|)
+
+      assert Enum.any?(Source.specimen_problems(nodes), &(&1 =~ "Brand new specimen"))
+    end
+
+    test "accepts an id-less card the library declares" do
+      nodes = area(~S|<.card title="Choice controls"><p>Bars</p></.card>|)
+
+      refute Enum.any?(Source.specimen_problems(nodes), &(&1 =~ "Choice controls"))
+    end
+
+    test "accepts a card that sits inside an anchored block" do
+      nodes =
+        area("""
+        <.card id="component-badge" title="Badge">
+          <.card title="Brand new specimen"><.badge>Active</.badge></.card>
+        </.card>
+        """)
+
+      refute Enum.any?(Source.specimen_problems(nodes), &(&1 =~ "Brand new specimen"))
+    end
+
+    test "reports a declaration that matches no card" do
+      problems = Source.specimen_problems(area(""))
+
+      assert Enum.any?(problems, &(&1 =~ "Empty workspace" and &1 =~ "matches no"))
+    end
+  end
+
   describe "reading the template" do
     test "counts a self-closing slot as present" do
       [call] =

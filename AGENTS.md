@@ -522,10 +522,12 @@ not call or recreate it elsewhere.
   `id="component-<name>"` block of its own that calls `<.name>`; framing
   another specimen is not presenting it. The only exempt anchors are the
   grouping sections the sidebar menu links to, so a new grouping section is
-  linked from the menu or drops the prefix. Hand-written control markup and
-  single-state specimens fail the guards in
+  linked from the menu or drops the prefix. An id-less `<.card>` in the
+  components area names nothing, so it is anchored, nested inside an anchored
+  block, or listed in that module's `@declared_specimens`. Hand-written control
+  markup and single-state specimens fail the guards in
   `apps/base/ui/test/design_library_*_test.exs`, which read the template and
-  `Components.__components__/0` rather than a fixture list. Those guards are
+  `Components.__components__/0`. Those guards are
   tagged `:design_library_drift` and excluded from the default run until the
   current specimens are corrected; run them with
   `mix test --include design_library_drift`. The rules themselves live in

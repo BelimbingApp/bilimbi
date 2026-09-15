@@ -5,24 +5,30 @@ defmodule Bilimbi.Base.UI.DesignLibraryImitationTest do
   `<.tabs>` exists; when it does not, the library is lying about what the
   product can build.
 
-  Two rules, both owned by `Bilimbi.Base.UI.DesignLibrarySource` and both
-  exercised on fixtures by `Bilimbi.Base.UI.DesignLibraryRulesTest`, make an
-  imitation detectable without a hand-maintained list:
+  Three shapes are mechanically detectable. All three rules are owned by
+  `Bilimbi.Base.UI.DesignLibrarySource` and exercised on fixtures by
+  `Bilimbi.Base.UI.DesignLibraryRulesTest`:
 
-    * **The anchor convention.** The library marks what it presents with
-      `id="component-<name>"`. Only the grouping sections the sidebar menu
-      links to, the wrapper around them and the menu itself are exempt. Every
-      other `component-*` anchor must name a public component and call it.
-    * **Control markup is component-owned.** Inside the components area, raw
-      `<nav>`, `<a>`, `<input>`, `<dl>` and the other control tags are what
-      shared components render, and so are raw elements carrying interaction
-      state such as `aria-current` or `role`. The theme, graphic and
-      design-spec areas are reference surfaces that claim no component, so
+    * **A `component-*` anchor with no component behind it.** The library
+      marks what it presents with `id="component-<name>"`. Only the grouping
+      sections the sidebar menu links to, the wrapper around them and the menu
+      itself are exempt. Every other `component-*` anchor must name a public
+      component and call it.
+    * **Control markup or interaction attributes.** Inside the components
+      area, raw `<nav>`, `<a>`, `<input>`, `<dl>` and the other control tags
+      are what shared components render, and so are raw elements carrying
+      interaction state such as `aria-current` or `role`. The theme, graphic
+      and design-spec areas are reference surfaces that claim no component, so
       only the components area is checked.
+    * **An undeclared `<.card>` in the components area.** A card frames a
+      specimen, so an id-less one presents something the library never names.
+      It has to be anchored, sit inside an anchored block, or be listed in
+      `@declared_specimens`.
 
-  Adding a fifth fake component trips one of these without anyone updating a
-  list: it either takes a `component-*` anchor with no component behind it, or
-  it is built from control markup.
+  What this does not catch: a fake built from raw non-card, non-control markup
+  that takes no anchor — styled `<div>`s directly inside a grouping section,
+  with no interaction attribute — is invisible to all three rules. Catching
+  that needs a convention the library does not have yet.
 
   These guards are excluded from the default run until the Design Library
   specimens they report are corrected. Run them with
@@ -65,6 +71,24 @@ defmodule Bilimbi.Base.UI.DesignLibraryImitationTest do
            or drop the prefix; a block that is guidance or scaffolding drops
            the prefix; and a component that does not exist yet gets built
            before it is shown.
+           """
+  end
+
+  test "every card specimen says what it presents", ctx do
+    problems = Source.specimen_problems(ctx.tree)
+
+    assert problems == [],
+           """
+           The Design Library's specimen declarations and its
+           #{Path.relative_to_cwd(Source.path())} cards disagree:
+
+           #{Enum.map_join(problems, "\n", &("  " <> &1))}
+
+           A `<.card>` in the components area frames a specimen, so one with no
+           `component-<name>` anchor claims to present something without saying
+           what. Anchor it, nest it inside the block that is anchored, or admit
+           it in `@declared_specimens`. A declaration that matches no card has
+           outlived its reason and goes.
            """
   end
 
