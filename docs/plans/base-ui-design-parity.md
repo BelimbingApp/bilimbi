@@ -196,7 +196,7 @@ Goal: Let Astra or a product reviewer inspect one family at a time without a lon
 - [ ] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source.
 - [ ] Show the current Bilimbi component in every meaningful state for the active family.
 - [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record Astra's accepted disposition and rationale.
-- [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough. The deterministic imitation and state guards already exist (Phase 6) and name what each family still has to show.
+- [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
 
 Affected pages: `/system/design-library`, `/system/design-library/components`, `/system/design-library/graphic`, `/system/design-library/design-spec`
 
@@ -259,9 +259,8 @@ Goal: Close the campaign with evidence that remains useful as Bilimbi evolves.
 - [ ] Classify every catalog item as Keep Bilimbi, Equivalent, Adopt adapted or Not applicable; no item remains ambiguous.
 - [ ] Verify applicable default, hover, focus, active/open, disabled, loading, validation, error, empty, dark and narrow states.
 - [ ] Verify keyboard movement, focus containment/return, screen-reader semantics, duplicate-work rejection and truthful recovery.
-- [x] Build the Design Library drift guards at the start of the campaign instead of at closeout, so later slices land against them rather than accumulating drift: `apps/base/ui/test/design_library_imitation_test.exs` rejects anchors that name no shared component, hand-written control markup and undeclared specimen cards; `design_library_coverage_test.exs` requires a `component-<name>` block per component and every state it declares. Both read the template through `Bilimbi.Base.UI.DesignLibrarySource`, which owns the rules and is covered on fixtures by `design_library_rules_test.exs`. Both are tagged `:design_library_drift` and stay out of the default run and `mix precommit` until the specimens they report are corrected; run them with `mix test --include design_library_drift`. `{kiatng/claude-opus-5}`
-- [ ] Remove the `:design_library_drift` exclusion once the specimens those guards report are corrected, so the campaign closes with them in the default run.
-- [ ] Add guards for raw palette use, local component forks and unregistered icons where deterministic checks are useful.
+- [x] Build the Design Library drift guards at the start of the campaign instead of at closeout, so later slices land against them rather than accumulating drift: `apps/base/ui/test/design_library_imitation_test.exs` rejects anchors that name no shared component, hand-written control markup and undeclared specimen cards; `design_library_coverage_test.exs` requires a `component-<name>` block per component and every state it declares. Both read the template through `Bilimbi.Base.UI.DesignLibrarySource`, which owns the rules and is covered on fixtures by `design_library_rules_test.exs`. Both are tagged `:design_library_drift` and stay out of the default run and `mix precommit` until the specimens they report are corrected; run them with `mix test --include design_library_drift`. `{claude-fable-guards-1/claude-fable-5-1}`
+- [ ] Add guards for raw palette use, local component forks, missing Design Library states and unregistered icons where deterministic checks are useful.
 - [ ] Run component, LiveView, module workflow, asset and full precommit validation.
 - [ ] Record the accepted catalog IDs in Design Spec and close the execution issues with browser evidence.
 

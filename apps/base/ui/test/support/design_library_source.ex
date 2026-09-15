@@ -15,10 +15,11 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
     * **Menu chrome** — the `<aside>` an area opens with, and everything
       inside it. That is the library navigating itself, not a specimen, so
       its subtree is skipped.
-    * **Grouping sections** — the `<section>`s that menu links point at. They
-      carry the `component-` prefix for a heading rather than a component, so
-      they are the one exemption from the anchor rule, and a new one earns the
-      exemption by being linked from the menu.
+    * **Grouping sections** — the `<section>`s that menu links point at, and
+      the element that wraps them. They carry the `component-` prefix for a
+      heading rather than a component, so they are the anchor rule's only
+      exemption outside the menu, and a new one earns the exemption by being
+      linked from the menu.
     * **The catalog** — every other `component-<slug>` anchor, resolved to the
       public component its slug names. A component is presented when it has a
       catalog entry of its own that calls it; using it to build some other
