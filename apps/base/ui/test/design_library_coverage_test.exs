@@ -10,9 +10,11 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   that can drift on its own, and a component that gains a declared state turns
   the state guard red until the library shows it.
 
-  Appearing in the library is not the same as being complete. The library's
-  own chrome (its page container, header and sidebar menu) uses shared
-  components too, and none of that counts as presenting them.
+  Appearing in the library is not the same as being complete, and being used
+  is not the same as being presented. A component is presented when it has a
+  `component-<name>` block of its own that calls it; the library's own chrome
+  and the containers that frame some *other* specimen do not count, and they
+  contribute no state either.
 
   These guards are excluded from the default run until the Design Library
   specimens they report are corrected. Run them with
@@ -35,21 +37,17 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
 
   setup_all do
     tree = Source.tree()
-    presented = Source.presented(tree)
 
     assert :components in Enum.map(Source.areas(tree), &elem(&1, 0)),
            floor_failure("has no `if @area == :components do` block")
 
-    assert presented != [], floor_failure("presents no element at all")
+    assert Source.presented(tree) != [], floor_failure("presents no element at all")
 
-    %{presented: presented}
+    %{catalog: Source.catalog(tree)}
   end
 
-  test "every public component is presented in the Design Library", %{presented: presented} do
-    missing =
-      public_components()
-      |> Enum.reject(&(Source.calls(&1, presented) != []))
-      |> Enum.sort()
+  test "every public component is presented in the Design Library", %{catalog: catalog} do
+    missing = Enum.reject(Source.public_components(), &(Source.entry_calls(&1, catalog) != []))
 
     assert missing == [],
            """
@@ -58,16 +56,18 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
 
                #{Enum.map_join(missing, ", ", &"<.#{&1}>")}
 
-           A call only counts inside one of the library's areas (the
-           `if @area == …` blocks of #{Path.relative_to_cwd(Source.path())}),
-           outside the sidebar menu. The library's own page chrome using a
-           component is not a presentation of it. A component missing from the
-           human review surface is a component nobody can validate in context.
+           A component is presented by a `component-<name>` block of its own,
+           inside one of the library's areas (the `if @area == …` blocks of
+           #{Path.relative_to_cwd(Source.path())}). Using it to frame another
+           specimen, or in the library's own page chrome, is not a presentation
+           of it, for the same reason a screen using `<.page>` does not present
+           `<.page>`. A component missing from the human review surface is a
+           component nobody can validate in context.
            """
   end
 
   test "every public component declares a state the library can be held to" do
-    stateless = Enum.filter(public_components(), &(axes(&1) == []))
+    stateless = Enum.filter(Source.public_components(), &(axes(&1) == []))
 
     assert stateless == [],
            """
@@ -86,10 +86,10 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
            """
   end
 
-  test "every declared state of every public component is presented", %{presented: presented} do
+  test "every declared state of every public component is presented", %{catalog: catalog} do
     report =
-      for name <- public_components(),
-          calls = Source.calls(name, presented),
+      for name <- Source.public_components(),
+          calls = Source.entry_calls(name, catalog),
           {axis, expected} <- axes(name),
           observed = observed(name, axis, calls),
           missing = expected -- observed,
@@ -111,17 +111,6 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
            value, a slot that is present or absent). Values computed at render
            time, like `kind={row.kind}`, prove nothing about what is shown.
            """
-  end
-
-  # `__components__/0` also reports internals — `error/1` and
-  # `table_sort_heading/1` are called only by other components and have no
-  # business on the Design Library page. Public means callable from another
-  # module.
-  defp public_components do
-    Components.__components__()
-    |> Map.keys()
-    |> Enum.filter(&function_exported?(Components, &1, 1))
-    |> Enum.sort()
   end
 
   # Every guard here passes when it finds nothing wrong, so an empty read is
@@ -308,7 +297,7 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   defp describe_gap({name, axis, missing, observed, calls}) do
     lines =
       case calls do
-        [] -> "never called inside an area"
+        [] -> "no `component-*` block of its own calls it"
         calls -> "called at line " <> Enum.map_join(calls, ", ", &to_string(&1.line))
       end
 

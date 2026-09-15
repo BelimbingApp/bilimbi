@@ -1,21 +1,29 @@
 defmodule Bilimbi.Base.UI.DesignLibrarySource do
   @moduledoc """
-  Reads the Design Library template as a tree so the drift guards can reason
-  about what the library *presents* instead of which strings it contains.
+  Reads the Design Library as a tree and owns the conventions its drift guards
+  hold it to, so that the guards and their own self-test share one definition
+  of every rule.
 
-  The template is parsed with the same parser `Phoenix.LiveView.HTMLFormatter`
+  A template is parsed with the same parser `Phoenix.LiveView.HTMLFormatter`
   uses, so every element, component call, slot and `<%= if @area == … %>`
   block is available with its line number. On top of that tree this module
-  derives, from the template's own conventions and nothing else:
+  derives, from the library's own conventions and nothing else:
 
     * **Areas** — the `if @area == :name do` blocks. Everything outside them
       is the library's own chrome (its page container, its header) and is not
       a presentation of anything.
-    * **Menu chrome** — the `<aside>` the components area opens with, and
-      everything inside it. That is the library navigating itself, not a
-      specimen, so its subtree is skipped.
-    * **Presented elements** — every element and component call inside an
-      area, minus menu chrome. This is what a reviewer sees as "the library".
+    * **Menu chrome** — the `<aside>` an area opens with, and everything
+      inside it. That is the library navigating itself, not a specimen, so
+      its subtree is skipped.
+    * **Grouping sections** — the `<section>`s that menu links point at. They
+      carry the `component-` prefix for a heading rather than a component, so
+      they are the one exemption from the anchor rule, and a new one earns the
+      exemption by being linked from the menu.
+    * **The catalog** — every other `component-<slug>` anchor, resolved to the
+      public component its slug names. A component is presented when it has a
+      catalog entry of its own that calls it; using it to build some other
+      specimen's container is not a presentation of it, for the same reason
+      the page chrome is not.
 
   Attribute values are normalised to `{:literal, term}` when the template
   spells a value out (a string, `{:info}`, `{false}`, a bare `disabled`) and
@@ -27,9 +35,20 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   would let the guards pass on a library they never read.
   """
 
+  alias Bilimbi.Base.UI.Components
   alias Phoenix.LiveView.TagEngine.Parser
 
   @path Path.expand("../../lib/ui/web/design_library_live.html.heex", __DIR__)
+
+  # Tags that only shared components may render inside a specimen. Each has a
+  # shared component that owns it, or names a control the product has not
+  # built yet, which is exactly when an imitation appears.
+  @control_tags ~w(a button dl fieldset form header input label nav select table textarea)
+
+  # Attributes that give a raw element the behaviour of a control. A tabs fake
+  # built from styled `<div>`s carries no control tag and is caught only here.
+  @control_attrs ~w(aria-current aria-expanded aria-pressed aria-selected phx-change phx-click
+                    phx-submit role tabindex)
 
   @type element :: %{
           kind: :tag | :component | :remote_component | :slot,
@@ -42,15 +61,26 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
           ancestors: [map()]
         }
 
-  @doc "Path of the template every guard reads."
+  @doc "Path of the template the drift guards read."
   def path, do: @path
 
-  @doc "The parsed template."
-  def tree do
+  @doc "Parses a HEEx template into parser nodes."
+  def parse(template, file \\ "nofile") when is_binary(template) do
     %Parser{nodes: nodes} =
-      Parser.parse!(File.read!(@path), tag_handler: Phoenix.LiveView.HTMLEngine, file: @path)
+      Parser.parse!(template, tag_handler: Phoenix.LiveView.HTMLEngine, file: file)
 
     nodes
+  end
+
+  @doc "The parsed Design Library template."
+  def tree, do: parse(File.read!(@path), @path)
+
+  @doc "Public components, the vocabulary every guard measures the library against."
+  def public_components do
+    Components.__components__()
+    |> Map.keys()
+    |> Enum.filter(&function_exported?(Components, &1, 1))
+    |> Enum.sort()
   end
 
   @doc """
@@ -75,27 +105,14 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   area, minus menu chrome, flattened in source order. Each element carries its
   `area` and its `ancestors` (outermost first) so a guard can ask where it sits.
   """
-  def presented(nodes \\ tree()) do
-    for {area, body} <- areas(nodes),
-        element <- flatten(body, area, [], prune_chrome: true),
-        do: element
-  end
-
-  @doc "Presented component calls with the given name."
-  def calls(name, presented \\ presented()) when is_atom(name) do
-    string = Atom.to_string(name)
-    Enum.filter(presented, &(&1.kind == :component and &1.name == string))
-  end
+  def presented(nodes \\ tree()), do: elements(nodes, true)
 
   @doc """
   Every element with an id, anywhere inside an area, chrome included, as an
   element record. Used to audit the `component-*` anchor convention.
   """
   def anchored(nodes \\ tree()) do
-    for {area, body} <- areas(nodes),
-        element <- flatten(body, area, [], prune_chrome: false),
-        is_binary(element.id),
-        do: element
+    nodes |> elements(false) |> Enum.filter(&is_binary(&1.id))
   end
 
   @doc """
@@ -103,15 +120,79 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
 
   The menu is the `<aside>` an area opens with: raw layout, outside any
   component call, whose job is navigating the library rather than presenting
-  anything. Nothing else is exempt.
+  anything.
   """
   def menu_chrome?(%{ancestors: ancestors} = element) do
     Enum.any?([element | ancestors], &menu_container?/1)
   end
 
+  @doc "The ids the sidebar menu links to, which is what makes a section a grouping."
+  def menu_targets(nodes \\ tree()) do
+    for element <- elements(nodes, false),
+        menu_chrome?(element),
+        element.kind == :tag,
+        element.name == "a",
+        {:literal, "#" <> id} <- [attr(element, "href")],
+        into: MapSet.new(),
+        do: id
+  end
+
+  @doc """
+  The library's catalog as `{component, entry}` pairs: every `component-<slug>`
+  anchor whose slug names a public component, paired with the block that
+  anchor marks. A heading carrying the anchor marks the section it heads.
+  """
+  def catalog(nodes \\ tree()) do
+    targets = menu_targets(nodes)
+
+    for element <- anchored(nodes),
+        String.starts_with?(element.id, "component-"),
+        not menu_chrome?(element),
+        not grouping_section?(element, targets),
+        component = component_for(component_slug(element)),
+        component != nil,
+        do: {component, entry_element(element)}
+  end
+
+  @doc "Calls to `component` inside the catalog entries that claim to present it."
+  def entry_calls(component, catalog) when is_atom(component) do
+    name = Atom.to_string(component)
+
+    catalog
+    |> Enum.flat_map(fn
+      {^component, entry} -> [entry | descendants(entry)]
+      _other -> []
+    end)
+    |> Enum.filter(&(&1.kind == :component and &1.name == name))
+  end
+
+  @doc """
+  Anchors whose `component-` prefix claims something the library does not
+  present, as one sentence each.
+  """
+  def anchor_problems(nodes \\ tree()) do
+    targets = menu_targets(nodes)
+
+    nodes
+    |> anchored()
+    |> Enum.filter(&String.starts_with?(&1.id, "component-"))
+    |> Enum.flat_map(&anchor_problem(&1, targets))
+  end
+
+  @doc """
+  Raw elements inside the components area that build a control by hand, as one
+  sentence each.
+  """
+  def control_problems(nodes \\ tree()) do
+    nodes
+    |> presented()
+    |> Enum.filter(&(&1.kind == :tag and &1.area == :components))
+    |> Enum.flat_map(&control_problem/1)
+  end
+
   @doc "Every element nested under the given one, in source order."
   def descendants(%{children: children, area: area, ancestors: ancestors} = element) do
-    flatten(children, area, ancestors ++ [element], prune_chrome: false)
+    flatten(children, area, ancestors ++ [element], false)
   end
 
   @doc "The normalised value of an attribute, or `nil` when it is not given."
@@ -122,10 +203,18 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
     end
   end
 
-  @doc "The named slots given directly to a component call."
+  @doc "The named slots given directly to a component call, self-closing ones included."
   def slots(%{children: children}, slot_name) when is_binary(slot_name) do
-    for {:block, :slot, ^slot_name, attrs, kids, meta, _} <- children,
-        do: element(:slot, slot_name, attrs, kids, meta)
+    Enum.flat_map(children, fn
+      {:block, :slot, ^slot_name, attrs, kids, meta, _} ->
+        [element(:slot, slot_name, attrs, kids, meta)]
+
+      {:self_close, :slot, ^slot_name, attrs, meta} ->
+        [element(:slot, slot_name, attrs, [], meta)]
+
+      _other ->
+        []
+    end)
   end
 
   @doc """
@@ -135,12 +224,111 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   def inner_block?(%{children: children}) do
     Enum.any?(children, fn
       {:block, :slot, _, _, _, _, _} -> false
+      {:self_close, :slot, _, _, _} -> false
       {:text, text, _} -> String.trim(text) != ""
-      _ -> true
+      _other -> true
     end)
   end
 
+  ## The anchor convention
+
+  defp anchor_problem(element, targets) do
+    cond do
+      menu_chrome?(element) -> []
+      grouping_section?(element, targets) -> []
+      wraps_grouping_section?(element, targets) -> []
+      true -> claim_problem(element)
+    end
+  end
+
+  defp grouping_section?(%{kind: :tag, name: "section", id: id}, targets) when is_binary(id) do
+    MapSet.member?(targets, id)
+  end
+
+  defp grouping_section?(_element, _targets), do: false
+
+  defp wraps_grouping_section?(element, targets) do
+    Enum.any?(descendants(element), &grouping_section?(&1, targets))
+  end
+
+  defp claim_problem(element) do
+    slug = component_slug(element)
+
+    case component_for(slug) do
+      nil ->
+        [
+          "##{element.id} (line #{element.line}) claims <.#{String.replace(slug, "-", "_")}>, " <>
+            "which is not a public component"
+        ]
+
+      component ->
+        if presents?(element, component),
+          do: [],
+          else: [
+            "##{element.id} (line #{element.line}) claims <.#{component}> but never calls it"
+          ]
+    end
+  end
+
+  defp component_slug(%{id: "component-" <> slug}), do: slug
+
+  # `component-icon-button` names `icon_button`; `component-input-states` is
+  # the `input` specimen qualified by what it shows. Longest match wins so a
+  # qualified anchor still has to present the component it names.
+  defp component_for(slug) do
+    names = Enum.map(public_components(), &Atom.to_string/1)
+
+    slug
+    |> String.split("-")
+    |> Enum.scan(&(&2 <> "_" <> &1))
+    |> Enum.reverse()
+    |> Enum.find(&(&1 in names))
+    |> then(&(&1 && String.to_atom(&1)))
+  end
+
+  defp presents?(element, component) do
+    name = Atom.to_string(component)
+    entry = entry_element(element)
+    Enum.any?([entry | descendants(entry)], &(&1.kind == :component and &1.name == name))
+  end
+
+  # A heading carrying the anchor marks the section it heads; anything else
+  # marks what it contains.
+  defp entry_element(%{kind: :tag, name: <<"h", digit>>} = heading) when digit in ?1..?6 do
+    heading.ancestors
+    |> Enum.reverse()
+    |> Enum.find(heading, &(&1.kind == :tag and &1.name == "section"))
+  end
+
+  defp entry_element(element), do: element
+
+  ## Control markup
+
+  defp control_problem(element) do
+    case control_reason(element) do
+      nil -> []
+      reason -> ["<#{element.name}> at line #{element.line}: #{reason}"]
+    end
+  end
+
+  defp control_reason(%{name: name}) when name in @control_tags do
+    "<#{name}> is markup a shared component owns"
+  end
+
+  defp control_reason(%{attrs: attrs}) do
+    case Enum.find(attrs, fn {attr, _value} -> attr in @control_attrs end) do
+      {attr, _value} -> "`#{attr}` gives it the behaviour of a control"
+      nil -> nil
+    end
+  end
+
   ## Tree walking
+
+  defp elements(nodes, prune_chrome?) do
+    for {area, body} <- areas(nodes),
+        element <- flatten(body, area, [], prune_chrome?),
+        do: element
+  end
 
   defp menu_container?(%{kind: :tag, name: "aside", ancestors: ancestors}) do
     Enum.all?(ancestors, &(&1.kind == :tag))
@@ -159,30 +347,30 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
         {:text, _, _} -> acc
         {:eex, _, _} -> acc
         {:body_expr, _, _} -> acc
-        {:eex_comment, _, _} -> acc
+        {:eex_comment, _} -> acc
         other -> unknown_node!(other)
       end
     end)
   end
 
-  defp flatten(nodes, area, ancestors, opts) do
-    prune? = Keyword.fetch!(opts, :prune_chrome)
-
+  defp flatten(nodes, area, ancestors, prune_chrome?) do
     Enum.flat_map(nodes, fn
       {:block, type, name, attrs, children, meta, _} ->
         element = element(type, name, attrs, children, meta, area, ancestors)
 
-        if prune? and menu_chrome?(element) do
+        if prune_chrome? and menu_chrome?(element) do
           []
         else
-          [element | flatten(children, area, ancestors ++ [element], opts)]
+          [element | flatten(children, area, ancestors ++ [element], prune_chrome?)]
         end
 
       {:self_close, type, name, attrs, meta} ->
         [element(type, name, attrs, [], meta, area, ancestors)]
 
       {:eex_block, _, clauses, _} ->
-        Enum.flat_map(clauses, fn {body, _, _} -> flatten(body, area, ancestors, opts) end)
+        Enum.flat_map(clauses, fn {body, _, _} ->
+          flatten(body, area, ancestors, prune_chrome?)
+        end)
 
       {:text, _, _} ->
         []
@@ -193,7 +381,7 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
       {:body_expr, _, _} ->
         []
 
-      {:eex_comment, _, _} ->
+      {:eex_comment, _} ->
         []
 
       other ->
