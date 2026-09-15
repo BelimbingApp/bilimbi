@@ -1101,7 +1101,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       <span>{assignment.role_name}</span>
                       <.icon_button
                         :if={@can_manage?}
-                        icon="hero-x-mark"
+                        icon="close"
                         label="Remove role"
                         context={:inline}
                         kind={:danger}
@@ -1127,7 +1127,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     phx-click="toggle_assign_roles"
                     class="text-xs font-medium"
                   >
-                    <.icon name="hero-plus" class="size-3.5" />
+                    <.icon name="create" class="size-3.5" />
                     <span>Roles</span>
                   </.button>
                 </div>
@@ -1205,8 +1205,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <.icon
                     name={
                       if @show_effective_permissions,
-                        do: "hero-chevron-down",
-                        else: "hero-chevron-right"
+                        do: "collapse",
+                        else: "expand"
                     }
                     class="size-3"
                   />
@@ -1252,7 +1252,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                           <%= if @can_manage? do %>
                             <%= if is_direct do %>
                               <.icon_button
-                                icon="hero-x-mark"
+                                icon="close"
                                 label="Remove direct grant"
                                 context={:inline}
                                 kind={:danger}
@@ -1263,7 +1263,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                             <% else %>
                               <%= if not is_nil(@user.company_id) do %>
                                 <.icon_button
-                                  icon="hero-x-mark"
+                                  icon="close"
                                   label="Deny this capability"
                                   context={:inline}
                                   kind={:danger}
@@ -1306,7 +1306,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                         <span>{cap}</span>
                         <.icon_button
                           :if={@can_manage?}
-                          icon="hero-x-mark"
+                          icon="close"
                           label="Remove deny"
                           context={:inline}
                           kind={:danger}
@@ -1390,7 +1390,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             >
               <span class="shrink-0 text-ink-muted w-3 grid place-items-center" aria-hidden="true">
                 <.icon
-                  name={if @show_change_password, do: "hero-chevron-down", else: "hero-chevron-right"}
+                  name={if @show_change_password, do: "collapse", else: "expand"}
                   class="size-3"
                 />
               </span>
@@ -1421,7 +1421,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     :if={@password_errors[:password]}
                     class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink"
                   >
-                    <.icon name="hero-exclamation-circle" class="size-4 shrink-0 text-danger" />
+                    <.icon name="error" class="size-4 shrink-0 text-danger" />
                     {@password_errors[:password]}
                   </p>
                 </div>
@@ -1444,7 +1444,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     :if={@password_errors[:password_confirmation]}
                     class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink"
                   >
-                    <.icon name="hero-exclamation-circle" class="size-4 shrink-0 text-danger" />
+                    <.icon name="error" class="size-4 shrink-0 text-danger" />
                     {@password_errors[:password_confirmation]}
                   </p>
                 </div>
@@ -1476,7 +1476,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   variant="primary"
                   class="text-xs"
                 >
-                  <.icon name="hero-plus" class="size-3.5" />
+                  <.icon name="create" class="size-3.5" />
                   <span>Add Employee</span>
                 </.button>
               </div>
@@ -1537,7 +1537,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               <:action :let={emp}>
                 <.icon_button
                   :if={@can_manage?}
-                  icon="hero-link-slash"
+                  icon="unlink"
                   label={"Unlink #{emp.full_name}"}
                   kind={:danger}
                   id={"unlink-employee-#{emp.id}"}
@@ -1564,7 +1564,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   phx-click="toggle_link_employee"
                   class="text-xs"
                 >
-                  <.icon name="hero-plus" class="size-3.5" />
+                  <.icon name="create" class="size-3.5" />
                   <span>Link Employee</span>
                 </.button>
               </div>

@@ -75,7 +75,7 @@ defmodule Bilimbi.Core.User.Web.CompanyUsersPanel do
       >
         <div class="relative">
           <.icon
-            name="hero-magnifying-glass"
+            name="search"
             class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
           />
           <.input

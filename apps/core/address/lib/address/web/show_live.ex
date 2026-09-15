@@ -404,10 +404,10 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
               id="address-back-company"
               navigate={~p"/companies/#{@company_context_id}"}
             >
-              <.icon name="hero-arrow-left" class="mr-1.5 size-4" /> Back to Company
+              <.icon name="back" class="mr-1.5 size-4" /> Back to Company
             </.button>
             <.button id="address-back-list" navigate={~p"/addresses"}>
-              <.icon name="hero-arrow-left" class="mr-1.5 size-4" /> Back to List
+              <.icon name="back" class="mr-1.5 size-4" /> Back to List
             </.button>
           </:actions>
         </.header>
@@ -433,7 +433,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                   type="button"
                   phx-click="edit_details"
                 >
-                  <.icon name="hero-pencil-square" class="mr-1 size-3.5" /> Edit Details
+                  <.icon name="edit" class="mr-1 size-3.5" /> Edit Details
                 </.button>
               </div>
             </div>
@@ -562,7 +562,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                   type="button"
                   phx-click="edit_location"
                 >
-                  <.icon name="hero-pencil-square" class="mr-1 size-3.5" /> Edit Location
+                  <.icon name="edit" class="mr-1 size-3.5" /> Edit Location
                 </.button>
               </div>
             </div>
@@ -721,7 +721,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                   type="button"
                   phx-click="edit_provenance"
                 >
-                  <.icon name="hero-pencil-square" class="mr-1 size-3.5" /> Edit Provenance
+                  <.icon name="edit" class="mr-1 size-3.5" /> Edit Provenance
                 </.button>
               </div>
             </div>

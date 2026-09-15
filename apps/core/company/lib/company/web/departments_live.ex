@@ -439,7 +439,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
                 />
                 <.icon_button
                   :if={@can_update? and dept.status != "active"}
-                  icon="hero-check-circle"
+                  icon="success"
                   label={"Activate #{dept.type.name}"}
                   id={"activate-dept-#{dept.id}"}
                   phx-click="update_status"
@@ -448,7 +448,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
                 />
                 <.icon_button
                   :if={@can_update? and dept.status != "suspended"}
-                  icon="hero-pause-circle"
+                  icon="pause"
                   label={"Suspend #{dept.type.name}"}
                   id={"suspend-dept-#{dept.id}"}
                   phx-click="update_status"
@@ -466,7 +466,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
                 />
                 <.icon_button
                   :if={@can_update?}
-                  icon="hero-trash"
+                  icon="delete"
                   label={"Remove #{dept.type.name}"}
                   kind={:danger}
                   id={"delete-dept-#{dept.id}"}

@@ -121,10 +121,10 @@ defmodule Bilimbi.Core.User.Notification do
 
   @doc "Extracts icon from data payload or returns default."
   def icon(%__MODULE__{data: data}) when is_map(data) do
-    Map.get(data, "icon") || Map.get(data, :icon) || "hero-bell"
+    Map.get(data, "icon") || Map.get(data, :icon) || "notify"
   end
 
-  def icon(_), do: "hero-bell"
+  def icon(_), do: "notify"
 
   defp format_type_title(type) when is_binary(type) do
     type

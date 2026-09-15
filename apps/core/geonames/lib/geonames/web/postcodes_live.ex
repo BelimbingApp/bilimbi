@@ -170,7 +170,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
               variant="primary"
               phx-click="new-postcode"
             >
-              <.icon name="hero-plus" class="size-4" /> New Postcode
+              <.icon name="create" class="size-4" /> New Postcode
             </.button>
           </:actions>
         </.header>
@@ -212,7 +212,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
         >
           <div class="relative">
             <.icon
-              name="hero-magnifying-glass"
+              name="search"
               class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
             />
             <.input
@@ -283,7 +283,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
             </:col>
             <:action :let={postcode} :if={@can_update?}>
               <.icon_button
-                icon="hero-pencil"
+                icon="edit"
                 label={"Edit #{postcode.postcode}"}
                 id={"postcode-#{postcode.id}-edit"}
                 phx-click="edit-postcode"

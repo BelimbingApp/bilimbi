@@ -306,7 +306,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
               <div class="flex items-center gap-2">
                 <.icon_button
                   :if={@can_update?}
-                  icon="hero-pencil"
+                  icon="edit"
                   label="Edit relationship dates"
                   id={"edit-rel-#{item.id}"}
                   phx-click="edit"
@@ -314,7 +314,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
                 />
                 <.icon_button
                   :if={@can_update?}
-                  icon="hero-link-slash"
+                  icon="unlink"
                   label="Remove relationship"
                   kind={:danger}
                   id={"delete-rel-#{item.id}"}

@@ -12,7 +12,7 @@
           navigate={~p"/admin/system/database-queries/_new"}
           variant="primary"
         >
-          <.icon name="hero-plus" class="size-4 mr-1.5" />
+          <.icon name="create" class="size-4 mr-1.5" />
           Create Query
         </.button>
       </:actions>
@@ -77,7 +77,7 @@
               phx-value-id={query.id}
             />
             <.icon_button
-              icon="hero-trash"
+              icon="delete"
               label="Delete query"
               kind={:danger}
               id={"delete-query-#{query.id}"}

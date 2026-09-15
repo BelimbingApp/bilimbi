@@ -75,7 +75,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
               navigate={~p"/addresses/create"}
               variant="primary"
             >
-              <.icon name="hero-plus" /> Create Address
+              <.icon name="create" /> Create Address
             </.button>
           </:actions>
         </.header>
@@ -88,7 +88,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
         >
           <div class="relative">
             <.icon
-              name="hero-magnifying-glass"
+              name="search"
               class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
             />
             <.input
@@ -166,7 +166,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
             <:action :let={address}>
               <.icon_button
                 :if={allowed?(@current_scope, "admin.address.delete")}
-                icon="hero-trash"
+                icon="delete"
                 label={"Delete #{address.label || "address"}"}
                 kind={:danger}
                 id={"address-delete-#{address.id}"}

@@ -20,7 +20,7 @@
           navigate={~p"/users/new"}
           variant="primary"
         >
-          <.icon name="hero-plus" /> Create User
+          <.icon name="create" /> Create User
         </.button>
       </:actions>
     </.header>
@@ -34,7 +34,7 @@
       <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_16rem]">
         <div class="relative">
           <.icon
-            name="hero-magnifying-glass"
+            name="search"
             class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
           />
           <.input
@@ -186,7 +186,7 @@
                   user.id != @current_scope.user["user_id"] and
                   not user.company_archived
               }
-              icon="hero-trash"
+              icon="delete"
               label={gettext("Delete %{name}", name: user.name)}
               title={gettext("Delete user")}
               kind={:danger}
@@ -200,7 +200,7 @@
                 allowed?(@current_scope, "admin.user.delete") and
                   (user.id == @current_scope.user["user_id"] or user.company_archived)
               }
-              icon="hero-trash"
+              icon="delete"
               label={gettext("Delete %{name}", name: user.name)}
               kind={:danger}
               id={"user-#{user.id}-delete"}

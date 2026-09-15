@@ -112,7 +112,7 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
       assert notification.type == "App\\Notifications\\LeaveApprovedNotification"
       assert Notification.title(notification) == "Leave Request Approved"
       assert Notification.body(notification) == "Annual leave approved by manager."
-      assert Notification.icon(notification) == "hero-bell"
+      assert Notification.icon(notification) == "notify"
       assert Notification.url(notification) == nil
     end
 

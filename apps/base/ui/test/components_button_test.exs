@@ -97,7 +97,7 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
       render_component(
         fn assigns ->
           ~H"""
-          <.icon_button id="delete-btn" icon="hero-trash" label="Delete row" kind={:danger} />
+          <.icon_button id="delete-btn" icon="delete" label="Delete row" kind={:danger} />
           """
         end,
         %{}
