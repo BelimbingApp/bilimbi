@@ -166,8 +166,13 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
 
   defp actor_label(_), do: "—"
 
-  defp actor_subtext(%{actor_role: role}) when is_binary(role) and role != "", do: role
-  defp actor_subtext(%{actor_type: type}), do: to_string(type)
+  defp actor_subtext(%{impersonator_id: id} = row) when is_integer(id) and id > 0,
+    do: "#{base_actor_subtext(row)} · impersonated by User ##{id}"
+
+  defp actor_subtext(row), do: base_actor_subtext(row)
+
+  defp base_actor_subtext(%{actor_role: role}) when is_binary(role) and role != "", do: role
+  defp base_actor_subtext(%{actor_type: type}), do: to_string(type)
 
   defp event_badge("created"), do: {:success, "Created"}
   defp event_badge("updated"), do: {:info, "Updated"}

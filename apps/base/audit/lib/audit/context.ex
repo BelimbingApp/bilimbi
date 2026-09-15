@@ -8,6 +8,10 @@ defmodule Bilimbi.Base.Audit.Context do
   source's guest default (`actor_type "guest"`, `actor_id 0`) rather than
   failing the write; background work that wants attribution sets its own.
 
+  `impersonator_id` names the operator behind an impersonated session. The
+  actor pair keeps naming the account acted as; the impersonator is the
+  person who actually acted. Nil outside impersonation.
+
   This is presentation-of-actor state, not authorization: nothing reads it
   to decide anything, only to record who did what.
   """
@@ -17,6 +21,7 @@ defmodule Bilimbi.Base.Audit.Context do
   defstruct actor_type: "guest",
             actor_id: 0,
             actor_role: nil,
+            impersonator_id: nil,
             company_id: nil,
             tenant_id: nil,
             ip_address: nil,
@@ -28,6 +33,7 @@ defmodule Bilimbi.Base.Audit.Context do
           actor_type: String.t(),
           actor_id: non_neg_integer(),
           actor_role: String.t() | nil,
+          impersonator_id: pos_integer() | nil,
           company_id: pos_integer() | nil,
           tenant_id: pos_integer() | nil,
           ip_address: String.t() | nil,

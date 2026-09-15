@@ -47,6 +47,7 @@ defmodule BilimbiWeb.UserAuth do
 
   use BilimbiWeb, :verified_routes
 
+  alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Audit.Context, as: AuditContext
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.Decision
@@ -249,18 +250,32 @@ defmodule BilimbiWeb.UserAuth do
   Switches the active session to `target_user` and records the administrator's
   identity in the `@impersonation_key` cookie payload. Updates the durable session
   row in place without leaving stranded authentication records.
+
+  The switch is recorded once it has happened: a retained `impersonation.started`
+  action names the operator as the actor and the target as the subject. The
+  record is best-effort, so a trail that cannot be written never undoes a
+  switch that already took effect.
   """
   def impersonate_user(
         conn,
-        %{"user_id" => original_user_id, "name" => original_user_name},
+        %{"user_id" => original_user_id, "name" => original_user_name} = original_user,
         %Summary{} = target_user
       )
       when is_integer(original_user_id) and is_binary(original_user_name) do
     current_id = current_session_id(conn)
+    scope = conn.assigns[:current_scope] && conn.assigns[:current_scope].scope
 
-    with {:ok, _target_session_user} <- session_user(target_user),
+    with %Scope{} <- scope,
+         {:ok, _target_session_user} <- session_user(target_user),
          {:ok, session_id} <-
            persist_durable_session(conn, target_user.id, target_user.company_id, current_id) do
+      record_impersonation(scope, "impersonation.started", %{
+        operator_id: original_user_id,
+        company_id: original_user["company_id"],
+        target_id: target_user.id,
+        summary: "Started impersonating #{target_user.name}"
+      })
+
       conn
       |> configure_session(renew: true)
       |> put_session(@impersonation_key, %{
@@ -284,12 +299,18 @@ defmodule BilimbiWeb.UserAuth do
   @doc """
   Leaves impersonation by clearing `@impersonation_key` and restoring the
   original administrator's authenticated session in place.
+
+  A retained `impersonation.stopped` action names the operator as the actor
+  once their own session is restored. Leaving must always succeed — an
+  operator is never trapped in a borrowed session — so a failed stop record
+  is logged rather than blocking.
   """
   def leave_impersonation(conn) do
     case get_session(conn, @impersonation_key) do
       %{"original_user_id" => original_user_id} when is_integer(original_user_id) ->
         scope = conn.assigns[:current_scope] && conn.assigns[:current_scope].scope
         current_id = current_session_id(conn)
+        impersonated_user_id = impersonated_user_id(conn)
 
         with %Scope{} <- scope,
              {:ok, %Summary{} = original_user} <- User.get_tenant_user(scope, original_user_id),
@@ -300,6 +321,13 @@ defmodule BilimbiWeb.UserAuth do
                  original_user.company_id,
                  current_id
                ) do
+          record_impersonation(scope, "impersonation.stopped", %{
+            operator_id: original_user.id,
+            company_id: original_user.company_id,
+            target_id: impersonated_user_id,
+            summary: "Stopped impersonating"
+          })
+
           conn
           |> configure_session(renew: true)
           |> delete_session(@impersonation_key)
@@ -317,6 +345,74 @@ defmodule BilimbiWeb.UserAuth do
       _ ->
         redirect(conn, to: ~p"/dashboard")
     end
+  end
+
+  defp impersonated_user_id(conn) do
+    case get_session(conn, @session_key) do
+      %{"user_id" => user_id} when is_integer(user_id) -> user_id
+      _ -> nil
+    end
+  end
+
+  # Belimbing's `ImpersonationManager` records both transitions as retained
+  # semantic actions, and its recorder payload shape is mirrored here so both
+  # trails read the same. The operator acts as themselves at each transition,
+  # so `impersonator_id` is an explicit nil rather than inherited from the
+  # request context — which, on stop, still names the operator as impersonator.
+  # Request facts come from that same context, set by `fetch_current_scope/2`.
+  #
+  # Both transitions have already taken effect by the time they are recorded,
+  # so recording is best-effort: a rejected changeset is logged, and a missing
+  # actions table is the pre-canonical state `MutationCapture.insert_capture/1`
+  # also tolerates. Neither ever fails the transition back out to the caller.
+  defp record_impersonation(%Scope{} = scope, event, %{
+         operator_id: operator_id,
+         company_id: company_id,
+         target_id: target_id,
+         summary: summary
+       }) do
+    context = AuditContext.get()
+
+    result =
+      Audit.record_action(scope, %{
+        company_id: company_id,
+        actor_type: "user",
+        actor_id: operator_id,
+        impersonator_id: nil,
+        ip_address: context.ip_address,
+        url: context.url,
+        user_agent: context.user_agent && String.slice(context.user_agent, 0, 80),
+        trace_id: context.trace_id && String.slice(context.trace_id, 0, 12),
+        event: event,
+        payload: %{
+          "semantic" => true,
+          "source" => "Impersonation",
+          "summary" => summary,
+          "surface" => "admin.impersonate",
+          "subject" => %{"name" => "user", "id" => target_id, "label" => "User##{target_id}"},
+          "context" => %{"impersonator_id" => operator_id, "target_id" => target_id},
+          "result" => "succeeded"
+        },
+        is_retained: true,
+        occurred_at: NaiveDateTime.utc_now()
+      })
+
+    case result do
+      {:ok, _action} ->
+        :ok
+
+      {:error, changeset} ->
+        Logger.warning("#{event} audit action was not recorded: #{inspect(changeset.errors)}")
+
+        :ok
+    end
+  rescue
+    error in Postgrex.Error ->
+      if match?(%{postgres: %{code: :undefined_table}}, error) do
+        :ok
+      else
+        reraise error, __STACKTRACE__
+      end
   end
 
   # ------------------------------------------------------------------
@@ -586,18 +682,21 @@ defmodule BilimbiWeb.UserAuth do
 
   # Captured mutations record who acted (ADR 0013). Resolved in the same
   # per-process lifecycle as the locale; an anonymous request records the
-  # guest default rather than a stale actor from a previous request.
+  # guest default rather than a stale actor from a previous request. Under
+  # impersonation the actor is the account acted as and the impersonator is
+  # the operator behind the session, so every row names both.
   defp put_audit_context(current_scope, conn \\ nil)
 
   defp put_audit_context(nil, _conn), do: AuditContext.put(nil)
 
   defp put_audit_context(
-         %{user: %{"user_id" => _} = user, scope: %Scope{} = scope, actor: actor},
+         %{user: %{"user_id" => _} = user, scope: %Scope{} = scope, actor: actor} = current_scope,
          conn
        ) do
     AuditContext.put(%AuditContext{
       actor_type: Atom.to_string(actor.type),
       actor_id: actor.id,
+      impersonator_id: impersonator_id(current_scope),
       company_id: user["company_id"],
       tenant_id: Scope.tenant_id(scope),
       ip_address: conn && conn.remote_ip |> :inet.ntoa() |> to_string(),
@@ -608,6 +707,9 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   defp put_audit_context(_current_scope, _conn), do: AuditContext.put(nil)
+
+  defp impersonator_id(%{impersonator: %{id: id}}) when is_integer(id) and id > 0, do: id
+  defp impersonator_id(_current_scope), do: nil
 
   defp put_gettext_locale(language) do
     Enum.each(@gettext_backends, &Gettext.put_locale(&1, language))

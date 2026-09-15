@@ -1,6 +1,12 @@
 defmodule Bilimbi.Base.Audit.SchemaContract do
   @moduledoc """
   Pinned PostgreSQL contract for the Base Audit compatibility baseline.
+
+  The `impersonator_id` column and its partial index on both tables are the
+  Bilimbi-only impersonation contribution (migration `20260914090000`). They
+  are declared as an optional group: an adopted Belimbing database verifies
+  without them, a migrated Bilimbi database verifies with them, and a table
+  carrying only half of the pair is drift.
   """
 
   @behaviour Bilimbi.Base.Database.SchemaContract
@@ -60,6 +66,12 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
             "subject_nameisnotnull"
           )
       },
+      optional_columns: %{"impersonator_id" => column(:bigint)},
+      optional_indexes: %{
+        "base_audit_mutations_impersonator_id_index" =>
+          index(["impersonator_id"], false, "impersonator_idisnotnull")
+      },
+      optional_groups: [impersonation_group("base_audit_mutations")],
       foreign_keys: %{}
     }
   end
@@ -96,7 +108,21 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
         "base_audit_actions_actor_type_actor_id_occurred_at_index" =>
           index(["actor_type", "actor_id", "occurred_at"])
       },
+      optional_columns: %{"impersonator_id" => column(:bigint)},
+      optional_indexes: %{
+        "base_audit_actions_impersonator_id_index" =>
+          index(["impersonator_id"], false, "impersonator_idisnotnull")
+      },
+      optional_groups: [impersonation_group("base_audit_actions")],
       foreign_keys: %{}
+    }
+  end
+
+  defp impersonation_group(table) do
+    %{
+      name: "base/audit impersonation operator",
+      columns: ["impersonator_id"],
+      indexes: ["#{table}_impersonator_id_index"]
     }
   end
 

@@ -101,6 +101,11 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
   defp history_count([_]), do: "1 recent mutation"
   defp history_count(entries), do: "#{length(entries)} recent mutations"
 
+  defp actor_label(%{impersonator_id: impersonator_id} = entry)
+       when is_integer(impersonator_id) and impersonator_id > 0 do
+    "#{actor_label(Map.put(entry, :impersonator_id, nil))} · impersonated by User ##{impersonator_id}"
+  end
+
   defp actor_label(%{actor_type: "user", actor_id: id}) when is_integer(id) and id > 0,
     do: "User ##{id}"
 

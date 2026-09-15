@@ -93,6 +93,25 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
     assert row.trace_id == "abc123"
   end
 
+  test "the process context names the operator behind an impersonated session" do
+    Context.put(%Context{actor_type: "user", actor_id: 92, impersonator_id: 91, tenant_id: 41})
+
+    Repo.insert!(Widget.changeset(%Widget{}, %{name: "Borrowed", tenant_id: 41}))
+
+    assert [row] = mutations()
+    # The actor is the account acted as; the impersonator is who acted.
+    assert row.actor_id == 92
+    assert row.impersonator_id == 91
+  end
+
+  test "a row written outside impersonation names no impersonator" do
+    Context.put(%Context{actor_type: "user", actor_id: 91, tenant_id: 41})
+
+    Repo.insert!(Widget.changeset(%Widget{}, %{name: "Own", tenant_id: 41}))
+
+    assert [%{actor_id: 91, impersonator_id: nil}] = mutations()
+  end
+
   test "a tenant-less row falls back to the context tenant" do
     Context.put(%Context{actor_type: "user", actor_id: 91, tenant_id: 41})
 
