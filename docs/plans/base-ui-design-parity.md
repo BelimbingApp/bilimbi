@@ -1,6 +1,6 @@
 # Base UI Design Parity
 
-**Status:** In progress — application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display are all merged to `main`; the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
+**Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families. Application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display are merged to `main`; the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
 **Last Updated:** 2026-09-16
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
 **Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`
@@ -424,9 +424,8 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
 - [x] Show the current Bilimbi component in every meaningful state for the active family. `{codex-luna-states-1/gpt-5.6-luna}`
 
   Both landed on 2026-09-15 and neither finished the job: the `:design_library_drift`
-  guards still report four failures on `main`, so they stay excluded from the default
-  run. Correcting those four is the next Phase 1 work, and this branch left them
-  unchanged.
+  guards still report four failures on `main`, and this branch left them unchanged.
+- [ ] Correct the four `:design_library_drift` specimen and state failures those two slices left, then move the guards into the default test run and `mix precommit`.
 - [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record the design steward's accepted disposition and rationale.
 - [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
 
@@ -596,5 +595,5 @@ All four merged on 2026-09-15 and closed their issues:
 
 Not finished by #719 and #720: the `:design_library_drift` guards report four failures
 on `main`, so #722's guards land excluded from the default test run and from
-`mix precommit`. Moving them into the default run is blocked on those four and is the
-next Phase 1 work. #722 being merged does not mean the guards are active.
+`mix precommit`. Correcting those four and activating the guards is the open Phase 1
+checklist row above. #722 being merged does not mean the guards are active.
