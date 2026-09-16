@@ -1,9 +1,9 @@
 # Base UI Design Parity
 
 **Status:** In progress — application shell, impersonation audit actor and the named icon vocabulary are merged to `main`; Design Library specimen separation, state coverage, drift guards and live timestamp display are implemented and in review
-**Last Updated:** 2026-09-15
+**Last Updated:** 2026-09-16
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`
 
 ## Problem Essence
 
@@ -366,7 +366,31 @@ Validation: A new agent can tell what must remain Bilimbi, what is being compare
 
 Goal: Let the design steward or a product reviewer inspect one family at a time without a long, conflicting page.
 
-- [ ] Align the secondary menu with the catalog families: Foundations, Page Structure, Navigation and Links, Actions, Inputs, Interaction Patterns, Feedback and States, Overlays, Data Display, Composite Patterns and Graphics.
+- [x] Align the secondary menu with the catalog families: Foundations, Page Structure, Navigation and Links, Actions, Inputs, Interaction Patterns, Feedback and States, Overlays, Data Display, Composite Patterns and Graphics. `{claude-opus-families-1/claude-opus-5}`
+
+  What the alignment exposed, recorded so the next slice does not rediscover it:
+
+  - **Overlays is the only family with no specimen anywhere.** OVR-01 to OVR-04
+    are all missing, so `#component-overlays` renders its heading and says "No
+    specimen yet" instead of being dropped from the menu.
+  - **Foundations and Graphics are not empty; they are elsewhere.** The Theme
+    area already is FND and the Graphic area already is GFX, so both keep one
+    home and the family menu links to their routes rather than showing a second
+    copy under Components.
+  - **The section headed "Interaction patterns" was CMP-01.** Its search, table,
+    empty result and pagination are one operational index flow, so it is now
+    Composite patterns; Interaction patterns keeps INT-01 inline editing alone.
+  - **`<.card>` and `<.badge>` moved to Data display** (DAT-01, DAT-02) and the
+    application shell moved under Page structure (LAY-02), keeping its own
+    `#component-shell` deep link as a nested menu-linked section.
+  - **NAV-04 pagination still has no specimen of its own.** It renders twice,
+    both times inside the table it pages, so it stays with Data display and
+    Composite patterns; the coverage guard reports it as unpresented.
+  - The eleven family entries follow catalog order, not the alphabetical order
+    root `AGENTS.md` §12 sets for the application navigation menu; this is a
+    page-local catalog index, and catalog order is what makes the alignment
+    checkable.
+
 - [ ] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source.
 - [ ] Show the current Bilimbi component in every meaningful state for the active family.
 - [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record the design steward's accepted disposition and rationale.

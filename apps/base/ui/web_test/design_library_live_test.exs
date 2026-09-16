@@ -86,18 +86,47 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
       refute has_element?(view, "#decision-c0#{number}")
     end
 
-    assert has_element?(view, "#component-secondary-menu nav[aria-label='Component sections']")
-    assert has_element?(view, "#component-menu-structure", "Structure")
-    assert has_element?(view, "#component-menu-controls", "Controls")
-    assert has_element?(view, "#component-menu-communication", "Communication")
-    assert has_element?(view, "#component-menu-workflows", "Workflows")
+    assert has_element?(view, "#component-secondary-menu nav[aria-label='Component families']")
 
-    for section <- ~w(structure inputs actions feedback states data patterns) do
-      assert has_element?(
-               view,
-               "#component-secondary-menu a[href='#component-#{section}']"
-             )
+    # The menu is the parity capability catalog's eleven families, in catalog
+    # order. A family nobody can review is still listed, so the gap is visible.
+    for {slug, family} <- [
+          {"foundations", "Foundations"},
+          {"page-structure", "Page structure"},
+          {"navigation-links", "Navigation and links"},
+          {"actions", "Actions"},
+          {"inputs", "Inputs"},
+          {"interaction-patterns", "Interaction patterns"},
+          {"feedback-states", "Feedback and states"},
+          {"overlays", "Overlays"},
+          {"data-display", "Data display"},
+          {"composite-patterns", "Composite patterns"},
+          {"graphics", "Graphics"}
+        ] do
+      assert has_element?(view, "#component-menu-#{slug}", family)
     end
+
+    # Nine families are reviewed on this page, and each menu entry lands on the
+    # section that owns their specimens.
+    for family <- ~w(page-structure navigation-links actions inputs interaction-patterns
+                     feedback-states overlays data-display composite-patterns) do
+      assert has_element?(view, "#component-secondary-menu a[href='#component-#{family}']")
+      assert has_element?(view, "#component-#{family}")
+    end
+
+    # Foundations and Graphics already have their own areas, so the menu points
+    # at them instead of showing a second copy here.
+    assert has_element?(view, "#component-menu-foundations[href='/system/design-library']")
+    assert has_element?(view, "#component-menu-graphics[href='/system/design-library/graphic']")
+
+    # Overlays is the one family with no specimen at all, and it says so rather
+    # than disappearing from the menu.
+    assert has_element?(view, "#component-overlays", "No specimen yet")
+
+    # The application shell is LAY-02, so it sits inside Page structure and
+    # keeps its own deep link.
+    assert has_element?(view, "#component-page-structure #component-shell")
+    assert has_element?(view, "#component-secondary-menu a[href='#component-shell']")
 
     refute has_element?(view, "#component-catalog")
     assert has_element?(view, "#component-input-guidance", "Choice guidance")
@@ -157,7 +186,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-card-boundary", "no loading, empty, error, or disabled")
     assert has_element?(view, "#component-list-boundary", "no loading, empty, or error state")
 
-    for area <- ~w(components component-patterns component-states) do
+    for area <- ~w(components component-composite-patterns component-feedback-states) do
       assert has_element?(view, "##{area}")
     end
 
