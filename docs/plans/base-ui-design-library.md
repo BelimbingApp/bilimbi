@@ -1,7 +1,7 @@
 # Base UI Design Library
 
 **Status:** Foundation merged; the parity campaign continues under Issue #709
-**Last Updated:** 2026-09-15
+**Last Updated:** 2026-09-16
 **Tracking:** [Issue #691](https://github.com/BelimbingApp/bilimbi/issues/691)
 **Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`; `fm/parity-designlib-specimens/grok-4.6`
 **Related:** `docs/plans/base-ui-design-parity.md`
@@ -10,7 +10,7 @@
 
 Bilimbi's design is visible in the product, but its choices are spread across theme CSS, shared components and individual screens. Text alone cannot show whether the result feels coherent. It also cannot expose two different treatments that both look reasonable in code.
 
-The Design Library must make Bilimbi's actual design visible, expose contradictions and support evidence-based acceptance. It must not read like developer documentation or explain repository history inside the product. The design steward owns routine design judgment under the user's delegation; humans can inspect the result without becoming a component-by-component approval dependency. The steward is a role, not one agent. Astra (`gpt-6-astra`) held it through 2026-09-15; Fable (`claude-fable-5-1`) holds it from 2026-09-16 at the user's direction. Completed-work attributions below record whoever did the work at the time and are historical facts rather than a statement of the current role.
+The Design Library must make Bilimbi's actual design visible, expose contradictions and support evidence-based acceptance. It must not read like developer documentation or explain repository history inside the product. The design steward owns routine design judgment under the user's delegation; humans can inspect the result without becoming a component-by-component approval dependency. The steward is a role, not one agent; `docs/plans/base-ui-design-parity.md` is the single record of who holds it and when. Completed-work attributions below record whoever did the work at the time and are historical facts rather than a statement of the current role.
 
 ## Desired Outcome
 
