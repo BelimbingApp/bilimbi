@@ -118,9 +118,11 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert labels == @family_menu_labels
     assert labels == Enum.sort(labels)
 
-    # A family nobody can review is still listed, so the gap is visible.
+    # Nine families are reviewed on this page. Each entry carries its own family
+    # label and lands on the section that owns that family's specimens, so a
+    # swapped target fails rather than sending the reviewer to a sibling. A
+    # family nobody can review is still listed, so the gap is visible.
     for {slug, family} <- [
-          {"foundations", "Foundations"},
           {"page-structure", "Page structure"},
           {"navigation-links", "Navigation and links"},
           {"actions", "Actions"},
@@ -129,24 +131,25 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
           {"feedback-states", "Feedback and states"},
           {"overlays", "Overlays"},
           {"data-display", "Data display"},
-          {"composite-patterns", "Composite patterns"},
-          {"graphics", "Graphics"}
+          {"composite-patterns", "Composite patterns"}
         ] do
-      assert has_element?(view, "#component-menu-#{slug}", family)
-    end
-
-    # Nine families are reviewed on this page, and each menu entry lands on the
-    # section that owns their specimens.
-    for family <- ~w(page-structure navigation-links actions inputs interaction-patterns
-                     feedback-states overlays data-display composite-patterns) do
-      assert has_element?(view, "#component-secondary-menu a[href='#component-#{family}']")
-      assert has_element?(view, "#component-#{family}")
+      assert has_element?(view, "#component-menu-#{slug}[href='#component-#{slug}']", family)
+      assert has_element?(view, "#component-#{slug}")
     end
 
     # Foundations and Graphics already have their own areas, so the menu points
     # at them instead of showing a second copy here.
-    assert has_element?(view, "#component-menu-foundations[href='/system/design-library']")
-    assert has_element?(view, "#component-menu-graphics[href='/system/design-library/graphic']")
+    assert has_element?(
+             view,
+             "#component-menu-foundations[href='/system/design-library']",
+             "Foundations"
+           )
+
+    assert has_element?(
+             view,
+             "#component-menu-graphics[href='/system/design-library/graphic']",
+             "Graphics"
+           )
 
     # Overlays is the one family with no specimen at all, and it says so rather
     # than disappearing from the menu.

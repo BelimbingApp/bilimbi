@@ -152,14 +152,6 @@ rather than being quietly reconciled.
 | ACT-01 Buttons | Adopt adapted | none |
 | ACT-02 Icon actions | Keep Bilimbi | ACT-01 loading contract |
 | ACT-03 Destructive entry | Adopt adapted | OVR-02, ACT-01 |
-| FBK-01 Inline alerts | Adopt adapted | none |
-| FBK-02 Flash | Adopt adapted | z-order agreed with OVR-01 |
-| FBK-03 Validation, disabled, loading | Adopt adapted | ACT-01 |
-| FBK-04 Empty, permission, error, recovery | Keep Bilimbi | none |
-| OVR-01 Standard modal | Adopt adapted — share the shell drawer's containment, do not re-add | extract containment hook from `app_shell.js` |
-| OVR-02 Confirmation modal | Adopt adapted | OVR-01, ACT-03 |
-| OVR-03 Inspector drawer | Not applicable — no workflow needs it | a real inspector workflow |
-| OVR-04 Tooltip and popover | Equivalent | none |
 | INP-01 Field shell | Adopt adapted — required marker, prefix/suffix, read-only | none — foundation |
 | INP-02 Text and textarea | Keep Bilimbi | INP-01 |
 | INP-03 Search | Adopt adapted — narrowed to the magnifier only | INP-01; clear → INT-05 |
@@ -175,6 +167,14 @@ rather than being quietly reconciled.
 | INT-04 Disclosure | Adopt adapted — as two distinct things | INP-04, FND-05 |
 | INT-05 Filter and period | Adopt adapted | INP-01, INP-03, OVR-01 |
 | INT-06 Unsaved change | Not applicable — keep deferred | none |
+| FBK-01 Inline alerts | Adopt adapted | none |
+| FBK-02 Flash | Adopt adapted | z-order agreed with OVR-01 |
+| FBK-03 Validation, disabled, loading | Adopt adapted | ACT-01 |
+| FBK-04 Empty, permission, error, recovery | Keep Bilimbi | none |
+| OVR-01 Standard modal | Adopt adapted — share the shell drawer's containment, do not re-add | extract containment hook from `app_shell.js` |
+| OVR-02 Confirmation modal | Adopt adapted | OVR-01, ACT-03 |
+| OVR-03 Inspector drawer | Not applicable — no workflow needs it | a real inspector workflow |
+| OVR-04 Tooltip and popover | Equivalent | none |
 | DAT-01 Record fact list | Keep Bilimbi — Belimbing hand-writes `<dl>` too | none for the API; migration is Phase 5 |
 | DAT-02 Status and badges | Adopt adapted — `info` role only, never `accent` | a new `info` role in `@theme` (FND) |
 | DAT-03 Tables | Keep Bilimbi (density, header case, sort) + Adopt adapted (accessible name, `title`) | shared-component edit; raw tables are Phase 5 |
@@ -408,7 +408,7 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     `K Graphics`), so the alphabetical ascending order root `AGENTS.md` §12
     requires and the catalog order that makes the alignment checkable are the
     same sequence. No exception to §12 is claimed or needed. Letters rather than
-    numbers because the page already renders 40 catalog IDs (`LAY-01`, `OVR-04`
+    numbers because the page already renders dozens of catalog IDs (`LAY-01`, `OVR-04`
     and so on): a numeric menu prefix sits beside those as a second numbering
     system a reader could reasonably think is related, and letters cannot be
     mistaken for a catalog ID. Letters also need no zero-padding, so a twelfth
