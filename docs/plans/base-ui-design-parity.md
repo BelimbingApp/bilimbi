@@ -592,7 +592,3 @@ Not finished by #719 and #720: the `:design_library_drift` guards report four fa
 on `main`, so #722's guards land excluded from the default test run and from
 `mix precommit`. Moving them into the default run is blocked on those four and is the
 next Phase 1 work. #722 being merged does not mean the guards are active.
-
-### In review — not yet merged
-
-Nothing is in review. The section is kept because a later slice will need it.
