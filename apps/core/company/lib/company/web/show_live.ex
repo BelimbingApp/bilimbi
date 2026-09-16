@@ -979,10 +979,16 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                   <button
                     :if={@can_update?}
                     type="button"
+                    id={"remove-activity-#{idx}"}
                     phx-click="remove_activity"
                     phx-value-index={idx}
+                    data-confirm={
+                      "Remove the business activity #{activity}? " <>
+                        "The change is saved immediately."
+                    }
                     class="text-ink-subtle hover:text-danger"
-                    title="Remove"
+                    title={"Remove #{activity}"}
+                    aria-label={"Remove #{activity}"}
                   >
                     &times;
                   </button>
