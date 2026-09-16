@@ -140,7 +140,7 @@ rather than being quietly reconciled.
 | LAY-03 Page header | Adopt adapted — responsive stacking, pin slot, help slot | NAV-01 pin decision |
 | LAY-04 Side panel | Adopt adapted | LAY-02 drawer mechanics, #719 |
 | LAY-05 Page geometry | Keep Bilimbi | FND-03, LAY-03 |
-| NAV-01 Menu tree and pins | **Steward review** — two pin models, one dead | none |
+| NAV-01 Menu tree and pins | Adopt adapted — pins become account state; `user_pins` is the sole store (steward, 2026-09-16) | unblocks LAY-03; adoption-URL question escalated |
 | NAV-02 Tabs | Adopt adapted — ARIA tablist, arrow keys, one URL rule | none |
 | NAV-03 Links | Adopt adapted | none |
 | NAV-04 Pagination | Keep Bilimbi | none |
@@ -179,13 +179,44 @@ rather than being quietly reconciled.
 | DAT-06 Record history | Keep Bilimbi — ownership split is strictly better | `history` icon name depends on GFX-02 |
 | CMP-01 Operational index | Keep Bilimbi on URL state and page sizes | settle one URL vocabulary before Phase 5 |
 | CMP-02 Create and edit form | Keep Bilimbi | `aria-describedby` belongs to INP-01 |
-| CMP-03 Detail page | **Steward review** | DAT-01 |
+| CMP-03 Detail page | Adopt adapted — one `detail_section` assembly on Bilimbi's archetype (steward, 2026-09-16) | DAT-01, FND-02, FND-03, LAY-03/CMP-06, INT-01, INT-02, DAT-03, GFX-02 |
 | CMP-04 Destructive flow | Adopt adapted — take the acknowledge-input contract | OVR-01, OVR-02 |
 | CMP-05 Authentication pages | Equivalent | none |
 | CMP-06 Page header assembly | Adopt adapted — responsive stacking | none; integration owner, not Phase 5 |
 | GFX-01 Identity mark | Keep Bilimbi | none |
 | GFX-02 Icon assets | Adopt adapted — but reorder: register the missing names first | none for the registration fix |
 | GFX-03 Illustration | Not applicable | none |
+
+##### Steward decisions (2026-09-16)
+
+**NAV-01 — pins are account state.** The server-side path is already built and
+entirely unwired: the local shell landed 2026-08-17 and the `user_pins` API the next
+day (#316), and nothing ever connected them. Verified live — pinning a nav item and a
+record pin persisted across navigation while `user_pins` stayed at 0 rows and no
+`/api/pins` traffic occurred. That is drift, not a recorded policy. `user_pins` becomes
+the sole store; the scope carries a `:pins` snapshot beside `:shell_preferences`;
+writes go through a `ShellPins` `attach_hook` twin of `ShellPreferences`, refusing
+impersonated writes exactly as `DisplayPreferences.own_account/1` does, so
+`PinController` and its routes are deleted rather than left as a second write path.
+Rail, width and branch expansion stay deliberately browser-local. Reason: a
+"Pin to sidebar" control that vanishes on another device fails silently against K09,
+and the round trip is the cost already accepted for theme and time display in #711.
+
+**CMP-03 — one detail assembly.** Bilimbi has five section-heading treatments, four
+`dt` label treatments, three grid rules, two card paddings and three editing models
+across six detail screens; on User and Employee the section title and the fact label
+share a class string, so the hierarchy collapses. Belimbing has the same flaw but is
+consistent everywhere — its consistency is what to take, not its uppercase styling.
+One `detail_section` (title, count, description, `:actions`), `<.list layout={:grid}>`
+for facts, inline editing per fact with a grouped Apply/Cancel only where facts change
+together, no modal, and permission-less viewers see the value with no affordance
+rather than a disabled control.
+
+**Escalated — not a design decision.** Belimbing's stored `user_pins.url` values point
+at `/admin/companies/1` while Bilimbi serves `/companies/1`. Whether adoption rewrites
+known prefixes, deletes the rows, or leaves them dormant is a durable-data decision
+under `docs/architecture/database.md`. The steward decided only the display rule: a pin
+to a URL this installation does not serve is hidden.
 
 ##### Targets the evidence contradicts
 
