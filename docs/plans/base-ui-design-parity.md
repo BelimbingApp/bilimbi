@@ -386,10 +386,15 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
   - **NAV-04 pagination still has no specimen of its own.** It renders twice,
     both times inside the table it pages, so it stays with Data display and
     Composite patterns; the coverage guard reports it as unpresented.
-  - The eleven family entries follow catalog order, not the alphabetical order
-    root `AGENTS.md` §12 sets for the application navigation menu; this is a
-    page-local catalog index, and catalog order is what makes the alignment
-    checkable.
+  - The eleven family entries carry letter prefixes (`A Foundations` through
+    `K Graphics`), so the alphabetical ascending order root `AGENTS.md` §12
+    requires and the catalog order that makes the alignment checkable are the
+    same sequence. No exception to §12 is claimed or needed. Letters rather than
+    numbers because the page already renders 40 catalog IDs (`LAY-01`, `OVR-04`
+    and so on): a numeric menu prefix sits beside those as a second numbering
+    system a reader could reasonably think is related, and letters cannot be
+    mistaken for a catalog ID. Letters also need no zero-padding, so a twelfth
+    family cannot silently break the sort the way unpadded numbers would.
 
 - [ ] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source.
 - [ ] Show the current Bilimbi component in every meaningful state for the active family.
