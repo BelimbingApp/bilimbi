@@ -10,7 +10,7 @@
 
 Bilimbi's design is visible in the product, but its choices are spread across theme CSS, shared components and individual screens. Text alone cannot show whether the result feels coherent. It also cannot expose two different treatments that both look reasonable in code.
 
-The Design Library must make Bilimbi's actual design visible, expose contradictions and support evidence-based acceptance. It must not read like developer documentation or explain repository history inside the product. Astra now owns routine design judgment under the user's delegation; humans can inspect the result without becoming a component-by-component approval dependency.
+The Design Library must make Bilimbi's actual design visible, expose contradictions and support evidence-based acceptance. It must not read like developer documentation or explain repository history inside the product. The design steward owns routine design judgment under the user's delegation; humans can inspect the result without becoming a component-by-component approval dependency. The steward is a role, not one agent. Astra (`gpt-6-astra`) held it through 2026-09-15; Fable (`claude-fable-5-1`) holds it from 2026-09-16 at the user's direction. Completed-work attributions below record whoever did the work at the time and are historical facts rather than a statement of the current role.
 
 ## Desired Outcome
 
@@ -43,7 +43,7 @@ The pages render real production components and interactions. They do not show c
 2. List every shared design element in a live state.
 3. Where different treatments exist, show them together and note the product screens where each appears.
 4. Give each open choice a stable number such as `C01` and each option a letter.
-5. Astra records a choice and its evidence using that reference, preserving Bilimbi identity and the user's explicit requirements.
+5. The design steward records a choice and its evidence using that reference, preserving Bilimbi identity and the user's explicit requirements.
 6. A coding change removes the rejected production variation or defines the accepted context rule.
 7. The same decision number moves to Design Spec as accepted design.
 8. Browser review and normal project validation confirm the result before commit.
@@ -64,10 +64,10 @@ Appearance Settings is the one screen `<.radio_group>` does not describe. It put
 
 ## Rules
 
-- The Design Library supports visual and interaction review by Astra and product reviewers.
+- The Design Library supports visual and interaction review by the design steward and product reviewers.
 - Production UI is the evidence. Old text and legacy provenance do not override what the product actually renders.
 - Every public Base UI component appears in the Design Library in a meaningful state.
-- Variations are inspected and resolved by Astra with recorded evidence and recognizable use cases.
+- Variations are inspected and resolved by the design steward with recorded evidence and recognizable use cases.
 - Source notes name recognisable product screens and routes.
 - Accepted decisions retain their review number so the decision can be traced without exposing development history in normal UI.
 - Feature screens use Base UI semantic meaning rather than library identity, raw palette or private asset paths.

@@ -11,6 +11,19 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   @view_cap "admin.system.design-library.view"
+  @family_menu_labels [
+    "A Foundations",
+    "B Page structure",
+    "C Navigation and links",
+    "D Actions",
+    "E Inputs",
+    "F Interaction patterns",
+    "G Feedback and states",
+    "H Overlays",
+    "I Data display",
+    "J Composite patterns",
+    "K Graphics"
+  ]
   @paths [
     "/system/design-library",
     "/system/design-library/components",
@@ -24,6 +37,16 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
     :ok
+  end
+
+  defp family_menu_labels(view) do
+    view
+    |> render()
+    |> LazyHTML.from_fragment()
+    |> LazyHTML.query(
+      "#component-secondary-menu nav[aria-label='Component families'] > a > span > span:first-child"
+    )
+    |> Enum.map(&(&1 |> LazyHTML.text() |> String.trim()))
   end
 
   defp open(conn, path) do
@@ -89,7 +112,13 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-secondary-menu nav[aria-label='Component families']")
 
     # The menu is the parity capability catalog's eleven families, in catalog
-    # order. A family nobody can review is still listed, so the gap is visible.
+    # order. The A-K prefixes make that sequence identical to the alphabetical
+    # ascending order root AGENTS.md section 12 requires, so both are asserted.
+    labels = family_menu_labels(view)
+    assert labels == @family_menu_labels
+    assert labels == Enum.sort(labels)
+
+    # A family nobody can review is still listed, so the gap is visible.
     for {slug, family} <- [
           {"foundations", "Foundations"},
           {"page-structure", "Page structure"},

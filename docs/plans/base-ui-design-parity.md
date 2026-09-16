@@ -137,7 +137,7 @@ rather than being quietly reconciled.
 | FND-06 Icon language | Adopt adapted — searchable catalog; finish the migration | #719 |
 | LAY-01 Authentication shell | Keep Bilimbi | none |
 | LAY-02 Application shell | Adopt adapted — shipped in #711, confirmed live | none |
-| LAY-03 Page header | Adopt adapted — responsive stacking, pin slot, help slot | NAV-01 pin decision |
+| LAY-03 Page header | Adopt adapted — responsive stacking, pin slot, help slot | NAV-01 pin decision; shared-component edit by the integration owner, not Phase 5 |
 | LAY-04 Side panel | Adopt adapted | LAY-02 drawer mechanics, #719 |
 | LAY-05 Page geometry | Keep Bilimbi | FND-03, LAY-03 |
 | NAV-01 Menu tree and pins | Adopt adapted — pins become account state; `user_pins` is the sole store (steward, 2026-09-16) | unblocks LAY-03; adoption-URL question escalated |
@@ -179,10 +179,10 @@ rather than being quietly reconciled.
 | DAT-06 Record history | Keep Bilimbi — ownership split is strictly better | `history` icon name depends on GFX-02 |
 | CMP-01 Operational index | Keep Bilimbi on URL state and page sizes | settle one URL vocabulary before Phase 5 |
 | CMP-02 Create and edit form | Keep Bilimbi | `aria-describedby` belongs to INP-01 |
-| CMP-03 Detail page | Adopt adapted — one `detail_section` assembly on Bilimbi's archetype (steward, 2026-09-16) | DAT-01, FND-02, FND-03, LAY-03/CMP-06, INT-01, INT-02, DAT-03, GFX-02 |
+| CMP-03 Detail page | Adopt adapted — one `detail_section` assembly on Bilimbi's archetype (steward, 2026-09-16) | DAT-01, FND-02, FND-03, LAY-03, INT-01, INT-02, DAT-03, GFX-02 |
 | CMP-04 Destructive flow | Adopt adapted — take the acknowledge-input contract | OVR-01, OVR-02 |
 | CMP-05 Authentication pages | Equivalent | none |
-| CMP-06 Page header assembly | Adopt adapted — responsive stacking | none; integration owner, not Phase 5 |
+| CMP-06 Responsive and theme coverage | Adopt adapted — one recorded narrow-width and light/dark review per assembly, replacing ad hoc checks | CMP-01 to CMP-05; dark theme on the Lane B rows was not verified in Phase 0 |
 | GFX-01 Identity mark | Keep Bilimbi | none |
 | GFX-02 Icon assets | Adopt adapted — but reorder: register the missing names first | none for the registration fix |
 | GFX-03 Illustration | Not applicable | none |
@@ -234,8 +234,13 @@ products were read and the plan forbids treating existence as acceptance.
   Belimbing has no component either.
 - **INP-03** — Belimbing *removes* the native clear affordance Bilimbi keeps; there is
   nothing to adopt.
-- **OVR-01** — "Missing" understates. The shell drawer already implements `inert`,
-  `aria-modal` and backdrop mechanics; the work is to share it, not to build it.
+- **OVR-01** — "Missing" understates, and moving toward Belimbing would be a
+  regression. The shell drawer already implements `inert`, `aria-modal` and backdrop
+  mechanics; the work is to share it, not to build it. Lane B observed through
+  dispatched in-page events that Belimbing's shared modal does not move focus in, trap
+  it or return it, and that two demo dialogs could be open at once — read together with
+  the note below that Belimbing modal focus behaviour beyond dispatched events was not
+  verified.
 - **LAY-02, NAV-05** — the "Bilimbi now" cells describe pre-#711 state; both shipped.
 - **INT-04** — reduced motion is not adoptable; neither product has a contract.
 
