@@ -44,7 +44,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     |> render()
     |> LazyHTML.from_fragment()
     |> LazyHTML.query(
-      "#component-secondary-menu nav[aria-label='Component families'] > a > span > span:first-child"
+      "#component-secondary-menu nav[aria-label='Component families'] a > span > span:first-child"
     )
     |> Enum.map(&(&1 |> LazyHTML.text() |> String.trim()))
   end
@@ -156,9 +156,21 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-overlays", "No specimen yet")
 
     # The application shell is LAY-02, so it sits inside Page structure and
-    # keeps its own deep link.
+    # keeps its own deep link. The menu entry is nested under B rather than
+    # sitting between B and C as a flat sibling, so the nav's own children are
+    # the eleven families and the A-K sequence above describes every one of them.
     assert has_element?(view, "#component-page-structure #component-shell")
     assert has_element?(view, "#component-secondary-menu a[href='#component-shell']")
+
+    refute has_element?(
+             view,
+             "#component-secondary-menu nav[aria-label='Component families'] > #component-menu-shell"
+           )
+
+    assert has_element?(
+             view,
+             "#component-secondary-menu nav[aria-label='Component families'] > div > #component-menu-page-structure + #component-menu-shell"
+           )
 
     refute has_element?(view, "#component-catalog")
     assert has_element?(view, "#component-input-guidance", "Choice guidance")

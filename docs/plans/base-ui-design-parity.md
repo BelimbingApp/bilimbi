@@ -253,11 +253,17 @@ products were read and the plan forbids treating existence as acceptance.
 Not catalog work. These are user-facing faults in shipped code, listed so they are not
 lost inside a design ledger:
 
-- Three destructive controls fire with no confirmation at all — `remove_role`
-  (`core/user/.../show_live.ex:1109`), `remove_capability` (`:1260`) and
-  `remove_activity` (`core/company/.../show_live.ex:982`). Two of those revoke
-  authorization. 22 `data-confirm` attributes exist elsewhere, so the convention is
-  established and these are the exceptions.
+- Eight destructive controls fire with no confirmation at all. Four change
+  authorization, all in `core/user/.../show_live.ex`: `remove_role` (`:1109`),
+  `remove_capability` on a direct grant (`:1260`), `deny_capability` (`:1271`) and
+  `remove_capability` on a deny (`:1314`). `remove_capability` is listed twice
+  deliberately — it backs two separate controls, and confirming only the first
+  leaves the second live. Three remove dashboard content in
+  `web/.../dashboard_live.ex`: `remove-section` (`:609` and `:650`) and
+  `remove-widget` (`:723`). The eighth is `remove_activity`
+  (`core/company/.../show_live.ex:982`), a hand-written button rather than a shared
+  danger control. 22 `data-confirm` attributes across 17 files exist elsewhere, so
+  the convention is established and these are the exceptions.
 - `<.multi_select>` cannot be closed by Escape or by its own toggle, and its
   `aria-expanded` is the literal `"false"` at `components.ex:669` — it never changes,
   so assistive technology is told the panel is shut while it is open.
