@@ -77,7 +77,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#nav-admin-system-design-library-theme[aria-current='page']")
   end
 
-  test "Components uses a grouped secondary menu without resolved alternatives", %{
+  test "Components lists the eleven catalog families without resolved alternatives", %{
     conn: conn
   } do
     {:ok, view, _html} = open(conn, "/system/design-library/components")

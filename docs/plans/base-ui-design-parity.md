@@ -268,10 +268,12 @@ lost inside a design ledger:
 
 ##### Corrections to this document
 
-- Line 339 claims 73 glyph entries; `IconRegistry` holds 3 glyphs, 9 shell names and
+- This document's claim that "`IconRegistry` now carries 73 glyph entries and 49 named
+  actions on `main`" is wrong; `IconRegistry` holds 3 glyphs, 9 shell names and
   49 actions, with 44 raw `hero-*` strings still outside it.
-- `app.css:222` says menu typography matches Belimbing. Belimbing renders 14px/400;
-  Bilimbi renders 13px/350.
+- The `/* Menu typography & font colors matching Belimbing */` rule in
+  `apps/web/assets/css/app.css` says menu typography matches Belimbing. Belimbing
+  renders 14px/400; Bilimbi renders 13px/350.
 - The Design Library labels the sign-in mark 48px; production renders 36px.
 - The raw-palette guard in root `AGENTS.md` §12 greps `apps/*/lib`, which matches only
   `apps/web/lib`. The 24 module libraries — including `apps/base/ui/lib`, where the
