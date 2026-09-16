@@ -45,6 +45,8 @@ The identity baseline records the characteristics that parity work must preserve
 
 The catalog is organized by what a human is trying to review, not by Laravel or Phoenix implementation. The assessment is a starting point to verify in the live products; it is not an automatic decision to port every Belimbing component.
 
+Phase 0 verified every row against both live products. A row whose `Bilimbi now` or `Parity target` cell the evidence contradicted carries a [(contradicted)](#targets-the-evidence-contradicts) marker beside its ID: the original wording stays here as the record of what was accepted, and the correction is recorded once under [Targets the evidence contradicts](#targets-the-evidence-contradicts). Do not act on a marked row without reading it.
+
 | ID | Design element | Bilimbi now | Parity target |
 |---|---|---|---|
 | FND-01 | Semantic colours | Strong identity and semantic roles | Keep Bilimbi; verify light/dark contrast and role separation. |
@@ -54,7 +56,7 @@ The catalog is organized by what a human is trying to review, not by Laravel or 
 | FND-05 | Focus, motion and reduced motion | Partial | Define consistent focus visibility, transition purpose and reduced-motion behavior. |
 | FND-06 | Icon language and catalog | Registry exists; review is limited | Use Belimbing's established icon choices for equivalent actions, except logout, while rendering them through Bilimbi's icon component and registry. Add searchable visual review, empty result, copy and copied feedback. |
 | LAY-01 | Authentication shell | Exists | Compare first impression, responsive behavior, errors and recovery. |
-| LAY-02 | Application shell and account footer | Exists | Remove persistent company and tenant repetition. Put the current timezone and light/dark theme selectors in the top bar. Keep the user circle at the bottom left as the account and scope entry point; show an always-visible warning only for unusual or safety-critical scope. Match the best collapse, drawer and navigation-continuity behavior. |
+| LAY-02 [(contradicted)](#targets-the-evidence-contradicts) | Application shell and account footer | Exists | Remove persistent company and tenant repetition. Put the current timezone and light/dark theme selectors in the top bar. Keep the user circle at the bottom left as the account and scope entry point; show an always-visible warning only for unusual or safety-critical scope. Match the best collapse, drawer and navigation-continuity behavior. |
 | LAY-03 | Page width and page header | Shared primitives exist | Cover title, subtitle, action, pin, contextual help and narrow states. |
 | LAY-04 | Secondary side panel | Bespoke Design Library example | Establish one responsive page-local navigation pattern with desktop rail and mobile access. |
 | LAY-05 | Index, form and detail geometry | Partial conventions | Define complete assemblies rather than leaving every screen to compose them differently. |
@@ -62,13 +64,13 @@ The catalog is organized by what a human is trying to review, not by Laravel or 
 | NAV-02 | Tabs | Shared `<.tabs>` used by Schedule and Settings | Provide shared semantics, keyboard navigation, active state and URL/history rules. |
 | NAV-03 | Link dictionary and related-link groups | No shared contract | Adopt internal, anchor, external, new-tab and download behavior; mutations remain buttons. |
 | NAV-04 | Pagination | Shared component exists | Compare narrow layout, disabled states, page-size control, URL state and accessible labels. |
-| NAV-05 | User account and scope menu | Partial user footer exists | On user-circle activation, show signed-in name and identifier, current company and tenant, change password and sign out. Show scope switching only when more than one permitted scope exists. |
+| NAV-05 [(contradicted)](#targets-the-evidence-contradicts) | User account and scope menu | Partial user footer exists | On user-circle activation, show signed-in name and identifier, current company and tenant, change password and sign out. Show scope switching only when more than one permitted scope exists. |
 | ACT-01 | Buttons | Primary, secondary and destructive basics | Cover emphasis, compact size, disabled, loading, navigation and truthful completion. |
 | ACT-02 | Icon actions and groups | Basic icon button exists | Add grouping, context sizing, disabled/loading behavior and accessible tooltips. |
 | ACT-03 | Destructive entry and acknowledgement | Inconsistent screen patterns | Standardize consequence copy, confirmation and typed acknowledgement where risk requires it. |
 | INP-01 | Shared field shell | Generic input has labels, hints and errors | Standardize required, help, error, disabled, read-only, prefix and suffix placement. |
 | INP-02 | Text, email, URL, telephone, number and textarea | Available through the generic input | Complete state and sizing contracts and validate realistic long content. |
-| INP-03 | Search | Generic search type | Add clear, empty, loading and result-update behavior. |
+| INP-03 [(contradicted)](#targets-the-evidence-contradicts) | Search | Generic search type | Add clear, empty, loading and result-update behavior. |
 | INP-04 | Select, multi-select, checkbox and radio | Shared components for all four, including `<.radio_group>`; state coverage partial | Complete open/close, summary, no-options, outside-click, Escape and keyboard behavior. |
 | INP-05 | Date, time, datetime and integer entry | Mostly native generic inputs | Define tabular display, step controls, validation and locale/timezone behavior. |
 | INP-06 | Secret input | Password field only | Distinguish saved mask, reveal, replacement and explicit clearing. |
@@ -77,25 +79,25 @@ The catalog is organized by what a human is trying to review, not by Laravel or 
 | INP-09 | Segmented control | Missing | Add for short peer choices when a real Bilimbi workflow needs it. |
 | INT-01 | Inline text editing | Shared primitive exists | Complete F2/typing entry, Enter/blur save, Escape cancel, focus restore and error recovery. |
 | INT-02 | Inline select, combobox and textarea editing | Missing | Add after their underlying controls are accepted. |
-| INT-03 | Grouped fact editing | Missing | Support Apply/Cancel where facts must change atomically. |
-| INT-04 | Disclosure | No shared primitive | Define open/closed semantics, `aria-expanded`, keyboard behavior and reduced motion. |
+| INT-03 [(contradicted)](#targets-the-evidence-contradicts) | Grouped fact editing | Missing | Support Apply/Cancel where facts must change atomically. |
+| INT-04 [(contradicted)](#targets-the-evidence-contradicts) | Disclosure | No shared primitive | Define open/closed semantics, `aria-expanded`, keyboard behavior and reduced motion. |
 | INT-05 | Filter and period patterns | Repeated local compositions | Standardize the shared composition while keeping URL state and production meaning. |
 | INT-06 | Unsaved-change and template selection flows | Missing | Defer until a real Bilimbi workflow proves the need. |
 | FBK-01 | Inline alerts | Shared primitive exists | Verify status semantics, copy, contrast, icons and dismissibility. |
 | FBK-02 | Flash and notification behavior | Basic fixed flash | Define stacking, timing, sticky warning/error, manual dismissal and redirect continuity. |
 | FBK-03 | Validation, disabled and loading states | Partial | Make the states visibly distinct and prevent duplicate work. |
 | FBK-04 | Empty, permission, unavailable, error and recovery states | Library specimens exist | Establish reusable page and region patterns with truthful recovery. |
-| OVR-01 | Standard modal | Missing | Add accessible open, close, Escape, backdrop, focus containment and focus return. |
+| OVR-01 [(contradicted)](#targets-the-evidence-contradicts) | Standard modal | Missing | Add accessible open, close, Escape, backdrop, focus containment and focus return. |
 | OVR-02 | Confirmation modal | Missing | Add consequence-first confirmation without copying Belimbing's accessibility gaps. |
 | OVR-03 | Inspector drawer | Missing | Add only for a real inspector workflow; cover mobile width, resizing and remembered width. |
 | OVR-04 | Tooltip and popover behavior | No shared contract | Define only where labels or contextual actions genuinely require it. |
 | DAT-01 | Cards, facts and dense summaries | Card and ad hoc facts exist | Standardize metadata hierarchy and compact summary composition. |
 | DAT-02 | Badges and status treatments | Basic badge exists | Complete neutral, information and status roles without using brand as status. |
 | DAT-03 | Tables and sortable headings | Shared table exists | Cover caption, overflow, sticky header, hover, stripes, empty state, footer and truthful sorting. |
-| DAT-04 | Absolute and relative time | Absolute datetime exists | Add relative time only with the absolute value available. |
-| DAT-05 | Statistics and stat strips | Missing | Add when a dashboard or operational summary supplies a real use case. |
+| DAT-04 [(contradicted)](#targets-the-evidence-contradicts) | Absolute and relative time | Absolute datetime exists | Add relative time only with the absolute value available. |
+| DAT-05 [(contradicted)](#targets-the-evidence-contradicts) | Statistics and stat strips | Missing | Add when a dashboard or operational summary supplies a real use case. |
 | DAT-06 | Record history, timeline and comparisons | Local or missing | Keep specialist behavior with the owning workflow; share only the generic presentation seam. |
-| CMP-01 | Operational index page | Partial specimen | Standardize header, filters, table, actions, empty/loading/error and pagination as one flow. |
+| CMP-01 [(contradicted)](#targets-the-evidence-contradicts) | Operational index page | Partial specimen | Standardize header, filters, table, actions, empty/loading/error and pagination as one flow. |
 | CMP-02 | Form page | Partial specimen | Standardize field rhythm, validation, save/cancel, loading, success and unsaved navigation. |
 | CMP-03 | Detail and settings page | Partial conventions | Standardize facts, inline/grouped editing, related navigation and permission states. |
 | CMP-04 | Destructive workflow | No complete specimen | Show entry, consequence, acknowledgement, in-flight, success, failure and recovery together. |
