@@ -3,7 +3,7 @@
 **Status:** In progress — application shell, impersonation audit actor and the named icon vocabulary are merged to `main`; Design Library specimen separation, state coverage, drift guards and live timestamp display are implemented and in review
 **Last Updated:** 2026-09-15
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`
 
 ## Problem Essence
 
@@ -13,7 +13,7 @@ Bilimbi has a recognisable identity, but its shared UI has less breadth and less
 
 Bilimbi reaches parity with the useful user-visible capabilities and interaction quality of Belimbing while remaining unmistakably Bilimbi. Parity means equivalent purpose, states, keyboard behavior, responsive behavior, feedback, recovery and production usefulness; it does not mean matching Blade components, CSS values, route names or pixels.
 
-The Design Library is the visual and interaction review surface for this work. Astra compares each catalog item against the live Belimbing reference, records its disposition, implements it through shared Base UI where appropriate, exercises it in the live library, and verifies adoption by at least one real screen before calling it complete. The user has delegated routine design judgment and does not need to approve each component or family.
+The Design Library is the visual and interaction review surface for this work. The design steward compares each catalog item against the live Belimbing reference, records its disposition, implements it through shared Base UI where appropriate, exercises it in the live library, and verifies adoption by at least one real screen before calling it complete. The user has delegated routine design judgment and does not need to approve each component or family.
 
 The campaign is structured so audits and production adoption can run in parallel without several agents redefining the same shared primitive at once.
 
@@ -112,7 +112,7 @@ Every catalog item receives one disposition after visual and interaction review:
 - **Keep Bilimbi** — Bilimbi is already the better result; document and enforce it.
 - **Equivalent** — capability and quality already match; fill only missing evidence.
 - **Adopt adapted** — take Belimbing's useful behavior but render it through Bilimbi identity.
-- **Steward review** — Astra compares live alternatives, chooses the best supported treatment within K01–K09 and records the reason; this is temporary audit work, not a user approval queue.
+- **Steward review** — the design steward compares live alternatives, chooses the best supported treatment within K01–K09 and records the reason; this is temporary audit work, not a user approval queue.
 - **Not applicable** — the capability has no honest Bilimbi use; record why and do not build it.
 
 The ledger is campaign tracking, not a permanent second design source. Accepted outcomes move to the live Design Library, Design Spec and shared implementation under the same catalog ID.
@@ -281,11 +281,16 @@ A text-only inventory is easy for agents but impossible to validate visually. A 
 
 One serial agent would be slow, while several agents concurrently changing theme and shared component files would recreate drift through merge conflict. The recommended direction is staged parallelism: audit families concurrently, use one integration owner for shared Base UI and design authority, then migrate independent module screens concurrently after each shared contract stabilizes.
 
-### Astra owns routine design acceptance
+### The design steward owns routine design acceptance
 
-Component-by-component human selection would interrupt the authorized campaign. An unrestricted whole-library rewrite would hide accumulated decisions and weaken verification. The accepted direction is autonomous Astra stewardship in complete, bounded slices: inspect Belimbing visually and in source, implement through Bilimbi's shared foundations, verify the live specimen and a production workflow, then record evidence before proceeding. User review remains available without being a dependency.
+Component-by-component human selection would interrupt the authorized campaign. An unrestricted whole-library rewrite would hide accumulated decisions and weaken verification. The accepted direction is autonomous steward stewardship in complete, bounded slices: inspect Belimbing visually and in source, implement through Bilimbi's shared foundations, verify the live specimen and a production workflow, then record evidence before proceeding. User review remains available without being a dependency.
 
-Preserve K01–K09 and the user's explicit shell and icon requirements. Escalate only when the work requires a new business, security or durable data-contract decision outside the accepted scope. Routine geometry, interaction, icon mapping, responsive layout and accessibility judgments belong to Astra. Shared-file ownership remains singular; delegated evidence and module adoption may proceed in parallel.
+The steward is a role, not one agent. Astra (`gpt-6-astra`) held it through
+2026-09-15; Fable (`claude-fable-5-1`) holds it from 2026-09-16 at the user's
+direction. Completed-work attributions below record whoever did the work at the
+time and are historical facts rather than a statement of the current role.
+
+Preserve K01–K09 and the user's explicit shell and icon requirements. Escalate only when the work requires a new business, security or durable data-contract decision outside the accepted scope. Routine geometry, interaction, icon mapping, responsive layout and accessibility judgments belong to the design steward. Shared-file ownership remains singular; delegated evidence and module adoption may proceed in parallel.
 
 The first parity slice owns `LAY-02`, `NAV-05`, shell-related `FND-06`, timezone/theme utilities and desktop, collapsed-sidebar and narrow-drawer states. Subsequent slices follow dependency order rather than waiting for every family audit to finish.
 
@@ -296,13 +301,13 @@ Keeping company and tenant in the top strip makes known context compete with the
 ## Public Contract
 
 - Belimbing is reference evidence, not visual or implementation authority.
-- Bilimbi identity IDs `K01`–`K09` are fixed constraints for parity work; Astra resolves routine design choices within them.
+- Bilimbi identity IDs `K01`–`K09` are fixed constraints for parity work; the design steward resolves routine design choices within them.
 - Ordinary company and tenant context is available through the bottom-left user account menu, not repeated in the top strip. Platform-operator, impersonated and other safety-critical scope remains visibly disclosed while active.
 - The top bar exposes the current timezone and light/dark theme selectors. What a selection must do — apply immediately, persist for the signed-in user and render truthfully — is stated once in `DESIGN.md`'s application shell section.
 - Equivalent actions use Belimbing's established icon choices through Bilimbi's icon registry, with logout as the explicit exception.
 - Every parity issue names the catalog IDs it owns, its dependencies, affected routes, owned files and acceptance evidence.
 - A catalog item is complete only when its disposition is recorded, the real component is shown in the Design Library, applicable states and keyboard behavior are tested, narrow and theme behavior are reviewed, and one production screen adopts it.
-- Astra accepts routine design choices from visual, interaction and production evidence; component and family completion does not require human selection. Unresolved business, security or durable data-contract decisions remain explicit blockers for the affected work only.
+- The design steward accepts routine design choices from visual, interaction and production evidence; component and family completion does not require human selection. Unresolved business, security or durable data-contract decisions remain explicit blockers for the affected work only.
 - Shared Base UI, theme, Design Spec and the parity ledger have one integration owner at a time.
 - Audit agents and module rollout agents do not edit those shared authority files concurrently.
 - Feature modules use semantic Base UI contracts and do not import Belimbing assets, CSS, Laravel names or private design-library markup.
@@ -324,16 +329,16 @@ Goal: Establish one current identity and catalog before any parity implementatio
 - [x] Give each row its initial disposition and dependency without treating component existence as acceptance. `{claude-opus-datetime-1/claude-opus-5}`
 - [x] Create campaign #709 and shell child #710; create subsequent children when their slice boundaries are verified. `{crewmate/gpt-6}`
 
-Validation: A new agent can tell what must remain Bilimbi, what is being compared, what is already equivalent, what Astra decides and which business/security/data-contract questions require escalation.
+Validation: A new agent can tell what must remain Bilimbi, what is being compared, what is already equivalent, what the design steward decides and which business/security/data-contract questions require escalation.
 
 ### Phase 1 — Make the Design Library the parity workbench
 
-Goal: Let Astra or a product reviewer inspect one family at a time without a long, conflicting page.
+Goal: Let the design steward or a product reviewer inspect one family at a time without a long, conflicting page.
 
 - [ ] Align the secondary menu with the catalog families: Foundations, Page Structure, Navigation and Links, Actions, Inputs, Interaction Patterns, Feedback and States, Overlays, Data Display, Composite Patterns and Graphics.
 - [ ] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source.
 - [ ] Show the current Bilimbi component in every meaningful state for the active family.
-- [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record Astra's accepted disposition and rationale.
+- [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record the design steward's accepted disposition and rationale.
 - [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
 
 Affected pages: `/system/design-library`, `/system/design-library/components`, `/system/design-library/graphic`, `/system/design-library/design-spec`
@@ -375,7 +380,7 @@ Goal: Prove the primitives work together before broad migration.
 - [ ] Review all three at desktop and narrow widths, light and dark themes, keyboard only, loading, error and permission states.
 - [ ] Correct composition problems in the shared layer before starting broad rollout.
 
-Validation: Astra's browser and interaction review confirms that parity improves real work and still looks and feels like Bilimbi, with recorded evidence for each assembly.
+Validation: the design steward's browser and interaction review confirms that parity improves real work and still looks and feels like Bilimbi, with recorded evidence for each assembly.
 
 ### Phase 5 — Parallel production rollout
 
