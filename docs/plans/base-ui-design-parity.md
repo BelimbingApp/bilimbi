@@ -1,8 +1,8 @@
 # Base UI Design Parity
 
-**Status:** In progress — application shell, impersonation audit actor and the named icon vocabulary are merged to `main`; Design Library specimen separation, state coverage, drift guards and live timestamp display are implemented and in review
+**Status:** In progress — application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display are all merged to `main`; the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
 **Last Updated:** 2026-09-16
-**Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
+**Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
 **Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`
 
 ## Problem Essence
@@ -120,8 +120,12 @@ The ledger is campaign tracking, not a permanent second design source. Accepted 
 #### Recorded dispositions (Phase 0, 2026-09-16)
 
 All 57 rows verified against both live products. Bilimbi was read at `ff5a5a0` on a
-private instance; Belimbing at `local.blb.lara`. Each row's full evidence, with the
-verification method stated per finding, is in the Phase 0 lane reports.
+private instance; Belimbing at `local.blb.lara`. The per-row working notes were not
+kept as durable artifacts, so this document is the whole record: every row carries its
+disposition and dependency, and the verification method is stated here only where the
+evidence contradicted the catalog's target, surfaced a shipped defect, or could not be
+obtained at all — the three subsections below. Auditing any other row means
+re-deriving it from those two builds.
 
 A disposition here is a starting position with evidence behind it, not an approval to
 build. Where the evidence contradicted the catalog's own target, the row says so
@@ -270,16 +274,23 @@ lost inside a design ledger:
 - `<.header>` never stacks; its actions are clipped and unreachable at 420px, where
   Belimbing's header wraps.
 - `:info` flashes render with success (green) roles.
+- The Design Library labelled the sign-in mark 48px and rendered it at 48px, while the
+  credential layout renders it at 36px. Fixed in this change: the specimen now renders
+  and labels 36px, so the mark section shows the size actually in use.
 
 ##### Corrections to this document
 
-- This document's claim that "`IconRegistry` now carries 73 glyph entries and 49 named
-  actions on `main`" is wrong; `IconRegistry` holds 3 glyphs, 9 shell names and
-  49 actions, with 44 raw `hero-*` strings still outside it.
+- The Icon vocabulary slice below claimed `IconRegistry` carried 73 glyph entries.
+  Corrected in place: it holds 3 glyph entries, 9 shell names and 49 named actions.
+
+##### Inaccurate claims found in other project files
+
+Not catalog work either, and not user-facing. Recorded so the next agent to touch
+these files does not inherit the claim:
+
 - The `/* Menu typography & font colors matching Belimbing */` rule in
   `apps/web/assets/css/app.css` says menu typography matches Belimbing. Belimbing
   renders 14px/400; Bilimbi renders 13px/350.
-- The Design Library labels the sign-in mark 48px; production renders 36px.
 - The raw-palette guard in root `AGENTS.md` §12 greps `apps/*/lib`, which matches only
   `apps/web/lib`. The 24 module libraries — including `apps/base/ui/lib`, where the
   shared components live — sit one level deeper and are not scanned. Both globs
@@ -403,8 +414,13 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     mistaken for a catalog ID. Letters also need no zero-padding, so a twelfth
     family cannot silently break the sort the way unpadded numbers would.
 
-- [ ] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source.
-- [ ] Show the current Bilimbi component in every meaningful state for the active family.
+- [x] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source. `{codex-sol-specimens-1/gpt-5.6-sol}`
+- [x] Show the current Bilimbi component in every meaningful state for the active family. `{codex-luna-states-1/gpt-5.6-luna}`
+
+  Both landed on 2026-09-15 and neither finished the job: the `:design_library_drift`
+  guards still report four failures on `main`, so they stay excluded from the default
+  run. Correcting those four is the next Phase 1 work, and this branch left them
+  unchanged.
 - [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record the design steward's accepted disposition and rationale.
 - [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
 
@@ -550,7 +566,7 @@ Goal: Give familiar actions named entries in the icon registry so call sites nam
 - [x] Populate `IconRegistry` with the named action vocabulary, keeping logout as the recorded Bilimbi exception. `{codex-terra-icons-1/gpt-5.6-terra}`
 - [x] Run the shipping gate and land the change. `{codex-terra-icons-1/gpt-5.6-terra}`
 
-`IconRegistry` now carries 73 glyph entries and 49 named actions on `main`, against three glyph entries before this slice.
+`IconRegistry` now carries 49 named actions on `main`, alongside the 3 Bilimbi glyph entries and 9 shell names it already had. The slice added the action vocabulary; the glyph count is unchanged by it.
 
 Not delivered by this slice, and still open under FND-06 and GFX-02: the searchable visual icon review with empty-result, copy and copied feedback. The registry holds the vocabulary; no review surface presents it yet.
 
@@ -558,9 +574,12 @@ Deferred: registry names are never proven to resolve — the equality test resta
 
 Delivery: https://github.com/BelimbingApp/bilimbi/pull/715 merged on 2026-09-15, closing #713.
 
-### In review — not yet merged
+### Design Library workbench slices — Issues #718 to #721
 
-These four are implemented with open pull requests. Their catalog rows above stay unticked until they land.
+Goal: Show real components in real states on the Design Library, and fail a test when
+it stops doing so.
+
+All four merged on 2026-09-15 and closed their issues:
 
 | Issue | Work | PR |
 |---|---|---|
@@ -569,4 +588,11 @@ These four are implemented with open pull requests. Their catalog rows above sta
 | #720 | Design Library missing component states | https://github.com/BelimbingApp/bilimbi/pull/716 |
 | #721 | Shell display controls with live-following timestamps | https://github.com/BelimbingApp/bilimbi/pull/717 |
 
-The drift guards in #722 land excluded from the default test run and from `mix precommit`, because they report specimens #719 and #720 are still correcting. Moving them into the default run is tracked separately and is blocked on those two. #722 merging does not mean the guards are active.
+Not finished by #719 and #720: the `:design_library_drift` guards report four failures
+on `main`, so #722's guards land excluded from the default test run and from
+`mix precommit`. Moving them into the default run is blocked on those four and is the
+next Phase 1 work. #722 being merged does not mean the guards are active.
+
+### In review — not yet merged
+
+Nothing is in review. The section is kept because a later slice will need it.
