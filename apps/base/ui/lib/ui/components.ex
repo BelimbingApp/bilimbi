@@ -36,9 +36,9 @@ defmodule Bilimbi.Base.UI.Components do
   @doc """
   Renders one flash message.
 
-  The message is the flash entry for `kind`, or the inner block. Its role
-  follows its severity: `:success` and `:info` are `role="status"`, a polite
-  announcement; `:warning` and `:error` are `role="alert"`, an assertive one.
+  The message is the flash entry for `kind`, or the inner block. Every
+  severity is `role="alert"`; announcing success and info politely instead
+  is deliberate follow-up work, not part of this contract.
   `:success` and `:info` share the success colouring and differ by icon: most
   `put_flash(:info, ...)` call sites report a completed write, so the two
   cannot be told apart by colour until those callers move to `:success`.
@@ -81,7 +81,7 @@ defmodule Bilimbi.Base.UI.Components do
       :if={msg = render_slot(@inner_block) || Phoenix.Flash.get(@flash, @kind)}
       id={@id}
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
-      role={flash_role(@kind)}
+      role="alert"
       class="w-full"
       {@rest}
     >
@@ -105,11 +105,6 @@ defmodule Bilimbi.Base.UI.Components do
     </div>
     """
   end
-
-  # A polite announcement for an outcome the reader can take in at their own
-  # pace; an assertive one for a message they must act on.
-  defp flash_role(kind) when kind in [:success, :info], do: "status"
-  defp flash_role(kind) when kind in [:warning, :error], do: "alert"
 
   defp status_icon(:info), do: "information"
   defp status_icon(:success), do: "success"

@@ -47,11 +47,8 @@ defmodule Bilimbi.Base.UI.ComponentsFlashTest do
     name
   end
 
-  test "success and info are polite statuses; warning and error are assertive alerts" do
-    assert role(:success) == "status"
-    assert role(:info) == "status"
-    assert role(:warning) == "alert"
-    assert role(:error) == "alert"
+  test "every severity is announced as an alert" do
+    for kind <- @kinds, do: assert(role(kind) == "alert")
   end
 
   test "each severity renders only its own message" do

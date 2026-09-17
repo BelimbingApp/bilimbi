@@ -544,7 +544,7 @@ defmodule Bilimbi.Base.UI.Layouts do
   disappear on a timer. The reconnect notices are errors and keep that rule.
 
   The group is a permanent polite live region, so a message inserted into it
-  is announced; each message also carries the role its severity implies.
+  is announced; every message is an alert, whatever its severity.
 
   The shell's preference status line under the top bar is deliberately not
   part of this outlet: see the Design Library's Feedback section.
