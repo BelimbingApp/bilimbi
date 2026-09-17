@@ -6,7 +6,9 @@ This module document describes Core Compatibility's owned coordinator behavior;
 it does not define a second database architecture.
 
 `apps/core/compatibility/` is the complete physical boundary for the required
-`core/compatibility` module. Its public API is `Bilimbi.Core.Compatibility`.
+`core/compatibility` module. Its public API is `Bilimbi.Core.Compatibility` for
+the schema lifecycle and `Bilimbi.Core.Compatibility.Cutover` for the one-shot
+stored-value remediation described below.
 
 The module coordinates fresh migration, structural verification, and explicit
 adoption for the currently installed Base and Core modules. It owns no business
@@ -30,6 +32,24 @@ module before choosing strict timestamp ordering. A class-valid gap may occur
 when a later compatible baseline was adopted while an earlier Bilimbi-only
 migration remains pending; arbitrary, foreign, or class-non-prefix ledgers fail
 closed.
+
+## Cutover value remediation
+
+Adoption proves shape; it cannot prove meaning. Some adopted rows load cleanly
+and then behave wrongly because Bilimbi reads the stored value differently:
+`/admin/...` URLs in `user_pins` and notification payloads, `heroicon-` icon
+names, and grants naming capabilities Bilimbi does not declare.
+`Bilimbi.Core.Compatibility.Cutover`, driven by `mix bilimbi.cutover.remap`,
+is the one grouped step that remediates those values, run once after adoption
+and before traffic. Its place in the operational sequence belongs to
+[Bilimbi Database Architecture](../../../../docs/architecture/database.md);
+the exact cases, the counting rules, and the residue contract are documented
+on the `Cutover` moduledoc.
+
+Nothing is deleted. For the values the step must not decide on the operator's
+behalf — an undeclared grant, a pin whose URL has no Bilimbi route — the
+report naming each affected row is the entire remedy, so that report, not the
+changed count, is what a cutover operator reads.
 
 ## Platform baseline failure evidence
 

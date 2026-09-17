@@ -189,6 +189,7 @@ The normal operational commands are:
 | `mix bilimbi.rollback` | Roll back installed migrations using all discovered migration paths and the shared ledger. |
 | `mix bilimbi.schema.verify` | Read-only verification of owned structure, contributions, and live-data invariants. |
 | `mix bilimbi.schema.adopt` | Re-verify an existing Belimbing schema and record only compatible-baseline versions without executing their DDL. |
+| `mix bilimbi.cutover.remap` | Remap adopted Belimbing stored values Bilimbi reads differently, and report the residue. Run once at cutover, after adoption. |
 | `mix bilimbi.seeds.run` | Run installed production seed providers through the separate production-seed ledger. |
 
 Run migrations through these Bilimbi tasks rather than a single module path.

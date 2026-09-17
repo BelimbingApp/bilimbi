@@ -1,12 +1,12 @@
 defmodule Bilimbi.Core.Compatibility.CutoverTest do
   use Bilimbi.Base.Database.DataCase, async: false
 
-  alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Authz.TestFixtures, as: AuthzFixtures
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
-  alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
+  alias Bilimbi.Base.Repo
   alias Bilimbi.Core.Compatibility.Cutover
   alias Bilimbi.Core.User.Pin
+  alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias Ecto.Adapters.SQL
 
   describe "classify_url/1" do
@@ -412,7 +412,7 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
       assert step.examined == 606
       assert step.changed == 601
 
-      assert notification_count("%\"url\":\"/companies\"%") == 600
+      assert notification_count(~s(%"url":"/companies"%)) == 600
       assert notification_count("%/admin/companies%") == 0
     end
 

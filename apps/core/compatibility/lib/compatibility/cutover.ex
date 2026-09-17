@@ -165,27 +165,25 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
     normalized = Pin.normalize_url(url)
     {path, query} = split_path_query(normalized)
 
-    cond do
-      known_bilimbi_path?(path) ->
-        {:identity, normalized}
+    if known_bilimbi_path?(path) do
+      {:identity, normalized}
+    else
+      case remap_path(path) do
+        {:ok, mapped_path} when query == "" ->
+          if known_bilimbi_path?(mapped_path),
+            do: {:mapped, mapped_path},
+            else: {:unmappable, normalized}
 
-      true ->
-        case remap_path(path) do
-          {:ok, mapped_path} when query == "" ->
-            if known_bilimbi_path?(mapped_path),
-              do: {:mapped, mapped_path},
-              else: {:unmappable, normalized}
+        {:ok, mapped_path} ->
+          candidate = mapped_path <> "?" <> query
 
-          {:ok, mapped_path} ->
-            candidate = mapped_path <> "?" <> query
+          if known_bilimbi_path?(mapped_path),
+            do: {:mapped, candidate},
+            else: {:unmappable, normalized}
 
-            if known_bilimbi_path?(mapped_path),
-              do: {:mapped, candidate},
-              else: {:unmappable, normalized}
-
-          :error ->
-            {:unmappable, normalized}
-        end
+        :error ->
+          {:unmappable, normalized}
+      end
     end
   end
 
@@ -749,9 +747,13 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
   rescue
     e in Postgrex.Error ->
       if e.postgres && e.postgres.code in @missing_table_codes do
-        raise Error,
-              "cutover remap needs #{table} in schema #{context.prefix}, which is absent. " <>
-                "Run after mix bilimbi.schema.adopt on a verified database; never remap values on an unverified schema."
+        reraise Error,
+                [
+                  message:
+                    "cutover remap needs #{table} in schema #{context.prefix}, which is absent. " <>
+                      "Run after mix bilimbi.schema.adopt on a verified database; never remap values on an unverified schema."
+                ],
+                __STACKTRACE__
       else
         reraise e, __STACKTRACE__
       end
