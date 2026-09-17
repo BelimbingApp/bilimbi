@@ -211,7 +211,7 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
     # technology because the control's own `required` attribute already
     # announces it; a raw "*" would be read aloud as "star".
     assert label =~ ~s(<span aria-hidden="true">*</span>)
-    assert html =~ ~s(<input) and html =~ "required"
+    assert control_tag(html, "f") =~ ~r/\srequired(\s|=|>|\/)/
   end
 
   test "an optional field carries no required marker" do
