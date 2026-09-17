@@ -123,7 +123,11 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
 
   @impl true
   def handle_async(:delete_employee_type, {:ok, :ok}, socket) do
-    socket = put_flash(socket, :info, "Employee type deleted.")
+    socket =
+      socket
+      |> assign(:deleting_type_id, nil)
+      |> put_flash(:info, "Employee type deleted.")
+
     load_page(socket, socket.assigns.index_state)
   end
 
@@ -227,7 +231,6 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
         {:noreply,
          socket
          |> assign(:index_state, state)
-         |> assign(:deleting_type_id, nil)
          |> assign(:employee_types_page, page)
          |> assign(:employee_types_count, page.total_entries)
          |> assign(:filters_form, to_form(filters_form_params(state), as: :filters))

@@ -285,10 +285,11 @@ defmodule Bilimbi.Base.UI.Components do
   label still names the action so assistive technology can say what is
   pending. `busy` is a button state here too, and raises on a link.
 
-  `phx-disable-with` is rejected. LiveView implements it by replacing the
-  control's text, which on an icon-only action deletes the glyph and restores
-  an empty string, leaving an empty well behind. Use `busy` for a wait the
-  server knows about; a plain one-round-trip `phx-click` needs no adornment.
+  `phx-disable-with` does not belong here. LiveView implements it by replacing
+  the control's text, which on an icon-only action deletes the glyph and
+  restores an empty string, leaving an empty well behind. Use `busy` for a
+  wait the server knows about; a plain one-round-trip `phx-click` needs no
+  adornment.
   """
   attr(:icon, :string, required: true)
   attr(:label, :string, required: true)
@@ -302,17 +303,14 @@ defmodule Bilimbi.Base.UI.Components do
   )
 
   attr(:rest, :global,
-    include: ~w(href navigate patch method download disabled type name value title)
+    include: ~w(href navigate patch method download disabled type name value title),
+    doc:
+      "`phx-disable-with` is incompatible with an icon-only action: LiveView " <>
+        "implements it by replacing the control's text content, which deletes the " <>
+        "glyph and restores an empty string. Use `busy` instead."
   )
 
   def icon_button(%{rest: rest} = assigns) do
-    if Map.has_key?(rest, :"phx-disable-with") do
-      raise ArgumentError,
-            "phx-disable-with replaces a control's text, which on an icon-only action " <>
-              "deletes its glyph and restores an empty string. Use busy for a wait the " <>
-              "server knows about, or leave a one-round-trip click unadorned."
-    end
-
     assigns =
       assigns
       |> assign(:control_class, [

@@ -592,11 +592,11 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   is reserved for orientation and selection, never an action or status. Async actions
   must show in-flight state, reject duplicate work, and truthfully report the data
   outcome and recovery: `phx-disable-with` covers one socket round trip, which
-  `app.js` mirrors onto `aria-busy`. It swaps the control's text, so it belongs on
-  text controls only and `<.icon_button>` rejects it. A wait the server knows about
-  (the sign-in handoff, an async delete) is `<.button busy>` or
-  `<.icon_button busy>`, which disables the control, marks it and announces
-  `aria-busy`.
+  `app.js` mirrors onto `aria-busy`. It swaps the control's text, so it belongs
+  on text controls only and never on `<.icon_button>`, whose glyph it would
+  delete. A wait the server knows about (the sign-in handoff, an async delete)
+  is `<.button busy>` or `<.icon_button busy>`, which disables the control,
+  marks it and announces `aria-busy`.
 - **Compact actions:** Use `<.icon_button>` for familiar repeated secondary
   actions in tables and toolbars. Inline icon controls are `size-6` (24px targets); table and
   toolbar icon controls are `size-7`. Every icon-only action has a truthful
