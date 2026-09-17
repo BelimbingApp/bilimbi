@@ -233,7 +233,7 @@ products were read and the plan forbids treating existence as acceptance.
   `page` in the URL and offers 10/20/50/100 page sizes; Bilimbi already mandates
   25/50/100/300 with full URL state. One shipped exception: `/audit/mutations`
   hand-writes a Previous/Next pager instead of `<.pagination>` (Lane A), a Phase 5
-  migration rather than an extraction source.
+  migration, not a pattern to copy.
 - **DAT-05** — "Missing" is wrong. Five stat cards ship on `/dashboard`, duplicated
   into ten markup blocks with 65 arbitrary-value classes.
 - **DAT-04** — relative time already ships in notifications, in a bare `<span>` with
@@ -253,7 +253,7 @@ products were read and the plan forbids treating existence as acceptance.
   focus containment (Lane B), so the shared modal has two adopters waiting.
 - **LAY-02, NAV-05** — the "Bilimbi now" cells describe pre-#711 state; both shipped.
 - **INT-04** — reduced motion is not adoptable; neither product has a contract.
-- **NAV-01** — "reorder" in the target has no observed counterpart in either product's
+- **NAV-01** — "reorder" in the target has no observed counterpart in Belimbing's
   navigation; pin-to-top covers the keep-favourites-handy need on both sides (Lane A).
   Dropped from parity acceptance rather than built to. Bilimbi does ship pinned drag
   reordering in the shell today — mouse-only, and saved to `localStorage` like the pins
