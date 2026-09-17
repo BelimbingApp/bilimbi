@@ -369,6 +369,11 @@ defmodule Bilimbi.Base.UI.Components do
     control with the generic noun, as `true` does. Passing a truthy `reveal` to
     an input of any type other than `password` raises.
 
+    Supported: a value the person is typing, or has just entered, in this form.
+    Not supported: revealing a secret the server already holds -- a saved mask
+    or a stored key. Do not bind a stored secret into a revealable field; its
+    plaintext is in the rendered HTML, and the control puts it on screen.
+
     A revealed field submits as `type="text"`, which makes its value eligible
     for browser form history and autofill storage; a `password`-typed field is
     excluded from both. Keeping a revealed secret out of the browser profile
