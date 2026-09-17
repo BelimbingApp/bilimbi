@@ -311,6 +311,10 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
     end
   end
 
+  def handle_event("clear_notice", _params, socket) do
+    {:noreply, assign(socket, :notice, nil)}
+  end
+
   def handle_event("sort_addresses", params, socket) do
     sort_col = params["sort_by"] || params["sort"] || "label"
     current_dir = socket.assigns.addresses_sort_dir
@@ -374,19 +378,29 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
   attr(:id, :string, required: true)
   attr(:notice, :any, required: true)
+  attr(:target, :any, required: true)
 
   defp panel_notice(assigns) do
     ~H"""
     <div
       :if={@notice}
       id={@id}
+      role={if elem(@notice, 0) == :error, do: "alert", else: "status"}
       class={[
-        "mb-3 rounded-lg border px-3 py-2 text-sm",
+        "mb-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm",
         elem(@notice, 0) == :info && "border-line bg-brand-surface text-ink",
         elem(@notice, 0) == :error && "border-danger/40 bg-surface text-danger"
       ]}
     >
-      {elem(@notice, 1)}
+      <span class="flex-1">{elem(@notice, 1)}</span>
+      <.icon_button
+        id={"#{@id}-dismiss"}
+        icon="close"
+        label="Dismiss notice"
+        context={:inline}
+        phx-click="clear_notice"
+        phx-target={@target}
+      />
     </div>
     """
   end
@@ -395,7 +409,12 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
   def render(assigns) do
     ~H"""
     <div id={@id} class="contents">
-      <.panel_notice :if={not @show_attach_modal} id={"#{@id}-notice"} notice={@notice} />
+      <.panel_notice
+        :if={not @show_attach_modal}
+        id={"#{@id}-notice"}
+        notice={@notice}
+        target={@myself}
+      />
           <!-- Card 4: Attached Addresses -->
           <.card id="addresses-card">
             <div class="p-5 sm:p-6 space-y-4">
@@ -719,7 +738,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
         on_cancel={JS.push("close_attach_modal", target: @myself)}
       >
         <:description>Select an address from the company to attach to this employee.</:description>
-        <.panel_notice id={"#{@id}-notice"} notice={@notice} />
+        <.panel_notice id={"#{@id}-notice"} notice={@notice} target={@myself} />
             <.form
               for={@attach_form}
               phx-submit="attach_address" phx-target={@myself}

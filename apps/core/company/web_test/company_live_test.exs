@@ -652,6 +652,12 @@ defmodule BilimbiWeb.CompanyLiveTest do
                "Address created and attached."
              )
 
+      # A success notice is announced politely, and the user can dismiss it.
+      assert has_element?(view, ~s(#company-addresses-panel-notice[role="status"]))
+
+      view |> element("#company-addresses-panel-notice-dismiss") |> render_click()
+      refute has_element?(view, "#company-addresses-panel-notice")
+
       view |> element("#btn-open-create-address") |> render_click()
       assert_modal_dialog(view, "company-create-address-modal", "Create & Attach Address")
       refute has_element?(view, "#company-addresses-panel-notice")
@@ -692,6 +698,14 @@ defmodule BilimbiWeb.CompanyLiveTest do
         }
       )
       |> render_submit()
+
+      # The refusal is announced assertively from inside the still-open dialog,
+      # because the page behind a modal dialog is inert.
+      assert has_element?(
+               view,
+               ~s(dialog#company-create-address-modal #company-addresses-panel-notice[role="alert"]),
+               "You do not have permission to edit companies."
+             )
 
       # No attachment and no address row: the write never reached the store.
       {:ok, attached} = Bilimbi.Core.Address.list_company_attached_addresses(scope, 73)

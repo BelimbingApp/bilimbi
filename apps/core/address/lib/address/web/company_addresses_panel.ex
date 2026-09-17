@@ -417,6 +417,10 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
      |> assign_address_location_options(params)}
   end
 
+  def handle_event("clear_notice", _params, socket) do
+    {:noreply, assign(socket, :notice, nil)}
+  end
+
   def handle_event("save_create_address", %{"address" => incoming}, socket) do
     if can_manage?(socket) do
       {params, auto_location} = address_location_params(socket, incoming)
@@ -520,19 +524,29 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
 
   attr(:id, :string, required: true)
   attr(:notice, :any, required: true)
+  attr(:target, :any, required: true)
 
   defp panel_notice(assigns) do
     ~H"""
     <div
       :if={@notice}
       id={@id}
+      role={if elem(@notice, 0) == :error, do: "alert", else: "status"}
       class={[
-        "mb-3 rounded-lg border px-3 py-2 text-sm",
+        "mb-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm",
         elem(@notice, 0) == :info && "border-line bg-brand-surface text-ink",
         elem(@notice, 0) == :error && "border-danger/40 bg-surface text-danger"
       ]}
     >
-      {elem(@notice, 1)}
+      <span class="flex-1">{elem(@notice, 1)}</span>
+      <.icon_button
+        id={"#{@id}-dismiss"}
+        icon="close"
+        label="Dismiss notice"
+        context={:inline}
+        phx-click="clear_notice"
+        phx-target={@target}
+      />
     </div>
     """
   end
@@ -667,6 +681,7 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
         :if={not @show_attach_modal and not @show_create_modal}
         id={"#{@id}-notice"}
         notice={@notice}
+        target={@myself}
       />
           <!-- Card 4: Attached Addresses -->
           <.card id="addresses-card">
@@ -1001,7 +1016,7 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
         on_cancel={JS.push("close_attach_modal", target: @myself)}
       >
         <:description>Select an address to attach to this company.</:description>
-        <.panel_notice id={"#{@id}-notice"} notice={@notice} />
+        <.panel_notice id={"#{@id}-notice"} notice={@notice} target={@myself} />
             <.form
               for={@attach_form}
               phx-submit="attach_address" phx-target={@myself}
@@ -1117,7 +1132,7 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
         width={:wide}
         on_cancel={JS.push("close_create_modal", target: @myself)}
       >
-        <.panel_notice id={"#{@id}-notice"} notice={@notice} />
+        <.panel_notice id={"#{@id}-notice"} notice={@notice} target={@myself} />
           <.form
             for={@address_form}
             id="create-attach-address-form"
