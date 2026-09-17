@@ -972,6 +972,22 @@
                 Review the missing address before continuing.
               </.alert><.alert kind={:error}>The record could not be saved.</.alert>
             </div>
+            <.card
+              id="component-connection-banners"
+              title="Connection banners"
+              inner_class="space-y-2 p-4"
+            >
+              <p class="text-xs text-ink-muted">
+                The pair LiveView reveals when the socket drops or the server stops answering.
+                They stay hidden until then, so the frame below is empty until a real
+                disconnection; there is no simulator. The same pair renders inside every open
+                modal dialog, so a dropped connection stays readable above the dialog rather
+                than dimmed behind it.
+              </p>
+              <div class="relative min-h-28 rounded-xl border border-line bg-canvas transform-gpu">
+                <.connection_banners id="design-library-connection" />
+              </div>
+            </.card>
             <div class="grid gap-3 lg:grid-cols-3">
               <.card title="Empty workspace" inner_class="p-4 text-center">
                 <.icon name="hero-building-office-2" class="mx-auto size-6 text-ink-faint" /><p class="mt-2 text-sm font-medium text-ink">

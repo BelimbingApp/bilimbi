@@ -21,6 +21,12 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
   dialog — which `assert_modal_dialog/3` does check — is not evidence that it
   returns focus. A reviewer confirms Escape, focus entry and focus return in a
   browser.
+
+  The dialog's connection banners are checked through the encoded `phx-*`
+  commands the LiveView client consumes — a serialized protocol, not source
+  text — because that wiring is what a dropped socket executes to reveal them.
+  Whether the revealed banner then paints above the dimmer and is announced
+  inside the top layer is browser-only and unproven here.
   """
 
   use ExUnit.Case, async: true
@@ -127,11 +133,40 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
     refute without_flash =~ ~s(id="plain-flash-info")
   end
 
-  test "the dialog carries its own connection banners, named after it" do
+  test "the dialog's connection banners carry the commands that reveal and hide them" do
     markup = render_modal(%{described: false})
 
-    assert markup =~ ~s(id="attach-modal-client-error")
-    assert markup =~ ~s(id="attach-modal-server-error")
+    for kind <- ~w(client server) do
+      id = "attach-modal-#{kind}-error"
+
+      assert [tag] = Regex.run(~r/<div[^>]*id="#{id}"[^>]*>/, markup)
+      assert tag =~ ~r/\shidden[\s>]/
+
+      assert Enum.any?(banner_command(markup, id, "phx-disconnected"), fn
+               ["remove_attr", %{"attr" => "hidden", "to" => to}] ->
+                 to == ".phx-#{kind}-error ##{id}"
+
+               _other ->
+                 false
+             end),
+             "#{id} has no phx-disconnected command that unhides it"
+
+      assert Enum.any?(banner_command(markup, id, "phx-connected"), fn
+               ["set_attr", %{"attr" => ["hidden", ""]}] -> true
+               _other -> false
+             end),
+             "#{id} has no phx-connected command that hides it again"
+    end
+
     assert markup =~ "Reconnecting"
+  end
+
+  defp banner_command(markup, id, attribute) do
+    assert [_, encoded] =
+             Regex.run(~r/<div[^>]*id="#{id}"[^>]*#{attribute}="([^"]*)"/, markup)
+
+    encoded
+    |> String.replace("&quot;", ~s("))
+    |> Jason.decode!()
   end
 end
