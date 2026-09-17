@@ -334,6 +334,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
           :if={@modal_action in [:new, :edit]}
           id="relationship-modal"
           title={if @modal_action == :new, do: "Add Relationship", else: "Edit Relationship Dates"}
+          flash={@flash}
           on_cancel={JS.push("close_modal")}
         >
           <:description>

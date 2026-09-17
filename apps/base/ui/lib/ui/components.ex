@@ -1176,6 +1176,11 @@ defmodule Bilimbi.Base.UI.Components do
   The dialog is named by its title and, when given, described by its
   description, so a screen reader announces both when focus enters.
 
+  A LiveView that can raise a flash while its dialog stays open passes
+  `flash`. The page behind a modal dialog is inert, so the layout's flash
+  group can be neither read nor dismissed while one is open; the dialog
+  renders its own copy instead, and the layout's copy is hidden.
+
   ## Examples
 
       <.modal
@@ -1202,6 +1207,11 @@ defmodule Bilimbi.Base.UI.Components do
     values: [:narrow, :wide],
     default: :narrow,
     doc: "`:narrow` for a single-column form, `:wide` for a two-column one"
+  )
+
+  attr(:flash, :map,
+    default: nil,
+    doc: "the caller's flash, rendered inside the dialog because the page behind it is inert"
   )
 
   attr(:rest, :global)
@@ -1232,6 +1242,8 @@ defmodule Bilimbi.Base.UI.Components do
       <h2 id={"#{@id}-title"} class="text-lg font-medium tracking-tight text-ink-strong">
         {@title}
       </h2>
+      <.flash :if={@flash} kind={:error} id={"#{@id}-flash-error"} flash={@flash} />
+      <.flash :if={@flash} kind={:info} id={"#{@id}-flash-info"} flash={@flash} />
       <p :if={@description != []} id={"#{@id}-description"} class="mt-1 text-xs text-ink-subtle">
         {render_slot(@description)}
       </p>

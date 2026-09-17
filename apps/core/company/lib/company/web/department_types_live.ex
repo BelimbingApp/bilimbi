@@ -377,6 +377,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
           :if={@modal_action in [:new, :edit]}
           id="department-type-modal"
           title={if @modal_action == :new, do: "New Department Type", else: "Edit Department Type"}
+          flash={@flash}
           on_cancel={JS.push("close_modal")}
         >
           <:description>

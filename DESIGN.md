@@ -147,6 +147,10 @@ A short workflow that must finish or be abandoned before the screen continues
 - **Closing:** `Escape` and the Cancel button are one action and reach the
   same server handler. Clicking the dimmed page does nothing: the dialog
   usually holds a form, and a stray click must not discard it.
+- **Feedback:** Because the page behind is inert, an outcome raised while the
+  dialog stays open renders inside it — a LiveView passes `flash`, and a panel
+  renders its own notice in the dialog. The layout's flash group is hidden
+  while a modal is open, so a message never appears where it cannot be read.
 - **Geometry:** A `rounded-xl` surface at `max-w-lg` for a single-column form
   or `max-w-2xl` for two columns, over an `ink/40` dimmer.
 

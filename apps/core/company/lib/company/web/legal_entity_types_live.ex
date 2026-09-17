@@ -316,6 +316,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
           :if={@modal_action in [:new, :edit]}
           id="legal-entity-type-modal"
           title={if @modal_action == :new, do: "New Legal Entity Type", else: "Edit Legal Entity Type"}
+          flash={@flash}
           on_cancel={JS.push("close_modal")}
         >
           <:description>

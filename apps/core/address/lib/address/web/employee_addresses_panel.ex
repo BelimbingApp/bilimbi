@@ -365,21 +365,30 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
   defp notice(socket, kind, message), do: assign(socket, :notice, {kind, message})
 
+  attr(:id, :string, required: true)
+  attr(:notice, :any, required: true)
+
+  defp panel_notice(assigns) do
+    ~H"""
+    <div
+      :if={@notice}
+      id={@id}
+      class={[
+        "mb-3 rounded-lg border px-3 py-2 text-sm",
+        elem(@notice, 0) == :info && "border-line bg-brand-surface text-ink",
+        elem(@notice, 0) == :error && "border-danger/40 bg-surface text-danger"
+      ]}
+    >
+      {elem(@notice, 1)}
+    </div>
+    """
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
     <div id={@id} class="contents">
-      <div
-        :if={@notice}
-        id={"#{@id}-notice"}
-        class={[
-          "mb-3 rounded-lg border px-3 py-2 text-sm",
-          elem(@notice, 0) == :info && "border-line bg-brand-surface text-ink",
-          elem(@notice, 0) == :error && "border-danger/40 bg-surface text-danger"
-        ]}
-      >
-        {elem(@notice, 1)}
-      </div>
+      <.panel_notice :if={not @show_attach_modal} id={"#{@id}-notice"} notice={@notice} />
           <!-- Card 4: Attached Addresses -->
           <.card id="addresses-card">
             <div class="p-5 sm:p-6 space-y-4">
@@ -703,6 +712,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
         on_cancel={JS.push("close_attach_modal", target: @myself)}
       >
         <:description>Select an address from the company to attach to this employee.</:description>
+        <.panel_notice id={"#{@id}-notice"} notice={@notice} />
             <.form
               for={@attach_form}
               phx-submit="attach_address" phx-target={@myself}

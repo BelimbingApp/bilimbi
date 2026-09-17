@@ -510,6 +510,25 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
 
   defp notice(socket, kind, message), do: assign(socket, :notice, {kind, message})
 
+  attr(:id, :string, required: true)
+  attr(:notice, :any, required: true)
+
+  defp panel_notice(assigns) do
+    ~H"""
+    <div
+      :if={@notice}
+      id={@id}
+      class={[
+        "mb-3 rounded-lg border px-3 py-2 text-sm",
+        elem(@notice, 0) == :info && "border-line bg-brand-surface text-ink",
+        elem(@notice, 0) == :error && "border-danger/40 bg-surface text-danger"
+      ]}
+    >
+      {elem(@notice, 1)}
+    </div>
+    """
+  end
+
   # --- Create-form location cascade (Geonames-backed, ported from show_live) ---
 
   defp address_location_params(socket, incoming) do
@@ -636,17 +655,11 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
   def render(assigns) do
     ~H"""
     <div id={@id} class="contents">
-      <div
-        :if={@notice}
+      <.panel_notice
+        :if={not @show_attach_modal and not @show_create_modal}
         id={"#{@id}-notice"}
-        class={[
-          "mb-3 rounded-lg border px-3 py-2 text-sm",
-          elem(@notice, 0) == :info && "border-line bg-brand-surface text-ink",
-          elem(@notice, 0) == :error && "border-danger/40 bg-surface text-danger"
-        ]}
-      >
-        {elem(@notice, 1)}
-      </div>
+        notice={@notice}
+      />
           <!-- Card 4: Attached Addresses -->
           <.card id="addresses-card">
             <div class="p-5 sm:p-6 space-y-4">
@@ -980,6 +993,7 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
         on_cancel={JS.push("close_attach_modal", target: @myself)}
       >
         <:description>Select an address to attach to this company.</:description>
+        <.panel_notice id={"#{@id}-notice"} notice={@notice} />
             <.form
               for={@attach_form}
               phx-submit="attach_address" phx-target={@myself}
@@ -1095,6 +1109,7 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
         width={:wide}
         on_cancel={JS.push("close_create_modal", target: @myself)}
       >
+        <.panel_notice id={"#{@id}-notice"} notice={@notice} />
           <.form
             for={@address_form}
             id="create-attach-address-form"

@@ -7,6 +7,10 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
   modal, named by its visible title, described by its optional description,
   and carries the `Modal` hook plus the cancel command the hook forwards to
   the server on Escape.
+
+  A modal that omits `on_cancel` is caught by Phoenix's missing-required-
+  attribute warning, which `mix precommit` turns into a build failure by
+  compiling with `--warnings-as-errors`.
   """
 
   use ExUnit.Case, async: true
@@ -80,13 +84,41 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
     refute wide =~ "max-w-lg"
   end
 
-  test "a modal written without a cancel command is rejected at compile time" do
+  test "renders the caller's flash inside the dialog, and nothing when none is passed" do
+    assigns = %{}
+
+    with_flash =
+      rendered_to_string(~H"""
+      <.modal
+        id="flashed"
+        title="Flashed"
+        flash={%{"error" => "Could not save the record."}}
+        on_cancel={JS.push("close")}
+      >
+        body
+      </.modal>
+      """)
+
+    without_flash =
+      rendered_to_string(~H"""
+      <.modal id="plain" title="Plain" on_cancel={JS.push("close")}>body</.modal>
+      """)
+
+    assert [dialog] = Regex.run(~r|<dialog[^>]*id="flashed".*?</dialog>|s, with_flash)
+    assert dialog =~ ~s(id="flashed-flash-error")
+    assert dialog =~ "Could not save the record."
+    refute dialog =~ ~s(id="flashed-flash-info")
+
+    refute without_flash =~ "flash"
+  end
+
+  test "a modal written without a cancel command warns that the attribute is missing" do
     warnings = compile_modal_probe("")
 
     assert warnings =~ ~s(missing required attribute "on_cancel")
   end
 
-  test "a modal written with a cancel command compiles without that warning" do
+  test "a modal written with a cancel command raises no such warning" do
     warnings = compile_modal_probe(" on_cancel={Phoenix.LiveView.JS.push(\"close_probe\")}")
 
     refute warnings =~ "on_cancel"

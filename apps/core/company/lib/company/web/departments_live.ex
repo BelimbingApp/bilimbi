@@ -486,6 +486,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
           :if={@modal_action == :new}
           id="department-modal"
           title="Add Department"
+          flash={@flash}
           on_cancel={JS.push("close_modal")}
         >
           <:description>
@@ -537,6 +538,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
           :if={@modal_action == :edit_head}
           id="department-head-modal"
           title="Set Department Head"
+          flash={@flash}
           on_cancel={JS.push("close_modal")}
         >
           <:description>

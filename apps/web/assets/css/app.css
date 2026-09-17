@@ -219,6 +219,13 @@ body {
   min-width: 20rem;
 }
 
+/* An open modal dialog makes the rest of the page inert, so the layout's
+ * flash group cannot be read, announced or dismissed while one is open.
+ * `<.modal flash={@flash}>` renders the same messages inside the dialog. */
+body:has(dialog:modal) #flash-group {
+  visibility: hidden;
+}
+
 /* Menu typography & font colors matching Belimbing */
 .app-nav-rail {
   font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;

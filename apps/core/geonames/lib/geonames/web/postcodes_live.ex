@@ -308,6 +308,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
           id="postcode-modal"
           title={if @modal_action == :new, do: "New Postcode", else: "Edit Postcode"}
           width={:wide}
+          flash={@flash}
           on_cancel={JS.push("close-postcode-modal")}
         >
           <:description>Local corrections survive future GeoNames country refreshes.</:description>

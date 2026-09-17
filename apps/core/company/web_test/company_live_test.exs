@@ -1304,6 +1304,31 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#company-departments td", "—")
     end
 
+    test "reports a failed head write inside the open dialog, not behind it", %{conn: conn} do
+      grant_capabilities!(["admin.company.view", "admin.company.update"])
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, type} = Company.create_department_type(%{code: "ENG", name: "Engineering"})
+
+      {:ok, department} =
+        Company.create_department(scope, 73, %{department_type_id: type.id, status: "active"})
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73/departments")
+
+      view |> element("#edit-dept-head-#{department.id}") |> render_click()
+      assert_modal_dialog(view, "department-head-modal", "Set Department Head")
+
+      render_submit(view, "save_head", %{"department_head" => %{"head_id" => "999999"}})
+
+      assert has_element?(view, "dialog#department-head-modal")
+
+      assert has_element?(
+               view,
+               "dialog#department-head-modal #department-head-modal-flash-error",
+               "That employee is not eligible to lead this department."
+             )
+    end
+
     test "ignores a forged department head while creating a department", %{conn: conn} do
       grant_capabilities!(["admin.company.view", "admin.company.update"])
       {:ok, scope} = Tenancy.scope(41)

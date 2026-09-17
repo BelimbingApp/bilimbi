@@ -1718,6 +1718,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           :if={@show_add_employee_modal}
           id="add-employee-modal"
           title="Add Employee Record"
+          flash={@flash}
           on_cancel={JS.push("close_add_employee_modal")}
         >
           <:description>Create a new employee record and link it to this user.</:description>

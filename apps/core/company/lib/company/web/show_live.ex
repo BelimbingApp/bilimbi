@@ -1351,6 +1351,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           id="company-details-modal"
           title="Edit Company Details"
           width={:wide}
+          flash={@flash}
           on_cancel={JS.push("close_modal")}
         >
             <.form
