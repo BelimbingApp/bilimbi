@@ -85,7 +85,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | INT-06 | Unsaved-change and template selection flows | Missing | Defer until a real Bilimbi workflow proves the need. |
 | FBK-01 | Inline alerts | Shared primitive exists | Verify status semantics, copy, contrast, icons and dismissibility. |
 | FBK-02 | Flash and notification behavior | Basic fixed flash | Define stacking, timing, sticky warning/error, manual dismissal and redirect continuity. |
-| FBK-03 | Validation, disabled and loading states | Partial: `<.button>` and `<.icon_button>` carry a `busy` state that spins, disables and announces `aria-busy`, so loading no longer looks or sounds like plain disabled; a `phx-disable-with` round trip is mirrored onto `aria-busy` by the shell; login goes busy with readonly fields and announces credential and lockout failures through `role="alert"`; validation states are untouched | Make the states visibly distinct and prevent duplicate work. |
+| FBK-03 | Validation, disabled and loading states | Partial: `<.button>` and `<.icon_button>` carry a `busy` state that spins, disables and announces `aria-busy`, distinct from plain disabled; a `phx-disable-with` round trip is mirrored onto `aria-busy` by the shell but keeps the dimmed disabled look, so on that path loading and disabled are still one picture; login goes busy with readonly fields and announces credential and lockout failures through `role="alert"`; validation states are untouched | Make the states visibly distinct and prevent duplicate work. |
 | FBK-04 | Empty, permission, unavailable, error and recovery states | Library specimens exist | Establish reusable page and region patterns with truthful recovery. |
 | OVR-01 [(contradicted)](#targets-the-evidence-contradicts) | Standard modal | Missing | Add accessible open, close, Escape, backdrop, focus containment and focus return. |
 | OVR-02 [(contradicted)](#targets-the-evidence-contradicts) | Confirmation modal | Missing | Add consequence-first confirmation without copying Belimbing's accessibility gaps. |
@@ -269,7 +269,8 @@ products were read and the plan forbids treating existence as acceptance.
 - **ACT-01** — "basics" understates what ships: disabled, navigation-as-button and an
   in-flight `Working…` primary already render on the Design Library (Lane B), and a
   `busy` state that spins and announces `aria-busy` now ships beside them. The open
-  work is a compact size, not the basics or the in-flight treatment.
+  work is a compact size and an in-flight treatment that stays visibly distinct from
+  disabled on the `phx-disable-with` path, not the basics.
 - **OVR-02** — "Missing" is true of a shared confirmation overlay only. Destructive
   work already confirms through the browser's native dialog, with consequence copy on
   some screens (Lane B), so the work is one accessible shared component rather than

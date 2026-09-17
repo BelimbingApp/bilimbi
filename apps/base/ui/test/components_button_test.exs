@@ -170,6 +170,30 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
     refute busy =~ "disabled:opacity-50"
   end
 
+  test "busy is refused on a navigation control it cannot make inert" do
+    assert_raise ArgumentError, ~r/busy is a button state/, fn ->
+      render_component(
+        fn assigns ->
+          ~H"""
+          <.button id="nav-busy-btn" navigate="/users" busy>Go to Users</.button>
+          """
+        end,
+        %{}
+      )
+    end
+
+    assert_raise ArgumentError, ~r/busy is a button state/, fn ->
+      render_component(
+        fn assigns ->
+          ~H"""
+          <.icon_button id="nav-busy-icon" icon="export" label="Export" href="/export" busy />
+          """
+        end,
+        %{}
+      )
+    end
+  end
+
   # Whether the control's opening tag carries the attribute. The class list
   # names `disabled:` variants, so a bare substring check would lie.
   defp attribute?(html, attribute) do

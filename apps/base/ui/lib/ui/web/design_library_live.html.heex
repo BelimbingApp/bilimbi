@@ -659,7 +659,7 @@
               >Clicked: {@click_count}</.button><.button variant="primary" busy>Saving…</.button>
             </div>
             <p class="text-xs text-ink-muted">
-              Clicked goes in flight for one round trip: LiveView disables it and shows "Working…" until the server replies, and the shell mirrors that wait onto <code>aria-busy</code>. Busy is the wait the server knows about, such as a sign-in that is opening the workspace: the control spins at full strength, is disabled and carries <code>aria-busy</code>. Disabled means the action is not available at all, so it dims and never spins.
+              Clicked goes in flight for one round trip: LiveView disables it and shows "Working…" until the server replies, and the shell mirrors that wait onto <code>aria-busy</code>; it is announced but still wears the dimmed disabled look. Busy is the wait the server knows about, such as a sign-in that is opening the workspace: the control spins at full strength, is disabled and carries <code>aria-busy</code>. Disabled means the action is not available at all, so it dims and never spins.
             </p>
             <.card id="component-icon-button" title="Compact icon actions" inner_class="p-4">
               <div class="flex flex-wrap items-center gap-4">
@@ -688,14 +688,14 @@
                   Busy
                   <.icon_button
                     id="component-icon-button-busy"
-                    icon="refresh"
-                    label="Refresh companies"
+                    icon="export"
+                    label="Export companies"
                     busy
                   />
                 </div>
               </div>
               <p class="mt-3 text-xs text-ink-muted">
-                Use icon-only controls for familiar repeated actions. Keep primary and unfamiliar actions as words. Disabled and busy are both inert, and they do not look alike: disabled dims the glyph, busy replaces it with a spinner at full strength and carries <code>aria-busy</code>, and its label still names the action that is pending.
+                Use icon-only controls for familiar repeated actions. Keep primary and unfamiliar actions as words. Disabled and busy are both inert, and they do not look alike: disabled dims the glyph, busy replaces it with a spinner at full strength and carries <code>aria-busy</code>, and its label still names the action that is pending — the export above reads "Export companies" while it spins.
               </p>
             </.card>
           </section>

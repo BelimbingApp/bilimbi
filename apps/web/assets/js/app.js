@@ -48,6 +48,20 @@ window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 // The marker records that the mirror owns this `aria-busy`: when the reply
 // renders a server-known busy state, the undo patch drops the marker and the
 // server's attribute stands.
+//
+// This carries every `phx-disable-with` control in the product and no test
+// exercises it -- there is no JS runner here. It rests on three things that
+// hold in phoenix_live_view 1.2.9 and are not ours to guarantee:
+//
+//   1. `phx:push` details keep `isLoading` and a `loadingComplete` promise;
+//   2. LiveView keeps dispatching `phx:push` on the submitter -- once a submit
+//      has one, `putRef` skips every element that is neither it nor the form,
+//      so the button we relabel is exactly the one we hear about;
+//   3. the reply patch strips `data-busy-mirror` before `phx:undo-loading`
+//      resolves, so the marker cannot outlive the wait and delete an
+//      `aria-busy` the server rendered itself.
+//
+// Re-read them when the LiveView pin moves.
 const BUSY_MIRROR = "data-busy-mirror"
 
 window.addEventListener("phx:push", ({target, detail}) => {
