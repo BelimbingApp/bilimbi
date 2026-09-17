@@ -151,14 +151,20 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
 
-    # The reply to the click is the in-flight render: the row comes back busy
-    # while the delete runs, rather than having its glyph replaced by text.
+    # The reply to the click is the in-flight render, read before the async
+    # delete can answer it: the clicked row's own control comes back busy
+    # rather than having its glyph replaced by text.
     in_flight =
       view
       |> element("#employee-type-delete-#{type.id}")
       |> render_click()
 
-    assert in_flight =~ ~s(aria-busy="true")
+    busy =
+      in_flight
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.query("#employee-type-delete-#{type.id}[aria-busy='true']")
+
+    assert Enum.count(busy) == 1
 
     render_async(view, 5_000)
 

@@ -72,6 +72,48 @@ defmodule BilimbiWeb.LoginLiveTest do
            )
   end
 
+  test "a repeated identical credential failure is announced again", %{conn: conn} do
+    Company.TestFixtures.insert_tenant!(%{id: 41})
+    Company.TestFixtures.insert_company!(%{id: 73, tenant_id: 41})
+
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    view
+    |> form("#login-form", login: %{email: "ada@example.com", password: "wr0ng-wr0ng"})
+    |> render_submit()
+
+    first = alert_node_id(view)
+
+    view
+    |> form("#login-form", login: %{email: "ada@example.com", password: "wr0ng-again"})
+    |> render_submit()
+
+    second = alert_node_id(view)
+
+    # Same message both times, so an assertive region only speaks again if the
+    # node itself was replaced.
+    assert has_element?(
+             view,
+             "#login-form-error [role='alert']",
+             "These credentials do not match our records."
+           )
+
+    assert first
+    assert second
+    refute first == second
+
+    BilimbiWeb.RateLimit.reset({:login, "ada@example.com", "127.0.0.1"})
+  end
+
+  defp alert_node_id(view) do
+    html = view |> element("#login-form-error [role='alert']") |> render()
+
+    case Regex.run(~r/\sid="([^"]+)"/, html) do
+      [_, id] -> id
+      nil -> nil
+    end
+  end
+
   test "a new attempt clears the previous failure alert", %{conn: conn} do
     Company.TestFixtures.insert_tenant!(%{id: 41})
     Company.TestFixtures.insert_company!(%{id: 73, tenant_id: 41})
