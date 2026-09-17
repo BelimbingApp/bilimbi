@@ -248,9 +248,11 @@ products were read and the plan forbids treating existence as acceptance.
   dispatched in-page events that Belimbing's shared modal does not move focus in, trap
   it or return it, and that two demo dialogs could be open at once — read together with
   the note below that Belimbing modal focus behaviour beyond dispatched events was not
-  verified. Full-viewport overlays also already ship in production — Attach Address on
-  `/companies/1` and Add Employee on `/users/1` — without a dialog role, Escape or
-  focus containment (Lane B), so the shared modal has two adopters waiting.
+  verified. Hand-written full-viewport overlays of the same fixed-inset,
+  dimmed-backdrop shape also already ship in production across several modules, none
+  of them carrying a dialog role, `aria-modal`, Escape or focus containment; Attach
+  Address on `/companies/1` and Add Employee on `/users/1` are the two Lane B
+  exercised live. The shared modal has production adopters waiting across modules.
 - **LAY-02, NAV-05** — the "Bilimbi now" cells describe pre-#711 state; both shipped.
 - **INT-04** — reduced motion is not adoptable; neither product has a contract.
 - **NAV-01** — "reorder" in the target has no observed counterpart in Belimbing's
