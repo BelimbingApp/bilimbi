@@ -79,7 +79,11 @@ Audit in the same transaction as the controlled state change; operational run
 rows remain separate best-effort evidence.
 
 History filtering, ordering, exact totals, and pagination happen in PostgreSQL
-before rows reach the LiveView. Worker arguments and recorded output excerpts
-never cross the operator-facing Schedule API. Diagnostics report scheduler,
-Queue, recorder, and due-work evidence independently, using unknown or
-unavailable states rather than deriving health from missing rows.
+before rows reach the LiveView. The start and end date filters bound UTC
+calendar days of `started_at`, and the operator board names that zone in the
+controls: the Started column renders in the operator's display timezone, so a
+run can appear on one local day while a different UTC day bounds it. Worker
+arguments and recorded output excerpts never cross the operator-facing Schedule
+API. Diagnostics report scheduler, Queue, recorder, and due-work evidence
+independently, using unknown or unavailable states rather than deriving health
+from missing rows.
