@@ -3,7 +3,7 @@
 **Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families. Application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display are merged to `main`; the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
 **Last Updated:** 2026-09-17
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`
 
 ## Problem Essence
 
@@ -139,7 +139,7 @@ rather than being quietly reconciled.
 | FND-02 Typography | Keep Bilimbi | none |
 | FND-03 Spacing rhythm | Adopt adapted — named spacing roles, Bilimbi values | before LAY-05, CMP-01…03 |
 | FND-04 Shape and elevation | Keep Bilimbi | none |
-| FND-05 Focus and motion | Adopt adapted — one focus contract, per-transition `motion-reduce` | before ACT-01, INP-01 |
+| FND-05 Focus and motion | Adopt adapted — one focus contract; reduced motion shipped as a single global `prefers-reduced-motion` rule in `app.css`, so no component carries `motion-reduce` | before ACT-01, INP-01 |
 | FND-06 Icon language | Adopt adapted — searchable catalog; finish the migration | #719 |
 | LAY-01 Authentication shell | Keep Bilimbi | none |
 | LAY-02 Application shell | Adopt adapted — shipped in #711, confirmed live | none |
@@ -257,7 +257,9 @@ products were read and the plan forbids treating existence as acceptance.
   Address on `/companies/1` and Add Employee on `/users/1` are the two Lane B
   exercised live. The shared modal has production adopters waiting across modules.
 - **LAY-02, NAV-05** — the "Bilimbi now" cells describe pre-#711 state; both shipped.
-- **INT-04** — reduced motion is not adoptable; neither product has a contract.
+- **INT-04** — reduced motion was not adoptable when Lane A measured it: neither
+  product had a contract. Bilimbi now has one platform-wide under FND-05, so a
+  disclosure primitive inherits it instead of defining its own.
 - **NAV-01** — "reorder" in the target has no observed counterpart in Belimbing's
   navigation; pin-to-top covers the keep-favourites-handy need on both sides (Lane A).
   Dropped from parity acceptance rather than built to. Bilimbi does ship pinned drag
@@ -389,7 +391,7 @@ Keeping company and tenant in the top strip makes known context compete with the
 
 ### Brand-strong text contrast (FND-01) is accepted
 
-`text-brand-strong` text, measured by Lane A at 3.06:1 against the 4.5:1 bar at its real 12–13px size, was shown to the captain with both remedies, a darker text lime and reserving brand-strong text for large or bold use, and ruled: "Leave it; the current contrast is acceptable for this product." This is a deliberate accepted decision, not an open defect: later audits cite it instead of reopening it. The ruling covers both call-site families Lane A measured — active-navigation text in `layouts.ex` and the timezone panel's pressed choices in `shell_components.ex` — and nothing else. Lane A's other contrast findings remain open evidence for Phase 3: C2, dark table-header ink at 3.64:1, and C3, faint ink used as real text. A separate in-flight change is addressing both; this ruling closes neither, and neither has landed here. Phase 0 recorded that it did not verify contrast beyond the automated test.
+`text-brand-strong` text, measured by Lane A at 3.06:1 against the 4.5:1 bar at its real 12–13px size, was shown to the captain with both remedies, a darker text lime and reserving brand-strong text for large or bold use, and ruled: "Leave it; the current contrast is acceptable for this product." This is a deliberate accepted decision, not an open defect: later audits cite it instead of reopening it. The ruling covers both call-site families Lane A measured — active-navigation text in `layouts.ex` and the timezone panel's pressed choices in `shell_components.ex` — and nothing else. Lane A's other two contrast findings are now closed, by the separate palette change rather than by this ruling. C2, dark table-header ink at 3.64:1, closed by raising `--color-ink-subtle` in both dark blocks of `app.css`: it measures 5.35:1 on `surface`, 4.88:1 on `surface-sunken` and 4.64:1 on `surface-muted`, with light `ink-subtle` raised alongside it to 6.02:1, 4.79:1 and 5.52:1 on those same three surfaces, and `theme_contrast_test.exs` now gating each header pair at 4.5:1. C3, faint ink used as real text, closed at the one site Lane A measured as real text: the decision-log acting-for line moved from `text-ink-faint` (2.59:1 light, 2.29:1 dark on `surface`) to `text-ink-muted` (7.64:1 light, 6.76:1 dark, and 6.08:1 / 6.17:1 on the `surface-sunken` row hover). The other `text-ink-faint` uses are non-essential icons and placeholders and were never part of C3. Phase 0 recorded that it did not verify contrast beyond the automated test.
 
 ### Unseen-by-you markers (K05) are orientation
 
@@ -494,6 +496,7 @@ Validation: Every catalog item has evidence, a recommended disposition, dependen
 Goal: Build accepted shared contracts in dependency order.
 
 - [ ] Stabilize identity tokens, focus, field shell, card, icon and action foundations.
+- [ ] FND-05 follow-up — make the vendored `topbar` navigation progress bar honor `prefers-reduced-motion` without losing an honest loading signal; it animates a canvas from JavaScript, so the global CSS rule cannot reach it.
 - [ ] Implement accepted navigation, link and action contracts.
 - [ ] Implement accepted native input, choice, feedback and data-display contracts.
 - [ ] Implement accepted combobox, edit-in-place, disclosure, modal and confirmation contracts only after their foundations are stable.
