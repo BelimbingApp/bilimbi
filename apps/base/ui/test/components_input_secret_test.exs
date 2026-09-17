@@ -34,6 +34,19 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
     String.split(value, ~r/\s+/, trim: true)
   end
 
+  # Matches only while the input and the control are adjacent children of one
+  # row, which is what makes the control's placement follow the input's box.
+  defp reveal_row(html) do
+    [row, control] =
+      Regex.run(
+        ~r|<div class="([^"]*)">\s*<input type="password"[^>]*\sid="api-key"[^>]*>\s*<button id="api-key-reveal"[^>]*\sclass="([^"]*)"|,
+        html,
+        capture: :all_but_first
+      )
+
+    {String.split(row, ~r/\s+/, trim: true), String.split(control, ~r/\s+/, trim: true)}
+  end
+
   defp glyph_class(html, id) do
     [value] = Regex.run(~r/<span id="#{id}" class="([^"]*)"/, html, capture: :all_but_first)
 
@@ -114,13 +127,31 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
     assert hide -- ["hidden"] == show
   end
 
-  test "a caller's own field class still reserves the space the control sits in" do
-    html = render_component(&secret_field/1, reveal: true, class: "w-64 border px-3 py-1")
+  test "the control is placed against the input's own box, not a box the caller cannot size" do
+    narrowed = render_component(&secret_field/1, reveal: true, class: "w-64 border px-3 py-1")
+    default = render_component(&secret_field/1, reveal: true)
 
-    classes = field_class(html)
+    {narrowed_row, narrowed_control} = reveal_row(narrowed)
+    {default_row, default_control} = reveal_row(default)
 
-    # The control is positioned inside the field, so its space is structural:
-    # replacing the field's look must not run the secret underneath the eye.
+    # The control follows the input in a flex row and is pulled back over the
+    # padding the input reserves, so it lands from the input's own used width.
+    # Nothing here reads a width, which is why both renders are identical: a
+    # caller replacing the field class moves the input and the control alike.
+    assert "flex" in narrowed_row
+    assert "items-center" in narrowed_row
+    assert "-ml-[1.875rem]" in narrowed_control
+    assert narrowed_row == default_row
+    assert narrowed_control == default_control
+
+    # An offset against an ancestor box would be the bug: that box is the full
+    # width of the field wrapper whatever the caller sized the input to.
+    refute "absolute" in narrowed_control
+    refute "relative" in narrowed_row
+
+    # The space it sits in is still reserved inside the field.
+    classes = field_class(narrowed)
+
     assert "pr-10" in classes
     assert "w-64" in classes
     refute "block" in classes
