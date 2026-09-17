@@ -58,6 +58,17 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     definition: definition
   } do
     grant_capabilities!(@view)
+
+    Repo.insert!(%Run{
+      source: "scheduler",
+      key: definition.key,
+      name: definition.task_name,
+      status: "succeeded",
+      started_at: ~N[2026-08-20 01:30:00],
+      finished_at: ~N[2026-08-20 01:30:02],
+      runtime_ms: 2_000
+    })
+
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule")
 
     assert has_element?(view, "#schedule-board")
