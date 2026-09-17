@@ -5,9 +5,6 @@
 // act on can disappear on a timer. Dismissal reuses the element's own click
 // command — clear the flash on the server, then hide it — so a timed dismissal
 // and a clicked one leave the same state behind.
-//
-// The pointer or keyboard focus on the message pauses the timer: someone
-// reading or reaching for the close button is not done with it.
 const FlashAutoDismiss = {
   mounted() {
     this.delay = Number(this.el.dataset.autoDismissMs)
@@ -18,13 +15,7 @@ const FlashAutoDismiss = {
       const command = this.el.getAttribute("phx-click")
       if (command) this.liveSocket.execJS(this.el, command, "click")
     }
-    this.pause = () => this.stop()
-    this.resume = () => this.start()
 
-    this.el.addEventListener("mouseenter", this.pause)
-    this.el.addEventListener("focusin", this.pause)
-    this.el.addEventListener("mouseleave", this.resume)
-    this.el.addEventListener("focusout", this.resume)
     this.start()
   },
 

@@ -63,11 +63,11 @@ module may add a semantic role only when its workflow genuinely needs one.
 - **`action` / `action-hover` / `action-ink`**: Confident primary action
   colours used for primary buttons and page `<h1>` headings. The base remains
   distinct from its brighter hover in both themes.
-- **`success` / `warning` / `danger` / `info`** (each with `-surface`,
-  `-line`, `-ink`): Honest status roles for real feedback. `info` is stone, a
-  statement that reports neither a good nor a bad outcome. Flash messages are
-  the one exception until their callers are migrated: an `:info` flash is
-  still painted with `success`, because most of them report a completed write.
+- **`success` / `warning` / `danger`** (each with `-surface`, `-line`,
+  `-ink`): Honest status roles for real feedback. A neutral statement has no
+  status role of its own yet: an `:info` flash is painted with `success` and
+  an `:info` alert stays on the neutral surface, because most of the
+  product's `:info` messages report a completed write.
 
 ## Compact typography
 
@@ -281,7 +281,7 @@ permission-denied state: say that no destinations are available and name
 the recovery (an operator must assign a role), not a blank rail.
 
 Flash messages stack at the top right, most severe first, so several stay
-readable at once. Success and info dismiss themselves and pause while read;
+readable at once. Success and info dismiss themselves after eight seconds;
 warning and error stay until the person dismisses them, because a message
 someone must act on must not disappear on a timer.
 

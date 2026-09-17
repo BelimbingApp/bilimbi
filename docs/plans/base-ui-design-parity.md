@@ -84,7 +84,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | INT-05 | Filter and period patterns | Repeated local compositions | Standardize the shared composition while keeping URL state and production meaning. |
 | INT-06 | Unsaved-change and template selection flows | Missing | Defer until a real Bilimbi workflow proves the need. |
 | FBK-01 | Inline alerts | Shared primitive exists | Verify status semantics, copy, contrast, icons and dismissibility. |
-| FBK-02 | Flash and notification behavior | Basic fixed flash | Define stacking, timing, sticky warning/error, manual dismissal and redirect continuity. |
+| FBK-02 | Flash and notification behavior | `Layouts.flash_group/1` is the one production outlet: four severities stack in one column, most severe first, click-to-dismiss throughout, success and info time out after eight seconds while warning, error and the reconnect notices stay until dismissed; the shell's preference status line is a recorded exception | Remaining: the `:info` colour defect stays open — the repaint was reverted because most `put_flash(:info, ...)` call sites report a completed write, so correcting it means migrating those callers first. Also pause-on-hover/focus for the timed messages, and redirect continuity. |
 | FBK-03 | Validation, disabled and loading states | Partial | Make the states visibly distinct and prevent duplicate work. |
 | FBK-04 | Empty, permission, unavailable, error and recovery states | Library specimens exist | Establish reusable page and region patterns with truthful recovery. |
 | OVR-01 [(contradicted)](#targets-the-evidence-contradicts) | Standard modal | Missing | Add accessible open, close, Escape, backdrop, focus containment and focus return. |

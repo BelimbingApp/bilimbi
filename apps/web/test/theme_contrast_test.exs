@@ -75,7 +75,6 @@ defmodule BilimbiWeb.ThemeContrastTest do
     {"success-ink", "success-surface", 4.5},
     {"warning-ink", "warning-surface", 4.5},
     {"danger-ink", "danger-surface", 4.5},
-    {"info-ink", "info-surface", 4.5},
     {"brand-ink", "brand-surface", 4.5}
   ]
 
