@@ -174,6 +174,53 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     assert {:ok, _} = Employee.get_employee_type(scope, 73, type.id)
   end
 
+  test "refuses another row's delete while one is in flight", %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, running} = Employee.create_employee_type(scope, 73, %{code: "temp", label: "Temporary"})
+    {:ok, other} = Employee.create_employee_type(scope, 73, %{code: "relief", label: "Relief"})
+
+    grant_capabilities!(["admin.employee-type.list", "admin.employee-type.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+
+    # The sandbox hands every process the one connection, so a transaction held
+    # here pins the delete task on its first query and the delete stays in
+    # flight for the whole block. Neither click needs the database: the
+    # capability check and the guard both read assigns.
+    Bilimbi.Base.Repo.transaction(fn ->
+      view
+      |> element("#employee-type-delete-#{running.id}")
+      |> render_click()
+
+      # Only the deleting row's own control goes busy, so another row's
+      # confirmed delete still reaches the server. One delete runs at a time,
+      # and the operator is told this one was not served rather than left
+      # watching a row that never goes away.
+      refused =
+        view
+        |> element("#employee-type-delete-#{other.id}")
+        |> render_click()
+
+      assert refused =~ "Another employee type is still being deleted."
+    end)
+
+    render_async(view, 5_000)
+
+    assert {:error, :type_not_found} = Employee.get_employee_type(scope, 73, running.id)
+    assert {:ok, _} = Employee.get_employee_type(scope, 73, other.id)
+
+    # The refusal was for that moment only: once nothing is in flight the same
+    # row deletes.
+    view
+    |> element("#employee-type-delete-#{other.id}")
+    |> render_click()
+
+    render_async(view, 5_000)
+
+    assert {:error, :type_not_found} = Employee.get_employee_type(scope, 73, other.id)
+  end
+
   test "system types do not show edit or delete action links", %{conn: conn} do
     {:ok, scope} = Tenancy.scope(41)
     {:ok, types} = Employee.list_employee_types(scope, 73)
