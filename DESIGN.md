@@ -30,7 +30,9 @@ The defining Bilimbi visual choice is **ledger geometry**: compact scale with
 `rounded-md` controls and
    `rounded-xl` surfaces, hairline rules, and tabular numerals for IDs and
    counts. The lime `brand` marks orientation only — the card's top edge,
-   the active navigation highlighting, selection — and never reports status.
+   the active navigation highlighting, selection, and unseen-by-you markers
+   (the aggregate unread count badge and the per-item unread dot) — and never
+   reports status.
 The surface is ruled paper with a bookmark.
 
 ## Semantic color roles
@@ -52,7 +54,9 @@ module may add a semantic role only when its workflow genuinely needs one.
   links, secondary labels, and active hover text. Links remain visibly stronger
   than muted text in both themes.
 - **`brand-strong` (`lime-600`)**: Orientation accent for active navigation,
-  ascended parent branches, and brand selection.
+  ascended parent branches, brand selection, and the aggregate unread count
+  badge. `brand` carries the same orientation meaning on the per-item unread
+  dot. Unseen-by-you markers are orientation, not status.
 - **`high-contrast-line` / `line` / `low-contrast-line`**: Neutral structural
   lines derived from `ink` at decreasing transparency. Their contrast remains
   ordered against canvas, surface, sunken, muted, and sidebar backgrounds.
