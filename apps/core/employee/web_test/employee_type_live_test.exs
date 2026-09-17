@@ -221,6 +221,92 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     assert {:error, :type_not_found} = Employee.get_employee_type(scope, 73, other.id)
   end
 
+  test "a sort patch during an in-flight delete leaves the deleting row marked busy",
+       %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, type} =
+      Employee.create_employee_type(scope, 73, %{code: "consultant", label: "Consultant"})
+
+    # An in-use type fails its delete, so the row is still on the page to be
+    # read after the patch instead of having been deleted out from under it.
+    {:ok, _employee} =
+      Employee.create_employee(scope, 73, %{
+        employee_number: "EMP-0099",
+        full_name: "Grace Hopper",
+        short_name: "Grace",
+        designation: "Lead Consultant",
+        employee_type: "consultant",
+        email: "grace@navy.mil",
+        status: "active"
+      })
+
+    grant_capabilities!(["admin.employee-type.list", "admin.employee-type.delete"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+
+    test_pid = self()
+
+    # The sandbox hands every process the one connection, so a transaction
+    # held here pins the delete task on its first query. The delete is
+    # provably still in flight until this holder is released.
+    holder =
+      spawn_link(fn ->
+        Bilimbi.Base.Repo.transaction(fn ->
+          send(test_pid, :pinned)
+
+          receive do
+            :release -> :ok
+          end
+        end)
+      end)
+
+    assert_receive :pinned, 5_000
+
+    # Confirming the delete needs no database: the capability check and the
+    # guard both read assigns.
+    view
+    |> element("#employee-type-delete-#{type.id}")
+    |> render_click()
+
+    # The patch a sort header pushes, driven while the delete is pinned.
+    # `render_patch/2` parses no DOM, so the patch is two local message hops
+    # and reaches the LiveView's mailbox well before the released task can
+    # reach it across five round trips to PostgreSQL. The LiveView therefore
+    # runs `handle_params` -> `load_page` with the delete still in flight,
+    # which is the moment this test exists to cover; it queues for the same
+    # connection behind the task and completes once the task lets go.
+    patch =
+      Task.async(fn ->
+        send(test_pid, :patching)
+        render_patch(view, ~p"/employee-types?sort=code")
+      end)
+
+    assert_receive :patching, 5_000
+    send(holder, :release)
+
+    patched = Task.await(patch, 5_000)
+
+    # The patch did not clear the delete marker: the row the operator is
+    # deleting still says so, so the guard that stops a second confirmed
+    # delete from overwriting this one under the same async name is still
+    # armed while the page is being re-sorted.
+    busy =
+      patched
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.query("#employee-type-delete-#{type.id}[aria-busy='true']")
+
+    assert Enum.count(busy) == 1
+
+    render_async(view, 5_000)
+
+    # That first delete's own outcome still reaches the operator, and the row
+    # goes idle once it resolves.
+    assert render(view) =~ "Cannot delete: employees are using this type."
+    refute has_element?(view, "#employee-type-delete-#{type.id}[aria-busy]")
+    assert {:ok, _} = Employee.get_employee_type(scope, 73, type.id)
+  end
+
   test "system types do not show edit or delete action links", %{conn: conn} do
     {:ok, scope} = Tenancy.scope(41)
     {:ok, types} = Employee.list_employee_types(scope, 73)
