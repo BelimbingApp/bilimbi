@@ -153,7 +153,7 @@ Validation: Updating Bilimbi does not modify the adopter's design, and the runni
 
 Goal: Let Bilimbi evolve quickly while making inconsistency visible.
 
-Drift guards are inventoried only in `docs/plans/base-ui-design-parity.md` Phase 6, which owns campaign execution detail; this plan does not keep a second list. As of 2026-09-17 that phase records two guards built by https://github.com/BelimbingApp/bilimbi/pull/722 — reflection-based coverage of every public Base UI component in its declared states, and rejection of hand-written markup that imitates a shared component — both tagged `:design_library_drift` and excluded from the default test run and `mix precommit` until the specimens they report are corrected. Guards for raw palette use, local component forks in production screens and unregistered icons remain open there.
+Drift guards are inventoried only in `docs/plans/base-ui-design-parity.md` Phase 6, which owns campaign execution detail; this plan does not keep a second list.
 
 - [ ] Add checks for local assets, contrast, focus, keyboard use, reduced motion and content security.
 - [ ] Add desktop and mobile evidence for first-impression screens and representative workflows.
