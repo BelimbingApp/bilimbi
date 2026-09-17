@@ -142,6 +142,27 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
     end
   end
 
+  describe "icon/1" do
+    test "keeps a name the icon component can render" do
+      assert Notification.icon(%Notification{data: %{"icon" => "notify"}}) == "notify"
+
+      assert Notification.icon(%Notification{data: %{"icon" => "hero-check-circle"}}) ==
+               "hero-check-circle"
+    end
+
+    test "falls back to the default for a legacy Belimbing icon the cutover left unmapped" do
+      assert Notification.icon(%Notification{data: %{"icon" => "heroicon-o-bell"}}) == "notify"
+      assert Notification.icon(%Notification{data: %{"icon" => "heroicon-s-user"}}) == "notify"
+    end
+
+    test "falls back to the default for an unregistered or non-string payload value" do
+      assert Notification.icon(%Notification{data: %{"icon" => "bilimbi-plus"}}) == "notify"
+      assert Notification.icon(%Notification{data: %{"icon" => ""}}) == "notify"
+      assert Notification.icon(%Notification{data: %{"icon" => 7}}) == "notify"
+      assert Notification.icon(%Notification{data: %{}}) == "notify"
+    end
+  end
+
   describe "unread_notification_count/2 and count_notifications/3" do
     test "counts unread and total notifications accurately per user within scope", %{scope: scope} do
       assert User.unread_notification_count(scope, 42) == {:ok, 0}

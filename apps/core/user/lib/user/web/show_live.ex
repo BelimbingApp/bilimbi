@@ -1102,13 +1102,18 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       <.icon_button
                         :if={@can_manage?}
                         icon="close"
-                        label="Remove role"
+                        label={"Remove the #{assignment.role_name} role"}
                         context={:inline}
                         kind={:danger}
                         id={"remove-role-#{assignment.id}"}
                         phx-click="remove_role"
                         phx-value-assignment-id={assignment.id}
                         phx-value-role-id={assignment.role_id}
+                        data-confirm={
+                          "Remove the #{assignment.role_name} role from #{@user.name}? " <>
+                            "They lose every capability this role grants, unless another " <>
+                            "role or direct grant also provides it."
+                        }
                         class="-mr-1"
                       />
                     </span>
@@ -1253,23 +1258,32 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                             <%= if is_direct do %>
                               <.icon_button
                                 icon="close"
-                                label="Remove direct grant"
+                                label={"Remove the direct grant of #{cap}"}
                                 context={:inline}
                                 kind={:danger}
                                 id={"remove-direct-cap-#{String.replace(cap, ".", "-")}"}
                                 phx-click="remove_capability"
                                 phx-value-grant-id={@direct_grant_ids[cap]}
+                                data-confirm={
+                                  "Remove the direct grant of #{cap} from #{@user.name}? " <>
+                                    "They keep this capability only if an assigned role " <>
+                                    "still grants it."
+                                }
                               />
                             <% else %>
                               <%= if not is_nil(@user.company_id) do %>
                                 <.icon_button
                                   icon="close"
-                                  label="Deny this capability"
+                                  label={"Deny #{cap}"}
                                   context={:inline}
                                   kind={:danger}
                                   id={"deny-cap-#{String.replace(cap, ".", "-")}"}
                                   phx-click="deny_capability"
                                   phx-value-capability-key={cap}
+                                  data-confirm={
+                                    "Deny #{cap} for #{@user.name}? This overrides every " <>
+                                      "role that grants it and takes effect immediately."
+                                  }
                                 />
                               <% end %>
                             <% end %>
@@ -1307,12 +1321,16 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                         <.icon_button
                           :if={@can_manage?}
                           icon="close"
-                          label="Remove deny"
+                          label={"Remove the deny rule for #{cap}"}
                           context={:inline}
                           kind={:danger}
                           id={"remove-denial-#{String.replace(cap, ".", "-")}"}
                           phx-click="remove_capability"
                           phx-value-grant-id={@direct_deny_ids[cap]}
+                          data-confirm={
+                            "Remove the deny rule for #{cap}? #{@user.name} regains this " <>
+                              "capability from any role or direct grant that provides it."
+                          }
                         />
                       </span>
                     </div>
