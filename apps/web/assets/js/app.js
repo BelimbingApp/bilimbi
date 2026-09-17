@@ -28,13 +28,14 @@ import AppShell from "./app_shell"
 import DateTime from "./date_time"
 import InlineEdit from "./inline_edit"
 import DashboardSort from "./dashboard_sort"
+import MultiSelectDismiss from "./multi_select"
 import SecretReveal from "./secret_reveal"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, AppShell, DateTime, InlineEdit, DashboardSort, SecretReveal},
+  hooks: {...colocatedHooks, AppShell, DateTime, InlineEdit, DashboardSort, MultiSelectDismiss, SecretReveal},
 })
 
 // Show progress bar on live navigation and form submits

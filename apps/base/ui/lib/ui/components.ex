@@ -543,7 +543,7 @@ defmodule Bilimbi.Base.UI.Components do
           name={@name}
           id={@id}
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
-          class={field_class(@class, @error_class, @errors, "pr-10")}
+          class={[field_class(@class, @error_class, @errors), "pr-10"]}
           {@rest}
         />
         <button
@@ -624,9 +624,9 @@ defmodule Bilimbi.Base.UI.Components do
   or "3 roles selected") with a chevron icon, and toggles a floating menu containing
   checkboxes for each option.
 
-  The trigger's `aria-expanded` follows the menu. Clicking the trigger again
-  or clicking outside closes it; Escape closes it from the trigger or from
-  any option and returns focus to the trigger.
+  The trigger's `aria-expanded` follows the menu. Clicking the trigger again,
+  clicking outside, or moving focus out of the field closes it; Escape closes
+  it from anywhere inside the open menu and returns focus to the trigger.
 
   ## Examples
 
@@ -732,9 +732,17 @@ defmodule Bilimbi.Base.UI.Components do
     # `aria-expanded` follows the list because the same command moves both.
     # Click-away sits on the wrapper: LiveView dispatches click-away before
     # the click it belongs to, so a click-away on the list itself would close
-    # and the trigger's toggle would reopen in the same click. Only Escape
-    # returns focus to the trigger; an outside click leaves focus where the
-    # user put it.
+    # and the trigger's toggle would reopen in the same click. The same
+    # command is published as `data-dismiss` for the `MultiSelectDismiss`
+    # hook, which closes the list once focus leaves the wrapper -- Tab past
+    # the last option is the one dismissal LiveView has no binding for. Only
+    # Escape returns focus to the trigger; the other paths leave focus where
+    # the user put it.
+    #
+    # The list is focusable so a click on its padding lands inside the field
+    # rather than on `body`. LiveView reads a key binding from the event
+    # target alone, so every focus stop inside the menu carries its own
+    # Escape.
     id = assigns.id
 
     dismiss =
@@ -761,6 +769,8 @@ defmodule Bilimbi.Base.UI.Components do
     ~H"""
     <div
       id={"#{@id}-wrapper"}
+      phx-hook="MultiSelectDismiss"
+      data-dismiss={@dismiss}
       phx-click-away={@dismiss}
       class={["relative", @wrapper_class || "mb-4"]}
     >
@@ -805,7 +815,10 @@ defmodule Bilimbi.Base.UI.Components do
 
       <div
         id={"#{@id}-options"}
-        class="hidden absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg space-y-0.5"
+        tabindex="-1"
+        phx-keydown={@escape}
+        phx-key="Escape"
+        class="hidden absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg space-y-0.5 focus:outline-none"
       >
         <label
           :for={{opt_label, opt_value} <- @normalized_options}

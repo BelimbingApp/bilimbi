@@ -6,7 +6,10 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
   import Bilimbi.Base.UI.Components
 
   defp secret_field(assigns) do
-    assigns = assign_new(assigns, :disabled, fn -> false end)
+    assigns =
+      assigns
+      |> assign_new(:disabled, fn -> false end)
+      |> assign_new(:class, fn -> nil end)
 
     ~H"""
     <.input
@@ -16,9 +19,19 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
       label="API key"
       value="sk-sample"
       reveal={@reveal}
+      class={@class}
       disabled={@disabled}
     />
     """
+  end
+
+  defp field_class(html) do
+    [value] =
+      Regex.run(~r/<input type="password"[^>]*\sid="api-key"[^>]*\sclass="([^"]*)"/, html,
+        capture: :all_but_first
+      )
+
+    String.split(value, ~r/\s+/, trim: true)
   end
 
   defp js_ops(html, attr, id) do
@@ -80,6 +93,18 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
 
     refute Enum.any?(ops, fn [op | _] -> op == "focus" end),
            "the toggle must not move focus; the hook keeps a pointer press in the input"
+  end
+
+  test "a caller's own field class still reserves the space the control sits in" do
+    html = render_component(&secret_field/1, reveal: true, class: "w-64 border px-3 py-1")
+
+    classes = field_class(html)
+
+    # The control is positioned inside the field, so its space is structural:
+    # replacing the field's look must not run the secret underneath the eye.
+    assert "pr-10" in classes
+    assert "w-64" in classes
+    refute "block" in classes
   end
 
   test "a disabled input disables its reveal control" do
