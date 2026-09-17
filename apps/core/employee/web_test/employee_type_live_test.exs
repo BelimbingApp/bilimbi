@@ -113,11 +113,13 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     grant_capabilities!(["admin.employee-type.list", "admin.employee-type.delete"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
-    assert has_element?(view, "#employee-type-delete-#{type.id}[phx-disable-with='Deleting…']")
+    refute has_element?(view, "#employee-type-delete-#{type.id}[phx-disable-with]")
 
     view
     |> element("#employee-type-delete-#{type.id}")
     |> render_click()
+
+    render_async(view, 5_000)
 
     refute has_element?(view, "#employee-types td", "Temporary")
     assert render(view) =~ "Employee type deleted."
@@ -149,11 +151,20 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
 
-    view
-    |> element("#employee-type-delete-#{type.id}")
-    |> render_click()
+    # The reply to the click is the in-flight render: the row comes back busy
+    # while the delete runs, rather than having its glyph replaced by text.
+    in_flight =
+      view
+      |> element("#employee-type-delete-#{type.id}")
+      |> render_click()
+
+    assert in_flight =~ ~s(aria-busy="true")
+
+    render_async(view, 5_000)
 
     assert render(view) =~ "Cannot delete: employees are using this type."
+    assert has_element?(view, "#employee-type-delete-#{type.id}")
+    refute has_element?(view, "#employee-type-delete-#{type.id}[aria-busy]")
     assert {:ok, _} = Employee.get_employee_type(scope, 73, type.id)
   end
 
@@ -326,6 +337,8 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
            )
 
     view |> element("#employee-type-delete-#{to_delete.id}") |> render_click()
+
+    render_async(view, 5_000)
 
     assert render(view) =~ "Employee type deleted."
     refute has_element?(view, "#employee-types td", "Last Page Type")

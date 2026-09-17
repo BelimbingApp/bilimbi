@@ -168,6 +168,31 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
     assert busy =~ "motion-safe:animate-spin"
     refute busy =~ "hero-trash"
     refute busy =~ "disabled:opacity-50"
+
+    # The spin does not render under prefers-reduced-motion, so the well and
+    # the swapped glyph carry the state on their own.
+    assert busy =~ ~r/\sbg-surface-sunken/
+    assert busy =~ "ring-1 ring-line"
+    refute disabled =~ ~r/\sbg-surface-sunken/
+  end
+
+  test "an icon action refuses the in-flight mechanism that would delete its glyph" do
+    assert_raise ArgumentError, ~r/phx-disable-with replaces a control's text/, fn ->
+      render_component(
+        fn assigns ->
+          ~H"""
+          <.icon_button
+            id="delete-btn"
+            icon="delete"
+            label="Delete company"
+            phx-click="delete"
+            phx-disable-with="Deleting…"
+          />
+          """
+        end,
+        %{}
+      )
+    end
   end
 
   test "busy is refused on a navigation control it cannot make inert" do
