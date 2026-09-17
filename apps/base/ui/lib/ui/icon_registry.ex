@@ -76,6 +76,10 @@ defmodule Bilimbi.Base.UI.IconRegistry do
   @doc "Accepted shell icon meanings; logout preserves Bilimbi's own treatment."
   def shell(action), do: Map.fetch!(@shell, action)
 
+  @doc "Every shell action and the Heroicon it names."
+  @spec shell_actions() :: %{atom() => String.t()}
+  def shell_actions, do: @shell
+
   # One chosen Heroicon per familiar action meaning. Theme and sort keep a
   # name per state because those controls are the meaning, not one glyph.
   @actions %{
