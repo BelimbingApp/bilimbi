@@ -502,11 +502,19 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   # A secret whose caller asked for a reveal control. The toggle is a real
-  # button whose accessible name states the action and the current state. The
-  # type, name, title and glyph swaps are JS commands, which LiveView keeps
-  # sticky across patches, so a form re-render never silently re-masks a value
-  # the user chose to see. The `SecretReveal` hook only keeps a pointer click
-  # on the toggle from pulling focus out of the input.
+  # button whose accessible name states the action and the current state.
+  #
+  # The input's own `type` is the only record of masked-or-shown, and the
+  # click is the single JS command that flips it. LiveView keeps that
+  # attribute sticky across patches, so a form re-render never silently
+  # re-masks a value the user chose to see. The button's accessible name,
+  # title and glyph are derived from `type` by the `SecretReveal` hook rather
+  # than swapped alongside it: LiveView applies an attribute op synchronously
+  # but defers a class op to a later animation frame, so toggling both at once
+  # could invert them -- two clicks inside one frame flipped `type` twice and
+  # the glyph once, leaving a masked input showing the "hide" eye with no path
+  # back. The hook also keeps a pointer press from pulling focus out of the
+  # input.
   def input(%{type: "password", reveal: reveal} = assigns) when reveal not in [false, nil] do
     subject = if is_binary(reveal), do: reveal, else: gettext("secret")
     show_label = gettext("Show %{subject}, currently hidden", subject: subject)
@@ -514,19 +522,13 @@ defmodule Bilimbi.Base.UI.Components do
     show_title = gettext("Show %{subject}", subject: subject)
     hide_title = gettext("Hide %{subject}", subject: subject)
 
-    toggle =
-      JS.toggle_attribute({"type", "text", "password"}, to: "##{assigns.id}")
-      |> JS.toggle_attribute({"aria-label", hide_label, show_label})
-      |> JS.toggle_attribute({"title", hide_title, show_title})
-      |> JS.toggle_class("hidden",
-        to: "##{assigns.id}-reveal-show, ##{assigns.id}-reveal-hide"
-      )
-
     assigns =
       assigns
       |> assign(:show_label, show_label)
+      |> assign(:hide_label, hide_label)
       |> assign(:show_title, show_title)
-      |> assign(:toggle, toggle)
+      |> assign(:hide_title, hide_title)
+      |> assign(:toggle, JS.toggle_attribute({"type", "text", "password"}, to: "##{assigns.id}"))
 
     ~H"""
     <div class={@wrapper_class || "mb-4"}>
@@ -554,6 +556,10 @@ defmodule Bilimbi.Base.UI.Components do
           aria-label={@show_label}
           aria-controls={@id}
           title={@show_title}
+          data-show-label={@show_label}
+          data-hide-label={@hide_label}
+          data-show-title={@show_title}
+          data-hide-title={@hide_title}
           disabled={@rest[:disabled]}
           class="-ml-[1.875rem] grid size-6 shrink-0 place-items-center rounded-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:text-ink-faint"
         >
@@ -754,19 +760,23 @@ defmodule Bilimbi.Base.UI.Components do
     # The trigger carries `aria-expanded` and `aria-controls` and no
     # `aria-haspopup`: the list is a disclosure of checkboxes, not a menu, and
     # `aria-haspopup="true"` would announce menu semantics with arrow-key
-    # navigation that nothing here implements. `aria-expanded` is also the one
-    # record of open the hook watches to know when to listen for Escape.
+    # navigation that nothing here implements.
+    #
+    # The trigger's `aria-expanded` is the only record of open, and every
+    # command below writes that one attribute and nothing else. The list's
+    # visibility and the chevron's rotation are CSS derived from it through
+    # the `peer`/`group` relationships the markup already has, so they cannot
+    # disagree with it. Toggling them alongside the attribute is what they
+    # used to do, and it could invert: LiveView applies an attribute op
+    # synchronously but defers a class op to a later animation frame, so two
+    # activations landing in one frame flipped the attribute twice and the
+    # classes once, leaving an open list announcing `aria-expanded="false"`.
+    # Deriving is also why the accessible state survives a patch for free --
+    # only the attribute has to be sticky.
     id = assigns.id
 
-    dismiss =
-      JS.add_class("hidden", to: "##{id}-options")
-      |> JS.remove_class("rotate-180", to: "##{id}-chevron")
-      |> JS.set_attribute({"aria-expanded", "false"}, to: "##{id}")
-
-    toggle =
-      JS.toggle_class("hidden", to: "##{id}-options")
-      |> JS.toggle_class("rotate-180", to: "##{id}-chevron")
-      |> JS.toggle_attribute({"aria-expanded", "true", "false"}, to: "##{id}")
+    dismiss = JS.set_attribute({"aria-expanded", "false"}, to: "##{id}")
+    toggle = JS.toggle_attribute({"aria-expanded", "true", "false"}, to: "##{id}")
 
     assigns =
       assigns
@@ -805,7 +815,7 @@ defmodule Bilimbi.Base.UI.Components do
         aria-controls={"#{@id}-options"}
         phx-click={@toggle}
         class={[
-          "flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30",
+          "peer group flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30",
           @class
         ]}
         {@rest}
@@ -815,7 +825,7 @@ defmodule Bilimbi.Base.UI.Components do
         </span>
         <span
           id={"#{@id}-chevron"}
-          class="inline-flex shrink-0 transition-transform duration-200"
+          class="inline-flex shrink-0 transition-transform duration-200 group-aria-expanded:rotate-180"
         >
           <.icon
             name="hero-chevron-down"
@@ -827,7 +837,7 @@ defmodule Bilimbi.Base.UI.Components do
       <div
         id={"#{@id}-options"}
         tabindex="-1"
-        class="hidden absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg space-y-0.5 focus:outline-none"
+        class="hidden peer-aria-expanded:block absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg space-y-0.5 focus:outline-none"
       >
         <label
           :for={{opt_label, opt_value} <- @normalized_options}

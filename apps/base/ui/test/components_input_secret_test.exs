@@ -84,31 +84,27 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
     assert html =~ "hero-eye-slash"
   end
 
-  test "the toggle swaps the input type, the accessible name, the title and the glyph together" do
+  test "masked-or-shown is one record: the click writes the input's type and nothing else" do
     html = render_component(&secret_field/1, reveal: "password")
 
     assert html =~ ~s(aria-label="Show password, currently hidden")
 
     ops = js_ops(html, "phx-click", "api-key-reveal")
 
-    assert [
-             ["toggle_attr", %{"attr" => ["type", "text", "password"], "to" => "#api-key"}],
-             [
-               "toggle_attr",
-               %{
-                 "attr" => [
-                   "aria-label",
-                   "Hide password, currently shown",
-                   "Show password, currently hidden"
-                 ]
-               }
-             ],
-             ["toggle_attr", %{"attr" => ["title", "Hide password", "Show password"]}],
-             [
-               "toggle_class",
-               %{"names" => ["hidden"], "to" => "#api-key-reveal-show, #api-key-reveal-hide"}
-             ]
-           ] = ops
+    # A second record could disagree with the first. LiveView writes an
+    # attribute op synchronously but defers a class op to a later animation
+    # frame, so two clicks inside one frame flip an attribute twice and a
+    # class once -- a masked input showing the "hide" glyph, with no dismiss
+    # path to re-sync it. State nobody writes cannot drift, so the name, the
+    # title and the glyph are derived from `type` instead of swapped with it.
+    assert [["toggle_attr", %{"attr" => ["type", "text", "password"], "to" => "#api-key"}]] = ops
+
+    # Both spellings of each derived string ride on the button, so the hook
+    # reads the record and picks; it never has to remember which way it went.
+    assert html =~ ~s(data-show-label="Show password, currently hidden")
+    assert html =~ ~s(data-hide-label="Hide password, currently shown")
+    assert html =~ ~s(data-show-title="Show password")
+    assert html =~ ~s(data-hide-title="Hide password")
 
     refute Enum.any?(ops, fn [op | _] -> op == "focus" end),
            "the toggle must not move focus; the hook keeps a pointer press in the input"
@@ -120,7 +116,7 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
     show = glyph_class(html, "api-key-reveal-show")
     hide = glyph_class(html, "api-key-reveal-hide")
 
-    # The toggle moves `hidden` and nothing else, so any other difference
+    # Deriving moves `hidden` and nothing else, so any other difference
     # between the two spans survives the swap and moves the icon.
     assert "hidden" in hide
     refute "hidden" in show
