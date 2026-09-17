@@ -738,11 +738,19 @@ defmodule Bilimbi.Base.UI.Components do
     #
     # Dismiss and escape are published on the wrapper for the
     # `MultiSelectDismiss` hook, which owns the two dismissals LiveView has
-    # no binding for: focus leaving the field, and a key pressed anywhere
-    # inside it. LiveView reads a key binding from the event target alone, so
-    # an element-level `phx-keydown` here would also stop every key ever
-    # reaching the page's `phx-window-keydown` handlers. The list is focusable
-    # so a click on its padding lands inside the field rather than on `body`.
+    # no binding for: focus leaving the field, and Escape from wherever focus
+    # actually is -- a list opened by mouse in Safari or macOS Firefox is open
+    # with focus still on `body`. LiveView reads a key binding from the event
+    # target alone, so an element-level `phx-keydown` here would also stop
+    # every key ever reaching the page's `phx-window-keydown` handlers. The
+    # list is focusable so a click on its padding lands inside the field
+    # rather than on `body`.
+    #
+    # The trigger carries `aria-expanded` and `aria-controls` and no
+    # `aria-haspopup`: the list is a disclosure of checkboxes, not a menu, and
+    # `aria-haspopup="true"` would announce menu semantics with arrow-key
+    # navigation that nothing here implements. `aria-expanded` is also the one
+    # record of open the hook watches to know when to listen for Escape.
     id = assigns.id
 
     dismiss =
@@ -788,7 +796,6 @@ defmodule Bilimbi.Base.UI.Components do
       <button
         id={@id}
         type="button"
-        aria-haspopup="true"
         aria-expanded="false"
         aria-controls={"#{@id}-options"}
         phx-click={@toggle}
