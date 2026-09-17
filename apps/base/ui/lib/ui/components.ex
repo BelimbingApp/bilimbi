@@ -354,6 +354,11 @@ defmodule Bilimbi.Base.UI.Components do
     doc: "visible rows for a `multiple` select; defaults to 5 so no row is half-painted"
   )
 
+  attr(:selection_label, :string,
+    default: nil,
+    doc: "the singular|plural summary template for a `multi_select` input"
+  )
+
   attr(:class, :any, default: nil, doc: "the input class to use over defaults")
   attr(:error_class, :any, default: nil, doc: "the input error class to use over defaults")
 
@@ -479,8 +484,21 @@ defmodule Bilimbi.Base.UI.Components do
   def input(%{type: "multi_select"} = assigns) do
     {required, rest} = Map.pop(assigns.rest, :required, false)
 
+    # `placeholder` names the empty-selection summary here rather than an HTML
+    # attribute, and a button has none to render. A key left absent lets
+    # `multi_select/1` merge its own declared default; assigning nil would
+    # replace that default with nothing.
+    {placeholder, rest} = Map.pop(rest, :placeholder)
+
+    forwarded =
+      Enum.reject(
+        [placeholder: placeholder, selection_label: assigns.selection_label],
+        fn {_key, value} -> is_nil(value) end
+      )
+
     assigns
     |> assign(required: required == true, rest: rest)
+    |> assign(forwarded)
     |> multi_select()
   end
 

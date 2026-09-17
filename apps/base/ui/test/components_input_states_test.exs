@@ -114,6 +114,42 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
     """
   end
 
+  defp multi_select_labelled(assigns) do
+    ~H"""
+    <.input
+      id="m"
+      name="m"
+      type="multi_select"
+      label="Roles"
+      value={@value}
+      options={[{"Administrator", "admin"}, {"Auditor", "auditor"}]}
+      placeholder="All roles"
+      selection_label=":count role selected|:count roles selected"
+    />
+    """
+  end
+
+  defp multi_select_labelled_direct(assigns) do
+    ~H"""
+    <.multi_select
+      id="m"
+      name="m"
+      label="Roles"
+      value={@value}
+      options={[{"Administrator", "admin"}, {"Auditor", "auditor"}]}
+      placeholder="All roles"
+      selection_label=":count role selected|:count roles selected"
+    />
+    """
+  end
+
+  defp summary_text(html) do
+    assert [_, text] = Regex.run(~r|<button.*?font-normal">(.*?)</span>|s, html),
+           "expected a multi-select summary in:\n#{html}"
+
+    String.trim(text)
+  end
+
   defp control_tag(html, id, tag \\ "input") do
     assert [match] = Regex.run(~r/<#{tag}[^>]*id="#{id}"[^>]*>/, html),
            "expected a <#{tag}> control with id=#{id} in:\n#{html}"
@@ -335,6 +371,27 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
     # `required` is not a conforming attribute on a button, so the global must
     # be consumed rather than splatted onto the trigger.
     refute control_tag(html, "m", "button") =~ ~r/[\s]required(\s|=|>|\/)/
+  end
+
+  test "a multi-select reached through <.input> summarises what the caller asked for" do
+    for {value, expected} <- [
+          {[], "All roles"},
+          {["admin"], "1 role selected"},
+          {["admin", "auditor"], "2 roles selected"}
+        ] do
+      through = render_component(&multi_select_labelled/1, value: value)
+
+      assert summary_text(through) == expected
+
+      # The two routes into the same control must read the same.
+      assert summary_text(through) ==
+               summary_text(render_component(&multi_select_labelled_direct/1, value: value))
+    end
+
+    # `placeholder` is the summary here, not an HTML attribute; a button has
+    # none to render.
+    refute control_tag(render_component(&multi_select_labelled/1, value: []), "m", "button") =~
+             "placeholder="
   end
 
   test "an optional multi-select carries no required marker" do
