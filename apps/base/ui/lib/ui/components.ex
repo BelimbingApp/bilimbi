@@ -625,8 +625,10 @@ defmodule Bilimbi.Base.UI.Components do
   checkboxes for each option.
 
   The trigger's `aria-expanded` follows the menu. Clicking the trigger again,
-  clicking outside, or moving focus out of the field closes it; Escape closes
-  it from anywhere inside the open menu and returns focus to the trigger.
+  clicking outside, or moving focus out of the field closes it. While it is
+  open, Escape closes it from anywhere on the page; focus returns to the
+  trigger only when focus was already inside the field, and otherwise stays
+  where the user put it.
 
   ## Examples
 
