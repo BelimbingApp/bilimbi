@@ -10,34 +10,27 @@
 //
 // Which control that is cannot be read from document.activeElement alone: a
 // browser that does not focus a <button> on click leaves focus on <body>, and
-// the dialog would then have nowhere to return it to. One capture-phase
-// listener records the control the user actually activated instead.
+// the dialog would then have nowhere to return it to. Capture-phase listeners
+// record the control the user actually activated instead. They are armed when
+// app.js imports this module, because the activation that opens the first
+// dialog of a page session happens before any dialog exists to mount a hook.
 const ACTIVATION_TARGETS = "button, a[href], [tabindex]"
 
 let lastActivated = null
-let capturing = false
 
 function rememberActivation({target}) {
   lastActivated = target instanceof Element ? target.closest(ACTIVATION_TARGETS) : null
 }
 
-function captureActivations() {
-  if (capturing) return
-  capturing = true
-
-  document.addEventListener("pointerdown", rememberActivation, true)
-  document.addEventListener(
-    "keydown",
-    (e) => {
-      if (e.key === "Enter" || e.key === " ") rememberActivation(e)
-    },
-    true,
-  )
+function rememberKeyActivation(e) {
+  if (e.key === "Enter" || e.key === " ") rememberActivation(e)
 }
+
+document.addEventListener("pointerdown", rememberActivation, true)
+document.addEventListener("keydown", rememberKeyActivation, true)
 
 const Modal = {
   mounted() {
-    captureActivations()
     this.opener = this.openerFrom(lastActivated) || this.openerFrom(document.activeElement)
 
     // The server renders `open` so a later patch never strips the attribute

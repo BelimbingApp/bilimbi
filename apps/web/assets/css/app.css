@@ -223,8 +223,8 @@ body {
  * `:info` and `:error` flashes cannot be read, announced or dismissed while
  * one is open. A dialog given `flash` renders its own copy of those two and
  * marks itself `data-owns-flash`; only then is the layout's copy hidden, so
- * the same message never appears twice. A dialog without that marker — a
- * LiveComponent panel's, say — leaves the layout flash painted, and the
+ * the same message never appears twice. A dialog without that marker — the
+ * Design Library specimen's, say — leaves the layout flash painted, and the
  * connection banners, which have no in-dialog copy, always stay there. */
 body:has(dialog:modal[data-owns-flash]) #flash-group > #flash-info,
 body:has(dialog:modal[data-owns-flash]) #flash-group > #flash-error {

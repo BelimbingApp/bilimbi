@@ -156,10 +156,11 @@ A short workflow that must finish or be abandoned before the screen continues
   renders its own notice in the dialog. The layout's `:info` and `:error`
   flashes are hidden only while a dialog carrying its own copy is open, so the
   same message never appears twice; a dialog without one, and the connection
-  banners, which never have one, leave the layout's copy painted. Opening any
-  dialog dismisses an earlier action's flash, so a message about finished work
-  is neither announced as this dialog's own nor left stranded and unreadable
-  behind the inert page.
+  banners, which never have one, leave the layout's copy painted. Opening a
+  dialog in a production workflow dismisses an earlier action's flash, so a
+  message about finished work is neither announced as this dialog's own nor
+  left stranded and unreadable behind the inert page; the Design Library
+  specimen, which raises no flash of its own, deliberately dismisses none.
 - **Geometry:** A `rounded-xl` surface at `max-w-lg` for a single-column form
   or `max-w-2xl` for two columns, over an `ink/40` dimmer.
 
