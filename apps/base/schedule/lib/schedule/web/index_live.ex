@@ -454,14 +454,6 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   defp task_status_kind(%{review_state: :disabled}), do: :neutral
   defp task_status_kind(task), do: status_kind(task.last_status)
 
-  defp format_datetime(nil), do: "—"
-
-  defp format_datetime(%DateTime{} = value),
-    do: Calendar.strftime(value, "%Y-%m-%d %H:%M UTC")
-
-  defp format_datetime(%NaiveDateTime{} = value),
-    do: Calendar.strftime(value, "%Y-%m-%d %H:%M UTC")
-
   defp duration(nil), do: "—"
   defp duration(milliseconds) when milliseconds < 1_000, do: "#{milliseconds} ms"
   defp duration(milliseconds), do: "#{Float.round(milliseconds / 1_000, 1)} s"
