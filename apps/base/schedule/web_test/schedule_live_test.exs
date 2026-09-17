@@ -181,6 +181,17 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     assert {:error, :unreviewed} = Schedule.run_now(definition.key)
   end
 
+  test "history date filters name the UTC day they bound", %{conn: conn} do
+    grant_capabilities!(@view)
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule?tab=history")
+
+    assert has_element?(view, "label[for='schedule-run-start-date']", "Start date (UTC)")
+    assert has_element?(view, "label[for='schedule-run-end-date']", "End date (UTC)")
+    assert has_element?(view, "#schedule-run-start-date + p", "UTC")
+    assert has_element?(view, "#schedule-run-end-date + p", "UTC")
+  end
+
   test "history refresh preserves URL filters and never discloses recorded output", %{conn: conn} do
     grant_capabilities!(@view)
 
