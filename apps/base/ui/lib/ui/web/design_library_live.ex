@@ -88,7 +88,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
     "updated_at" => :updated_at
   }
   @sample_initial_directions %{"updated_at" => "desc"}
-  @sample_default_sort "updated_at"
+  @sample_default_sort "name"
 
   @impl true
   def mount(_params, _session, socket) do

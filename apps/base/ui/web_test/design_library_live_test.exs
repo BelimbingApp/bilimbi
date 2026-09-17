@@ -262,7 +262,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     end
 
     assert has_element?(view, "#sample-table", "Acme Holdings")
-    assert has_element?(view, "#sample-table", "Globex Corporation")
+    assert has_element?(view, "#sample-table", "Example Company 10")
     assert has_element?(view, "#nav-admin-system-design-library-components[aria-current='page']")
   end
 
@@ -378,16 +378,24 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     {:ok, view, _html} = open(conn, "/system/design-library/components")
 
     assert has_element?(view, "#sample-sort-updated")
-    assert has_element?(view, "th[aria-sort='descending'] #sample-sort-updated")
-    assert has_element?(view, "#sample-table tr:first-child", "Acme Holdings")
-    assert has_element?(view, "#sample-table tr:nth-child(3)", "Initech LLC")
-
-    view |> element("#sample-sort-name") |> render_click()
     assert has_element?(view, "th[aria-sort='ascending'] #sample-sort-name")
     assert has_element?(view, "th[aria-sort='none'] #sample-sort-updated")
     assert has_element?(view, "#sample-table tr:first-child", "Acme Holdings")
     assert has_element?(view, "#sample-table tr:nth-child(2)", "Example Company 10")
     refute has_element?(view, "#sample-table", "Globex Corporation")
+
+    view |> element("#sample-sort-updated") |> render_click()
+    assert has_element?(view, "th[aria-sort='descending'] #sample-sort-updated")
+    assert has_element?(view, "th[aria-sort='none'] #sample-sort-name")
+    assert has_element?(view, "#sample-table tr:first-child", "Acme Holdings")
+    assert has_element?(view, "#sample-table tr:nth-child(3)", "Initech LLC")
+
+    view |> element("#sample-sort-updated") |> render_click()
+    assert has_element?(view, "th[aria-sort='ascending'] #sample-sort-updated")
+    assert has_element?(view, "#sample-table tr:first-child", "Example Company 120")
+
+    view |> element("#sample-sort-name") |> render_click()
+    assert has_element?(view, "th[aria-sort='ascending'] #sample-sort-name")
 
     view |> element("#sample-sort-name") |> render_click()
     assert has_element?(view, "th[aria-sort='descending'] #sample-sort-name")
