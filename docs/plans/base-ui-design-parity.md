@@ -229,7 +229,10 @@ to a URL this installation does not serve is hidden.
 These are recorded rather than reconciled, because the catalog was written before the
 products were read and the plan forbids treating existence as acceptance.
 
-- **CMP-01** — moving toward Belimbing would be a regression. Belimbing keeps only
+- **CMP-01** — "Partial specimen" understates what ships: complete operational indexes
+  already ship on `/companies`, `/users`, `/audit/mutations` and `/notifications`
+  (Lane D), so the remaining work is one shared composition, not capability. Moving
+  toward Belimbing would also be a regression. Belimbing keeps only
   `page` in the URL and offers 10/20/50/100 page sizes; Bilimbi already mandates
   25/50/100/300 with full URL state. One shipped exception: `/audit/mutations`
   hand-writes a Previous/Next pager instead of `<.pagination>` (Lane A), a Phase 5
@@ -386,7 +389,7 @@ Keeping company and tenant in the top strip makes known context compete with the
 
 ### Brand-strong text contrast (FND-01) is accepted
 
-`text-brand-strong` text, measured by Lane A at 3.06:1 against the 4.5:1 bar at its real 12–13px size, was shown to the captain with both remedies, a darker text lime and reserving brand-strong text for large or bold use, and ruled: "Leave it; the current contrast is acceptable for this product." This is a deliberate accepted decision, not an open defect: later audits cite it instead of reopening it. The ruling covers both call-site families Lane A measured — active-navigation text in `layouts.ex` and the timezone panel's pressed choices in `shell_components.ex` — and nothing else. Lane A's other contrast findings remain open evidence for Phase 3: dark table-header ink at 3.64:1, which a separate change is fixing and which this ruling does not close, and faint ink used as real text. Phase 0 recorded that it did not verify contrast beyond the automated test.
+`text-brand-strong` text, measured by Lane A at 3.06:1 against the 4.5:1 bar at its real 12–13px size, was shown to the captain with both remedies, a darker text lime and reserving brand-strong text for large or bold use, and ruled: "Leave it; the current contrast is acceptable for this product." This is a deliberate accepted decision, not an open defect: later audits cite it instead of reopening it. The ruling covers both call-site families Lane A measured — active-navigation text in `layouts.ex` and the timezone panel's pressed choices in `shell_components.ex` — and nothing else. Lane A's other contrast findings remain open evidence for Phase 3: C2, dark table-header ink at 3.64:1, and C3, faint ink used as real text. A separate in-flight change is addressing both; this ruling closes neither, and neither has landed here. Phase 0 recorded that it did not verify contrast beyond the automated test.
 
 ### Unseen-by-you markers (K05) are orientation
 
