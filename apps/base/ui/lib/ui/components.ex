@@ -1373,7 +1373,18 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   slot(:action, doc: "the slot for showing user actions in the last table column")
-  slot(:empty, doc: "row shown in a sibling tbody when the caller decides the table is empty")
+
+  slot :empty,
+    doc: """
+    row shown in a sibling tbody when the caller decides the table is empty.
+    Plain content renders as given. With `title` or `forbidden` the row is an
+    `empty_state/1` and the slot body is its recovery action, so a table says
+    what is missing and why without a second component.
+    """ do
+    attr(:title, :string, doc: "what is missing, as `empty_state/1` takes it")
+    attr(:reason, :string, doc: "why it is missing")
+    attr(:forbidden, :string, doc: "the action the actor lacks permission for")
+  end
 
   def table(assigns) do
     assigns =
@@ -1443,7 +1454,19 @@ defmodule Bilimbi.Base.UI.Components do
               colspan={table_empty_colspan(@col, @action)}
               class="px-2 py-8 text-center text-sm text-ink-muted"
             >
-              {render_slot(@empty)}
+              <%= for empty <- @empty do %>
+                <%= if empty[:title] || empty[:forbidden] do %>
+                  <.empty_state
+                    title={empty[:title]}
+                    reason={empty[:reason]}
+                    forbidden={empty[:forbidden]}
+                  >
+                    <:action :if={empty[:inner_block]}>{render_slot(empty)}</:action>
+                  </.empty_state>
+                <% else %>
+                  {render_slot(empty)}
+                <% end %>
+              <% end %>
             </td>
           </tr>
         </tbody>
@@ -1451,6 +1474,113 @@ defmodule Bilimbi.Base.UI.Components do
     </div>
     """
   end
+
+  @doc """
+  Renders an empty region: what is missing, why it is missing, and an
+  optional way to recover.
+
+  A region with nothing to show is one of three situations, and the person in
+  front of it has to tell them apart because each asks something different of
+  them:
+
+    * nothing has been created yet: `title` and `reason`, usually with the
+      action that creates the first record;
+    * a search or filter matched nothing: `title` and `reason`, with the
+      action that clears it;
+    * they may not look: `forbidden`.
+
+  The first two are the caller's own sentences, and they must not be one
+  sentence. The third is one wording owned here so that every region that is
+  out of reach says the same plain thing: "You do not have permission to
+  <forbidden>." followed by the recovery, "Ask an operator to review your
+  role." It does not suggest trying again and it does not imply the data is
+  absent.
+
+  `forbidden` beside a `title` keeps the title as the heading and gives the
+  permission wording as the reason: the region is visible but the way to fill
+  it is not, as when a first record cannot be created by this actor.
+
+  `<.table>` reaches this from its `<:empty>` slot, so a table needs no second
+  component. The block carries no padding of its own; the table cell or the
+  caller's region supplies it.
+
+  ## Examples
+
+      <.empty_state title="No companies yet" reason="Companies you create appear here.">
+        <:action>
+          <.button variant="primary" navigate={~p"/companies/create"}>Add Company</.button>
+        </:action>
+      </.empty_state>
+
+      <.empty_state title="No companies match “acme”" reason="Clear the search to see every company.">
+        <:action><.button patch={~p"/companies"}>Clear search</.button></:action>
+      </.empty_state>
+
+      <.empty_state forbidden="view companies" />
+  """
+  attr(:id, :string, default: nil)
+
+  attr(:title, :string,
+    default: nil,
+    doc: "what is missing; required unless `forbidden` is given"
+  )
+
+  attr(:reason, :string, default: nil, doc: "why it is missing")
+
+  attr(:forbidden, :string,
+    default: nil,
+    doc: "the action the actor lacks permission for, such as \"view companies\""
+  )
+
+  attr(:class, :any, default: nil)
+
+  slot(:action,
+    doc: "an optional recovery, such as clearing the search or creating the first record"
+  )
+
+  def empty_state(%{title: nil, forbidden: nil}) do
+    raise ArgumentError,
+          "<.empty_state> needs a title (what is missing) or forbidden (the action the actor lacks)"
+  end
+
+  def empty_state(assigns) do
+    assigns = assign(assigns, empty_state_copy(assigns))
+
+    ~H"""
+    <div id={@id} class={["text-center text-sm", @class]}>
+      <p class="font-medium text-ink">{@heading}</p>
+      <p :for={line <- @details} class="mt-1 text-ink-muted">{line}</p>
+      <div :if={@action != []} class="mt-3 flex flex-wrap items-center justify-center gap-2">
+        {render_slot(@action)}
+      </div>
+    </div>
+    """
+  end
+
+  # The one permission wording. A region the actor may not see states that
+  # plainly and names the recovery; it never says to try again, and never
+  # implies the records do not exist.
+  defp empty_state_copy(%{title: nil, forbidden: forbidden}) do
+    %{heading: permission_wording(forbidden), details: [permission_recovery()]}
+  end
+
+  defp empty_state_copy(%{title: title, reason: reason, forbidden: nil}) do
+    %{heading: title, details: Enum.reject([reason], &is_nil/1)}
+  end
+
+  defp empty_state_copy(%{title: title, reason: reason, forbidden: forbidden}) do
+    %{
+      heading: title,
+      details:
+        Enum.reject(
+          [reason, permission_wording(forbidden) <> " " <> permission_recovery()],
+          &is_nil/1
+        )
+    }
+  end
+
+  defp permission_wording(action), do: "You do not have permission to #{action}."
+  defp permission_recovery, do: "Ask an operator to review your role."
 
   @doc """
   Renders an inline-editable text cell (Belimbing inline-edit pattern).

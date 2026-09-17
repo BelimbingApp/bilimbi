@@ -86,7 +86,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | FBK-01 | Inline alerts | Shared primitive exists | Verify status semantics, copy, contrast, icons and dismissibility. |
 | FBK-02 | Flash and notification behavior | Basic fixed flash | Define stacking, timing, sticky warning/error, manual dismissal and redirect continuity. |
 | FBK-03 | Validation, disabled and loading states | Partial | Make the states visibly distinct and prevent duplicate work. |
-| FBK-04 | Empty, permission, unavailable, error and recovery states | Library specimens exist | Establish reusable page and region patterns with truthful recovery. |
+| FBK-04 | Empty, permission, unavailable, error and recovery states | Shared `<.empty_state>` (what is missing, why, optional recovery) reachable from `<.table>`'s `<:empty>` slot, with one owned permission wording; `/companies` adopts its nothing-yet, nothing-matched and not-permitted states. Unavailable and error states remain the Schedule alerts and layout flashes | Adopt the region pattern on the remaining index and show-page tables; unavailable/reconnect stays unverified. |
 | OVR-01 [(contradicted)](#targets-the-evidence-contradicts) | Standard modal | Missing | Add accessible open, close, Escape, backdrop, focus containment and focus return. |
 | OVR-02 [(contradicted)](#targets-the-evidence-contradicts) | Confirmation modal | Missing | Add consequence-first confirmation without copying Belimbing's accessibility gaps. |
 | OVR-03 | Inspector drawer | Missing | Add only for a real inspector workflow; cover mobile width, resizing and remembered width. |

@@ -581,7 +581,12 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   state. Use `<.datetime>` for timestamps and `<.icon>` for all icons.
   Name user-facing actions through `Bilimbi.Base.UI.IconRegistry` rather than
   raw `hero-*` strings; put product-only SVGs in the same registry. Logout
-  keeps `hero-arrow-right-on-rectangle`. `<.datetime>` already follows a saved
+  keeps `hero-arrow-right-on-rectangle`. An empty region says what is
+  missing, why, and how to recover through `<.empty_state>` or the same
+  `title`/`reason`/`forbidden` attrs on `<.table>`'s `<:empty>` slot;
+  nothing-yet and nothing-matched are different sentences with different
+  recoveries, and a region the actor may not see uses the component's
+  `forbidden` wording rather than looking empty. `<.datetime>` already follows a saved
   clock change on instants that are already on screen, streamed rows included;
   do not thread a `display` assign to achieve that. Pass `display` only to pin
   one instant to a context of your own. Primary actions use

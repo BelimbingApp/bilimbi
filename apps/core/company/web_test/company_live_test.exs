@@ -1,6 +1,7 @@
 defmodule BilimbiWeb.CompanyLiveTest do
   use BilimbiWeb.ConnCase, async: false
 
+  import Ecto.Query, only: [from: 2]
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
@@ -148,6 +149,82 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(view, "#companies td", "Bilimbi Industries")
       assert has_element?(view, "#companies td", "Bilimbi Subsidiary")
+    end
+
+    test "an empty search says what matched nothing and offers to clear it", %{conn: conn} do
+      grant_capabilities!(["admin.company.list"])
+
+      {:ok, view, _html} =
+        conn |> log_in_as() |> live(~p"/companies?search=zzz-no-such-company&sort=name&dir=desc")
+
+      assert has_element?(view, "#companies-empty", "No companies match “zzz-no-such-company”")
+      assert has_element?(view, "#companies-empty", "clear the search")
+      refute has_element?(view, "#companies-empty", "No companies yet")
+
+      view |> element("#companies-clear-search", "Clear search") |> render_click()
+
+      assert_patch(view, ~p"/companies?dir=desc")
+      assert has_element?(view, "#companies td", "Bilimbi Industries")
+      refute has_element?(view, "#companies-empty")
+    end
+
+    test "an empty status filter names the status and offers every status", %{conn: conn} do
+      grant_capabilities!(["admin.company.list"])
+      conn = log_in_as(conn)
+
+      {:ok, view, _html} = live(conn, ~p"/companies?status=suspended")
+
+      assert has_element?(view, "#companies-empty", "No suspended companies")
+      assert has_element?(view, "#companies-empty", "has this status")
+
+      view |> element("#companies-clear-search", "Show all statuses") |> render_click()
+      assert_patch(view, ~p"/companies")
+      assert has_element?(view, "#companies td", "Bilimbi Industries")
+
+      {:ok, view, _html} = live(conn, ~p"/companies?status=suspended&search=zzz")
+
+      assert has_element?(view, "#companies-empty", "No suspended companies match “zzz”")
+      assert has_element?(view, "#companies-clear-search", "Clear search and filter")
+    end
+
+    # A signed-in actor's own company is always a live row of this list, so an
+    # unfiltered empty page cannot be reached by a fresh request. It can be
+    # reached by a mounted view whose rows vanish before its next patch, which
+    # is also the honest shape of the state: the list went empty under them.
+    test "a tenant with no companies yet says so and offers the first create", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.create"])
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies?search=zzz")
+      Repo.delete_all(from(c in "companies", where: c.tenant_id == 41))
+
+      view |> element("#companies-clear-search") |> render_click()
+      assert_patch(view, ~p"/companies")
+
+      assert has_element?(view, "#companies-empty", "No companies yet")
+      refute has_element?(view, "#companies-empty", "match")
+      refute has_element?(view, "#companies-clear-search")
+      assert has_element?(view, "#companies-empty-add[href='/companies/create']", "Add Company")
+    end
+
+    test "a tenant with no companies yet tells an actor who cannot create so, plainly", %{
+      conn: conn
+    } do
+      grant_capabilities!(["admin.company.list"])
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies?search=zzz")
+      Repo.delete_all(from(c in "companies", where: c.tenant_id == 41))
+
+      view |> element("#companies-clear-search") |> render_click()
+      assert_patch(view, ~p"/companies")
+
+      assert has_element?(view, "#companies-empty", "No companies yet")
+
+      assert has_element?(
+               view,
+               "#companies-empty",
+               "You do not have permission to create companies. Ask an operator to review your role."
+             )
+
+      refute has_element?(view, "#companies-empty-add")
+      refute has_element?(view, "#companies-empty", "try again")
     end
   end
 

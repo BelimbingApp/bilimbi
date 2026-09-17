@@ -974,18 +974,60 @@
                 Review the missing address before continuing.
               </.alert><.alert kind={:error}>The record could not be saved.</.alert>
             </div>
+            <div id="component-empty-state" class="space-y-2">
+              <p class="text-xs text-ink-muted">
+                An empty region says what is missing, why, and how to recover. Nothing yet, nothing
+                matched, and not permitted are three different sentences; the permission wording is
+                one sentence owned by the component. A table reaches the same pattern through its
+                empty slot.
+              </p>
+              <div class="grid gap-3 lg:grid-cols-3">
+                <.card title="Nothing yet" inner_class="p-4">
+                  <.empty_state
+                    id="design-library-empty-new"
+                    title="No companies yet"
+                    reason="Companies created in this tenant appear here."
+                  >
+                    <:action>
+                      <.button variant="primary">Add Company</.button>
+                    </:action>
+                  </.empty_state>
+                </.card>
+                <.card title="Nothing matched" inner_class="p-4">
+                  <.empty_state
+                    id="design-library-empty-filtered"
+                    title="No companies match “acme”"
+                    reason="Check the spelling, or clear the search to see every company in this tenant."
+                  >
+                    <:action>
+                      <.button>Clear search</.button>
+                    </:action>
+                  </.empty_state>
+                </.card>
+                <.card title="Not permitted" inner_class="p-4">
+                  <.empty_state id="design-library-empty-forbidden" forbidden="view companies" />
+                </.card>
+              </div>
+              <.card title="Cannot recover here" inner_class="p-4">
+                <.empty_state
+                  id="design-library-empty-forbidden-create"
+                  title="No companies yet"
+                  forbidden="create companies"
+                />
+              </.card>
+              <.table id="design-library-empty-table" rows={[]} caption="Example empty table">
+                <:col :let={row} label="Company">{row.name}</:col>
+                <:col :let={row} label="Status">{row.status}</:col>
+                <:empty
+                  title="No suspended companies"
+                  reason="No company in this tenant has this status. Show all statuses to see every company."
+                >
+                  <.button>Show all statuses</.button>
+                </:empty>
+              </.table>
+            </div>
             <div class="grid gap-3 lg:grid-cols-3">
-              <.card title="Empty workspace" inner_class="p-4 text-center">
-                <.icon name="hero-building-office-2" class="mx-auto size-6 text-ink-faint" /><p class="mt-2 text-sm font-medium text-ink">
-                  No companies yet
-                </p><p class="mt-1 text-xs text-ink-muted">
-                  Create the first company to establish this workspace.
-                </p><.button variant="primary" class="mt-3">Create company</.button>
-              </.card><.card title="Permission denied" inner_class="p-4">
-                <.alert kind={:error}>
-                  You cannot view this area. Ask an operator to review your role.
-                </.alert>
-              </.card><.card title="Connection interrupted" inner_class="p-4">
+              <.card title="Connection interrupted" inner_class="p-4">
                 <.alert kind={:warning}>
                   Bilimbi is reconnecting. Your work has not been submitted twice.
                 </.alert>
