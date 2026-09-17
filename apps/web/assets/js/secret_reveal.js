@@ -18,6 +18,13 @@
 // swap (browsers reset the selection when `type` changes), so the user can
 // look, then keep typing where they were. Keyboard activation still focuses
 // the button as usual.
+//
+// That restore covers the click only, because the click is the only type swap
+// outside a patch. A patch of a focused revealed input writes `type` twice --
+// the server's `password`, then the sticky `text` back -- but LiveView reads
+// the caret before the morph and puts it back after (`restoreFocus`), and a
+// revealed input qualifies at both ends because its live `type` is `text`.
+// Restoring it here too would be a second record of the caret.
 const SecretReveal = {
   mounted() {
     this.input = document.getElementById(this.el.getAttribute("aria-controls"))
