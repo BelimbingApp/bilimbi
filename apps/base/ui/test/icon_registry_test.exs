@@ -75,74 +75,61 @@ defmodule Bilimbi.Base.UI.IconRegistryTest do
              "fullscreen-exit" => "hero-arrows-pointing-in",
              "inspect" => "hero-document-magnifying-glass",
              "dashboard" => "hero-squares-2x2",
-             "status" => "hero-signal",
-             "bilimbi-plus" => "hero-plus",
-             "bilimbi-pencil" => "hero-pencil",
-             "bilimbi-link-slash" => "hero-link-slash",
-             "bilimbi-x-mark" => "hero-x-mark"
+             "status" => "hero-signal"
            }
   end
 
-  test "registers each literal bilimbi-* call site name to its matching Heroicon" do
-    assert {:ok, "hero-plus"} = IconRegistry.action("bilimbi-plus")
-    assert {:ok, "hero-pencil"} = IconRegistry.action("bilimbi-pencil")
-    assert {:ok, "hero-link-slash"} = IconRegistry.action("bilimbi-link-slash")
-    assert {:ok, "hero-x-mark"} = IconRegistry.action("bilimbi-x-mark")
-
-    assert {:hero, "hero-plus"} = IconRegistry.lookup("bilimbi-plus")
-    assert {:hero, "hero-pencil"} = IconRegistry.lookup("bilimbi-pencil")
-    assert {:hero, "hero-link-slash"} = IconRegistry.lookup("bilimbi-link-slash")
-    assert {:hero, "hero-x-mark"} = IconRegistry.lookup("bilimbi-x-mark")
-
-    # Each of the four resolves to a genuinely different Heroicon, so the
-    # "add", "edit", "unlink" and "remove" call sites that use them stop
-    # rendering the same fallback glyph.
-    resolved =
-      for name <- ~w(bilimbi-plus bilimbi-pencil bilimbi-link-slash bilimbi-x-mark) do
-        {:hero, hero_name} = IconRegistry.lookup(name)
-        hero_name
-      end
-
-    assert Enum.uniq(resolved) == resolved
+  test "resolves each action the address and employee panels name to its own Heroicon" do
+    assert {:hero, "hero-plus"} = IconRegistry.lookup("create")
+    assert {:hero, "hero-pencil"} = IconRegistry.lookup("edit")
+    assert {:hero, "hero-link-slash"} = IconRegistry.lookup("unlink")
+    assert {:hero, "hero-x-mark"} = IconRegistry.lookup("close")
   end
 
-  test "renders the previously-broken call site names as distinct, correct icons" do
-    assigns = %{}
+  test "renders those four actions as distinct icons rather than one fallback glyph" do
+    rendered =
+      for name <- ~w(create edit unlink close) do
+        assigns = %{name: name}
 
-    plus_html =
-      rendered_to_string(~H"""
-      <.icon name="bilimbi-plus" class="size-3.5" />
-      """)
+        rendered_to_string(~H"""
+        <.icon name={@name} class="size-3.5" />
+        """)
+      end
 
-    pencil_html =
-      rendered_to_string(~H"""
-      <.icon name="bilimbi-pencil" class="size-3.5" />
-      """)
+    [create_html, edit_html, unlink_html, close_html] = rendered
 
-    link_slash_html =
-      rendered_to_string(~H"""
-      <.icon name="bilimbi-link-slash" class="size-3.5" />
-      """)
+    assert create_html =~ "hero-plus"
+    assert edit_html =~ "hero-pencil"
+    assert unlink_html =~ "hero-link-slash"
+    assert close_html =~ "hero-x-mark"
 
-    x_mark_html =
-      rendered_to_string(~H"""
-      <.icon name="bilimbi-x-mark" class="size-3.5" />
-      """)
+    refute Enum.any?(rendered, &(&1 =~ "hero-square-3-stack-3d"))
+    assert Enum.uniq(rendered) == rendered
+  end
 
-    assert plus_html =~ "hero-plus"
-    assert pencil_html =~ "hero-pencil"
-    assert link_slash_html =~ "hero-link-slash"
-    assert x_mark_html =~ "hero-x-mark"
+  test "refuses the bilimbi-* misspellings of those four actions" do
+    for name <- ~w(bilimbi-plus bilimbi-pencil bilimbi-link-slash bilimbi-x-mark) do
+      assert :error = IconRegistry.action(name)
+      assert :error = IconRegistry.fetch(name)
 
-    # None of them fall back to the generic, meaningless glyph anymore.
-    refute plus_html =~ "hero-square-3-stack-3d"
-    refute pencil_html =~ "hero-square-3-stack-3d"
-    refute link_slash_html =~ "hero-square-3-stack-3d"
-    refute x_mark_html =~ "hero-square-3-stack-3d"
+      assert_raise ArgumentError, ~r/no icon named "#{name}"/, fn ->
+        IconRegistry.lookup(name)
+      end
+    end
+  end
 
-    # And the four rendered outputs are pairwise distinct.
-    assert Enum.uniq([plus_html, pencil_html, link_slash_html, x_mark_html]) ==
-             [plus_html, pencil_html, link_slash_html, x_mark_html]
+  test "renderable?/1 answers exactly whether lookup/1 raises" do
+    for name <- ~w(bilimbi-pin bilimbi-impersonate create edit unlink close hero-made-up) do
+      assert IconRegistry.renderable?(name)
+      refute lookup_raises?(name)
+    end
+
+    for name <- ~w(bilimbi-plus bilimbi-x-mark heroicon-o-bell unknown-icon) do
+      refute IconRegistry.renderable?(name)
+      assert lookup_raises?(name)
+    end
+
+    refute IconRegistry.renderable?(nil)
   end
 
   test "does not register logout or an unknown hero- name" do
@@ -191,5 +178,12 @@ defmodule Bilimbi.Base.UI.IconRegistryTest do
       """)
 
     assert html =~ "hero-plus"
+  end
+
+  defp lookup_raises?(name) do
+    IconRegistry.lookup(name)
+    false
+  rescue
+    ArgumentError -> true
   end
 end

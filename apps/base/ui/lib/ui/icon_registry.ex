@@ -7,17 +7,12 @@ defmodule Bilimbi.Base.UI.IconRegistry do
   rather than a raw `hero-*` string. `<.icon>` still passes unknown names
   beginning with `hero-` through to generated Heroicons.
 
-  A small set of call sites spell an action with its literal `bilimbi-*`
-  Heroicon name (`bilimbi-plus`, `bilimbi-pencil`, `bilimbi-link-slash`,
-  `bilimbi-x-mark`) instead of the semantic name (`create`, `edit`, `unlink`,
-  `close`). Both resolve to the same Heroicon; the `bilimbi-*` spellings are
-  registered as-is rather than rewritten across call sites.
-
-  `lookup/1` raises for any other name that is neither registered here nor a
-  `hero-*` passthrough, instead of silently rendering a generic fallback
-  glyph. Every name actually used by a call site must resolve to something
-  meaningful; use a raw `hero-*` name to reach an icon this module does not
-  name.
+  `lookup/1` raises for a name that is neither registered here nor a `hero-*`
+  passthrough, instead of silently rendering a generic fallback glyph. Every
+  name a call site writes must resolve to something meaningful; use a raw
+  `hero-*` name to reach an icon this module does not name. A name that comes
+  from stored data rather than source is filtered through `renderable?/1`
+  first.
 
   Logout is intentionally absent: Bilimbi keeps `hero-arrow-right-on-rectangle`.
   Destination navigation has no single action glyph; menu contributions keep
@@ -132,16 +127,7 @@ defmodule Bilimbi.Base.UI.IconRegistry do
     "fullscreen-exit" => "hero-arrows-pointing-in",
     "inspect" => "hero-document-magnifying-glass",
     "dashboard" => "hero-squares-2x2",
-    "status" => "hero-signal",
-
-    # Literal `bilimbi-*` spellings of the four actions above, kept for the
-    # call sites that already name the Heroicon directly. Each resolves to
-    # the exact same glyph as its semantic sibling; prefer the semantic name
-    # ("create", "edit", "unlink", "close") at a new call site.
-    "bilimbi-plus" => "hero-plus",
-    "bilimbi-pencil" => "hero-pencil",
-    "bilimbi-link-slash" => "hero-link-slash",
-    "bilimbi-x-mark" => "hero-x-mark"
+    "status" => "hero-signal"
   }
 
   @spec fetch(String.t()) :: {:ok, icon()} | :error
@@ -157,13 +143,38 @@ defmodule Bilimbi.Base.UI.IconRegistry do
 
   A `hero-*` name with no registry entry returns `:error` so `<.icon>` can
   pass it straight through to generated Heroicons. Any other unregistered
-  name raises: a fail-soft registry is how a typo or an unregistered
-  `bilimbi-*`/action name used to render the same meaningless fallback glyph
-  for every caller without anyone noticing. Register the name in `@icons` or
-  `@actions` (or use a raw `hero-*` name) instead of relying on the fallback.
+  name raises: a fail-soft registry is how a misspelled action name used to
+  render the same meaningless fallback glyph for every caller without anyone
+  noticing. Register the name in `@icons` or `@actions` (or use a raw
+  `hero-*` name) instead of relying on a fallback.
+
+  Names supplied by stored data must be filtered through `renderable?/1`
+  first; a legacy payload is not a source typo to fail loudly on.
   """
   @spec lookup(String.t()) :: {:svg, icon()} | {:hero, String.t()} | :error
   def lookup(name) when is_binary(name) do
+    case classify(name) do
+      {:svg, _icon} = resolved -> resolved
+      {:hero, _hero_name} = resolved -> resolved
+      :hero_passthrough -> :error
+      :unregistered -> raise ArgumentError, unregistered_message(name)
+    end
+  end
+
+  def lookup(_name), do: :error
+
+  @doc """
+  Returns true when `<.icon>` renders `name` instead of raising.
+
+  This is the one safe entry point for a name that reaches `<.icon>` from
+  data rather than from source — a Laravel-compatible notification payload,
+  for instance — so the caller can substitute its own default.
+  """
+  @spec renderable?(term()) :: boolean()
+  def renderable?(name) when is_binary(name), do: classify(name) != :unregistered
+  def renderable?(_name), do: false
+
+  defp classify(name) do
     case Map.fetch(@icons, name) do
       {:ok, icon} ->
         {:svg, icon}
@@ -171,17 +182,16 @@ defmodule Bilimbi.Base.UI.IconRegistry do
       :error ->
         case Map.fetch(@actions, name) do
           {:ok, hero_name} -> {:hero, hero_name}
-          :error -> unregistered(name)
+          :error -> classify_unregistered(name)
         end
     end
   end
 
-  def lookup(_name), do: :error
+  defp classify_unregistered("hero-" <> _), do: :hero_passthrough
+  defp classify_unregistered(_name), do: :unregistered
 
-  defp unregistered("hero-" <> _), do: :error
-
-  defp unregistered(name) do
-    raise ArgumentError, """
+  defp unregistered_message(name) do
+    """
     Bilimbi.Base.UI.IconRegistry has no icon named #{inspect(name)}.
 
     Register it in the @icons or @actions map in \
