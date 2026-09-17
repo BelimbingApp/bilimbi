@@ -586,10 +586,11 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   `title`/`reason`/`forbidden` attrs on `<.table>`'s `<:empty>` slot;
   nothing-yet and nothing-matched are different sentences with different
   recoveries, and a region the actor may not see uses the component's
-  `forbidden` wording rather than looking empty. `<.datetime>` already follows a saved
-  clock change on instants that are already on screen, streamed rows included;
-  do not thread a `display` assign to achieve that. Pass `display` only to pin
-  one instant to a context of your own. Primary actions use
+  `forbidden` wording rather than looking empty. `<.datetime>` already
+  follows a saved clock change on instants that are already on screen,
+  streamed rows included; do not thread a `display` assign to achieve
+  that. Pass `display` only to pin one instant to a context of your own.
+  Primary actions use
   `<.button variant="primary">` with deep olive base (`bg-action`, `lime-950`
   light / `lime-600` dark), high-contrast text (`text-action-ink`, `lime-50`
   light / `lime-950` dark), and a brighter lime hover
