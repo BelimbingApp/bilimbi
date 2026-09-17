@@ -63,6 +63,11 @@ module may add a semantic role only when its workflow genuinely needs one.
 - **`action` / `action-hover` / `action-ink`**: Confident primary action
   colours used for primary buttons and page `<h1>` headings. The base remains
   distinct from its brighter hover in both themes.
+- **`success` / `warning` / `danger`** (each with `-surface`, `-line`,
+  `-ink`): Honest status roles for real feedback. A neutral statement has no
+  status role of its own yet: an `:info` flash is painted with `success` and
+  an `:info` alert stays on the neutral surface, because most of the
+  product's `:info` messages report a completed write.
 
 ## Compact typography
 
@@ -285,6 +290,12 @@ flight, give every action a visible and timely response, and keep outcomes
 honest and transparent. Never fail silently. An empty navigation is a
 permission-denied state: say that no destinations are available and name
 the recovery (an operator must assign a role), not a blank rail.
+
+Flash messages stack at the top right, most severe first, so several stay
+readable at once. Info, warning and error stay until the person dismisses
+them, because a message someone must act on must not disappear on a timer.
+Only a success times out, after eight seconds, and nothing emits one yet: the
+timer waits on the confirmation callers that still use info.
 
 ## Reduce anxiety
 

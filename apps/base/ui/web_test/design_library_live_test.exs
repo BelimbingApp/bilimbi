@@ -241,9 +241,12 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
              "#component-header-title-action button.size-6[aria-label='Edit company']"
            )
 
-    assert has_element?(view, "#component-flash > .transform-gpu > #design-library-flash")
-    assert has_element?(view, "#component-flash > .transform-gpu > #design-library-flash-error")
+    for kind <- ~w(error warning success info) do
+      assert has_element?(view, "#component-flash #design-library-flash-#{kind}")
+    end
+
     assert has_element?(view, "#component-flash", "Save failed")
+    assert has_element?(view, "#component-flash", "preference status line")
     assert has_element?(view, "#component-card-titled .border-b h3", "Company profile")
     refute has_element?(view, "#component-card-untitled h3")
     assert has_element?(view, "#component-card-boundary", "no loading, empty, error, or disabled")

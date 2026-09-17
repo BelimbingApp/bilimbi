@@ -939,29 +939,36 @@
                 Short-lived messages, inline guidance, and the empty, blocked and interrupted states. These states are part of the product, not exceptions to its design. Validation, disabled and in-flight states are shown with the controls that have them, under Inputs and Actions.
               </p>
             </div>
-            <%!--
-            The real flash is `position: fixed`, so `transform-gpu` on each wrapper
-            makes the wrapper its containing block and keeps the specimen inside the
-            page. The wrapper must stay unclipped: the panel is wider than the wrapper
-            at narrow widths, and a clipping class cuts off its left edge.
-            --%>
             <div id="component-flash" class="space-y-3">
-              <div class="relative min-h-28 rounded-xl border border-line bg-canvas transform-gpu">
-                <.flash
-                  id="design-library-flash"
-                  kind={:info}
-                  flash={%{"info" => "Your changes were saved."}}
-                  title="Saved"
-                />
-              </div>
-              <div class="relative min-h-28 rounded-xl border border-line bg-canvas transform-gpu">
+              <p class="text-sm text-ink-muted">
+                One message per severity. The layout's flash group is the single production outlet: it stacks messages in one column at the top right, most severe first, so several stay readable at once. Info, warning and error stay until dismissed, because a message someone must act on must not disappear on a timer. Only a success times out, after eight seconds, and no screen emits one yet: the timer waits on the confirmation callers that still use info. Success and info share one colour and differ by icon: most of the product's info messages still report a completed write, so the neutral colour cannot be applied until those callers move to success.
+              </p>
+              <div class="flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
                 <.flash
                   id="design-library-flash-error"
                   kind={:error}
                   flash={%{"error" => "The changes could not be saved."}}
                   title="Save failed"
                 />
+                <.flash
+                  id="design-library-flash-warning"
+                  kind={:warning}
+                  flash={%{"warning" => "Two employees still report to the archived department."}}
+                  title="Review before continuing"
+                />
+                <.flash
+                  id="design-library-flash-success"
+                  kind={:success}
+                  flash={%{"success" => "Your changes were saved."}}
+                  title="Saved"
+                />
+                <.flash id="design-library-flash-info" kind={:info}>
+                  This change affects future records only.
+                </.flash>
               </div>
+              <p class="text-xs text-ink-muted">
+                Deliberately outside this contract: the shell's preference status line under the top bar. It reports the in-flight and settled state of the clock and theme controls in place, written by the shell's own client hook before the server answers, so "Saving…" can show at once and a failure stays beside the control it belongs to. A flash is a server fact rendered after the round trip and cannot do that, so the status line is not folded into this outlet and this outlet does not report preference saves.
+              </p>
             </div>
             <div id="component-alert" class="grid gap-2 lg:grid-cols-2">
               <.alert kind={:info}>This change affects future records.</.alert><.alert kind={

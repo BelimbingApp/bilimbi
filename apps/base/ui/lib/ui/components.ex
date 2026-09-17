@@ -34,14 +34,26 @@ defmodule Bilimbi.Base.UI.Components do
   alias Phoenix.LiveView.JS
 
   @doc """
-  Renders flash notices.
+  Renders one flash message.
+
+  The message is the flash entry for `kind`, or the inner block. Every
+  severity is `role="alert"`; announcing success and info politely instead
+  is deliberate follow-up work, not part of this contract.
+  `:success` and `:info` share the success colouring and differ by icon: most
+  `put_flash(:info, ...)` call sites report a completed write, so the two
+  cannot be told apart by colour until those callers move to `:success`.
+
+  Clicking the message clears it on the server and hides it. The component
+  itself never dismisses on a timer; `Bilimbi.Base.UI.Layouts.flash_group/1`,
+  the one production outlet, stacks the messages and decides which of them
+  time out, so a message a person must act on stays until they dismiss it.
 
   ## Examples
 
       <.flash kind={:info} flash={@flash} />
       <.flash
         id="welcome-back"
-        kind={:info}
+        kind={:success}
         phx-mounted={show("#welcome-back") |> JS.remove_attribute("hidden")}
         hidden
       >
@@ -51,7 +63,12 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:id, :string, doc: "the optional id of flash container")
   attr(:flash, :map, default: %{}, doc: "the map of flash messages to display")
   attr(:title, :string, default: nil)
-  attr(:kind, :atom, values: [:info, :error], doc: "used for styling and flash lookup")
+
+  attr(:kind, :atom,
+    values: [:success, :info, :warning, :error],
+    doc: "the severity: it picks the colour role, the icon, the ARIA role, and the flash lookup"
+  )
+
   attr(:rest, :global, doc: "the arbitrary HTML attributes to add to the flash container")
 
   slot(:inner_block, doc: "the optional inner block that renders the flash message")
@@ -65,16 +82,17 @@ defmodule Bilimbi.Base.UI.Components do
       id={@id}
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
-      class="fixed right-4 top-4 z-50 w-[min(24rem,calc(100vw-2rem))]"
+      class="w-full"
       {@rest}
     >
       <div class={[
         "flex items-start gap-3 rounded-2xl border p-4 text-sm shadow-xl shadow-ink/[0.08] backdrop-blur",
-        @kind == :info && "border-success-line bg-success-surface/95 text-success-ink",
+        @kind in [:success, :info] &&
+          "border-success-line bg-success-surface/95 text-success-ink",
+        @kind == :warning && "border-warning-line bg-warning-surface/95 text-warning-ink",
         @kind == :error && "border-danger-line bg-danger-surface/95 text-danger-ink"
       ]}>
-        <.icon :if={@kind == :info} name="information" class="size-5 shrink-0" />
-        <.icon :if={@kind == :error} name="error" class="size-5 shrink-0" />
+        <.icon name={status_icon(@kind)} class="size-5 shrink-0" />
         <div>
           <p :if={@title} class="font-semibold">{@title}</p>
           <p>{msg}</p>
@@ -87,6 +105,11 @@ defmodule Bilimbi.Base.UI.Components do
     </div>
     """
   end
+
+  defp status_icon(:info), do: "information"
+  defp status_icon(:success), do: "success"
+  defp status_icon(:warning), do: "warning"
+  defp status_icon(:error), do: "error"
 
   @doc """
   Renders an inline status alert (Belimbing's `x-ui.alert` counterpart).
@@ -117,17 +140,7 @@ defmodule Bilimbi.Base.UI.Components do
       ]}
       {@rest}
     >
-      <.icon
-        name={
-          case @kind do
-            :info -> "information"
-            :success -> "success"
-            :warning -> "warning"
-            :error -> "error"
-          end
-        }
-        class="mt-0.5 size-4 shrink-0"
-      />
+      <.icon name={status_icon(@kind)} class="mt-0.5 size-4 shrink-0" />
       <div class="min-w-0">{render_slot(@inner_block)}</div>
     </div>
     """
