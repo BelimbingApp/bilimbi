@@ -119,10 +119,17 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
 
     refute attribute?(idle, "aria-busy")
     refute attribute?(idle, "disabled")
+    refute idle =~ "motion-safe:animate-spin"
 
     assert attribute?(busy, ~s(aria-busy="true"))
     assert attribute?(busy, "disabled")
     assert busy =~ "Saving…"
+
+    # Waiting is not the same picture as unavailable: busy spins at full
+    # strength instead of taking the dimmed disabled treatment.
+    assert busy =~ "motion-safe:animate-spin"
+    assert idle =~ "disabled:opacity-50"
+    refute busy =~ "disabled:opacity-50"
   end
 
   test "an icon button distinguishes busy from disabled for assistive technology" do
@@ -140,7 +147,7 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
       render_component(
         fn assigns ->
           ~H"""
-          <.icon_button id="refresh-btn" icon="refresh" label="Refresh companies" busy />
+          <.icon_button id="delete-btn" icon="delete" label="Delete company" busy />
           """
         end,
         %{}
@@ -148,10 +155,19 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
 
     assert attribute?(disabled, "disabled")
     refute attribute?(disabled, "aria-busy")
+    assert disabled =~ "disabled:opacity-50"
+    refute disabled =~ "motion-safe:animate-spin"
 
     assert attribute?(busy, ~s(aria-busy="true"))
     assert attribute?(busy, "disabled")
-    assert attribute?(busy, ~s(aria-label="Refresh companies"))
+    assert attribute?(busy, ~s(aria-label="Delete company"))
+
+    # The glyph becomes a spinner while the action is pending, so the two
+    # inert states are told apart by sight as well as by screen reader.
+    assert busy =~ "hero-arrow-path"
+    assert busy =~ "motion-safe:animate-spin"
+    refute busy =~ "hero-trash"
+    refute busy =~ "disabled:opacity-50"
   end
 
   # Whether the control's opening tag carries the attribute. The class list

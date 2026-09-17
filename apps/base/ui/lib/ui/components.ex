@@ -184,14 +184,17 @@ defmodule Bilimbi.Base.UI.Components do
   ## In-flight state
 
   A control that has been activated and is waiting for its outcome is
-  `busy`. `phx-disable-with` already covers the client-side round trip of a
-  `phx-click` or `phx-submit`: LiveView disables the control and swaps its
-  label until the server replies. `busy` is the server-known wait that
-  outlives one round trip, such as the sign-in handoff that arms a full form
-  submission. A busy control renders `aria-busy="true"` and is disabled, so
-  assistive technology hears that the work is pending and a second activation
-  cannot start duplicate work. The caller keeps the label truthful
-  ("Saving…", "Opening workspace…").
+  `busy`: it spins, stays at full strength, and renders `aria-busy="true"`
+  and `disabled`, so the wait is visible, is heard by assistive technology,
+  and cannot be started twice. Plain `disabled` dims and never spins, so
+  "not available" never reads as "working". The caller keeps the label
+  truthful ("Saving…", "Opening workspace…").
+
+  `busy` is the server-known wait that outlives one round trip, such as the
+  sign-in handoff that arms a full form submission. The shorter wait of one
+  `phx-click` or `phx-submit` round trip stays `phx-disable-with`'s job:
+  LiveView disables the control and swaps its label, and `app.js` mirrors
+  LiveView's own loading state onto `aria-busy` while it lasts.
   """
   attr(:rest, :global, include: ~w(href navigate patch method download name value disabled type))
 
@@ -229,7 +232,10 @@ defmodule Bilimbi.Base.UI.Components do
         "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
         "transition focus-visible:outline-none focus-visible:ring-2",
         "focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-        "disabled:cursor-not-allowed disabled:opacity-50",
+        if(assigns.busy,
+          do: "cursor-progress",
+          else: "disabled:cursor-not-allowed disabled:opacity-50"
+        ),
         Map.fetch!(variants, assigns[:variant]),
         assigns[:class]
       ])
@@ -238,12 +244,14 @@ defmodule Bilimbi.Base.UI.Components do
     if link?(rest) do
       ~H"""
       <.link class={@class} aria-busy={@busy && "true"} {@rest}>
+        <.icon :if={@busy} name="hero-arrow-path" class="size-4 motion-safe:animate-spin" />
         {render_slot(@inner_block)}
       </.link>
       """
     else
       ~H"""
       <button class={@class} aria-busy={@busy && "true"} {@rest}>
+        <.icon :if={@busy} name="hero-arrow-path" class="size-4 motion-safe:animate-spin" />
         {render_slot(@inner_block)}
       </button>
       """
@@ -267,10 +275,11 @@ defmodule Bilimbi.Base.UI.Components do
   technology and as a tooltip. Keep primary or unfamiliar actions as text
   buttons.
 
-  `disabled` and `busy` follow `button/1`: a disabled action is not available,
-  a busy one was activated and is waiting for its outcome. Both are inert;
-  only the busy one carries `aria-busy`, and its label still names the
-  action so assistive technology can say what is pending.
+  `disabled` and `busy` follow `button/1`: a disabled action is not available
+  and dims, a busy one was activated and is waiting for its outcome, so its
+  glyph becomes a spinner at full strength. Both are inert; only the busy one
+  carries `aria-busy`, and its label still names the action so assistive
+  technology can say what is pending.
   """
   attr(:icon, :string, required: true)
   attr(:label, :string, required: true)
@@ -294,14 +303,19 @@ defmodule Bilimbi.Base.UI.Components do
         "grid shrink-0 place-items-center transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
         assigns.context == :inline && "size-6 rounded-sm",
         assigns.context == :table && "size-7 rounded-md",
-        assigns.kind == :neutral &&
-          "text-ink-muted hover:bg-surface-sunken hover:text-ink disabled:text-ink-faint",
-        assigns.kind == :danger &&
-          "text-danger hover:bg-danger-surface hover:text-danger-ink disabled:text-ink-faint",
-        "disabled:cursor-not-allowed disabled:opacity-50",
+        assigns.kind == :neutral && "text-ink-muted hover:bg-surface-sunken hover:text-ink",
+        assigns.kind == :danger && "text-danger hover:bg-danger-surface hover:text-danger-ink",
+        if(assigns.busy,
+          do: "cursor-progress",
+          else: "disabled:text-ink-faint disabled:cursor-not-allowed disabled:opacity-50"
+        ),
         assigns.class
       ])
-      |> assign(:icon_class, if(assigns.context == :inline, do: "size-3.5", else: "size-4"))
+      |> assign(:icon_name, if(assigns.busy, do: "hero-arrow-path", else: assigns.icon))
+      |> assign(:icon_class, [
+        if(assigns.context == :inline, do: "size-3.5", else: "size-4"),
+        assigns.busy && "motion-safe:animate-spin"
+      ])
       |> assign(:title, rest[:title] || assigns.label)
       |> assign(:control_type, rest[:type] || "button")
       |> assign(
@@ -318,7 +332,7 @@ defmodule Bilimbi.Base.UI.Components do
         class={@control_class}
         {@control_rest}
       >
-        <.icon name={@icon} class={@icon_class} />
+        <.icon name={@icon_name} class={@icon_class} />
       </.link>
       """
     else
@@ -331,7 +345,7 @@ defmodule Bilimbi.Base.UI.Components do
         class={@control_class}
         {@control_rest}
       >
-        <.icon name={@icon} class={@icon_class} />
+        <.icon name={@icon_name} class={@icon_class} />
       </button>
       """
     end

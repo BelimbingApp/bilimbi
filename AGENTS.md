@@ -591,9 +591,10 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   (`hover:bg-action-hover`, `lime-600` light / `lime-500` dark). Lime `brand`
   is reserved for orientation and selection, never an action or status. Async actions
   must show in-flight state, reject duplicate work, and truthfully report the data
-  outcome and recovery: `phx-disable-with` covers one socket round trip, and a wait
-  the server knows about (such as the sign-in handoff) is `<.button busy>` or
-  `<.icon_button busy>`, which disables the control and announces `aria-busy`.
+  outcome and recovery: `phx-disable-with` covers one socket round trip, which
+  `app.js` mirrors onto `aria-busy`, and a wait the server knows about (such as the
+  sign-in handoff) is `<.button busy>` or `<.icon_button busy>`, which disables the
+  control, spins it and announces `aria-busy`.
 - **Flash messages:** `put_flash` kinds are `:success`, `:info`, `:warning`,
   and `:error`. The layout's `flash_group` is the single stacked outlet:
   only success carries the eight-second timer, while info, warning and error

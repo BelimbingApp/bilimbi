@@ -52,6 +52,7 @@ defmodule BilimbiWeb.LoginLive do
 
   def handle_event("login", %{"login" => params}, socket) do
     changeset = login_changeset(params)
+    socket = assign(socket, :form_error, nil)
 
     if changeset.valid? do
       attempt_login(socket, changeset)
