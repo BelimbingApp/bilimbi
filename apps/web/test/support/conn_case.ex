@@ -134,6 +134,12 @@ defmodule BilimbiWeb.ConnCase do
     ExUnit.Assertions.assert(has_element?(view, "dialog##{id} h2##{id}-title", title),
       message: "expected modal dialog ##{id} to be titled #{inspect(title)}"
     )
+
+    ExUnit.Assertions.assert(has_element?(view, "dialog##{id} ##{id}-client-error"),
+      message:
+        "expected modal dialog ##{id} to carry its own connection banners, " <>
+          "since the layout's are inert and dimmed while it is open"
+    )
   end
 
   @doc """

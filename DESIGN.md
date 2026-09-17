@@ -151,12 +151,15 @@ A short workflow that must finish or be abandoned before the screen continues
 - **Closing:** `Escape` and the Cancel button are one action and reach the
   same server handler. Clicking the dimmed page does nothing: the dialog
   usually holds a form, and a stray click must not discard it.
-- **Feedback:** Because the page behind is inert, an outcome raised while the
-  dialog stays open renders inside it — a LiveView passes `flash`, and a panel
-  renders its own notice in the dialog. The layout's `:info` and `:error`
-  flashes are hidden only while a dialog carrying its own copy is open, so the
-  same message never appears twice; a dialog without one, and the connection
-  banners, which never have one, leave the layout's copy painted. Opening a
+- **Feedback:** Because the page behind is inert and the dialog paints above
+  it in the top layer, an outcome raised while the dialog stays open renders
+  inside it — a LiveView passes `flash`, and a panel renders its own notice in
+  the dialog. Every dialog also carries its own connection banners, so a
+  dropped websocket is still announced and dismissable while one is open. The
+  layout's copy of whatever the dialog carries is hidden, so the same message
+  never appears twice; a dialog that carries no `flash` copy leaves the
+  layout's `:info` and `:error` in the DOM, dimmed behind the backdrop until it
+  closes. Opening a
   dialog in a production workflow dismisses an earlier action's flash, so a
   message about finished work is neither announced as this dialog's own nor
   left stranded and unreadable behind the inert page; the Design Library

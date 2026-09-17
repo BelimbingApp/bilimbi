@@ -34,8 +34,6 @@ defmodule Bilimbi.Base.UI.Layouts do
   import Bilimbi.Base.UI.Components
   alias Bilimbi.Base.UI.ShellComponents
 
-  alias Phoenix.LiveView.JS
-
   use Phoenix.VerifiedRoutes,
     router: Bilimbi.Base.UI.RouteContract,
     endpoint: Bilimbi.Base.UI.ScriptPath,
@@ -538,35 +536,7 @@ defmodule Bilimbi.Base.UI.Layouts do
     <div id={@id} aria-live="polite">
       <.flash kind={:info} flash={@flash} />
       <.flash kind={:error} flash={@flash} />
-
-      <.flash
-        id="client-error"
-        kind={:error}
-        title={gettext("Connection interrupted")}
-        phx-disconnected={
-          show(".phx-client-error #client-error")
-          |> JS.remove_attribute("hidden", to: ".phx-client-error #client-error")
-        }
-        phx-connected={hide("#client-error") |> JS.set_attribute({"hidden", ""})}
-        hidden
-      >
-        {gettext("Reconnecting…")}
-      </.flash>
-
-      <.flash
-        id="server-error"
-        kind={:error}
-        title={gettext("Server unavailable")}
-        phx-disconnected={
-          show(".phx-server-error #server-error")
-          |> JS.remove_attribute("hidden", to: ".phx-server-error #server-error")
-        }
-        phx-connected={hide("#server-error") |> JS.set_attribute({"hidden", ""})}
-        hidden
-      >
-        {gettext("Attempting to reconnect")}
-        <.icon name="hero-arrow-path" class="ml-1 size-3 animate-spin" />
-      </.flash>
+      <.connection_banners id="connection" />
     </div>
     """
   end

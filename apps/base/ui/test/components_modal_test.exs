@@ -15,10 +15,12 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
   Returning focus to the control that opened the dialog is the `Modal` hook's
   alone: no caller marks its opener, and the hook records the control the user
   activated rather than reading `document.activeElement`, which a browser that
-  does not focus a `<button>` on click leaves on `<body>`. Only the rendered
-  contract is checked here — that every dialog carries the hook and no call
-  site supplies a focus target. The recording itself needs a browser, and this
-  repository has no JavaScript test tooling, so a reviewer confirms it there.
+  does not focus a `<button>` on click leaves on `<body>`. None of that is
+  proven anywhere in this repository: it needs a real browser, there is no
+  JavaScript test tooling here, and the hook's presence on every production
+  dialog — which `assert_modal_dialog/3` does check — is not evidence that it
+  returns focus. A reviewer confirms Escape, focus entry and focus return in a
+  browser.
   """
 
   use ExUnit.Case, async: true
@@ -119,16 +121,17 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
     assert [dialog_tag] = Regex.run(~r/<dialog[^>]*>/, with_flash)
     assert dialog_tag =~ "data-owns-flash"
 
-    refute without_flash =~ "flash"
+    assert [plain_tag] = Regex.run(~r/<dialog[^>]*id="plain"[^>]*>/, without_flash)
+    refute plain_tag =~ "data-owns-flash"
+    refute without_flash =~ ~s(id="plain-flash-error")
+    refute without_flash =~ ~s(id="plain-flash-info")
   end
 
-  test "focus return is carried by the hook, not by a per-caller focus target" do
+  test "the dialog carries its own connection banners, named after it" do
     markup = render_modal(%{described: false})
 
-    assert [dialog_tag] = Regex.run(~r/<dialog[^>]*>/, markup)
-    assert dialog_tag =~ ~s(phx-hook="Modal")
-
-    refute markup =~ "phx-focus"
-    refute markup =~ "autofocus"
+    assert markup =~ ~s(id="attach-modal-client-error")
+    assert markup =~ ~s(id="attach-modal-server-error")
+    assert markup =~ "Reconnecting"
   end
 end

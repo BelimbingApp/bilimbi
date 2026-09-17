@@ -89,6 +89,60 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Renders the two connection banners for one container.
+
+  They report a dropped or unreachable websocket, and LiveView reveals them
+  from the client — the server is by definition not reachable to re-render
+  when they matter. Both ids derive from `id`, so a container can carry its
+  own pair without colliding with another's.
+
+  An open modal dialog is promoted to the browser's top layer and makes the
+  rest of the page inert, so the layout's pair can be neither painted above
+  the dimmer, announced nor dismissed while one is open. `modal/1` renders a
+  second pair inside the dialog for that reason, and the layout's is hidden
+  while a dialog is open so the same banner never appears twice.
+  """
+  attr(:id, :string, required: true)
+
+  def connection_banners(assigns) do
+    assigns =
+      assigns
+      |> assign(:client_id, "#{assigns.id}-client-error")
+      |> assign(:server_id, "#{assigns.id}-server-error")
+
+    ~H"""
+    <.flash
+      id={@client_id}
+      kind={:error}
+      title={gettext("Connection interrupted")}
+      phx-disconnected={
+        show(".phx-client-error ##{@client_id}")
+        |> JS.remove_attribute("hidden", to: ".phx-client-error ##{@client_id}")
+      }
+      phx-connected={hide("##{@client_id}") |> JS.set_attribute({"hidden", ""})}
+      hidden
+    >
+      {gettext("Reconnecting…")}
+    </.flash>
+
+    <.flash
+      id={@server_id}
+      kind={:error}
+      title={gettext("Server unavailable")}
+      phx-disconnected={
+        show(".phx-server-error ##{@server_id}")
+        |> JS.remove_attribute("hidden", to: ".phx-server-error ##{@server_id}")
+      }
+      phx-connected={hide("##{@server_id}") |> JS.set_attribute({"hidden", ""})}
+      hidden
+    >
+      {gettext("Attempting to reconnect")}
+      <.icon name="hero-arrow-path" class="ml-1 size-3 animate-spin" />
+    </.flash>
+    """
+  end
+
+  @doc """
   Renders an inline status alert (Belimbing's `x-ui.alert` counterpart).
 
   Kinds map to the honest status roles: `:info`, `:success`, `:warning`,
@@ -1181,6 +1235,10 @@ defmodule Bilimbi.Base.UI.Components do
   group can be neither read nor dismissed while one is open; the dialog
   renders its own copy instead, and the layout's copy is hidden.
 
+  The dialog also carries its own `connection_banners/1`, because the page
+  behind it is inert and painted under the dimmer: a dropped websocket must
+  still be announced and dismissable while a dialog is open.
+
   Every production caller dismisses the layout flash as it opens a dialog, so
   a message about finished work is neither adopted as the new dialog's own
   feedback nor stranded unreadable behind the inert page. A LiveView does that
@@ -1254,6 +1312,7 @@ defmodule Bilimbi.Base.UI.Components do
       </h2>
       <.flash :if={@flash} kind={:error} id={"#{@id}-flash-error"} flash={@flash} />
       <.flash :if={@flash} kind={:info} id={"#{@id}-flash-info"} flash={@flash} />
+      <.connection_banners id={@id} />
       <p :if={@description != []} id={"#{@id}-description"} class="mt-1 text-xs text-ink-subtle">
         {render_slot(@description)}
       </p>

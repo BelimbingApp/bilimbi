@@ -219,15 +219,19 @@ body {
   min-width: 20rem;
 }
 
-/* An open modal dialog makes the rest of the page inert, so the layout's
- * `:info` and `:error` flashes cannot be read, announced or dismissed while
- * one is open. A dialog given `flash` renders its own copy of those two and
- * marks itself `data-owns-flash`; only then is the layout's copy hidden, so
- * the same message never appears twice. A dialog without that marker — the
- * Design Library specimen's, say — leaves the layout flash painted, and the
- * connection banners, which have no in-dialog copy, always stay there. */
+/* An open modal dialog is promoted to the top layer and makes the rest of the
+ * page inert, so anything left in the layout's flash group paints under the
+ * dimmer and can be neither announced nor dismissed while one is open. Every
+ * dialog renders its own connection banners, and a dialog given `flash` also
+ * renders its own `:info` and `:error` copy and marks itself
+ * `data-owns-flash`. Hide the layout copy of whatever the open dialog carries,
+ * so the same message never appears twice. A dialog without that marker — the
+ * Design Library specimen's, say — leaves the layout flash in the DOM, dimmed
+ * behind the backdrop until the dialog closes. */
 body:has(dialog:modal[data-owns-flash]) #flash-group > #flash-info,
-body:has(dialog:modal[data-owns-flash]) #flash-group > #flash-error {
+body:has(dialog:modal[data-owns-flash]) #flash-group > #flash-error,
+body:has(dialog:modal) #flash-group > #connection-client-error,
+body:has(dialog:modal) #flash-group > #connection-server-error {
   visibility: hidden;
 }
 
