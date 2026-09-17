@@ -63,6 +63,13 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     conn |> log_in_as() |> live(path)
   end
 
+  defp query(view, selector) do
+    view
+    |> render()
+    |> LazyHTML.from_fragment()
+    |> LazyHTML.query(selector)
+  end
+
   defp area_text(view, selector) do
     view
     |> element(selector)
@@ -286,6 +293,35 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-input-live-state", "Bilimbi Holdings")
     assert has_element?(view, "#component-input-live-state", "operator")
     assert has_element?(view, "#component-input-live-state", "dark")
+  end
+
+  test "the Components inputs specimen shows the opt-in reveal on a field the server leaves empty",
+       %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    # The control the intent asked for is on the page it names: a real button
+    # pointed at the field it unmasks, naming the action and the state.
+    assert has_element?(
+             view,
+             "#component-inputs button#sample_api_key_field-reveal" <>
+               "[aria-controls='sample_api_key_field']" <>
+               "[aria-label='Show API key, currently hidden']"
+           )
+
+    # Reveal is a caller option, so the sibling secret specimen has none and
+    # a screen like sign-in stays masked.
+    assert has_element?(view, "#component-inputs input#sample_password_field[type='password']")
+    refute has_element?(view, "#sample_password_field-reveal")
+
+    # This specimen is what a caller copies, and revealing a secret the server
+    # already holds is not supported: its plaintext is in the rendered HTML
+    # and the eye would put it on screen. So the revealable field ships with
+    # no value at all, unlike every other seeded specimen on this page.
+    api_key = query(view, "#sample_api_key_field")
+
+    assert [_attrs] = LazyHTML.attributes(api_key)
+    assert LazyHTML.attribute(api_key, "value") == []
+    assert LazyHTML.attribute(query(view, "#sample_password_field"), "value") == ["secret-value"]
   end
 
   test "both pagination specimens update their own rows and page size", %{conn: conn} do
