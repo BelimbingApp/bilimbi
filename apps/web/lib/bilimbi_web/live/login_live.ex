@@ -12,7 +12,9 @@ defmodule BilimbiWeb.LoginLive do
     * a session-expired notice when an expired session is bounced here;
     * on success, a painted "Signed in. Opening your workspace…" state while
       the session form submits and the browser navigates; the submit button
-      is busy and both fields are readonly until the workspace appears.
+      is busy and both fields are readonly until the workspace appears. That
+      state is painted first and the form armed second, because arming it
+      stops LiveView patching the controls inside it.
 
   What differs is Bilimbi's own: the workspace strip under the card names
   the platform this is signing into, and the geometry follows `DESIGN.md`'s
@@ -88,20 +90,32 @@ defmodule BilimbiWeb.LoginLive do
     end
   end
 
+  # The handoff takes two patches, not one. Once a form carries
+  # `phx-trigger-action` LiveView freezes its controls: every one of them
+  # merges attributes and keeps the children it already has, so a submit
+  # button first painted busy in that same patch would keep the label and
+  # glyph it wore before it was pressed, for the whole POST to /session. The
+  # busy paint therefore lands on its own, and the form is armed by the next
+  # message.
   defp complete_login(socket, user, key) do
     case UserAuth.session_user(user) do
       {:ok, session_user} ->
         :ok = RateLimit.reset(key)
+        send(self(), :arm_session_form)
 
         {:noreply,
          socket
          |> assign(:phase, :opening)
-         |> assign(:login_token, UserAuth.sign_login_token(session_user))
-         |> assign(:trigger_action, true)}
+         |> assign(:login_token, UserAuth.sign_login_token(session_user))}
 
       {:error, :tenant_unavailable} ->
         {:noreply, put_form_error(socket, "This account is not attached to an active workspace.")}
     end
+  end
+
+  @impl true
+  def handle_info(:arm_session_form, socket) do
+    {:noreply, assign(socket, :trigger_action, true)}
   end
 
   # The failure is a form-level outcome, not a field format error, so it goes

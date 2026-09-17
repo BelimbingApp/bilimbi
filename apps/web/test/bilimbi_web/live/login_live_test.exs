@@ -163,11 +163,25 @@ defmodule BilimbiWeb.LoginLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/")
 
-    view
-    |> form("#login-form",
-      login: %{email: "ada@example.com", password: "c0rrect-horse-battery"}
-    )
-    |> render_submit()
+    handoff =
+      view
+      |> form("#login-form",
+        login: %{email: "ada@example.com", password: "c0rrect-horse-battery"}
+      )
+      |> render_submit()
+
+    # The reply to the submit is the busy paint, and it arrives before the
+    # form is armed. Arming it stops LiveView patching the controls inside
+    # it: from then on they merge attributes and keep the children they
+    # already have, so a button first painted busy in that patch would read
+    # "Log in" at full strength for the whole POST to /session.
+    painted = LazyHTML.from_fragment(handoff)
+
+    assert painted
+           |> LazyHTML.query("#login-submit[aria-busy='true'][disabled]")
+           |> LazyHTML.text() =~ "Opening workspace…"
+
+    assert Enum.empty?(LazyHTML.query(painted, "#login-form[phx-trigger-action]"))
 
     # The two-phase Belimbing handoff: the LiveView paints the confirmed
     # state and arms the session form for full navigation.

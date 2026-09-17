@@ -106,16 +106,11 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
   end
 
   @impl true
-  def handle_event("delete", _params, %{assigns: %{deleting_type_id: id}} = socket)
-      when not is_nil(id) do
-    {:noreply, socket}
-  end
-
   def handle_event("delete", %{"id" => id_str}, socket) do
     if allowed?(socket.assigns.current_scope, "admin.employee-type.delete") do
       case Integer.parse(id_str) do
         {type_id, ""} ->
-          start_delete(socket, type_id)
+          request_delete(socket, type_id)
 
         _ ->
           {:noreply, put_flash(socket, :error, "Could not delete employee type.")}
@@ -153,6 +148,28 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
 
   def handle_async(:delete_employee_type, _result, socket) do
     {:noreply, delete_failed(socket, "Could not delete employee type.")}
+  end
+
+  # `start_async/3` is keyed by name, so one delete runs at a time. A repeat of
+  # the row already deleting is the request that is already running and needs
+  # nothing; any other confirmed delete is refused out loud, because a
+  # destructive action the operator confirmed must never be dropped in silence.
+  defp request_delete(socket, type_id) do
+    case socket.assigns.deleting_type_id do
+      nil ->
+        start_delete(socket, type_id)
+
+      ^type_id ->
+        {:noreply, socket}
+
+      _another ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Another employee type is still being deleted. Try again once it finishes."
+         )}
+    end
   end
 
   # The delete runs outside the event so the row can paint its in-flight state
