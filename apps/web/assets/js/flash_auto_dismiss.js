@@ -1,8 +1,8 @@
 // Dismisses a transient flash after the delay the server wrote on it.
 //
-// The layout's flash group attaches this hook only to `:success` and `:info`
-// messages; a warning or an error never carries it, so nothing a person must
-// act on can disappear on a timer. Dismissal reuses the element's own click
+// The layout's flash group attaches this hook only to `:success` messages;
+// info, warning and error never carry it, so nothing a person must act on can
+// disappear on a timer. Dismissal reuses the element's own click
 // command — clear the flash on the server, then hide it — so a timed dismissal
 // and a clicked one leave the same state behind.
 const FlashAutoDismiss = {

@@ -1,8 +1,8 @@
 defmodule Bilimbi.Base.UI.LayoutsFlashGroupTest do
   @moduledoc """
   Tests for `Layouts.flash_group/1`, the one production outlet for flash
-  messages: every severity present at once is readable, and only the
-  severities a reader can take in at their own pace dismiss on a timer.
+  messages: every severity present at once is readable, and only a completed
+  write confirms itself away on a timer.
   """
 
   use ExUnit.Case, async: true
@@ -49,11 +49,11 @@ defmodule Bilimbi.Base.UI.LayoutsFlashGroupTest do
     end
   end
 
-  test "success and info dismiss on a timer; warning and error stay until dismissed" do
+  test "success dismisses on a timer; info, warning and error stay until dismissed" do
     html = render_group(@all)
 
     assert timed?(html, "flash-success")
-    assert timed?(html, "flash-info")
+    refute timed?(html, "flash-info")
     refute timed?(html, "flash-warning")
     refute timed?(html, "flash-error")
   end

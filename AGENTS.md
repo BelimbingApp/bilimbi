@@ -594,8 +594,10 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   outcome and recovery.
 - **Flash messages:** `put_flash` kinds are `:success`, `:info`, `:warning`,
   and `:error`. The layout's `flash_group` is the single stacked outlet:
-  success and info dismiss themselves, warning and error stay until
-  dismissed. `:success` and `:info` still share the success colouring because
+  success dismisses itself, while info, warning and error stay until
+  dismissed. Info is excluded from the timer deliberately, because callers
+  currently use it for actionable failure notices.
+  `:success` and `:info` still share the success colouring because
   most `put_flash(:info, ...)` call sites report a completed write; correcting
   that means migrating those callers, not repainting `:info`. The shell's
   preference status line is deliberately not a flash. Do not build a second
