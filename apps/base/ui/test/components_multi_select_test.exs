@@ -85,7 +85,7 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
            ] = js_ops(html, "phx-click", "roles-filter")
   end
 
-  test "Escape closes the list from anywhere inside the menu and returns focus to the trigger" do
+  test "Escape closes the list and returns focus to the trigger, from one binding on the field" do
     html =
       render_component(&multi_select_field/1,
         placeholder: "All roles",
@@ -94,28 +94,22 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
         value: []
       )
 
-    # The trigger, the list itself and both option checkboxes: LiveView only
-    # matches a key binding on the element that has it, so a wrapper binding
-    # would miss all four.
-    assert length(Regex.scan(~r/phx-key="Escape"/, html)) == 4
+    # Not one key binding anywhere in the field: LiveView matches `phx-keydown`
+    # on the event target alone, and a match there stops every key -- not only
+    # Escape -- reaching the page's `phx-window-keydown` handlers.
+    refute html =~ "phx-keydown"
+    refute html =~ "phx-key"
 
-    # Every focus stop inside the open menu is one of those four, because the
+    assert [
+             ["add_class", %{"names" => ["hidden"], "to" => "#roles-filter-options"}],
+             ["remove_class", %{"names" => ["rotate-180"], "to" => "#roles-filter-chevron"}],
+             ["set_attr", %{"attr" => ["aria-expanded", "false"], "to" => "#roles-filter"}],
+             ["focus", %{"to" => "#roles-filter"}]
+           ] = js_ops(html, "data-escape", "roles-filter-wrapper")
+
+    # Every focus stop inside the open menu is under that wrapper, because the
     # list takes focus itself when a click lands on its padding.
     assert html =~ ~r/id="roles-filter-options"[^>]*\stabindex="-1"/
-
-    for id <- [
-          "roles-filter",
-          "roles-filter-options",
-          "roles-filter-option-1",
-          "roles-filter-option-2"
-        ] do
-      assert [
-               ["add_class", %{"names" => ["hidden"], "to" => "#roles-filter-options"}],
-               ["remove_class", %{"names" => ["rotate-180"], "to" => "#roles-filter-chevron"}],
-               ["set_attr", %{"attr" => ["aria-expanded", "false"], "to" => "#roles-filter"}],
-               ["focus", %{"to" => "#roles-filter"}]
-             ] = js_ops(html, "phx-keydown", id)
-    end
   end
 
   test "an outside click closes the list from the wrapper without moving focus" do

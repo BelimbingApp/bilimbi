@@ -732,17 +732,17 @@ defmodule Bilimbi.Base.UI.Components do
     # `aria-expanded` follows the list because the same command moves both.
     # Click-away sits on the wrapper: LiveView dispatches click-away before
     # the click it belongs to, so a click-away on the list itself would close
-    # and the trigger's toggle would reopen in the same click. The same
-    # command is published as `data-dismiss` for the `MultiSelectDismiss`
-    # hook, which closes the list once focus leaves the wrapper -- Tab past
-    # the last option is the one dismissal LiveView has no binding for. Only
-    # Escape returns focus to the trigger; the other paths leave focus where
-    # the user put it.
+    # and the trigger's toggle would reopen in the same click. Only Escape
+    # returns focus to the trigger; the other paths leave focus where the
+    # user put it.
     #
-    # The list is focusable so a click on its padding lands inside the field
-    # rather than on `body`. LiveView reads a key binding from the event
-    # target alone, so every focus stop inside the menu carries its own
-    # Escape.
+    # Dismiss and escape are published on the wrapper for the
+    # `MultiSelectDismiss` hook, which owns the two dismissals LiveView has
+    # no binding for: focus leaving the field, and a key pressed anywhere
+    # inside it. LiveView reads a key binding from the event target alone, so
+    # an element-level `phx-keydown` here would also stop every key ever
+    # reaching the page's `phx-window-keydown` handlers. The list is focusable
+    # so a click on its padding lands inside the field rather than on `body`.
     id = assigns.id
 
     dismiss =
@@ -771,6 +771,7 @@ defmodule Bilimbi.Base.UI.Components do
       id={"#{@id}-wrapper"}
       phx-hook="MultiSelectDismiss"
       data-dismiss={@dismiss}
+      data-escape={@escape}
       phx-click-away={@dismiss}
       class={["relative", @wrapper_class || "mb-4"]}
     >
@@ -791,8 +792,6 @@ defmodule Bilimbi.Base.UI.Components do
         aria-expanded="false"
         aria-controls={"#{@id}-options"}
         phx-click={@toggle}
-        phx-keydown={@escape}
-        phx-key="Escape"
         class={[
           "flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30",
           @class
@@ -816,8 +815,6 @@ defmodule Bilimbi.Base.UI.Components do
       <div
         id={"#{@id}-options"}
         tabindex="-1"
-        phx-keydown={@escape}
-        phx-key="Escape"
         class="hidden absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg space-y-0.5 focus:outline-none"
       >
         <label
@@ -831,8 +828,6 @@ defmodule Bilimbi.Base.UI.Components do
             name={@input_name}
             value={opt_value}
             checked={opt_value in @selected_values}
-            phx-keydown={@escape}
-            phx-key="Escape"
             class="size-4 shrink-0 rounded border-line text-action accent-action focus:ring-2 focus:ring-brand-strong/30"
           />
           <span class="truncate font-normal">{opt_label}</span>
