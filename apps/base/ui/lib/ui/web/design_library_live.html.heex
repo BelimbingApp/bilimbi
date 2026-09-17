@@ -470,7 +470,7 @@
         <div id="component-content" class="min-w-0 space-y-9">
           <section id="component-shell" class="scroll-mt-4 space-y-3">
             <h2 class="text-base font-semibold text-ink">
-              Application shell <span class="text-xs text-muted">LAY-02 · NAV-05</span>
+              Application shell
             </h2>
             <p class="text-sm text-muted">
               Your account stays at the bottom left. Open it for company, tenant and account actions. Unusual access stays visible while you work.
@@ -960,17 +960,30 @@
             </div>
             <div id="component-table" class="space-y-2">
               <p class="text-xs text-ink-muted">
-                Example companies; changes stay in this preview.
+                Example companies; sort by any heading. Changes stay in this preview.
               </p>
-              <.table id="sample-table" rows={@sample_rows} caption="Example companies">
-                <:col :let={row} label="Company">
+              <.table
+                id="sample-table"
+                rows={@streams.sample_rows}
+                row_id={fn {dom_id, _} -> dom_id end}
+                row_item={fn {_, row} -> row end}
+                sort_by={@sample_sort.sort_by}
+                sort_dir={@sample_sort.sort_dir}
+                sort_event="sample-sort"
+                caption="Example companies"
+              >
+                <:col :let={row} label="Company" sort="name" sort_id="sample-sort-name">
                   <span class="font-medium text-ink-strong">{row.name}</span>
-                </:col><:col :let={row} label="Code">{row.code}</:col><:col
-                  :let={row}
-                  label="Status"
-                >
+                </:col><:col :let={row} label="Code" sort="code" sort_id="sample-sort-code">
+                  {row.code}
+                </:col><:col :let={row} label="Status" sort="status" sort_id="sample-sort-status">
                   <.badge kind={row.kind}>{row.status}</.badge>
-                </:col><:col :let={row} label="Updated">
+                </:col><:col
+                  :let={row}
+                  label="Updated"
+                  sort="updated_at"
+                  sort_id="sample-sort-updated"
+                >
                   <.datetime
                     id={"sample-updated-#{row.id}"}
                     value={row.updated_at}
@@ -1241,7 +1254,7 @@
           </div>
           <section id="spec-shell" class="space-y-3">
             <h2 class="text-base font-semibold text-ink">
-              Application shell · LAY-02 / NAV-05 / FND-06
+              Application shell
             </h2>
             <p class="text-sm text-muted">
               Account details belong behind the bottom-left circle. Platform-operator and impersonated access remain visible above the workspace. An account works in one company and tenant, so the menu shows the current scope and offers no switching.

@@ -280,6 +280,46 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
            )
   end
 
+  test "the canonical table sorts by its headings and starts each sort on page one", %{
+    conn: conn
+  } do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    assert has_element?(view, "#sample-sort-updated")
+    assert has_element?(view, "th[aria-sort='descending'] #sample-sort-updated")
+    assert has_element?(view, "#sample-table tr:first-child", "Acme Holdings")
+    assert has_element?(view, "#sample-table tr:nth-child(3)", "Initech LLC")
+
+    view |> element("#sample-sort-name") |> render_click()
+    assert has_element?(view, "th[aria-sort='ascending'] #sample-sort-name")
+    assert has_element?(view, "th[aria-sort='none'] #sample-sort-updated")
+    assert has_element?(view, "#sample-table tr:first-child", "Acme Holdings")
+    assert has_element?(view, "#sample-table tr:nth-child(2)", "Example Company 10")
+    refute has_element?(view, "#sample-table", "Globex Corporation")
+
+    view |> element("#sample-sort-name") |> render_click()
+    assert has_element?(view, "th[aria-sort='descending'] #sample-sort-name")
+    assert has_element?(view, "#sample-table tr:first-child", "Initech LLC")
+    assert has_element?(view, "#sample-table tr:nth-child(2)", "Globex Corporation")
+
+    view |> element("#design-library-pagination-page-5") |> render_click()
+    assert has_element?(view, "#design-library-pagination-summary", "Showing 101 to 120")
+    view |> element("#sample-sort-status") |> render_click()
+    assert has_element?(view, "#design-library-pagination-summary", "Showing 1 to 25")
+    assert has_element?(view, "th[aria-sort='ascending'] #sample-sort-status")
+    assert has_element?(view, "#sample-table tr:first-child", "active")
+    assert has_element?(view, "#sample-table tr:nth-child(25)")
+    refute has_element?(view, "#sample-table tr:nth-child(26)")
+    assert has_element?(view, "#design-library-pattern-table", "Acme Holdings")
+  end
+
+  test "no Design Library area renders a parity catalog identifier", %{conn: conn} do
+    for path <- @paths do
+      {:ok, _view, html} = open(conn, path)
+      refute html =~ ~r/\b[A-Z]{3,4}-\d{2}\b/, "#{path} renders a catalog identifier"
+    end
+  end
+
   test "example actions preview fictional facts without linking to business records", %{
     conn: conn
   } do
