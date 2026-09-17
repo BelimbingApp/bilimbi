@@ -30,7 +30,7 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
 
     assert html =~ "All roles"
     assert html =~ ~s(id="roles-filter-options")
-    assert html =~ "hidden absolute"
+    assert html =~ "hidden peer-aria-expanded:block absolute"
     assert html =~ ~s(id="roles-filter-option-1")
     assert html =~ ~s(id="roles-filter-option-2")
     refute html =~ "checked"
@@ -81,13 +81,48 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
     refute html =~ "aria-haspopup"
 
     assert [
-             ["toggle_class", %{"names" => ["hidden"], "to" => "#roles-filter-options"}],
-             ["toggle_class", %{"names" => ["rotate-180"], "to" => "#roles-filter-chevron"}],
              [
                "toggle_attr",
                %{"attr" => ["aria-expanded", "true", "false"], "to" => "#roles-filter"}
              ]
            ] = js_ops(html, "phx-click", "roles-filter")
+  end
+
+  test "open is one record: the list and the chevron derive from it, nothing else toggles" do
+    html =
+      render_component(&multi_select_field/1,
+        placeholder: "All roles",
+        selection_label: "1 role selected|:count roles selected",
+        options: [{"Auditor", "1"}, {"Admin", "2"}],
+        value: []
+      )
+
+    # A second record could disagree with the first. LiveView writes an
+    # attribute op synchronously but defers a class op to a later animation
+    # frame, so two activations inside one frame flip an attribute twice and a
+    # class once -- an open list announcing `aria-expanded="false"`. That
+    # cannot happen to state nobody writes, so every command writes exactly
+    # the one attribute and nothing else, however many of them land.
+    for {attr, id} <- [
+          {"phx-click", "roles-filter"},
+          {"data-dismiss", "roles-filter-wrapper"},
+          {"data-escape", "roles-filter-wrapper"},
+          {"phx-click-away", "roles-filter-wrapper"}
+        ] do
+      writes = js_ops(html, attr, id) |> Enum.reject(fn [op | _] -> op == "focus" end)
+
+      assert [[_, %{"to" => "#roles-filter"}]] = writes,
+             "#{attr} must write only the trigger's aria-expanded, got: #{inspect(writes)}"
+
+      refute Enum.any?(writes, fn [op | _] -> String.contains?(op, "class") end),
+             "#{attr} must not carry a class op: derived state cannot be toggled"
+    end
+
+    # The list and the chevron read that attribute through the sibling and
+    # ancestor relationships the markup already has.
+    assert html =~ ~r/id="roles-filter"[^>]*\sclass="peer group /
+    assert html =~ ~r/id="roles-filter-options"[^>]*\sclass="hidden peer-aria-expanded:block/
+    assert html =~ ~r/id="roles-filter-chevron"[^>]*group-aria-expanded:rotate-180/
   end
 
   test "the field publishes a close-and-refocus command for Escape from inside it" do
@@ -106,8 +141,6 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
     refute html =~ "phx-key"
 
     assert [
-             ["add_class", %{"names" => ["hidden"], "to" => "#roles-filter-options"}],
-             ["remove_class", %{"names" => ["rotate-180"], "to" => "#roles-filter-chevron"}],
              ["set_attr", %{"attr" => ["aria-expanded", "false"], "to" => "#roles-filter"}],
              ["focus", %{"to" => "#roles-filter"}]
            ] = js_ops(html, "data-escape", "roles-filter-wrapper")
@@ -128,8 +161,6 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
     assert length(Regex.scan(~r/phx-click-away=/, html)) == 1
 
     assert [
-             ["add_class", _],
-             ["remove_class", _],
              ["set_attr", %{"attr" => ["aria-expanded", "false"], "to" => "#roles-filter"}]
            ] = js_ops(html, "phx-click-away", "roles-filter-wrapper")
   end
@@ -151,8 +182,6 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
     ops = js_ops(html, "data-dismiss", "roles-filter-wrapper")
 
     assert [
-             ["add_class", %{"names" => ["hidden"], "to" => "#roles-filter-options"}],
-             ["remove_class", %{"names" => ["rotate-180"], "to" => "#roles-filter-chevron"}],
              ["set_attr", %{"attr" => ["aria-expanded", "false"], "to" => "#roles-filter"}]
            ] = ops
 
