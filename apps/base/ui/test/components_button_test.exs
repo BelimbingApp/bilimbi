@@ -113,6 +113,65 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
     assert table =~ "text-danger hover:bg-danger-surface"
   end
 
+  test "a busy button says so to assistive technology and refuses a second activation" do
+    idle = render_button(false)
+    busy = render_button(true)
+
+    refute attribute?(idle, "aria-busy")
+    refute attribute?(idle, "disabled")
+
+    assert attribute?(busy, ~s(aria-busy="true"))
+    assert attribute?(busy, "disabled")
+    assert busy =~ "Saving…"
+  end
+
+  test "an icon button distinguishes busy from disabled for assistive technology" do
+    disabled =
+      render_component(
+        fn assigns ->
+          ~H"""
+          <.icon_button id="impersonate-btn" icon="bilimbi-impersonate" label="Impersonate user" disabled />
+          """
+        end,
+        %{}
+      )
+
+    busy =
+      render_component(
+        fn assigns ->
+          ~H"""
+          <.icon_button id="refresh-btn" icon="refresh" label="Refresh companies" busy />
+          """
+        end,
+        %{}
+      )
+
+    assert attribute?(disabled, "disabled")
+    refute attribute?(disabled, "aria-busy")
+
+    assert attribute?(busy, ~s(aria-busy="true"))
+    assert attribute?(busy, "disabled")
+    assert attribute?(busy, ~s(aria-label="Refresh companies"))
+  end
+
+  # Whether the control's opening tag carries the attribute. The class list
+  # names `disabled:` variants, so a bare substring check would lie.
+  defp attribute?(html, attribute) do
+    [tag] = Regex.run(~r/<button[^>]*>/, html)
+    tag =~ ~r/\s#{Regex.escape(attribute)}(?=[\s>])/
+  end
+
+  defp render_button(busy) do
+    render_component(
+      fn assigns ->
+        ~H"""
+        <.button id="busy-btn" type="submit" variant="primary" busy={@busy}>Saving…</.button>
+        """
+      end,
+      %{busy: busy}
+    )
+  end
+
   test "caller-supplied class extends variant styling" do
     html =
       render_component(

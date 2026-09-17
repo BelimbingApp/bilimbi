@@ -31,6 +31,14 @@ defmodule BilimbiWeb.LoginLiveTest do
     assert has_element?(view, "#login-submit", "Log in")
   end
 
+  test "the fields are editable and the button idle before a submit", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    refute has_element?(view, "#login-submit[aria-busy]")
+    refute has_element?(view, "#login-email[readonly]")
+    refute has_element?(view, "#login-password[readonly]")
+  end
+
   test "validates required fields without leaving the page", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/")
 
@@ -54,6 +62,31 @@ defmodule BilimbiWeb.LoginLiveTest do
       |> render_submit()
 
     assert html =~ "These credentials do not match our records."
+
+    # The failure is announced the way the forgot-password confirmation is:
+    # through an alert region, so a screen reader hears that the attempt failed.
+    assert has_element?(
+             view,
+             "#login-form-error [role='alert']",
+             "These credentials do not match our records."
+           )
+  end
+
+  test "announces the lockout the same way as a credential failure", %{conn: conn} do
+    Company.TestFixtures.insert_tenant!(%{id: 41})
+    Company.TestFixtures.insert_company!(%{id: 73, tenant_id: 41})
+
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    for _ <- 1..6 do
+      view
+      |> form("#login-form", login: %{email: "ada@example.com", password: "wr0ng-wr0ng"})
+      |> render_submit()
+    end
+
+    assert has_element?(view, "#login-form-error [role='alert']", "Too many sign-in attempts")
+
+    BilimbiWeb.RateLimit.reset({:login, "ada@example.com", "127.0.0.1"})
   end
 
   test "signs in with valid credentials and opens the workspace", %{conn: conn} do
@@ -83,6 +116,13 @@ defmodule BilimbiWeb.LoginLiveTest do
     assert has_element?(view, "#login-opening", "Signed in. Opening your workspace…")
     assert has_element?(view, "#login-submit[disabled]")
     assert has_element?(view, "#login-form[phx-trigger-action]")
+
+    # While the handoff is in flight the button says so to assistive
+    # technology and the fields can no longer be edited, but they stay
+    # readonly rather than disabled so their values still submit.
+    assert has_element?(view, "#login-submit[aria-busy='true']", "Opening workspace…")
+    assert has_element?(view, "#login-email[readonly]:not([disabled])")
+    assert has_element?(view, "#login-password[readonly]:not([disabled])")
 
     # The armed form carries a token the session controller accepts.
     assert render(view) =~ "login[_token]"

@@ -646,7 +646,7 @@
               <h2 id="component-button" class="text-base font-semibold text-ink-strong">
                 Actions <span class="text-xs text-muted">ACT-01 · ACT-02</span>
               </h2><p class="text-sm text-ink-muted">
-                Primary, secondary, destructive, disabled, navigation, and in-flight examples. Consequence copy and typed acknowledgement (ACT-03) are not built.
+                Primary, secondary, destructive, disabled, navigation, in-flight, and busy examples. Consequence copy and typed acknowledgement (ACT-03) are not built.
               </p>
             </div>
             <div class="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-4 shadow-xs">
@@ -656,10 +656,13 @@
                 phx-click="test_click"
                 variant="primary"
                 phx-disable-with="Working…"
-              >Clicked: {@click_count}</.button>
+              >Clicked: {@click_count}</.button><.button variant="primary" busy>Saving…</.button>
             </div>
+            <p class="text-xs text-ink-muted">
+              Clicked goes in flight for one round trip: LiveView disables it and shows "Working…" until the server replies. Busy is the wait the server knows about, such as a sign-in that is opening the workspace: the control is disabled and carries <code>aria-busy</code>, so assistive technology hears that work is pending. Disabled means the action is not available at all.
+            </p>
             <.card id="component-icon-button" title="Compact icon actions" inner_class="p-4">
-              <div class="flex items-center gap-4">
+              <div class="flex flex-wrap items-center gap-4">
                 <div class="flex items-center gap-2 text-sm text-ink-muted">
                   Inline
                   <.icon_button
@@ -672,9 +675,27 @@
                   Table <.icon_button icon="edit" label="Edit company" />
                   <.icon_button icon="delete" label="Delete company" kind={:danger} />
                 </div>
+                <div class="flex items-center gap-2 text-sm text-ink-muted">
+                  Disabled
+                  <.icon_button
+                    id="component-icon-button-disabled"
+                    icon="bilimbi-impersonate"
+                    label="Impersonate user"
+                    disabled
+                  />
+                </div>
+                <div class="flex items-center gap-2 text-sm text-ink-muted">
+                  Busy
+                  <.icon_button
+                    id="component-icon-button-busy"
+                    icon="refresh"
+                    label="Refresh companies"
+                    busy
+                  />
+                </div>
               </div>
               <p class="mt-3 text-xs text-ink-muted">
-                Use icon-only controls for familiar repeated actions. Keep primary and unfamiliar actions as words.
+                Use icon-only controls for familiar repeated actions. Keep primary and unfamiliar actions as words. Disabled and busy are both inert; only busy carries <code>aria-busy</code>, and its label still names the action that is pending.
               </p>
             </.card>
           </section>
