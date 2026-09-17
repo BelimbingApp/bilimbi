@@ -34,6 +34,12 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
     String.split(value, ~r/\s+/, trim: true)
   end
 
+  defp glyph_class(html, id) do
+    [value] = Regex.run(~r/<span id="#{id}" class="([^"]*)"/, html, capture: :all_but_first)
+
+    String.split(value, ~r/\s+/, trim: true)
+  end
+
   defp js_ops(html, attr, id) do
     [value] = Regex.run(~r/id="#{id}"[^>]*\s#{attr}="([^"]*)"/, html, capture: :all_but_first)
 
@@ -93,6 +99,19 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
 
     refute Enum.any?(ops, fn [op | _] -> op == "focus" end),
            "the toggle must not move focus; the hook keeps a pointer press in the input"
+  end
+
+  test "the two glyphs differ only by `hidden`, so the control holds still as it toggles" do
+    html = render_component(&secret_field/1, reveal: true)
+
+    show = glyph_class(html, "api-key-reveal-show")
+    hide = glyph_class(html, "api-key-reveal-hide")
+
+    # The toggle moves `hidden` and nothing else, so any other difference
+    # between the two spans survives the swap and moves the icon.
+    assert "hidden" in hide
+    refute "hidden" in show
+    assert hide -- ["hidden"] == show
   end
 
   test "a caller's own field class still reserves the space the control sits in" do
