@@ -359,6 +359,16 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:wrapper_class, :any, default: nil, doc: "the class for the control wrapper")
   attr(:label_class, :any, default: nil, doc: "the class for the control label")
 
+  attr(:reveal, :any,
+    default: false,
+    doc: """
+    adds a show/hide control to a `password` input. `false` keeps the value
+    masked with no control, which is right for sign-in. `true` names the value
+    a secret; a string such as `"password"` or `"API key"` is the noun the
+    control's accessible name uses instead. Any other type rejects it.
+    """
+  )
+
   attr(:rest, :global,
     include: ~w(accept autocomplete capture cols disabled form list max maxlength min minlength
                 multiple pattern placeholder readonly required rows size step)
@@ -379,6 +389,12 @@ defmodule Bilimbi.Base.UI.Components do
   # empty and the label would announce to nothing. Fall back to the input name.
   def input(%{id: nil, name: name} = assigns) when is_binary(name) do
     assigns |> assign(:id, name) |> input()
+  end
+
+  def input(%{reveal: reveal, type: type})
+      when reveal not in [false, nil] and type != "password" do
+    raise ArgumentError,
+          "reveal only applies to a password input; got reveal=#{inspect(reveal)} on type=#{inspect(type)}"
   end
 
   def input(%{type: "hidden"} = assigns) do
@@ -485,6 +501,76 @@ defmodule Bilimbi.Base.UI.Components do
     """
   end
 
+  # A secret whose caller asked for a reveal control. The toggle is a real
+  # button whose accessible name states the action and the current state. The
+  # type, name, title and glyph swaps are JS commands, which LiveView keeps
+  # sticky across patches, so a form re-render never silently re-masks a value
+  # the user chose to see. The `SecretReveal` hook only keeps a pointer click
+  # on the toggle from pulling focus out of the input.
+  def input(%{type: "password", reveal: reveal} = assigns) when reveal not in [false, nil] do
+    subject = if is_binary(reveal), do: reveal, else: gettext("secret")
+    show_label = gettext("Show %{subject}, currently hidden", subject: subject)
+    hide_label = gettext("Hide %{subject}, currently shown", subject: subject)
+    show_title = gettext("Show %{subject}", subject: subject)
+    hide_title = gettext("Hide %{subject}", subject: subject)
+
+    toggle =
+      JS.toggle_attribute({"type", "text", "password"}, to: "##{assigns.id}")
+      |> JS.toggle_attribute({"aria-label", hide_label, show_label})
+      |> JS.toggle_attribute({"title", hide_title, show_title})
+      |> JS.toggle_class("hidden",
+        to: "##{assigns.id}-reveal-show, ##{assigns.id}-reveal-hide"
+      )
+
+    assigns =
+      assigns
+      |> assign(:show_label, show_label)
+      |> assign(:show_title, show_title)
+      |> assign(:toggle, toggle)
+
+    ~H"""
+    <div class={@wrapper_class || "mb-4"}>
+      <label
+        :if={@label}
+        for={@id}
+        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
+      >
+        {@label}
+      </label>
+      <div class="relative">
+        <input
+          type="password"
+          name={@name}
+          id={@id}
+          value={Phoenix.HTML.Form.normalize_value(@type, @value)}
+          class={field_class(@class, @error_class, @errors, "pr-10")}
+          {@rest}
+        />
+        <button
+          id={"#{@id}-reveal"}
+          type="button"
+          phx-hook="SecretReveal"
+          phx-click={@toggle}
+          aria-label={@show_label}
+          aria-controls={@id}
+          title={@show_title}
+          disabled={@rest[:disabled]}
+          class="absolute right-1.5 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:text-ink-faint"
+        >
+          <span id={"#{@id}-reveal-show"} class="grid">
+            <.icon name="reveal" class="size-4" />
+          </span>
+          <span id={"#{@id}-reveal-hide"} class="hidden">
+            <.icon name="conceal" class="size-4" />
+          </span>
+        </button>
+      </div>
+      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={msg <- @errors}>{msg}</.error>
+    </div>
+    """
+  end
+
   # All other inputs text, datetime-local, url, password, etc. are handled here...
   def input(assigns) do
     ~H"""
@@ -537,6 +623,10 @@ defmodule Bilimbi.Base.UI.Components do
   Displays a button showing the selection summary (e.g. "All roles", "1 role selected",
   or "3 roles selected") with a chevron icon, and toggles a floating menu containing
   checkboxes for each option.
+
+  The trigger's `aria-expanded` follows the menu. Clicking the trigger again
+  or clicking outside closes it; Escape closes it from the trigger or from
+  any option and returns focus to the trigger.
 
   ## Examples
 
@@ -639,6 +729,24 @@ defmodule Bilimbi.Base.UI.Components do
         assigns.selection_label
       )
 
+    # `aria-expanded` follows the list because the same command moves both.
+    # Click-away sits on the wrapper: LiveView dispatches click-away before
+    # the click it belongs to, so a click-away on the list itself would close
+    # and the trigger's toggle would reopen in the same click. Only Escape
+    # returns focus to the trigger; an outside click leaves focus where the
+    # user put it.
+    id = assigns.id
+
+    dismiss =
+      JS.add_class("hidden", to: "##{id}-options")
+      |> JS.remove_class("rotate-180", to: "##{id}-chevron")
+      |> JS.set_attribute({"aria-expanded", "false"}, to: "##{id}")
+
+    toggle =
+      JS.toggle_class("hidden", to: "##{id}-options")
+      |> JS.toggle_class("rotate-180", to: "##{id}-chevron")
+      |> JS.toggle_attribute({"aria-expanded", "true", "false"}, to: "##{id}")
+
     assigns =
       assigns
       |> assign(:input_name, input_name)
@@ -646,10 +754,14 @@ defmodule Bilimbi.Base.UI.Components do
       |> assign(:normalized_options, normalized_options)
       |> assign(:selected_count, selected_count)
       |> assign(:summary_label, summary_label)
+      |> assign(:dismiss, dismiss)
+      |> assign(:toggle, toggle)
+      |> assign(:escape, JS.focus(dismiss, to: "##{id}"))
 
     ~H"""
     <div
       id={"#{@id}-wrapper"}
+      phx-click-away={@dismiss}
       class={["relative", @wrapper_class || "mb-4"]}
     >
       <input type="hidden" name={@input_name} value="" />
@@ -668,10 +780,9 @@ defmodule Bilimbi.Base.UI.Components do
         aria-haspopup="true"
         aria-expanded="false"
         aria-controls={"#{@id}-options"}
-        phx-click={
-          JS.toggle_class("hidden", to: "##{@id}-options")
-          |> JS.toggle_class("rotate-180", to: "##{@id}-chevron")
-        }
+        phx-click={@toggle}
+        phx-keydown={@escape}
+        phx-key="Escape"
         class={[
           "flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30",
           @class
@@ -694,10 +805,6 @@ defmodule Bilimbi.Base.UI.Components do
 
       <div
         id={"#{@id}-options"}
-        phx-click-away={
-          JS.add_class("hidden", to: "##{@id}-options")
-          |> JS.remove_class("rotate-180", to: "##{@id}-chevron")
-        }
         class="hidden absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg space-y-0.5"
       >
         <label
@@ -711,6 +818,8 @@ defmodule Bilimbi.Base.UI.Components do
             name={@input_name}
             value={opt_value}
             checked={opt_value in @selected_values}
+            phx-keydown={@escape}
+            phx-key="Escape"
             class="size-4 shrink-0 rounded border-line text-action accent-action focus:ring-2 focus:ring-brand-strong/30"
           />
           <span class="truncate font-normal">{opt_label}</span>
