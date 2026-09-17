@@ -114,7 +114,7 @@ during long operational sessions:
 - **Row padding:** `py-0.5` (`0.125rem` / `2px`), `px-2` (`0.5rem` / `8px`) horizontal cell padding.
 - **Header padding:** `py-1.5` (`0.375rem` / `6px`), `px-2` horizontal header padding.
 - **Header background:** `bg-surface-sunken`.
-- **Header typography:** Proper case `text-xs font-semibold text-muted`.
+- **Header typography:** Proper case `text-xs font-semibold text-muted` (`text-ink-subtle`).
 - **Body typography:** `text-sm text-ink`, with `tabular-nums text-muted` (`text-ink-muted`) for codes, IDs, currencies, phones, populations, dates, and measurements.
 - **Search & filter toolbar:** Search and filters sit together in an open
   toolbar with `mb-2` above the table surface. Do not wrap the toolbar in a
@@ -137,6 +137,12 @@ table view:
 Use contrast, borders, and shadows with restraint. Motion should clarify state,
 continuity, or completion at roughly 60fps. It must not delay work or create
 attention noise.
+
+Motion is opt-out at the platform, not per component. A single
+`prefers-reduced-motion: reduce` rule in `apps/web/assets/css/app.css` collapses
+every transition and animation to one frame, so anyone whose operating system
+asks for reduced motion gets a still product everywhere. Components and
+templates do not carry their own `motion-reduce` variants.
 
 Use Phoenix and LiveView loading states honestly. Users should know when work is
 in flight, waiting, blocked, or complete.

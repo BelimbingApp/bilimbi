@@ -1,7 +1,7 @@
 # Base UI Design Parity
 
 **Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families. Application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display are merged to `main`; the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
-**Last Updated:** 2026-09-16
+**Last Updated:** 2026-09-17
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
 **Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`
 
@@ -139,7 +139,7 @@ rather than being quietly reconciled.
 | FND-02 Typography | Keep Bilimbi | none |
 | FND-03 Spacing rhythm | Adopt adapted — named spacing roles, Bilimbi values | before LAY-05, CMP-01…03 |
 | FND-04 Shape and elevation | Keep Bilimbi | none |
-| FND-05 Focus and motion | Adopt adapted — one focus contract, per-transition `motion-reduce` | before ACT-01, INP-01 |
+| FND-05 Focus and motion | Adopt adapted — one focus contract; reduced motion shipped as a single global `prefers-reduced-motion` rule in `app.css`, so no component carries `motion-reduce` | before ACT-01, INP-01 |
 | FND-06 Icon language | Adopt adapted — searchable catalog; finish the migration | #719 |
 | LAY-01 Authentication shell | Keep Bilimbi | none |
 | LAY-02 Application shell | Adopt adapted — shipped in #711, confirmed live | none |

@@ -127,7 +127,7 @@
     --color-ink-strong: var(--color-stone-50);
     --color-ink: var(--color-stone-100);
     --color-ink-muted: var(--color-stone-400);
-    --color-ink-subtle: var(--color-stone-500);
+    --color-ink-subtle: var(--color-stone-400);
     --color-ink-faint: var(--color-stone-600);
     --color-ink-inverse: var(--color-stone-950);
     --color-link: var(--color-stone-300);
@@ -170,7 +170,7 @@
   --color-ink-strong: var(--color-stone-50);
   --color-ink: var(--color-stone-100);
   --color-ink-muted: var(--color-stone-400);
-  --color-ink-subtle: var(--color-stone-500);
+  --color-ink-subtle: var(--color-stone-400);
   --color-ink-faint: var(--color-stone-600);
   --color-ink-inverse: var(--color-stone-950);
   --color-link: var(--color-stone-300);
@@ -221,11 +221,11 @@ body {
 
 /* Reduced motion (parity finding M1). One global rule, not a per-component
  * opt-out: a person who asked their operating system to reduce motion gets no
- * transition, animation, or smooth scroll anywhere in the product. Durations
- * collapse to a single frame rather than `none` so `transitionend` and
- * `animationend` listeners still fire and state still settles. `!important`
- * is deliberate: the drawer and any id-specific rule would otherwise outrank
- * the universal selector. */
+ * transition or animation anywhere in the product. Durations collapse to a
+ * single frame rather than `none` so `transitionend` and `animationend`
+ * listeners still fire and state still settles. `!important` is deliberate:
+ * the drawer and any id-specific rule would otherwise outrank the universal
+ * selector. */
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
@@ -233,7 +233,6 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
   }
 }
 

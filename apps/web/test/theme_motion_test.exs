@@ -27,8 +27,7 @@ defmodule BilimbiWeb.ThemeMotionTest do
     for declaration <- [
           ~r/animation-duration:\s*0\.01ms !important;/,
           ~r/animation-iteration-count:\s*1 !important;/,
-          ~r/transition-duration:\s*0\.01ms !important;/,
-          ~r/scroll-behavior:\s*auto !important;/
+          ~r/transition-duration:\s*0\.01ms !important;/
         ] do
       assert body =~ declaration, "reduced-motion block is missing #{inspect(declaration)}"
     end
