@@ -340,7 +340,7 @@ Goal: Give familiar actions named entries in the icon registry so call sites nam
 - [x] Populate `IconRegistry` with the named action vocabulary, keeping logout as the recorded Bilimbi exception. `{codex-terra-icons-1/gpt-5.6-terra}`
 - [x] Run the shipping gate and land the change. `{codex-terra-icons-1/gpt-5.6-terra}`
 
-`IconRegistry` now carries 73 glyph entries and 49 named actions on `main`, against three glyph entries before this slice.
+`IconRegistry` now carries 49 named actions on `main`, against none before this slice; its three custom glyph entries are unchanged.
 
 Not delivered by this slice, and still open under FND-06 and GFX-02: the searchable visual icon review with empty-result, copy and copied feedback. The registry holds the vocabulary; no review surface presents it yet.
 
