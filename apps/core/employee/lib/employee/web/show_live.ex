@@ -1078,7 +1078,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                         variant="primary"
                         class="text-xs px-2.5 py-1"
                       >
-                        <.icon name="bilimbi-plus" class="size-3.5" /> <span>Add</span>
+                        <.icon name="create" class="size-3.5" /> <span>Add</span>
                       </.button>
                     <% end %>
                   </div>
@@ -1197,7 +1197,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                               data-confirm={"Remove #{sub.full_name} as subordinate?"}
                               class="text-danger hover:bg-danger/10 text-xs px-2 py-1"
                             >
-                              <.icon name="bilimbi-x-mark" class="size-3.5" />
+                              <.icon name="close" class="size-3.5" />
                               <span class="sr-only">Remove</span>
                             </.button>
                           </td>

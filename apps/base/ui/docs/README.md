@@ -20,4 +20,7 @@ Authentication `on_mount` hooks stay in `BilimbiWeb.UserAuth`.
 Call sites name user-facing actions through `IconRegistry` (`create`, `edit`,
 `delete`, …) rather than raw `hero-*` strings. Logout is the exception and
 keeps `hero-arrow-right-on-rectangle`. Destination navigation has no single
-action glyph; menu contributions keep their own icons.
+action glyph; menu contributions keep their own icons. A name that is neither
+registered nor `hero-*`-prefixed raises instead of rendering a fallback glyph,
+so a name that reaches `<.icon>` from stored data is filtered through
+`IconRegistry.renderable?/1` first; that module's doc owns the lookup contract.

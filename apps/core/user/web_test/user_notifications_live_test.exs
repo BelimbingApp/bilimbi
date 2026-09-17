@@ -72,6 +72,22 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
     assert render(view) =~ "Your profile has been created."
   end
 
+  test "renders a row whose stored icon name is a legacy Belimbing one", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, legacy} =
+      User.send_notification(scope, 91, %{
+        title: "Adopted from Belimbing",
+        icon: "heroicon-o-bell"
+      })
+
+    {:ok, view, _html} = open(conn)
+
+    assert has_element?(view, "#notifications-list [id$='#{legacy.id}']")
+    assert render(view) =~ "Adopted from Belimbing"
+  end
+
   test "filters by all, unread, and read tabs", %{conn: conn, scope: scope} do
     {:ok, n1} = User.send_notification(scope, 91, %{title: "Note 1 Unread"})
     {:ok, n2} = User.send_notification(scope, 91, %{title: "Note 2 Read"})
