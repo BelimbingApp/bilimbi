@@ -52,18 +52,19 @@ defmodule BilimbiWeb.EmployeeShowTest do
     refute has_element?(view, "#employee-danger")
   end
 
-  test "shows record history when the actor can list audit logs", %{
+  test "shows record history and impersonation attribution when the actor can list audit logs", %{
     conn: conn,
     employee: employee
   } do
     AuditFixtures.create_audit_tables!()
     {:ok, scope} = Tenancy.scope(41)
 
-    {:ok, _mutation} =
+    {:ok, impersonated} =
       Audit.record_mutation(scope, %{
         company_id: 73,
         actor_type: "user",
-        actor_id: 91,
+        actor_id: 92,
+        impersonator_id: 91,
         auditable_type: Employee.addressable_identity(),
         auditable_id: to_string(employee.id),
         subject_name: "John Doe",
@@ -73,6 +74,20 @@ defmodule BilimbiWeb.EmployeeShowTest do
         new_values: %{"designation" => "Lead Analyst"}
       })
 
+    {:ok, ordinary} =
+      Audit.record_mutation(scope, %{
+        company_id: 73,
+        actor_type: "user",
+        actor_id: 91,
+        auditable_type: Employee.addressable_identity(),
+        auditable_id: to_string(employee.id),
+        subject_name: "John Doe",
+        event: "updated",
+        occurred_at: ~N[2026-08-18 09:59:00],
+        old_values: %{"email" => "old@example.test"},
+        new_values: %{"email" => "john@example.test"}
+      })
+
     grant_capabilities!(["admin.employee.view", "admin.audit.log.list"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
@@ -80,6 +95,18 @@ defmodule BilimbiWeb.EmployeeShowTest do
     assert has_element?(view, "#employee-record-history-toggle", "History")
     assert has_element?(view, "#employee-record-history-panel", "Analyst")
     assert has_element?(view, "#employee-record-history-panel", "Lead Analyst")
+
+    assert has_element?(
+             view,
+             "#employee-record-history-entry-#{impersonated.id}",
+             "User #92 · impersonated by User #91"
+           )
+
+    refute has_element?(
+             view,
+             "#employee-record-history-entry-#{ordinary.id}",
+             "impersonated by"
+           )
   end
 
   test "hides the destructive action without admin.employee.delete", %{
