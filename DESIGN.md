@@ -144,9 +144,14 @@ attention noise.
 
 Motion is opt-out at the platform, not per component. A single
 `prefers-reduced-motion: reduce` rule in `apps/web/assets/css/app.css` collapses
-every transition and animation to one frame, so anyone whose operating system
-asks for reduced motion gets a still product everywhere. Components and
-templates do not carry their own `motion-reduce` variants.
+every CSS transition and animation to one frame, so anyone whose operating
+system asks for reduced motion gets a still product wherever the motion is CSS.
+Components and templates do not carry their own `motion-reduce` variants.
+
+One known exception is outstanding: the vendored `topbar` navigation progress
+bar paints itself onto a canvas from JavaScript, so no CSS duration reaches it
+and it still slides and fades under reduce. Teaching it the preference without
+losing an honest loading signal is open parity work under FND-05.
 
 Use Phoenix and LiveView loading states honestly. Users should know when work is
 in flight, waiting, blocked, or complete.

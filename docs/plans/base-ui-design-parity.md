@@ -257,7 +257,9 @@ products were read and the plan forbids treating existence as acceptance.
   Address on `/companies/1` and Add Employee on `/users/1` are the two Lane B
   exercised live. The shared modal has production adopters waiting across modules.
 - **LAY-02, NAV-05** — the "Bilimbi now" cells describe pre-#711 state; both shipped.
-- **INT-04** — reduced motion is not adoptable; neither product has a contract.
+- **INT-04** — reduced motion was not adoptable when Lane A measured it: neither
+  product had a contract. Bilimbi now has one platform-wide under FND-05, so a
+  disclosure primitive inherits it instead of defining its own.
 - **NAV-01** — "reorder" in the target has no observed counterpart in Belimbing's
   navigation; pin-to-top covers the keep-favourites-handy need on both sides (Lane A).
   Dropped from parity acceptance rather than built to. Bilimbi does ship pinned drag
@@ -389,7 +391,7 @@ Keeping company and tenant in the top strip makes known context compete with the
 
 ### Brand-strong text contrast (FND-01) is accepted
 
-`text-brand-strong` text, measured by Lane A at 3.06:1 against the 4.5:1 bar at its real 12–13px size, was shown to the captain with both remedies, a darker text lime and reserving brand-strong text for large or bold use, and ruled: "Leave it; the current contrast is acceptable for this product." This is a deliberate accepted decision, not an open defect: later audits cite it instead of reopening it. The ruling covers both call-site families Lane A measured — active-navigation text in `layouts.ex` and the timezone panel's pressed choices in `shell_components.ex` — and nothing else. Lane A's other contrast findings remain open evidence for Phase 3: C2, dark table-header ink at 3.64:1, and C3, faint ink used as real text. A separate in-flight change is addressing both; this ruling closes neither, and neither has landed here. Phase 0 recorded that it did not verify contrast beyond the automated test.
+`text-brand-strong` text, measured by Lane A at 3.06:1 against the 4.5:1 bar at its real 12–13px size, was shown to the captain with both remedies, a darker text lime and reserving brand-strong text for large or bold use, and ruled: "Leave it; the current contrast is acceptable for this product." This is a deliberate accepted decision, not an open defect: later audits cite it instead of reopening it. The ruling covers both call-site families Lane A measured — active-navigation text in `layouts.ex` and the timezone panel's pressed choices in `shell_components.ex` — and nothing else. Lane A's other two contrast findings are now closed, by the separate palette change rather than by this ruling. C2, dark table-header ink at 3.64:1, closed by raising `--color-ink-subtle` in both dark blocks of `app.css`: it measures 5.35:1 on `surface`, 4.88:1 on `surface-sunken` and 4.64:1 on `surface-muted`, with light `ink-subtle` raised alongside it to 6.02:1, 4.79:1 and 5.52:1 on those same three surfaces, and `theme_contrast_test.exs` now gating each header pair at 4.5:1. C3, faint ink used as real text, closed at the one site Lane A measured as real text: the decision-log acting-for line moved from `text-ink-faint` (2.59:1 light, 2.29:1 dark on `surface`) to `text-ink-muted` (7.64:1 light, 6.76:1 dark, and 6.08:1 / 6.17:1 on the `surface-sunken` row hover). The other `text-ink-faint` uses are non-essential icons and placeholders and were never part of C3. Phase 0 recorded that it did not verify contrast beyond the automated test.
 
 ### Unseen-by-you markers (K05) are orientation
 
@@ -494,6 +496,7 @@ Validation: Every catalog item has evidence, a recommended disposition, dependen
 Goal: Build accepted shared contracts in dependency order.
 
 - [ ] Stabilize identity tokens, focus, field shell, card, icon and action foundations.
+- [ ] FND-05 follow-up — make the vendored `topbar` navigation progress bar honor `prefers-reduced-motion` without losing an honest loading signal; it animates a canvas from JavaScript, so the global CSS rule cannot reach it.
 - [ ] Implement accepted navigation, link and action contracts.
 - [ ] Implement accepted native input, choice, feedback and data-display contracts.
 - [ ] Implement accepted combobox, edit-in-place, disclosure, modal and confirmation contracts only after their foundations are stable.
