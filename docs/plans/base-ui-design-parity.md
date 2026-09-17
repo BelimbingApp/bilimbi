@@ -87,7 +87,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | FBK-02 | Flash and notification behavior | Basic fixed flash | Define stacking, timing, sticky warning/error, manual dismissal and redirect continuity. |
 | FBK-03 | Validation, disabled and loading states | Partial | Make the states visibly distinct and prevent duplicate work. |
 | FBK-04 | Empty, permission, unavailable, error and recovery states | Library specimens exist | Establish reusable page and region patterns with truthful recovery. |
-| OVR-01 [(contradicted)](#targets-the-evidence-contradicts) | Standard modal | Shared `<.modal>` shipped: a native `<dialog>` with a labelled title, focus in, containment and return, Escape, and an inert page behind; adopted by every production workflow overlay and shown at both widths in the Design Library | Met, exceeding Belimbing on focus and Escape. Clicking the dimmed page deliberately does not close, so a stray click cannot discard a form. |
+| OVR-01 [(contradicted)](#targets-the-evidence-contradicts) | Standard modal | Missing | Add accessible open, close, Escape, backdrop, focus containment and focus return. |
 | OVR-02 [(contradicted)](#targets-the-evidence-contradicts) | Confirmation modal | Missing | Add consequence-first confirmation without copying Belimbing's accessibility gaps. |
 | OVR-03 | Inspector drawer | Missing | Add only for a real inspector workflow; cover mobile width, resizing and remembered width. |
 | OVR-04 | Tooltip and popover behavior | No shared contract | Define only where labels or contextual actions genuinely require it. |
@@ -255,8 +255,12 @@ products were read and the plan forbids treating existence as acceptance.
   dimmed-backdrop shape also shipped in production across several modules, none
   of them carrying a dialog role, `aria-modal`, Escape or focus containment; Attach
   Address on `/companies/1` and Add Employee on `/users/1` were the two Lane B
-  exercised live. The shared `<.modal>` has since replaced every one of them, so the
-  row above carries that shipped state instead of the accepted "Missing" wording.
+  exercised live. The shared `<.modal>` has since replaced every one of them: a native
+  `<dialog>` with a labelled title, focus in, containment and return, Escape, and an
+  inert page behind, adopted by every production workflow overlay and shown at both
+  widths in the Design Library. That meets the accepted target and exceeds Belimbing on
+  focus and Escape, with one deliberate departure from its "backdrop" wording: clicking
+  the dimmed page does not close, so a stray click cannot discard a form.
 - **LAY-02, NAV-05** — the "Bilimbi now" cells describe pre-#711 state; both shipped.
 - **INT-04** — reduced motion is not adoptable; neither product has a contract.
 - **NAV-01** — "reorder" in the target has no observed counterpart in Belimbing's
