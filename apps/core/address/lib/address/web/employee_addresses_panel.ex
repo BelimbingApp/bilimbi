@@ -12,7 +12,10 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
   every write re-evaluates the actor's current grants through `Authz.can/2`
   (the #482/#541 pattern) — mount-time capability state is presentation, not
   an authorization decision. Outcomes render as a panel-local notice because a
-  LiveComponent cannot reach the page's flash without a parent contract.
+  LiveComponent cannot reach the page's flash without a parent contract. While
+  the attach dialog is open the notice renders inside it instead of above the
+  cards: the page behind a modal dialog is inert, so a notice left outside
+  could be neither read nor dismissed.
   """
 
   use Bilimbi.Base.UI, :live_component

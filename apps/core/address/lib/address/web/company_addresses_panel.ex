@@ -21,7 +21,10 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
   (the #482/#541/#610 pattern) — mount-time capability state is presentation,
   not an authorization decision. Outcomes render as a panel-local notice
   because a LiveComponent cannot reach the page's flash without a parent
-  contract.
+  contract. While one of the panel's `<.modal>` dialogs is open the notice
+  renders inside that dialog instead of above the cards: the page behind a
+  modal dialog is inert, so a notice left outside could be neither read nor
+  dismissed.
   """
 
   use Bilimbi.Base.UI, :live_component
