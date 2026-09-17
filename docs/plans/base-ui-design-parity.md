@@ -1,7 +1,7 @@
 # Base UI Design Parity
 
 **Status:** In progress — application shell, impersonation audit actor and the named icon vocabulary are merged to `main`; Design Library specimen separation, state coverage, drift guards and live timestamp display are implemented and in review
-**Last Updated:** 2026-09-15
+**Last Updated:** 2026-09-17
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
 **Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`
 
@@ -328,7 +328,7 @@ Goal: Record the real operator on every action taken while impersonating, so an 
 - [x] Record the impersonating operator alongside the impersonated subject on audit rows. `{claude-fable-audit-1/claude-fable-5-1}`
 - [x] Cover the attribution with tests and run the shipping gate. `{claude-fable-audit-1/claude-fable-5-1}`
 
-Deferred: no test covers the impersonation label on the audit reader surfaces, so deleting it would not turn the suite red. Tracked as follow-up.
+Deferred at delivery, closed by the follow-up on this branch: the impersonation label on the reader surfaces is now covered where each one renders it — `apps/base/audit/web_test/audit_live_test.exs` on the mutations and actions readers, `apps/core/employee/web_test/employee_show_test.exs` on record history. Each case asserts the operator attribution on an impersonated row and refutes it on an ordinary row in the same listing, so deleting a rendering clause turns the suite red.
 
 Delivery: https://github.com/BelimbingApp/bilimbi/pull/714 merged on 2026-09-15, closing #712.
 
