@@ -70,6 +70,10 @@ defmodule BilimbiWeb.LoginLiveTest do
              "#login-form-error [role='alert']",
              "These credentials do not match our records."
            )
+
+    # It is also pinned under the email field, so a scan sees which field the
+    # attempt went wrong on.
+    assert has_element?(view, "#login-form p", "These credentials do not match our records.")
   end
 
   test "a repeated identical credential failure is announced again", %{conn: conn} do

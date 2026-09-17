@@ -176,8 +176,8 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
     refute disabled =~ ~r/\sbg-surface-sunken/
   end
 
-  test "busy is refused on a navigation control it cannot make inert" do
-    assert_raise ArgumentError, ~r/busy is a button state/, fn ->
+  test "a navigation control ignores busy instead of claiming a wait it cannot enforce" do
+    button =
       render_component(
         fn assigns ->
           ~H"""
@@ -186,9 +186,8 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
         end,
         %{}
       )
-    end
 
-    assert_raise ArgumentError, ~r/busy is a button state/, fn ->
+    icon =
       render_component(
         fn assigns ->
           ~H"""
@@ -197,13 +196,20 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
         end,
         %{}
       )
+
+    assert button =~ ~s(<a)
+    assert icon =~ ~s(<a)
+
+    for html <- [button, icon] do
+      refute attribute?(html, "aria-busy")
+      refute attribute?(html, "disabled")
     end
   end
 
   # Whether the control's opening tag carries the attribute. The class list
   # names `disabled:` variants, so a bare substring check would lie.
   defp attribute?(html, attribute) do
-    [tag] = Regex.run(~r/<button[^>]*>/, html)
+    [tag] = Regex.run(~r/<(?:button|a)[^>]*>/, html)
     tag =~ ~r/\s#{Regex.escape(attribute)}(?=[\s>])/
   end
 

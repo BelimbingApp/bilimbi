@@ -191,9 +191,8 @@ defmodule Bilimbi.Base.UI.Components do
   truthful ("Saving…", "Opening workspace…").
 
   `busy` is a button state. It is carried by `disabled`, which an anchor has
-  no equivalent of, so `busy` together with `href`, `navigate` or `patch`
-  raises rather than announcing a wait it cannot prevent a second activation
-  of.
+  no equivalent of, so a control rendered as a link ignores `busy` entirely
+  rather than announcing a wait it cannot prevent a second activation of.
 
   `busy` is the server-known wait that outlives one round trip, such as the
   sign-in handoff that arms a full form submission. The shorter wait of one
@@ -209,12 +208,16 @@ defmodule Bilimbi.Base.UI.Components do
 
   attr(:busy, :boolean,
     default: false,
-    doc: "the control was activated and is waiting; renders `aria-busy` and disables it"
+    doc:
+      "the control was activated and is waiting; renders `aria-busy` and disables it. " <>
+        "A button state: a link cannot be disabled, so `busy` is ignored on one."
   )
 
   slot(:inner_block, required: true)
 
   def button(%{rest: rest} = assigns) do
+    assigns = assign(assigns, :busy, assigns.busy and not link?(rest))
+
     # Each variant owns every color property it sets, including the focus ring;
     # a color defined in both the shared base and a variant is resolved by
     # stylesheet order, not by this list's order (#619's invisible button).
@@ -267,18 +270,10 @@ defmodule Bilimbi.Base.UI.Components do
 
   # A busy control is also disabled: the activation that made it busy is the
   # one whose outcome is pending, and a second one would duplicate the work.
-  # A link cannot be disabled, so it cannot be busy either.
+  # A link cannot be disabled, so `busy` is already resolved to false on one
+  # and never reaches here.
   defp busy_rest(rest, false), do: rest
-
-  defp busy_rest(rest, true) do
-    if link?(rest) do
-      raise ArgumentError,
-            "busy is a button state: a link cannot be disabled, so it would announce " <>
-              "a wait it cannot prevent a second activation of. Render a button instead."
-    end
-
-    Map.put(rest, :disabled, true)
-  end
+  defp busy_rest(rest, true), do: Map.put(rest, :disabled, true)
 
   @doc """
   Renders a compact icon-only action.
@@ -296,7 +291,7 @@ defmodule Bilimbi.Base.UI.Components do
   distinguishable under `prefers-reduced-motion`, where the spin itself does
   not render. Both are inert; only the busy one carries `aria-busy`, and its
   label still names the action so assistive technology can say what is
-  pending. `busy` is a button state here too, and raises on a link.
+  pending. `busy` is a button state here too, and is ignored on a link.
 
   `phx-disable-with` does not belong here. LiveView implements it by replacing
   the control's text, which on an icon-only action deletes the glyph and
@@ -312,7 +307,9 @@ defmodule Bilimbi.Base.UI.Components do
 
   attr(:busy, :boolean,
     default: false,
-    doc: "the action was activated and is waiting; renders `aria-busy` and disables it"
+    doc:
+      "the action was activated and is waiting; renders `aria-busy` and disables it. " <>
+        "A button state: a link cannot be disabled, so `busy` is ignored on one."
   )
 
   attr(:rest, :global,
@@ -324,6 +321,8 @@ defmodule Bilimbi.Base.UI.Components do
   )
 
   def icon_button(%{rest: rest} = assigns) do
+    assigns = assign(assigns, :busy, assigns.busy and not link?(rest))
+
     assigns =
       assigns
       |> assign(:control_class, [

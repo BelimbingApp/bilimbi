@@ -5,8 +5,8 @@ defmodule BilimbiWeb.LoginLive do
   Behavior mirrors Belimbing's `Core/User/Livewire/Auth/Login`:
 
     * email + password, both required, email format checked live;
-    * a neutral credential failure ("These credentials do not match our
-      records.");
+    * a neutral credential failure on the email field ("These credentials do
+      not match our records.");
     * five attempts per email+IP per minute, then a lockout that names the
       remaining seconds;
     * a session-expired notice when an expired session is bounced here;
@@ -21,9 +21,10 @@ defmodule BilimbiWeb.LoginLive do
   compact ledger rules rather than Belimbing's arid pill styling. The
   credential and lockout failures are announced above the form through the
   same `<.alert>` the forgot-password confirmation uses, so a screen reader
-  hears that every attempt failed, including a repeat of the same message;
+  hears that every attempt failed, including a repeat of the same message.
   Belimbing pins the message under the email field, where nothing announces
-  it.
+  it; Bilimbi keeps that field-level mark as well, so a scan sees which
+  field the failure concerns and a screen reader still hears it.
   """
 
   use BilimbiWeb, :live_view
@@ -118,10 +119,16 @@ defmodule BilimbiWeb.LoginLive do
     {:noreply, assign(socket, :trigger_action, true)}
   end
 
-  # The failure is a form-level outcome, not a field format error, so it goes
-  # through the announced `#login-form-error` alert rather than the field's
-  # error slot; the submitted values stay in the form for another attempt.
+  # The failure is reported twice over: the announced `#login-form-error`
+  # alert carries it to assistive technology, and the email field's own error
+  # slot marks where the attempt went wrong. The submitted values stay in the
+  # form for another attempt.
   defp reject(socket, changeset, message) do
+    changeset =
+      changeset
+      |> Ecto.Changeset.add_error(:email, message)
+      |> Map.put(:action, :validate)
+
     socket
     |> put_form_error(message)
     |> assign_form(changeset)
