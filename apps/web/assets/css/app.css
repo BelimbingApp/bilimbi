@@ -63,7 +63,7 @@
   --color-ink-strong: var(--color-stone-950);
   --color-ink: var(--color-stone-900);
   --color-ink-muted: var(--color-stone-600);
-  --color-ink-subtle: var(--color-stone-500);
+  --color-ink-subtle: color-mix(in srgb, var(--color-stone-600) 50%, var(--color-stone-500));
   --color-ink-faint: var(--color-stone-400);
   --color-ink-inverse: var(--color-white);
   --color-link: var(--color-stone-700);
@@ -127,7 +127,7 @@
     --color-ink-strong: var(--color-stone-50);
     --color-ink: var(--color-stone-100);
     --color-ink-muted: var(--color-stone-400);
-    --color-ink-subtle: var(--color-stone-500);
+    --color-ink-subtle: color-mix(in srgb, var(--color-stone-400) 60%, var(--color-stone-500));
     --color-ink-faint: var(--color-stone-600);
     --color-ink-inverse: var(--color-stone-950);
     --color-link: var(--color-stone-300);
@@ -170,7 +170,7 @@
   --color-ink-strong: var(--color-stone-50);
   --color-ink: var(--color-stone-100);
   --color-ink-muted: var(--color-stone-400);
-  --color-ink-subtle: var(--color-stone-500);
+  --color-ink-subtle: color-mix(in srgb, var(--color-stone-400) 60%, var(--color-stone-500));
   --color-ink-faint: var(--color-stone-600);
   --color-ink-inverse: var(--color-stone-950);
   --color-link: var(--color-stone-300);
@@ -217,6 +217,23 @@
 body {
   font-family: var(--font-sans);
   min-width: 20rem;
+}
+
+/* Reduced motion (parity finding M1). One global rule, not a per-component
+ * opt-out: a person who asked their operating system to reduce motion gets no
+ * transition or animation anywhere in the product. Durations collapse to a
+ * single frame rather than `none` so `transitionend` and `animationend`
+ * listeners still fire and state still settles. `!important` is deliberate:
+ * the drawer and any id-specific rule would otherwise outrank the universal
+ * selector. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Menu typography & font colors matching Belimbing */
@@ -313,9 +330,10 @@ body {
 
 /* Authenticated shell chrome. Geometry matches Belimbing: full-width top
  * bar, persistent rail on wide screens, off-canvas drawer below `lg`.
- * The AppShell hook writes data attributes; reduced-motion skips the
- * drawer transform. Rail styles apply only at `lg+` — the mobile drawer
- * always shows labels, the same as Belimbing's honorRail=false copy.
+ * The AppShell hook writes data attributes; the global reduced-motion
+ * rule above collapses the drawer transition. Rail styles apply only at
+ * `lg+` — the mobile drawer always shows labels, the same as Belimbing's
+ * honorRail=false copy.
  * Rail is a state of the sidebar, so every rule below stays keyed to
  * `#app-sidebar`: `.app-nav-*` rows also render outside it (the Design
  * Library shows the real rail), and collapsing the sidebar must not strip
@@ -410,12 +428,5 @@ body {
     transition-property: transform, opacity;
     transition-duration: 200ms;
     transition-timing-function: ease-out;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    #app-sidebar,
-    #app-sidebar-backdrop {
-      transition: none;
-    }
   }
 }

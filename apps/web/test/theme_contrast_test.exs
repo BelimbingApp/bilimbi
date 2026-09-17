@@ -65,10 +65,22 @@ defmodule BilimbiWeb.ThemeContrastTest do
 
   # {foreground, background, minimum ratio}. Body text pairs at 4.5; the
   # action button label and badge chips are bold/large-adjacent at 3.0.
+  #
+  # `ink-subtle` carries 12px semibold table headers, so it is gated as body
+  # text on each background those headers actually render on: the shared
+  # `<.table>` head on `surface-sunken`, the database-query head on
+  # `surface-muted`, and hand-written heads inside a card on `surface`
+  # (parity finding C2). `ink-muted` is the role the decision-log acting-for
+  # line moved onto; its rows sit on `surface` and hover to `surface-sunken`
+  # (finding C3).
   @pairs [
     {"ink", "surface", 4.5},
     {"ink", "canvas", 4.5},
     {"ink-muted", "surface", 4.5},
+    {"ink-muted", "surface-sunken", 4.5},
+    {"ink-subtle", "surface", 4.5},
+    {"ink-subtle", "surface-sunken", 4.5},
+    {"ink-subtle", "surface-muted", 4.5},
     {"link", "surface-sidebar", 4.5},
     {"muted", "surface-sidebar", 4.5},
     {"action-ink", "action", 4.5},
@@ -77,6 +89,11 @@ defmodule BilimbiWeb.ThemeContrastTest do
     {"danger-ink", "danger-surface", 4.5},
     {"brand-ink", "brand-surface", 4.5}
   ]
+
+  # The text ladder the `@theme` block labels "strongest first". Every step
+  # must stay a step: a role that resolves to its neighbour's colour is no
+  # longer a named level, and the Design Library presents them as distinct.
+  @ink_ladder ~w(ink-strong ink ink-muted ink-subtle ink-faint)
 
   @surface_roles ~w(canvas surface surface-sunken surface-muted surface-sidebar)
   @dark_surface_ladder ~w(canvas surface-sidebar surface surface-sunken surface-muted)
@@ -98,6 +115,25 @@ defmodule BilimbiWeb.ThemeContrastTest do
       assert ratio >= minimum,
              "#{name}: #{fg} (#{fg_hex}) on #{bg} (#{bg_hex}) is #{Float.round(ratio, 2)}:1, " <>
                "below #{minimum}:1"
+    end
+  end
+
+  test "the ink ladder keeps a distinct, strongest-first step at every level" do
+    css = File.read!(@css_path)
+    light = tokens_in(theme_block(css))
+    [dark_media, _dark_attr] = dark_blocks(css)
+
+    for {name, tokens} <- [{"light", light}, {"dark", dark_media}] do
+      surface_hex = resolve!(tokens, "surface")
+      hexes = Enum.map(@ink_ladder, &resolve!(tokens, &1))
+      ratios = Enum.map(hexes, &contrast(&1, surface_hex))
+
+      assert Enum.uniq(hexes) == hexes,
+             "#{name}: the ink ladder collapsed — #{inspect(Enum.zip(@ink_ladder, hexes))}"
+
+      assert Enum.chunk_every(ratios, 2, 1, :discard) |> Enum.all?(fn [a, b] -> a > b end),
+             "#{name}: the ink ladder is not strongest-first on surface — " <>
+               inspect(Enum.zip(@ink_ladder, Enum.map(ratios, &Float.round(&1, 2))))
     end
   end
 
