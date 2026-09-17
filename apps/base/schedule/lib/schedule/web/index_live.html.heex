@@ -224,7 +224,8 @@
         submit_event="filter_runs"
         class="mt-4"
       >
-        <:search
+        <:control
+          type={:search}
           field={@run_form[:search]}
           id="schedule-run-search"
           label="Search run name"
@@ -232,9 +233,9 @@
           maxlength="255"
           debounce="300"
           autocomplete="off"
-          input_class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
         />
-        <:select
+        <:control
+          type={:select}
           field={@run_form[:status]}
           id="schedule-run-status"
           label="Filter run status"
@@ -245,24 +246,27 @@
             {"Failed", "failed"},
             {"Skipped", "skipped"}
           ]}
-          input_class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
         />
-        <:date_range
-          from_id="schedule-run-start-date"
-          from_field={@run_form[:start_date]}
-          from_label="Start date (UTC)"
-          to_id="schedule-run-end-date"
-          to_field={@run_form[:end_date]}
-          to_label="End date (UTC)"
+        <:control
+          type={:date}
+          field={@run_form[:start_date]}
+          id="schedule-run-start-date"
+          label="Start date (UTC)"
           hint="UTC"
-          input_class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
         />
-        <:select
+        <:control
+          type={:date}
+          field={@run_form[:end_date]}
+          id="schedule-run-end-date"
+          label="End date (UTC)"
+          hint="UTC"
+        />
+        <:control
+          type={:select}
           field={@run_form[:page_size]}
           id="schedule-run-page-size"
           label="Runs per page"
           options={[{"25 / page", 25}, {"50 / page", 50}, {"100 / page", 100}]}
-          input_class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
         />
       </.filter_toolbar>
 

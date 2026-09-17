@@ -182,7 +182,8 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   end
 
   def handle_event("filter-toolbar-preview", %{"toolbar_full" => toolbar_data}, socket) do
-    {:noreply, assign(socket, :filter_toolbar_full_form, to_form(toolbar_data, as: :toolbar_full))}
+    {:noreply,
+     assign(socket, :filter_toolbar_full_form, to_form(toolbar_data, as: :toolbar_full))}
   end
 
   def handle_event("filter-toolbar-preview", %{"toolbar_selects" => toolbar_data}, socket) do

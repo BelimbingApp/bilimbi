@@ -286,7 +286,8 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
         </.header>
 
         <.filter_toolbar id="companies-filters" form={@filters_form} event="filters">
-          <:search
+          <:control
+            type={:search}
             field={@filters_form[:search]}
             id="companies-search"
             label="Search companies"
@@ -294,9 +295,9 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
             icon="search"
             debounce="300"
             maxlength="255"
-            input_class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
           />
-          <:select
+          <:control
+            type={:select}
             field={@filters_form[:status_filter]}
             id="companies-status-filter"
             label="Status filter"

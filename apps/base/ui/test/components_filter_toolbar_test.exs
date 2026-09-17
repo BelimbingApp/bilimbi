@@ -6,8 +6,10 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
   page laid its controls out by its own rule: some labels visible and some
   hidden, helper text as a sibling paragraph with a hand-picked margin, and a
   grid that held native date inputs side by side past the viewport edge.
-  These tests pin the three rules that stop that drift: labels all visible or
-  all hidden, hints through the input component, and cells that wrap.
+  These tests pin the rules that stop that drift: controls render where the
+  caller wrote them, one shared field rule frames every control, the search
+  box reserves the room its own icon takes, labels are all visible or all
+  hidden, hints ride the input component, and cells wrap.
   """
 
   use ExUnit.Case, async: true
@@ -27,8 +29,9 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
       submit_event={@submit_event}
       labels={@labels}
     >
-      <:search
+      <:control
         :if={@with_search}
+        type={:search}
         field={@form[:search]}
         id="tb-search"
         label="Search things"
@@ -37,22 +40,37 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
         debounce="300"
         maxlength="255"
       />
-      <:select
+      <:control
         :if={@with_select}
+        type={:select}
         field={@form[:status]}
         id="tb-status"
         label="Status filter"
         options={[{"All statuses", "all"}, {"Active", "active"}]}
       />
-      <:date_range
+      <:control
         :if={@with_dates}
-        from_id="tb-start-date"
-        from_field={@form[:start_date]}
-        from_label="Start date (UTC)"
-        to_id="tb-end-date"
-        to_field={@form[:end_date]}
-        to_label="End date (UTC)"
+        type={:date}
+        field={@form[:start_date]}
+        id="tb-start-date"
+        label="Start date (UTC)"
         hint="UTC"
+      />
+      <:control
+        :if={@with_dates}
+        type={:date}
+        field={@form[:end_date]}
+        id="tb-end-date"
+        label="End date (UTC)"
+        hint="UTC"
+      />
+      <:control
+        :if={@with_trailing_select}
+        type={:select}
+        field={@form[:page_size]}
+        id="tb-page-size"
+        label="Rows per page"
+        options={[{"25 / page", 25}, {"50 / page", 50}]}
       />
     </.filter_toolbar>
     """
@@ -60,7 +78,13 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
 
   defp form do
     to_form(
-      %{"search" => "", "status" => "all", "start_date" => "", "end_date" => ""},
+      %{
+        "search" => "",
+        "status" => "all",
+        "start_date" => "",
+        "end_date" => "",
+        "page_size" => 25
+      },
       as: :filters
     )
   end
@@ -72,7 +96,8 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
       submit_event: Keyword.get(opts, :submit_event, nil),
       with_search: Keyword.get(opts, :with_search, true),
       with_select: Keyword.get(opts, :with_select, true),
-      with_dates: Keyword.get(opts, :with_dates, true)
+      with_dates: Keyword.get(opts, :with_dates, true),
+      with_trailing_select: Keyword.get(opts, :with_trailing_select, false)
     )
   end
 
@@ -124,7 +149,12 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
     [toolbar_label | _] = render_toolbar(labels: :visible) |> labels()
 
     class_tokens = fn label ->
-      label |> String.split(~s(class=")) |> Enum.at(1) |> String.split(~s(")) |> hd() |> String.split()
+      label
+      |> String.split(~s(class="))
+      |> Enum.at(1)
+      |> String.split(~s("))
+      |> hd()
+      |> String.split()
     end
 
     assert class_tokens.(toolbar_label) == class_tokens.(input_label),
@@ -150,11 +180,85 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
     overridden =
       for slot <- slots,
           %{name: attr} <- slot.attrs,
-          attr in [:label_class, :wrapper_class],
+          attr in [:class, :input_class, :label_class, :wrapper_class],
           do: "#{slot.name}.#{attr}"
 
     assert overridden == [],
-           "a per-control label or wrapper class is how mixed visibility and bespoke spacing return: #{inspect(overridden)}"
+           "a per-control class is how five controls end up laid out by two rules: #{inspect(overridden)}"
+  end
+
+  test "controls render in the order the caller declares them" do
+    html = render_toolbar(with_trailing_select: true)
+
+    order =
+      ~w(tb-search tb-status tb-start-date tb-end-date tb-page-size)
+      |> Enum.map(fn id ->
+        {at, _} = :binary.match(html, ~s(id="#{id}"))
+        {at, id}
+      end)
+      |> Enum.sort()
+      |> Enum.map(&elem(&1, 1))
+
+    assert order == ~w(tb-search tb-status tb-start-date tb-end-date tb-page-size),
+           "grouping controls by type moves a page-size select into the middle of the date pair"
+  end
+
+  test "every control is framed by the one shared field rule" do
+    html = render_toolbar(with_trailing_select: true)
+
+    for id <- ~w(tb-search tb-status tb-start-date tb-end-date tb-page-size) do
+      classes = control_class(html, id)
+
+      assert "focus:border-brand-strong" in classes,
+             "#{id} skips the shared brand-strong focus border"
+
+      assert "focus:ring-brand-strong/30" in classes, "#{id} skips the shared focus ring"
+      assert "shadow-xs" in classes, "#{id} skips the shared field elevation"
+    end
+  end
+
+  test "the search box reserves the room its own icon occupies" do
+    classes = render_toolbar() |> control_class("tb-search")
+
+    assert "pl-8" in classes,
+           "the toolbar renders the leading icon, so the prompt text needs the clearance it takes"
+
+    refute "px-3" in classes,
+           "symmetric padding under a left-2.5 size-4 icon puts the prompt text under the magnifier"
+  end
+
+  test "a search box without an icon keeps the shared symmetric padding" do
+    classes =
+      render_component(&iconless_search/1, form: form())
+      |> control_class("tb-plain-search")
+
+    assert "px-3" in classes
+    refute "pl-8" in classes
+  end
+
+  defp iconless_search(assigns) do
+    ~H"""
+    <.filter_toolbar id="tb-plain" form={@form} event="filters">
+      <:control
+        type={:search}
+        field={@form[:search]}
+        id="tb-plain-search"
+        label="Search things"
+        placeholder="Search…"
+      />
+    </.filter_toolbar>
+    """
+  end
+
+  defp control_class(html, id) do
+    [tag] = Regex.run(~r/<(?:input|select)\b[^>]*id="#{id}"[^>]*>/, html)
+
+    tag
+    |> String.split(~s(class="))
+    |> Enum.at(1)
+    |> String.split(~s("))
+    |> hd()
+    |> String.split()
   end
 
   test "date helper text rides each input's own hint" do
@@ -174,8 +278,11 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
     refute html =~ "grid-cols-[",
            "column tracks with minimum widths are what pinned the date pair past the viewport edge"
 
-    assert html =~ ~r/<div[^>]*class="w-full min-w-0 sm:w-auto"[^>]*>\s*<label[^>]*for="tb-start-date"/s
-    assert html =~ ~r/<div[^>]*class="w-full min-w-0 sm:w-auto"[^>]*>\s*<label[^>]*for="tb-end-date"/s
+    assert html =~
+             ~r/<div[^>]*class="w-full min-w-0 sm:w-auto"[^>]*>\s*<label[^>]*for="tb-start-date"/s
+
+    assert html =~
+             ~r/<div[^>]*class="w-full min-w-0 sm:w-auto"[^>]*>\s*<label[^>]*for="tb-end-date"/s
   end
 
   test "the search icon centers on the input, above or below a label alike" do
@@ -218,5 +325,20 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
     assert_raise ArgumentError, ~r/at least one control/, fn ->
       render_component(&empty_toolbar/1, form: form())
     end
+  end
+
+  test "a second search raises rather than splitting the leading cell" do
+    assert_raise ArgumentError, ~r/at most one search/, fn ->
+      render_component(&two_searches/1, form: form())
+    end
+  end
+
+  defp two_searches(assigns) do
+    ~H"""
+    <.filter_toolbar id="tb-two" form={@form} event="filters">
+      <:control type={:search} field={@form[:search]} id="tb-search-a" label="Search A" />
+      <:control type={:search} field={@form[:status]} id="tb-search-b" label="Search B" />
+    </.filter_toolbar>
+    """
   end
 end
