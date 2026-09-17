@@ -1,7 +1,7 @@
 # Base UI Design Parity
 
 **Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families. Application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display are merged to `main`; the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
-**Last Updated:** 2026-09-16
+**Last Updated:** 2026-09-17
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
 **Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`
 
@@ -21,7 +21,7 @@ The campaign is structured so audits and production adoption can run in parallel
 
 The foundation at https://github.com/BelimbingApp/bilimbi/pull/696 merged on 2026-09-14 at 07:02:16 UTC with all seven checks passing. It integrates `main` through `d93feb1`, including #694's status-first company actions and 24px icon hit targets. Its accepted decisions retain compact `rounded-md` fields, brand focus, open filter toolbars and calm destructive actions. Inline icon controls retain their small glyphs within 24px targets; table and toolbar controls remain 28px. Pagination uses content-sized `w-auto`, `h-7`, `pl-2 pr-6` geometry so three-digit options clear the dropdown arrow, preserving the intentional #304 correction in both root guidance and `DESIGN.md`.
 
-The foundation completed specimen interactions, browser review and `mix precommit`; its closeout evidence is recorded in the Design Library plan. The account menu, top-bar utilities, icon parity and wider catalog are subsequent implementation slices; their recorded design contract does not claim they already ship. No agent should treat accidental branch state, a Belimbing value or an isolated production screen as design authority.
+The foundation completed specimen interactions, browser review and `mix precommit`; its closeout evidence is recorded in the Design Library plan. The account menu and top-bar utilities shipped in the application shell slice (#711) and the named icon vocabulary in #715; the searchable icon review and the wider catalog are subsequent slices whose recorded design contract does not claim they already ship. No agent should treat accidental branch state, a Belimbing value or an isolated production screen as design authority.
 
 ## Top-Level Components
 
@@ -35,7 +35,7 @@ The identity baseline records the characteristics that parity work must preserve
 | K02 | Bilimbi geometry | Keep `rounded-xl` primary surfaces, compact `rounded-md` fields and table controls, the accepted action hierarchy, and hairline ledger structure. |
 | K03 | Compact operational density | Preserve fast scanning, dense tables, compact controls and restrained spacing without becoming cramped. |
 | K04 | Instrument Sans hierarchy | Preserve the current typeface, compact navigation scale and tabular numerals for comparable data. |
-| K05 | Brand means orientation | Lime identifies selection, focus, active navigation and location; it never represents status. |
+| K05 | Brand means orientation | Lime identifies orientation — selection, focus, active navigation, location and unseen-by-you markers (the aggregate unread count badge and the per-item unread dot); it never represents status. |
 | K06 | Calm action language | Keep the deep-olive primary action, scarce emphasis and calm treatment of destructive work. |
 | K07 | Bilimbi mark and wordmark | Keep the product mark, wordmark and local graphic identity. |
 | K08 | Ledger page archetypes | Keep one shared width and hierarchy for list, form and detail pages. |
@@ -45,11 +45,11 @@ The identity baseline records the characteristics that parity work must preserve
 
 The catalog is organized by what a human is trying to review, not by Laravel or Phoenix implementation. The assessment is a starting point to verify in the live products; it is not an automatic decision to port every Belimbing component.
 
-Phase 0 verified every row against both live products. A row whose `Bilimbi now` or `Parity target` cell the evidence contradicted carries a [(contradicted)](#targets-the-evidence-contradicts) marker beside its ID: the original wording stays here as the record of what was accepted, and the correction is recorded once under [Targets the evidence contradicts](#targets-the-evidence-contradicts). Do not act on a marked row without reading it.
+Phase 0 verified every row against both live products. A row whose `Bilimbi now` or `Parity target` cell the evidence contradicted carries a [(contradicted)](#targets-the-evidence-contradicts) marker beside its ID, and the full correction is recorded once under [Targets the evidence contradicts](#targets-the-evidence-contradicts). Where the evidence settled what actually ships, the cell is restated here; where it did not, the original wording stays as the record of what was accepted. Do not act on a marked row without reading it.
 
 | ID | Design element | Bilimbi now | Parity target |
 |---|---|---|---|
-| FND-01 | Semantic colours | Strong identity and semantic roles | Keep Bilimbi; verify light/dark contrast and role separation. |
+| FND-01 | Semantic colours | Strong identity and semantic roles | Keep Bilimbi; verify light/dark contrast and role separation. Active-navigation contrast is an accepted decision (see Design Decisions). |
 | FND-02 | Typography hierarchy | Present | Keep Bilimbi; verify headings, body, labels, help and tabular data. |
 | FND-03 | Spacing and density rhythm | Partly standardized | Define one compact rhythm across primitives and page assemblies. |
 | FND-04 | Shape, lines and elevation | Strong identity with local drift | Keep Bilimbi geometry; remove unexplained variations. |
@@ -59,14 +59,14 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | LAY-02 [(contradicted)](#targets-the-evidence-contradicts) | Application shell and account footer | Exists | Remove persistent company and tenant repetition. Put the current timezone and light/dark theme selectors in the top bar. Keep the user circle at the bottom left as the account and scope entry point; show an always-visible warning only for unusual or safety-critical scope. Match the best collapse, drawer and navigation-continuity behavior. |
 | LAY-03 | Page width and page header | Shared primitives exist | Cover title, subtitle, action, pin, contextual help and narrow states. |
 | LAY-04 | Secondary side panel | Bespoke Design Library example | Establish one responsive page-local navigation pattern with desktop rail and mobile access. |
-| LAY-05 | Index, form and detail geometry | Partial conventions | Define complete assemblies rather than leaving every screen to compose them differently. |
-| NAV-01 | Main menu tree | Exists | Verify active ancestry, pinned items, reorder, collapse, mobile drawer and persistence. |
+| LAY-05 | Index, form and detail geometry | Shared `<.page>` enforces one width per list, form and detail archetype; each screen still composes its assembly locally | Define complete assemblies rather than leaving every screen to compose them differently. |
+| NAV-01 | Main menu tree | Exists | Verify active ancestry, pinned items, collapse, mobile drawer and persistence. |
 | NAV-02 | Tabs | Shared `<.tabs>` used by Schedule and Settings | Provide shared semantics, keyboard navigation, active state and URL/history rules. |
 | NAV-03 | Link dictionary and related-link groups | No shared contract | Adopt internal, anchor, external, new-tab and download behavior; mutations remain buttons. |
 | NAV-04 | Pagination | Shared component exists | Compare narrow layout, disabled states, page-size control, URL state and accessible labels. |
 | NAV-05 [(contradicted)](#targets-the-evidence-contradicts) | User account and scope menu | Partial user footer exists | On user-circle activation, show signed-in name and identifier, current company and tenant, change password and sign out. Show scope switching only when more than one permitted scope exists. |
-| ACT-01 | Buttons | Primary, secondary and destructive basics | Cover emphasis, compact size, disabled, loading, navigation and truthful completion. |
-| ACT-02 | Icon actions and groups | Basic icon button exists | Add grouping, context sizing, disabled/loading behavior and accessible tooltips. |
+| ACT-01 | Buttons | Primary, secondary, calm destructive, disabled, navigation-as-button and in-flight `Working…` already ship | Cover emphasis, compact size, disabled, loading, navigation and truthful completion. |
+| ACT-02 | Icon actions and groups | Shared icon button ships with inline and table sizes, accessible labels and native titles; grouping is ad hoc (dashboard customize clusters) and disabled/loading have no specimen | Add grouping, context sizing, disabled/loading behavior and accessible tooltips. |
 | ACT-03 | Destructive entry and acknowledgement | Inconsistent screen patterns | Standardize consequence copy, confirmation and typed acknowledgement where risk requires it. |
 | INP-01 | Shared field shell | Generic input has labels, hints and errors | Standardize required, help, error, disabled, read-only, prefix and suffix placement. |
 | INP-02 | Text, email, URL, telephone, number and textarea | Available through the generic input | Complete state and sizing contracts and validate realistic long content. |
@@ -87,22 +87,22 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | FBK-02 | Flash and notification behavior | Basic fixed flash | Define stacking, timing, sticky warning/error, manual dismissal and redirect continuity. |
 | FBK-03 | Validation, disabled and loading states | Partial | Make the states visibly distinct and prevent duplicate work. |
 | FBK-04 | Empty, permission, unavailable, error and recovery states | Library specimens exist | Establish reusable page and region patterns with truthful recovery. |
-| OVR-01 [(contradicted)](#targets-the-evidence-contradicts) | Standard modal | Missing | Add accessible open, close, Escape, backdrop, focus containment and focus return. |
-| OVR-02 | Confirmation modal | Missing | Add consequence-first confirmation without copying Belimbing's accessibility gaps. |
+| OVR-01 [(contradicted)](#targets-the-evidence-contradicts) | Standard modal | No shared primitive; full-viewport overlays already ship on `/companies/1` and `/users/1` without dialog semantics, Escape or focus containment | Extract one shared accessible modal from the shipping overlays: open, close, Escape, backdrop, focus containment and focus return, exceeding Belimbing on focus and Escape. |
+| OVR-02 | Confirmation modal | No shared confirmation overlay; destructive work uses the browser's native confirm dialog, with consequence copy on some screens | Add consequence-first confirmation without copying Belimbing's accessibility gaps. |
 | OVR-03 | Inspector drawer | Missing | Add only for a real inspector workflow; cover mobile width, resizing and remembered width. |
 | OVR-04 | Tooltip and popover behavior | No shared contract | Define only where labels or contextual actions genuinely require it. |
-| DAT-01 | Cards, facts and dense summaries | Card and ad hoc facts exist | Standardize metadata hierarchy and compact summary composition. |
+| DAT-01 | Cards, facts and dense summaries | Shared card and definition-list fact rows exist and `/companies/1` uses them; dashboard summaries are ad hoc | Standardize metadata hierarchy and compact summary composition. |
 | DAT-02 | Badges and status treatments | Basic badge exists | Complete neutral, information and status roles without using brand as status. |
 | DAT-03 | Tables and sortable headings | Shared table exists | Cover caption, overflow, sticky header, hover, stripes, empty state, footer and truthful sorting. |
 | DAT-04 [(contradicted)](#targets-the-evidence-contradicts) | Absolute and relative time | Absolute datetime exists | Add relative time only with the absolute value available. |
-| DAT-05 [(contradicted)](#targets-the-evidence-contradicts) | Statistics and stat strips | Missing | Add when a dashboard or operational summary supplies a real use case. |
+| DAT-05 [(contradicted)](#targets-the-evidence-contradicts) | Statistics and stat strips | Dashboard stat strips already ship as ad hoc markup; no shared component exists | Extract a minimal shared stat-strip seam (label/value/subvalue with optional link and empty line) and point the dashboard cards at it. |
 | DAT-06 | Record history, timeline and comparisons | Local or missing | Keep specialist behavior with the owning workflow; share only the generic presentation seam. |
-| CMP-01 [(contradicted)](#targets-the-evidence-contradicts) | Operational index page | Partial specimen | Standardize header, filters, table, actions, empty/loading/error and pagination as one flow. |
-| CMP-02 | Form page | Partial specimen | Standardize field rhythm, validation, save/cancel, loading, success and unsaved navigation. |
-| CMP-03 | Detail and settings page | Partial conventions | Standardize facts, inline/grouped editing, related navigation and permission states. |
+| CMP-01 [(contradicted)](#targets-the-evidence-contradicts) | Operational index page | Complete operational indexes already ship (`/companies`, `/users`, `/audit/mutations`, `/notifications`); the shared composition is not extracted | Extract the shared index composition (header, filters, table, actions, empty/loading/error, pagination) from the shipping indexes. |
+| CMP-02 | Form page | Complete production form ships (`/companies/create`: field rhythm, inline validation, save/cancel); no unsaved-navigation guard exists; the shared composition is not extracted | Standardize field rhythm, validation, save/cancel, loading and success; unsaved navigation follows INT-06's deferral. |
+| CMP-03 | Detail and settings page | Complete production detail ships (`/companies/1`: facts, explicit edit modes, related navigation, permission states); the shared assembly is not extracted | Standardize facts, inline/grouped editing, related navigation and permission states. |
 | CMP-04 | Destructive workflow | No complete specimen | Show entry, consequence, acknowledgement, in-flight, success, failure and recovery together. |
-| CMP-05 | Authentication and first arrival | Implemented but not parity-audited | Treat login, recovery and dashboard arrival as first-impression acceptance surfaces. |
-| CMP-06 | Responsive and theme coverage | Ad hoc | Review representative assemblies at desktop/narrow widths and in light/dark themes. |
+| CMP-05 | Authentication and first arrival | Login, recovery and dashboard arrival ship and were audited live against Belimbing (Lanes A and D); only the submit in-flight state is unverified | Treat login, recovery and dashboard arrival as first-impression acceptance surfaces. |
+| CMP-06 | Responsive and theme coverage | `/companies` and the shell verified live at desktop/narrow widths and in light/dark themes (Lane D); narrow detail and a full keyboard pass remain | Review the remaining assemblies (narrow detail, full keyboard pass) at desktop/narrow widths and in light/dark themes. |
 | GFX-01 | Mark and wordmark | Present | Keep Bilimbi identity and verify size, surface and contrast uses. |
 | GFX-02 | Product and interface icons | Registry and Heroicons exist | Make the approved FND-06 icon set searchable and verify size, alignment and meaning without copying Belimbing assets or framework markup. |
 | GFX-03 | Placeholder and empty-state graphics | Limited | Add only when graphics improve comprehension rather than decorate empty space. |
@@ -226,28 +226,30 @@ to a URL this installation does not serve is hidden.
 
 ##### Targets the evidence contradicts
 
-These are recorded rather than reconciled, because the catalog was written before the
-products were read and the plan forbids treating existence as acceptance.
+The evidence is recorded here in full, because the catalog was written before the
+products were read and the plan forbids treating existence as acceptance. A row whose
+cell has since been restated above keeps its marker so this record stays reachable.
 
 - **CMP-01** — moving toward Belimbing would be a regression. Belimbing keeps only
   `page` in the URL and offers 10/20/50/100 page sizes; Bilimbi already mandates
   25/50/100/300 with full URL state.
-- **DAT-05** — "Missing" is wrong. Five stat cards ship on `/dashboard`, duplicated
-  into ten markup blocks with 65 arbitrary-value classes.
+- **DAT-05** — the original "Missing" was wrong. Five stat cards ship on
+  `/dashboard`, duplicated into ten markup blocks with 65 arbitrary-value classes.
 - **DAT-04** — relative time already ships in notifications, in a bare `<span>` with
   no `<time>`, no `datetime` and no `title`, frozen at render.
 - **INT-03** — "Missing" is wrong. Bilimbi runs it in ten production LiveViews and
   Belimbing has no component either.
 - **INP-03** — Belimbing *removes* the native clear affordance Bilimbi keeps; there is
   nothing to adopt.
-- **OVR-01** — "Missing" understates, and moving toward Belimbing would be a
-  regression. The shell drawer already implements `inert`, `aria-modal` and backdrop
-  mechanics; the work is to share it, not to build it. Lane B observed through
-  dispatched in-page events that Belimbing's shared modal does not move focus in, trap
-  it or return it, and that two demo dialogs could be open at once — read together with
-  the note below that Belimbing modal focus behaviour beyond dispatched events was not
-  verified.
-- **LAY-02, NAV-05** — the "Bilimbi now" cells describe pre-#711 state; both shipped.
+- **OVR-01** — the original "Missing" understated, and moving toward Belimbing would
+  be a regression. The shell drawer already implements `inert`, `aria-modal` and
+  backdrop mechanics; the work is to share it, not to build it. Lane B observed
+  through dispatched in-page events that Belimbing's shared modal does not move focus
+  in, trap it or return it, and that two demo dialogs could be open at once — read
+  together with the note below that Belimbing modal focus behaviour beyond dispatched
+  events was not verified.
+- **LAY-02, NAV-05** — the original "Bilimbi now" cells described pre-#711 state;
+  both shipped.
 - **INT-04** — reduced motion is not adoptable; neither product has a contract.
 
 ##### Defects found while verifying
@@ -355,6 +357,14 @@ The first parity slice owns `LAY-02`, `NAV-05`, shell-related `FND-06`, timezone
 
 Keeping company and tenant in the top strip makes known context compete with the current task. Hiding scope everywhere is also unsafe for platform operators, impersonation and cross-company work. The recommended direction is progressive disclosure: the bottom-left user circle opens one account menu containing identity, company, tenant and account actions. A switcher appears only for users who can switch. Unusual or safety-critical scope remains visible outside the menu as a persistent warning.
 
+### Active-navigation contrast is accepted
+
+Active-navigation text (`text-brand-strong` on surface, measured 3.06:1 against the 4.5:1 bar at its real 12–13px size) was shown to the captain with both remedies, a darker text lime and reserving brand-strong text for large or bold use, and ruled: "Leave it; the current contrast is acceptable for this product." This is a deliberate accepted decision, not an open defect: later audits cite it instead of reopening it. The ruling covers active-navigation text only; Lane A's other contrast findings (dark table-header ink at 3.64:1 and faint ink used as real text) remain open evidence for Phase 3.
+
+### Unseen-by-you markers are orientation
+
+Lane D asked whether the notification unread count badge and per-item unread dot may use brand lime under K05. The captain ruled: "Keep both; tighten K05 wording to name unseen-by-you markers as orientation". Both keep lime, and the K05 row now names unseen-by-you markers so the precedent is bounded by the written rule rather than by memory of this decision. No code changed.
+
 ## Public Contract
 
 - Belimbing is reference evidence, not visual or implementation authority.
@@ -444,6 +454,8 @@ Goal: Complete evidence and recommended dispositions without changing production
 - [ ] Lane C — audit INP and INT, including field shell, keyboard behavior, editing and rich choices.
 - [ ] Lane D — audit DAT, CMP and GFX, including actual index, form, detail, authentication and dashboard flows.
 - [ ] Integration owner consolidates reports into this ledger and removes duplicate or speculative targets.
+
+The four lane audits ran on 2026-09-16 and produced evidence only. Their corrections to the catalog's "Bilimbi now" cells, the NAV-01 acceptance criterion and the two captain rulings recorded under Design Decisions landed on 2026-09-17; consolidation and dispositions remain open.
 
 Validation: Every catalog item has evidence, a recommended disposition, dependencies and at least one real Bilimbi use case or a reason to omit it.
 
