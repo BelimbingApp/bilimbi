@@ -66,7 +66,7 @@ defmodule Bilimbi.Base.UI.ComponentsFlashTest do
     refute html =~ "saved"
   end
 
-  test "info is a neutral statement, not painted as a confirmation" do
+  test "success and info are told apart by their icons" do
     {:hero, information} = IconRegistry.lookup("information")
     {:hero, success} = IconRegistry.lookup("success")
 

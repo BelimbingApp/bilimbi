@@ -593,11 +593,13 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   must show in-flight state, reject duplicate work, and truthfully report the data
   outcome and recovery.
 - **Flash messages:** `put_flash` kinds are `:success`, `:info`, `:warning`,
-  and `:error`; `:info` is the neutral statement role and is never painted as
-  success. The layout's `flash_group` is the single stacked outlet: success
-  and info dismiss themselves, warning and error stay until dismissed. The
-  shell's preference status line is deliberately not a flash. Do not build a
-  second notification surface.
+  and `:error`. The layout's `flash_group` is the single stacked outlet:
+  success and info dismiss themselves, warning and error stay until
+  dismissed. `:success` and `:info` still share the success colouring because
+  most `put_flash(:info, ...)` call sites report a completed write; correcting
+  that means migrating those callers, not repainting `:info`. The shell's
+  preference status line is deliberately not a flash. Do not build a second
+  notification surface.
 - **Compact actions:** Use `<.icon_button>` for familiar repeated secondary
   actions in tables and toolbars. Inline icon controls are `size-6` (24px targets); table and
   toolbar icon controls are `size-7`. Every icon-only action has a truthful

@@ -64,9 +64,10 @@ module may add a semantic role only when its workflow genuinely needs one.
   colours used for primary buttons and page `<h1>` headings. The base remains
   distinct from its brighter hover in both themes.
 - **`success` / `warning` / `danger` / `info`** (each with `-surface`,
-  `-line`, `-ink`): Honest status roles for real feedback. `info` is stone,
-  a statement that reports neither a good nor a bad outcome, so a neutral
-  message is never read as a confirmation.
+  `-line`, `-ink`): Honest status roles for real feedback. `info` is stone, a
+  statement that reports neither a good nor a bad outcome. Flash messages are
+  the one exception until their callers are migrated: an `:info` flash is
+  still painted with `success`, because most of them report a completed write.
 
 ## Compact typography
 

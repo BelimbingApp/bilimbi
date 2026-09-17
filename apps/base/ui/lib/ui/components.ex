@@ -39,8 +39,9 @@ defmodule Bilimbi.Base.UI.Components do
   The message is the flash entry for `kind`, or the inner block. Its role
   follows its severity: `:success` and `:info` are `role="status"`, a polite
   announcement; `:warning` and `:error` are `role="alert"`, an assertive one.
-  `:info` is the neutral role — a statement that reports neither a good nor a
-  bad outcome — and is painted with the `info` colour role, never `success`.
+  `:success` and `:info` share the success colouring and differ by icon: most
+  `put_flash(:info, ...)` call sites report a completed write, so the two
+  cannot be told apart by colour until those callers move to `:success`.
 
   Clicking the message clears it on the server and hides it. The component
   itself never dismisses on a timer; `Bilimbi.Base.UI.Layouts.flash_group/1`,
@@ -86,8 +87,8 @@ defmodule Bilimbi.Base.UI.Components do
     >
       <div class={[
         "flex items-start gap-3 rounded-2xl border p-4 text-sm shadow-xl shadow-ink/[0.08] backdrop-blur",
-        @kind == :success && "border-success-line bg-success-surface/95 text-success-ink",
-        @kind == :info && "border-info-line bg-info-surface/95 text-info-ink",
+        @kind in [:success, :info] &&
+          "border-success-line bg-success-surface/95 text-success-ink",
         @kind == :warning && "border-warning-line bg-warning-surface/95 text-warning-ink",
         @kind == :error && "border-danger-line bg-danger-surface/95 text-danger-ink"
       ]}>
@@ -136,7 +137,7 @@ defmodule Bilimbi.Base.UI.Components do
       role="alert"
       class={[
         "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm",
-        @kind == :info && "border-info-line bg-info-surface text-info-ink",
+        @kind == :info && "border-line bg-surface-sunken text-ink",
         @kind == :success && "border-success-line bg-success-surface text-success-ink",
         @kind == :warning && "border-warning-line bg-warning-surface text-warning-ink",
         @kind == :error && "border-danger-line bg-danger-surface text-danger-ink",

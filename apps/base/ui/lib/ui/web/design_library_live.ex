@@ -152,18 +152,6 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> put_flash(:info, gettext("Preview value updated."))}
   end
 
-  def handle_event("preview-flash-stack", _params, socket) do
-    {:noreply,
-     socket
-     |> put_flash(:error, gettext("Example only: the record could not be saved."))
-     |> put_flash(
-       :warning,
-       gettext("Example only: review the missing address before continuing.")
-     )
-     |> put_flash(:success, gettext("Example only: your changes were saved."))
-     |> put_flash(:info, gettext("Example only: this change affects future records only."))}
-  end
-
   def handle_event("preview-company", %{"id" => id}, socket) do
     case Enum.find(@sample_rows, &(Integer.to_string(&1.id) == id)) do
       nil ->
