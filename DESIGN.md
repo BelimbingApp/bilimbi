@@ -281,10 +281,10 @@ permission-denied state: say that no destinations are available and name
 the recovery (an operator must assign a role), not a blank rail.
 
 Flash messages stack at the top right, most severe first, so several stay
-readable at once. A success dismisses itself after eight seconds; info,
-warning and error stay until the person dismisses them, because a message
-someone must act on must not disappear on a timer. Info keeps that protection
-while callers still use it for actionable failure notices.
+readable at once. Info, warning and error stay until the person dismisses
+them, because a message someone must act on must not disappear on a timer.
+Only a success times out, after eight seconds, and nothing emits one yet: the
+timer waits on the confirmation callers that still use info.
 
 ## Reduce anxiety
 

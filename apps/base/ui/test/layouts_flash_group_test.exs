@@ -1,8 +1,9 @@
 defmodule Bilimbi.Base.UI.LayoutsFlashGroupTest do
   @moduledoc """
   Tests for `Layouts.flash_group/1`, the one production outlet for flash
-  messages: every severity present at once is readable, and only a completed
-  write confirms itself away on a timer.
+  messages: the group is the one positioned stack, so messages sit in a
+  column instead of covering each other, and only `:success` carries the
+  dismissal timer.
   """
 
   use ExUnit.Case, async: true
@@ -40,13 +41,30 @@ defmodule Bilimbi.Base.UI.LayoutsFlashGroupTest do
 
   defp timed?(html, id), do: tag(html, id) =~ ~s(phx-hook="FlashAutoDismiss")
 
-  test "several messages are all present instead of one replacing another" do
+  # Where the element with this id starts in the rendered document.
+  defp position(html, id) do
+    [{start, _length}] = Regex.run(~r/<div[^>]*\sid="#{id}"[^>]*>/, html, return: :index)
+    start
+  end
+
+  test "the group is the one positioned stack, so no message covers another" do
     html = render_group(@all)
 
+    group = tag(html, "flash-group")
+    assert group =~ ~r/\bfixed\b/, "the group does not position the stack"
+    assert group =~ ~r/\bflex-col\b/, "the group does not lay its messages out in a column"
+
     for {kind, text} <- @all do
-      assert tag(html, "flash-#{kind}"), "no #{kind} message rendered"
+      message = tag(html, "flash-#{kind}")
+      assert message, "no #{kind} message rendered"
       assert html =~ text
+
+      refute message =~ ~r/\bfixed\b/,
+             "the #{kind} message claims a slot of its own instead of stacking in the group"
     end
+
+    severity_order = Enum.map(~w(error warning success info), &position(html, "flash-#{&1}"))
+    assert severity_order == Enum.sort(severity_order), "messages do not stack most severe first"
   end
 
   test "success dismisses on a timer; info, warning and error stay until dismissed" do
