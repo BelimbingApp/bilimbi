@@ -5,17 +5,22 @@ defmodule BilimbiWeb.LoginLive do
   Behavior mirrors Belimbing's `Core/User/Livewire/Auth/Login`:
 
     * email + password, both required, email format checked live;
-    * a neutral credential failure on the email field
-      ("These credentials do not match our records.");
+    * a neutral credential failure ("These credentials do not match our
+      records.");
     * five attempts per email+IP per minute, then a lockout that names the
       remaining seconds;
     * a session-expired notice when an expired session is bounced here;
     * on success, a painted "Signed in. Opening your workspace…" state while
-      the session form submits and the browser navigates.
+      the session form submits and the browser navigates; the submit button
+      is busy and both fields are readonly until the workspace appears.
 
   What differs is Bilimbi's own: the workspace strip under the card names
   the platform this is signing into, and the geometry follows `DESIGN.md`'s
-  compact ledger rules rather than Belimbing's arid pill styling.
+  compact ledger rules rather than Belimbing's arid pill styling. The
+  credential and lockout failures are announced above the form through the
+  same `<.alert>` the forgot-password confirmation uses, so a screen reader
+  hears that the attempt failed; Belimbing pins the message under the email
+  field, where nothing announces it.
   """
 
   use BilimbiWeb, :live_view
@@ -97,14 +102,12 @@ defmodule BilimbiWeb.LoginLive do
     end
   end
 
+  # The failure is a form-level outcome, not a field format error, so it goes
+  # through the announced `#login-form-error` alert rather than the field's
+  # error slot; the submitted values stay in the form for another attempt.
   defp reject(socket, changeset, message) do
-    changeset =
-      changeset
-      |> Ecto.Changeset.add_error(:email, message)
-      |> Map.put(:action, :validate)
-
     socket
-    |> assign(:form_error, nil)
+    |> assign(:form_error, message)
     |> assign_form(changeset)
   end
 
@@ -193,6 +196,7 @@ defmodule BilimbiWeb.LoginLive do
             placeholder="email@example.com"
             autocomplete="email"
             phx-debounce="blur"
+            readonly={@phase == :opening}
             required
             autofocus
           />
@@ -205,6 +209,7 @@ defmodule BilimbiWeb.LoginLive do
               label="Password"
               placeholder="Password"
               autocomplete="current-password"
+              readonly={@phase == :opening}
               required
             />
             <.link
@@ -222,7 +227,7 @@ defmodule BilimbiWeb.LoginLive do
             id="login-submit"
             class="w-full"
             phx-disable-with="Signing in…"
-            disabled={@phase == :opening}
+            busy={@phase == :opening}
           >
             <%= if @phase == :opening do %>
               Opening workspace…
