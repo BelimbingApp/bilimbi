@@ -205,7 +205,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#companies-empty-add[href='/companies/create']", "Add Company")
     end
 
-    test "a tenant with no companies yet tells an actor who cannot create so, plainly", %{
+    test "a tenant with no companies yet offers no create to an actor who cannot", %{
       conn: conn
     } do
       grant_capabilities!(["admin.company.list"])
@@ -220,11 +220,10 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(
                view,
                "#companies-empty",
-               "You do not have permission to create companies. Ask an operator to review your role."
+               "Companies created in this tenant appear here."
              )
 
       refute has_element?(view, "#companies-empty-add")
-      refute has_element?(view, "#companies-empty", "try again")
     end
   end
 

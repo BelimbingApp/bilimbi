@@ -1006,13 +1006,6 @@
                   <.empty_state id="design-library-empty-forbidden" forbidden="view companies" />
                 </.card>
               </div>
-              <.card title="Cannot recover here" inner_class="p-4">
-                <.empty_state
-                  id="design-library-empty-forbidden-create"
-                  title="No companies yet"
-                  forbidden="create companies"
-                />
-              </.card>
               <.table id="design-library-empty-table" rows={[]} caption="Example empty table">
                 <:col :let={row} label="Company">{row.name}</:col>
                 <:col :let={row} label="Status">{row.status}</:col>

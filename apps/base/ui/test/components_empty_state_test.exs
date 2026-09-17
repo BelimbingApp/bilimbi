@@ -83,17 +83,14 @@ defmodule Bilimbi.Base.UI.ComponentsEmptyStateTest do
     refute text(html) =~ ~r/\bno companies\b/i
   end
 
-  test "a forbidden recovery beside a title keeps the title and explains the missing action" do
-    html =
+  test "refuses a call that says both what is missing and what is forbidden" do
+    assert_raise ArgumentError, ~r/not both/, fn ->
       render_component(&empty_state/1, %{
         title: "No companies yet",
         forbidden: "create companies",
         action: []
       })
-
-    assert text(html) ==
-             "No companies yet You do not have permission to create companies. " <>
-               "Ask an operator to review your role."
+    end
   end
 
   test "refuses a call that says neither what is missing nor what is forbidden" do

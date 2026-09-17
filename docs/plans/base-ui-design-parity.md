@@ -86,7 +86,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | FBK-01 | Inline alerts | Shared primitive exists | Verify status semantics, copy, contrast, icons and dismissibility. |
 | FBK-02 | Flash and notification behavior | Basic fixed flash | Define stacking, timing, sticky warning/error, manual dismissal and redirect continuity. |
 | FBK-03 | Validation, disabled and loading states | Partial | Make the states visibly distinct and prevent duplicate work. |
-| FBK-04 | Empty, permission, unavailable, error and recovery states | Shared `<.empty_state>` (what is missing, why, optional recovery) reachable from `<.table>`'s `<:empty>` slot, with one owned permission wording; `/companies` adopts its nothing-yet, nothing-matched and not-permitted states. Unavailable and error states remain the Schedule alerts and layout flashes | Adopt the region pattern on the remaining index and show-page tables; unavailable/reconnect stays unverified. |
+| FBK-04 | Empty, permission, unavailable, error and recovery states | Shared `<.empty_state>` (what is missing, why, optional recovery) reachable from `<.table>`'s `<:empty>` slot, with one owned permission wording; `/companies` adopts its nothing-yet and nothing-matched states and offers the first create only to an actor who may make one. Unavailable and error states remain the Schedule alerts and layout flashes | Adopt the region pattern on the remaining index and show-page tables; a nothing-yet region that also explains a missing create right is deferred until a workflow needs that sentence; unavailable/reconnect stays unverified. |
 | OVR-01 [(contradicted)](#targets-the-evidence-contradicts) | Standard modal | Missing | Add accessible open, close, Escape, backdrop, focus containment and focus return. |
 | OVR-02 [(contradicted)](#targets-the-evidence-contradicts) | Confirmation modal | Missing | Add consequence-first confirmation without copying Belimbing's accessibility gaps. |
 | OVR-03 | Inspector drawer | Missing | Add only for a real inspector workflow; cover mobile width, resizing and remembered width. |
@@ -172,7 +172,7 @@ rather than being quietly reconciled.
 | FBK-01 Inline alerts | Adopt adapted | none |
 | FBK-02 Flash | Adopt adapted | z-order agreed with OVR-01 |
 | FBK-03 Validation, disabled, loading | Adopt adapted | ACT-01 |
-| FBK-04 Empty, permission, error, recovery | Keep Bilimbi | none |
+| FBK-04 Empty, permission, error, recovery | Adopt adapted (empty and permission regions — one shared `<.empty_state>` with one owned permission wording) / Keep Bilimbi (unavailable and error — the existing alerts and layout flashes) | none |
 | OVR-01 Standard modal | Adopt adapted — share the shell drawer's containment, do not re-add | extract containment hook from `app_shell.js` |
 | OVR-02 Confirmation modal | Adopt adapted | OVR-01, ACT-03 |
 | OVR-03 Inspector drawer | Not applicable — no workflow needs it | a real inspector workflow |

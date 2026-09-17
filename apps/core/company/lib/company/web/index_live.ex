@@ -428,10 +428,10 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
               </div>
             </:action>
 
-            <%!-- Three different absences, three different sentences: a search or
+            <%!-- Two different absences, two different sentences: a search or
                  filter that matched nothing offers the way back; a tenant with no
-                 companies yet offers the first create, or says plainly that this
-                 actor may not create one. --%>
+                 companies yet offers the first create to an actor who may make
+                 one. --%>
             <:empty
               :if={@companies_page.entries == [] and filtered?(@index_state)}
               title={filtered_empty_title(@index_state)}
@@ -442,25 +442,19 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
               </.button>
             </:empty>
             <:empty
-              :if={
-                @companies_page.entries == [] and not filtered?(@index_state) and
-                  allowed?(@current_scope, "admin.company.create")
-              }
+              :if={@companies_page.entries == [] and not filtered?(@index_state)}
               title="No companies yet"
               reason="Companies created in this tenant appear here."
             >
-              <.button id="companies-empty-add" variant="primary" navigate={~p"/companies/create"}>
+              <.button
+                :if={allowed?(@current_scope, "admin.company.create")}
+                id="companies-empty-add"
+                variant="primary"
+                navigate={~p"/companies/create"}
+              >
                 <.icon name="create" class="size-4" /> Add Company
               </.button>
             </:empty>
-            <:empty
-              :if={
-                @companies_page.entries == [] and not filtered?(@index_state) and
-                  not allowed?(@current_scope, "admin.company.create")
-              }
-              title="No companies yet"
-              forbidden="create companies"
-            />
           </.table>
 
           <.pagination

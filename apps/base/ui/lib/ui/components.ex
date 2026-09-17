@@ -1496,9 +1496,8 @@ defmodule Bilimbi.Base.UI.Components do
   role." It does not suggest trying again and it does not imply the data is
   absent.
 
-  `forbidden` beside a `title` keeps the title as the heading and gives the
-  permission wording as the reason: the region is visible but the way to fill
-  it is not, as when a first record cannot be created by this actor.
+  `title` and `forbidden` are the two modes, and a call gives one of them: a
+  region either says what is missing or says it is out of reach.
 
   `<.table>` reaches this from its `<:empty>` slot, so a table needs no second
   component. The block carries no padding of its own; the table cell or the
@@ -1522,7 +1521,7 @@ defmodule Bilimbi.Base.UI.Components do
 
   attr(:title, :string,
     default: nil,
-    doc: "what is missing; required unless `forbidden` is given"
+    doc: "what is missing; give this or `forbidden`, never both"
   )
 
   attr(:reason, :string, default: nil, doc: "why it is missing")
@@ -1541,6 +1540,12 @@ defmodule Bilimbi.Base.UI.Components do
   def empty_state(%{title: nil, forbidden: nil}) do
     raise ArgumentError,
           "<.empty_state> needs a title (what is missing) or forbidden (the action the actor lacks)"
+  end
+
+  def empty_state(%{title: title, forbidden: forbidden})
+      when is_binary(title) and is_binary(forbidden) do
+    raise ArgumentError,
+          "<.empty_state> takes a title (what is missing) or forbidden (the action the actor lacks), not both"
   end
 
   def empty_state(assigns) do
@@ -1566,17 +1571,6 @@ defmodule Bilimbi.Base.UI.Components do
 
   defp empty_state_copy(%{title: title, reason: reason, forbidden: nil}) do
     %{heading: title, details: Enum.reject([reason], &is_nil/1)}
-  end
-
-  defp empty_state_copy(%{title: title, reason: reason, forbidden: forbidden}) do
-    %{
-      heading: title,
-      details:
-        Enum.reject(
-          [reason, permission_wording(forbidden) <> " " <> permission_recovery()],
-          &is_nil/1
-        )
-    }
   end
 
   defp permission_wording(action), do: "You do not have permission to #{action}."
