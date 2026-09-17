@@ -11,6 +11,12 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   @view_cap "admin.system.design-library.view"
+  @areas [
+    {"/system/design-library", "#foundations"},
+    {"/system/design-library/components", "#components"},
+    {"/system/design-library/design-spec", "#specifications"},
+    {"/system/design-library/graphic", "#graphics"}
+  ]
   @family_menu_labels [
     "A Foundations",
     "B Page structure",
@@ -24,12 +30,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     "J Composite patterns",
     "K Graphics"
   ]
-  @paths [
-    "/system/design-library",
-    "/system/design-library/components",
-    "/system/design-library/design-spec",
-    "/system/design-library/graphic"
-  ]
+  @paths Enum.map(@areas, &elem(&1, 0))
 
   setup do
     UserFixtures.create_user_tables!()
@@ -40,11 +41,19 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
   end
 
   defp family_menu_labels(view) do
+    family_menu_lines(view, "first-child")
+  end
+
+  defp family_menu_descriptions(view) do
+    family_menu_lines(view, "last-child")
+  end
+
+  defp family_menu_lines(view, position) do
     view
     |> render()
     |> LazyHTML.from_fragment()
     |> LazyHTML.query(
-      "#component-secondary-menu nav[aria-label='Component families'] a > span > span:first-child"
+      "#component-secondary-menu nav[aria-label='Component families'] a > span > span:#{position}"
     )
     |> Enum.map(&(&1 |> LazyHTML.text() |> String.trim()))
   end
@@ -52,6 +61,16 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
   defp open(conn, path) do
     grant_capabilities!(@view_cap)
     conn |> log_in_as() |> live(path)
+  end
+
+  defp area_text(view, selector) do
+    view
+    |> element(selector)
+    |> render()
+    |> LazyHTML.from_fragment()
+    |> LazyHTML.text()
+    |> String.replace(~r/\s+/u, " ")
+    |> String.trim()
   end
 
   test "all Design Library areas require authentication", %{conn: conn} do
@@ -243,7 +262,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     end
 
     assert has_element?(view, "#sample-table", "Acme Holdings")
-    assert has_element?(view, "#sample-table", "Globex Corporation")
+    assert has_element?(view, "#sample-table", "Example Company 10")
     assert has_element?(view, "#nav-admin-system-design-library-components[aria-current='page']")
   end
 
@@ -351,6 +370,70 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
              "#design-library-pattern-pagination-summary",
              "Showing 1 to 25 of 120 results"
            )
+  end
+
+  test "the canonical table sorts by its headings and starts each sort on page one", %{
+    conn: conn
+  } do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    assert has_element?(view, "#sample-sort-updated")
+    assert has_element?(view, "th[aria-sort='ascending'] #sample-sort-name")
+    assert has_element?(view, "th[aria-sort='none'] #sample-sort-updated")
+    assert has_element?(view, "#sample-table tr:first-child", "Acme Holdings")
+    assert has_element?(view, "#sample-table tr:nth-child(2)", "Example Company 10")
+    refute has_element?(view, "#sample-table", "Globex Corporation")
+
+    view |> element("#sample-sort-updated") |> render_click()
+    assert has_element?(view, "th[aria-sort='descending'] #sample-sort-updated")
+    assert has_element?(view, "th[aria-sort='none'] #sample-sort-name")
+    assert has_element?(view, "#sample-table tr:first-child", "Acme Holdings")
+    assert has_element?(view, "#sample-table tr:nth-child(3)", "Initech LLC")
+
+    view |> element("#sample-sort-updated") |> render_click()
+    assert has_element?(view, "th[aria-sort='ascending'] #sample-sort-updated")
+    assert has_element?(view, "#sample-table tr:first-child", "Example Company 120")
+
+    view |> element("#sample-sort-name") |> render_click()
+    assert has_element?(view, "th[aria-sort='ascending'] #sample-sort-name")
+
+    view |> element("#sample-sort-name") |> render_click()
+    assert has_element?(view, "th[aria-sort='descending'] #sample-sort-name")
+    assert has_element?(view, "#sample-table tr:first-child", "Initech LLC")
+    assert has_element?(view, "#sample-table tr:nth-child(2)", "Globex Corporation")
+
+    view |> element("#design-library-pagination-page-5") |> render_click()
+    assert has_element?(view, "#design-library-pagination-summary", "Showing 101 to 120")
+    view |> element("#sample-sort-status") |> render_click()
+    assert has_element?(view, "#design-library-pagination-summary", "Showing 1 to 25")
+    assert has_element?(view, "th[aria-sort='ascending'] #sample-sort-status")
+    assert has_element?(view, "#sample-table tr:first-child", "active")
+    assert has_element?(view, "#sample-table tr:nth-child(25)")
+    refute has_element?(view, "#sample-table tr:nth-child(26)")
+    assert has_element?(view, "#design-library-pattern-table", "Acme Holdings")
+  end
+
+  test "no Design Library area renders a parity catalog identifier", %{conn: conn} do
+    for {path, area} <- @areas do
+      {:ok, view, _html} = open(conn, path)
+
+      refute area_text(view, area) =~ ~r/\b[A-Z]{3,4}-\d{2}\b/,
+             "#{path} renders a catalog identifier"
+    end
+
+    {:ok, components, _html} = open(conn, "/system/design-library/components")
+    assert area_text(components, "#component-shell h3") == "Application shell"
+
+    descriptions = family_menu_descriptions(components)
+    assert length(descriptions) == length(@family_menu_labels)
+
+    for description <- descriptions do
+      refute description =~ ~r/^[A-Z][A-Z0-9]*\s*·/,
+             "the component family menu still leads a description with a catalog code: #{description}"
+    end
+
+    {:ok, spec, _html} = open(conn, "/system/design-library/design-spec")
+    assert area_text(spec, "#spec-shell h2") == "Application shell"
   end
 
   test "example actions preview fictional facts without linking to business records", %{
