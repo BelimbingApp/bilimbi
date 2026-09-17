@@ -11,12 +11,13 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   @view_cap "admin.system.design-library.view"
-  @paths [
-    "/system/design-library",
-    "/system/design-library/components",
-    "/system/design-library/design-spec",
-    "/system/design-library/graphic"
+  @areas [
+    {"/system/design-library", "#foundations"},
+    {"/system/design-library/components", "#components"},
+    {"/system/design-library/design-spec", "#specifications"},
+    {"/system/design-library/graphic", "#graphics"}
   ]
+  @paths Enum.map(@areas, &elem(&1, 0))
 
   setup do
     UserFixtures.create_user_tables!()
@@ -29,6 +30,16 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
   defp open(conn, path) do
     grant_capabilities!(@view_cap)
     conn |> log_in_as() |> live(path)
+  end
+
+  defp area_text(view, selector) do
+    view
+    |> element(selector)
+    |> render()
+    |> LazyHTML.from_fragment()
+    |> LazyHTML.text()
+    |> String.replace(~r/\s+/u, " ")
+    |> String.trim()
   end
 
   test "all Design Library areas require authentication", %{conn: conn} do
@@ -314,10 +325,18 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
   end
 
   test "no Design Library area renders a parity catalog identifier", %{conn: conn} do
-    for path <- @paths do
-      {:ok, _view, html} = open(conn, path)
-      refute html =~ ~r/\b[A-Z]{3,4}-\d{2}\b/, "#{path} renders a catalog identifier"
+    for {path, area} <- @areas do
+      {:ok, view, _html} = open(conn, path)
+
+      refute area_text(view, area) =~ ~r/\b[A-Z]{3,4}-\d{2}\b/,
+             "#{path} renders a catalog identifier"
     end
+
+    {:ok, components, _html} = open(conn, "/system/design-library/components")
+    assert area_text(components, "#component-shell h2") == "Application shell"
+
+    {:ok, spec, _html} = open(conn, "/system/design-library/design-spec")
+    assert area_text(spec, "#spec-shell h2") == "Application shell"
   end
 
   test "example actions preview fictional facts without linking to business records", %{

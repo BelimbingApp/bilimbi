@@ -958,54 +958,61 @@
                 Tables, inline editing, pagination, key facts, and dates.
               </p>
             </div>
-            <div id="component-table" class="space-y-2">
+            <div class="space-y-2">
               <p class="text-xs text-ink-muted">
                 Example companies; sort by any heading. Changes stay in this preview.
               </p>
-              <.table
-                id="sample-table"
-                rows={@streams.sample_rows}
-                row_id={fn {dom_id, _} -> dom_id end}
-                row_item={fn {_, row} -> row end}
-                sort_by={@sample_sort.sort_by}
-                sort_dir={@sample_sort.sort_dir}
-                sort_event="sample-sort"
-                caption="Example companies"
-              >
-                <:col :let={row} label="Company" sort="name" sort_id="sample-sort-name">
-                  <span class="font-medium text-ink-strong">{row.name}</span>
-                </:col><:col :let={row} label="Code" sort="code" sort_id="sample-sort-code">
-                  {row.code}
-                </:col><:col :let={row} label="Status" sort="status" sort_id="sample-sort-status">
-                  <.badge kind={row.kind}>{row.status}</.badge>
-                </:col><:col
-                  :let={row}
-                  label="Updated"
-                  sort="updated_at"
-                  sort_id="sample-sort-updated"
+              <.card id="component-table" inner_class="p-0">
+                <.table
+                  id="sample-table"
+                  rows={@streams.sample_rows}
+                  row_id={fn {dom_id, _} -> dom_id end}
+                  row_item={fn {_, row} -> row end}
+                  sort_by={@sample_sort.sort_by}
+                  sort_dir={@sample_sort.sort_dir}
+                  sort_event="sample-sort"
+                  caption="Example companies"
+                  framed={false}
                 >
-                  <.datetime
-                    id={"sample-updated-#{row.id}"}
-                    value={row.updated_at}
-                    format={:date}
-                  />
-                </:col><:action :let={row}>
-                  <.icon_button
-                    icon="view"
-                    id={"sample-preview-#{row.id}"}
-                    label={"Preview #{row.name}"}
-                    phx-click="preview-company"
-                    phx-value-id={row.id}
-                  />
-                </:action>
-              </.table>
-              <.pagination
-                id="design-library-pagination"
-                page={@sample_page}
-                filters_form={@sample_page_form}
-                page_event="sample-page"
-                filters_event="sample-page-size"
-              />
+                  <:col :let={row} label="Company" sort="name" sort_id="sample-sort-name">
+                    <span class="font-medium text-ink-strong">{row.name}</span>
+                  </:col><:col :let={row} label="Code" sort="code" sort_id="sample-sort-code">
+                    {row.code}
+                  </:col><:col
+                    :let={row}
+                    label="Status"
+                    sort="status"
+                    sort_id="sample-sort-status"
+                  >
+                    <.badge kind={row.kind}>{row.status}</.badge>
+                  </:col><:col
+                    :let={row}
+                    label="Updated"
+                    sort="updated_at"
+                    sort_id="sample-sort-updated"
+                  >
+                    <.datetime
+                      id={"sample-updated-#{row.id}"}
+                      value={row.updated_at}
+                      format={:date}
+                    />
+                  </:col><:action :let={row}>
+                    <.icon_button
+                      icon="view"
+                      id={"sample-preview-#{row.id}"}
+                      label={"Preview #{row.name}"}
+                      phx-click="preview-company"
+                      phx-value-id={row.id}
+                    />
+                  </:action>
+                </.table><.pagination
+                  id="design-library-pagination"
+                  page={@sample_page}
+                  filters_form={@sample_page_form}
+                  page_event="sample-page"
+                  filters_event="sample-page-size"
+                />
+              </.card>
             </div>
             <.card id="component-inline-edit" title="Inline edit" inner_class="p-4">
               <p class="mb-2 text-xs text-ink-muted">
