@@ -58,6 +58,17 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     definition: definition
   } do
     grant_capabilities!(@view)
+
+    Repo.insert!(%Run{
+      source: "scheduler",
+      key: definition.key,
+      name: definition.task_name,
+      status: "succeeded",
+      started_at: ~N[2026-08-20 01:30:00],
+      finished_at: ~N[2026-08-20 01:30:02],
+      runtime_ms: 2_000
+    })
+
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule")
 
     assert has_element?(view, "#schedule-board")
@@ -67,6 +78,13 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     assert has_element?(view, "#schedule-task-test-schedule", definition.expression)
     assert has_element?(view, "#schedule-task-test-schedule", definition.timezone)
     assert has_element?(view, "#schedule-task-test-schedule a[href='/system/performance']")
+    assert has_element?(view, "#schedule-task-test-schedule-next-due[data-follow-shell='true']")
+
+    assert has_element?(
+             view,
+             "#schedule-task-test-schedule-last-started[data-follow-shell='true']"
+           )
+
     refute has_element?(view, "#schedule-task-test-schedule button")
 
     assert render_click(view, "run_now", %{"key" => definition.key}) =~
@@ -183,6 +201,7 @@ defmodule BilimbiWeb.ScheduleLiveTest do
 
     assert has_element?(view, "#schedule-runs", "Visible run")
     assert has_element?(view, "#schedule-runs", "Exit 7")
+    assert has_element?(view, "#schedule-runs time[data-follow-shell='true']")
     refute render(view) =~ "secret-output-must-not-render"
 
     Repo.insert!(%Run{
