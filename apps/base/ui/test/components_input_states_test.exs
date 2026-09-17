@@ -5,8 +5,12 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
 
   These tests assert behaviour and relationships — that the control itself
   carries the invalid marking, that `aria-describedby` points at elements
-  that exist and hold the hint and error text — never class strings, which
-  break on the next restyle and prove nothing.
+  that exist and hold the hint and error text.
+
+  Readonly paint is the one exception. A locked background has no evidence
+  beyond the class that draws it, so that test matches the class, anchored
+  on its boundaries so it cannot be satisfied by the `disabled:` variant
+  every field already carries.
   """
 
   use ExUnit.Case, async: true
