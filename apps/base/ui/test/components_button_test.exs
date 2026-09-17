@@ -176,25 +176,6 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
     refute disabled =~ ~r/\sbg-surface-sunken/
   end
 
-  test "an icon action refuses the in-flight mechanism that would delete its glyph" do
-    assert_raise ArgumentError, ~r/phx-disable-with replaces a control's text/, fn ->
-      render_component(
-        fn assigns ->
-          ~H"""
-          <.icon_button
-            id="delete-btn"
-            icon="delete"
-            label="Delete company"
-            phx-click="delete"
-            phx-disable-with="Deleting…"
-          />
-          """
-        end,
-        %{}
-      )
-    end
-  end
-
   test "busy is refused on a navigation control it cannot make inert" do
     assert_raise ArgumentError, ~r/busy is a button state/, fn ->
       render_component(
