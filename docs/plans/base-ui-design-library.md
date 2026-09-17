@@ -1,7 +1,7 @@
 # Base UI Design Library
 
 **Status:** Foundation merged; the parity campaign continues under Issue #709
-**Last Updated:** 2026-09-15
+**Last Updated:** 2026-09-17
 **Tracking:** [Issue #691](https://github.com/BelimbingApp/bilimbi/issues/691)
 **Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`; `fm/parity-designlib-specimens/grok-4.6`
 **Related:** `docs/plans/base-ui-design-parity.md`
@@ -153,10 +153,10 @@ Validation: Updating Bilimbi does not modify the adopter's design, and the runni
 
 Goal: Let Bilimbi evolve quickly while making inconsistency visible.
 
-- [ ] Keep reflection-based coverage for every public Base UI component.
+Drift guards are inventoried only in `docs/plans/base-ui-design-parity.md` Phase 6, which owns campaign execution detail; this plan does not keep a second list. As of 2026-09-17 that phase records two guards built by https://github.com/BelimbingApp/bilimbi/pull/722 — reflection-based coverage of every public Base UI component in its declared states, and rejection of hand-written markup that imitates a shared component — both tagged `:design_library_drift` and excluded from the default test run and `mix precommit` until the specimens they report are corrected. Guards for raw palette use, local component forks in production screens and unregistered icons remain open there.
+
 - [ ] Add checks for local assets, contrast, focus, keyboard use, reduced motion and content security.
 - [ ] Add desktop and mobile evidence for first-impression screens and representative workflows.
-- [ ] Guard against raw palette use, duplicated shared markup, local component forks and unregistered icons.
 - [ ] Make the Design Library skill run the same project validators used by normal development.
 
 Validation: A new design variation is either a deliberate numbered decision or a failing drift check; it cannot hide as an unexplained local override.
