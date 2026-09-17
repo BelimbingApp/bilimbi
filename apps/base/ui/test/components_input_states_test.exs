@@ -76,6 +76,21 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
     """
   end
 
+  defp multi_select_field(assigns) do
+    ~H"""
+    <.multi_select
+      id="m"
+      name="m"
+      label="Roles"
+      options={[{"Administrator", "admin"}]}
+      value={[]}
+      hint={@hint}
+      errors={@errors}
+      required={@required}
+    />
+    """
+  end
+
   defp control_tag(html, id, tag \\ "input") do
     assert [match] = Regex.run(~r/<#{tag}[^>]*id="#{id}"[^>]*>/, html),
            "expected a <#{tag}> control with id=#{id} in:\n#{html}"
@@ -83,8 +98,8 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
     match
   end
 
-  defp label_tag(html) do
-    assert [match] = Regex.run(~r/<label[^>]*for="f"[^>]*>.*?<\/label>/s, html),
+  defp label_tag(html, id \\ "f") do
+    assert [match] = Regex.run(~r/<label[^>]*for="#{id}"[^>]*>.*?<\/label>/s, html),
            "expected a label for the field in:\n#{html}"
 
     match
@@ -197,9 +212,9 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
 
     tag = control_tag(html, "f")
 
-    # Match the attributes themselves: bare substrings also hit the
-    # `disabled:` / `read-only:` styling variants. A disabled control would
-    # not submit its value, which is the behaviour this distinguishes.
+    # Match the attributes themselves: a bare substring also hits the
+    # `disabled:` styling variant. A disabled control would not submit its
+    # value, which is the behaviour this distinguishes.
     assert tag =~ ~r/\sreadonly(\s|=|>|\/)/
     refute tag =~ ~r/\sdisabled(\s|=|>|\/)/
   end
@@ -227,6 +242,67 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
     tag = control_tag(html, "t", "textarea")
     assert tag =~ ~s(aria-invalid="true")
     assert tag =~ ~s(aria-describedby="t-hint t-error-0")
+  end
+
+  test "only a field the caller marked readonly is painted locked" do
+    locked =
+      render_component(&field/1, hint: nil, errors: [], required: nil, readonly: true)
+
+    editable =
+      render_component(&field/1, hint: nil, errors: [], required: nil, readonly: nil)
+
+    select = render_component(&select_field/1, value: nil, hint: nil, errors: [])
+
+    assert control_tag(locked, "f") =~ ~r/[\s"]bg-surface-sunken[\s"]/
+    refute control_tag(editable, "f") =~ ~r/[\s"]bg-surface-sunken[\s"]/
+
+    # HTML has no readonly `select`: the attribute does not apply, so a
+    # dropdown must never be painted from readonliness. The CSS `:read-only`
+    # pseudo-class matches every one of them, which is why the state is read
+    # from the attribute the caller set instead.
+    select_tag = control_tag(select, "s", "select")
+    refute select_tag =~ "read-only"
+    refute select_tag =~ ~r/[\s"]bg-surface-sunken[\s"]/
+  end
+
+  test "an invalid multi-select marks its own control invalid and associated" do
+    html =
+      render_component(&multi_select_field/1,
+        hint: "Pick at least one.",
+        errors: ["can't be blank"],
+        required: false
+      )
+
+    tag = control_tag(html, "m", "button")
+
+    assert tag =~ ~s(aria-invalid="true")
+    assert tag =~ ~s(aria-describedby="m-hint m-error-0")
+    assert html =~ ~r/id="m-hint"[^>]*>Pick at least one\./
+    assert html =~ ~r/id="m-error-0"[^>]*>.*can&#39;t be blank/s
+  end
+
+  test "a valid multi-select carries no invalid marking or dangling association" do
+    html =
+      render_component(&multi_select_field/1, hint: nil, errors: [], required: false)
+
+    refute html =~ "aria-invalid"
+    refute html =~ "aria-describedby"
+  end
+
+  test "a required multi-select marks its label and announces the requirement" do
+    html =
+      render_component(&multi_select_field/1, hint: nil, errors: [], required: true)
+
+    assert label_tag(html, "m") =~ ~s(<span aria-hidden="true">*</span>)
+    assert control_tag(html, "m", "button") =~ ~s(aria-required="true")
+  end
+
+  test "an optional multi-select carries no required marker" do
+    html =
+      render_component(&multi_select_field/1, hint: nil, errors: [], required: false)
+
+    refute label_tag(html, "m") =~ "aria-hidden"
+    refute html =~ "aria-required"
   end
 
   test "an invalid checkbox marks its own control invalid and associated" do

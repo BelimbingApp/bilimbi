@@ -495,7 +495,9 @@ defmodule Bilimbi.Base.UI.Components do
         name={@name}
         aria-invalid={@errors != [] && "true"}
         aria-describedby={described_by(@id, @hint, @errors)}
-        class={field_class(@class, @error_class, @errors, "min-h-24")}
+        class={
+          field_class(@class, @error_class, @errors, extra: "min-h-24", readonly: @rest[:readonly])
+        }
         {@rest}
       >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
       <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
@@ -522,7 +524,7 @@ defmodule Bilimbi.Base.UI.Components do
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         aria-invalid={@errors != [] && "true"}
         aria-describedby={described_by(@id, @hint, @errors)}
-        class={field_class(@class, @error_class, @errors)}
+        class={field_class(@class, @error_class, @errors, readonly: @rest[:readonly])}
         {@rest}
       />
       <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
@@ -535,8 +537,6 @@ defmodule Bilimbi.Base.UI.Components do
   # with the control, not stranded beside it. Returns the space-separated id
   # list for `aria-describedby`, or nil when there is nothing to point at so
   # no dangling reference is rendered.
-  defp described_by(id, _hint, _errors) when not is_binary(id), do: nil
-
   defp described_by(id, hint, errors) do
     error_ids = errors |> Enum.with_index() |> Enum.map(fn {_, i} -> "#{id}-error-#{i}" end)
 
@@ -550,10 +550,10 @@ defmodule Bilimbi.Base.UI.Components do
 
   # One control family for every field type. `class` replaces the default
   # entirely; `error_class` replaces only the invalid-state styling.
-  defp field_class(class, error_class, errors, extra \\ nil) do
+  defp field_class(class, error_class, errors, opts \\ []) do
     [
-      class || field_base_class(),
-      is_nil(class) && extra,
+      class || field_base_class(opts[:readonly]),
+      is_nil(class) && opts[:extra],
       if errors == [] do
         "border-high-contrast-line"
       else
@@ -562,11 +562,15 @@ defmodule Bilimbi.Base.UI.Components do
     ]
   end
 
-  defp field_base_class do
-    "block w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-ink shadow-xs " <>
+  # `readonly` is a statement the caller made about this field. The CSS
+  # `:read-only` pseudo-class is not the same statement: it matches every
+  # immutable control, including every `select`, `color` and `file` input.
+  defp field_base_class(readonly) do
+    "block w-full rounded-md border px-3 py-1.5 text-sm text-ink shadow-xs " <>
       "transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none " <>
       "focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed " <>
-      "disabled:bg-surface-sunken disabled:text-ink-subtle read-only:bg-surface-sunken"
+      "disabled:bg-surface-sunken disabled:text-ink-subtle " <>
+      if(readonly, do: "bg-surface-sunken", else: "bg-surface")
   end
 
   @doc """
@@ -613,6 +617,7 @@ defmodule Bilimbi.Base.UI.Components do
   )
 
   attr(:hint, :string, default: nil)
+  attr(:required, :boolean, default: false)
   attr(:rest, :global, doc: "arbitrary HTML attributes for the button")
 
   def multi_select(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
@@ -697,7 +702,7 @@ defmodule Bilimbi.Base.UI.Components do
         for={@id}
         class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
       >
-        {@label}
+        {@label}<span :if={@required} aria-hidden="true">*</span>
       </label>
 
       <button
@@ -706,6 +711,9 @@ defmodule Bilimbi.Base.UI.Components do
         aria-haspopup="true"
         aria-expanded="false"
         aria-controls={"#{@id}-options"}
+        aria-required={@required && "true"}
+        aria-invalid={@errors != [] && "true"}
+        aria-describedby={described_by(@id, @hint, @errors)}
         phx-click={
           JS.toggle_class("hidden", to: "##{@id}-options")
           |> JS.toggle_class("rotate-180", to: "##{@id}-chevron")
@@ -761,8 +769,8 @@ defmodule Bilimbi.Base.UI.Components do
         </div>
       </div>
 
-      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
     </div>
     """
   end
@@ -1157,11 +1165,10 @@ defmodule Bilimbi.Base.UI.Components do
     do: Calendar.strftime(value, "%d/%m/%Y, %H:%M ") <> value.zone_abbr
 
   # Helper used by inputs to generate form errors
+  attr(:id, :string, default: nil)
   slot(:inner_block, required: true)
 
   defp error(assigns) do
-    assigns = assign_new(assigns, :id, fn -> nil end)
-
     ~H"""
     <p id={@id} class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink">
       <.icon name="error" class="size-4 shrink-0 text-danger" />
