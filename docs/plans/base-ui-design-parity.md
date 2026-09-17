@@ -472,7 +472,14 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
 - [x] Show the current Bilimbi component in every meaningful state for the active family. `{codex-luna-states-1/gpt-5.6-luna}`
 
   Both landed on 2026-09-15 and neither finished the job: the `:design_library_drift`
-  guards still report four failures on `main`, and this branch left them unchanged.
+  guards still report four failures on `main`, and this branch left the count
+  unchanged. The shared modal (`OVR-01`) does add one name to the coverage guard's
+  missing list: `connection_banners` is layout chrome that every page carries once
+  and every open dialog carries again, so the Design Library presents it through
+  the modal specimen rather than through an anchor of its own. A second live
+  instance on that page would announce a dropped connection twice — the component
+  has no presentational mode, and giving it one to satisfy a guard would be the
+  guard shaping the product.
 - [ ] Correct the four `:design_library_drift` specimen and state failures those two slices left, then move the guards into the default test run and `mix precommit`.
 - [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record the design steward's accepted disposition and rationale.
 - [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.

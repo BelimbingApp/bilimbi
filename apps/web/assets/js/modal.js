@@ -10,10 +10,12 @@
 //
 // Which control that is cannot be read from document.activeElement alone: a
 // browser that does not focus a <button> on click leaves focus on <body>, and
-// the dialog would then have nowhere to return it to. Capture-phase listeners
-// record the control the user actually activated instead. They are armed when
-// app.js imports this module, because the activation that opens the first
-// dialog of a page session happens before any dialog exists to mount a hook.
+// the dialog would then have nowhere to return it to. One capture-phase
+// pointerdown listener records the control the user activated instead. It is
+// armed when app.js imports this module, because the click that opens the
+// first dialog of a page session lands before any dialog exists to mount a
+// hook. A keyboard activation needs no listener: the control holds focus while
+// it is activated, so document.activeElement is already the opener.
 const ACTIVATION_TARGETS = "button, a[href], [tabindex]"
 
 let lastActivated = null
@@ -22,12 +24,7 @@ function rememberActivation({target}) {
   lastActivated = target instanceof Element ? target.closest(ACTIVATION_TARGETS) : null
 }
 
-function rememberKeyActivation(e) {
-  if (e.key === "Enter" || e.key === " ") rememberActivation(e)
-}
-
 document.addEventListener("pointerdown", rememberActivation, true)
-document.addEventListener("keydown", rememberKeyActivation, true)
 
 const Modal = {
   mounted() {
