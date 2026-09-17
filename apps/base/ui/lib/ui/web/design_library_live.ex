@@ -145,11 +145,6 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> assign_preview_page(:pattern, 1, 25)
      |> assign(:sample_datetime, ~U[2026-08-17 14:30:00Z])
      |> assign(:inline_value, "Editable entity value")
-     |> assign(:filter_toolbar_minimal_form, to_form(%{"search" => ""}, as: :toolbar_minimal))
-     |> assign(
-       :filter_toolbar_selects_form,
-       to_form(%{"status" => "", "kind" => ""}, as: :toolbar_selects)
-     )
      |> assign(
        :filter_toolbar_full_form,
        to_form(
@@ -176,19 +171,9 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
     {:noreply, assign(socket, :sample_form, to_form(sample_data, as: :sample))}
   end
 
-  def handle_event("filter-toolbar-preview", %{"toolbar_minimal" => toolbar_data}, socket) do
-    {:noreply,
-     assign(socket, :filter_toolbar_minimal_form, to_form(toolbar_data, as: :toolbar_minimal))}
-  end
-
   def handle_event("filter-toolbar-preview", %{"toolbar_full" => toolbar_data}, socket) do
     {:noreply,
      assign(socket, :filter_toolbar_full_form, to_form(toolbar_data, as: :toolbar_full))}
-  end
-
-  def handle_event("filter-toolbar-preview", %{"toolbar_selects" => toolbar_data}, socket) do
-    {:noreply,
-     assign(socket, :filter_toolbar_selects_form, to_form(toolbar_data, as: :toolbar_selects))}
   end
 
   @impl true
