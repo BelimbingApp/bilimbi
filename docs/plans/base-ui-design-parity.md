@@ -604,7 +604,7 @@ Goal: Record the real operator on every action taken while impersonating, so an 
 - [x] Record the impersonating operator alongside the impersonated subject on audit rows. `{claude-fable-audit-1/claude-fable-5-1}`
 - [x] Cover the attribution with tests and run the shipping gate. `{claude-fable-audit-1/claude-fable-5-1}`
 
-Deferred: no test covers the impersonation label on the audit reader surfaces, so deleting it would not turn the suite red. Tracked as follow-up.
+Deferred at delivery, closed by the follow-up on this branch: the impersonation label on the reader surfaces is now covered where each one renders it — `apps/base/audit/web_test/audit_live_test.exs` on the mutations and actions readers, `apps/core/employee/web_test/employee_show_test.exs` on record history. Each case asserts the operator attribution on an impersonated row and refutes it on an ordinary row in the same listing, so deleting a rendering clause turns the suite red.
 
 Delivery: https://github.com/BelimbingApp/bilimbi/pull/714 merged on 2026-09-15, closing #712.
 
