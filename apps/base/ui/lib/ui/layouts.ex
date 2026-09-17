@@ -36,6 +36,10 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   alias Phoenix.LiveView.JS
 
+  # How long a `:success` or `:info` flash stays before it dismisses itself.
+  # Long enough to read a sentence twice; the pointer or focus on it pauses it.
+  @auto_dismiss_ms 8_000
+
   use Phoenix.VerifiedRoutes,
     router: Bilimbi.Base.UI.RouteContract,
     endpoint: Bilimbi.Base.UI.ScriptPath,
@@ -530,14 +534,48 @@ defmodule Bilimbi.Base.UI.Layouts do
   defp operator_company_missing?(%{operator_company_missing: true}), do: true
   defp operator_company_missing?(_current_scope), do: false
 
+  @doc """
+  The one production outlet for flash messages.
+
+  Messages stack in one column at the top right, most severe first, so several
+  are readable at once. Dismissal splits by severity: `:success` and `:info`
+  time out after eight seconds unless the pointer or focus is on
+  them, while `:warning` and `:error` stay until the person dismisses them,
+  because a message someone must act on must not disappear on a timer. The
+  reconnect notices are errors and keep that rule.
+
+  The group is a permanent polite live region, so a message inserted into it
+  is announced; each message also carries the role its severity implies.
+
+  The shell's preference status line under the top bar is deliberately not
+  part of this outlet: see the Design Library's Feedback section.
+  """
   attr(:flash, :map, required: true)
   attr(:id, :string, default: "flash-group")
 
   def flash_group(assigns) do
+    assigns = assign(assigns, :auto_dismiss_ms, @auto_dismiss_ms)
+
     ~H"""
-    <div id={@id} aria-live="polite">
-      <.flash kind={:info} flash={@flash} />
+    <div
+      id={@id}
+      aria-live="polite"
+      class="fixed right-4 top-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
+    >
       <.flash kind={:error} flash={@flash} />
+      <.flash kind={:warning} flash={@flash} />
+      <.flash
+        kind={:success}
+        flash={@flash}
+        phx-hook="FlashAutoDismiss"
+        data-auto-dismiss-ms={@auto_dismiss_ms}
+      />
+      <.flash
+        kind={:info}
+        flash={@flash}
+        phx-hook="FlashAutoDismiss"
+        data-auto-dismiss-ms={@auto_dismiss_ms}
+      />
 
       <.flash
         id="client-error"

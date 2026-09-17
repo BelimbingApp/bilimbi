@@ -102,6 +102,13 @@
   --color-danger-surface: var(--color-red-50);
   --color-danger-line: var(--color-red-200);
   --color-danger-ink: var(--color-red-900);
+
+  /* Neutral information — a statement, not a verdict. Stone, so a flash or
+   * alert that reports nothing good or bad is never read as a confirmation. */
+  --color-info: var(--color-stone-600);
+  --color-info-surface: var(--color-stone-200);
+  --color-info-line: var(--color-stone-300);
+  --color-info-ink: var(--color-stone-900);
 }
 
 /*
@@ -155,6 +162,10 @@
     --color-danger-surface: var(--color-red-950);
     --color-danger-line: var(--color-red-800);
     --color-danger-ink: var(--color-red-200);
+    --color-info: var(--color-stone-400);
+    --color-info-surface: var(--color-stone-800);
+    --color-info-line: var(--color-stone-700);
+    --color-info-ink: var(--color-stone-100);
   }
 }
 
@@ -198,6 +209,10 @@
   --color-danger-surface: var(--color-red-950);
   --color-danger-line: var(--color-red-800);
   --color-danger-ink: var(--color-red-200);
+  --color-info: var(--color-stone-400);
+  --color-info-surface: var(--color-stone-800);
+  --color-info-line: var(--color-stone-700);
+  --color-info-ink: var(--color-stone-100);
 }
 
 @custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
