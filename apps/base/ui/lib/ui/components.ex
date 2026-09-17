@@ -190,11 +190,17 @@ defmodule Bilimbi.Base.UI.Components do
   "not available" never reads as "working". The caller keeps the label
   truthful ("Saving…", "Opening workspace…").
 
+  `busy` is a button state. It is carried by `disabled`, which an anchor has
+  no equivalent of, so `busy` together with `href`, `navigate` or `patch`
+  raises rather than announcing a wait it cannot prevent a second activation
+  of.
+
   `busy` is the server-known wait that outlives one round trip, such as the
   sign-in handoff that arms a full form submission. The shorter wait of one
   `phx-click` or `phx-submit` round trip stays `phx-disable-with`'s job:
   LiveView disables the control and swaps its label, and `app.js` mirrors
-  LiveView's own loading state onto `aria-busy` while it lasts.
+  LiveView's own loading state onto `aria-busy` while it lasts. That path is
+  announced but not spun: it still wears the dimmed disabled treatment.
   """
   attr(:rest, :global, include: ~w(href navigate patch method download name value disabled type))
 
@@ -239,12 +245,11 @@ defmodule Bilimbi.Base.UI.Components do
         Map.fetch!(variants, assigns[:variant]),
         assigns[:class]
       ])
-      |> assign(:rest, busy_rest(rest, assigns.busy, link?(rest)))
+      |> assign(:rest, busy_rest(rest, assigns.busy))
 
     if link?(rest) do
       ~H"""
-      <.link class={@class} aria-busy={@busy && "true"} {@rest}>
-        <.icon :if={@busy} name="hero-arrow-path" class="size-4 motion-safe:animate-spin" />
+      <.link class={@class} {@rest}>
         {render_slot(@inner_block)}
       </.link>
       """
@@ -260,11 +265,20 @@ defmodule Bilimbi.Base.UI.Components do
 
   defp link?(rest), do: !!(rest[:href] || rest[:navigate] || rest[:patch])
 
-  # A busy button is also disabled: the activation that made it busy is the
+  # A busy control is also disabled: the activation that made it busy is the
   # one whose outcome is pending, and a second one would duplicate the work.
-  # A link has no `disabled`, so a busy navigation only announces itself.
-  defp busy_rest(rest, true, false), do: Map.put(rest, :disabled, true)
-  defp busy_rest(rest, _busy, _link?), do: rest
+  # A link cannot be disabled, so it cannot be busy either.
+  defp busy_rest(rest, false), do: rest
+
+  defp busy_rest(rest, true) do
+    if link?(rest) do
+      raise ArgumentError,
+            "busy is a button state: a link cannot be disabled, so it would announce " <>
+              "a wait it cannot prevent a second activation of. Render a button instead."
+    end
+
+    Map.put(rest, :disabled, true)
+  end
 
   @doc """
   Renders a compact icon-only action.
@@ -279,7 +293,8 @@ defmodule Bilimbi.Base.UI.Components do
   and dims, a busy one was activated and is waiting for its outcome, so its
   glyph becomes a spinner at full strength. Both are inert; only the busy one
   carries `aria-busy`, and its label still names the action so assistive
-  technology can say what is pending.
+  technology can say what is pending. `busy` is a button state here too, and
+  raises on a link.
   """
   attr(:icon, :string, required: true)
   attr(:label, :string, required: true)
@@ -320,18 +335,12 @@ defmodule Bilimbi.Base.UI.Components do
       |> assign(:control_type, rest[:type] || "button")
       |> assign(
         :control_rest,
-        rest |> Map.drop([:title, :type]) |> busy_rest(assigns.busy, link?(rest))
+        rest |> Map.drop([:title, :type]) |> busy_rest(assigns.busy)
       )
 
     if link?(rest) do
       ~H"""
-      <.link
-        aria-label={@label}
-        aria-busy={@busy && "true"}
-        title={@title}
-        class={@control_class}
-        {@control_rest}
-      >
+      <.link aria-label={@label} title={@title} class={@control_class} {@control_rest}>
         <.icon name={@icon_name} class={@icon_class} />
       </.link>
       """
