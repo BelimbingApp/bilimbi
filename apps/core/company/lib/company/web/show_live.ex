@@ -976,9 +976,12 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               <%= for {activity, idx} <- Enum.with_index(@company.scope_activities || []) do %>
                 <span class="inline-flex items-center gap-1 rounded-full border border-line bg-surface-sunken px-3 py-1 text-xs font-medium text-ink">
                   {activity}
-                  <button
+                  <.icon_button
                     :if={@can_update?}
-                    type="button"
+                    icon="close"
+                    label={"Remove #{activity}"}
+                    context={:inline}
+                    kind={:danger}
                     id={"remove-activity-#{idx}"}
                     phx-click="remove_activity"
                     phx-value-index={idx}
@@ -986,12 +989,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                       "Remove the business activity #{activity}? " <>
                         "The change is saved immediately."
                     }
-                    class="text-ink-subtle hover:text-danger"
-                    title={"Remove #{activity}"}
-                    aria-label={"Remove #{activity}"}
-                  >
-                    &times;
-                  </button>
+                  />
                 </span>
               <% end %>
               <span
