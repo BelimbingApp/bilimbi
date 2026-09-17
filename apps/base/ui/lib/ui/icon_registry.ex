@@ -87,6 +87,8 @@ defmodule Bilimbi.Base.UI.IconRegistry do
     "edit" => "hero-pencil",
     "delete" => "hero-trash",
     "view" => "hero-eye",
+    "reveal" => "hero-eye",
+    "conceal" => "hero-eye-slash",
     "filter" => "hero-funnel",
     "search" => "hero-magnifying-glass",
     "sort" => "hero-chevron-up-down",

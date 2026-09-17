@@ -107,6 +107,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
       "url_field" => "https://bilimbi.test",
       "number_field" => "25",
       "password_field" => "secret-value",
+      "api_key_field" => "sk-sample-0000",
       "select_field" => "standard",
       "roles" => ["admin", "reviewer"],
       "checkbox_field" => "true",
