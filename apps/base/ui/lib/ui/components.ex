@@ -732,9 +732,12 @@ defmodule Bilimbi.Base.UI.Components do
     # `aria-expanded` follows the list because the same command moves both.
     # Click-away sits on the wrapper: LiveView dispatches click-away before
     # the click it belongs to, so a click-away on the list itself would close
-    # and the trigger's toggle would reopen in the same click. Only Escape
-    # returns focus to the trigger; the other paths leave focus where the
-    # user put it.
+    # and the trigger's toggle would reopen in the same click. Escape is the
+    # only path that returns focus to the trigger, and only from a press that
+    # was already inside the field: the hook runs plain `dismiss` otherwise,
+    # so Escape typed into a search box elsewhere on the page closes the list
+    # without taking the caret. Every other path leaves focus where the user
+    # put it.
     #
     # Dismiss and escape are published on the wrapper for the
     # `MultiSelectDismiss` hook, which owns the two dismissals LiveView has

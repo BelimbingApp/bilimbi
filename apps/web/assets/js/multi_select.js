@@ -9,8 +9,7 @@
 // is. Binding those per element instead would need one binding on every
 // option, and the `phx-keydown` match would stop every key reaching the
 // page's own `phx-window-keydown` handlers. The commands come from the
-// wrapper, so there is one definition of "closed", and only Escape moves
-// focus.
+// wrapper, so there is one definition of "closed".
 //
 // Escape listens on `window`, not the field: Safari and macOS Firefox blur
 // without focusing the button being pressed, so a list opened by mouse there
@@ -20,6 +19,12 @@
 // trigger's `aria-expanded` is the single record of open, so observing that
 // one attribute catches every path that opens or closes the list -- the
 // trigger, click-away, focus leaving, and Escape closing it again.
+//
+// Reaching that far means the key also arrives from a search box the user is
+// typing in, so the field's two published commands are not interchangeable
+// here: only a press with focus already inside the field runs the one that
+// returns focus to the trigger. Everywhere else the list closes and the caret
+// stays where the user put it.
 //
 // That same blur-without-focus is why a pointer press starting inside the
 // field is not focus leaving it, even when the browser reports no new target.
@@ -40,7 +45,9 @@ const MultiSelectDismiss = {
     this.onKeyDown = (e) => {
       if (e.key !== "Escape") return
 
-      this.js().exec(this.el.dataset.escape)
+      const inside = this.el.contains(document.activeElement)
+
+      this.js().exec(inside ? this.el.dataset.escape : this.el.dataset.dismiss)
     }
 
     this.onFocusOut = (e) => {
