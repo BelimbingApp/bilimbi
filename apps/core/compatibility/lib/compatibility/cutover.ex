@@ -403,7 +403,7 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
         state
         |> write_icon(context, pin, desired_icon)
         |> bump(:unmapped)
-        |> add_residue(entry, {:duplicate_of, keeper_id(state.taken, pin.user_id, desired_hash)})
+        |> add_residue(entry, {:duplicate_of, occupant_id!(context, pin.user_id, desired_hash)})
         |> reserve(pin.user_id, pin.url_hash, pin.id)
 
       {:failed, message} ->
@@ -454,6 +454,21 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
 
   defp keeper_id(taken, user_id, hash) do
     taken |> Map.get(user_id, %{}) |> Map.get(hash)
+  end
+
+  # The unique index rejected the write, so the pin holding that hash is one
+  # this run has not examined yet and cannot be in `taken`. The index makes
+  # the row unique, so the operator gets exactly one pin to re-pin against.
+  defp occupant_id!(context, user_id, hash) do
+    %{rows: [[id]]} =
+      query!(
+        context,
+        "SELECT id FROM #{context.quoted_prefix}.user_pins WHERE user_id = $1 AND url_hash = $2",
+        [user_id, hash],
+        "user_pins"
+      )
+
+    id
   end
 
   defp remainder_list(remainder) do

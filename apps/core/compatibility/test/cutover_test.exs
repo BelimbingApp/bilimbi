@@ -346,7 +346,11 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
              }
 
       assert Enum.any?(report.steps.pins.residue, fn entry ->
-               entry.pin_id == 4 and match?({:duplicate_of, _}, entry.reason)
+               entry.pin_id == 4 and entry.reason == {:duplicate_of, 90}
+             end)
+
+      assert Enum.any?(report.steps.pins.residue, fn entry ->
+               entry.pin_id == 5 and entry.reason == {:duplicate_of, 90}
              end)
     end
 
