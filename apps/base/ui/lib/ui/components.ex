@@ -431,7 +431,10 @@ defmodule Bilimbi.Base.UI.Components do
           aria-describedby={described_by(@id, @hint, @errors)}
           class={
             @class ||
-              "size-4 shrink-0 rounded border-high-contrast-line accent-action focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
+              [
+                "size-4 shrink-0 rounded accent-action focus:outline-none focus:ring-2",
+                field_state_class(@errors, "border-high-contrast-line focus:ring-brand-strong/30")
+              ]
           }
           {@rest}
         />{@label}<span :if={@rest[:required]} aria-hidden="true">*</span>
@@ -485,20 +488,21 @@ defmodule Bilimbi.Base.UI.Components do
     {required, rest} = Map.pop(assigns.rest, :required, false)
 
     # `placeholder` names the empty-selection summary here rather than an HTML
-    # attribute, and a button has none to render. A key left absent lets
-    # `multi_select/1` merge its own declared default; assigning nil would
-    # replace that default with nothing.
+    # attribute, and a button has none to render. An absent key lets
+    # `multi_select/1` merge its own declared default; a nil one replaces that
+    # default with nothing, so what the caller omitted is dropped outright.
     {placeholder, rest} = Map.pop(rest, :placeholder)
 
-    forwarded =
-      Enum.reject(
+    {omitted, supplied} =
+      Enum.split_with(
         [placeholder: placeholder, selection_label: assigns.selection_label],
         fn {_key, value} -> is_nil(value) end
       )
 
     assigns
+    |> Map.drop(Keyword.keys(omitted))
     |> assign(required: required == true, rest: rest)
-    |> assign(forwarded)
+    |> assign(supplied)
     |> multi_select()
   end
 
@@ -576,13 +580,17 @@ defmodule Bilimbi.Base.UI.Components do
     [
       class || field_base_class(opts[:readonly]),
       is_nil(class) && opts[:extra],
-      if errors == [] do
-        "border-high-contrast-line"
-      else
-        error_class || "border-danger focus:border-danger focus:ring-danger/20"
-      end
+      field_state_class(errors, "border-high-contrast-line", error_class)
     ]
   end
+
+  # A field in error reads the same whichever control draws it, so the invalid
+  # appearance is decided once here rather than per control family.
+  defp field_state_class(errors, valid_class, error_class \\ nil)
+  defp field_state_class([], valid_class, _error_class), do: valid_class
+
+  defp field_state_class(_errors, _valid_class, error_class),
+    do: error_class || "border-danger focus:border-danger focus:ring-danger/20"
 
   # `readonly` is a statement the caller made about this field. The CSS
   # `:read-only` pseudo-class is not the same statement: it matches every
@@ -741,7 +749,11 @@ defmodule Bilimbi.Base.UI.Components do
           |> JS.toggle_class("rotate-180", to: "##{@id}-chevron")
         }
         class={[
-          "flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30",
+          "flex w-full items-center justify-between gap-3 rounded-md border bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:outline-none focus:ring-2",
+          field_state_class(
+            @errors,
+            "border-line focus:border-brand-strong focus:ring-brand-strong/30"
+          ),
           @class
         ]}
         {@rest}

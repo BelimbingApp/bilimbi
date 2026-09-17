@@ -7,10 +7,11 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
   carries the invalid marking, that `aria-describedby` points at elements
   that exist and hold the hint and error text.
 
-  Readonly paint is the one exception. A locked background has no evidence
-  beyond the class that draws it, so that test matches the class, anchored
-  on its boundaries so it cannot be satisfied by the `disabled:` variant
-  every field already carries.
+  Appearance is the exception: a locked background and an invalid border
+  have no evidence beyond the class that draws them, so those two tests
+  match the class. The readonly one is anchored on its boundaries so it
+  cannot be satisfied by the `disabled:` variant every field already
+  carries.
   """
 
   use ExUnit.Case, async: true
@@ -139,6 +140,31 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
       options={[{"Administrator", "admin"}, {"Auditor", "auditor"}]}
       placeholder="All roles"
       selection_label=":count role selected|:count roles selected"
+    />
+    """
+  end
+
+  defp multi_select_bare(assigns) do
+    ~H"""
+    <.input
+      id="m"
+      name="m"
+      type="multi_select"
+      label="Roles"
+      value={@value}
+      options={[{"Administrator", "admin"}, {"Auditor", "auditor"}]}
+    />
+    """
+  end
+
+  defp multi_select_bare_direct(assigns) do
+    ~H"""
+    <.multi_select
+      id="m"
+      name="m"
+      label="Roles"
+      value={@value}
+      options={[{"Administrator", "admin"}, {"Auditor", "auditor"}]}
     />
     """
   end
@@ -392,6 +418,44 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
     # none to render.
     refute control_tag(render_component(&multi_select_labelled/1, value: []), "m", "button") =~
              "placeholder="
+  end
+
+  test "a multi-select reached through <.input> keeps the same summary defaults" do
+    for {value, expected} <- [
+          {[], "All options"},
+          {["admin"], "1 option selected"},
+          {["admin", "auditor"], "2 options selected"}
+        ] do
+      through = render_component(&multi_select_bare/1, value: value)
+
+      assert summary_text(through) == expected
+
+      assert summary_text(through) ==
+               summary_text(render_component(&multi_select_bare_direct/1, value: value))
+    end
+  end
+
+  test "a control in error draws the error appearance and a valid one does not" do
+    # Every control the shared field shell draws. `hidden` is absent because it
+    # renders no label, hint or error at all, so it has no appearance to carry.
+    controls = [
+      {&field/1, [hint: nil, required: nil, readonly: nil], "f", "input"},
+      {&select_field/1, [value: nil, hint: nil], "s", "select"},
+      {&textarea_field/1, [hint: nil], "t", "textarea"},
+      {&checkbox_field/1, [hint: nil], "c", "input"},
+      {&multi_select_field/1, [hint: nil, required: false], "m", "button"}
+    ]
+
+    for {fixture, args, id, tag} <- controls do
+      invalid = render_component(fixture, Keyword.put(args, :errors, ["can\'t be blank"]))
+      valid = render_component(fixture, Keyword.put(args, :errors, []))
+
+      assert control_tag(invalid, id, tag) =~ "border-danger",
+             "an invalid <#{tag}> must look invalid, not only announce it"
+
+      refute control_tag(valid, id, tag) =~ "border-danger",
+             "a valid <#{tag}> must not look invalid"
+    end
   end
 
   test "an optional multi-select carries no required marker" do
