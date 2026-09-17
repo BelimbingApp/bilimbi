@@ -429,7 +429,10 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                 <.button
                   :if={@can_manage?}
                   id="btn-open-attach-address"
-                  phx-click="open_attach_modal" phx-target={@myself}
+                  phx-click={
+                    JS.push("lv:clear-flash")
+                    |> JS.push("open_attach_modal", target: @myself)
+                  }
                   variant="primary"
                   class="text-xs px-2.5 py-1"
                 >

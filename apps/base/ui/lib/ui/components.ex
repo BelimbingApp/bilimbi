@@ -1181,10 +1181,12 @@ defmodule Bilimbi.Base.UI.Components do
   group can be neither read nor dismissed while one is open; the dialog
   renders its own copy instead, and the layout's copy is hidden.
 
-  Such a LiveView clears the flash in the handler that opens the dialog.
-  The copy is whatever the LiveView holds, so a message left over from an
-  earlier action would otherwise open inside the new dialog and be
-  announced as feedback about it.
+  Every caller dismisses the layout flash as it opens a dialog, so a message
+  about finished work is neither adopted as the new dialog's own feedback nor
+  stranded unreadable behind the inert page. A LiveView does that in the
+  handler that opens the dialog; a LiveComponent cannot reach the page's
+  flash, so its opening control pushes `lv:clear-flash` untargeted before the
+  open event.
 
   ## Examples
 

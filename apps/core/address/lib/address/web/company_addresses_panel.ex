@@ -697,16 +697,20 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
                 <div :if={@can_manage?} class="flex items-center gap-2">
                   <.button
                     id="btn-open-attach-address"
-                    phx-click="open_attach_modal"
-                    phx-target={@myself}
+                    phx-click={
+                      JS.push("lv:clear-flash")
+                      |> JS.push("open_attach_modal", target: @myself)
+                    }
                     class="text-xs px-2.5 py-1"
                   >
                     <.icon name="create" class="size-3.5" /> <span>Attach Address</span>
                   </.button>
                   <.button
                     id="btn-open-create-address"
-                    phx-click="open_create_modal"
-                    phx-target={@myself}
+                    phx-click={
+                      JS.push("lv:clear-flash")
+                      |> JS.push("open_create_modal", target: @myself)
+                    }
                     variant="primary"
                     class="text-xs px-2.5 py-1"
                   >

@@ -623,6 +623,30 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#flash-info", "Timezone cleared.")
     end
 
+    test "opening a panel dialog dismisses an earlier page flash", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      view
+      |> form("#company-timezone-form", %{"timezone" => "Asia/Kuala_Lumpur"})
+      |> render_change()
+
+      assert has_element?(view, "#flash-info", "Timezone saved: Asia/Kuala_Lumpur")
+
+      # The panel is a LiveComponent, so its dialog owns no flash copy. An
+      # open dialog makes the page inert, so the layout copy must go rather
+      # than sit unreadable behind it.
+      view |> element("#btn-open-attach-address") |> render_click()
+
+      assert_modal_dialog(view, "attach-address-modal", "Attach Address")
+      refute has_element?(view, "#flash-info")
+
+      view |> element("#btn-open-create-address") |> render_click()
+      assert_modal_dialog(view, "company-create-address-modal", "Create & Attach Address")
+      refute has_element?(view, "#flash-info")
+    end
+
     test "creates and attaches a new address through the company.addresses panel", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
 

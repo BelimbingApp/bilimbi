@@ -636,9 +636,20 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
 
+      # A page flash raised before the dialog opens would sit unreadable behind
+      # the inert page, so opening the dialog dismisses it.
+      view |> element("#employee-status-display") |> render_click()
+
+      view
+      |> form("#employee-status-form")
+      |> render_change(%{"status" => "probation"})
+
+      assert has_element?(view, "#flash-info", "Status updated.")
+
       # Open modal
       view |> element("#btn-open-attach-address") |> render_click()
       assert_modal_dialog(view, "attach-address-modal", "Attach Address")
+      refute has_element?(view, "#flash-info")
 
       # Attach address with shipping kind and priority 5
       view
