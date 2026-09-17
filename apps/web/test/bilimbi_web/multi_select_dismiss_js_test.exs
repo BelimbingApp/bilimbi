@@ -16,6 +16,8 @@ defmodule BilimbiWeb.MultiSelectDismissJsTest do
       removeEventListener(type, fn) { if (onWindow[type] === fn) delete onWindow[type] },
     }
 
+    globalThis.document = {activeElement: null}
+
     const observers = []
     globalThis.MutationObserver = class {
       constructor(fn) { this.fn = fn; observers.push(this) }
@@ -32,9 +34,11 @@ defmodule BilimbiWeb.MultiSelectDismissJsTest do
 
     // Opening and closing are LiveView JS commands on the markup: they land
     // as an attribute write on the trigger, which is what the hook watches.
+    // Only an observer registered on that element hears it, so a hook wired
+    // to any other node goes deaf here exactly as it would in a browser.
     const expand = (value) => {
       trigger.attrs['aria-expanded'] = value
-      observers.forEach(o => { if (!o.stopped) o.fn([], o) })
+      observers.forEach(o => { if (!o.stopped && o.node === trigger) o.fn([], o) })
     }
 
     const option = {}
@@ -46,7 +50,7 @@ defmodule BilimbiWeb.MultiSelectDismissJsTest do
         escape: '[["add_class",{"names":["hidden"],"to":"#roles-filter-options"}],["focus",{"to":"#roles-filter"}]]',
       },
       contains: node => node === trigger || node === option,
-      querySelector: () => trigger,
+      querySelector: sel => (sel === '[aria-expanded]' ? trigger : null),
       addEventListener(type, fn) { listeners[type] = fn },
       removeEventListener(type, fn) { if (listeners[type] === fn) delete listeners[type] },
     }
@@ -69,6 +73,10 @@ defmodule BilimbiWeb.MultiSelectDismissJsTest do
       // A closed field watches no keys, so every other Escape handler on the
       // page keeps the ones it already had.
       assert.equal(onWindow.keydown, undefined)
+
+      // The attribute the list's open state actually lives on, on the element
+      // that actually carries it.
+      assert.equal(observers[0].node, trigger)
       assert.deepEqual(observers[0].options, {attributeFilter: ['aria-expanded']})
 
       expand('true')
@@ -76,13 +84,25 @@ defmodule BilimbiWeb.MultiSelectDismissJsTest do
 
       // Safari and macOS Firefox open the list by mouse without focusing the
       // trigger, so the key arrives with focus still on `body`: nothing under
-      // the field would ever see it.
+      // the field would ever see it, and the list must still close.
       onWindow.keydown({key: 'Escape'})
-      assert.deepEqual(execed, [el.dataset.escape])
+      assert.deepEqual(execed, [el.dataset.dismiss])
+
+      // A window listener also hears Escape typed into a search box further
+      // up the page. Closing there must not yank the caret onto this trigger.
+      document.activeElement = elsewhere
+      onWindow.keydown({key: 'Escape'})
+      assert.deepEqual(execed, [el.dataset.dismiss, el.dataset.dismiss])
+
+      // Focus already inside the field is the one case that restores it, so a
+      // keyboard user is left on the control they just dismissed.
+      document.activeElement = option
+      onWindow.keydown({key: 'Escape'})
+      assert.deepEqual(execed, [el.dataset.dismiss, el.dataset.dismiss, el.dataset.escape])
 
       // Every other key is the page's to handle.
       onWindow.keydown({key: 'a'})
-      assert.deepEqual(execed, [el.dataset.escape])
+      assert.equal(execed.length, 3)
 
       // Closing again -- by the command Escape just ran, the trigger, or a
       // click away -- stops the listening.

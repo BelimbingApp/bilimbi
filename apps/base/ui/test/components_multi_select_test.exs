@@ -90,7 +90,7 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
            ] = js_ops(html, "phx-click", "roles-filter")
   end
 
-  test "Escape closes the list and returns focus to the trigger" do
+  test "the field publishes a close-and-refocus command for Escape from inside it" do
     html =
       render_component(&multi_select_field/1,
         placeholder: "All roles",
