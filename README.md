@@ -73,11 +73,22 @@ instead of running fresh creation migrations:
 ```bash
 mix bilimbi.schema.verify
 mix bilimbi.schema.adopt
+mix bilimbi.cutover.remap --dry-run
+mix bilimbi.cutover.remap
 mix bilimbi.server
 ```
 
 Adoption refuses schema drift and records the verified baselines in
 `bilimbi_schema_migrations`. Laravel's `migrations` table is never changed.
+
+The schemas already match, so the remaining cutover work is stored values
+Bilimbi reads differently. `mix bilimbi.cutover.remap` remaps pin and
+notification URLs (always recomputing the pin hash) and `heroicon-` names, and
+reports what it must not fix by itself: grants naming capabilities Bilimbi does
+not declare, and pins with no Bilimbi equivalent. It deletes nothing and is
+idempotent, so `--dry-run` first and read its residue before opening traffic.
+See [Database Architecture](./docs/architecture/database.md) for the full
+sequence and `mix help bilimbi.cutover.remap` for the options.
 
 After a fresh migration or an unprovisioned adoption, establish explicit
 operator identity with:

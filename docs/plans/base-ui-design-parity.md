@@ -572,12 +572,13 @@ Goal: Give familiar actions named entries in the icon registry so call sites nam
 - [x] Inventory Belimbing's action icons against Bilimbi's registry; 48 actions mapped, 44 of them gaps. `{codex-terra-icons-1/gpt-5.6-terra}`
 - [x] Populate `IconRegistry` with the named action vocabulary, keeping logout as the recorded Bilimbi exception. `{codex-terra-icons-1/gpt-5.6-terra}`
 - [x] Run the shipping gate and land the change. `{codex-terra-icons-1/gpt-5.6-terra}`
+- [x] Follow-up after #715 — prove each named entry resolves to a Heroicon the build emits. `{fm/icon-registry-name-validity/opus-5}`
 
 `IconRegistry` now carries 49 named actions on `main`, alongside the 3 Bilimbi glyph entries and 9 shell names it already had. The slice added the action vocabulary; the glyph count is unchanged by it.
 
 Not delivered by this slice, and still open under FND-06 and GFX-02: the searchable visual icon review with empty-result, copy and copied feedback. The registry holds the vocabulary; no review surface presents it yet.
 
-Deferred: registry names are never proven to resolve — the equality test restates the map rather than rendering each entry. Tracked as follow-up.
+The deferred gap is closed, after this slice and outside #715: registry names are now checked against the icons the build can emit, not against a second copy of the map. `BilimbiWeb.HeroiconsManifest` derives the accepted `hero-` names from the Tailwind plugin's own icon directory and suffix table, and `apps/web/test/bilimbi_web/icon_name_validity_test.exs` holds both halves of the named vocabulary to them through `IconRegistry.actions/0` and `IconRegistry.shell_actions/0`; `menu_icon_safelist_test.exs` holds contributed menu Heroicons and the `app.css` safelist to the same names. A misspelled or upstream-removed glyph now fails the suite instead of rendering an empty span. Call sites that bypass the registry and pass a `hero-` name straight through remain unchecked.
 
 Delivery: https://github.com/BelimbingApp/bilimbi/pull/715 merged on 2026-09-15, closing #713.
 

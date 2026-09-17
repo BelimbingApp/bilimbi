@@ -26,6 +26,22 @@ defmodule Bilimbi.Base.UI.RouteContract do
              []
            end)
 
+  @doc """
+  The declared GET route path patterns of the workspace, sorted.
+
+  Non-GET entries are excluded: these are the paths a stored navigation
+  target, such as a pinned URL, can legitimately point at. Params keep their
+  `:name` segment so a caller can match a concrete path against them.
+  """
+  @spec navigable_paths() :: [String.t()]
+  def navigable_paths do
+    @routes
+    |> Enum.filter(&(Map.get(&1, :verb, :get) == :get))
+    |> Enum.map(& &1.path)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
   @impl true
   def formatted_routes(_opts) do
     Enum.map(@routes, fn route ->

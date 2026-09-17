@@ -28,6 +28,19 @@ defmodule Bilimbi.Base.UI.RouteContractTest do
     assert function_exported?(RouteContract, :verified_route?, 2)
   end
 
+  test "navigable_paths lists the GET route patterns and drops the rest" do
+    paths = RouteContract.navigable_paths()
+
+    assert "/dashboard" in paths
+    assert "/users/:id" in paths
+    assert "/companies" in paths
+
+    # `/session` is declared POST and DELETE only: no stored navigation
+    # target can legitimately point at it.
+    refute "/session" in paths
+    assert paths == paths |> Enum.uniq() |> Enum.sort()
+  end
+
   test "verified_route? matches host routes compiled from the manifest" do
     assert RouteContract.verified_route?([], [])
     assert RouteContract.verified_route?([], ["users", "1"])
