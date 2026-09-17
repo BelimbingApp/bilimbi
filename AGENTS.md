@@ -601,7 +601,7 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
 - **Data tables & inline editing:** Tables use compact density (`py-0.5` row
   cells, `py-1.5` header cells, `px-2` cell horizontal padding,
   `bg-surface-sunken` header background, proper case
-  `text-xs font-semibold text-muted` headers,
+  `text-xs font-semibold text-ink-subtle` headers,
   tabular numbers for numeric/code/date columns). Search filters use an open
   toolbar with an `mb-2` gap above the table card; do not wrap the toolbar in
   another card. Inline editing uses `<.inline_edit>` with
