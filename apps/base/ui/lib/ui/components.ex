@@ -560,7 +560,7 @@ defmodule Bilimbi.Base.UI.Components do
           <span id={"#{@id}-reveal-show"} class="grid">
             <.icon name="reveal" class="size-4" />
           </span>
-          <span id={"#{@id}-reveal-hide"} class="hidden">
+          <span id={"#{@id}-reveal-hide"} class="grid hidden">
             <.icon name="conceal" class="size-4" />
           </span>
         </button>

@@ -37,8 +37,28 @@ defmodule BilimbiWeb.MultiSelectDismissJsTest do
     listeners.focusout({relatedTarget: null})
     assert.deepEqual(execed, [el.dataset.dismiss, el.dataset.dismiss])
 
+    // Safari and macOS Firefox blur without focusing the control being
+    // pressed, so a press on the trigger arrives as focus leaving the field.
+    // Closing there would let the click that press belongs to reopen the
+    // list, leaving the trigger unable to close it at all.
+    listeners.pointerdown({})
+    listeners.focusout({relatedTarget: null})
+    assert.equal(execed.length, 2)
+
+    // That blur spends the press: the next one is a real one.
+    listeners.focusout({relatedTarget: null})
+    assert.equal(execed.length, 3)
+
+    // A press with no focus to take spends itself on its own click.
+    listeners.pointerdown({})
+    listeners.click({})
+    listeners.focusout({relatedTarget: null})
+    assert.equal(execed.length, 4)
+
     hook.destroyed()
     assert.equal(listeners.focusout, undefined)
+    assert.equal(listeners.pointerdown, undefined)
+    assert.equal(listeners.click, undefined)
     console.log('ok')
     """
 
