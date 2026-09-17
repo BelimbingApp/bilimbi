@@ -75,6 +75,11 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
 
     assert html =~ ~s(aria-expanded="false")
 
+    # `aria-haspopup` is ARIA-synonymous with "menu", which promises arrow-key
+    # navigation over a `role="menu"`. This list is a disclosure of checkboxes,
+    # and `aria-expanded` plus `aria-controls` already say so truthfully.
+    refute html =~ "aria-haspopup"
+
     assert [
              ["toggle_class", %{"names" => ["hidden"], "to" => "#roles-filter-options"}],
              ["toggle_class", %{"names" => ["rotate-180"], "to" => "#roles-filter-chevron"}],
@@ -85,7 +90,7 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
            ] = js_ops(html, "phx-click", "roles-filter")
   end
 
-  test "Escape closes the list and returns focus to the trigger, from one binding on the field" do
+  test "Escape closes the list and returns focus to the trigger" do
     html =
       render_component(&multi_select_field/1,
         placeholder: "All roles",
@@ -106,10 +111,6 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
              ["set_attr", %{"attr" => ["aria-expanded", "false"], "to" => "#roles-filter"}],
              ["focus", %{"to" => "#roles-filter"}]
            ] = js_ops(html, "data-escape", "roles-filter-wrapper")
-
-    # Every focus stop inside the open menu is under that wrapper, because the
-    # list takes focus itself when a click lands on its padding.
-    assert html =~ ~r/id="roles-filter-options"[^>]*\stabindex="-1"/
   end
 
   test "an outside click closes the list from the wrapper without moving focus" do
@@ -157,6 +158,10 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
 
     refute Enum.any?(ops, fn [op | _] -> op == "focus" end),
            "only Escape returns focus to the trigger"
+
+    # The list takes focus itself, so a click on its padding lands inside the
+    # field rather than on `body` and does not read as focus leaving it.
+    assert html =~ ~r/id="roles-filter-options"[^>]*\stabindex="-1"/
   end
 
   defp js_ops(html, attr, id) do
