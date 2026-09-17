@@ -891,6 +891,25 @@
                     value="Managed by Bilimbi"
                     disabled
                   />
+                  <.input
+                    name="required-field"
+                    label="Company name"
+                    placeholder="Enter a value"
+                    required
+                  />
+                  <.input
+                    name="readonly-field"
+                    label="System identifier"
+                    value="acme-0042"
+                    readonly
+                  />
+                  <.input
+                    name="field-with-help-and-error"
+                    label="Tax ID"
+                    value=""
+                    hint="As printed on the certificate."
+                    errors={["can't be blank"]}
+                  />
                 </div>
                 <.radio_group
                   id="component-radio-disabled"

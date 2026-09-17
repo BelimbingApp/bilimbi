@@ -935,6 +935,34 @@ defmodule BilimbiWeb.CompanyLiveTest do
       {:ok, companies} = Company.list_companies(scope)
       refute Enum.any?(companies, &(&1.name == "Fake Co"))
     end
+
+    test "Name is visibly marked required on the real form", %{conn: conn} do
+      grant_capabilities!(["admin.company.create"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+
+      assert has_element?(view, "label[for='company-name']", "*")
+    end
+
+    test "a server-side required failure marks the Name field invalid", %{conn: conn} do
+      grant_capabilities!(["admin.company.create"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
+
+      html =
+        view
+        |> element("#company-form")
+        |> render_submit(%{"company" => %{"name" => "", "status" => "active"}})
+
+      assert html =~ "can&#39;t be blank"
+      assert has_element?(view, "#company-name[aria-invalid='true']")
+      assert has_element?(view, "#company-name[aria-describedby='company-name-error-0']")
+      assert has_element?(view, "#company-name-error-0")
+
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, companies} = Company.list_companies(scope)
+      assert Enum.all?(companies, &(&1.name != ""))
+    end
   end
 
   describe "Legal Entity Types Live" do

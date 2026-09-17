@@ -422,15 +422,17 @@ defmodule Bilimbi.Base.UI.Components do
           name={@name}
           value="true"
           checked={@checked}
+          aria-invalid={@errors != [] && "true"}
+          aria-describedby={described_by(@id, @hint, @errors)}
           class={
             @class ||
               "size-4 shrink-0 rounded border-high-contrast-line accent-action focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
           }
           {@rest}
-        />{@label}
+        />{@label}<span :if={@rest[:required]} aria-hidden="true">*</span>
       </label>
-      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
     </div>
     """
   end
@@ -443,11 +445,13 @@ defmodule Bilimbi.Base.UI.Components do
         for={@id}
         class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
       >
-        {@label}
+        {@label}<span :if={@rest[:required]} aria-hidden="true">*</span>
       </label>
       <select
         id={@id}
         name={@name}
+        aria-invalid={@errors != [] && "true"}
+        aria-describedby={described_by(@id, @hint, @errors)}
         class={
           [
             field_class(@class, @error_class, @errors),
@@ -466,8 +470,8 @@ defmodule Bilimbi.Base.UI.Components do
         <option :if={@prompt} value="" selected={@value in [nil, ""]}>{@prompt}</option>
         {Phoenix.HTML.Form.options_for_select(@options, @value)}
       </select>
-      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
     </div>
     """
   end
@@ -484,16 +488,18 @@ defmodule Bilimbi.Base.UI.Components do
         for={@id}
         class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
       >
-        {@label}
+        {@label}<span :if={@rest[:required]} aria-hidden="true">*</span>
       </label>
       <textarea
         id={@id}
         name={@name}
+        aria-invalid={@errors != [] && "true"}
+        aria-describedby={described_by(@id, @hint, @errors)}
         class={field_class(@class, @error_class, @errors, "min-h-24")}
         {@rest}
       >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
-      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
     </div>
     """
   end
@@ -507,20 +513,39 @@ defmodule Bilimbi.Base.UI.Components do
         for={@id}
         class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
       >
-        {@label}
+        {@label}<span :if={@rest[:required]} aria-hidden="true">*</span>
       </label>
       <input
         type={@type}
         name={@name}
         id={@id}
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
+        aria-invalid={@errors != [] && "true"}
+        aria-describedby={described_by(@id, @hint, @errors)}
         class={field_class(@class, @error_class, @errors)}
         {@rest}
       />
-      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
     </div>
     """
+  end
+
+  # Relationships a person depends on: hint and error text must be announced
+  # with the control, not stranded beside it. Returns the space-separated id
+  # list for `aria-describedby`, or nil when there is nothing to point at so
+  # no dangling reference is rendered.
+  defp described_by(id, _hint, _errors) when not is_binary(id), do: nil
+
+  defp described_by(id, hint, errors) do
+    error_ids = errors |> Enum.with_index() |> Enum.map(fn {_, i} -> "#{id}-error-#{i}" end)
+
+    [if(hint, do: "#{id}-hint") | error_ids]
+    |> Enum.filter(& &1)
+    |> case do
+      [] -> nil
+      ids -> Enum.join(ids, " ")
+    end
   end
 
   # One control family for every field type. `class` replaces the default
@@ -541,7 +566,7 @@ defmodule Bilimbi.Base.UI.Components do
     "block w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-ink shadow-xs " <>
       "transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none " <>
       "focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed " <>
-      "disabled:bg-surface-sunken disabled:text-ink-subtle"
+      "disabled:bg-surface-sunken disabled:text-ink-subtle read-only:bg-surface-sunken"
   end
 
   @doc """
@@ -1135,8 +1160,10 @@ defmodule Bilimbi.Base.UI.Components do
   slot(:inner_block, required: true)
 
   defp error(assigns) do
+    assigns = assign_new(assigns, :id, fn -> nil end)
+
     ~H"""
-    <p class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink">
+    <p id={@id} class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink">
       <.icon name="error" class="size-4 shrink-0 text-danger" />
       {render_slot(@inner_block)}
     </p>
