@@ -326,6 +326,92 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
              end)
     end
 
+    test "a pin that loses a collision the database catches still has its icon repaired" do
+      now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+      SQL.query!(
+        Repo,
+        "INSERT INTO user_pins (id, user_id, label, url, url_hash, icon, sort_order, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+        [90, 91, "Dead late", "/people/late", Pin.hash_url("/companies/5"), nil, 99, now, now]
+      )
+
+      assert {:ok, report} = run_cutover()
+
+      # The dead pin sorts last, so pin 4 is examined while nothing in memory
+      # holds that hash yet and the unique index is what rejects the write.
+      assert pin_row(4) == %{
+               url: "/admin/companies/5",
+               url_hash: Pin.hash_url("belimbing-stale-4"),
+               icon: "hero-building-office-2"
+             }
+
+      assert Enum.any?(report.steps.pins.residue, fn entry ->
+               entry.pin_id == 4 and match?({:duplicate_of, _}, entry.reason)
+             end)
+    end
+
+    test "a pin needing only its icon repaired is not counted as a URL change" do
+      now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+      SQL.query!(
+        Repo,
+        "INSERT INTO user_pins (id, user_id, label, url, url_hash, icon, sort_order, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+        [
+          93,
+          92,
+          "Notifications",
+          "/notifications",
+          Pin.hash_url("/notifications"),
+          "heroicon-o-bell",
+          9,
+          now,
+          now
+        ]
+      )
+
+      assert {:ok, report} = run_cutover()
+      pins = report.steps.pins
+
+      assert pins.examined == 9
+      assert pins.changed == 5
+      assert pins.unchanged == 2
+      assert pins.icons_changed == 7
+
+      assert pin_row(93) == %{
+               url: "/notifications",
+               url_hash: Pin.hash_url("/notifications"),
+               icon: "hero-bell"
+             }
+    end
+
+    test "remaps every notification past the first read batch" do
+      now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+      SQL.query!(
+        Repo,
+        """
+        INSERT INTO notifications (id, type, notifiable_type, notifiable_id, data, created_at, updated_at)
+        SELECT gen_random_uuid(), $1, $2, $3, $4, $5, $5 FROM generate_series(1, 600)
+        """,
+        [
+          "generic",
+          "App\\Core\\User\\Models\\User",
+          91,
+          Jason.encode!(%{"title" => "Bulk", "url" => "/admin/companies"}),
+          now
+        ]
+      )
+
+      assert {:ok, report} = run_cutover()
+      step = report.steps.notifications
+
+      assert step.examined == 606
+      assert step.changed == 601
+
+      assert notification_count("%\"url\":\"/companies\"%") == 600
+      assert notification_count("%/admin/companies%") == 0
+    end
+
     test "a NULL url becomes residue instead of aborting the run" do
       SQL.query!(Repo, "ALTER TABLE user_pins ALTER COLUMN url DROP NOT NULL", [])
 
@@ -379,6 +465,28 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
       assert Enum.any?(messages, fn message ->
                message =~ "ada@example.com" and message =~ "Leave approvals" and
                  message =~ "/people/leave/approvals"
+             end)
+    end
+
+    test "mix task reports grants without a deployment application running" do
+      ContributionRegistry.clear_for_test!()
+      on_exit(fn -> ContributionRegistry.install!() end)
+
+      Mix.Task.reenable("bilimbi.cutover.remap")
+      Mix.shell(Mix.Shell.Process)
+
+      try do
+        Mix.Task.run("bilimbi.cutover.remap", ["--dry-run", "--prefix", "pg_temp"])
+      after
+        Mix.shell(Mix.Shell.IO)
+      end
+
+      messages = shell_messages()
+
+      assert Enum.any?(messages, &String.starts_with?(&1, "authz grants (report only"))
+
+      assert Enum.any?(messages, fn message ->
+               message =~ "UNDECLARED" and message =~ "people.leave.approve"
              end)
     end
   end
@@ -540,6 +648,13 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
       SQL.query!(Repo, "SELECT data FROM notifications WHERE id = $1::uuid", [Ecto.UUID.dump!(id)])
 
     data
+  end
+
+  defp notification_count(pattern) do
+    %{rows: [[count]]} =
+      SQL.query!(Repo, "SELECT count(*) FROM notifications WHERE data LIKE $1", [pattern])
+
+    count
   end
 
   defp notification_url(id), do: Jason.decode!(notification_data(id))["url"]

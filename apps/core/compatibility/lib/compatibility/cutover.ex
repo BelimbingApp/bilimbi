@@ -36,15 +36,18 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
   the loser keeps its ORIGINAL Belimbing URL and hash, reported as collision
   residue for the operator to re-pin by hand.
 
-  Counting follows that split. `changed`, `unchanged`, and `unmapped`
-  classify the URL outcome and always sum to `examined`; `icons_changed` and
-  `remainder` describe icons separately, because a pin counted as `unmapped`
-  can still have had its icon repaired.
+  Counting follows that split. For pins, `changed`, `unchanged`, and
+  `unmapped` classify the URL outcome alone and always sum to `examined`;
+  `icons_changed` and `remainder` describe icons separately, because a pin
+  counted `unchanged` or `unmapped` can still have had its icon repaired.
+  For query icons there is no URL, so a row is either `changed` or part of
+  the `unmapped` remainder.
 
   Execution contract: idempotent (every mapping is a fixed point, so a rerun
-  reports `changed: 0`), per-table examined/changed/unchanged/unmapped
-  counts, loud failure when a required table is absent, a `--dry-run`
-  read-only mode, and `--prefix` to read the same PostgreSQL schema
+  reports `changed: 0`), per-table counts, loud failure when a required table
+  is absent, a bounded read of the one table that grows without bound
+  (`notifications`, paged by `id`), a `--dry-run` read-only mode, and
+  `--prefix` to read the same PostgreSQL schema
   `bilimbi.schema.verify` and `bilimbi.schema.adopt` were pointed at. This
   deliberately runs without a tenancy scope: cutover remaps the whole adopted
   database at once, before any tenant traffic exists.
@@ -138,6 +141,9 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
   # A prefixed read fails with `undefined_table` when the schema exists and
   # `invalid_schema_name` when it does not; both mean the same thing here.
   @missing_table_codes [:undefined_table, :invalid_schema_name]
+
+  @notification_columns "id::text, type, notifiable_id, data"
+  @notification_batch 500
 
   @doc "The cutover steps, in dependency-safe order."
   @spec steps() :: [atom()]
@@ -367,8 +373,11 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
     desired_hash = Pin.hash_url(effective_url)
 
     cond do
-      effective_url == pin.url and desired_hash == pin.url_hash and desired_icon == pin.icon ->
-        state |> bump(:unchanged) |> reserve(pin.user_id, pin.url_hash, pin.id)
+      effective_url == pin.url and desired_hash == pin.url_hash ->
+        state
+        |> write_icon(context, pin, desired_icon)
+        |> bump(:unchanged)
+        |> reserve(pin.user_id, pin.url_hash, pin.id)
 
       taken_hash?(state.taken, pin.user_id, desired_hash) ->
         state
@@ -392,12 +401,14 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
 
       {:duplicate} ->
         state
+        |> write_icon(context, pin, desired_icon)
         |> bump(:unmapped)
         |> add_residue(entry, {:duplicate_of, keeper_id(state.taken, pin.user_id, desired_hash)})
         |> reserve(pin.user_id, pin.url_hash, pin.id)
 
       {:failed, message} ->
         state
+        |> write_icon(context, pin, desired_icon)
         |> bump(:unmapped)
         |> add_residue(entry, {:update_failed, message})
         |> reserve(pin.user_id, pin.url_hash, pin.id)
@@ -518,7 +529,7 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
       query!(context, queries_sql(context.quoted_prefix), [], "user_database_queries").rows
 
     {counts, remainder} =
-      Enum.reduce(rows, {%{examined: 0, changed: 0, unchanged: 0, unmapped: 0}, %{}}, fn
+      Enum.reduce(rows, {%{examined: 0, changed: 0, unmapped: 0}, %{}}, fn
         [id, user_id, name, icon], {counts, remainder} ->
           counts = Map.update!(counts, :examined, &(&1 + 1))
 
@@ -536,8 +547,7 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
                   name: name
                 })
 
-              {counts |> Map.update!(:unchanged, &(&1 + 1)) |> Map.update!(:unmapped, &(&1 + 1)),
-               remainder}
+              {Map.update!(counts, :unmapped, &(&1 + 1)), remainder}
           end
       end)
 
@@ -560,20 +570,56 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
   # Reads notification payloads through raw SQL on purpose: the schema's
   # JSON type masks corrupt payloads as `%{}`, and corrupt rows must be
   # reported loudly, never round-tripped into a write.
-  defp notifications_sql(schema) do
-    "SELECT id::text, type, notifiable_id, data FROM #{schema}.notifications ORDER BY id"
+  defp notifications_sql(schema, nil) do
+    "SELECT #{@notification_columns} FROM #{schema}.notifications " <>
+      "ORDER BY id LIMIT #{@notification_batch}"
+  end
+
+  defp notifications_sql(schema, _cursor) do
+    "SELECT #{@notification_columns} FROM #{schema}.notifications " <>
+      "WHERE id > $1::uuid ORDER BY id LIMIT #{@notification_batch}"
   end
 
   defp run_notifications(context) do
-    rows = query!(context, notifications_sql(context.quoted_prefix), [], "notifications").rows
-
     {counts, residue} =
-      Enum.reduce(rows, {%{examined: 0, changed: 0, unchanged: 0, unmapped: 0}, []}, fn
-        row, {counts, residue} ->
-          process_notification(context, row, counts, residue)
-      end)
+      reduce_notifications(
+        context,
+        nil,
+        {%{examined: 0, changed: 0, unchanged: 0, unmapped: 0}, []}
+      )
 
     Map.put(counts, :residue, Enum.reverse(residue))
+  end
+
+  # `notifications` is the one table here that grows without bound, so it is
+  # read one keyset page at a time: a remap rewrites `data` and never `id`,
+  # so the cursor stays stable across the writes this step makes.
+  defp reduce_notifications(context, cursor, acc) do
+    rows = notification_rows(context, cursor)
+
+    acc =
+      Enum.reduce(rows, acc, fn row, {counts, residue} ->
+        process_notification(context, row, counts, residue)
+      end)
+
+    if length(rows) < @notification_batch do
+      acc
+    else
+      reduce_notifications(context, rows |> List.last() |> hd(), acc)
+    end
+  end
+
+  defp notification_rows(context, nil) do
+    query!(context, notifications_sql(context.quoted_prefix, nil), [], "notifications").rows
+  end
+
+  defp notification_rows(context, cursor) do
+    query!(
+      context,
+      notifications_sql(context.quoted_prefix, cursor),
+      [Ecto.UUID.dump!(cursor)],
+      "notifications"
+    ).rows
   end
 
   defp process_notification(context, [id, type, notifiable_id, data], counts, residue) do

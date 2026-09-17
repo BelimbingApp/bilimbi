@@ -28,6 +28,7 @@ defmodule Mix.Tasks.Bilimbi.Cutover.Remap do
 
   use Mix.Task
 
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Core.Compatibility.Cutover
 
@@ -45,6 +46,8 @@ defmodule Mix.Tasks.Bilimbi.Cutover.Remap do
 
     dry_run? = Keyword.get(opts, :dry_run, false)
     prefix = Keyword.get(opts, :prefix, "public")
+
+    ContributionRegistry.install!()
 
     with_repo!(Repo, fn repo ->
       case Cutover.run(repo: repo, dry_run: dry_run?, prefix: prefix) do
@@ -84,7 +87,7 @@ defmodule Mix.Tasks.Bilimbi.Cutover.Remap do
 
   defp print_step(:query_icons, counts) do
     Mix.shell().info(
-      "user_database_queries icons: examined=#{counts.examined} changed=#{counts.changed} unchanged=#{counts.unchanged} remainder=#{counts.unmapped}"
+      "user_database_queries icons: examined=#{counts.examined} changed=#{counts.changed} remainder=#{counts.unmapped}"
     )
 
     Enum.each(counts.remainder, fn entry ->
