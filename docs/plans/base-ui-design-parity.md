@@ -45,7 +45,7 @@ The identity baseline records the characteristics that parity work must preserve
 
 The catalog is organized by what a human is trying to review, not by Laravel or Phoenix implementation. The assessment is a starting point to verify in the live products; it is not an automatic decision to port every Belimbing component.
 
-Phase 0 verified every row against both live products. A row whose `Bilimbi now` or `Parity target` cell the evidence contradicted carries a [(contradicted)](#targets-the-evidence-contradicts) marker beside its ID: the original wording stays here as the record of what was accepted, and the correction is recorded once under [Targets the evidence contradicts](#targets-the-evidence-contradicts). Do not act on a marked row without reading it. A row the Phase 2 lane audits found understated rather than contradicted carries no marker; its `Bilimbi now` and `Parity target` cells are restated here to what ships, audited 2026-09-16 and restated 2026-09-17.
+Phase 0 verified every row against both live products. A row whose `Bilimbi now` or `Parity target` cell the evidence contradicted carries a [(contradicted)](#targets-the-evidence-contradicts) marker beside its ID: the original wording stays here as the record of what was accepted, and the correction is recorded once under [Targets the evidence contradicts](#targets-the-evidence-contradicts). Do not act on a marked row without reading it. A row the 2026-09-16 lane audits found understated, and that carries no marker, has its `Bilimbi now` cell corrected in the table itself to what ships, restated 2026-09-17; its `Parity target` keeps the accepted wording.
 
 | ID | Design element | Bilimbi now | Parity target |
 |---|---|---|---|
