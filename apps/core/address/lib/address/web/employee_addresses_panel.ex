@@ -696,26 +696,18 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
               </div>
             </div>
           </.card>
-              <!-- Attach Address Modal Dialog -->
-              <div
-          :if={@show_attach_modal}
-          id="attach-address-modal"
-          class="fixed inset-0 z-40 flex items-start justify-center bg-ink/40 p-6"
-              >
-          <div class="mt-16 w-full max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-lg space-y-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-              Attach Address
-            </h3>
-
-            <p class="text-xs text-ink-muted">
-              Select an address from the company to attach to this employee.
-            </p>
-
+      <.modal
+        :if={@show_attach_modal}
+        id="attach-address-modal"
+        title="Attach Address"
+        on_cancel={JS.push("close_attach_modal", target: @myself)}
+      >
+        <:description>Select an address from the company to attach to this employee.</:description>
             <.form
               for={@attach_form}
               phx-submit="attach_address" phx-target={@myself}
               id="attach-address-modal-form"
-              class="space-y-4"
+              class="mt-4 space-y-4"
             >
               <div>
                 <label
@@ -816,8 +808,8 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                 </.button>
               </div>
             </.form>
-          </div>
-              </div>    </div>
+      </.modal>
+    </div>
     """
   end
 

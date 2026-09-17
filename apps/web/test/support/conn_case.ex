@@ -114,6 +114,29 @@ defmodule BilimbiWeb.ConnCase do
   end
 
   @doc """
+  Asserts that a shared `<.modal>` with this DOM id is open and carries the
+  dialog semantics assistive technology relies on: a modal `<dialog>` named
+  by its visible title and driven by the `Modal` hook.
+
+  The hook's browser behaviour (focus in, containment, Escape, focus return)
+  is not observable here; the markup that enables it is.
+  """
+  def assert_modal_dialog(view, id, title) do
+    import Phoenix.LiveViewTest, only: [has_element?: 2, has_element?: 3]
+
+    selector =
+      ~s(dialog##{id}[open][aria-modal="true"][aria-labelledby="#{id}-title"][phx-hook="Modal"])
+
+    ExUnit.Assertions.assert(has_element?(view, selector),
+      message: "expected an open modal dialog ##{id} with dialog semantics"
+    )
+
+    ExUnit.Assertions.assert(has_element?(view, "dialog##{id} h2##{id}-title", title),
+      message: "expected modal dialog ##{id} to be titled #{inspect(title)}"
+    )
+  end
+
+  @doc """
   Grants direct Authz capabilities to the signed-in test user against their
   live company. Uses the real contribution registry, not the Authz test snapshot.
   """

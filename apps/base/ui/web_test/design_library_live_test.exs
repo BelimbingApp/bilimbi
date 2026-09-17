@@ -375,6 +375,24 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "button", "Clicked: 1")
   end
 
+  test "opens each modal dialog width and closes it again", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    refute has_element?(view, "#design-library-modal")
+
+    view |> element("#design-library-open-modal") |> render_click()
+    assert_modal_dialog(view, "design-library-modal", "Rename example company")
+
+    view |> element("#design-library-modal button", "Cancel") |> render_click()
+    refute has_element?(view, "#design-library-modal")
+
+    view |> element("#design-library-open-wide-modal") |> render_click()
+    assert_modal_dialog(view, "design-library-wide-modal", "Edit example company")
+
+    view |> form("#design-library-wide-modal-form") |> render_submit()
+    refute has_element?(view, "#design-library-wide-modal")
+  end
+
   test "keeps inline editing interactive without persisting business data", %{conn: conn} do
     {:ok, view, _html} = open(conn, "/system/design-library/components")
 

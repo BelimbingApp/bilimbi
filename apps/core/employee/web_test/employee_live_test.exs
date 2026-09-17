@@ -638,7 +638,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
       # Open modal
       view |> element("#btn-open-attach-address") |> render_click()
-      assert has_element?(view, "#attach-address-modal")
+      assert_modal_dialog(view, "attach-address-modal", "Attach Address")
 
       # Attach address with shipping kind and priority 5
       view

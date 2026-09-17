@@ -58,45 +58,42 @@
     </.card>
   </.page>
 
-  <div
+  <.modal
     :if={@show_create}
     id="tenant-create-modal"
-    class="fixed inset-0 z-40 flex items-start justify-center bg-ink/40 p-6"
+    title="Add Tenant"
+    on_cancel={JS.push("cancel_create")}
   >
-    <div class="mt-16 w-full max-w-lg rounded-xl border border-line bg-surface p-6 shadow-sm">
-      <h2 class="text-lg font-medium tracking-tight text-ink-strong">Add Tenant</h2>
+    <.form for={@form} id="tenant-create-form" phx-submit="create" class="mt-6 space-y-4">
+      <.input
+        field={@form[:name]}
+        id="tenant-name"
+        label="Name"
+        placeholder="e.g. Acme Sdn Bhd"
+        required
+        maxlength="255"
+      />
+      <.input
+        field={@form[:parent_id]}
+        id="tenant-parent"
+        type="select"
+        label="Parent tenant"
+        prompt="None (top-level tenant)"
+        options={@parent_options}
+      />
+      <.input
+        field={@form[:status]}
+        id="tenant-status"
+        type="select"
+        label="Status"
+        required
+        options={[{"Active", "active"}, {"Suspended", "suspended"}]}
+      />
 
-      <.form for={@form} id="tenant-create-form" phx-submit="create" class="mt-6 space-y-4">
-        <.input
-          field={@form[:name]}
-          id="tenant-name"
-          label="Name"
-          placeholder="e.g. Acme Sdn Bhd"
-          required
-          maxlength="255"
-        />
-        <.input
-          field={@form[:parent_id]}
-          id="tenant-parent"
-          type="select"
-          label="Parent tenant"
-          prompt="None (top-level tenant)"
-          options={@parent_options}
-        />
-        <.input
-          field={@form[:status]}
-          id="tenant-status"
-          type="select"
-          label="Status"
-          required
-          options={[{"Active", "active"}, {"Suspended", "suspended"}]}
-        />
-
-        <div class="flex items-center gap-4 pt-2">
-          <.button variant="primary">Create</.button>
-          <.button type="button" phx-click="cancel_create">Cancel</.button>
-        </div>
-      </.form>
-    </div>
-  </div>
+      <div class="flex items-center gap-4 pt-2">
+        <.button variant="primary">Create</.button>
+        <.button type="button" phx-click="cancel_create">Cancel</.button>
+      </div>
+    </.form>
+  </.modal>
 </Layouts.app>

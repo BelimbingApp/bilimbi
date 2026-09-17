@@ -1158,6 +1158,89 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Renders a modal dialog over the current screen.
+
+  The caller decides whether the dialog exists: render it with `:if` while
+  the workflow it hosts is in progress and stop rendering it when that
+  workflow ends. While it exists the browser owns modal behaviour through a
+  native `<dialog>`: focus moves inside on open and stays inside, the page
+  behind is inert to the keyboard and to assistive technology, and Escape
+  asks to close. The `Modal` hook promotes the dialog to modal on mount,
+  forwards Escape to `on_cancel`, and returns focus to the control that
+  opened the dialog once the server has removed it.
+
+  `on_cancel` must reach the same handler as the Cancel button, so Escape
+  and Cancel are one action. Clicking the dimmed page does nothing: a dialog
+  usually holds a form, and a stray click must not discard it.
+
+  The dialog is named by its title and, when given, described by its
+  description, so a screen reader announces both when focus enters.
+
+  ## Examples
+
+      <.modal
+        :if={@show_attach_modal}
+        id="attach-address-modal"
+        title="Attach Address"
+        on_cancel={JS.push("close_attach_modal", target: @myself)}
+      >
+        <:description>Select an address to attach to this company.</:description>
+        <.form for={@attach_form} id="attach-address-modal-form" ...>
+          ...
+        </.form>
+      </.modal>
+  """
+  attr(:id, :string, required: true)
+  attr(:title, :string, required: true)
+
+  attr(:on_cancel, JS,
+    default: %JS{},
+    doc: "the command run when the user asks to close, the same push as the Cancel button"
+  )
+
+  attr(:width, :atom,
+    values: [:narrow, :wide],
+    default: :narrow,
+    doc: "`:narrow` for a single-column form, `:wide` for a two-column one"
+  )
+
+  attr(:rest, :global)
+  slot(:description, doc: "one short line under the title, announced with the dialog")
+  slot(:inner_block, required: true)
+
+  def modal(assigns) do
+    ~H"""
+    <dialog
+      id={@id}
+      open
+      phx-hook="Modal"
+      data-cancel={@on_cancel}
+      aria-modal="true"
+      aria-labelledby={"#{@id}-title"}
+      aria-describedby={@description != [] && "#{@id}-description"}
+      tabindex="-1"
+      class={[
+        "mx-auto mt-16 mb-4 max-h-[calc(100%-5rem)] w-[calc(100%-2rem)] overflow-y-auto",
+        "rounded-xl border border-line bg-surface p-6 text-ink shadow-lg",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/30",
+        "backdrop:bg-ink/40",
+        @width == :narrow && "max-w-lg",
+        @width == :wide && "max-w-2xl"
+      ]}
+      {@rest}
+    >
+      <h2 id={"#{@id}-title"} class="text-lg font-medium tracking-tight text-ink-strong">
+        {@title}
+      </h2>
+      <p :if={@description != []} id={"#{@id}-description"} class="mt-1 text-xs text-ink-subtle">
+        {render_slot(@description)}
+      </p>
+      {render_slot(@inner_block)}
+    </dialog>
+    """
+  end
+
+  @doc """
   Renders the page content container at the width of its workflow kind.
 
   Every screen is one of three kinds, and the width is chosen here and

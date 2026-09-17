@@ -1714,20 +1714,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           </section>
         </div>
 
-        <!-- Add Employee Modal Dialog -->
-        <div
+        <.modal
           :if={@show_add_employee_modal}
           id="add-employee-modal"
-          class="fixed inset-0 z-40 flex items-start justify-center bg-ink/40 p-6"
+          title="Add Employee Record"
+          on_cancel={JS.push("close_add_employee_modal")}
         >
-          <div class="mt-16 w-full max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-lg space-y-4">
-            <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-              Add Employee Record
-            </h3>
-            <p class="mt-1 text-xs text-ink-muted">
-              Create a new employee record and link it to this user.
-            </p>
-
+          <:description>Create a new employee record and link it to this user.</:description>
             <.form
               for={@new_employee_form}
               id="modal-create-employee-form"
@@ -1824,8 +1817,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 </.button>
               </div>
             </.form>
-          </div>
-        </div>
+        </.modal>
       </.page>
     </Layouts.app>
     """

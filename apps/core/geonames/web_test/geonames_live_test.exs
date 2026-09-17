@@ -358,7 +358,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
            )
 
     postcodes |> element("#postcode-#{source.id}-edit") |> render_click()
-    assert has_element?(postcodes, "#postcode-modal")
+    assert_modal_dialog(postcodes, "postcode-modal", "Edit Postcode")
     assert has_element?(postcodes, "#postcode-place-name[value='Kuala Lumpur City']")
 
     postcodes

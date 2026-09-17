@@ -131,7 +131,23 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> assign_preview_page(:pattern, 1, 25)
      |> assign(:sample_datetime, ~U[2026-08-17 14:30:00Z])
      |> assign(:inline_value, "Editable entity value")
-     |> assign(:click_count, 0)}
+     |> assign(:click_count, 0)
+     |> assign(:modal_width, nil)
+     |> assign(
+       :modal_form,
+       to_form(%{"name" => "Example Sdn Bhd", "code" => "EX-01"}, as: :example)
+     )}
+  end
+
+  @impl true
+  def handle_event("open-modal", params, socket) do
+    width = if params["width"] == "wide", do: :wide, else: :narrow
+    {:noreply, assign(socket, :modal_width, width)}
+  end
+
+  @impl true
+  def handle_event("close-modal", _params, socket) do
+    {:noreply, assign(socket, :modal_width, nil)}
   end
 
   @impl true

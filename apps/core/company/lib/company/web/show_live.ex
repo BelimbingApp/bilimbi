@@ -1346,22 +1346,19 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         />
 
         <%!-- MODAL 1: Edit Company Details --%>
-        <div
+        <.modal
           :if={@modal_action == :edit_details}
           id="company-details-modal"
-          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-ink/40 p-4"
+          title="Edit Company Details"
+          width={:wide}
+          on_cancel={JS.push("close_modal")}
         >
-          <div class="w-full max-w-2xl rounded-2xl border border-line bg-surface p-6 shadow-xl">
-            <h3 class="text-base font-semibold text-ink-strong mb-4">
-              Edit Company Details
-            </h3>
-
             <.form
               for={@details_form}
               id="company-details-form"
               phx-change="validate_details"
               phx-submit="save_details"
-              class="space-y-4"
+              class="mt-4 space-y-4"
             >
               <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <.input
@@ -1464,8 +1461,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 </.button>
               </div>
             </.form>
-          </div>
-        </div>
+        </.modal>
       </.page>
     </Layouts.app>
     """

@@ -482,18 +482,15 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
           </.table>
         </.card>
 
-        <div
+        <.modal
           :if={@modal_action == :new}
           id="department-modal"
-          class="fixed inset-0 z-40 flex items-start justify-center bg-ink/40 p-6"
+          title="Add Department"
+          on_cancel={JS.push("close_modal")}
         >
-          <div class="mt-16 w-full max-w-lg rounded-xl border border-line bg-surface p-6 shadow-sm">
-            <h2 class="text-lg font-medium tracking-tight text-ink-strong">
-              Add Department
-            </h2>
-            <p class="mt-1 text-xs text-ink-subtle">
-              Select an available department type to establish in {Company.Summary.display_name(@company)}.
-            </p>
+          <:description>
+            Select an available department type to establish in {Company.Summary.display_name(@company)}.
+          </:description>
 
             <.form
               :if={@form}
@@ -534,21 +531,17 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
                 </.button>
               </div>
             </.form>
-          </div>
-        </div>
+        </.modal>
 
-        <div
+        <.modal
           :if={@modal_action == :edit_head}
           id="department-head-modal"
-          class="fixed inset-0 z-40 flex items-start justify-center bg-ink/40 p-6"
+          title="Set Department Head"
+          on_cancel={JS.push("close_modal")}
         >
-          <div class="mt-16 w-full max-w-lg rounded-xl border border-line bg-surface p-6 shadow-sm">
-            <h2 class="text-lg font-medium tracking-tight text-ink-strong">
-              Set Department Head
-            </h2>
-            <p class="mt-1 text-xs text-ink-subtle">
-              Choose the employee responsible for this department, or clear the current head.
-            </p>
+          <:description>
+            Choose the employee responsible for this department, or clear the current head.
+          </:description>
 
             <.form
               :if={@head_form}
@@ -575,8 +568,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
                 </.button>
               </div>
             </.form>
-          </div>
-        </div>
+        </.modal>
       </.page>
     </Layouts.app>
     """

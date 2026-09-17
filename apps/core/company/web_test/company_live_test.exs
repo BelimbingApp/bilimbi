@@ -612,7 +612,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       # The address behaviour now lives in the core/address-owned panel, reached
       # by manifest key; its events are phx-targeted to the component.
       view |> element("#btn-open-create-address") |> render_click()
-      assert has_element?(view, "#company-create-address-modal")
+      assert_modal_dialog(view, "company-create-address-modal", "Create & Attach Address")
 
       view
       |> form("#create-attach-address-form",
