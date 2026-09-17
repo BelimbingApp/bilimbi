@@ -3,7 +3,7 @@
 **Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families. Application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display are merged to `main`; the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
 **Last Updated:** 2026-09-17
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `claude-fable-inputs-1/claude-fable-5-1` (firstmate task secret-input-reveal)
 
 ## Problem Essence
 
@@ -652,3 +652,43 @@ Not finished by #719 and #720: the `:design_library_drift` guards report four fa
 on `main`, so #722's guards land excluded from the default test run and from
 `mix precommit`. Correcting those four and activating the guards is the open Phase 1
 checklist row above. #722 being merged does not mean the guards are active.
+
+### Secret input reveal and multi-select accessibility slice
+
+Goal: Give a secret input the reveal control its caller asks for, and make the shared
+multi-select announce and accept the open state it actually has.
+
+- [x] Add the caller-optional reveal to `<.input type="password">`, with its two glyphs
+  named in `IconRegistry`. `{claude-fable-inputs-1/claude-fable-5-1}`
+- [x] Make the multi-select trigger's `aria-expanded` the single record of open and
+  close the list on Escape. `{claude-fable-inputs-1/claude-fable-5-1}`
+- [x] Present the reveal on `/system/design-library/components#component-inputs` and
+  cover both components with tests. `{claude-fable-inputs-1/claude-fable-5-1}`
+
+INP-06, delivered here: `reveal` is off by default, so sign-in keeps its password masked
+with no control. A caller passes `true`, or the noun the control's accessible name
+should use, to get a show/hide button against the field; passing it to any other input
+type raises. The input's own `type` is the only record of masked-or-shown and one
+LiveView JS command flips it, so a form re-render never silently re-masks a value the
+user chose to see, and the button's accessible name, title and glyph are derived from
+that one attribute by the `SecretReveal` hook rather than swapped alongside it. Capability
+was adopted from Belimbing's reveal; no Blade structure, attribute name or asset was.
+
+INP-04, delivered here: the trigger's `aria-expanded` is the single record of open, with
+the list's visibility and the chevron rotation derived from it in CSS. The trigger
+toggles it closed, click-away and focus leaving the field close it, and while it is open
+Escape closes it from anywhere on the page — returning focus to the trigger only when
+focus was already inside the field. `aria-haspopup` is gone: the list is a disclosure of
+checkboxes, not the menu that attribute announces, and nothing here implements menu
+arrow-key navigation.
+
+Not delivered by this slice, and still open under INP-06: the saved-secret mask,
+replacement and explicit clearing its catalog row names. The Phase 0 disposition still
+excludes revealing a secret the server already holds. The behavior contract for both
+components is stated once with the component in `apps/base/ui/lib/ui/components.ex`, and
+held by `apps/base/ui/test/components_input_secret_test.exs`,
+`apps/base/ui/test/components_multi_select_test.exs`,
+`apps/web/test/bilimbi_web/secret_reveal_js_test.exs` and
+`apps/web/test/bilimbi_web/multi_select_dismiss_js_test.exs`.
+
+Delivery: pending; the merging maintainer fills in the pull request URL and date.
