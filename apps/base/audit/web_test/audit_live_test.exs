@@ -62,6 +62,48 @@ defmodule BilimbiWeb.AuditLiveTest do
       assert has_element?(view, "#mutations-table", "trc123456")
     end
 
+    test "shows impersonation attribution only on impersonated mutations", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.audit.log.list")
+
+      {:ok, impersonated} =
+        Audit.record_mutation(scope, %{
+          company_id: 73,
+          actor_type: "user",
+          actor_id: 92,
+          actor_role: "admin",
+          impersonator_id: 91,
+          auditable_type: "Bilimbi.Core.Company",
+          auditable_id: "73",
+          event: "updated",
+          occurred_at: ~N[2026-08-18 10:01:00]
+        })
+
+      {:ok, ordinary} =
+        Audit.record_mutation(scope, %{
+          company_id: 73,
+          actor_type: "user",
+          actor_id: 91,
+          actor_role: "owner",
+          auditable_type: "Bilimbi.Core.Company",
+          auditable_id: "73",
+          event: "updated",
+          occurred_at: ~N[2026-08-18 10:00:00]
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
+
+      assert has_element?(
+               view,
+               "#mutations-#{impersonated.id}",
+               "admin · impersonated by User #91"
+             )
+
+      refute has_element?(view, "#mutations-#{ordinary.id}", "impersonated by")
+    end
+
     test "filters and searches mutations", %{conn: conn, scope: scope} do
       grant_capabilities!("admin.audit.log.list")
 
@@ -222,6 +264,44 @@ defmodule BilimbiWeb.AuditLiveTest do
       # Toggle back
       view |> element("#action-retain-#{action.id}") |> render_click()
       assert has_element?(view, "#action-retain-#{action.id}[title='Retain this entry']")
+    end
+
+    test "shows impersonation attribution only on impersonated actions", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.audit.log.list")
+
+      {:ok, impersonated} =
+        Audit.record_action(scope, %{
+          company_id: 73,
+          actor_type: "user",
+          actor_id: 92,
+          actor_role: "admin",
+          impersonator_id: 91,
+          event: "employee.updated",
+          occurred_at: ~N[2026-08-18 10:16:00]
+        })
+
+      {:ok, ordinary} =
+        Audit.record_action(scope, %{
+          company_id: 73,
+          actor_type: "user",
+          actor_id: 91,
+          actor_role: "owner",
+          event: "employee.updated",
+          occurred_at: ~N[2026-08-18 10:15:00]
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/actions")
+
+      assert has_element?(
+               view,
+               "#actions-#{impersonated.id}",
+               "admin · impersonated by User #91"
+             )
+
+      refute has_element?(view, "#actions-#{ordinary.id}", "impersonated by")
     end
 
     test "filters actions by family, actor_type, result, and diagnostics", %{
