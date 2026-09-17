@@ -11,6 +11,15 @@ defmodule BilimbiWeb.ThemeContrastTest do
   use ExUnit.Case, async: true
 
   @css_path Path.expand("../assets/css/app.css", __DIR__)
+  @components_path Path.expand("../../base/ui/lib/ui/components.ex", __DIR__)
+  @decision_logs_path Path.expand(
+                        "../../base/authz/lib/authz/web/decision_logs_live.html.heex",
+                        __DIR__
+                      )
+  @database_queries_path Path.expand(
+                           "../../core/user/lib/user/web/database_queries_live/show.html.heex",
+                           __DIR__
+                         )
 
   # Tailwind 4.3 palette values used by the semantic roles, resolved to sRGB
   # hex so the ratios are computable. If Tailwind's palette shifts under an
@@ -78,6 +87,23 @@ defmodule BilimbiWeb.ThemeContrastTest do
     {"brand-ink", "brand-surface", 4.5}
   ]
 
+  # Body-text sites the parity audit measured against their real backgrounds
+  # (findings C2 and C3). Each entry names the markup whose class list carries
+  # the text role, anchored to the background it sits on, plus every surface
+  # role that markup can be read against. The text role is read from the class
+  # list itself, so the assertion fails on a call-site drift back to a fainter
+  # role as well as on a token change that drops the ratio.
+  @text_sites [
+    {"shared <.table> header (C2)", @components_path,
+     ~r/<thead class="[^"]*\bbg-surface-sunken\b[^"]*">\s*<tr>\s*<th\s[^>]*?class=\{\[\s*"([^"]*)"/,
+     ["surface-sunken"]},
+    {"database query result header (C2)", @database_queries_path,
+     ~r/<thead class="([^"]*\bbg-surface-muted\b[^"]*)">/, ["surface-muted"]},
+    # Rows sit on the card's `surface` and hover to `surface-sunken`.
+    {"decision log acting-for line (C3)", @decision_logs_path,
+     ~r/<span :if=\{log\.acting_for_user_id\} class="([^"]*)">/, ["surface", "surface-sunken"]}
+  ]
+
   @surface_roles ~w(canvas surface surface-sunken surface-muted surface-sidebar)
   @dark_surface_ladder ~w(canvas surface-sidebar surface surface-sunken surface-muted)
   @line_roles ~w(high-contrast-line line low-contrast-line)
@@ -98,6 +124,31 @@ defmodule BilimbiWeb.ThemeContrastTest do
       assert ratio >= minimum,
              "#{name}: #{fg} (#{fg_hex}) on #{bg} (#{bg_hex}) is #{Float.round(ratio, 2)}:1, " <>
                "below #{minimum}:1"
+    end
+  end
+
+  test "audited text sites reach 4.5:1 on their real backgrounds in both themes" do
+    css = File.read!(@css_path)
+    light = tokens_in(theme_block(css))
+    [dark_media, _dark_attr] = dark_blocks(css)
+
+    for {site, path, pattern, backgrounds} <- @text_sites do
+      class_list =
+        case Regex.run(pattern, File.read!(path)) do
+          [_, class_list] -> class_list
+          nil -> flunk("#{site}: markup not found in #{Path.relative_to_cwd(path)}")
+        end
+
+      for {name, tokens} <- [{"light", light}, {"dark", dark_media}], bg <- backgrounds do
+        role = text_role!(tokens, class_list, site)
+        fg_hex = resolve!(tokens, role)
+        bg_hex = resolve!(tokens, bg)
+        ratio = contrast(fg_hex, bg_hex)
+
+        assert ratio >= 4.5,
+               "#{name}: #{site} uses #{role} (#{fg_hex}) on #{bg} (#{bg_hex}) at " <>
+                 "#{Float.round(ratio, 2)}:1, below 4.5:1"
+      end
     end
   end
 
@@ -207,6 +258,22 @@ defmodule BilimbiWeb.ThemeContrastTest do
           _ ->
             flunk("unsupported colour mix #{mix}")
         end
+    end
+  end
+
+  # The one unprefixed `text-<role>` utility in a class list whose role is a
+  # theme colour. `text-xs` and `text-right` are not roles; `hover:text-ink`
+  # is a prefixed state, not the resting colour.
+  defp text_role!(tokens, class_list, site) do
+    roles =
+      Regex.scan(~r/(?:^|\s)text-([a-z-]+)/, class_list)
+      |> Enum.map(fn [_, role] -> role end)
+      |> Enum.filter(&is_map_key(tokens, &1))
+
+    case roles do
+      [role] -> role
+      [] -> flunk("#{site}: class list #{inspect(class_list)} names no text colour role")
+      many -> flunk("#{site}: class list names several text colour roles #{inspect(many)}")
     end
   end
 

@@ -1392,7 +1392,7 @@ defmodule Bilimbi.Base.UI.Components do
               scope="col"
               aria-sort={table_aria_sort(col[:sort], @sort_by, @sort_dir)}
               class={[
-                "px-2 py-1.5 text-xs font-semibold text-ink-subtle",
+                "px-2 py-1.5 text-xs font-semibold text-muted",
                 col[:align] == :right && "text-right"
               ]}
             >
