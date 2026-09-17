@@ -60,6 +60,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
   def handle_event("open_attach_modal", _params, socket) do
     {:noreply,
      socket
+     |> assign(:notice, nil)
      |> assign(:show_attach_modal, true)
      |> assign(
        :attach_form,

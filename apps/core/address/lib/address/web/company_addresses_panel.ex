@@ -100,6 +100,7 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
   def handle_event("open_attach_modal", _params, socket) do
     {:noreply,
      socket
+     |> assign(:notice, nil)
      |> assign(:show_attach_modal, true)
      |> assign(
        :attach_form,
@@ -374,6 +375,7 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
 
     {:noreply,
      socket
+     |> assign(:notice, nil)
      |> assign(:show_create_modal, true)
      |> assign(:address_form_params, params)
      |> assign(:auto_location, %{admin1_code: false, locality: false})

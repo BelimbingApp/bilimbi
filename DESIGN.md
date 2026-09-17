@@ -149,8 +149,9 @@ A short workflow that must finish or be abandoned before the screen continues
   usually holds a form, and a stray click must not discard it.
 - **Feedback:** Because the page behind is inert, an outcome raised while the
   dialog stays open renders inside it — a LiveView passes `flash`, and a panel
-  renders its own notice in the dialog. The layout's flash group is hidden
-  while a modal is open, so a message never appears where it cannot be read.
+  renders its own notice in the dialog. The layout's `:info` and `:error`
+  flashes are hidden while a modal is open, so the same message never appears
+  twice; the connection banners have no in-dialog copy and stay in the layout.
 - **Geometry:** A `rounded-xl` surface at `max-w-lg` for a single-column form
   or `max-w-2xl` for two columns, over an `ink/40` dimmer.
 

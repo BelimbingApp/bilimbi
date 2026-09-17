@@ -627,6 +627,16 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(view, "#company-addresses-panel", "Head Office")
 
+      assert has_element?(
+               view,
+               "#company-addresses-panel-notice",
+               "Address created and attached."
+             )
+
+      view |> element("#btn-open-create-address") |> render_click()
+      assert_modal_dialog(view, "company-create-address-modal", "Create & Attach Address")
+      refute has_element?(view, "#company-addresses-panel-notice")
+
       {:ok, scope} = Tenancy.scope(41)
       {:ok, attached} = Bilimbi.Core.Address.list_company_attached_addresses(scope, 73)
       assert Enum.any?(attached, &(&1.label == "Head Office"))

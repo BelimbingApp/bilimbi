@@ -701,6 +701,11 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       view |> element("#unlink-address-#{address.id}") |> render_click()
       assert render(view) =~ "Address unlinked."
       refute has_element?(view, "#address-row-#{address.id}")
+      assert has_element?(view, "#addresses-panel-notice", "Address unlinked.")
+
+      view |> element("#btn-open-attach-address") |> render_click()
+      assert_modal_dialog(view, "attach-address-modal", "Attach Address")
+      refute has_element?(view, "#addresses-panel-notice")
 
       {:ok, attached} = Address.list_employee_attached_addresses(scope, employee.id)
       assert attached == []

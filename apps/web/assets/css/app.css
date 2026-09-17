@@ -220,9 +220,12 @@ body {
 }
 
 /* An open modal dialog makes the rest of the page inert, so the layout's
- * flash group cannot be read, announced or dismissed while one is open.
- * `<.modal flash={@flash}>` renders the same messages inside the dialog. */
-body:has(dialog:modal) #flash-group {
+ * `:info` and `:error` flashes cannot be read, announced or dismissed while
+ * one is open; `<.modal flash={@flash}>` renders those two inside the dialog,
+ * and only those two are hidden here. The connection banners have no
+ * in-dialog copy, so they stay in the layout. */
+body:has(dialog:modal) #flash-group > #flash-info,
+body:has(dialog:modal) #flash-group > #flash-error {
   visibility: hidden;
 }
 
