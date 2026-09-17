@@ -41,11 +41,19 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
   end
 
   defp family_menu_labels(view) do
+    family_menu_lines(view, "first-child")
+  end
+
+  defp family_menu_descriptions(view) do
+    family_menu_lines(view, "last-child")
+  end
+
+  defp family_menu_lines(view, position) do
     view
     |> render()
     |> LazyHTML.from_fragment()
     |> LazyHTML.query(
-      "#component-secondary-menu nav[aria-label='Component families'] a > span > span:first-child"
+      "#component-secondary-menu nav[aria-label='Component families'] a > span > span:#{position}"
     )
     |> Enum.map(&(&1 |> LazyHTML.text() |> String.trim()))
   end
@@ -407,6 +415,14 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
 
     {:ok, components, _html} = open(conn, "/system/design-library/components")
     assert area_text(components, "#component-shell h3") == "Application shell"
+
+    descriptions = family_menu_descriptions(components)
+    assert length(descriptions) == length(@family_menu_labels)
+
+    for description <- descriptions do
+      refute description =~ ~r/^[A-Z][A-Z0-9]*\s*·/,
+             "the component family menu still leads a description with a catalog code: #{description}"
+    end
 
     {:ok, spec, _html} = open(conn, "/system/design-library/design-spec")
     assert area_text(spec, "#spec-shell h2") == "Application shell"
