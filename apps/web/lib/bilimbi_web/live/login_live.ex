@@ -19,8 +19,9 @@ defmodule BilimbiWeb.LoginLive do
   compact ledger rules rather than Belimbing's arid pill styling. The
   credential and lockout failures are announced above the form through the
   same `<.alert>` the forgot-password confirmation uses, so a screen reader
-  hears that the attempt failed; Belimbing pins the message under the email
-  field, where nothing announces it.
+  hears that every attempt failed, including a repeat of the same message;
+  Belimbing pins the message under the email field, where nothing announces
+  it.
   """
 
   use BilimbiWeb, :live_view
@@ -41,6 +42,7 @@ defmodule BilimbiWeb.LoginLive do
      |> assign(:trigger_action, false)
      |> assign(:login_token, nil)
      |> assign(:form_error, nil)
+     |> assign(:form_error_seq, 0)
      |> assign_workspace()
      |> assign_form(login_changeset(%{}))}
   end
@@ -98,8 +100,7 @@ defmodule BilimbiWeb.LoginLive do
          |> assign(:trigger_action, true)}
 
       {:error, :tenant_unavailable} ->
-        {:noreply,
-         assign(socket, :form_error, "This account is not attached to an active workspace.")}
+        {:noreply, put_form_error(socket, "This account is not attached to an active workspace.")}
     end
   end
 
@@ -108,8 +109,18 @@ defmodule BilimbiWeb.LoginLive do
   # error slot; the submitted values stay in the form for another attempt.
   defp reject(socket, changeset, message) do
     socket
-    |> assign(:form_error, message)
+    |> put_form_error(message)
     |> assign_form(changeset)
+  end
+
+  # An assertive live region speaks when its node changes, so a second wrong
+  # password with the same message would be silent. Each failure gets its own
+  # `#login-form-error-N` node, which the patch replaces rather than leaves
+  # alone.
+  defp put_form_error(socket, message) do
+    socket
+    |> assign(:form_error, message)
+    |> assign(:form_error_seq, socket.assigns.form_error_seq + 1)
   end
 
   defp throttle_message(seconds) do
@@ -174,7 +185,7 @@ defmodule BilimbiWeb.LoginLive do
         </div>
 
         <div :if={@form_error} id="login-form-error">
-          <.alert kind={:error}>{@form_error}</.alert>
+          <.alert id={"login-form-error-#{@form_error_seq}"} kind={:error}>{@form_error}</.alert>
         </div>
 
         <.form
