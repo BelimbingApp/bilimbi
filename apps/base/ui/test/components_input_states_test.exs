@@ -38,6 +38,8 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
   end
 
   defp select_field(assigns) do
+    assigns = assign_new(assigns, :readonly, fn -> nil end)
+
     ~H"""
     <.input
       id="s"
@@ -48,6 +50,7 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
       value={@value}
       hint={@hint}
       errors={@errors}
+      readonly={@readonly}
     />
     """
   end
@@ -271,15 +274,17 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
     editable =
       render_component(&field/1, hint: nil, errors: [], required: nil, readonly: nil)
 
-    select = render_component(&select_field/1, value: nil, hint: nil, errors: [])
+    select =
+      render_component(&select_field/1, value: nil, hint: nil, errors: [], readonly: true)
 
     assert control_tag(locked, "f") =~ ~r/[\s"]bg-surface-sunken[\s"]/
     refute control_tag(editable, "f") =~ ~r/[\s"]bg-surface-sunken[\s"]/
 
-    # HTML has no readonly `select`: the attribute does not apply, so a
-    # dropdown must never be painted from readonliness. The CSS `:read-only`
-    # pseudo-class matches every one of them, which is why the state is read
-    # from the attribute the caller set instead.
+    # HTML has no readonly `select`: the attribute does not apply, so this one
+    # stays editable however it was marked, and painting it locked would lie.
+    # The CSS `:read-only` pseudo-class matches every dropdown, which is why
+    # the state is read from the attribute instead -- and why the select is
+    # asked for readonly here rather than left plain.
     select_tag = control_tag(select, "s", "select")
     refute select_tag =~ "read-only"
     refute select_tag =~ ~r/[\s"]bg-surface-sunken[\s"]/
