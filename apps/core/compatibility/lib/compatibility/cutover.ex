@@ -11,8 +11,9 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
      never mutated. Evaluation fails closed (`:denied_unknown_capability`),
      so each such grant is a permanent silent denial for non-`grant_all`
      roles. The capabilities genuinely do not exist, so there is nothing to
-     fix: every affected grant is listed with role code, principal, and
-     capability for a deliberate operator decision.
+     fix: every affected grant is listed for a deliberate operator decision.
+     The scan is `Bilimbi.Base.Authz.unknown_persisted_capabilities/1`, the
+     owner's own API, so it compares keys exactly the way evaluation does.
   2. `user_pins.url` + `url_hash` — the URL is remapped through the path
      table below; the hash is ALWAYS recomputed with `Pin.hash_url/1` and
      never copied across. The pair is written together.
@@ -24,26 +25,35 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
      `heroicon-m-<n>` becomes `hero-<n>-mini`. Anything else, including
      NULL, is left untouched and counted as a known remainder. The sampled
      corpus is small by construction, so the remainder is reported rather
-     than guessed.
+     than guessed. An icon is remediated independently of its pin's URL: a
+     pin nobody can follow still renders its icon in the sidebar.
 
-  Nothing is deleted. A pin whose URL has no Bilimbi equivalent stays
-  byte-identical in place; with nothing removed, the report is the entire
+  Nothing is deleted. A pin whose URL has no Bilimbi equivalent keeps that
+  URL and its stored hash; with nothing removed, the report is the entire
   remedy, so every affected pin is named with its user, label, and dead URL.
   Dedup collisions on `(user_id, url_hash)` resolve non-destructively: the
   pin with the lowest `sort_order` (then lowest id) wins the mapped URL and
   the loser keeps its ORIGINAL Belimbing URL and hash, reported as collision
   residue for the operator to re-pin by hand.
 
+  Counting follows that split. `changed`, `unchanged`, and `unmapped`
+  classify the URL outcome and always sum to `examined`; `icons_changed` and
+  `remainder` describe icons separately, because a pin counted as `unmapped`
+  can still have had its icon repaired.
+
   Execution contract: idempotent (every mapping is a fixed point, so a rerun
   reports `changed: 0`), per-table examined/changed/unchanged/unmapped
   counts, loud failure when a required table is absent, a `--dry-run`
-  read-only mode, and `--strict` to turn residue into failure for rehearsals.
-  This deliberately runs without a tenancy scope: cutover remaps the whole
-  adopted database at once, before any tenant traffic exists.
+  read-only mode, and `--prefix` to read the same PostgreSQL schema
+  `bilimbi.schema.verify` and `bilimbi.schema.adopt` were pointed at. This
+  deliberately runs without a tenancy scope: cutover remaps the whole adopted
+  database at once, before any tenant traffic exists.
   """
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.UI.RouteContract
   alias Bilimbi.Core.User.DatabaseQuery
   alias Bilimbi.Core.User.Pin
   alias Ecto.Adapters.SQL
@@ -95,62 +105,39 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
     {"/admin/system/performance", "/system/performance", false}
   ]
 
-  # Bilimbi route shapes a remapped or already-clean path must match.
-  # `:id`/`:slug` match any single segment; literals must match exactly, so
-  # `/companies/create` wins over `/companies/:id` while `/companies/new`
-  # (no such page) stays unmappable. Mirrors `apps/*/priv/web_routes.exs`.
-  @known_paths [
-    ["companies"],
-    ["companies", "create"],
-    ["companies", :id],
-    ["companies", :id, "departments"],
-    ["companies", :id, "relationships"],
-    ["companies", "legal-entity-types"],
-    ["companies", "department-types"],
-    ["employees"],
-    ["employees", "new"],
-    ["employees", :id],
-    ["employees", :id, "edit"],
-    ["employee-types"],
-    ["employee-types", "new"],
-    ["employee-types", :id, "edit"],
-    ["users"],
-    ["users", "new"],
-    ["users", :id],
-    ["users", :id, "edit"],
-    ["addresses"],
-    ["addresses", "create"],
-    ["addresses", :id],
-    ["geonames", "countries"],
-    ["geonames", "admin1"],
-    ["geonames", "postcodes"],
-    ["authz", "roles"],
-    ["authz", "roles", "create"],
-    ["authz", "roles", :id],
-    ["authz", "capabilities"],
-    ["authz", "principal-roles"],
-    ["authz", "principal-capabilities"],
-    ["authz", "decision-logs"],
-    ["audit", "actions"],
-    ["audit", "mutations"],
-    ["system", "schedule"],
-    ["system", "sessions"],
-    ["system", "settings"],
-    ["system", "info"],
-    ["system", "localization"],
-    ["system", "performance"],
-    ["admin", "system", "database-queries"],
-    ["admin", "system", "database-queries", :slug],
-    ["settings", "profile"],
-    ["settings", "password"],
-    ["settings", "appearance"],
-    ["notifications"],
-    ["dashboard"]
-  ]
+  # Bilimbi route shapes a remapped or already-clean path must match. These
+  # are the installed module and host route declarations themselves, read
+  # through the manifest Base UI already compiles for `~p` verification, so a
+  # renamed or added route cannot leave a stale copy behind here and turn a
+  # healthy pin into a reported dead one.
+  @known_paths RouteContract.navigable_paths()
+               |> Enum.map(fn path ->
+                 path
+                 |> String.split("/", trim: true)
+                 |> Enum.map(fn
+                   ":" <> _param -> :param
+                   literal -> literal
+                 end)
+               end)
+               |> Enum.uniq()
+
+  if @known_paths == [] do
+    raise "no routes are compiled into #{inspect(RouteContract)}; the cutover remap " <>
+            "cannot tell a live Bilimbi URL from a dead one without them"
+  end
+
+  # Literal segments doubled as route words (new, create, edit, …) can never
+  # be a param: `/companies/new` is not a company show page. Without this,
+  # the param wildcard would bless reserved words as already-clean paths.
+  @literal_segments @known_paths |> List.flatten() |> Enum.filter(&is_binary/1) |> MapSet.new()
 
   @icon_regex ~r/^heroicon-([osm])-(.+)$/
 
   @steps [:pins, :query_icons, :notifications, :grants]
+
+  # A prefixed read fails with `undefined_table` when the schema exists and
+  # `invalid_schema_name` when it does not; both mean the same thing here.
+  @missing_table_codes [:undefined_table, :invalid_schema_name]
 
   @doc "The cutover steps, in dependency-safe order."
   @spec steps() :: [atom()]
@@ -214,11 +201,11 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
   end
 
   @doc """
-  Runs the requested cutover steps against `repo` (default `Bilimbi.Base.Repo`).
+  Runs every cutover step against `repo` (default `Bilimbi.Base.Repo`).
 
-  Options: `:repo`, `:dry_run` (report without writing), `:only` (subset of
-  `steps/0`), `:declared_capabilities` (override for the grants step,
-  defaulting to the live Authz registry).
+  Options: `:repo`, `:dry_run` (report without writing), `:prefix` (the
+  PostgreSQL schema, default `"public"`), and `:declared_capabilities`
+  (override for the grants step, defaulting to the live Authz registry).
 
   Returns `{:ok, report}` with per-table
   examined/changed/unchanged/unmapped counts plus named residue, or
@@ -226,64 +213,30 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
   """
   @spec run(keyword()) :: {:ok, report()} | {:error, String.t()}
   def run(opts \\ []) do
-    repo = Keyword.get(opts, :repo, Repo)
-    dry_run? = Keyword.get(opts, :dry_run, false)
-    only = parse_only!(Keyword.get(opts, :only, @steps))
-    step_opts = [repo: repo, dry_run: dry_run?] ++ Keyword.take(opts, [:declared_capabilities])
+    context = context!(opts)
+    steps = Map.new(@steps, fn step -> {step, apply_step(step, context)} end)
 
-    steps =
-      Enum.reduce(only, %{}, fn step, acc ->
-        Map.put(acc, step, apply_step(step, step_opts))
-      end)
-
-    {:ok, %{dry_run: dry_run?, steps: steps}}
+    {:ok, %{dry_run: context.dry_run?, steps: steps}}
   rescue
     e in Error -> {:error, e.message}
   end
 
-  @doc """
-  True when the report holds residue an operator must disposition: unmapped
-  pins, unmapped notification URLs, or grants naming undeclared capabilities.
-  Icon remainders are cosmetic and expected, so they never count here.
-  """
-  @spec strict_residue?(report()) :: boolean()
-  def strict_residue?(%{steps: steps}) do
-    Enum.any?([:pins, :notifications, :grants], fn step ->
-      case Map.get(steps, step) do
-        %{unmapped: unmapped} when is_integer(unmapped) -> unmapped > 0
-        _ -> false
-      end
-    end)
+  defp context!(opts) do
+    prefix = Keyword.get(opts, :prefix, "public")
+
+    %{
+      repo: Keyword.get(opts, :repo, Repo),
+      dry_run?: Keyword.get(opts, :dry_run, false),
+      prefix: prefix,
+      quoted_prefix: SchemaVerifier.quote_identifier!(prefix),
+      declared_capabilities: Keyword.get(opts, :declared_capabilities)
+    }
   end
 
-  defp parse_only!(nil), do: @steps
-
-  defp parse_only!(only) when is_list(only) do
-    Enum.map(only, &normalize_step!/1)
-  end
-
-  defp parse_only!(only) when is_atom(only) or is_binary(only), do: [normalize_step!(only)]
-
-  defp normalize_step!(:query_icons), do: :query_icons
-  defp normalize_step!(:pins), do: :pins
-  defp normalize_step!(:notifications), do: :notifications
-  defp normalize_step!(:grants), do: :grants
-  defp normalize_step!("pins"), do: :pins
-  defp normalize_step!("query_icons"), do: :query_icons
-  defp normalize_step!("query-icons"), do: :query_icons
-  defp normalize_step!("icons"), do: :query_icons
-  defp normalize_step!("notifications"), do: :notifications
-  defp normalize_step!("grants"), do: :grants
-
-  defp normalize_step!(other) do
-    raise Error,
-          "unknown cutover step #{inspect(other)}; expected one of pins, query_icons, notifications, grants"
-  end
-
-  defp apply_step(:pins, opts), do: run_pins(opts)
-  defp apply_step(:query_icons, opts), do: run_query_icons(opts)
-  defp apply_step(:notifications, opts), do: run_notifications(opts)
-  defp apply_step(:grants, opts), do: run_grants(opts)
+  defp apply_step(:pins, context), do: run_pins(context)
+  defp apply_step(:query_icons, context), do: run_query_icons(context)
+  defp apply_step(:notifications, context), do: run_notifications(context)
+  defp apply_step(:grants, context), do: run_grants(context)
 
   defp split_path_query(normalized) do
     case String.split(normalized, "?", parts: 2) do
@@ -291,11 +244,6 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
       [path, query] -> {path, query}
     end
   end
-
-  # Literal segments doubled as route words (new, create, edit, …) can never
-  # be an `:id`: `/companies/new` is not a company show page. Without this,
-  # the `:id` wildcard would bless reserved words as already-clean paths.
-  @literal_segments @known_paths |> List.flatten() |> Enum.filter(&is_binary/1) |> MapSet.new()
 
   defp known_bilimbi_path?(path) do
     segments = String.split(path, "/", trim: true)
@@ -306,7 +254,7 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
     Enum.zip(pattern, segments)
     |> Enum.all?(fn
       {literal, actual} when is_binary(literal) -> literal == actual
-      {_param, actual} -> actual not in @literal_segments
+      {:param, actual} -> actual not in @literal_segments
     end)
   end
 
@@ -341,37 +289,39 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
   # report needs the owner's email/name alongside each pin, and Pin carries
   # no users association. Writes still go through `Pin.changeset/2` so URL
   # normalization, hash recomputation, and validation stay canonical.
-  @pins_sql """
-  SELECT p.id, p.user_id, p.label, p.url, p.url_hash, p.icon, p.sort_order, u.email, u.name
-  FROM user_pins AS p LEFT JOIN users AS u ON u.id = p.user_id
-  ORDER BY p.user_id, p.sort_order, p.id
-  """
+  defp pins_sql(schema) do
+    """
+    SELECT p.id, p.user_id, p.label, p.url, p.url_hash, p.icon, p.sort_order, u.email, u.name
+    FROM #{schema}.user_pins AS p LEFT JOIN #{schema}.users AS u ON u.id = p.user_id
+    ORDER BY p.user_id, p.sort_order, p.id
+    """
+  end
 
-  defp run_pins(opts) do
-    repo = Keyword.fetch!(opts, :repo)
-    dry_run? = Keyword.get(opts, :dry_run, false)
+  defp run_pins(context) do
+    rows = query!(context, pins_sql(context.quoted_prefix), [], "user_pins").rows
 
-    rows = query!(repo, @pins_sql, [], "user_pins").rows
+    state =
+      Enum.reduce(rows, empty_pin_state(), fn row, state -> process_pin(row, state, context) end)
 
-    {counts, residue, _taken} =
-      Enum.reduce(rows, {%{examined: 0, changed: 0, unchanged: 0, unmapped: 0}, [], %{}}, fn
-        row, {counts, residue, taken} ->
-          process_pin(repo, dry_run?, row, counts, residue, taken)
-      end)
+    state.counts
+    |> Map.put(:residue, Enum.reverse(state.residue))
+    |> Map.put(:remainder, remainder_list(state.remainder))
+  end
 
-    Map.put(counts, :residue, Enum.reverse(residue))
+  defp empty_pin_state do
+    %{
+      counts: %{examined: 0, changed: 0, unchanged: 0, unmapped: 0, icons_changed: 0},
+      residue: [],
+      remainder: %{},
+      taken: %{}
+    }
   end
 
   defp process_pin(
-         repo,
-         dry_run?,
          [id, user_id, label, url, url_hash, icon, _sort, email, name],
-         counts,
-         residue,
-         taken
+         state,
+         context
        ) do
-    counts = Map.update!(counts, :examined, &(&1 + 1))
-
     entry = %{
       pin_id: id,
       user_id: user_id,
@@ -381,90 +331,110 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
       url: url
     }
 
-    if not is_binary(url) do
-      counts = Map.update!(counts, :unmapped, &(&1 + 1))
-      residue = [Map.put(entry, :reason, {:invalid_row, "url is NULL or not a string"}) | residue]
-      {counts, residue, remember_taken(taken, user_id, url_hash, id)}
+    pin = %{id: id, user_id: user_id, label: label, url: url, url_hash: url_hash, icon: icon}
+    state = bump(state, :examined)
+
+    if is_binary(url) do
+      process_pin_row(state, context, entry, pin)
     else
-      process_pin_url(
-        repo,
-        dry_run?,
-        entry,
-        url,
-        url_hash,
-        icon,
-        id,
-        user_id,
-        counts,
-        residue,
-        taken
-      )
+      # The whole row is residue: with no URL there is nothing to normalize
+      # and no changeset that would accept a write, icon included.
+      state
+      |> bump(:unmapped)
+      |> add_residue(entry, {:invalid_row, "url is NULL or not a string"})
+      |> reserve(pin.user_id, pin.url_hash, pin.id)
     end
   end
 
-  defp process_pin_url(
-         repo,
-         dry_run?,
-         entry,
-         url,
-         url_hash,
-         icon,
-         id,
-         user_id,
-         counts,
-         residue,
-         taken
-       ) do
-    case classify_url(url) do
+  defp process_pin_row(state, context, entry, pin) do
+    {state, desired_icon} = classify_icon(state, pin)
+
+    case classify_url(pin.url) do
       {:unmappable, _} ->
-        counts = Map.update!(counts, :unmapped, &(&1 + 1))
-        residue = [Map.put(entry, :reason, {:no_bilimbi_route}) | residue]
-        # The dead pin keeps its hash in the database, so it still reserves it.
-        {counts, residue, remember_taken(taken, user_id, url_hash, id)}
+        # The dead pin keeps its URL and hash, so it still reserves it.
+        state
+        |> write_icon(context, pin, desired_icon)
+        |> bump(:unmapped)
+        |> add_residue(entry, {:no_bilimbi_route})
+        |> reserve(pin.user_id, pin.url_hash, pin.id)
 
-      {_, effective_url} ->
-        desired_icon =
-          case map_icon(icon) do
-            {:mapped, mapped} -> mapped
-            :remainder -> icon
-          end
-
-        desired_hash = Pin.hash_url(effective_url)
-
-        cond do
-          effective_url == url and desired_hash == url_hash and desired_icon == icon ->
-            counts = Map.update!(counts, :unchanged, &(&1 + 1))
-            {counts, residue, remember_taken(taken, user_id, url_hash, id)}
-
-          taken_hash?(taken, user_id, desired_hash) ->
-            keeper = keeper_id(taken, user_id, desired_hash)
-            counts = Map.update!(counts, :unmapped, &(&1 + 1))
-            residue = [Map.put(entry, :reason, {:duplicate_of, keeper}) | residue]
-            {counts, residue, remember_taken(taken, user_id, url_hash, id)}
-
-          true ->
-            case write_pin(repo, dry_run?, id, effective_url, icon, desired_icon) do
-              :ok ->
-                counts = Map.update!(counts, :changed, &(&1 + 1))
-                {counts, residue, remember_taken(taken, user_id, desired_hash, id)}
-
-              {:duplicate} ->
-                counts = Map.update!(counts, :unmapped, &(&1 + 1))
-                keeper = keeper_id(taken, user_id, desired_hash)
-                residue = [Map.put(entry, :reason, {:duplicate_of, keeper}) | residue]
-                {counts, residue, remember_taken(taken, user_id, url_hash, id)}
-
-              {:failed, message} ->
-                counts = Map.update!(counts, :unmapped, &(&1 + 1))
-                residue = [Map.put(entry, :reason, {:update_failed, message}) | residue]
-                {counts, residue, remember_taken(taken, user_id, url_hash, id)}
-            end
-        end
+      {_kind, effective_url} ->
+        remap_pin(state, context, entry, pin, effective_url, desired_icon)
     end
   end
 
-  defp remember_taken(taken, user_id, hash, pin_id) do
-    Map.update(taken, user_id, %{hash => pin_id}, &Map.put_new(&1, hash, pin_id))
+  defp remap_pin(state, context, entry, pin, effective_url, desired_icon) do
+    desired_hash = Pin.hash_url(effective_url)
+
+    cond do
+      effective_url == pin.url and desired_hash == pin.url_hash and desired_icon == pin.icon ->
+        state |> bump(:unchanged) |> reserve(pin.user_id, pin.url_hash, pin.id)
+
+      taken_hash?(state.taken, pin.user_id, desired_hash) ->
+        state
+        |> write_icon(context, pin, desired_icon)
+        |> bump(:unmapped)
+        |> add_residue(entry, {:duplicate_of, keeper_id(state.taken, pin.user_id, desired_hash)})
+        |> reserve(pin.user_id, pin.url_hash, pin.id)
+
+      true ->
+        write_remapped_pin(state, context, entry, pin, effective_url, desired_hash, desired_icon)
+    end
+  end
+
+  defp write_remapped_pin(state, context, entry, pin, effective_url, desired_hash, desired_icon) do
+    case write_pin(context, pin, effective_url, desired_icon) do
+      :ok ->
+        state
+        |> bump(:changed)
+        |> count_icon(pin, desired_icon)
+        |> reserve(pin.user_id, desired_hash, pin.id)
+
+      {:duplicate} ->
+        state
+        |> bump(:unmapped)
+        |> add_residue(entry, {:duplicate_of, keeper_id(state.taken, pin.user_id, desired_hash)})
+        |> reserve(pin.user_id, pin.url_hash, pin.id)
+
+      {:failed, message} ->
+        state
+        |> bump(:unmapped)
+        |> add_residue(entry, {:update_failed, message})
+        |> reserve(pin.user_id, pin.url_hash, pin.id)
+    end
+  end
+
+  defp classify_icon(state, pin) do
+    case map_icon(pin.icon) do
+      {:mapped, mapped} ->
+        {state, mapped}
+
+      :remainder ->
+        remainder =
+          Map.put_new(state.remainder, pin.icon, %{
+            icon: pin.icon,
+            example_pin_id: pin.id,
+            user_id: pin.user_id,
+            label: pin.label
+          })
+
+        {%{state | remainder: remainder}, pin.icon}
+    end
+  end
+
+  defp count_icon(state, %{icon: icon}, icon), do: state
+  defp count_icon(state, _pin, _desired_icon), do: bump(state, :icons_changed)
+
+  defp bump(state, key), do: %{state | counts: Map.update!(state.counts, key, &(&1 + 1))}
+
+  defp add_residue(state, entry, reason),
+    do: %{state | residue: [Map.put(entry, :reason, reason) | state.residue]}
+
+  defp reserve(state, user_id, hash, pin_id) do
+    taken =
+      Map.update(state.taken, user_id, %{hash => pin_id}, &Map.put_new(&1, hash, pin_id))
+
+    %{state | taken: taken}
   end
 
   defp taken_hash?(taken, user_id, hash) do
@@ -475,22 +445,44 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
     taken |> Map.get(user_id, %{}) |> Map.get(hash)
   end
 
-  defp write_pin(_repo, true = _dry_run?, _id, _url, _icon, _desired_icon), do: :ok
+  defp remainder_list(remainder) do
+    remainder |> Map.values() |> Enum.sort_by(&inspect(&1.icon))
+  end
 
-  defp write_pin(repo, false, id, effective_url, icon, desired_icon) do
+  # A pin whose URL cannot move still gets its icon repaired: the URL and the
+  # hash are deliberately left exactly as Belimbing stored them.
+  defp write_icon(state, _context, %{icon: icon}, icon), do: state
+
+  defp write_icon(state, context, pin, desired_icon) do
+    unless context.dry_run? do
+      changeset =
+        context
+        |> repo_get!(Pin, pin.id)
+        |> Pin.changeset(%{icon: desired_icon})
+
+      update!(context, changeset)
+    end
+
+    count_icon(state, pin, desired_icon)
+  end
+
+  defp write_pin(%{dry_run?: true}, _pin, _effective_url, _desired_icon), do: :ok
+
+  defp write_pin(context, pin, effective_url, desired_icon) do
     attrs = %{url: effective_url}
-    attrs = if desired_icon == icon, do: attrs, else: Map.put(attrs, :icon, desired_icon)
+    attrs = if desired_icon == pin.icon, do: attrs, else: Map.put(attrs, :icon, desired_icon)
 
     # `Pin.changeset/2` only recomputes `url_hash` when the URL itself
     # changes, so an already-Bilimbi URL with a stale cross-system hash
     # would round-trip untouched. Force the pair invariant through the same
     # canonical function the changeset uses; never copy a stored hash.
     changeset =
-      repo.get!(Pin, id)
+      context
+      |> repo_get!(Pin, pin.id)
       |> Pin.changeset(attrs)
       |> Ecto.Changeset.put_change(:url_hash, Pin.hash_url(effective_url))
 
-    case repo.update(changeset) do
+    case context.repo.update(changeset, prefix: context.prefix) do
       {:ok, _} ->
         :ok
 
@@ -500,6 +492,10 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
           else: {:failed, inspect_errors(changeset)}
     end
   end
+
+  defp repo_get!(context, schema, id), do: context.repo.get!(schema, id, prefix: context.prefix)
+
+  defp update!(context, changeset), do: context.repo.update!(changeset, prefix: context.prefix)
 
   defp unique_violation?(changeset) do
     Enum.any?(changeset.errors, fn {_field, {message, _}} ->
@@ -513,13 +509,13 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
 
   # Reads query rows through raw SQL; the icon is the only column ever
   # written, through `DatabaseQuery.changeset/2`.
-  @queries_sql "SELECT id, user_id, name, icon FROM user_database_queries ORDER BY id"
+  defp queries_sql(schema) do
+    "SELECT id, user_id, name, icon FROM #{schema}.user_database_queries ORDER BY id"
+  end
 
-  defp run_query_icons(opts) do
-    repo = Keyword.fetch!(opts, :repo)
-    dry_run? = Keyword.get(opts, :dry_run, false)
-
-    rows = query!(repo, @queries_sql, [], "user_database_queries").rows
+  defp run_query_icons(context) do
+    rows =
+      query!(context, queries_sql(context.quoted_prefix), [], "user_database_queries").rows
 
     {counts, remainder} =
       Enum.reduce(rows, {%{examined: 0, changed: 0, unchanged: 0, unmapped: 0}, %{}}, fn
@@ -528,33 +524,35 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
 
           case map_icon(icon) do
             {:mapped, mapped} when mapped != icon ->
-              write_query_icon(repo, dry_run?, id, mapped)
+              write_query_icon(context, id, mapped)
               {Map.update!(counts, :changed, &(&1 + 1)), remainder}
 
             _ ->
               remainder =
-                Map.update(
-                  remainder,
-                  icon,
-                  %{icon: icon, example_query_id: id, user_id: user_id, name: name},
-                  & &1
-                )
+                Map.put_new(remainder, icon, %{
+                  icon: icon,
+                  example_query_id: id,
+                  user_id: user_id,
+                  name: name
+                })
 
               {counts |> Map.update!(:unchanged, &(&1 + 1)) |> Map.update!(:unmapped, &(&1 + 1)),
                remainder}
           end
       end)
 
-    counts
-    |> Map.put(:remainder, remainder |> Map.values() |> Enum.sort_by(&inspect(&1.icon)))
+    Map.put(counts, :remainder, remainder_list(remainder))
   end
 
-  defp write_query_icon(_repo, true = _dry_run?, _id, _icon), do: :ok
+  defp write_query_icon(%{dry_run?: true}, _id, _icon), do: :ok
 
-  defp write_query_icon(repo, false, id, icon) do
-    repo.get!(DatabaseQuery, id)
-    |> DatabaseQuery.changeset(%{icon: icon})
-    |> repo.update!()
+  defp write_query_icon(context, id, icon) do
+    changeset =
+      context
+      |> repo_get!(DatabaseQuery, id)
+      |> DatabaseQuery.changeset(%{icon: icon})
+
+    update!(context, changeset)
 
     :ok
   end
@@ -562,32 +560,30 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
   # Reads notification payloads through raw SQL on purpose: the schema's
   # JSON type masks corrupt payloads as `%{}`, and corrupt rows must be
   # reported loudly, never round-tripped into a write.
-  @notifications_sql "SELECT id::text, type, notifiable_id, data FROM notifications ORDER BY id"
+  defp notifications_sql(schema) do
+    "SELECT id::text, type, notifiable_id, data FROM #{schema}.notifications ORDER BY id"
+  end
 
-  defp run_notifications(opts) do
-    repo = Keyword.fetch!(opts, :repo)
-    dry_run? = Keyword.get(opts, :dry_run, false)
-
-    rows = query!(repo, @notifications_sql, [], "notifications").rows
+  defp run_notifications(context) do
+    rows = query!(context, notifications_sql(context.quoted_prefix), [], "notifications").rows
 
     {counts, residue} =
       Enum.reduce(rows, {%{examined: 0, changed: 0, unchanged: 0, unmapped: 0}, []}, fn
         row, {counts, residue} ->
-          process_notification(repo, dry_run?, row, counts, residue)
+          process_notification(context, row, counts, residue)
       end)
 
     Map.put(counts, :residue, Enum.reverse(residue))
   end
 
-  defp process_notification(repo, dry_run?, [id, type, notifiable_id, data], counts, residue) do
+  defp process_notification(context, [id, type, notifiable_id, data], counts, residue) do
     counts = Map.update!(counts, :examined, &(&1 + 1))
     entry = %{notification_id: id, notifiable_id: notifiable_id, type: type}
 
     case decode_data(data) do
       {:ok, payload} ->
         process_notification_payload(
-          repo,
-          dry_run?,
+          context,
           id,
           entry,
           payload,
@@ -606,18 +602,18 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
     end
   end
 
-  defp process_notification_payload(_repo, _dry_run?, _id, _entry, _payload, url, counts, residue)
+  defp process_notification_payload(_context, _id, _entry, _payload, url, counts, residue)
        when not is_binary(url) or url == "" do
     {Map.update!(counts, :unchanged, &(&1 + 1)), residue}
   end
 
-  defp process_notification_payload(repo, dry_run?, id, entry, payload, url, counts, residue) do
+  defp process_notification_payload(context, id, entry, payload, url, counts, residue) do
     relative? = String.starts_with?(url, "/") and not String.starts_with?(url, "//")
 
     if relative? do
       case classify_url(url) do
         {:mapped, mapped} ->
-          write_notification(repo, dry_run?, id, payload, mapped)
+          write_notification(context, id, payload, mapped)
           {Map.update!(counts, :changed, &(&1 + 1)), residue}
 
         {:identity, _} ->
@@ -641,114 +637,56 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
 
   defp decode_data(_), do: {:invalid, nil}
 
-  defp write_notification(_repo, true = _dry_run?, _id, _payload, _mapped), do: :ok
+  defp write_notification(%{dry_run?: true}, _id, _payload, _mapped), do: :ok
 
-  defp write_notification(repo, false, id, payload, mapped) do
+  defp write_notification(context, id, payload, mapped) do
     now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
     SQL.query!(
-      repo,
-      "UPDATE notifications SET data = $1, updated_at = $2 WHERE id = $3::uuid",
+      context.repo,
+      "UPDATE #{context.quoted_prefix}.notifications SET data = $1, updated_at = $2 WHERE id = $3::uuid",
       [Jason.encode!(Map.put(payload, "url", mapped)), now, Ecto.UUID.dump!(id)]
     )
 
     :ok
   end
 
-  # Grant rows are read through raw SQL with the owning descriptor's table
-  # names: Authz exposes no "rewrite my grants" API (and must not gain one
-  # for a one-shot cutover), and this step never writes in any case.
-  @role_grants_sql """
-  SELECT rc.id, rc.role_id, rc.capability_key, r.code, r.company_id, r.grant_all
-  FROM base_authz_role_capabilities AS rc JOIN base_authz_roles AS r ON r.id = rc.role_id
-  ORDER BY rc.id
-  """
+  # The grants scan belongs to Base Authz: it owns the grant tables, and its
+  # diagnostic already compares capability keys exactly the way the evaluator
+  # does, so a stored case variant is reported instead of excused. This step
+  # only reads; nothing about a grant is ever rewritten.
+  defp run_grants(context) do
+    opts = [repo: context.repo, prefix: context.prefix]
 
-  @principal_grants_sql """
-  SELECT id, company_id, principal_type, principal_id, capability_key, is_allowed
-  FROM base_authz_principal_capabilities
-  ORDER BY id
-  """
+    opts =
+      case context.declared_capabilities do
+        nil -> opts
+        capabilities -> Keyword.put(opts, :capabilities, capabilities)
+      end
 
-  defp run_grants(opts) do
-    repo = Keyword.fetch!(opts, :repo)
-    declared = declared_capabilities(opts)
-
-    role_rows = query!(repo, @role_grants_sql, [], "base_authz_role_capabilities").rows
-
-    principal_rows =
-      query!(repo, @principal_grants_sql, [], "base_authz_principal_capabilities").rows
-
-    {role_affected, role_clean} =
-      Enum.split_with(role_rows, fn [_id, _role_id, capability | _] ->
-        unknown?(declared, capability)
-      end)
-
-    {principal_affected, principal_clean} =
-      Enum.split_with(principal_rows, fn [_id, _company, _type, _pid, capability | _] ->
-        unknown?(declared, capability)
+    %{role_grants: role_grants, principal_grants: principal_grants} =
+      guard_missing_table!("base_authz grant tables", context, fn ->
+        Authz.unknown_persisted_capabilities(opts)
       end)
 
     %{
-      examined: length(role_rows) + length(principal_rows),
-      changed: 0,
-      unchanged: length(role_clean) + length(principal_clean),
-      unmapped: length(role_affected) + length(principal_affected),
-      role_grants:
-        Enum.map(role_affected, fn [id, role_id, capability, code, company_id, grant_all] ->
-          %{
-            grant_id: id,
-            role_id: role_id,
-            role_code: code,
-            company_id: company_id,
-            grant_all: grant_all,
-            capability: capability
-          }
-        end),
-      principal_grants:
-        Enum.map(principal_affected, fn [
-                                          id,
-                                          company_id,
-                                          principal_type,
-                                          principal_id,
-                                          capability,
-                                          is_allowed
-                                        ] ->
-          %{
-            grant_id: id,
-            company_id: company_id,
-            principal_type: principal_type,
-            principal_id: principal_id,
-            capability: capability,
-            is_allowed: is_allowed
-          }
-        end)
+      undeclared: length(role_grants) + length(principal_grants),
+      role_grants: role_grants,
+      principal_grants: principal_grants
     }
   end
 
-  defp declared_capabilities(opts) do
-    caps =
-      case Keyword.fetch(opts, :declared_capabilities) do
-        {:ok, caps} -> caps
-        :error -> Authz.capabilities()
-      end
-
-    caps |> Enum.map(&String.downcase/1) |> MapSet.new()
+  defp query!(context, sql, params, table) do
+    guard_missing_table!(table, context, fn -> SQL.query!(context.repo, sql, params) end)
   end
 
-  defp unknown?(declared, capability) when is_binary(capability) do
-    not MapSet.member?(declared, String.downcase(capability))
-  end
-
-  defp unknown?(_declared, _capability), do: true
-
-  defp query!(repo, sql, params, table) do
-    SQL.query!(repo, sql, params)
+  defp guard_missing_table!(table, context, operation) do
+    operation.()
   rescue
     e in Postgrex.Error ->
-      if e.postgres && e.postgres.code == :undefined_table do
+      if e.postgres && e.postgres.code in @missing_table_codes do
         raise Error,
-              "cutover remap needs table #{table}, which is absent. " <>
+              "cutover remap needs #{table} in schema #{context.prefix}, which is absent. " <>
                 "Run after mix bilimbi.schema.adopt on a verified database; never remap values on an unverified schema."
       else
         reraise e, __STACKTRACE__

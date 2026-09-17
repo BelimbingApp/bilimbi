@@ -3,6 +3,7 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
 
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Authz.TestFixtures, as: AuthzFixtures
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias Bilimbi.Core.Compatibility.Cutover
   alias Bilimbi.Core.User.Pin
@@ -98,8 +99,10 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
     end
   end
 
-  describe "run/2 over seeded Belimbing-shaped rows" do
+  describe "run/1 over seeded Belimbing-shaped rows" do
     setup do
+      ContributionRegistry.install!()
+
       UserFixtures.create_user_tables!()
       UserFixtures.create_user_pins_table!()
       UserFixtures.create_user_database_queries_table!()
@@ -129,13 +132,14 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
     end
 
     test "remaps pins, recomputes hashes, and names every kept-broken pin" do
-      assert {:ok, report} = Cutover.run(only: [:pins])
+      assert {:ok, report} = run_cutover()
       pins = report.steps.pins
 
       assert pins.examined == 8
       assert pins.changed == 5
       assert pins.unchanged == 1
       assert pins.unmapped == 2
+      assert pins.examined == pins.changed + pins.unchanged + pins.unmapped
 
       # Route + icon both move; the stale Belimbing hash is never trusted.
       assert pin_row(1).url == "/companies"
@@ -147,11 +151,12 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
       assert pin_row(2).url_hash == Pin.hash_url("/admin/system/database-queries/monthly-sales")
       assert pin_row(2).icon == "hero-chart-bar-solid"
 
-      # The dead pin stays byte-identical: URL, hash, and even icon.
+      # The dead pin keeps its URL and hash, but its icon is still repaired:
+      # a pin nobody can follow is still rendered in the sidebar.
       assert pin_row(3) == %{
                url: "/people/leave/approvals",
                url_hash: Pin.hash_url("belimbing-stale-3"),
-               icon: "heroicon-o-clock"
+               icon: "hero-clock"
              }
 
       assert Enum.any?(pins.residue, fn entry ->
@@ -160,13 +165,14 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
                  entry.reason == {:no_bilimbi_route}
              end)
 
-      # Collision: lower sort_order wins; the loser keeps its original URL.
+      # Collision: lower sort_order wins; the loser keeps its original URL
+      # and hash, and its icon is repaired in place too.
       assert pin_row(4).url == "/companies/5"
 
       assert pin_row(5) == %{
                url: "/companies/5",
                url_hash: Pin.hash_url("belimbing-stale-5"),
-               icon: "heroicon-o-building-office-2"
+               icon: "hero-building-office-2"
              }
 
       assert Enum.any?(pins.residue, fn entry ->
@@ -177,43 +183,45 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
       assert pin_row(6).url_hash == Pin.hash_url("/dashboard")
       assert pin_row(6).icon == nil
 
-      # Already-clean row is untouched.
-      assert pins.unchanged == 1
+      # Every heroicon moved, including the two on unmapped pins; the icons
+      # left alone are reported rather than guessed.
+      assert pins.icons_changed == 6
+      remainder_icons = Enum.map(pins.remainder, & &1.icon)
+      assert nil in remainder_icons
+      assert "hero-plus" in remainder_icons
+      assert pin_row(7).icon == "hero-plus"
     end
 
-    # The grants step reads the live Authz registry by default; tests inject
-    # the declared set so they do not depend on a deployment snapshot.
-    @tag declared: [
-           "admin.company.list",
-           "people.leave.approve",
-           "admin.user.view",
-           "commerce.order.approve"
-         ]
-    test "rerunning is idempotent and never double-applies", %{declared: declared} do
-      assert {:ok, first} = Cutover.run(declared_capabilities: declared)
+    test "rerunning is idempotent and never double-applies" do
+      assert {:ok, first} = run_cutover()
       assert first.steps.pins.changed > 0
+      assert first.steps.pins.icons_changed > 0
 
-      assert {:ok, second} = Cutover.run(declared_capabilities: declared)
+      assert {:ok, second} = run_cutover()
       assert second.steps.pins.changed == 0
+      assert second.steps.pins.icons_changed == 0
       assert second.steps.query_icons.changed == 0
       assert second.steps.notifications.changed == 0
       assert length(second.steps.pins.residue) == length(first.steps.pins.residue)
-      assert Cutover.strict_residue?(second)
+      assert second.steps.grants.undeclared == first.steps.grants.undeclared
     end
 
     test "dry_run reports without writing", %{nids: nids} do
-      assert {:ok, report} = Cutover.run(only: [:pins, :notifications], dry_run: true)
+      assert {:ok, report} = run_cutover(dry_run: true)
       assert report.dry_run
       assert report.steps.pins.changed == 5
+      assert report.steps.pins.icons_changed == 6
       assert report.steps.notifications.changed == 1
 
       assert pin_row(1).url == "/admin/companies"
       assert pin_row(1).url_hash == Pin.hash_url("belimbing-stale-1")
+      assert pin_row(3).icon == "heroicon-o-clock"
+      assert query_icon(1) == "heroicon-o-table-cells"
       assert notification_url(nids["n1"]) == "/admin/companies/5"
     end
 
     test "remaps query icons and reports the remainder without guessing" do
-      assert {:ok, report} = Cutover.run(only: [:query_icons])
+      assert {:ok, report} = run_cutover()
       step = report.steps.query_icons
 
       assert step.examined == 4
@@ -230,7 +238,7 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
     end
 
     test "remaps notification admin URLs and leaves the rest alone", %{nids: nids} do
-      assert {:ok, report} = Cutover.run(only: [:notifications])
+      assert {:ok, report} = run_cutover()
       step = report.steps.notifications
 
       assert step.examined == 6
@@ -264,25 +272,25 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
       before_principals =
         SQL.query!(Repo, "SELECT * FROM base_authz_principal_capabilities ORDER BY id", []).rows
 
-      assert {:ok, report} =
-               Cutover.run(
-                 only: [:grants],
-                 declared_capabilities: ["admin.company.list", "admin.user.view"]
-               )
+      assert {:ok, report} = run_cutover()
 
       grants = report.steps.grants
-      assert grants.examined == 5
-      assert grants.changed == 0
-      assert grants.unchanged == 3
-      assert grants.unmapped == 2
+      assert grants.undeclared == 3
 
       assert Enum.any?(grants.role_grants, fn grant ->
-               grant.role_code == "manager" and grant.capability == "people.leave.approve"
+               grant.role_id == 2 and grant.capability == "people.leave.approve"
+             end)
+
+      # Evaluation compares capability keys exactly, so a stored case variant
+      # of a declared key is a permanent silent denial: report it, never
+      # excuse it as declared.
+      assert Enum.any?(grants.role_grants, fn grant ->
+               grant.role_id == 2 and grant.capability == "ADMIN.USER.VIEW"
              end)
 
       assert Enum.any?(grants.principal_grants, fn grant ->
                grant.principal_type == "user" and grant.principal_id == 91 and
-                 grant.capability == "commerce.order.approve" and grant.is_allowed == false
+                 grant.capability == "commerce.order.approve" and grant.allowed == false
              end)
 
       assert SQL.query!(Repo, "SELECT * FROM base_authz_role_capabilities ORDER BY id", []).rows ==
@@ -302,14 +310,15 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
         [90, 91, "Dead early", "/people/early", target_hash, nil, -1, now, now]
       )
 
-      assert {:ok, report} = Cutover.run(only: [:pins])
+      assert {:ok, report} = run_cutover()
 
       # Pin 4 would map onto /companies/5, but the dead pin got there first
-      # and keeps it; pin 4 keeps its original Belimbing URL instead.
+      # and keeps it; pin 4 keeps its original Belimbing URL and hash, with
+      # only its icon repaired.
       assert pin_row(4) == %{
                url: "/admin/companies/5",
                url_hash: Pin.hash_url("belimbing-stale-4"),
-               icon: "heroicon-o-building-office-2"
+               icon: "hero-building-office-2"
              }
 
       assert Enum.any?(report.steps.pins.residue, fn entry ->
@@ -328,7 +337,7 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
         [91, 91, "Null url", nil, Pin.hash_url("belimbing-stale-91"), nil, 99, now, now]
       )
 
-      assert {:ok, report} = Cutover.run(only: [:pins])
+      assert {:ok, report} = run_cutover()
 
       assert Enum.any?(report.steps.pins.residue, fn entry ->
                entry.pin_id == 91 and match?({:invalid_row, _}, entry.reason)
@@ -338,40 +347,17 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
     end
 
     test "says so loudly when a required table is absent" do
-      # The shared test database carries migrated public tables, so both the
-      # temporary fixture table and its public namesake must go before the
-      # lookup genuinely misses. The sandbox rolls both drops back.
       SQL.query!(Repo, "DROP TABLE IF EXISTS user_pins", [])
-      SQL.query!(Repo, "DROP TABLE IF EXISTS public.user_pins", [])
 
-      assert {:error, message} = Cutover.run(only: [:pins])
+      assert {:error, message} = run_cutover()
       assert message =~ "user_pins"
       assert message =~ "bilimbi.schema.adopt"
     end
 
-    test "strict residue ignores cosmetic icon remainders" do
-      refute Cutover.strict_residue?(%{dry_run: true, steps: %{query_icons: %{unmapped: 3}}})
-
-      assert {:ok, report} =
-               Cutover.run(
-                 only: [:grants],
-                 declared_capabilities: [
-                   "admin.company.list",
-                   "people.leave.approve",
-                   "admin.user.view",
-                   "commerce.order.approve"
-                 ]
-               )
-
-      refute Cutover.strict_residue?(report)
-    end
-
-    test "mix task rejects unknown steps loudly" do
-      Mix.Task.reenable("bilimbi.cutover.remap")
-
-      assert_raise Mix.Error, ~r/unknown cutover step/, fn ->
-        Mix.Task.run("bilimbi.cutover.remap", ["--only", "bogus"])
-      end
+    test "reads only the schema the prefix names" do
+      assert {:error, message} = run_cutover(prefix: "bilimbi_cutover_absent_schema")
+      assert message =~ "bilimbi_cutover_absent_schema"
+      assert message =~ "user_pins"
     end
 
     test "mix task dry-run names every kept-broken pin and writes nothing" do
@@ -379,7 +365,7 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
       Mix.shell(Mix.Shell.Process)
 
       try do
-        Mix.Task.run("bilimbi.cutover.remap", ["--dry-run", "--only", "pins"])
+        Mix.Task.run("bilimbi.cutover.remap", ["--dry-run", "--prefix", "pg_temp"])
       after
         Mix.shell(Mix.Shell.IO)
       end
@@ -387,21 +373,26 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
       assert pin_row(1).url == "/admin/companies"
 
       messages = shell_messages()
-      assert "user_pins: examined=8 changed=5 unchanged=1 unmapped=2" in messages
+
+      assert "user_pins: examined=8 changed=5 unchanged=1 unmapped=2 icons_changed=6" in messages
 
       assert Enum.any?(messages, fn message ->
                message =~ "ada@example.com" and message =~ "Leave approvals" and
                  message =~ "/people/leave/approvals"
              end)
     end
+  end
 
-    test "mix task strict turns pin residue into failure" do
-      Mix.Task.reenable("bilimbi.cutover.remap")
+  # The grants step reads the live Authz registry by default; tests inject the
+  # declared set so they do not depend on a deployment snapshot. Fixtures are
+  # temporary tables, so the run is pointed at the session schema that holds
+  # them rather than the migrated `public` one.
+  @declared_capabilities ["admin.company.list", "admin.user.view"]
 
-      assert_raise Mix.Error, ~r/residue remains/, fn ->
-        Mix.Task.run("bilimbi.cutover.remap", ["--only", "pins", "--strict"])
-      end
-    end
+  defp run_cutover(opts \\ []) do
+    [prefix: "pg_temp", declared_capabilities: @declared_capabilities]
+    |> Keyword.merge(opts)
+    |> Cutover.run()
   end
 
   defp seed_pins! do

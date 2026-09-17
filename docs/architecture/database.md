@@ -232,9 +232,10 @@ Laravel's ledger. Pending Bilimbi-only migrations remain pending and run later
 through `mix bilimbi.migrate`.
 
 Run the remap's `--dry-run` first on cutover day (it is the read-only
-value verifier: shape verification stays `bilimbi.schema.verify`), rehearse
-to a `--strict` clean pass where achievable, then run the real remap before
-opening traffic. The run is idempotent; reruns report `changed: 0`.
+value verifier: shape verification stays `bilimbi.schema.verify`), read the
+residue it names, then run the real remap before opening traffic. Pass the
+same `--prefix` the two schema steps used. The run is idempotent; reruns
+report `changed: 0`.
 
 The detailed historical decision and pinned compatibility source remain in
 [ADR 0002](./decisions/0002-compatible-schema-baselines.md).

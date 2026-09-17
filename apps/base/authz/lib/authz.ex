@@ -268,9 +268,18 @@ defmodule Bilimbi.Base.Authz do
     SystemRoleReconciler.reconcile(repo, registry!())
   end
 
-  @spec unknown_persisted_capabilities() :: map()
-  def unknown_persisted_capabilities do
-    Diagnostics.unknown_persisted_capabilities(capabilities())
+  @doc """
+  Lists persisted grants naming capabilities no installed module declares.
+
+  Options: `:capabilities` (declared set, defaulting to the live registry),
+  `:repo`, and `:prefix` for reading a named PostgreSQL schema. Comparison is
+  case-sensitive, exactly like evaluation, so a stored case variant of a
+  declared key is reported rather than excused.
+  """
+  @spec unknown_persisted_capabilities(keyword()) :: map()
+  def unknown_persisted_capabilities(opts \\ []) when is_list(opts) do
+    {capabilities, opts} = Keyword.pop_lazy(opts, :capabilities, fn -> capabilities() end)
+    Diagnostics.unknown_persisted_capabilities(capabilities, opts)
   end
 
   @spec prune_decision_logs() :: non_neg_integer()
