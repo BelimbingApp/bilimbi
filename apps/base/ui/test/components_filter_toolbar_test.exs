@@ -8,8 +8,9 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
   grid that held native date inputs side by side past the viewport edge.
   These tests pin the rules that stop that drift: controls render where the
   caller wrote them, one shared field rule frames every control, every search
-  box carries the same magnifier over the room that clears it, labels are
-  screen-reader only, hints ride the input component, and cells wrap.
+  box carries the same magnifier and the same typing contract, Enter filters
+  in place, labels are screen-reader only, helper text sits below its control
+  in one shape, and cells wrap.
   """
 
   use ExUnit.Case, async: true
@@ -20,7 +21,7 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
 
   defp toolbar(assigns) do
     ~H"""
-    <.filter_toolbar id="tb-filters" form={@form} event="filters" submit_event={@submit_event}>
+    <.filter_toolbar id="tb-filters" form={@form} event="filters">
       <:control
         :if={@with_search}
         type={:search}
@@ -28,8 +29,6 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
         id="tb-search"
         label="Search things"
         placeholder="Search…"
-        debounce="300"
-        maxlength="255"
       />
       <:control
         :if={@with_select}
@@ -83,7 +82,6 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
   defp render_toolbar(opts \\ []) do
     render_component(&toolbar/1,
       form: form(),
-      submit_event: Keyword.get(opts, :submit_event, nil),
       with_search: Keyword.get(opts, :with_search, true),
       with_select: Keyword.get(opts, :with_select, true),
       with_dates: Keyword.get(opts, :with_dates, true),
@@ -189,19 +187,37 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
            "symmetric padding under a left-2.5 size-4 icon puts the prompt text under the magnifier"
   end
 
-  test "the magnifier is centred on a box holding the input alone" do
-    for html <- [render_toolbar(), render_component(&hinted_search/1, form: form())] do
-      box = search_box(html)
+  test "every search box types on the same contract" do
+    [tag] = Regex.run(~r/<input\b[^>]*id="tb-search"[^>]*>/, render_toolbar())
 
-      assert box =~ "top-1/2" and box =~ "-translate-y-1/2",
-             "the icon centres on its positioning box"
+    assert tag =~ ~s(phx-debounce="300"),
+           "one debounce, or two lists answer a keystroke differently"
 
-      refute box =~ "<label",
-             "a label inside the box would drag the icon off the input's centre"
+    assert tag =~ ~s(maxlength="255"),
+           "one length cap, or two lists stop accepting input at different points"
 
-      refute box =~ "<p",
-             "helper text inside the box would stretch it and drag the icon below the input"
-    end
+    assert tag =~ ~s(autocomplete="off"),
+           "one autocomplete answer, or one list drops a saved-value menu over its filtered rows"
+  end
+
+  test "a search hint renders below the box the magnifier is centred in" do
+    html = render_component(&hinted_search/1, form: form())
+    box = search_box(html)
+
+    assert html =~ "Matches name or code",
+           "a hint the API accepts and never renders is helper text an operator never sees"
+
+    assert box =~ "top-1/2" and box =~ "-translate-y-1/2",
+           "the icon centres on its positioning box"
+
+    refute box =~ "<label",
+           "a label inside the box would drag the icon off the input's centre"
+
+    refute box =~ "Matches name or code",
+           "helper text inside the box would stretch it and drag the icon below the input"
+
+    assert html =~ ~r|</div>\s*<p[^>]*>Matches name or code</p>|,
+           "the hint follows the positioning box rather than sitting inside it"
   end
 
   test "date helper text rides each input's own hint" do
@@ -228,12 +244,15 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
              ~r/<div[^>]*class="w-full min-w-0 sm:w-auto"[^>]*>\s*<label[^>]*for="tb-end-date"/s
   end
 
-  test "filter state passes through untouched" do
-    html = render_toolbar(submit_event: "filters")
+  test "filter state passes through untouched, and Enter filters in place" do
+    html = render_toolbar()
 
     assert html =~ ~s(id="tb-filters")
     assert html =~ ~s(phx-change="filters")
-    assert html =~ ~s(phx-submit="filters")
+
+    assert html =~ ~s(phx-submit="filters"),
+           "without a submit binding Enter falls back to a native submit that reloads the page"
+
     assert html =~ ~s(name="filters[search]")
     assert html =~ ~s(name="filters[status]")
     assert html =~ ~s(name="filters[start_date]")

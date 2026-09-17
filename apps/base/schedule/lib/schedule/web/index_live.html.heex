@@ -221,7 +221,6 @@
         id="schedule-history-filters"
         form={@run_form}
         event="filter_runs"
-        submit_event="filter_runs"
         class="mt-4"
       >
         <:control
@@ -230,9 +229,6 @@
           id="schedule-run-search"
           label="Search run name"
           placeholder="Search run name…"
-          maxlength="255"
-          debounce="300"
-          autocomplete="off"
         />
         <:control
           type={:select}

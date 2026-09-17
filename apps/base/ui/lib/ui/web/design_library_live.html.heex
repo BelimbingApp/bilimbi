@@ -1228,8 +1228,6 @@
                     id="design-library-filter-minimal-search"
                     label="Search example companies"
                     placeholder="Search example companies…"
-                    debounce="300"
-                    maxlength="255"
                   />
                 </.filter_toolbar>
               </div>
@@ -1268,7 +1266,6 @@
                   id="design-library-filter-full"
                   form={@filter_toolbar_full_form}
                   event="filter-toolbar-preview"
-                  submit_event="filter-toolbar-preview"
                 >
                   <:control
                     type={:search}
@@ -1276,8 +1273,6 @@
                     id="design-library-filter-full-search"
                     label="Search example companies"
                     placeholder="Search example companies…"
-                    debounce="300"
-                    maxlength="255"
                   />
                   <:control
                     type={:select}

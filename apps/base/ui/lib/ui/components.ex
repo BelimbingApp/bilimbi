@@ -980,16 +980,21 @@ defmodule Bilimbi.Base.UI.Components do
       takes no per-control class, because a per-control class is how five
       controls end up laid out by two rules with nothing declaring which is
       correct.
-    * Every search box carries the same leading magnifier and the room that
-      clears it. Neither is a caller's choice, so an operator who learns one
-      list recognises the search box on the next.
+    * Every search box carries the same leading magnifier, the same room that
+      clears it, and the same debounce, length cap, and autocomplete answer.
+      None of them is a caller's choice, so an operator who learns one list
+      recognises the search box on the next.
+    * Enter filters in place on every toolbar. The form carries the caller's
+      event as both `phx-change` and `phx-submit`, because a form with only a
+      change binding falls back to a native submit that reloads the page with
+      the form's own param names and drops the filter the operator typed.
     * Labels are always screen-reader only. A page that shows some and hides
       others drops the labelled controls below their row-mates, because a
       visible label adds a row of height only some cells carry.
-    * Helper text travels through a select's or date's own `input` hint, never
-      a hand-written paragraph beside the input. A search box takes no hint:
-      its magnifier is centred on the input, and a line of helper text below
-      would stretch the box that centring measures.
+    * Helper text sits below its control in one shape. A select's and a date's
+      rides its own `input`; a search box's sits below the box the magnifier
+      is centred in, so helper text never stretches that box and drags the
+      magnifier off the input.
     * Cells wrap instead of squeezing. Each control is its own flex item, so
       native date inputs stack on a narrow viewport rather than holding a
       grid row wider than the page.
@@ -1020,11 +1025,9 @@ defmodule Bilimbi.Base.UI.Components do
     doc: "the caller's Phoenix form; field names and params are unchanged"
   )
 
-  attr(:event, :string, required: true, doc: "the phx-change event the caller already handles")
-
-  attr(:submit_event, :string,
-    default: nil,
-    doc: "optional phx-submit event the caller already handles"
+  attr(:event, :string,
+    required: true,
+    doc: "the event the caller already handles; bound to both phx-change and phx-submit"
   )
 
   attr(:class, :any,
@@ -1049,13 +1052,7 @@ defmodule Bilimbi.Base.UI.Components do
     )
 
     attr(:placeholder, :string, doc: "`:search` prompt text")
-    attr(:debounce, :string, doc: "phx-debounce for the `:search` input")
-    attr(:maxlength, :any, doc: "maxlength for the `:search` input")
-    attr(:autocomplete, :string, doc: "autocomplete for the `:search` input")
-
-    attr(:hint, :string,
-      doc: "helper text for a `:select` or `:date`, rendered through its own input hint"
-    )
+    attr(:hint, :string, doc: "helper text rendered below the control")
   end
 
   def filter_toolbar(assigns) do
@@ -1064,7 +1061,7 @@ defmodule Bilimbi.Base.UI.Components do
       for={@form}
       id={@id}
       phx-change={@event}
-      phx-submit={@submit_event}
+      phx-submit={@event}
       class={["mb-2 flex flex-wrap items-start gap-x-3 gap-y-2", @class]}
     >
       <.toolbar_control :for={control <- @control} control={control} />
@@ -1089,12 +1086,13 @@ defmodule Bilimbi.Base.UI.Components do
           type="search"
           wrapper_class="mb-0"
           placeholder={@control[:placeholder]}
-          phx-debounce={@control[:debounce]}
-          maxlength={@control[:maxlength]}
-          autocomplete={@control[:autocomplete]}
+          phx-debounce="300"
+          maxlength="255"
+          autocomplete="off"
           class={field_base_class("pl-8 pr-3")}
         />
       </div>
+      <p :if={@control[:hint]} class="mt-1.5 text-xs text-ink-subtle">{@control[:hint]}</p>
     </div>
     """
   end
