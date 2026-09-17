@@ -362,10 +362,12 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:reveal, :any,
     default: false,
     doc: """
-    adds a show/hide control to a `password` input. `false` keeps the value
-    masked with no control, which is right for sign-in. `true` names the value
-    a secret; a string such as `"password"` or `"API key"` is the noun the
-    control's accessible name uses instead. Any other type rejects it.
+    adds a show/hide control to a `password` input. `false` or `nil` keeps the
+    value masked with no control, which is right for sign-in. `true` names the
+    value a secret; a string such as `"password"` or `"API key"` is the noun
+    the control's accessible name uses instead. Any other value renders the
+    control with the generic noun, as `true` does. Passing a truthy `reveal` to
+    an input of any type other than `password` raises.
     """
   )
 
