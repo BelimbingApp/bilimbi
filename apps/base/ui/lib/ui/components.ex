@@ -290,11 +290,18 @@ defmodule Bilimbi.Base.UI.Components do
   buttons.
 
   `disabled` and `busy` follow `button/1`: a disabled action is not available
-  and dims, a busy one was activated and is waiting for its outcome, so its
-  glyph becomes a spinner at full strength. Both are inert; only the busy one
-  carries `aria-busy`, and its label still names the action so assistive
-  technology can say what is pending. `busy` is a button state here too, and
-  raises on a link.
+  and dims, a busy one was activated and is waiting for its outcome, so it
+  sits in a sunken ringed well and its glyph becomes a spinner at full
+  strength. The well and the swapped glyph are static, so the states stay
+  distinguishable under `prefers-reduced-motion`, where the spin itself does
+  not render. Both are inert; only the busy one carries `aria-busy`, and its
+  label still names the action so assistive technology can say what is
+  pending. `busy` is a button state here too, and raises on a link.
+
+  `phx-disable-with` is rejected. LiveView implements it by replacing the
+  control's text, which on an icon-only action deletes the glyph and restores
+  an empty string, leaving an empty well behind. Use `busy` for a wait the
+  server knows about; a plain one-round-trip `phx-click` needs no adornment.
   """
   attr(:icon, :string, required: true)
   attr(:label, :string, required: true)
@@ -312,6 +319,13 @@ defmodule Bilimbi.Base.UI.Components do
   )
 
   def icon_button(%{rest: rest} = assigns) do
+    if Map.has_key?(rest, :"phx-disable-with") do
+      raise ArgumentError,
+            "phx-disable-with replaces a control's text, which on an icon-only action " <>
+              "deletes its glyph and restores an empty string. Use busy for a wait the " <>
+              "server knows about, or leave a one-round-trip click unadorned."
+    end
+
     assigns =
       assigns
       |> assign(:control_class, [
@@ -321,7 +335,7 @@ defmodule Bilimbi.Base.UI.Components do
         assigns.kind == :neutral && "text-ink-muted hover:bg-surface-sunken hover:text-ink",
         assigns.kind == :danger && "text-danger hover:bg-danger-surface hover:text-danger-ink",
         if(assigns.busy,
-          do: "cursor-progress",
+          do: "cursor-progress bg-surface-sunken ring-1 ring-line",
           else: "disabled:text-ink-faint disabled:cursor-not-allowed disabled:opacity-50"
         ),
         assigns.class
