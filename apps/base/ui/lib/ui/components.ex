@@ -537,7 +537,7 @@ defmodule Bilimbi.Base.UI.Components do
       >
         {@label}
       </label>
-      <div class="relative">
+      <div class="flex items-center">
         <input
           type="password"
           name={@name}
@@ -555,7 +555,7 @@ defmodule Bilimbi.Base.UI.Components do
           aria-controls={@id}
           title={@show_title}
           disabled={@rest[:disabled]}
-          class="absolute right-1.5 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:text-ink-faint"
+          class="-ml-[1.875rem] grid size-6 shrink-0 place-items-center rounded-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:text-ink-faint"
         >
           <span id={"#{@id}-reveal-show"} class="grid">
             <.icon name="reveal" class="size-4" />
