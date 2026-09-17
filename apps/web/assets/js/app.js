@@ -41,6 +41,29 @@ topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
 window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 
+// A pressed `phx-disable-with` control is disabled and relabelled while the
+// round trip is in flight, but LiveView writes no `aria-busy`, so the wait is
+// silent to assistive technology. `phx:push` carries the promise that resolves
+// when LiveView undoes its own loading state, so the mirror cannot outlive it.
+// The marker records that the mirror owns this `aria-busy`: when the reply
+// renders a server-known busy state, the undo patch drops the marker and the
+// server's attribute stands.
+const BUSY_MIRROR = "data-busy-mirror"
+
+window.addEventListener("phx:push", ({target, detail}) => {
+  if(!detail.isLoading || !detail.loadingComplete){ return }
+  if(!target.hasAttribute("phx-disable-with") || target.hasAttribute("aria-busy")){ return }
+
+  target.setAttribute("aria-busy", "true")
+  target.setAttribute(BUSY_MIRROR, "")
+  detail.loadingComplete.then(() => {
+    if(target.hasAttribute(BUSY_MIRROR)){
+      target.removeAttribute(BUSY_MIRROR)
+      target.removeAttribute("aria-busy")
+    }
+  })
+})
+
 // connect if there are any LiveViews on the page
 liveSocket.connect()
 

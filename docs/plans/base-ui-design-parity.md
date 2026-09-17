@@ -66,7 +66,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | NAV-04 | Pagination | Shared component exists | Compare narrow layout, disabled states, page-size control, URL state and accessible labels. |
 | NAV-05 [(contradicted)](#targets-the-evidence-contradicts) | User account and scope menu | Partial user footer exists | On user-circle activation, show signed-in name and identifier, current company and tenant, change password and sign out. Show scope switching only when more than one permitted scope exists. |
 | ACT-01 [(contradicted)](#targets-the-evidence-contradicts) | Buttons | Primary, secondary and destructive basics | Cover emphasis, compact size, disabled, loading, navigation and truthful completion. |
-| ACT-02 | Icon actions and groups | Shared icon button ships with inline and table sizes, accessible labels, native titles, and disabled and busy (`aria-busy`) specimens; grouping is ad hoc (dashboard customize clusters) | Add grouping, context sizing and accessible tooltips. |
+| ACT-02 | Icon actions and groups | Shared icon button ships with inline and table sizes, accessible labels, native titles, and disabled and busy (spinner plus `aria-busy`) specimens; grouping is ad hoc (dashboard customize clusters) | Add grouping, context sizing, disabled/loading behavior and accessible tooltips. |
 | ACT-03 | Destructive entry and acknowledgement | Inconsistent screen patterns | Standardize consequence copy, confirmation and typed acknowledgement where risk requires it. |
 | INP-01 | Shared field shell | Generic input has labels, hints and errors | Standardize required, help, error, disabled, read-only, prefix and suffix placement. |
 | INP-02 | Text, email, URL, telephone, number and textarea | Available through the generic input | Complete state and sizing contracts and validate realistic long content. |
@@ -85,7 +85,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | INT-06 | Unsaved-change and template selection flows | Missing | Defer until a real Bilimbi workflow proves the need. |
 | FBK-01 | Inline alerts | Shared primitive exists | Verify status semantics, copy, contrast, icons and dismissibility. |
 | FBK-02 | Flash and notification behavior | Basic fixed flash | Define stacking, timing, sticky warning/error, manual dismissal and redirect continuity. |
-| FBK-03 | Validation, disabled and loading states | Partial: `<.button>` and `<.icon_button>` carry a `busy` state that is disabled and announces `aria-busy`, distinct from plain disabled for assistive technology; login goes busy with readonly fields and announces credential and lockout failures through `role="alert"`; busy and disabled still share one appearance | Make the states visibly distinct and prevent duplicate work. |
+| FBK-03 | Validation, disabled and loading states | Partial: `<.button>` and `<.icon_button>` carry a `busy` state that spins, disables and announces `aria-busy`, so loading no longer looks or sounds like plain disabled; a `phx-disable-with` round trip is mirrored onto `aria-busy` by the shell; login goes busy with readonly fields and announces credential and lockout failures through `role="alert"`; validation states are untouched | Make the states visibly distinct and prevent duplicate work. |
 | FBK-04 | Empty, permission, unavailable, error and recovery states | Library specimens exist | Establish reusable page and region patterns with truthful recovery. |
 | OVR-01 [(contradicted)](#targets-the-evidence-contradicts) | Standard modal | Missing | Add accessible open, close, Escape, backdrop, focus containment and focus return. |
 | OVR-02 [(contradicted)](#targets-the-evidence-contradicts) | Confirmation modal | Missing | Add consequence-first confirmation without copying Belimbing's accessibility gaps. |
@@ -268,9 +268,8 @@ products were read and the plan forbids treating existence as acceptance.
   mouse-only limitation is recorded below as a defect, not adopted here as a target.
 - **ACT-01** — "basics" understates what ships: disabled, navigation-as-button and an
   in-flight `Working…` primary already render on the Design Library (Lane B), and a
-  `busy` state that announces `aria-busy` now ships beside them. The open work is a
-  compact size and an in-flight treatment that stays visibly distinct from disabled,
-  not the basics.
+  `busy` state that spins and announces `aria-busy` now ships beside them. The open
+  work is a compact size, not the basics or the in-flight treatment.
 - **OVR-02** — "Missing" is true of a shared confirmation overlay only. Destructive
   work already confirms through the browser's native dialog, with consequence copy on
   some screens (Lane B), so the work is one accessible shared component rather than

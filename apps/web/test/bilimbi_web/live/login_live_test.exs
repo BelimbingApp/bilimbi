@@ -72,21 +72,37 @@ defmodule BilimbiWeb.LoginLiveTest do
            )
   end
 
-  test "announces the lockout the same way as a credential failure", %{conn: conn} do
+  test "a new attempt clears the previous failure alert", %{conn: conn} do
     Company.TestFixtures.insert_tenant!(%{id: 41})
     Company.TestFixtures.insert_company!(%{id: 73, tenant_id: 41})
+    Company.TestFixtures.assign_primary_company!(41, 73)
+
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    assert {:ok, _user} =
+             Bilimbi.Core.User.register_user(scope, 73, %{
+               name: "Ada Lovelace",
+               email: "ada@example.com",
+               password: "c0rrect-horse-battery"
+             })
 
     {:ok, view, _html} = live(conn, ~p"/")
 
-    for _ <- 1..6 do
-      view
-      |> form("#login-form", login: %{email: "ada@example.com", password: "wr0ng-wr0ng"})
-      |> render_submit()
-    end
+    view
+    |> form("#login-form", login: %{email: "ada@example.com", password: "wr0ng-wr0ng"})
+    |> render_submit()
 
-    assert has_element?(view, "#login-form-error [role='alert']", "Too many sign-in attempts")
+    assert has_element?(view, "#login-form-error", "These credentials do not match our records.")
 
-    BilimbiWeb.RateLimit.reset({:login, "ada@example.com", "127.0.0.1"})
+    view
+    |> form("#login-form",
+      login: %{email: "ada@example.com", password: "c0rrect-horse-battery"}
+    )
+    |> render_submit()
+
+    # The stale credential alert must not sit beside the signed-in notice.
+    assert has_element?(view, "#login-opening", "Signed in. Opening your workspace…")
+    refute has_element?(view, "#login-form-error")
   end
 
   test "signs in with valid credentials and opens the workspace", %{conn: conn} do
@@ -146,6 +162,7 @@ defmodule BilimbiWeb.LoginLiveTest do
       |> render_submit()
 
     assert html =~ "Too many sign-in attempts"
+    assert has_element?(view, "#login-form-error [role='alert']", "Too many sign-in attempts")
 
     BilimbiWeb.RateLimit.reset({:login, "ada@example.com", "127.0.0.1"})
   end
