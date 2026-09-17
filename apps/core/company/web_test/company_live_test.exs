@@ -554,6 +554,25 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#company-details-card", "training")
     end
 
+    # `remove_activity` writes the company row immediately -- there is no
+    # surrounding modal to cancel out of -- so the control asks first and names
+    # the activity it is about to drop.
+    test "confirms business activity removal and names the activity", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      view
+      |> form("#add-activity-form", %{"activity" => "consulting"})
+      |> render_submit()
+
+      assert has_element?(
+               view,
+               ~s(#remove-activity-0[data-confirm="Remove the business activity consulting? ) <>
+                 ~s(The change is saved immediately."])
+             )
+    end
+
     test "edits, validates, and clears metadata JSON", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
 

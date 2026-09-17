@@ -6,8 +6,12 @@ defmodule Bilimbi.Core.User.Notification do
   use Ecto.Schema
   import Ecto.Changeset
 
+  alias Bilimbi.Base.UI.IconRegistry
+
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :bigint
+
+  @default_icon "notify"
 
   defmodule Data do
     @moduledoc """
@@ -119,12 +123,21 @@ defmodule Bilimbi.Core.User.Notification do
 
   def url(_), do: nil
 
-  @doc "Extracts icon from data payload or returns default."
+  @doc """
+  Extracts icon from data payload or returns default.
+
+  The payload is Laravel-compatible data, so its icon name is untrusted: an
+  adopted Belimbing row can still carry a `heroicon-o-*` name the cutover
+  deliberately left unmapped. A name `<.icon>` cannot render resolves to the
+  default rather than raising on the notification list.
+  """
   def icon(%__MODULE__{data: data}) when is_map(data) do
-    Map.get(data, "icon") || Map.get(data, :icon) || "notify"
+    name = Map.get(data, "icon") || Map.get(data, :icon)
+
+    if IconRegistry.renderable?(name), do: name, else: @default_icon
   end
 
-  def icon(_), do: "notify"
+  def icon(_), do: @default_icon
 
   defp format_type_title(type) when is_binary(type) do
     type

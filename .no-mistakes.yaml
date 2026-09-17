@@ -1,0 +1,30 @@
+# no-mistakes gate configuration for this repository.
+#
+# Schema: the no-mistakes repo-config reference
+# (docs/src/content/docs/reference/repo-config.md in kunchenguid/no-mistakes,
+# read at the installed v1.72.0). Commands run through `sh -c` in the run
+# worktree. The gate reads `commands.*` only from the trusted default-branch
+# copy of this file, so a change here takes effect once it lands on `main`.
+#
+# `.github/workflows/ci.yml` is hand-written and is the source of truth for
+# the checks the `main` ruleset requires (`Elixir quality`, `Elixir types`,
+# `Elixir tests`). Never regenerate it with `no-mistakes ci-workflow`.
+#
+# Toolchain: the README pins Erlang and Elixir through `.mise.toml`, and the
+# daemon's PATH carries `mise` but no `mix`, so every command goes through
+# `mise exec`. A run worktree is a fresh directory whose `.mise.toml` mise has
+# not been told to trust; MISE_TRUSTED_CONFIG_PATHS trusts it for that command
+# only, without writing mise state, and `mise exec` also applies the pinned
+# PGPORT from `.mise.toml`.
+
+commands:
+  # Run worktrees start with tracked files only; materialize locked deps once
+  # before the first configured command, exactly as CI's "Install dependencies".
+  prepare: 'MISE_TRUSTED_CONFIG_PATHS="$PWD" mise exec -- mix deps.get'
+
+  # The test half of CI's `Elixir tests` job. That job runs `mix precommit`,
+  # whose testing member is the `precommit.test` alias in mix.exs: `mix test`
+  # in apps/core, apps/base, and apps/web against the sandboxed test database.
+  # Compile-with-warnings, format, unused-dependency, and contribution checks
+  # stay with the lint step and CI so the test step stays narrow and fast.
+  test: 'MISE_TRUSTED_CONFIG_PATHS="$PWD" MIX_ENV=test mise exec -- mix precommit.test'
