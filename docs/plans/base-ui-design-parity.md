@@ -671,7 +671,11 @@ should use, to get a show/hide button against the field; passing it to any other
 type raises. The input's own `type` is the only record of masked-or-shown and one
 LiveView JS command flips it, so a form re-render never silently re-masks a value the
 user chose to see, and the button's accessible name, title and glyph are derived from
-that one attribute by the `SecretReveal` hook rather than swapped alongside it. Capability
+that one attribute by the `SecretReveal` hook rather than swapped alongside it. A revealed
+field therefore submits as `type="text"`, which makes its value eligible for browser form
+history and autofill storage where a `password`-typed field is excluded from both, so the
+component and not each caller keeps it out of the browser profile: `reveal` defaults the
+input's `autocomplete` to `off`, and a caller that supplies its own still wins. Capability
 was adopted from Belimbing's reveal; no Blade structure, attribute name or asset was.
 
 INP-04, delivered here: the trigger's `aria-expanded` is the single record of open, with

@@ -10,6 +10,7 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
       assigns
       |> assign_new(:disabled, fn -> false end)
       |> assign_new(:class, fn -> nil end)
+      |> assign_new(:autocomplete, fn -> nil end)
 
     ~H"""
     <.input
@@ -21,6 +22,7 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
       reveal={@reveal}
       class={@class}
       disabled={@disabled}
+      autocomplete={@autocomplete}
     />
     """
   end
@@ -151,6 +153,27 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
     assert "pr-10" in classes
     assert "w-64" in classes
     refute "block" in classes
+  end
+
+  test "reveal keeps the shown value out of browser form history unless the caller says otherwise" do
+    # A revealed field submits as `type="text"`, which browser form history and
+    # autofill may store; a `password`-typed one is excluded from both. The
+    # component owns the mitigation, so no caller has to know this.
+    revealed = render_component(&secret_field/1, reveal: true)
+
+    assert revealed =~ ~r/<input type="password"[^>]*\sautocomplete="off"/
+
+    # Nothing to leak without the control, so the default input is untouched.
+    masked = render_component(&secret_field/1, reveal: false)
+
+    refute masked =~ "autocomplete"
+
+    # Safe unless someone explicitly opts out: a caller that names its own
+    # autocomplete keeps it.
+    caller = render_component(&secret_field/1, reveal: true, autocomplete: "new-password")
+
+    assert caller =~ ~r/<input type="password"[^>]*\sautocomplete="new-password"/
+    refute caller =~ ~s(autocomplete="off")
   end
 
   test "a disabled input disables its reveal control" do

@@ -368,6 +368,13 @@ defmodule Bilimbi.Base.UI.Components do
     the control's accessible name uses instead. Any other value renders the
     control with the generic noun, as `true` does. Passing a truthy `reveal` to
     an input of any type other than `password` raises.
+
+    A revealed field submits as `type="text"`, which makes its value eligible
+    for browser form history and autofill storage; a `password`-typed field is
+    excluded from both. Keeping a revealed secret out of the browser profile
+    belongs to the component rather than to every caller, so `reveal` also
+    defaults the input's `autocomplete` to `"off"`. A caller that supplies its
+    own `autocomplete` still wins.
     """
   )
 
@@ -530,6 +537,7 @@ defmodule Bilimbi.Base.UI.Components do
       |> assign(:hide_label, hide_label)
       |> assign(:show_title, show_title)
       |> assign(:hide_title, hide_title)
+      |> assign(:rest, Map.update(assigns.rest, :autocomplete, "off", &(&1 || "off")))
       |> assign(:toggle, JS.toggle_attribute({"type", "text", "password"}, to: "##{assigns.id}"))
 
     ~H"""
