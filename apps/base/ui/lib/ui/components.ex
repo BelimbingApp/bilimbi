@@ -477,7 +477,11 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   def input(%{type: "multi_select"} = assigns) do
-    multi_select(assigns)
+    {required, rest} = Map.pop(assigns.rest, :required, false)
+
+    assigns
+    |> assign(required: required == true, rest: rest)
+    |> multi_select()
   end
 
   def input(%{type: "textarea"} = assigns) do

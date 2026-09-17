@@ -91,6 +91,22 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
     """
   end
 
+  defp multi_select_through_input(assigns) do
+    ~H"""
+    <.input
+      id="m"
+      name="m"
+      type="multi_select"
+      label="Roles"
+      value={[]}
+      options={[{"Administrator", "admin"}]}
+      hint={@hint}
+      errors={@errors}
+      required={@required}
+    />
+    """
+  end
+
   defp control_tag(html, id, tag \\ "input") do
     assert [match] = Regex.run(~r/<#{tag}[^>]*id="#{id}"[^>]*>/, html),
            "expected a <#{tag}> control with id=#{id} in:\n#{html}"
@@ -295,6 +311,21 @@ defmodule Bilimbi.Base.UI.ComponentsInputStatesTest do
 
     assert label_tag(html, "m") =~ ~s(<span aria-hidden="true">*</span>)
     assert control_tag(html, "m", "button") =~ ~s(aria-required="true")
+  end
+
+  test "a required multi-select reached through <.input> is marked the same way" do
+    html =
+      render_component(&multi_select_through_input/1,
+        hint: nil,
+        errors: [],
+        required: true
+      )
+
+    assert label_tag(html, "m") =~ ~s(<span aria-hidden="true">*</span>)
+
+    # `required` is not a conforming attribute on a button, so the global must
+    # be consumed rather than splatted onto the trigger.
+    refute control_tag(html, "m", "button") =~ ~r/[\s]required(\s|=|>|\/)/
   end
 
   test "an optional multi-select carries no required marker" do

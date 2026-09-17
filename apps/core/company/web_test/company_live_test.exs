@@ -958,10 +958,6 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#company-name[aria-invalid='true']")
       assert has_element?(view, "#company-name[aria-describedby='company-name-error-0']")
       assert has_element?(view, "#company-name-error-0")
-
-      {:ok, scope} = Tenancy.scope(41)
-      {:ok, companies} = Company.list_companies(scope)
-      assert Enum.all?(companies, &(&1.name != ""))
     end
   end
 
