@@ -1225,6 +1225,7 @@ defmodule Bilimbi.Base.UI.Components do
       open
       phx-hook="Modal"
       data-cancel={@on_cancel}
+      data-owns-flash={@flash != nil}
       aria-modal="true"
       aria-labelledby={"#{@id}-title"}
       aria-describedby={@description != [] && "#{@id}-description"}

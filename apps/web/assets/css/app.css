@@ -221,11 +221,13 @@ body {
 
 /* An open modal dialog makes the rest of the page inert, so the layout's
  * `:info` and `:error` flashes cannot be read, announced or dismissed while
- * one is open; `<.modal flash={@flash}>` renders those two inside the dialog,
- * and only those two are hidden here. The connection banners have no
- * in-dialog copy, so they stay in the layout. */
-body:has(dialog:modal) #flash-group > #flash-info,
-body:has(dialog:modal) #flash-group > #flash-error {
+ * one is open. A dialog given `flash` renders its own copy of those two and
+ * marks itself `data-owns-flash`; only then is the layout's copy hidden, so
+ * the same message never appears twice. A dialog without that marker — a
+ * LiveComponent panel's, say — leaves the layout flash painted, and the
+ * connection banners, which have no in-dialog copy, always stay there. */
+body:has(dialog:modal[data-owns-flash]) #flash-group > #flash-info,
+body:has(dialog:modal[data-owns-flash]) #flash-group > #flash-error {
   visibility: hidden;
 }
 

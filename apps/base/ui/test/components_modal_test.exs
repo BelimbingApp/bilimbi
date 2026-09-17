@@ -109,6 +109,9 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
     assert dialog =~ "Could not save the record."
     refute dialog =~ ~s(id="flashed-flash-info")
 
+    assert [dialog_tag] = Regex.run(~r/<dialog[^>]*>/, with_flash)
+    assert dialog_tag =~ "data-owns-flash"
+
     refute without_flash =~ "flash"
   end
 
