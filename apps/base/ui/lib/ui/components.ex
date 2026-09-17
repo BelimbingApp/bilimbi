@@ -970,9 +970,7 @@ defmodule Bilimbi.Base.UI.Components do
   inputs framed as one open toolbar above the list surface (Design Spec C04).
 
   Controls are declared through one repeating `control` slot and render in the
-  order they are written, so the template reads the way the toolbar looks. A
-  toolbar with no control at all raises: an empty form is a caller bug, not a
-  state worth presenting.
+  order they are written, so the template reads the way the toolbar looks.
 
   Filter state itself stays where it already lives — the caller's form, event,
   and URL round-trip are untouched, so the same inputs return the same rows.
@@ -982,15 +980,16 @@ defmodule Bilimbi.Base.UI.Components do
       takes no per-control class, because a per-control class is how five
       controls end up laid out by two rules with nothing declaring which is
       correct.
-    * A search control's leading icon and the room that clears it are owned
-      together here. A caller cannot set the icon without the padding, so the
-      prompt text cannot land under the magnifier.
-    * Labels are all visible or all hidden, chosen once with `labels`. A mix
-      drops the labelled controls below their row-mates, because a visible
-      label adds a row of height only some cells carry.
-    * Helper text travels through each control's own `input` hint, never a
-      hand-written paragraph beside the input. A sibling paragraph sits
-      outside the wrapper that owns the spacing.
+    * Every search box carries the same leading magnifier and the room that
+      clears it. Neither is a caller's choice, so an operator who learns one
+      list recognises the search box on the next.
+    * Labels are always screen-reader only. A page that shows some and hides
+      others drops the labelled controls below their row-mates, because a
+      visible label adds a row of height only some cells carry.
+    * Helper text travels through a select's or date's own `input` hint, never
+      a hand-written paragraph beside the input. A search box takes no hint:
+      its magnifier is centred on the input, and a line of helper text below
+      would stretch the box that centring measures.
     * Cells wrap instead of squeezing. Each control is its own flex item, so
       native date inputs stack on a narrow viewport rather than holding a
       grid row wider than the page.
@@ -1004,7 +1003,6 @@ defmodule Bilimbi.Base.UI.Components do
           id="companies-search"
           label="Search companies"
           placeholder="Search by name, code, legal name, email, or jurisdiction..."
-          icon="search"
         />
         <:control
           type={:select}
@@ -1029,12 +1027,6 @@ defmodule Bilimbi.Base.UI.Components do
     doc: "optional phx-submit event the caller already handles"
   )
 
-  attr(:labels, :atom,
-    values: [:hidden, :visible],
-    default: :hidden,
-    doc: "label visibility for every control at once; never mixed"
-  )
-
   attr(:class, :any,
     default: nil,
     doc:
@@ -1045,40 +1037,28 @@ defmodule Bilimbi.Base.UI.Components do
     attr(:type, :atom,
       values: [:search, :select, :date],
       required: true,
-      doc: "which control to render; at most one `:search`, the toolbar's leading control"
+      doc: "which control to render"
     )
 
     attr(:field, :any, required: true, doc: "the control's form field")
     attr(:id, :string, required: true, doc: "the control's DOM id")
-
-    attr(:label, :string,
-      required: true,
-      doc: "the accessible label, hidden or visible per `labels`"
-    )
+    attr(:label, :string, required: true, doc: "the control's screen-reader-only label")
 
     attr(:options, :list,
       doc: "`:select` options passed to `Phoenix.HTML.Form.options_for_select/2`"
     )
 
     attr(:placeholder, :string, doc: "`:search` prompt text")
-    attr(:icon, :string, doc: "optional `:search` leading icon name rendered inside the box")
     attr(:debounce, :string, doc: "phx-debounce for the `:search` input")
     attr(:maxlength, :any, doc: "maxlength for the `:search` input")
     attr(:autocomplete, :string, doc: "autocomplete for the `:search` input")
-    attr(:hint, :string, doc: "helper text rendered through the control's own input hint")
+
+    attr(:hint, :string,
+      doc: "helper text for a `:select` or `:date`, rendered through its own input hint"
+    )
   end
 
   def filter_toolbar(assigns) do
-    if assigns.control == [] do
-      raise ArgumentError,
-            "filter_toolbar needs at least one control: a search, a select, or a date"
-    end
-
-    if Enum.count(assigns.control, &(&1.type == :search)) > 1 do
-      raise ArgumentError,
-            "filter_toolbar takes at most one search; it is the toolbar's leading control"
-    end
-
     ~H"""
     <.form
       for={@form}
@@ -1087,22 +1067,20 @@ defmodule Bilimbi.Base.UI.Components do
       phx-submit={@submit_event}
       class={["mb-2 flex flex-wrap items-start gap-x-3 gap-y-2", @class]}
     >
-      <.toolbar_control :for={control <- @control} control={control} labels={@labels} />
+      <.toolbar_control :for={control <- @control} control={control} />
     </.form>
     """
   end
 
   attr(:control, :map, required: true)
-  attr(:labels, :atom, values: [:hidden, :visible], required: true)
 
   defp toolbar_control(%{control: %{type: :search}} = assigns) do
     ~H"""
     <div class="min-w-52 flex-1 basis-64">
-      <.toolbar_label id={@control[:id]} label={@control[:label]} labels={@labels} />
+      <.toolbar_label id={@control[:id]} label={@control[:label]} />
       <div class="relative">
         <.icon
-          :if={@control[:icon]}
-          name={@control[:icon]}
+          name="search"
           class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
         />
         <.input
@@ -1114,8 +1092,7 @@ defmodule Bilimbi.Base.UI.Components do
           phx-debounce={@control[:debounce]}
           maxlength={@control[:maxlength]}
           autocomplete={@control[:autocomplete]}
-          class={@control[:icon] && field_base_class("pl-8 pr-3")}
-          hint={@control[:hint]}
+          class={field_base_class("pl-8 pr-3")}
         />
       </div>
     </div>
@@ -1125,7 +1102,7 @@ defmodule Bilimbi.Base.UI.Components do
   defp toolbar_control(%{control: %{type: :select}} = assigns) do
     ~H"""
     <div class="w-full min-w-0 sm:w-auto sm:min-w-36">
-      <.toolbar_label id={@control[:id]} label={@control[:label]} labels={@labels} />
+      <.toolbar_label id={@control[:id]} label={@control[:label]} />
       <.input
         field={@control[:field]}
         id={@control[:id]}
@@ -1141,7 +1118,7 @@ defmodule Bilimbi.Base.UI.Components do
   defp toolbar_control(%{control: %{type: :date}} = assigns) do
     ~H"""
     <div class="w-full min-w-0 sm:w-auto">
-      <.toolbar_label id={@control[:id]} label={@control[:label]} labels={@labels} />
+      <.toolbar_label id={@control[:id]} label={@control[:label]} />
       <.input
         field={@control[:field]}
         id={@control[:id]}
@@ -1153,22 +1130,12 @@ defmodule Bilimbi.Base.UI.Components do
     """
   end
 
-  # The toolbar renders every label itself so `labels` can hold for all
-  # controls at once. The visible classes mirror `input/1`'s label line; if
-  # that line changes, `Bilimbi.Base.UI.ComponentsFilterToolbarTest` fails on
-  # purpose rather than letting the two label shapes drift apart.
   attr(:id, :string, required: true)
   attr(:label, :string, required: true)
-  attr(:labels, :atom, values: [:hidden, :visible], required: true)
 
   defp toolbar_label(assigns) do
     ~H"""
-    <label
-      for={@id}
-      class={(@labels == :visible && "mb-1.5 block text-sm font-medium text-ink") || "sr-only"}
-    >
-      {@label}
-    </label>
+    <label for={@id} class="sr-only">{@label}</label>
     """
   end
 

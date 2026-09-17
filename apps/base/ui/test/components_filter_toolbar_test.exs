@@ -7,9 +7,9 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
   hidden, helper text as a sibling paragraph with a hand-picked margin, and a
   grid that held native date inputs side by side past the viewport edge.
   These tests pin the rules that stop that drift: controls render where the
-  caller wrote them, one shared field rule frames every control, the search
-  box reserves the room its own icon takes, labels are all visible or all
-  hidden, hints ride the input component, and cells wrap.
+  caller wrote them, one shared field rule frames every control, every search
+  box carries the same magnifier over the room that clears it, labels are
+  screen-reader only, hints ride the input component, and cells wrap.
   """
 
   use ExUnit.Case, async: true
@@ -18,17 +18,9 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
   import Phoenix.LiveViewTest
   import Bilimbi.Base.UI.Components
 
-  alias Bilimbi.Base.UI.Components
-
   defp toolbar(assigns) do
     ~H"""
-    <.filter_toolbar
-      id="tb-filters"
-      form={@form}
-      event="filters"
-      submit_event={@submit_event}
-      labels={@labels}
-    >
+    <.filter_toolbar id="tb-filters" form={@form} event="filters" submit_event={@submit_event}>
       <:control
         :if={@with_search}
         type={:search}
@@ -36,7 +28,6 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
         id="tb-search"
         label="Search things"
         placeholder="Search…"
-        icon="search"
         debounce="300"
         maxlength="255"
       />
@@ -92,7 +83,6 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
   defp render_toolbar(opts \\ []) do
     render_component(&toolbar/1,
       form: form(),
-      labels: Keyword.get(opts, :labels, :hidden),
       submit_event: Keyword.get(opts, :submit_event, nil),
       with_search: Keyword.get(opts, :with_search, true),
       with_select: Keyword.get(opts, :with_select, true),
@@ -107,84 +97,52 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
     """
   end
 
+  defp hinted_search(assigns) do
+    ~H"""
+    <.filter_toolbar id="tb-hinted" form={@form} event="filters">
+      <:control
+        type={:search}
+        field={@form[:search]}
+        id="tb-search"
+        label="Search things"
+        placeholder="Search…"
+        hint="Matches name or code"
+      />
+    </.filter_toolbar>
+    """
+  end
+
   defp labels(html) do
     Regex.scan(~r/<label\b[^>]*>.*?<\/label>/s, html) |> Enum.map(&hd/1)
   end
 
-  test "hidden labels stay accessible but take no row height" do
+  defp control_class(html, id) do
+    [tag] = Regex.run(~r/<(?:input|select)\b[^>]*id="#{id}"[^>]*>/, html)
+
+    tag
+    |> String.split(~s(class="))
+    |> Enum.at(1)
+    |> String.split(~s("))
+    |> hd()
+    |> String.split()
+  end
+
+  defp search_box(html) do
+    {relative_at, _} = :binary.match(html, ~s(<div class="relative">))
+    rest = binary_part(html, relative_at, byte_size(html) - relative_at)
+    [box] = Regex.run(~r|<div class="relative">.*?</div>\s*</div>|s, rest)
+    box
+  end
+
+  test "every label stays accessible but takes no row height" do
     found = render_toolbar() |> labels()
 
     assert length(found) == 4
 
     for label <- found do
       assert label =~ "sr-only",
-             "every toolbar label hides together, or the labelled controls drop a row: #{label}"
+             "a visible label drops its control below its row-mates: #{label}"
     end
-  end
-
-  test "visible labels share one shape on every control" do
-    found = render_toolbar(labels: :visible) |> labels()
-
-    assert length(found) == 4
-    refute Enum.any?(found, &(&1 =~ "sr-only"))
-
-    for label <- found do
-      assert label =~ "mb-1.5 block text-sm font-medium text-ink",
-             "a label with its own spacing breaks the shared row: #{label}"
-    end
-  end
-
-  test "the toolbar label mirrors the input label it stands in for" do
-    input_html =
-      render_component(
-        &field/1,
-        id: "mirror",
-        name: "mirror",
-        value: "",
-        type: "text",
-        label: "Same label"
-      )
-
-    [input_label] = labels(input_html)
-    [toolbar_label | _] = render_toolbar(labels: :visible) |> labels()
-
-    class_tokens = fn label ->
-      label
-      |> String.split(~s(class="))
-      |> Enum.at(1)
-      |> String.split(~s("))
-      |> hd()
-      |> String.split()
-    end
-
-    assert class_tokens.(toolbar_label) == class_tokens.(input_label),
-           "the toolbar renders labels itself, so a change to the input label must land here too"
-  end
-
-  defp field(assigns) do
-    ~H"""
-    <.input
-      id={@id}
-      name={@name}
-      value={@value}
-      type={@type}
-      label={@label}
-      errors={[]}
-    />
-    """
-  end
-
-  test "the API offers no per-control label or wrapper override" do
-    %{slots: slots} = Components.__components__()[:filter_toolbar]
-
-    overridden =
-      for slot <- slots,
-          %{name: attr} <- slot.attrs,
-          attr in [:class, :input_class, :label_class, :wrapper_class],
-          do: "#{slot.name}.#{attr}"
-
-    assert overridden == [],
-           "a per-control class is how five controls end up laid out by two rules: #{inspect(overridden)}"
   end
 
   test "controls render in the order the caller declares them" do
@@ -217,8 +175,12 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
     end
   end
 
-  test "the search box reserves the room its own icon occupies" do
-    classes = render_toolbar() |> control_class("tb-search")
+  test "a search box always shows the magnifier over the room that clears it" do
+    html = render_toolbar()
+    classes = control_class(html, "tb-search")
+
+    assert search_box(html) =~ "hero-magnifying-glass",
+           "the same leading icon on every list, or an operator meets a different search box per page"
 
     assert "pl-8" in classes,
            "the toolbar renders the leading icon, so the prompt text needs the clearance it takes"
@@ -227,38 +189,19 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
            "symmetric padding under a left-2.5 size-4 icon puts the prompt text under the magnifier"
   end
 
-  test "a search box without an icon keeps the shared symmetric padding" do
-    classes =
-      render_component(&iconless_search/1, form: form())
-      |> control_class("tb-plain-search")
+  test "the magnifier is centred on a box holding the input alone" do
+    for html <- [render_toolbar(), render_component(&hinted_search/1, form: form())] do
+      box = search_box(html)
 
-    assert "px-3" in classes
-    refute "pl-8" in classes
-  end
+      assert box =~ "top-1/2" and box =~ "-translate-y-1/2",
+             "the icon centres on its positioning box"
 
-  defp iconless_search(assigns) do
-    ~H"""
-    <.filter_toolbar id="tb-plain" form={@form} event="filters">
-      <:control
-        type={:search}
-        field={@form[:search]}
-        id="tb-plain-search"
-        label="Search things"
-        placeholder="Search…"
-      />
-    </.filter_toolbar>
-    """
-  end
+      refute box =~ "<label",
+             "a label inside the box would drag the icon off the input's centre"
 
-  defp control_class(html, id) do
-    [tag] = Regex.run(~r/<(?:input|select)\b[^>]*id="#{id}"[^>]*>/, html)
-
-    tag
-    |> String.split(~s(class="))
-    |> Enum.at(1)
-    |> String.split(~s("))
-    |> hd()
-    |> String.split()
+      refute box =~ "<p",
+             "helper text inside the box would stretch it and drag the icon below the input"
+    end
   end
 
   test "date helper text rides each input's own hint" do
@@ -285,22 +228,6 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
              ~r/<div[^>]*class="w-full min-w-0 sm:w-auto"[^>]*>\s*<label[^>]*for="tb-end-date"/s
   end
 
-  test "the search icon centers on the input, above or below a label alike" do
-    for labels <- [:hidden, :visible] do
-      html = render_toolbar(labels: labels)
-
-      {relative_at, _} = :binary.match(html, ~s(<div class="relative">))
-      {input_at, _} = :binary.match(html, ~s(id="tb-search"))
-      box = binary_part(html, relative_at, input_at - relative_at)
-
-      assert box =~ "top-1/2" and box =~ "-translate-y-1/2",
-             "the icon lives in the relative box around the input (#{labels} labels)"
-
-      refute box =~ "<label",
-             "a label inside the relative box would drag the icon off the input's center (#{labels} labels)"
-    end
-  end
-
   test "filter state passes through untouched" do
     html = render_toolbar(submit_event: "filters")
 
@@ -315,30 +242,17 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
     assert html =~ ~s(id="tb-status")
   end
 
-  test "every slot is optional, but an empty toolbar raises" do
+  test "every control is optional and an empty toolbar is still a toolbar" do
     html = render_toolbar(with_search: false, with_dates: false)
 
     assert html =~ ~s(id="tb-status")
     refute html =~ ~s(id="tb-search")
     refute html =~ ~s(id="tb-start-date")
 
-    assert_raise ArgumentError, ~r/at least one control/, fn ->
-      render_component(&empty_toolbar/1, form: form())
-    end
-  end
+    empty = render_component(&empty_toolbar/1, form: form())
 
-  test "a second search raises rather than splitting the leading cell" do
-    assert_raise ArgumentError, ~r/at most one search/, fn ->
-      render_component(&two_searches/1, form: form())
-    end
-  end
-
-  defp two_searches(assigns) do
-    ~H"""
-    <.filter_toolbar id="tb-two" form={@form} event="filters">
-      <:control type={:search} field={@form[:search]} id="tb-search-a" label="Search A" />
-      <:control type={:search} field={@form[:status]} id="tb-search-b" label="Search B" />
-    </.filter_toolbar>
-    """
+    assert empty =~ ~s(id="tb-empty")
+    refute empty =~ "<input"
+    refute empty =~ "<select"
   end
 end

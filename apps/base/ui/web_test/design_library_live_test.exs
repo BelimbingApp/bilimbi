@@ -269,15 +269,16 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#nav-admin-system-design-library-components[aria-current='page']")
   end
 
-  test "filter toolbar specimens keep hidden and visible labels apart", %{conn: conn} do
+  test "filter toolbar specimens share one label and search treatment", %{conn: conn} do
     {:ok, view, _html} = open(conn, "/system/design-library/components")
 
-    assert has_element?(view, "#component-filter-toolbar", "never mixed")
     assert has_element?(view, "#filter-toolbar-minimal label.sr-only", "Search example companies")
-
-    refute has_element?(view, "#filter-toolbar-full label.sr-only")
-    assert has_element?(view, "#filter-toolbar-full label", "Start date (UTC)")
+    assert has_element?(view, "#filter-toolbar-full label.sr-only", "Start date (UTC)")
     assert has_element?(view, "#design-library-filter-full-start-date + p", "UTC")
+
+    for specimen <- ~w(filter-toolbar-minimal filter-toolbar-full) do
+      assert has_element?(view, "##{specimen} .hero-magnifying-glass")
+    end
 
     view
     |> form("#design-library-filter-full", %{"toolbar_full" => %{"search" => "Acme"}})

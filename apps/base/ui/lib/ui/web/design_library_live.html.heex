@@ -1213,10 +1213,10 @@
               inner_class="space-y-5 p-4"
             >
               <p class="text-sm text-ink-muted">
-                One composition for every list's search, selects, and date pair. Labels are all hidden or all visible, never mixed; helper text rides each input's own hint; cells wrap on narrow screens.
+                One composition for every list's search, selects, and date pair. Every search box carries the same leading magnifier; labels are screen-reader only; helper text rides each input's own hint; cells wrap on narrow screens.
               </p>
               <div id="filter-toolbar-minimal">
-                <h3 class="mb-2 text-sm font-semibold text-ink">Search only, hidden labels</h3>
+                <h3 class="mb-2 text-sm font-semibold text-ink">Search only</h3>
                 <.filter_toolbar
                   id="design-library-filter-minimal"
                   form={@filter_toolbar_minimal_form}
@@ -1228,14 +1228,13 @@
                     id="design-library-filter-minimal-search"
                     label="Search example companies"
                     placeholder="Search example companies…"
-                    icon="search"
                     debounce="300"
                     maxlength="255"
                   />
                 </.filter_toolbar>
               </div>
               <div id="filter-toolbar-selects">
-                <h3 class="mb-2 text-sm font-semibold text-ink">Selects only, hidden labels</h3>
+                <h3 class="mb-2 text-sm font-semibold text-ink">Selects only</h3>
                 <.filter_toolbar
                   id="design-library-filter-selects"
                   form={@filter_toolbar_selects_form}
@@ -1263,14 +1262,13 @@
               </div>
               <div id="filter-toolbar-full">
                 <h3 class="mb-2 text-sm font-semibold text-ink">
-                  Search, selects, and UTC date pair, visible labels
+                  Search, selects, and UTC date pair
                 </h3>
                 <.filter_toolbar
                   id="design-library-filter-full"
                   form={@filter_toolbar_full_form}
                   event="filter-toolbar-preview"
                   submit_event="filter-toolbar-preview"
-                  labels={:visible}
                 >
                   <:control
                     type={:search}

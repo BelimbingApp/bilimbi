@@ -292,7 +292,6 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
             id="companies-search"
             label="Search companies"
             placeholder="Search by name, code, legal name, email, or jurisdiction..."
-            icon="search"
             debounce="300"
             maxlength="255"
           />
