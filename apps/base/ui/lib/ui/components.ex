@@ -1194,7 +1194,7 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:title, :string, required: true)
 
   attr(:on_cancel, JS,
-    default: %JS{},
+    required: true,
     doc: "the command run when the user asks to close, the same push as the Cancel button"
   )
 

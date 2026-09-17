@@ -11,6 +11,7 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
 
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureIO
   import Phoenix.Component
   import Phoenix.LiveViewTest
   import Bilimbi.Base.UI.Components
@@ -65,17 +66,47 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
 
     narrow =
       rendered_to_string(~H"""
-      <.modal id="narrow" title="Narrow">body</.modal>
+      <.modal id="narrow" title="Narrow" on_cancel={JS.push("close")}>body</.modal>
       """)
 
     wide =
       rendered_to_string(~H"""
-      <.modal id="wide" title="Wide" width={:wide}>body</.modal>
+      <.modal id="wide" title="Wide" width={:wide} on_cancel={JS.push("close")}>body</.modal>
       """)
 
     assert narrow =~ "max-w-lg"
     refute narrow =~ "max-w-2xl"
     assert wide =~ "max-w-2xl"
     refute wide =~ "max-w-lg"
+  end
+
+  test "a modal written without a cancel command is rejected at compile time" do
+    warnings = compile_modal_probe("")
+
+    assert warnings =~ ~s(missing required attribute "on_cancel")
+  end
+
+  test "a modal written with a cancel command compiles without that warning" do
+    warnings = compile_modal_probe(" on_cancel={Phoenix.LiveView.JS.push(\"close_probe\")}")
+
+    refute warnings =~ "on_cancel"
+  end
+
+  defp compile_modal_probe(extra_attrs) do
+    code = """
+    defmodule Bilimbi.Base.UI.ModalCancelProbe#{System.unique_integer([:positive])} do
+      use Phoenix.Component
+
+      import Bilimbi.Base.UI.Components
+
+      def render(assigns), do: ~H\"\"\"
+      <.modal id="probe-modal" title="Probe"#{extra_attrs}>body</.modal>
+      \"\"\"
+    end
+    """
+
+    capture_io(:stderr, fn ->
+      assert [_ | _] = Code.compile_string(code)
+    end)
   end
 end
