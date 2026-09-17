@@ -24,7 +24,8 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
   contract. While one of the panel's `<.modal>` dialogs is open the notice
   renders inside that dialog instead of above the cards: the page behind a
   modal dialog is inert, so a notice left outside could be neither read nor
-  dismissed.
+  dismissed. An unexpected failure recovered by `Bilimbi.Base.UI` reports
+  through the same notice for that reason.
   """
 
   use Bilimbi.Base.UI, :live_component
@@ -514,6 +515,8 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
   end
 
   defp notice(socket, kind, message), do: assign(socket, :notice, {kind, message})
+
+  def report_action_failure(socket, message), do: notice(socket, :error, message)
 
   attr(:id, :string, required: true)
   attr(:notice, :any, required: true)

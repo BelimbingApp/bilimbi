@@ -15,7 +15,8 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
   LiveComponent cannot reach the page's flash without a parent contract. While
   the attach dialog is open the notice renders inside it instead of above the
   cards: the page behind a modal dialog is inert, so a notice left outside
-  could be neither read nor dismissed.
+  could be neither read nor dismissed. An unexpected failure recovered by
+  `Bilimbi.Base.UI` reports through the same notice for that reason.
   """
 
   use Bilimbi.Base.UI, :live_component
@@ -368,6 +369,8 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
   end
 
   defp notice(socket, kind, message), do: assign(socket, :notice, {kind, message})
+
+  def report_action_failure(socket, message), do: notice(socket, :error, message)
 
   attr(:id, :string, required: true)
   attr(:notice, :any, required: true)
