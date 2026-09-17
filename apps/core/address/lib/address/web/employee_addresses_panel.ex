@@ -398,7 +398,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                   variant="primary"
                   class="text-xs px-2.5 py-1"
                 >
-                  <.icon name="bilimbi-plus" class="size-3.5" /> <span>Attach Address</span>
+                  <.icon name="create" class="size-3.5" /> <span>Attach Address</span>
                 </.button>
               </div>
 
@@ -592,7 +592,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
                                 <.icon
                                   :if={@can_manage?}
-                                  name="bilimbi-pencil"
+                                  name="edit"
                                   class="size-3 text-ink-subtle ml-0.5"
                                 />
                               </div>
@@ -660,7 +660,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                                 <span>{addr.priority || 0}</span>
                                 <.icon
                                   :if={@can_manage?}
-                                  name="bilimbi-pencil"
+                                  name="edit"
                                   class="size-3 text-ink-subtle"
                                 />
                               </div>
@@ -684,7 +684,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                               data-confirm="Are you sure you want to unlink this address?"
                               class="text-danger hover:bg-danger/10 text-xs px-2 py-1"
                             >
-                              <.icon name="bilimbi-link-slash" class="size-3.5" />
+                              <.icon name="unlink" class="size-3.5" />
                               <span class="sr-only">Unlink</span>
                             </.button>
                           </td>
