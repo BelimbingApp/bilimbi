@@ -390,6 +390,95 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(view, "#flash-group", "Capability rule removed.")
   end
 
+  # Every control on this card changes authorization for a real person and has
+  # no undo, so each one must ask first and must name the role or capability it
+  # is about -- a bare "Remove this role?" does not tell the administrator which
+  # of several badges they are about to act on.
+  test "confirms role removal and names the role and the user", %{conn: conn} do
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+    {:ok, role} = Bilimbi.Base.Authz.create_role(scope, 73, %{name: "Editor", code: "editor"})
+
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    {:ok, _} = Bilimbi.Base.Authz.assign_role(scope, 73, :user, 92, role.id)
+
+    grant_capabilities!(["admin.user.view", "admin.user.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+
+    assignments = Bilimbi.Base.Authz.list_principal_role_assignments(scope, :user, 92)
+    [assignment] = assignments.entries
+
+    assert has_element?(
+             view,
+             ~s(#remove-role-#{assignment.id}[data-confirm="Remove the Editor role from ) <>
+               ~s(Grace Hopper? They lose every capability this role grants, unless another ) <>
+               ~s(role or direct grant also provides it."])
+           )
+  end
+
+  test "confirms every capability control and names the capability and the user", %{conn: conn} do
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+    {:ok, role} = Bilimbi.Base.Authz.create_role(scope, 73, %{name: "Auditor", code: "auditor"})
+
+    {:ok, _} =
+      Bilimbi.Base.Authz.replace_role_capabilities(scope, role.id, ["admin.company.view"])
+
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    {:ok, _} = Bilimbi.Base.Authz.assign_role(scope, 73, :user, 92, role.id)
+
+    grant_capabilities!(["admin.user.view", "admin.user.update", "admin.company.list"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+
+    view |> element("#toggle-permissions-btn") |> render_click()
+
+    # Denying a role-derived capability revokes it, so it asks first.
+    assert has_element?(
+             view,
+             ~s(#deny-cap-admin-company-view[data-confirm="Deny admin.company.view for ) <>
+               ~s(Grace Hopper? This overrides every role that grants it and takes effect ) <>
+               ~s(immediately."])
+           )
+
+    view |> element("#deny-cap-admin-company-view") |> render_click()
+
+    # Removing the deny rule restores access rather than revoking it, so the
+    # copy says that instead of borrowing the revocation wording.
+    assert has_element?(
+             view,
+             ~s(#remove-denial-admin-company-view[data-confirm="Remove the deny rule for ) <>
+               ~s(admin.company.view? Grace Hopper regains this capability from any role or ) <>
+               ~s(direct grant that provides it."])
+           )
+
+    view
+    |> form("#add-capabilities-form")
+    |> render_submit(%{"capability_keys" => ["admin.company.list"]})
+
+    assert has_element?(
+             view,
+             ~s(#remove-direct-cap-admin-company-list[data-confirm="Remove the direct grant of ) <>
+               ~s(admin.company.list from Grace Hopper? They keep this capability only if an ) <>
+               ~s(assigned role still grants it."])
+           )
+  end
+
   test "prevents privilege escalation when assigning roles not held by the administrator", %{
     conn: conn
   } do
