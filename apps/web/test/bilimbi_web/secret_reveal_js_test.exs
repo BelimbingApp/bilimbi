@@ -162,18 +162,20 @@ defmodule BilimbiWeb.SecretRevealJsTest do
                __DIR__
              )
 
-  test "a re-render while the field is revealed and focused leaves the caret where it was" do
+  test "LiveView's patch functions restore the caret across the type flip (no re-render is driven here)" do
     # The hook restores the caret for the click only. The other type swap is a
     # patch, and LiveView restores that one itself -- so this field's usability
-    # rests on LiveView internals we do not own. This drives the real shipped
-    # bundle, so a LiveView upgrade that changes any of them fails here instead
-    # of silently appending the characters someone types mid-secret.
+    # rests on LiveView internals we do not own. This calls those internals in
+    # the real shipped bundle, so an upgrade that changes any of them fails
+    # here instead of silently appending the characters someone types
+    # mid-secret.
     #
-    # It calls the four real functions the patch calls, in the order
-    # `dom_patch.ts` calls them. What it does NOT prove is that a patch still
-    # reaches them: that the focused-input branch is chosen for this input, and
-    # that the capture, merge, sticky reapply and restore keep this order.
-    # Those are `dom_patch.ts`'s to change, and only a browser would catch it.
+    # It does not drive a re-render. It calls the four functions a patch calls,
+    # in the order `dom_patch.ts` calls them, so what stays unproven is that a
+    # patch still reaches them: that the focused-input branch is chosen for
+    # this input, and that the capture, merge, sticky reapply and restore keep
+    # this order. Those are `dom_patch.ts`'s to change, and only a browser
+    # would catch it.
     script = """
     import assert from 'node:assert/strict'
     import fs from 'node:fs'

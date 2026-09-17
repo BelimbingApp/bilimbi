@@ -45,9 +45,11 @@ defmodule BilimbiWeb.MultiSelectDismissJsTest do
     const elsewhere = {}
     const execed = []
     const el = {
+      // The two commands the wrapper really publishes: closing writes the one
+      // record of open and nothing else, and only Escape adds the refocus.
       dataset: {
-        dismiss: '[["add_class",{"names":["hidden"],"to":"#roles-filter-options"}]]',
-        escape: '[["add_class",{"names":["hidden"],"to":"#roles-filter-options"}],["focus",{"to":"#roles-filter"}]]',
+        dismiss: '[["set_attr",{"to":"#roles-filter","attr":["aria-expanded","false"]}]]',
+        escape: '[["set_attr",{"to":"#roles-filter","attr":["aria-expanded","false"]}],["focus",{"to":"#roles-filter"}]]',
       },
       contains: node => node === trigger || node === option,
       querySelector: sel => (sel === '[aria-expanded]' ? trigger : null),
