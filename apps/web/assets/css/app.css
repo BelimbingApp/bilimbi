@@ -63,7 +63,7 @@
   --color-ink-strong: var(--color-stone-950);
   --color-ink: var(--color-stone-900);
   --color-ink-muted: var(--color-stone-600);
-  --color-ink-subtle: var(--color-stone-500);
+  --color-ink-subtle: color-mix(in srgb, var(--color-stone-600) 50%, var(--color-stone-500));
   --color-ink-faint: var(--color-stone-400);
   --color-ink-inverse: var(--color-white);
   --color-link: var(--color-stone-700);
@@ -127,7 +127,7 @@
     --color-ink-strong: var(--color-stone-50);
     --color-ink: var(--color-stone-100);
     --color-ink-muted: var(--color-stone-400);
-    --color-ink-subtle: var(--color-stone-400);
+    --color-ink-subtle: color-mix(in srgb, var(--color-stone-400) 60%, var(--color-stone-500));
     --color-ink-faint: var(--color-stone-600);
     --color-ink-inverse: var(--color-stone-950);
     --color-link: var(--color-stone-300);
@@ -170,7 +170,7 @@
   --color-ink-strong: var(--color-stone-50);
   --color-ink: var(--color-stone-100);
   --color-ink-muted: var(--color-stone-400);
-  --color-ink-subtle: var(--color-stone-400);
+  --color-ink-subtle: color-mix(in srgb, var(--color-stone-400) 60%, var(--color-stone-500));
   --color-ink-faint: var(--color-stone-600);
   --color-ink-inverse: var(--color-stone-950);
   --color-link: var(--color-stone-300);
