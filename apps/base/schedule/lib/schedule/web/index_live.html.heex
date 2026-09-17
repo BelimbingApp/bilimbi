@@ -217,65 +217,54 @@
     </section>
 
     <section :if={@state.tab == "history"} id="schedule-history-panel" aria-labelledby="schedule-tab-history">
-      <.form
-        for={@run_form}
+      <.filter_toolbar
         id="schedule-history-filters"
-        phx-change="filter_runs"
-        phx-submit="filter_runs"
-        class="mt-4 grid gap-3 lg:grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto]"
+        form={@run_form}
+        event="filter_runs"
+        submit_event="filter_runs"
+        class="mt-4"
       >
-        <div>
-          <.input
-            field={@run_form[:search]}
-            id="schedule-run-search"
-            type="search"
-            label="Search run name"
-            label_class="sr-only"
-            wrapper_class="mb-0"
-            placeholder="Search run name…"
-            maxlength="255"
-            phx-debounce="300"
-            autocomplete="off"
-            class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
-          />
-        </div>
-        <div>
-          <.input
-            field={@run_form[:status]}
-            id="schedule-run-status"
-            type="select"
-            label="Filter run status"
-            label_class="sr-only"
-            wrapper_class="mb-0"
-            options={[
-              {"All run statuses", ""},
-              {"Running", "running"},
-              {"Succeeded", "succeeded"},
-              {"Failed", "failed"},
-              {"Skipped", "skipped"}
-            ]}
-            class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
-          />
-        </div>
-        <div>
-          <.input field={@run_form[:start_date]} id="schedule-run-start-date" type="date" label="Start date (UTC)" label_class="sr-only" wrapper_class="mb-0" hint="UTC" class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink" />
-        </div>
-        <div>
-          <.input field={@run_form[:end_date]} id="schedule-run-end-date" type="date" label="End date (UTC)" label_class="sr-only" wrapper_class="mb-0" hint="UTC" class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink" />
-        </div>
-        <div>
-          <.input
-            field={@run_form[:page_size]}
-            id="schedule-run-page-size"
-            type="select"
-            label="Runs per page"
-            label_class="sr-only"
-            wrapper_class="mb-0"
-            options={[{"25 / page", 25}, {"50 / page", 50}, {"100 / page", 100}]}
-            class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
-          />
-        </div>
-      </.form>
+        <:search
+          field={@run_form[:search]}
+          id="schedule-run-search"
+          label="Search run name"
+          placeholder="Search run name…"
+          maxlength="255"
+          debounce="300"
+          autocomplete="off"
+          input_class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
+        />
+        <:select
+          field={@run_form[:status]}
+          id="schedule-run-status"
+          label="Filter run status"
+          options={[
+            {"All run statuses", ""},
+            {"Running", "running"},
+            {"Succeeded", "succeeded"},
+            {"Failed", "failed"},
+            {"Skipped", "skipped"}
+          ]}
+          input_class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+        />
+        <:date_range
+          from_id="schedule-run-start-date"
+          from_field={@run_form[:start_date]}
+          from_label="Start date (UTC)"
+          to_id="schedule-run-end-date"
+          to_field={@run_form[:end_date]}
+          to_label="End date (UTC)"
+          hint="UTC"
+          input_class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+        />
+        <:select
+          field={@run_form[:page_size]}
+          id="schedule-run-page-size"
+          label="Runs per page"
+          options={[{"25 / page", 25}, {"50 / page", 50}, {"100 / page", 100}]}
+          input_class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+        />
+      </.filter_toolbar>
 
       <.alert :if={@run_state == :invalid_filters} id="schedule-history-invalid" kind={:warning} class="mt-4">
         The start date must not be after the end date.

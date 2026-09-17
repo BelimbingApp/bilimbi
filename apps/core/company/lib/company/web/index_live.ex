@@ -285,43 +285,30 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
           </:actions>
         </.header>
 
-        <.form for={@filters_form} id="companies-filters" phx-change="filters" class="mb-2">
-          <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,13rem)]">
-            <div class="relative">
-              <.icon
-                name="search"
-                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-              />
-              <.input
-                field={@filters_form[:search]}
-                id="companies-search"
-                type="search"
-                phx-debounce="300"
-                maxlength="255"
-                label="Search companies"
-                label_class="sr-only"
-                wrapper_class="mb-0"
-                placeholder="Search by name, code, legal name, email, or jurisdiction..."
-                class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-              />
-            </div>
-            <.input
-              field={@filters_form[:status_filter]}
-              id="companies-status-filter"
-              type="select"
-              label="Status filter"
-              label_class="sr-only"
-              wrapper_class="mb-0"
-              options={[
-                {"All statuses", "all"},
-                {"Active", "active"},
-                {"Suspended", "suspended"},
-                {"Pending", "pending"},
-                {"Archived", "archived"}
-              ]}
-            />
-          </div>
-        </.form>
+        <.filter_toolbar id="companies-filters" form={@filters_form} event="filters">
+          <:search
+            field={@filters_form[:search]}
+            id="companies-search"
+            label="Search companies"
+            placeholder="Search by name, code, legal name, email, or jurisdiction..."
+            icon="search"
+            debounce="300"
+            maxlength="255"
+            input_class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
+          />
+          <:select
+            field={@filters_form[:status_filter]}
+            id="companies-status-filter"
+            label="Status filter"
+            options={[
+              {"All statuses", "all"},
+              {"Active", "active"},
+              {"Suspended", "suspended"},
+              {"Pending", "pending"},
+              {"Archived", "archived"}
+            ]}
+          />
+        </.filter_toolbar>
 
         <.card id="companies-card" inner_class="p-0">
           <h2 id="companies-table-title" class="sr-only">Companies</h2>

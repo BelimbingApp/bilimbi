@@ -965,6 +965,191 @@ defmodule Bilimbi.Base.UI.Components do
     """
   end
 
+  @doc """
+  Renders the shared list filter toolbar: an optional search field, zero or
+  more selects, and an optional from/to date pair, framed as one open
+  toolbar above the list surface (Design Spec C04).
+
+  Each slot is optional, but a toolbar with no control at all raises: an
+  empty form is a caller bug, not a state worth presenting.
+
+  Filter state itself stays where it already lives — the caller's form, event,
+  and URL round-trip are untouched, so the same inputs return the same rows.
+  This component owns only composition and presentation:
+
+    * Labels are all visible or all hidden, chosen once with `labels`. A mix
+      drops the labelled controls below their row-mates, because a visible
+      label adds a row of height only some cells carry.
+    * Helper text travels through each control's own `input` hint (the
+      date pair's `hint`), never a hand-written paragraph beside the input.
+      A sibling paragraph sits outside the wrapper that owns the spacing.
+    * Cells wrap instead of squeezing. Each control is its own flex item, so
+      native date inputs stack on a narrow viewport rather than holding a
+      grid row wider than the page.
+
+  ## Examples
+
+      <.filter_toolbar id="companies-filters" form={@filters_form} event="filters">
+        <:search
+          field={@filters_form[:search]}
+          id="companies-search"
+          label="Search companies"
+          placeholder="Search by name, code, legal name, email, or jurisdiction..."
+          icon="search"
+        />
+        <:select
+          field={@filters_form[:status_filter]}
+          id="companies-status-filter"
+          label="Status filter"
+          options={[{"All statuses", "all"}, {"Active", "active"}]}
+        />
+      </.filter_toolbar>
+  """
+  attr(:id, :string, required: true, doc: "the toolbar form's DOM id")
+  attr(:form, :any, required: true, doc: "the caller's Phoenix form; field names and params are unchanged")
+  attr(:event, :string, required: true, doc: "the phx-change event the caller already handles")
+  attr(:submit_event, :string, default: nil, doc: "optional phx-submit event the caller already handles")
+
+  attr(:labels, :atom,
+    values: [:hidden, :visible],
+    default: :hidden,
+    doc: "label visibility for every control at once; never mixed"
+  )
+
+  attr(:class, :any,
+    default: nil,
+    doc: "extra classes for page context (for example mt-4 below tabs); the open-toolbar framing stays owned here"
+  )
+
+  slot :search, doc: "at most one search field; the toolbar's leading control" do
+    attr(:field, :any, required: true, doc: "the search form field")
+    attr(:id, :string, required: true, doc: "the search input's DOM id")
+    attr(:label, :string, required: true, doc: "the accessible label, hidden or visible per `labels`")
+    attr(:placeholder, :string, doc: "the search prompt text")
+    attr(:icon, :string, doc: "optional leading icon name rendered inside the search box")
+    attr(:debounce, :string, doc: "phx-debounce for the search input")
+    attr(:maxlength, :any, doc: "maxlength for the search input")
+    attr(:autocomplete, :string, doc: "autocomplete for the search input")
+    attr(:input_class, :any, doc: "the search input class to use over defaults")
+  end
+
+  slot :select, doc: "zero or more selects; each is its own wrapping cell" do
+    attr(:field, :any, required: true, doc: "the select form field")
+    attr(:id, :string, required: true, doc: "the select's DOM id")
+    attr(:label, :string, required: true, doc: "the accessible label, hidden or visible per `labels`")
+    attr(:options, :list, required: true, doc: "options passed to `Phoenix.HTML.Form.options_for_select/2`")
+    attr(:input_class, :any, doc: "the select class to use over defaults")
+  end
+
+  slot :date_range, doc: "at most one from/to date pair; each date is its own wrapping cell" do
+    attr(:from_id, :string, required: true, doc: "the from date input's DOM id")
+    attr(:from_field, :any, required: true, doc: "the from date form field")
+    attr(:from_label, :string, required: true, doc: "the from label, hidden or visible per `labels`")
+    attr(:to_id, :string, required: true, doc: "the to date input's DOM id")
+    attr(:to_field, :any, required: true, doc: "the to date form field")
+    attr(:to_label, :string, required: true, doc: "the to label, hidden or visible per `labels`")
+    attr(:hint, :string, doc: "helper text rendered through each date input's own hint")
+    attr(:input_class, :any, doc: "the date input class to use over defaults")
+  end
+
+  def filter_toolbar(assigns) do
+    if assigns.search == [] and assigns.select == [] and assigns.date_range == [] do
+      raise ArgumentError,
+            "filter_toolbar needs at least one control: a search, a select, or a date_range"
+    end
+
+    if length(assigns.search) > 1 or length(assigns.date_range) > 1 do
+      raise ArgumentError,
+            "filter_toolbar takes at most one search and one date_range; selects are the repeating control"
+    end
+
+    ~H"""
+    <.form
+      for={@form}
+      id={@id}
+      phx-change={@event}
+      phx-submit={@submit_event}
+      class={["mb-2 flex flex-wrap items-start gap-x-3 gap-y-2", @class]}
+    >
+      <div :for={search <- @search} class="min-w-52 flex-1 basis-64">
+        <.toolbar_label id={search[:id]} label={search[:label]} labels={@labels} />
+        <div class="relative">
+          <.icon
+            :if={search[:icon]}
+            name={search[:icon]}
+            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+          />
+          <.input
+            field={search[:field]}
+            id={search[:id]}
+            type="search"
+            wrapper_class="mb-0"
+            placeholder={search[:placeholder]}
+            phx-debounce={search[:debounce]}
+            maxlength={search[:maxlength]}
+            autocomplete={search[:autocomplete]}
+            class={search[:input_class]}
+          />
+        </div>
+      </div>
+      <div :for={select <- @select} class="w-full min-w-0 sm:w-auto sm:min-w-36">
+        <.toolbar_label id={select[:id]} label={select[:label]} labels={@labels} />
+        <.input
+          field={select[:field]}
+          id={select[:id]}
+          type="select"
+          wrapper_class="mb-0"
+          options={select[:options]}
+          class={select[:input_class]}
+        />
+      </div>
+      <%= for range <- @date_range do %>
+        <div class="w-full min-w-0 sm:w-auto">
+          <.toolbar_label id={range[:from_id]} label={range[:from_label]} labels={@labels} />
+          <.input
+            field={range[:from_field]}
+            id={range[:from_id]}
+            type="date"
+            wrapper_class="mb-0"
+            hint={range[:hint]}
+            class={range[:input_class]}
+          />
+        </div>
+        <div class="w-full min-w-0 sm:w-auto">
+          <.toolbar_label id={range[:to_id]} label={range[:to_label]} labels={@labels} />
+          <.input
+            field={range[:to_field]}
+            id={range[:to_id]}
+            type="date"
+            wrapper_class="mb-0"
+            hint={range[:hint]}
+            class={range[:input_class]}
+          />
+        </div>
+      <% end %>
+    </.form>
+    """
+  end
+
+  # The toolbar renders every label itself so `labels` can hold for all
+  # controls at once. The visible classes mirror `input/1`'s label line; if
+  # that line changes, `Bilimbi.Base.UI.ComponentsFilterToolbarTest` fails on
+  # purpose rather than letting the two label shapes drift apart.
+  attr(:id, :string, required: true)
+  attr(:label, :string, required: true)
+  attr(:labels, :atom, values: [:hidden, :visible], required: true)
+
+  defp toolbar_label(assigns) do
+    ~H"""
+    <label
+      for={@id}
+      class={(@labels == :visible && "mb-1.5 block text-sm font-medium text-ink") || "sr-only"}
+    >
+      {@label}
+    </label>
+    """
+  end
+
   defp page_summary(%{total_entries: 0}), do: "No results"
 
   defp page_summary(%{page: page, page_size: page_size, total_entries: total_entries}) do
