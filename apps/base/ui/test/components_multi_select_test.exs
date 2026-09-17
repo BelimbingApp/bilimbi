@@ -85,7 +85,7 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
            ] = js_ops(html, "phx-click", "roles-filter")
   end
 
-  test "Escape closes the list from the trigger or any option and returns focus to the trigger" do
+  test "Escape closes the list from anywhere inside the menu and returns focus to the trigger" do
     html =
       render_component(&multi_select_field/1,
         placeholder: "All roles",
@@ -94,11 +94,21 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
         value: []
       )
 
-    # The trigger and both option checkboxes: LiveView only matches a key
-    # binding on the element that has it, so a wrapper binding would miss all three.
-    assert length(Regex.scan(~r/phx-key="Escape"/, html)) == 3
+    # The trigger, the list itself and both option checkboxes: LiveView only
+    # matches a key binding on the element that has it, so a wrapper binding
+    # would miss all four.
+    assert length(Regex.scan(~r/phx-key="Escape"/, html)) == 4
 
-    for id <- ["roles-filter", "roles-filter-option-1", "roles-filter-option-2"] do
+    # Every focus stop inside the open menu is one of those four, because the
+    # list takes focus itself when a click lands on its padding.
+    assert html =~ ~r/id="roles-filter-options"[^>]*\stabindex="-1"/
+
+    for id <- [
+          "roles-filter",
+          "roles-filter-options",
+          "roles-filter-option-1",
+          "roles-filter-option-2"
+        ] do
       assert [
                ["add_class", %{"names" => ["hidden"], "to" => "#roles-filter-options"}],
                ["remove_class", %{"names" => ["rotate-180"], "to" => "#roles-filter-chevron"}],
@@ -127,6 +137,32 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
              ["remove_class", _],
              ["set_attr", %{"attr" => ["aria-expanded", "false"], "to" => "#roles-filter"}]
            ] = js_ops(html, "phx-click-away", "roles-filter-wrapper")
+  end
+
+  test "focus leaving the field closes the list without moving focus" do
+    html =
+      render_component(&multi_select_field/1,
+        placeholder: "All roles",
+        selection_label: "1 role selected|:count roles selected",
+        options: [{"Auditor", "1"}],
+        value: []
+      )
+
+    # Tabbing past the last option fires no LiveView binding -- it reads
+    # `phx-blur` from the element losing focus, never the wrapper -- so the
+    # hook watches `focusout` and runs the wrapper's own dismiss command.
+    assert html =~ ~s(phx-hook="MultiSelectDismiss")
+
+    ops = js_ops(html, "data-dismiss", "roles-filter-wrapper")
+
+    assert [
+             ["add_class", %{"names" => ["hidden"], "to" => "#roles-filter-options"}],
+             ["remove_class", %{"names" => ["rotate-180"], "to" => "#roles-filter-chevron"}],
+             ["set_attr", %{"attr" => ["aria-expanded", "false"], "to" => "#roles-filter"}]
+           ] = ops
+
+    refute Enum.any?(ops, fn [op | _] -> op == "focus" end),
+           "only Escape returns focus to the trigger"
   end
 
   defp js_ops(html, attr, id) do
