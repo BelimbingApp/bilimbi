@@ -142,7 +142,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   @impl true
   def handle_event("open-modal", params, socket) do
     width = if params["width"] == "wide", do: :wide, else: :narrow
-    {:noreply, assign(socket, :modal_width, width)}
+    {:noreply, socket |> clear_flash() |> assign(:modal_width, width)}
   end
 
   @impl true

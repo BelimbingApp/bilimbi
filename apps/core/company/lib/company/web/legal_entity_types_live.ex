@@ -39,6 +39,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
 
     {:noreply,
      socket
+     |> clear_flash()
      |> assign(:modal_action, :new)
      |> assign(:editing_type, %LegalEntityType{})
      |> assign_form(changeset)}
@@ -56,6 +57,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
 
             {:noreply,
              socket
+             |> clear_flash()
              |> assign(:modal_action, :edit)
              |> assign(:editing_type, type)
              |> assign_form(changeset)}

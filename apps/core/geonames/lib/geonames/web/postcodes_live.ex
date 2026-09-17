@@ -71,6 +71,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
     {:noreply,
      socket
+     |> clear_flash()
      |> assign(:modal_action, :new)
      |> assign(:editing_postcode_id, nil)
      |> assign(:editing_revision, nil)
@@ -90,6 +91,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
             {:noreply,
              socket
+             |> clear_flash()
              |> assign(:modal_action, :edit)
              |> assign(:editing_postcode_id, postcode.id)
              |> assign(:editing_revision, postcode.revision)

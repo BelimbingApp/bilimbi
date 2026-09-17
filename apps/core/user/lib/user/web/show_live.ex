@@ -702,6 +702,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
     {:noreply,
      socket
+     |> clear_flash()
      |> assign(:show_add_employee_modal, true)
      |> assign(
        :new_employee_form,

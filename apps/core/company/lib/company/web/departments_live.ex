@@ -94,6 +94,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
 
         {:noreply,
          socket
+         |> clear_flash()
          |> assign(:modal_action, :new)
          |> assign(:available_types, available_types)
          |> assign_form(changeset)}
@@ -190,6 +191,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
          {:ok, head_options} <- head_choices(scope, company_id) do
       {:noreply,
        socket
+       |> clear_flash()
        |> assign(:modal_action, :edit_head)
        |> assign(:editing_department_id, department.id)
        |> assign(:head_options, head_options)

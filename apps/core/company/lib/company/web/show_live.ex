@@ -337,6 +337,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
     {:noreply,
      socket
+     |> clear_flash()
      |> assign(:modal_action, :edit_details)
      |> assign(:details_form, to_form(changeset, as: :company))}
   end

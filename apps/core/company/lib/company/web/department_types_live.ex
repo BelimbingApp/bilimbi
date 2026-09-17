@@ -61,6 +61,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
 
     {:noreply,
      socket
+     |> clear_flash()
      |> assign(:modal_action, :new)
      |> assign(:editing_type, %DepartmentType{category: "operational"})
      |> assign_form(changeset)}
@@ -78,6 +79,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
 
             {:noreply,
              socket
+             |> clear_flash()
              |> assign(:modal_action, :edit)
              |> assign(:editing_type, type)
              |> assign_form(changeset)}

@@ -67,6 +67,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
 
       {:noreply,
        socket
+       |> clear_flash()
        |> assign(:modal_action, :new)
        |> assign(:editing_rel, nil)
        |> assign(:available_companies, companies)
@@ -95,6 +96,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
 
                 {:noreply,
                  socket
+                 |> clear_flash()
                  |> assign(:modal_action, :edit)
                  |> assign(:editing_rel, item)
                  |> assign_form(changeset)}
