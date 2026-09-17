@@ -1,9 +1,9 @@
 # Base UI Design Parity
 
-**Status:** In progress — application shell, impersonation audit actor and the named icon vocabulary are merged to `main`; Design Library specimen separation, state coverage, drift guards and live timestamp display are implemented and in review
-**Last Updated:** 2026-09-15
-**Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`
+**Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families. Application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display are merged to `main`; the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
+**Last Updated:** 2026-09-16
+**Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`
 
 ## Problem Essence
 
@@ -13,7 +13,7 @@ Bilimbi has a recognisable identity, but its shared UI has less breadth and less
 
 Bilimbi reaches parity with the useful user-visible capabilities and interaction quality of Belimbing while remaining unmistakably Bilimbi. Parity means equivalent purpose, states, keyboard behavior, responsive behavior, feedback, recovery and production usefulness; it does not mean matching Blade components, CSS values, route names or pixels.
 
-The Design Library is the visual and interaction review surface for this work. Astra compares each catalog item against the live Belimbing reference, records its disposition, implements it through shared Base UI where appropriate, exercises it in the live library, and verifies adoption by at least one real screen before calling it complete. The user has delegated routine design judgment and does not need to approve each component or family.
+The Design Library is the visual and interaction review surface for this work. The design steward compares each catalog item against the live Belimbing reference, records its disposition, implements it through shared Base UI where appropriate, exercises it in the live library, and verifies adoption by at least one real screen before calling it complete. The user has delegated routine design judgment and does not need to approve each component or family.
 
 The campaign is structured so audits and production adoption can run in parallel without several agents redefining the same shared primitive at once.
 
@@ -45,6 +45,8 @@ The identity baseline records the characteristics that parity work must preserve
 
 The catalog is organized by what a human is trying to review, not by Laravel or Phoenix implementation. The assessment is a starting point to verify in the live products; it is not an automatic decision to port every Belimbing component.
 
+Phase 0 verified every row against both live products. A row whose `Bilimbi now` or `Parity target` cell the evidence contradicted carries a [(contradicted)](#targets-the-evidence-contradicts) marker beside its ID: the original wording stays here as the record of what was accepted, and the correction is recorded once under [Targets the evidence contradicts](#targets-the-evidence-contradicts). Do not act on a marked row without reading it.
+
 | ID | Design element | Bilimbi now | Parity target |
 |---|---|---|---|
 | FND-01 | Semantic colours | Strong identity and semantic roles | Keep Bilimbi; verify light/dark contrast and role separation. |
@@ -54,7 +56,7 @@ The catalog is organized by what a human is trying to review, not by Laravel or 
 | FND-05 | Focus, motion and reduced motion | Partial | Define consistent focus visibility, transition purpose and reduced-motion behavior. |
 | FND-06 | Icon language and catalog | Registry exists; review is limited | Use Belimbing's established icon choices for equivalent actions, except logout, while rendering them through Bilimbi's icon component and registry. Add searchable visual review, empty result, copy and copied feedback. |
 | LAY-01 | Authentication shell | Exists | Compare first impression, responsive behavior, errors and recovery. |
-| LAY-02 | Application shell and account footer | Exists | Remove persistent company and tenant repetition. Put the current timezone and light/dark theme selectors in the top bar. Keep the user circle at the bottom left as the account and scope entry point; show an always-visible warning only for unusual or safety-critical scope. Match the best collapse, drawer and navigation-continuity behavior. |
+| LAY-02 [(contradicted)](#targets-the-evidence-contradicts) | Application shell and account footer | Exists | Remove persistent company and tenant repetition. Put the current timezone and light/dark theme selectors in the top bar. Keep the user circle at the bottom left as the account and scope entry point; show an always-visible warning only for unusual or safety-critical scope. Match the best collapse, drawer and navigation-continuity behavior. |
 | LAY-03 | Page width and page header | Shared primitives exist | Cover title, subtitle, action, pin, contextual help and narrow states. |
 | LAY-04 | Secondary side panel | Bespoke Design Library example | Establish one responsive page-local navigation pattern with desktop rail and mobile access. |
 | LAY-05 | Index, form and detail geometry | Partial conventions | Define complete assemblies rather than leaving every screen to compose them differently. |
@@ -62,13 +64,13 @@ The catalog is organized by what a human is trying to review, not by Laravel or 
 | NAV-02 | Tabs | Shared `<.tabs>` used by Schedule and Settings | Provide shared semantics, keyboard navigation, active state and URL/history rules. |
 | NAV-03 | Link dictionary and related-link groups | No shared contract | Adopt internal, anchor, external, new-tab and download behavior; mutations remain buttons. |
 | NAV-04 | Pagination | Shared component exists | Compare narrow layout, disabled states, page-size control, URL state and accessible labels. |
-| NAV-05 | User account and scope menu | Partial user footer exists | On user-circle activation, show signed-in name and identifier, current company and tenant, change password and sign out. Show scope switching only when more than one permitted scope exists. |
+| NAV-05 [(contradicted)](#targets-the-evidence-contradicts) | User account and scope menu | Partial user footer exists | On user-circle activation, show signed-in name and identifier, current company and tenant, change password and sign out. Show scope switching only when more than one permitted scope exists. |
 | ACT-01 | Buttons | Primary, secondary and destructive basics | Cover emphasis, compact size, disabled, loading, navigation and truthful completion. |
 | ACT-02 | Icon actions and groups | Basic icon button exists | Add grouping, context sizing, disabled/loading behavior and accessible tooltips. |
 | ACT-03 | Destructive entry and acknowledgement | Inconsistent screen patterns | Standardize consequence copy, confirmation and typed acknowledgement where risk requires it. |
 | INP-01 | Shared field shell | Generic input has labels, hints and errors | Standardize required, help, error, disabled, read-only, prefix and suffix placement. |
 | INP-02 | Text, email, URL, telephone, number and textarea | Available through the generic input | Complete state and sizing contracts and validate realistic long content. |
-| INP-03 | Search | Generic search type | Add clear, empty, loading and result-update behavior. |
+| INP-03 [(contradicted)](#targets-the-evidence-contradicts) | Search | Generic search type | Add clear, empty, loading and result-update behavior. |
 | INP-04 | Select, multi-select, checkbox and radio | Shared components for all four, including `<.radio_group>`; state coverage partial | Complete open/close, summary, no-options, outside-click, Escape and keyboard behavior. |
 | INP-05 | Date, time, datetime and integer entry | Mostly native generic inputs | Define tabular display, step controls, validation and locale/timezone behavior. |
 | INP-06 | Secret input | Password field only | Distinguish saved mask, reveal, replacement and explicit clearing. |
@@ -77,25 +79,25 @@ The catalog is organized by what a human is trying to review, not by Laravel or 
 | INP-09 | Segmented control | Missing | Add for short peer choices when a real Bilimbi workflow needs it. |
 | INT-01 | Inline text editing | Shared primitive exists | Complete F2/typing entry, Enter/blur save, Escape cancel, focus restore and error recovery. |
 | INT-02 | Inline select, combobox and textarea editing | Missing | Add after their underlying controls are accepted. |
-| INT-03 | Grouped fact editing | Missing | Support Apply/Cancel where facts must change atomically. |
-| INT-04 | Disclosure | No shared primitive | Define open/closed semantics, `aria-expanded`, keyboard behavior and reduced motion. |
+| INT-03 [(contradicted)](#targets-the-evidence-contradicts) | Grouped fact editing | Missing | Support Apply/Cancel where facts must change atomically. |
+| INT-04 [(contradicted)](#targets-the-evidence-contradicts) | Disclosure | No shared primitive | Define open/closed semantics, `aria-expanded`, keyboard behavior and reduced motion. |
 | INT-05 | Filter and period patterns | Repeated local compositions | Standardize the shared composition while keeping URL state and production meaning. |
 | INT-06 | Unsaved-change and template selection flows | Missing | Defer until a real Bilimbi workflow proves the need. |
 | FBK-01 | Inline alerts | Shared primitive exists | Verify status semantics, copy, contrast, icons and dismissibility. |
 | FBK-02 | Flash and notification behavior | Basic fixed flash | Define stacking, timing, sticky warning/error, manual dismissal and redirect continuity. |
 | FBK-03 | Validation, disabled and loading states | Partial | Make the states visibly distinct and prevent duplicate work. |
 | FBK-04 | Empty, permission, unavailable, error and recovery states | Library specimens exist | Establish reusable page and region patterns with truthful recovery. |
-| OVR-01 | Standard modal | Missing | Add accessible open, close, Escape, backdrop, focus containment and focus return. |
+| OVR-01 [(contradicted)](#targets-the-evidence-contradicts) | Standard modal | Missing | Add accessible open, close, Escape, backdrop, focus containment and focus return. |
 | OVR-02 | Confirmation modal | Missing | Add consequence-first confirmation without copying Belimbing's accessibility gaps. |
 | OVR-03 | Inspector drawer | Missing | Add only for a real inspector workflow; cover mobile width, resizing and remembered width. |
 | OVR-04 | Tooltip and popover behavior | No shared contract | Define only where labels or contextual actions genuinely require it. |
 | DAT-01 | Cards, facts and dense summaries | Card and ad hoc facts exist | Standardize metadata hierarchy and compact summary composition. |
 | DAT-02 | Badges and status treatments | Basic badge exists | Complete neutral, information and status roles without using brand as status. |
 | DAT-03 | Tables and sortable headings | Shared table exists | Cover caption, overflow, sticky header, hover, stripes, empty state, footer and truthful sorting. |
-| DAT-04 | Absolute and relative time | Absolute datetime exists | Add relative time only with the absolute value available. |
-| DAT-05 | Statistics and stat strips | Missing | Add when a dashboard or operational summary supplies a real use case. |
+| DAT-04 [(contradicted)](#targets-the-evidence-contradicts) | Absolute and relative time | Absolute datetime exists | Add relative time only with the absolute value available. |
+| DAT-05 [(contradicted)](#targets-the-evidence-contradicts) | Statistics and stat strips | Missing | Add when a dashboard or operational summary supplies a real use case. |
 | DAT-06 | Record history, timeline and comparisons | Local or missing | Keep specialist behavior with the owning workflow; share only the generic presentation seam. |
-| CMP-01 | Operational index page | Partial specimen | Standardize header, filters, table, actions, empty/loading/error and pagination as one flow. |
+| CMP-01 [(contradicted)](#targets-the-evidence-contradicts) | Operational index page | Partial specimen | Standardize header, filters, table, actions, empty/loading/error and pagination as one flow. |
 | CMP-02 | Form page | Partial specimen | Standardize field rhythm, validation, save/cancel, loading, success and unsaved navigation. |
 | CMP-03 | Detail and settings page | Partial conventions | Standardize facts, inline/grouped editing, related navigation and permission states. |
 | CMP-04 | Destructive workflow | No complete specimen | Show entry, consequence, acknowledgement, in-flight, success, failure and recovery together. |
@@ -112,10 +114,203 @@ Every catalog item receives one disposition after visual and interaction review:
 - **Keep Bilimbi** — Bilimbi is already the better result; document and enforce it.
 - **Equivalent** — capability and quality already match; fill only missing evidence.
 - **Adopt adapted** — take Belimbing's useful behavior but render it through Bilimbi identity.
-- **Steward review** — Astra compares live alternatives, chooses the best supported treatment within K01–K09 and records the reason; this is temporary audit work, not a user approval queue.
+- **Steward review** — the design steward compares live alternatives, chooses the best supported treatment within K01–K09 and records the reason; this is temporary audit work, not a user approval queue.
 - **Not applicable** — the capability has no honest Bilimbi use; record why and do not build it.
 
 The ledger is campaign tracking, not a permanent second design source. Accepted outcomes move to the live Design Library, Design Spec and shared implementation under the same catalog ID.
+
+#### Recorded dispositions (Phase 0, 2026-09-16)
+
+All 57 rows verified against both live products. Bilimbi was read at `ff5a5a0` on a
+private instance; Belimbing at `local.blb.lara`. The per-row working notes were not
+kept as durable artifacts, so this document is the whole record: every row carries its
+disposition and dependency, and the verification method is stated here only where the
+evidence contradicted the catalog's target, surfaced a shipped defect, or could not be
+obtained at all — the three subsections below. Auditing any other row means
+re-deriving it from those two builds.
+
+A disposition here is a starting position with evidence behind it, not an approval to
+build. Where the evidence contradicted the catalog's own target, the row says so
+rather than being quietly reconciled.
+
+| ID | Disposition | Depends on |
+|---|---|---|
+| FND-01 Semantic colours | Keep Bilimbi | none |
+| FND-02 Typography | Keep Bilimbi | none |
+| FND-03 Spacing rhythm | Adopt adapted — named spacing roles, Bilimbi values | before LAY-05, CMP-01…03 |
+| FND-04 Shape and elevation | Keep Bilimbi | none |
+| FND-05 Focus and motion | Adopt adapted — one focus contract, per-transition `motion-reduce` | before ACT-01, INP-01 |
+| FND-06 Icon language | Adopt adapted — searchable catalog; finish the migration | #719 |
+| LAY-01 Authentication shell | Keep Bilimbi | none |
+| LAY-02 Application shell | Adopt adapted — shipped in #711, confirmed live | none |
+| LAY-03 Page header | Adopt adapted — responsive stacking, pin slot, help slot | NAV-01 pin decision; shared-component edit by the integration owner, not Phase 5 |
+| LAY-04 Side panel | Adopt adapted | LAY-02 drawer mechanics, #719 |
+| LAY-05 Page geometry | Keep Bilimbi | FND-03, LAY-03 |
+| NAV-01 Menu tree and pins | Adopt adapted — pins become account state; `user_pins` is the sole store (steward, 2026-09-16) | unblocks LAY-03; adoption-URL question escalated |
+| NAV-02 Tabs | Adopt adapted — ARIA tablist, arrow keys, one URL rule | none |
+| NAV-03 Links | Adopt adapted | none |
+| NAV-04 Pagination | Keep Bilimbi | none |
+| NAV-05 Account menu | Adopt adapted — shipped in #711, confirmed live | multi-scope selector deferred (business decision) |
+| ACT-01 Buttons | Adopt adapted | none |
+| ACT-02 Icon actions | Keep Bilimbi | ACT-01 loading contract |
+| ACT-03 Destructive entry | Adopt adapted | OVR-02, ACT-01 |
+| INP-01 Field shell | Adopt adapted — required marker, prefix/suffix, read-only | none — foundation |
+| INP-02 Text and textarea | Keep Bilimbi | INP-01 |
+| INP-03 Search | Adopt adapted — narrowed to the magnifier only | INP-01; clear → INT-05 |
+| INP-04 Choice controls | Adopt adapted (multi-select) / Keep Bilimbi (radio group) | INP-01 |
+| INP-05 Date, time, integer | Adopt adapted — narrow, `tabular-nums` | INP-01 |
+| INP-06 Secret | Adopt adapted — excluding reveal-a-saved-secret | INP-01 |
+| INP-07 Combobox | Adopt adapted | INP-01, INP-04 |
+| INP-08 Country and currency | Adopt adapted — seam only | INP-07 |
+| INP-09 Segmented control | Adopt adapted | INP-01, FND-05 |
+| INT-01 Inline text edit | Adopt adapted | INP-01 |
+| INT-02 Inline select and combobox | Adopt adapted | INT-01, INP-04, INP-07 |
+| INT-03 Grouped fact editing | **Equivalent** — already in ten production LiveViews | INP-01, ACT-01 |
+| INT-04 Disclosure | Adopt adapted — as two distinct things | INP-04, FND-05 |
+| INT-05 Filter and period | Adopt adapted | INP-01, INP-03, OVR-01 |
+| INT-06 Unsaved change | Not applicable — keep deferred | none |
+| FBK-01 Inline alerts | Adopt adapted | none |
+| FBK-02 Flash | Adopt adapted | z-order agreed with OVR-01 |
+| FBK-03 Validation, disabled, loading | Adopt adapted | ACT-01 |
+| FBK-04 Empty, permission, error, recovery | Keep Bilimbi | none |
+| OVR-01 Standard modal | Adopt adapted — share the shell drawer's containment, do not re-add | extract containment hook from `app_shell.js` |
+| OVR-02 Confirmation modal | Adopt adapted | OVR-01, ACT-03 |
+| OVR-03 Inspector drawer | Not applicable — no workflow needs it | a real inspector workflow |
+| OVR-04 Tooltip and popover | Equivalent | none |
+| DAT-01 Record fact list | Keep Bilimbi — Belimbing hand-writes `<dl>` too | none for the API; migration is Phase 5 |
+| DAT-02 Status and badges | Adopt adapted — `info` role only, never `accent` | a new `info` role in `@theme` (FND) |
+| DAT-03 Tables | Keep Bilimbi (density, header case, sort) + Adopt adapted (accessible name, `title`) | shared-component edit; raw tables are Phase 5 |
+| DAT-04 Timestamps | Keep Bilimbi (absolute) + Adopt adapted (relative) | none for the primitive; raw-format sites are Phase 5 |
+| DAT-05 Stat cards | Adopt adapted — now, not later; already shipping | label/value scale should become shared tokens |
+| DAT-06 Record history | Keep Bilimbi — ownership split is strictly better | `history` icon name depends on GFX-02 |
+| CMP-01 Operational index | Keep Bilimbi on URL state and page sizes | settle one URL vocabulary before Phase 5 |
+| CMP-02 Create and edit form | Keep Bilimbi | `aria-describedby` belongs to INP-01 |
+| CMP-03 Detail page | Adopt adapted — one `detail_section` assembly on Bilimbi's archetype (steward, 2026-09-16) | DAT-01, FND-02, FND-03, LAY-03, INT-01, INT-02, DAT-03, GFX-02 |
+| CMP-04 Destructive flow | Adopt adapted — take the acknowledge-input contract | OVR-01, OVR-02 |
+| CMP-05 Authentication pages | Equivalent | none |
+| CMP-06 Responsive and theme coverage | Adopt adapted — one recorded narrow-width and light/dark review per assembly, replacing ad hoc checks | CMP-01 to CMP-05; dark theme on the Lane B rows was not verified in Phase 0 |
+| GFX-01 Identity mark | Keep Bilimbi | none |
+| GFX-02 Icon assets | Adopt adapted — but reorder: register the missing names first | none for the registration fix |
+| GFX-03 Illustration | Not applicable | none |
+
+##### Steward decisions (2026-09-16)
+
+**NAV-01 — pins are account state.** The server-side path is already built and
+entirely unwired: the local shell landed 2026-08-17 and the `user_pins` API the next
+day (#316), and nothing ever connected them. Verified live — pinning a nav item and a
+record pin persisted across navigation while `user_pins` stayed at 0 rows and no
+`/api/pins` traffic occurred. That is drift, not a recorded policy. `user_pins` becomes
+the sole store; the scope carries a `:pins` snapshot beside `:shell_preferences`;
+writes go through a `ShellPins` `attach_hook` twin of `ShellPreferences`, refusing
+impersonated writes exactly as `DisplayPreferences.own_account/1` does, so
+`PinController` and its routes are deleted rather than left as a second write path.
+Rail, width and branch expansion stay deliberately browser-local. Reason: a
+"Pin to sidebar" control that vanishes on another device fails silently against K09,
+and the round trip is the cost already accepted for theme and time display in #711.
+
+**CMP-03 — one detail assembly.** Bilimbi has five section-heading treatments, four
+`dt` label treatments, three grid rules, two card paddings and three editing models
+across six detail screens; on User and Employee the section title and the fact label
+share a class string, so the hierarchy collapses. Belimbing has the same flaw but is
+consistent everywhere — its consistency is what to take, not its uppercase styling.
+One `detail_section` (title, count, description, `:actions`), `<.list layout={:grid}>`
+for facts, inline editing per fact with a grouped Apply/Cancel only where facts change
+together, no modal, and permission-less viewers see the value with no affordance
+rather than a disabled control.
+
+**Escalated — not a design decision.** Belimbing's stored `user_pins.url` values point
+at `/admin/companies/1` while Bilimbi serves `/companies/1`. Whether adoption rewrites
+known prefixes, deletes the rows, or leaves them dormant is a durable-data decision
+under `docs/architecture/database.md`. The steward decided only the display rule: a pin
+to a URL this installation does not serve is hidden.
+
+##### Targets the evidence contradicts
+
+These are recorded rather than reconciled, because the catalog was written before the
+products were read and the plan forbids treating existence as acceptance.
+
+- **CMP-01** — moving toward Belimbing would be a regression. Belimbing keeps only
+  `page` in the URL and offers 10/20/50/100 page sizes; Bilimbi already mandates
+  25/50/100/300 with full URL state.
+- **DAT-05** — "Missing" is wrong. Five stat cards ship on `/dashboard`, duplicated
+  into ten markup blocks with 65 arbitrary-value classes.
+- **DAT-04** — relative time already ships in notifications, in a bare `<span>` with
+  no `<time>`, no `datetime` and no `title`, frozen at render.
+- **INT-03** — "Missing" is wrong. Bilimbi runs it in ten production LiveViews and
+  Belimbing has no component either.
+- **INP-03** — Belimbing *removes* the native clear affordance Bilimbi keeps; there is
+  nothing to adopt.
+- **OVR-01** — "Missing" understates, and moving toward Belimbing would be a
+  regression. The shell drawer already implements `inert`, `aria-modal` and backdrop
+  mechanics; the work is to share it, not to build it. Lane B observed through
+  dispatched in-page events that Belimbing's shared modal does not move focus in, trap
+  it or return it, and that two demo dialogs could be open at once — read together with
+  the note below that Belimbing modal focus behaviour beyond dispatched events was not
+  verified.
+- **LAY-02, NAV-05** — the "Bilimbi now" cells describe pre-#711 state; both shipped.
+- **INT-04** — reduced motion is not adoptable; neither product has a contract.
+
+##### Defects found while verifying
+
+Not catalog work. These are user-facing faults in shipped code, listed so they are not
+lost inside a design ledger:
+
+- Eight destructive controls fire with no confirmation at all. Four change
+  authorization, all in `core/user/.../show_live.ex`: `remove_role` (`:1109`),
+  `remove_capability` on a direct grant (`:1260`), `deny_capability` (`:1271`) and
+  `remove_capability` on a deny (`:1314`). `remove_capability` is listed twice
+  deliberately — it backs two separate controls, and confirming only the first
+  leaves the second live. Three remove dashboard content in
+  `web/.../dashboard_live.ex`: `remove-section` (`:609` and `:650`) and
+  `remove-widget` (`:723`). The eighth is `remove_activity`
+  (`core/company/.../show_live.ex:982`), a hand-written button rather than a shared
+  danger control. 22 `data-confirm` attributes across 17 files exist elsewhere, so
+  the convention is established and these are the exceptions.
+- `<.multi_select>` cannot be closed by Escape or by its own toggle, and its
+  `aria-expanded` is the literal `"false"` at `components.ex:669` — it never changes,
+  so assistive technology is told the panel is shut while it is open.
+- `<.inline_edit>` drops focus to `document.body` on every Enter-commit; Escape
+  returns focus correctly. A blank commit is silently discarded under a stale success
+  flash.
+- Four icon names — `bilimbi-plus`, `bilimbi-pencil`, `bilimbi-link-slash`,
+  `bilimbi-x-mark` — are unregistered across 11 call sites, so "add", "edit", "unlink"
+  and "remove" all render the registry's fallback glyph.
+- Per-user pins are built twice and shipped once: `PinController`,
+  `/api/pins/toggle|reorder`, `User.toggle_user_pin/reorder_user_pins` and the
+  `user_pins` table exist, and `app_shell.js` calls that API zero times while using
+  `localStorage` ten times. Pins do not follow the account.
+- `<.header>` never stacks; its actions are clipped and unreachable at 420px, where
+  Belimbing's header wraps.
+- `:info` flashes render with success (green) roles.
+- The Design Library labelled the sign-in mark 48px and rendered it at 48px, while the
+  credential layout renders it at 36px. Fixed in this change: the specimen now renders
+  and labels 36px, so the mark section shows the size actually in use.
+
+##### Corrections to this document
+
+- The Icon vocabulary slice below claimed `IconRegistry` carried 73 glyph entries.
+  Corrected in place: it holds 3 glyph entries, 9 shell names and 49 named actions.
+
+##### Inaccurate claims found in other project files
+
+Not catalog work either, and not user-facing. Recorded so the next agent to touch
+these files does not inherit the claim:
+
+- The `/* Menu typography & font colors matching Belimbing */` rule in
+  `apps/web/assets/css/app.css` says menu typography matches Belimbing. Belimbing
+  renders 14px/400; Bilimbi renders 13px/350.
+- The raw-palette guard in root `AGENTS.md` §12 greps `apps/*/lib`, which matches only
+  `apps/web/lib`. The 24 module libraries — including `apps/base/ui/lib`, where the
+  shared components live — sit one level deeper and are not scanned. Both globs
+  currently return 0, so nothing is wrong today; the guard simply would not catch it.
+
+##### What Phase 0 did not verify
+
+Stated so later phases do not mistake silence for coverage: keyboard focus-visible
+rendering in either product (the browser bridge could not deliver trusted key input),
+contrast ratios beyond Bilimbi's automated test, any flow requiring writes
+(password reset, Belimbing `wire:loading`), Belimbing modal focus behaviour beyond
+dispatched events, and dark theme on the Lane B rows.
 
 ### Live Review Surface
 
@@ -143,11 +338,16 @@ A text-only inventory is easy for agents but impossible to validate visually. A 
 
 One serial agent would be slow, while several agents concurrently changing theme and shared component files would recreate drift through merge conflict. The recommended direction is staged parallelism: audit families concurrently, use one integration owner for shared Base UI and design authority, then migrate independent module screens concurrently after each shared contract stabilizes.
 
-### Astra owns routine design acceptance
+### The design steward owns routine design acceptance
 
-Component-by-component human selection would interrupt the authorized campaign. An unrestricted whole-library rewrite would hide accumulated decisions and weaken verification. The accepted direction is autonomous Astra stewardship in complete, bounded slices: inspect Belimbing visually and in source, implement through Bilimbi's shared foundations, verify the live specimen and a production workflow, then record evidence before proceeding. User review remains available without being a dependency.
+Component-by-component human selection would interrupt the authorized campaign. An unrestricted whole-library rewrite would hide accumulated decisions and weaken verification. The accepted direction is autonomous steward stewardship in complete, bounded slices: inspect Belimbing visually and in source, implement through Bilimbi's shared foundations, verify the live specimen and a production workflow, then record evidence before proceeding. User review remains available without being a dependency.
 
-Preserve K01–K09 and the user's explicit shell and icon requirements. Escalate only when the work requires a new business, security or durable data-contract decision outside the accepted scope. Routine geometry, interaction, icon mapping, responsive layout and accessibility judgments belong to Astra. Shared-file ownership remains singular; delegated evidence and module adoption may proceed in parallel.
+The steward is a role, not one agent. Astra (`gpt-6-astra`) held it through
+2026-09-15; Fable (`claude-fable-5-1`) holds it from 2026-09-16 at the user's
+direction. Completed-work attributions below record whoever did the work at the
+time and are historical facts rather than a statement of the current role.
+
+Preserve K01–K09 and the user's explicit shell and icon requirements. Escalate only when the work requires a new business, security or durable data-contract decision outside the accepted scope. Routine geometry, interaction, icon mapping, responsive layout and accessibility judgments belong to the design steward. Shared-file ownership remains singular; delegated evidence and module adoption may proceed in parallel.
 
 The first parity slice owns `LAY-02`, `NAV-05`, shell-related `FND-06`, timezone/theme utilities and desktop, collapsed-sidebar and narrow-drawer states. Subsequent slices follow dependency order rather than waiting for every family audit to finish.
 
@@ -158,13 +358,13 @@ Keeping company and tenant in the top strip makes known context compete with the
 ## Public Contract
 
 - Belimbing is reference evidence, not visual or implementation authority.
-- Bilimbi identity IDs `K01`–`K09` are fixed constraints for parity work; Astra resolves routine design choices within them.
+- Bilimbi identity IDs `K01`–`K09` are fixed constraints for parity work; the design steward resolves routine design choices within them.
 - Ordinary company and tenant context is available through the bottom-left user account menu, not repeated in the top strip. Platform-operator, impersonated and other safety-critical scope remains visibly disclosed while active.
 - The top bar exposes the current timezone and light/dark theme selectors. What a selection must do — apply immediately, persist for the signed-in user and render truthfully — is stated once in `DESIGN.md`'s application shell section.
 - Equivalent actions use Belimbing's established icon choices through Bilimbi's icon registry, with logout as the explicit exception.
 - Every parity issue names the catalog IDs it owns, its dependencies, affected routes, owned files and acceptance evidence.
 - A catalog item is complete only when its disposition is recorded, the real component is shown in the Design Library, applicable states and keyboard behavior are tested, narrow and theme behavior are reviewed, and one production screen adopts it.
-- Astra accepts routine design choices from visual, interaction and production evidence; component and family completion does not require human selection. Unresolved business, security or durable data-contract decisions remain explicit blockers for the affected work only.
+- The design steward accepts routine design choices from visual, interaction and production evidence; component and family completion does not require human selection. Unresolved business, security or durable data-contract decisions remain explicit blockers for the affected work only.
 - Shared Base UI, theme, Design Spec and the parity ledger have one integration owner at a time.
 - Audit agents and module rollout agents do not edit those shared authority files concurrently.
 - Feature modules use semantic Base UI contracts and do not import Belimbing assets, CSS, Laravel names or private design-library markup.
@@ -182,20 +382,53 @@ Goal: Establish one current identity and catalog before any parity implementatio
 - [x] Preserve the subsequently merged #694 behavior through shared 24px inline icon controls, 24px sidebar unpin controls, status-first company actions and the pin-state regression test. `{astra_pr_gate/gpt-6-astra}`
 - [x] Reconcile current guidance on compact fields, open filter framing, calm destructive actions and content-sized pagination; distinguish planned shell contracts from shipped behavior. `{astra_pr_gate/gpt-6-astra}`
 - [x] Preserve identity IDs `K01`–`K09` and delegate routine acceptance to Astra under the user's instruction. `{astra_pr_gate/gpt-6-astra}`
-- [ ] Verify every catalog row against the current Bilimbi build and Belimbing reference.
-- [ ] Give each row its initial disposition and dependency without treating component existence as acceptance.
+- [x] Verify every catalog row against the current Bilimbi build and Belimbing reference. `{claude-opus-datetime-1/claude-opus-5}`
+- [x] Give each row its initial disposition and dependency without treating component existence as acceptance. `{claude-opus-datetime-1/claude-opus-5}`
 - [x] Create campaign #709 and shell child #710; create subsequent children when their slice boundaries are verified. `{crewmate/gpt-6}`
 
-Validation: A new agent can tell what must remain Bilimbi, what is being compared, what is already equivalent, what Astra decides and which business/security/data-contract questions require escalation.
+Validation: A new agent can tell what must remain Bilimbi, what is being compared, what is already equivalent, what the design steward decides and which business/security/data-contract questions require escalation.
 
 ### Phase 1 — Make the Design Library the parity workbench
 
-Goal: Let Astra or a product reviewer inspect one family at a time without a long, conflicting page.
+Goal: Let the design steward or a product reviewer inspect one family at a time without a long, conflicting page.
 
-- [ ] Align the secondary menu with the catalog families: Foundations, Page Structure, Navigation and Links, Actions, Inputs, Interaction Patterns, Feedback and States, Overlays, Data Display, Composite Patterns and Graphics.
-- [ ] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source.
-- [ ] Show the current Bilimbi component in every meaningful state for the active family.
-- [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record Astra's accepted disposition and rationale.
+- [x] Align the secondary menu with the catalog families: Foundations, Page Structure, Navigation and Links, Actions, Inputs, Interaction Patterns, Feedback and States, Overlays, Data Display, Composite Patterns and Graphics. `{claude-opus-families-1/claude-opus-5}`
+
+  What the alignment exposed, recorded so the next slice does not rediscover it:
+
+  - **Overlays is the only family with no specimen anywhere.** OVR-01 to OVR-04
+    are all missing, so `#component-overlays` renders its heading and says "No
+    specimen yet" instead of being dropped from the menu.
+  - **Foundations and Graphics are not empty; they are elsewhere.** The Theme
+    area already is FND and the Graphic area already is GFX, so both keep one
+    home and the family menu links to their routes rather than showing a second
+    copy under Components.
+  - **The section headed "Interaction patterns" was CMP-01.** Its search, table,
+    empty result and pagination are one operational index flow, so it is now
+    Composite patterns; Interaction patterns keeps INT-01 inline editing alone.
+  - **`<.card>` and `<.badge>` moved to Data display** (DAT-01, DAT-02) and the
+    application shell moved under Page structure (LAY-02), keeping its own
+    `#component-shell` deep link as a nested menu-linked section.
+  - **NAV-04 pagination still has no specimen of its own.** It renders twice,
+    both times inside the table it pages, so it stays with Data display and
+    Composite patterns; the coverage guard reports it as unpresented.
+  - The eleven family entries carry letter prefixes (`A Foundations` through
+    `K Graphics`), so the alphabetical ascending order root `AGENTS.md` §12
+    requires and the catalog order that makes the alignment checkable are the
+    same sequence. No exception to §12 is claimed or needed. Letters rather than
+    numbers because the page already renders dozens of catalog IDs (`LAY-01`, `OVR-04`
+    and so on): a numeric menu prefix sits beside those as a second numbering
+    system a reader could reasonably think is related, and letters cannot be
+    mistaken for a catalog ID. Letters also need no zero-padding, so a twelfth
+    family cannot silently break the sort the way unpadded numbers would.
+
+- [x] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source. `{codex-sol-specimens-1/gpt-5.6-sol}`
+- [x] Show the current Bilimbi component in every meaningful state for the active family. `{codex-luna-states-1/gpt-5.6-luna}`
+
+  Both landed on 2026-09-15 and neither finished the job: the `:design_library_drift`
+  guards still report four failures on `main`, and this branch left them unchanged.
+- [ ] Correct the four `:design_library_drift` specimen and state failures those two slices left, then move the guards into the default test run and `mix precommit`.
+- [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record the design steward's accepted disposition and rationale.
 - [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
 
 Affected pages: `/system/design-library`, `/system/design-library/components`, `/system/design-library/graphic`, `/system/design-library/design-spec`
@@ -237,7 +470,7 @@ Goal: Prove the primitives work together before broad migration.
 - [ ] Review all three at desktop and narrow widths, light and dark themes, keyboard only, loading, error and permission states.
 - [ ] Correct composition problems in the shared layer before starting broad rollout.
 
-Validation: Astra's browser and interaction review confirms that parity improves real work and still looks and feels like Bilimbi, with recorded evidence for each assembly.
+Validation: the design steward's browser and interaction review confirms that parity improves real work and still looks and feels like Bilimbi, with recorded evidence for each assembly.
 
 ### Phase 5 — Parallel production rollout
 
@@ -341,7 +574,7 @@ Goal: Give familiar actions named entries in the icon registry so call sites nam
 - [x] Run the shipping gate and land the change. `{codex-terra-icons-1/gpt-5.6-terra}`
 - [x] Follow-up after #715 — prove each named entry resolves to a Heroicon the build emits. `{fm/icon-registry-name-validity/opus-5}`
 
-`IconRegistry` now carries 73 glyph entries and 49 named actions on `main`, against three glyph entries before this slice.
+`IconRegistry` now carries 49 named actions on `main`, alongside the 3 Bilimbi glyph entries and 9 shell names it already had. The slice added the action vocabulary; the glyph count is unchanged by it.
 
 Not delivered by this slice, and still open under FND-06 and GFX-02: the searchable visual icon review with empty-result, copy and copied feedback. The registry holds the vocabulary; no review surface presents it yet.
 
@@ -349,9 +582,12 @@ The deferred gap is closed, after this slice and outside #715: registry names ar
 
 Delivery: https://github.com/BelimbingApp/bilimbi/pull/715 merged on 2026-09-15, closing #713.
 
-### In review — not yet merged
+### Design Library workbench slices — Issues #718 to #721
 
-These four are implemented with open pull requests. Their catalog rows above stay unticked until they land.
+Goal: Show real components in real states on the Design Library, and fail a test when
+it stops doing so.
+
+All four merged on 2026-09-15 and closed their issues:
 
 | Issue | Work | PR |
 |---|---|---|
@@ -360,4 +596,7 @@ These four are implemented with open pull requests. Their catalog rows above sta
 | #720 | Design Library missing component states | https://github.com/BelimbingApp/bilimbi/pull/716 |
 | #721 | Shell display controls with live-following timestamps | https://github.com/BelimbingApp/bilimbi/pull/717 |
 
-The drift guards in #722 land excluded from the default test run and from `mix precommit`, because they report specimens #719 and #720 are still correcting. Moving them into the default run is tracked separately and is blocked on those two. #722 merging does not mean the guards are active.
+Not finished by #719 and #720: the `:design_library_drift` guards report four failures
+on `main`, so #722's guards land excluded from the default test run and from
+`mix precommit`. Correcting those four and activating the guards is the open Phase 1
+checklist row above. #722 being merged does not mean the guards are active.
