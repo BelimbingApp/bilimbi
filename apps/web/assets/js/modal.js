@@ -7,12 +7,38 @@
 // bridges the two: it promotes the server's dialog to a modal one on mount,
 // forwards every close request to the server, and returns focus to the control
 // that opened the dialog once the server has removed it.
+//
+// Which control that is cannot be read from document.activeElement alone: a
+// browser that does not focus a <button> on click leaves focus on <body>, and
+// the dialog would then have nowhere to return it to. One capture-phase
+// listener records the control the user actually activated instead.
+const ACTIVATION_TARGETS = "button, a[href], [tabindex]"
+
+let lastActivated = null
+let capturing = false
+
+function rememberActivation({target}) {
+  lastActivated = target instanceof Element ? target.closest(ACTIVATION_TARGETS) : null
+}
+
+function captureActivations() {
+  if (capturing) return
+  capturing = true
+
+  document.addEventListener("pointerdown", rememberActivation, true)
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (e.key === "Enter" || e.key === " ") rememberActivation(e)
+    },
+    true,
+  )
+}
+
 const Modal = {
   mounted() {
-    // The control that opened the dialog still holds focus when the patch
-    // that inserted the dialog lands, so it is the place to return to.
-    const active = document.activeElement
-    this.opener = active && active !== document.body ? active : null
+    captureActivations()
+    this.opener = this.openerFrom(lastActivated) || this.openerFrom(document.activeElement)
 
     // The server renders `open` so a later patch never strips the attribute
     // and closes the dialog under the user. An open non-modal dialog cannot
@@ -39,6 +65,13 @@ const Modal = {
     if (opener && opener.isConnected && typeof opener.focus === "function") {
       opener.focus()
     }
+  },
+
+  openerFrom(candidate) {
+    if (!candidate || candidate === document.body) return null
+    if (!candidate.isConnected || this.el.contains(candidate)) return null
+
+    return typeof candidate.focus === "function" ? candidate : null
   },
 
   requestClose() {

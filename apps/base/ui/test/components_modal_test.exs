@@ -11,6 +11,14 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
   A modal that omits `on_cancel` is caught by Phoenix's missing-required-
   attribute warning, which `mix precommit` turns into a build failure by
   compiling with `--warnings-as-errors`.
+
+  Returning focus to the control that opened the dialog is the `Modal` hook's
+  alone: no caller marks its opener, and the hook records the control the user
+  activated rather than reading `document.activeElement`, which a browser that
+  does not focus a `<button>` on click leaves on `<body>`. Only the rendered
+  contract is checked here — that every dialog carries the hook and no call
+  site supplies a focus target. The recording itself needs a browser, and this
+  repository has no JavaScript test tooling, so a reviewer confirms it there.
   """
 
   use ExUnit.Case, async: true
@@ -112,5 +120,15 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
     assert dialog_tag =~ "data-owns-flash"
 
     refute without_flash =~ "flash"
+  end
+
+  test "focus return is carried by the hook, not by a per-caller focus target" do
+    markup = render_modal(%{described: false})
+
+    assert [dialog_tag] = Regex.run(~r/<dialog[^>]*>/, markup)
+    assert dialog_tag =~ ~s(phx-hook="Modal")
+
+    refute markup =~ "phx-focus"
+    refute markup =~ "autofocus"
   end
 end

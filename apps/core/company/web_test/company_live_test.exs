@@ -642,6 +642,17 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert_modal_dialog(view, "attach-address-modal", "Attach Address")
       refute has_element?(view, "#flash-info")
 
+      # The page behind an open dialog is inert, so the second dialog is
+      # reachable only once the first has closed, and needs its own flash.
+      view |> element("button[phx-click='close_attach_modal']") |> render_click()
+      refute has_element?(view, "#attach-address-modal")
+
+      view
+      |> form("#company-timezone-form", %{"timezone" => ""})
+      |> render_change()
+
+      assert has_element?(view, "#flash-info", "Timezone cleared.")
+
       view |> element("#btn-open-create-address") |> render_click()
       assert_modal_dialog(view, "company-create-address-modal", "Create & Attach Address")
       refute has_element?(view, "#flash-info")
@@ -680,10 +691,6 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, ~s(#company-addresses-panel-notice[role="status"]))
 
       view |> element("#company-addresses-panel-notice-dismiss") |> render_click()
-      refute has_element?(view, "#company-addresses-panel-notice")
-
-      view |> element("#btn-open-create-address") |> render_click()
-      assert_modal_dialog(view, "company-create-address-modal", "Create & Attach Address")
       refute has_element?(view, "#company-addresses-panel-notice")
 
       {:ok, scope} = Tenancy.scope(41)

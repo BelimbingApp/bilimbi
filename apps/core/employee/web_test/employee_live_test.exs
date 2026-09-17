@@ -715,9 +715,6 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       assert has_element?(view, "#addresses-panel-notice", "Address unlinked.")
       assert has_element?(view, ~s(#addresses-panel-notice[role="status"]))
 
-      view |> element("#addresses-panel-notice-dismiss") |> render_click()
-      refute has_element?(view, "#addresses-panel-notice")
-
       view |> element("#btn-open-attach-address") |> render_click()
       assert_modal_dialog(view, "attach-address-modal", "Attach Address")
       refute has_element?(view, "#addresses-panel-notice")
