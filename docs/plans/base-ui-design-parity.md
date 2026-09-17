@@ -73,7 +73,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | INP-03 [(contradicted)](#targets-the-evidence-contradicts) | Search | Generic search type | Add clear, empty, loading and result-update behavior. |
 | INP-04 | Select, multi-select, checkbox and radio | Shared components for all four, including `<.radio_group>`; state coverage partial | Complete open/close, summary, no-options, outside-click, Escape and keyboard behavior. |
 | INP-05 | Date, time, datetime and integer entry | Mostly native generic inputs | Define tabular display, step controls, validation and locale/timezone behavior. |
-| INP-06 | Secret input | Password field only | Distinguish saved mask, reveal, replacement and explicit clearing. |
+| INP-06 | Secret input | Password field with a caller-optional reveal control | Distinguish saved mask, reveal, replacement and explicit clearing. |
 | INP-07 | Searchable and editable combobox | Missing | Adopt the useful Belimbing behavior with full keyboard, async, no-result and commit/cancel states. |
 | INP-08 | Country and currency lookup | Missing | Build only the generic visual/interaction seam; domain data stays with its owning module. |
 | INP-09 | Segmented control | Missing | Add for short peer choices when a real Bilimbi workflow needs it. |
@@ -296,9 +296,16 @@ lost inside a design ledger:
   (`core/company/.../show_live.ex:982`), a hand-written button rather than a shared
   danger control. 22 `data-confirm` attributes across 17 files exist elsewhere, so
   the convention is established and these are the exceptions.
-- `<.multi_select>` cannot be closed by Escape or by its own toggle, and its
-  `aria-expanded` is the literal `"false"` at `components.ex:669` — it never changes,
-  so assistive technology is told the panel is shut while it is open.
+- `<.multi_select>` could not be closed by Escape or by its own toggle, and its
+  `aria-expanded` was the literal `"false"` — it never changed, so assistive technology
+  was told the panel was shut while it was open. Fixed in this change (INP-04): the
+  trigger's `aria-expanded` is the single record of open, and every path that opens or
+  closes the list writes that one attribute, with the list's visibility and the chevron
+  rotation derived from it in CSS. The trigger toggles it closed, click-away and focus
+  leaving the field close it, and while it is open Escape closes it from anywhere on the
+  page — returning focus to the trigger only when focus was already inside the field.
+  The behavior contract is stated once with the component in
+  `apps/base/ui/lib/ui/components.ex`.
 - `<.inline_edit>` drops focus to `document.body` on every Enter-commit; Escape
   returns focus correctly. A blank commit is silently discarded under a stale success
   flash.
