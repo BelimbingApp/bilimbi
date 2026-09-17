@@ -416,7 +416,11 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
       assert notification_count("%/admin/companies%") == 0
     end
 
-    test "a NULL url becomes residue instead of aborting the run" do
+    test "defence: a NULL url becomes residue instead of aborting the run" do
+      # `user_pins.url` is non-null in the verified baseline, so adoption -
+      # this step's documented precondition - refuses a database that could
+      # hold this row. The NOT NULL constraint is dropped here deliberately
+      # to reach the defensive branch; it is not a reachable production state.
       SQL.query!(Repo, "ALTER TABLE user_pins ALTER COLUMN url DROP NOT NULL", [])
 
       now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)

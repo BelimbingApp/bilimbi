@@ -76,7 +76,10 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
           required(:label) => String.t(),
           required(:url) => String.t() | nil,
           required(:reason) =>
-            {:no_bilimbi_route} | {:duplicate_of, pos_integer()} | {:update_failed, String.t()}
+            {:no_bilimbi_route}
+            | {:duplicate_of, pos_integer()}
+            | {:update_failed, String.t()}
+            | {:invalid_row, String.t()}
         }
 
   @type report :: %{
