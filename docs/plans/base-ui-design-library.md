@@ -117,7 +117,7 @@ Final closeout evidence: after integrating #694, `mix precommit` completed with 
 
 The foundation merged at https://github.com/BelimbingApp/bilimbi/pull/696 on 2026-09-14 at 07:02:16 UTC with all seven checks passing.
 
-The shell account menu, top-bar timezone/theme controls and icon parity are recorded requirements for the next slice. The wider parity campaign, optional inspection skill and adopter-owned library are follow-up work and do not block this foundation's closeout.
+The shell account menu, top-bar timezone/theme controls and the named icon vocabulary were the next slice's recorded requirements and shipped on 2026-09-15; `docs/plans/base-ui-design-parity.md` owns their delivery record, and the searchable icon review remains open there. The wider parity campaign, optional inspection skill and adopter-owned library are follow-up work and do not block this foundation's closeout.
 
 ### Phase 1 — Resolve and consolidate the default design
 
