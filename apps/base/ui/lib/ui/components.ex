@@ -1566,21 +1566,28 @@ defmodule Bilimbi.Base.UI.Components do
     display = assigns.display || Bilimbi.Base.UI.DateTimeDisplay.get()
     date_time = datetime_value(assigns.value)
     mode = display_mode(display)
+    format = assigns.format
+
+    # Both server-decidable modes are rendered up front, whatever the current
+    # mode is, so the browser can follow a mode change by copying a server
+    # string instead of formatting one of its own.
+    text_company = date_time && policy_datetime(date_time, format, :company, display)
+    text_utc = date_time && server_datetime(date_time, format)
 
     assigns =
       assigns
       |> assign(:date_time, date_time)
       |> assign(:date, date_value(assigns.value))
       |> assign(:mode, mode)
-      # Both server-decidable modes are rendered up front, whatever the
-      # current mode is, so the browser can follow a mode change by copying a
-      # server string instead of formatting one of its own.
-      |> assign(
-        :text_company,
-        date_time && policy_datetime(date_time, assigns.format, :company, display)
-      )
-      |> assign(:text_utc, date_time && server_datetime(date_time, assigns.format))
-      |> assign(:text, date_time && policy_datetime(date_time, assigns.format, mode, display))
+      |> assign(:text_company, text_company)
+      |> assign(:text_utc, text_utc)
+      # The mode's own text is always one of the two above rather than a third
+      # rendering: `:company` is `text_company`, and both `:local` and `:utc`
+      # delegate to `server_datetime/2`, which is `text_utc`. Picking avoids a
+      # third formatting pass per timestamp — and in `:company`, the product
+      # default, a second `DateTime.shift_zone/3` through the time zone
+      # database on every timestamp of every row.
+      |> assign(:text, if(mode == :company, do: text_company, else: text_utc))
 
     ~H"""
     <%!-- A calendar date is a zone-free fact: converting it through the
@@ -1619,10 +1626,6 @@ defmodule Bilimbi.Base.UI.Components do
 
   defp display_mode(%{mode: mode}) when mode in [:company, :local, :utc], do: mode
   defp display_mode(_display), do: :local
-
-  defp policy_datetime(value, format, :local, _display), do: server_datetime(value, format)
-
-  defp policy_datetime(value, format, :utc, _display), do: server_datetime(value, format)
 
   defp policy_datetime(value, format, :company, display) do
     with %{timezone: timezone, tz_db: tz_db} when is_binary(timezone) and is_atom(tz_db) <-

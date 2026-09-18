@@ -68,6 +68,21 @@ const DateTime = {
 
   destroyed() {
     instances.delete(this)
+
+    // With nothing left to repaint, stop observing. Otherwise the observer
+    // keeps a strong reference to a detached #app-shell — the root of the
+    // whole previous page — after navigating to a screen that carries no
+    // instants and so mounts no hook to re-arm it.
+    //
+    // Conditioned on the set being empty rather than on destroyed() alone:
+    // during LiveView navigation the incoming view's hooks mount BEFORE the
+    // outgoing view's are destroyed, so live instances are still registered
+    // here and an observer they depend on is never torn down underneath them.
+    if (instances.size === 0) {
+      observer?.disconnect()
+      observer = null
+      observed = null
+    }
   },
 
   renderDateTime() {

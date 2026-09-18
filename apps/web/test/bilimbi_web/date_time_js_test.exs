@@ -114,4 +114,111 @@ defmodule BilimbiWeb.DateTimeJsTest do
                "24/07/2026, 03:00 GMT-4"
     end
   end
+
+  describe "the shell observer's lifetime" do
+    # One page-level MutationObserver repaints every mounted instant when the
+    # shell publishes a new mode. It holds `#app-shell` — the root of the whole
+    # page — so it must not outlive the instants that need it, and must not be
+    # torn down while any of them remain.
+    setup do
+      {:ok, lifetime: observer_lifetime()}
+    end
+
+    test "arms one observer for the whole page, not one per instant", %{lifetime: l} do
+      assert l["created"] == 1
+      assert l["armedAfterMount"] == 1
+    end
+
+    test "keeps observing while any instant is still mounted", %{lifetime: l} do
+      # LiveView mounts the incoming view's hooks before destroying the
+      # outgoing view's, so a destroy with instances remaining is the ordinary
+      # navigation case and must not disarm the survivors' observer.
+      assert l["armedAfterFirstDestroy"] == 1
+    end
+
+    test "releases the detached shell once the last instant goes", %{lifetime: l} do
+      # The leak this closes: without it the observer keeps a strong reference
+      # to a detached #app-shell after navigating to a page with no instants,
+      # retaining that whole previous page's DOM.
+      assert l["armedAfterLastDestroy"] == 0
+    end
+
+    test "re-arms for a later page that does carry instants", %{lifetime: l} do
+      assert l["createdAfterRemount"] == 2
+      assert l["armedAfterRemount"] == 1
+    end
+  end
+
+  # Drives mount/destroy against a stubbed MutationObserver and shell, and
+  # reports how many observers were created and how many remain connected.
+  defp observer_lifetime do
+    encoded_source = @hook |> File.read!() |> Base.encode64()
+
+    script = """
+    const {default: DateTime} = await import("data:text/javascript;base64,#{encoded_source}")
+
+    const observers = []
+    globalThis.MutationObserver = class {
+      constructor(callback) {
+        this.callback = callback
+        this.connected = false
+        observers.push(this)
+      }
+      observe() { this.connected = true }
+      disconnect() { this.connected = false }
+    }
+
+    const shell = {dataset: {displayMode: "utc"}}
+    globalThis.document = {querySelector: s => (s === "#app-shell" ? shell : null)}
+
+    const instant = () => {
+      const hook = Object.create(DateTime)
+      hook.el = {
+        dateTime: "2026-08-18T10:00:00Z",
+        dataset: {
+          format: "datetime",
+          mode: "utc",
+          followShell: "true",
+          textUtc: "18/08/2026, 10:00 UTC",
+          textCompany: "18/08/2026, 18:00 +08",
+        },
+        textContent: "",
+        title: null,
+        removeAttribute() {},
+      }
+      return hook
+    }
+
+    const armed = () => observers.filter(o => o.connected).length
+
+    const first = instant()
+    const second = instant()
+    first.mounted()
+    second.mounted()
+    const armedAfterMount = armed()
+    const created = observers.length
+
+    first.destroyed()
+    const armedAfterFirstDestroy = armed()
+
+    second.destroyed()
+    const armedAfterLastDestroy = armed()
+
+    instant().mounted()
+    const createdAfterRemount = observers.length
+    const armedAfterRemount = armed()
+
+    console.log(JSON.stringify({
+      created,
+      armedAfterMount,
+      armedAfterFirstDestroy,
+      armedAfterLastDestroy,
+      createdAfterRemount,
+      armedAfterRemount,
+    }))
+    """
+
+    {output, 0} = System.cmd("node", ["--input-type=module", "--eval", script])
+    Jason.decode!(output)
+  end
 end
