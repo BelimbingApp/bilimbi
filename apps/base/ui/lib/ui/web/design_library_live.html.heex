@@ -1230,6 +1230,65 @@
                 filters_event="pattern-page-size"
               />
             </.card>
+            <.card
+              id="component-filter-toolbar"
+              title="Filter toolbar"
+              inner_class="space-y-5 p-4"
+            >
+              <p class="text-sm text-ink-muted">
+                One composition for every list's search, selects, and date pair. Every search box carries the same leading magnifier; labels are screen-reader only; helper text sits below its control; cells wrap on narrow screens.
+              </p>
+              <div id="filter-toolbar-full">
+                <h3 class="mb-2 text-sm font-semibold text-ink">
+                  Search, selects, and UTC date pair
+                </h3>
+                <.filter_toolbar
+                  id="design-library-filter-full"
+                  form={@filter_toolbar_full_form}
+                  event="filter-toolbar-preview"
+                >
+                  <:control
+                    type={:search}
+                    field={@filter_toolbar_full_form[:search]}
+                    id="design-library-filter-full-search"
+                    label="Search example companies"
+                    placeholder="Search example companies…"
+                  />
+                  <:control
+                    type={:select}
+                    field={@filter_toolbar_full_form[:status]}
+                    id="design-library-filter-full-status"
+                    label="Status filter"
+                    options={[{"All statuses", ""}, {"Active", "active"}, {"Pending", "pending"}]}
+                  />
+                  <:control
+                    type={:select}
+                    field={@filter_toolbar_full_form[:kind]}
+                    id="design-library-filter-full-kind"
+                    label="Kind filter"
+                    options={[
+                      {"All kinds", ""},
+                      {"Standard", "standard"},
+                      {"Advanced", "advanced"}
+                    ]}
+                  />
+                  <:control
+                    type={:date}
+                    field={@filter_toolbar_full_form[:start_date]}
+                    id="design-library-filter-full-start-date"
+                    label="Start date (UTC)"
+                    hint="UTC"
+                  />
+                  <:control
+                    type={:date}
+                    field={@filter_toolbar_full_form[:end_date]}
+                    id="design-library-filter-full-end-date"
+                    label="End date (UTC)"
+                    hint="UTC"
+                  />
+                </.filter_toolbar>
+              </div>
+            </.card>
           </section>
         </div>
       </section>

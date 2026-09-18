@@ -620,8 +620,8 @@ defmodule Bilimbi.Base.UI.Components do
     ]
   end
 
-  defp field_base_class do
-    "block w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-ink shadow-xs " <>
+  defp field_base_class(padding \\ "px-3") do
+    "block w-full rounded-md border bg-surface #{padding} py-1.5 text-sm text-ink shadow-xs " <>
       "transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none " <>
       "focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed " <>
       "disabled:bg-surface-sunken disabled:text-ink-subtle"
@@ -1045,6 +1045,178 @@ defmodule Bilimbi.Base.UI.Components do
         </button>
       </div>
     </nav>
+    """
+  end
+
+  @doc """
+  Renders the shared list filter toolbar: search fields, selects, and date
+  inputs framed as one open toolbar above the list surface (Design Spec C04).
+
+  Controls are declared through one repeating `control` slot and render in the
+  order they are written, so the template reads the way the toolbar looks.
+
+  Filter state itself stays where it already lives — the caller's form, event,
+  and URL round-trip are untouched, so the same inputs return the same rows.
+  This component owns only composition and presentation:
+
+    * Every control's framing comes from one shared field rule. The toolbar
+      takes no per-control class, because a per-control class is how five
+      controls end up laid out by two rules with nothing declaring which is
+      correct.
+    * Every search box carries the same leading magnifier, the same room that
+      clears it, and the same debounce, length cap, and autocomplete answer.
+      None of them is a caller's choice, so an operator who learns one list
+      recognises the search box on the next.
+    * Enter filters in place on every toolbar. The form carries the caller's
+      event as both `phx-change` and `phx-submit`, because a form with only a
+      change binding falls back to a native submit that reloads the page with
+      the form's own param names and drops the filter the operator typed.
+    * Labels are always screen-reader only. A page that shows some and hides
+      others drops the labelled controls below their row-mates, because a
+      visible label adds a row of height only some cells carry.
+    * Helper text sits below its control in one shape. A select's and a date's
+      rides its own `input`; a search box's sits below the box the magnifier
+      is centred in, so helper text never stretches that box and drags the
+      magnifier off the input.
+    * Cells wrap instead of squeezing. Each control is its own flex item, so
+      native date inputs stack on a narrow viewport rather than holding a
+      grid row wider than the page.
+
+  ## Examples
+
+      <.filter_toolbar id="companies-filters" form={@filters_form} event="filters">
+        <:control
+          type={:search}
+          field={@filters_form[:search]}
+          id="companies-search"
+          label="Search companies"
+          placeholder="Search by name, code, legal name, email, or jurisdiction..."
+        />
+        <:control
+          type={:select}
+          field={@filters_form[:status_filter]}
+          id="companies-status-filter"
+          label="Status filter"
+          options={[{"All statuses", "all"}, {"Active", "active"}]}
+        />
+      </.filter_toolbar>
+  """
+  attr(:id, :string, required: true, doc: "the toolbar form's DOM id")
+
+  attr(:form, :any,
+    required: true,
+    doc: "the caller's Phoenix form; field names and params are unchanged"
+  )
+
+  attr(:event, :string,
+    required: true,
+    doc: "the event the caller already handles; bound to both phx-change and phx-submit"
+  )
+
+  attr(:class, :any,
+    default: nil,
+    doc:
+      "extra classes for page context (for example mt-4 below tabs); the open-toolbar framing stays owned here"
+  )
+
+  slot :control, doc: "one filter control per entry, rendered in the order declared" do
+    attr(:type, :atom,
+      values: [:search, :select, :date],
+      required: true,
+      doc: "which control to render"
+    )
+
+    attr(:field, :any, required: true, doc: "the control's form field")
+    attr(:id, :string, required: true, doc: "the control's DOM id")
+    attr(:label, :string, required: true, doc: "the control's screen-reader-only label")
+
+    attr(:options, :list,
+      doc: "`:select` options passed to `Phoenix.HTML.Form.options_for_select/2`"
+    )
+
+    attr(:placeholder, :string, doc: "`:search` prompt text")
+    attr(:hint, :string, doc: "helper text rendered below the control")
+  end
+
+  def filter_toolbar(assigns) do
+    ~H"""
+    <.form
+      for={@form}
+      id={@id}
+      phx-change={@event}
+      phx-submit={@event}
+      class={["mb-2 flex flex-wrap items-start gap-x-3 gap-y-2", @class]}
+    >
+      <.toolbar_control :for={control <- @control} control={control} />
+    </.form>
+    """
+  end
+
+  attr(:control, :map, required: true)
+
+  defp toolbar_control(%{control: %{type: :search}} = assigns) do
+    ~H"""
+    <div class="min-w-52 flex-1 basis-64">
+      <.toolbar_label id={@control[:id]} label={@control[:label]} />
+      <div class="relative">
+        <.icon
+          name="search"
+          class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+        />
+        <.input
+          field={@control[:field]}
+          id={@control[:id]}
+          type="search"
+          wrapper_class="mb-0"
+          placeholder={@control[:placeholder]}
+          phx-debounce="300"
+          maxlength="255"
+          autocomplete="off"
+          class={field_base_class("pl-8 pr-3")}
+        />
+      </div>
+      <p :if={@control[:hint]} class="mt-1.5 text-xs text-ink-subtle">{@control[:hint]}</p>
+    </div>
+    """
+  end
+
+  defp toolbar_control(%{control: %{type: :select}} = assigns) do
+    ~H"""
+    <div class="w-full min-w-0 sm:w-auto sm:min-w-36">
+      <.toolbar_label id={@control[:id]} label={@control[:label]} />
+      <.input
+        field={@control[:field]}
+        id={@control[:id]}
+        type="select"
+        wrapper_class="mb-0"
+        options={@control[:options]}
+        hint={@control[:hint]}
+      />
+    </div>
+    """
+  end
+
+  defp toolbar_control(%{control: %{type: :date}} = assigns) do
+    ~H"""
+    <div class="w-full min-w-0 sm:w-auto">
+      <.toolbar_label id={@control[:id]} label={@control[:label]} />
+      <.input
+        field={@control[:field]}
+        id={@control[:id]}
+        type="date"
+        wrapper_class="mb-0"
+        hint={@control[:hint]}
+      />
+    </div>
+    """
+  end
+
+  attr(:id, :string, required: true)
+  attr(:label, :string, required: true)
+
+  defp toolbar_label(assigns) do
+    ~H"""
+    <label for={@id} class="sr-only">{@label}</label>
     """
   end
 
