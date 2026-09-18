@@ -465,11 +465,12 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     `K Graphics`), so the alphabetical ascending order root `AGENTS.md` §12
     requires and the catalog order that makes the alignment checkable are the
     same sequence. No exception to §12 is claimed or needed. Letters rather than
-    numbers because the page already renders dozens of catalog IDs (`LAY-01`, `OVR-04`
-    and so on): a numeric menu prefix sits beside those as a second numbering
-    system a reader could reasonably think is related, and letters cannot be
-    mistaken for a catalog ID. Letters also need no zero-padding, so a twelfth
-    family cannot silently break the sort the way unpadded numbers would.
+    numbers because the page then rendered dozens of catalog IDs (`LAY-01`,
+    `OVR-04` and so on, since dropped from the product by #728): a numeric menu
+    prefix sat beside those as a second numbering system a reader could
+    reasonably think was related, and letters cannot be mistaken for a catalog
+    ID. Letters also need no zero-padding, so a twelfth family cannot silently
+    break the sort the way unpadded numbers would.
 
 - [x] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source. `{codex-sol-specimens-1/gpt-5.6-sol}`
 - [x] Show the current Bilimbi component in every meaningful state for the active family. `{codex-luna-states-1/gpt-5.6-luna}`
