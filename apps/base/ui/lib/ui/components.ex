@@ -509,6 +509,16 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:wrapper_class, :any, default: nil, doc: "the class for the control wrapper")
   attr(:label_class, :any, default: nil, doc: "the class for the control label")
 
+  attr(:reveal, :any,
+    default: false,
+    doc: """
+    adds a show/hide control to a `password` input. `false` keeps the value
+    masked with no control, which is right for sign-in. `true` names the value
+    a secret; a string such as `"password"` or `"API key"` is the noun the
+    control's accessible name uses instead. Any other type rejects it.
+    """
+  )
+
   attr(:rest, :global,
     include: ~w(accept autocomplete capture cols disabled form list max maxlength min minlength
                 multiple pattern placeholder readonly required rows size step)
@@ -529,6 +539,12 @@ defmodule Bilimbi.Base.UI.Components do
   # empty and the label would announce to nothing. Fall back to the input name.
   def input(%{id: nil, name: name} = assigns) when is_binary(name) do
     assigns |> assign(:id, name) |> input()
+  end
+
+  def input(%{reveal: reveal, type: type})
+      when reveal not in [false, nil] and type != "password" do
+    raise ArgumentError,
+          "reveal only applies to a password input; got reveal=#{inspect(reveal)} on type=#{inspect(type)}"
   end
 
   def input(%{type: "hidden"} = assigns) do
@@ -635,6 +651,82 @@ defmodule Bilimbi.Base.UI.Components do
     """
   end
 
+  # A secret whose caller asked for a reveal control. The toggle is a real
+  # button whose accessible name states the action and the current state.
+  #
+  # The input's own `type` is the only record of masked-or-shown, and the
+  # click is the single JS command that flips it. LiveView keeps that
+  # attribute sticky across patches, so a form re-render never silently
+  # re-masks a value the user chose to see. The button's accessible name,
+  # title and glyph are derived from `type` by the `SecretReveal` hook rather
+  # than swapped alongside it: LiveView applies an attribute op synchronously
+  # but defers a class op to a later animation frame, so toggling both at once
+  # could invert them -- two clicks inside one frame flipped `type` twice and
+  # the glyph once, leaving a masked input showing the "hide" eye with no path
+  # back. The hook also keeps a pointer press from pulling focus out of the
+  # input.
+  def input(%{type: "password", reveal: reveal} = assigns) when reveal not in [false, nil] do
+    subject = if is_binary(reveal), do: reveal, else: gettext("secret")
+    show_label = gettext("Show %{subject}, currently hidden", subject: subject)
+    hide_label = gettext("Hide %{subject}, currently shown", subject: subject)
+    show_title = gettext("Show %{subject}", subject: subject)
+    hide_title = gettext("Hide %{subject}", subject: subject)
+
+    assigns =
+      assigns
+      |> assign(:show_label, show_label)
+      |> assign(:hide_label, hide_label)
+      |> assign(:show_title, show_title)
+      |> assign(:hide_title, hide_title)
+      |> assign(:toggle, JS.toggle_attribute({"type", "text", "password"}, to: "##{assigns.id}"))
+
+    ~H"""
+    <div class={@wrapper_class || "mb-4"}>
+      <label
+        :if={@label}
+        for={@id}
+        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
+      >
+        {@label}
+      </label>
+      <div class="flex items-center">
+        <input
+          type="password"
+          name={@name}
+          id={@id}
+          value={Phoenix.HTML.Form.normalize_value(@type, @value)}
+          class={[field_class(@class, @error_class, @errors), "pr-10"]}
+          {@rest}
+        />
+        <button
+          id={"#{@id}-reveal"}
+          type="button"
+          phx-hook="SecretReveal"
+          phx-click={@toggle}
+          aria-label={@show_label}
+          aria-controls={@id}
+          title={@show_title}
+          data-show-label={@show_label}
+          data-hide-label={@hide_label}
+          data-show-title={@show_title}
+          data-hide-title={@hide_title}
+          disabled={@rest[:disabled]}
+          class="-ml-[1.875rem] grid size-6 shrink-0 place-items-center rounded-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:text-ink-faint"
+        >
+          <span id={"#{@id}-reveal-show"} class="grid">
+            <.icon name="reveal" class="size-4" />
+          </span>
+          <span id={"#{@id}-reveal-hide"} class="grid hidden">
+            <.icon name="conceal" class="size-4" />
+          </span>
+        </button>
+      </div>
+      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={msg <- @errors}>{msg}</.error>
+    </div>
+    """
+  end
+
   # All other inputs text, datetime-local, url, password, etc. are handled here...
   def input(assigns) do
     ~H"""
@@ -687,6 +779,12 @@ defmodule Bilimbi.Base.UI.Components do
   Displays a button showing the selection summary (e.g. "All roles", "1 role selected",
   or "3 roles selected") with a chevron icon, and toggles a floating menu containing
   checkboxes for each option.
+
+  The trigger's `aria-expanded` follows the menu. Clicking the trigger again,
+  clicking outside, or moving focus out of the field closes it. While it is
+  open, Escape closes it from anywhere on the page; focus returns to the
+  trigger only when focus was already inside the field, and otherwise stays
+  where the user put it.
 
   ## Examples
 
@@ -789,6 +887,47 @@ defmodule Bilimbi.Base.UI.Components do
         assigns.selection_label
       )
 
+    # `aria-expanded` follows the list because the same command moves both.
+    # Click-away sits on the wrapper: LiveView dispatches click-away before
+    # the click it belongs to, so a click-away on the list itself would close
+    # and the trigger's toggle would reopen in the same click. Escape is the
+    # only path that returns focus to the trigger, and only from a press that
+    # was already inside the field: the hook runs plain `dismiss` otherwise,
+    # so Escape typed into a search box elsewhere on the page closes the list
+    # without taking the caret. Every other path leaves focus where the user
+    # put it.
+    #
+    # Dismiss and escape are published on the wrapper for the
+    # `MultiSelectDismiss` hook, which owns the two dismissals LiveView has
+    # no binding for: focus leaving the field, and Escape from wherever focus
+    # actually is -- a list opened by mouse in Safari or macOS Firefox is open
+    # with focus still on `body`. LiveView reads a key binding from the event
+    # target alone, so an element-level `phx-keydown` here would also stop
+    # every key ever reaching the page's `phx-window-keydown` handlers. The
+    # list is focusable so a click on its padding lands inside the field
+    # rather than on `body`.
+    #
+    # The trigger carries `aria-expanded` and `aria-controls` and no
+    # `aria-haspopup`: the list is a disclosure of checkboxes, not a menu, and
+    # `aria-haspopup="true"` would announce menu semantics with arrow-key
+    # navigation that nothing here implements.
+    #
+    # The trigger's `aria-expanded` is the only record of open, and every
+    # command below writes that one attribute and nothing else. The list's
+    # visibility and the chevron's rotation are CSS derived from it through
+    # the `peer`/`group` relationships the markup already has, so they cannot
+    # disagree with it. Toggling them alongside the attribute is what they
+    # used to do, and it could invert: LiveView applies an attribute op
+    # synchronously but defers a class op to a later animation frame, so two
+    # activations landing in one frame flipped the attribute twice and the
+    # classes once, leaving an open list announcing `aria-expanded="false"`.
+    # Deriving is also why the accessible state survives a patch for free --
+    # only the attribute has to be sticky.
+    id = assigns.id
+
+    dismiss = JS.set_attribute({"aria-expanded", "false"}, to: "##{id}")
+    toggle = JS.toggle_attribute({"aria-expanded", "true", "false"}, to: "##{id}")
+
     assigns =
       assigns
       |> assign(:input_name, input_name)
@@ -796,10 +935,17 @@ defmodule Bilimbi.Base.UI.Components do
       |> assign(:normalized_options, normalized_options)
       |> assign(:selected_count, selected_count)
       |> assign(:summary_label, summary_label)
+      |> assign(:dismiss, dismiss)
+      |> assign(:toggle, toggle)
+      |> assign(:escape, JS.focus(dismiss, to: "##{id}"))
 
     ~H"""
     <div
       id={"#{@id}-wrapper"}
+      phx-hook="MultiSelectDismiss"
+      data-dismiss={@dismiss}
+      data-escape={@escape}
+      phx-click-away={@dismiss}
       class={["relative", @wrapper_class || "mb-4"]}
     >
       <input type="hidden" name={@input_name} value="" />
@@ -815,15 +961,11 @@ defmodule Bilimbi.Base.UI.Components do
       <button
         id={@id}
         type="button"
-        aria-haspopup="true"
         aria-expanded="false"
         aria-controls={"#{@id}-options"}
-        phx-click={
-          JS.toggle_class("hidden", to: "##{@id}-options")
-          |> JS.toggle_class("rotate-180", to: "##{@id}-chevron")
-        }
+        phx-click={@toggle}
         class={[
-          "flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30",
+          "peer group flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30",
           @class
         ]}
         {@rest}
@@ -833,7 +975,7 @@ defmodule Bilimbi.Base.UI.Components do
         </span>
         <span
           id={"#{@id}-chevron"}
-          class="inline-flex shrink-0 transition-transform duration-200"
+          class="inline-flex shrink-0 transition-transform duration-200 group-aria-expanded:rotate-180"
         >
           <.icon
             name="hero-chevron-down"
@@ -844,11 +986,8 @@ defmodule Bilimbi.Base.UI.Components do
 
       <div
         id={"#{@id}-options"}
-        phx-click-away={
-          JS.add_class("hidden", to: "##{@id}-options")
-          |> JS.remove_class("rotate-180", to: "##{@id}-chevron")
-        }
-        class="hidden absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg space-y-0.5"
+        tabindex="-1"
+        class="hidden peer-aria-expanded:block absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg space-y-0.5 focus:outline-none"
       >
         <label
           :for={{opt_label, opt_value} <- @normalized_options}
