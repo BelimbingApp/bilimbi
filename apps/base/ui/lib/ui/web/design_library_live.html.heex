@@ -706,16 +706,6 @@
                 does not belong here: it replaces the control's text, which on an icon-only action deletes the glyph.
               </p>
             </.card>
-            <.card id="component-icon" title="Icons" inner_class="p-4">
-              <div class="flex items-center gap-2">
-                <.icon name="bilimbi-pin" class="size-5 text-action" />
-                <p class="text-sm text-ink">A registered glyph names its meaning.</p>
-              </div>
-              <div class="mt-3 flex items-center gap-2 border-t border-line pt-3">
-                <.icon name="hero-users" class="size-5 text-action" />
-                <p class="text-sm text-ink">Anything else passes a Heroicon through.</p>
-              </div>
-            </.card>
           </section>
 
           <section id="component-inputs" class="scroll-mt-4 space-y-4">
@@ -864,6 +854,7 @@
                   <.multi_select
                     field={@sample_form[:plain_roles]}
                     id="design-library-multi-select-plain"
+                    aria-label="Roles"
                     options={[
                       {"Administrator", "admin"},
                       {"Operator", "operator"},
@@ -878,6 +869,7 @@
                 <.radio_group
                   id="design-library-radio-locked"
                   name="locked_region"
+                  aria-label="Data region"
                   value="sg"
                   disabled
                   hint="Your organization set this for everyone."
@@ -885,8 +877,9 @@
                   wrapper_class="mb-0"
                 />
                 <p class="mt-3 border-t border-line pt-3 text-xs text-ink-muted">
-                  Locked, so every choice is inert. The card heading names the group, so it
-                  carries no label of its own, and the hint says who decided.
+                  Locked, so every choice is inert. The card heading names the group on
+                  screen and an <code>aria-label</code> names it for assistive tech, so it
+                  passes no label of its own, and the hint says who decided.
                 </p>
               </.card>
 
@@ -1004,6 +997,29 @@
                     hint="As printed on the certificate."
                     errors={["can't be blank"]}
                   />
+                </div>
+                <.radio_group
+                  id="component-radio-disabled"
+                  name="radio_disabled"
+                  label="Locked appearance"
+                  value="system"
+                  disabled
+                  options={[
+                    {"System", "system"},
+                    {"Light", "light"},
+                    {"Dark", "dark"}
+                  ]}
+                  wrapper_class="mb-0 mt-4"
+                />
+              </.card>
+
+              <.card
+                id="component-input-variants"
+                title="Select, multi-value, and search inputs"
+                inner_class="p-4 lg:col-span-2"
+                class="lg:col-span-2"
+              >
+                <div class="grid gap-x-3 sm:grid-cols-2 lg:grid-cols-4">
                   <.input
                     name="example_role"
                     type="select"
@@ -1041,19 +1057,11 @@
                     value=""
                   />
                 </div>
-                <.radio_group
-                  id="component-radio-disabled"
-                  name="radio_disabled"
-                  label="Locked appearance"
-                  value="system"
-                  disabled
-                  options={[
-                    {"System", "system"},
-                    {"Light", "light"},
-                    {"Dark", "dark"}
-                  ]}
-                  wrapper_class="mb-0 mt-4"
-                />
+                <p class="mt-3 border-t border-line pt-3 text-xs text-ink-muted">
+                  A prompt names the empty choice, both multi-value controls report how
+                  many are chosen, and the search box takes an <code>aria-label</code>
+                  rather than a visible one.
+                </p>
               </.card>
             </.form>
           </section>
@@ -1574,126 +1582,128 @@
 
     <%= if @area == :graphic do %>
       <section id="graphics" class="space-y-8">
-        <section id="graphic-mark" class="space-y-4">
-          <div>
-            <h2 class="text-base font-semibold text-ink-strong">Bilimbi mark</h2><p class="text-sm text-ink-muted">
-              One mark, shown at the sizes and surfaces currently in use.
-            </p>
-          </div>
-          <div class="grid gap-3 sm:grid-cols-3">
-            <div class="grid min-h-36 place-items-center rounded-xl border border-line bg-canvas p-4">
-              <div class="text-center">
-                <img src={~p"/images/logo.svg"} alt="Bilimbi" class="mx-auto size-9" /><p class="mt-3 text-xs text-ink-muted">
-                  Sign in · 36px
-                </p>
+        <div id="component-icon" class="space-y-8">
+          <section id="graphic-mark" class="space-y-4">
+            <div>
+              <h2 class="text-base font-semibold text-ink-strong">Bilimbi mark</h2><p class="text-sm text-ink-muted">
+                One mark, shown at the sizes and surfaces currently in use.
+              </p>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-3">
+              <div class="grid min-h-36 place-items-center rounded-xl border border-line bg-canvas p-4">
+                <div class="text-center">
+                  <img src={~p"/images/logo.svg"} alt="Bilimbi" class="mx-auto size-9" /><p class="mt-3 text-xs text-ink-muted">
+                    Sign in · 36px
+                  </p>
+                </div>
+              </div>
+              <div class="grid min-h-36 place-items-center rounded-xl border border-line bg-surface-sidebar p-4">
+                <div class="text-center">
+                  <img src={~p"/images/logo.svg"} alt="Bilimbi" class="mx-auto size-6" /><p class="mt-3 text-xs text-ink-muted">
+                    App bar · 24px
+                  </p>
+                </div>
+              </div>
+              <div class="grid min-h-36 place-items-center rounded-xl border border-line bg-surface p-4 shadow-xs">
+                <div class="text-center">
+                  <img src={~p"/favicon.svg"} alt="Bilimbi favicon" class="mx-auto size-8" /><p class="mt-3 text-xs text-ink-muted">
+                    Browser icon · 32px
+                  </p>
+                </div>
               </div>
             </div>
-            <div class="grid min-h-36 place-items-center rounded-xl border border-line bg-surface-sidebar p-4">
-              <div class="text-center">
-                <img src={~p"/images/logo.svg"} alt="Bilimbi" class="mx-auto size-6" /><p class="mt-3 text-xs text-ink-muted">
-                  App bar · 24px
-                </p>
+            <div class="rounded-xl border border-line bg-surface p-4 shadow-xs">
+              <h3 class="mb-2 text-sm font-semibold text-ink">Bilimbi-specific icons</h3>
+              <div class="flex flex-wrap gap-5">
+                <div class="flex items-center gap-2">
+                  <.icon name="bilimbi-pin" class="size-5 text-action" /><span class="text-sm text-ink">Pin to sidebar</span>
+                </div><div class="flex items-center gap-2">
+                  <.icon name="bilimbi-impersonate" class="size-5 text-action" /><span class="text-sm text-ink">Impersonate user</span>
+                </div>
               </div>
             </div>
-            <div class="grid min-h-36 place-items-center rounded-xl border border-line bg-surface p-4 shadow-xs">
-              <div class="text-center">
-                <img src={~p"/favicon.svg"} alt="Bilimbi favicon" class="mx-auto size-8" /><p class="mt-3 text-xs text-ink-muted">
-                  Browser icon · 32px
-                </p>
-              </div>
-            </div>
-          </div>
-          <div class="rounded-xl border border-line bg-surface p-4 shadow-xs">
-            <h3 class="mb-2 text-sm font-semibold text-ink">Bilimbi-specific icons</h3>
-            <div class="flex flex-wrap gap-5">
-              <div class="flex items-center gap-2">
-                <.icon name="bilimbi-pin" class="size-5 text-action" /><span class="text-sm text-ink">Pin to sidebar</span>
-              </div><div class="flex items-center gap-2">
-                <.icon name="bilimbi-impersonate" class="size-5 text-action" /><span class="text-sm text-ink">Impersonate user</span>
-              </div>
-            </div>
-          </div>
-        </section>
+          </section>
 
-        <section id="graphic-icons" class="space-y-4">
-          <div>
-            <h2 class="text-base font-semibold text-ink-strong">Icons</h2><p class="text-sm text-ink-muted">
-              Outline icons are the current default. Familiar actions share one named glyph so the mapping cannot drift.
-            </p>
-          </div>
-          <div class="space-y-5 rounded-xl border border-line bg-surface p-4 shadow-xs">
+          <section id="graphic-icons" class="space-y-4">
             <div>
-              <h3 class="mb-2 text-sm font-semibold text-ink">Navigation</h3><div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                <div class="flex items-center gap-3 rounded-lg bg-canvas p-3">
-                  <.icon name="hero-building-office-2" class="size-5 text-action" /><span class="text-sm text-ink">Companies</span>
-                </div><div class="flex items-center gap-3 rounded-lg bg-canvas p-3">
-                  <.icon name="hero-users" class="size-5 text-action" /><span class="text-sm text-ink">Users</span>
-                </div><div class="flex items-center gap-3 rounded-lg bg-canvas p-3">
-                  <.icon name="hero-shield-check" class="size-5 text-action" /><span class="text-sm text-ink">Authorization</span>
-                </div><div class="flex items-center gap-3 rounded-lg bg-canvas p-3">
-                  <.icon name="hero-cog-6-tooth" class="size-5 text-action" /><span class="text-sm text-ink">System</span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <h3 class="mb-2 text-sm font-semibold text-ink">Actions</h3><div class="flex flex-wrap gap-2">
-                <.button><.icon name="create" /> Add</.button>
-                <.button><.icon name="edit" /> Edit</.button>
-                <.button><.icon name="search" /> Search</.button>
-                <.button variant="danger"><.icon name="delete" /> Delete</.button>
-              </div>
-            </div>
-            <div>
-              <h3 class="mb-2 text-sm font-semibold text-ink">Status</h3><div class="flex flex-wrap gap-5">
-                <div class="flex items-center gap-2 text-success-ink">
-                  <.icon name="success" class="size-5" /><span class="text-sm">Completed</span>
-                </div><div class="flex items-center gap-2 text-warning-ink">
-                  <.icon name="warning" class="size-5" /><span class="text-sm">Attention</span>
-                </div><div class="flex items-center gap-2 text-danger-ink">
-                  <.icon name="error" class="size-5" /><span class="text-sm">Failed</span>
-                </div><div class="flex items-center gap-2 text-ink-muted">
-                  <.icon name="information" class="size-5" /><span class="text-sm">Information</span>
-                </div>
-              </div>
-            </div>
-            <div id="graphic-icon-variants" class="border-t border-line pt-4">
-              <h3 class="mb-2 text-sm font-semibold text-ink">Icon treatments</h3>
-              <div class="flex flex-wrap items-end gap-6">
-                <div class="text-center">
-                  <.icon name="hero-check-circle" class="mx-auto text-success" />
-                  <p class="mt-1 text-xs text-ink-muted">Outline — the default</p>
-                </div>
-                <div class="text-center">
-                  <.icon name="hero-check-circle-solid" class="mx-auto text-success" />
-                  <p class="mt-1 text-xs text-ink-muted">Solid</p>
-                </div>
-                <div class="text-center">
-                  <.icon name="hero-check-circle-mini" class="mx-auto text-success" />
-                  <p class="mt-1 text-xs text-ink-muted">Mini</p>
-                </div>
-              </div>
-              <p class="mt-3 text-xs text-ink-muted">
-                Outline and solid use regular dimensions; Mini is a smaller-optimized drawing intended for compact use.
-              </p>
-              <h3 class="mb-2 mt-4 text-sm font-semibold text-ink">
-                Size and color are set where the icon is used
-              </h3>
-              <div class="flex flex-wrap items-end gap-6">
-                <div class="text-center">
-                  <.icon name="hero-check-circle" class="mx-auto size-4 text-success" />
-                  <p class="mt-1 text-xs text-ink-muted">Small, success green</p>
-                </div>
-                <div class="text-center">
-                  <.icon name="hero-check-circle" class="mx-auto size-7 text-muted" />
-                  <p class="mt-1 text-xs text-ink-muted">Large, muted</p>
-                </div>
-              </div>
-              <p class="mt-3 text-xs text-ink-muted">
-                Icons have no built-in interaction or disabled state; the name chooses the drawing and the screen sets its size and color.
+              <h2 class="text-base font-semibold text-ink-strong">Icons</h2><p class="text-sm text-ink-muted">
+                Outline icons are the current default. Familiar actions share one named glyph so the mapping cannot drift.
               </p>
             </div>
-          </div>
-        </section>
+            <div class="space-y-5 rounded-xl border border-line bg-surface p-4 shadow-xs">
+              <div>
+                <h3 class="mb-2 text-sm font-semibold text-ink">Navigation</h3><div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  <div class="flex items-center gap-3 rounded-lg bg-canvas p-3">
+                    <.icon name="hero-building-office-2" class="size-5 text-action" /><span class="text-sm text-ink">Companies</span>
+                  </div><div class="flex items-center gap-3 rounded-lg bg-canvas p-3">
+                    <.icon name="hero-users" class="size-5 text-action" /><span class="text-sm text-ink">Users</span>
+                  </div><div class="flex items-center gap-3 rounded-lg bg-canvas p-3">
+                    <.icon name="hero-shield-check" class="size-5 text-action" /><span class="text-sm text-ink">Authorization</span>
+                  </div><div class="flex items-center gap-3 rounded-lg bg-canvas p-3">
+                    <.icon name="hero-cog-6-tooth" class="size-5 text-action" /><span class="text-sm text-ink">System</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h3 class="mb-2 text-sm font-semibold text-ink">Actions</h3><div class="flex flex-wrap gap-2">
+                  <.button><.icon name="create" /> Add</.button>
+                  <.button><.icon name="edit" /> Edit</.button>
+                  <.button><.icon name="search" /> Search</.button>
+                  <.button variant="danger"><.icon name="delete" /> Delete</.button>
+                </div>
+              </div>
+              <div>
+                <h3 class="mb-2 text-sm font-semibold text-ink">Status</h3><div class="flex flex-wrap gap-5">
+                  <div class="flex items-center gap-2 text-success-ink">
+                    <.icon name="success" class="size-5" /><span class="text-sm">Completed</span>
+                  </div><div class="flex items-center gap-2 text-warning-ink">
+                    <.icon name="warning" class="size-5" /><span class="text-sm">Attention</span>
+                  </div><div class="flex items-center gap-2 text-danger-ink">
+                    <.icon name="error" class="size-5" /><span class="text-sm">Failed</span>
+                  </div><div class="flex items-center gap-2 text-ink-muted">
+                    <.icon name="information" class="size-5" /><span class="text-sm">Information</span>
+                  </div>
+                </div>
+              </div>
+              <div id="graphic-icon-variants" class="border-t border-line pt-4">
+                <h3 class="mb-2 text-sm font-semibold text-ink">Icon treatments</h3>
+                <div class="flex flex-wrap items-end gap-6">
+                  <div class="text-center">
+                    <.icon name="hero-check-circle" class="mx-auto text-success" />
+                    <p class="mt-1 text-xs text-ink-muted">Outline — the default</p>
+                  </div>
+                  <div class="text-center">
+                    <.icon name="hero-check-circle-solid" class="mx-auto text-success" />
+                    <p class="mt-1 text-xs text-ink-muted">Solid</p>
+                  </div>
+                  <div class="text-center">
+                    <.icon name="hero-check-circle-mini" class="mx-auto text-success" />
+                    <p class="mt-1 text-xs text-ink-muted">Mini</p>
+                  </div>
+                </div>
+                <p class="mt-3 text-xs text-ink-muted">
+                  Outline and solid use regular dimensions; Mini is a smaller-optimized drawing intended for compact use.
+                </p>
+                <h3 class="mb-2 mt-4 text-sm font-semibold text-ink">
+                  Size and color are set where the icon is used
+                </h3>
+                <div class="flex flex-wrap items-end gap-6">
+                  <div class="text-center">
+                    <.icon name="hero-check-circle" class="mx-auto size-4 text-success" />
+                    <p class="mt-1 text-xs text-ink-muted">Small, success green</p>
+                  </div>
+                  <div class="text-center">
+                    <.icon name="hero-check-circle" class="mx-auto size-7 text-muted" />
+                    <p class="mt-1 text-xs text-ink-muted">Large, muted</p>
+                  </div>
+                </div>
+                <p class="mt-3 text-xs text-ink-muted">
+                  Icons have no built-in interaction or disabled state; the name chooses the drawing and the screen sets its size and color.
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
       </section>
     <% end %>
 
