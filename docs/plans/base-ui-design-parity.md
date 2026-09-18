@@ -3,7 +3,7 @@
 **Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families. Application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display are merged to `main`; the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
 **Last Updated:** 2026-09-18
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1)
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1); `fm/parity-plan-checklist-reconcile/muse-spark`
 
 ## Problem Essence
 
@@ -495,10 +495,10 @@ Validation: The reviewer can reach any catalog family quickly, interact with the
 
 Goal: Complete evidence and recommended dispositions without changing production design prematurely.
 
-- [x] Lane A — audit FND, LAY and NAV against both applications and representative shell/page routes.
-- [x] Lane B — audit ACT, FBK and OVR, including loading, dismissal, confirmation and recovery.
-- [x] Lane C — audit INP and INT, including field shell, keyboard behavior, editing and rich choices.
-- [x] Lane D — audit DAT, CMP and GFX, including actual index, form, detail, authentication and dashboard flows.
+- [x] Lane A — audit FND, LAY and NAV against both applications and representative shell/page routes. `{fm/parity-plan-checklist-reconcile/muse-spark}`
+- [x] Lane B — audit ACT, FBK and OVR, including loading, dismissal, confirmation and recovery. `{fm/parity-plan-checklist-reconcile/muse-spark}`
+- [x] Lane C — audit INP and INT, including field shell, keyboard behavior, editing and rich choices. `{fm/parity-plan-checklist-reconcile/muse-spark}`
+- [x] Lane D — audit DAT, CMP and GFX, including actual index, form, detail, authentication and dashboard flows. `{fm/parity-plan-checklist-reconcile/muse-spark}`
 - [ ] Integration owner consolidates reports into this ledger and removes duplicate or speculative targets.
 
 The four lane audits ran on 2026-09-16 and produced evidence only; their reports are held outside the repository. What landed on 2026-09-17: seven understated rows — LAY-05, ACT-02, DAT-01, CMP-02, CMP-03, CMP-05 and CMP-06 — were restated in the catalog table above; the NAV-01, ACT-01 and OVR-02 corrections and the OVR-01 and CMP-01 additions were recorded under Targets the evidence contradicts; and the two captain rulings were recorded under Design Decisions. Nothing else from the four reports is claimed to be on file: consolidating them into this ledger remains open.
@@ -680,8 +680,7 @@ deferred until a workflow needs that sentence; unavailable and reconnect states
 keep the existing Schedule alerts and layout flashes, which the ledger row
 records as Keep Bilimbi.
 
-Delivery: pending. The work is on `fm/empty-and-permission-states` with no child
-issue and no PR yet; whoever merges it records the PR URL and merge date here.
+Delivery: https://github.com/BelimbingApp/bilimbi/pull/740 merged on 2026-09-18.
 
 ### Field shell states slice — INP-01 and INP-02, partial
 
