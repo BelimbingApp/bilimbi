@@ -71,6 +71,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
     {:noreply,
      socket
+     |> clear_flash()
      |> assign(:modal_action, :new)
      |> assign(:editing_postcode_id, nil)
      |> assign(:editing_revision, nil)
@@ -90,6 +91,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
 
             {:noreply,
              socket
+             |> clear_flash()
              |> assign(:modal_action, :edit)
              |> assign(:editing_postcode_id, postcode.id)
              |> assign(:editing_revision, postcode.revision)
@@ -303,18 +305,15 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
           />
         </.card>
 
-        <div
+        <.modal
           :if={@modal_action in [:new, :edit]}
           id="postcode-modal"
-          class="fixed inset-0 z-40 flex items-start justify-center bg-ink/40 p-6"
+          title={if @modal_action == :new, do: "New Postcode", else: "Edit Postcode"}
+          width={:wide}
+          flash={@flash}
+          on_cancel={JS.push("close-postcode-modal")}
         >
-          <div class="mt-10 w-full max-w-2xl rounded-xl border border-line bg-surface p-6 shadow-sm">
-            <h2 class="text-lg font-medium tracking-tight text-ink-strong">
-              {if @modal_action == :new, do: "New Postcode", else: "Edit Postcode"}
-            </h2>
-            <p class="mt-1 text-xs text-ink-subtle">
-              Local corrections survive future GeoNames country refreshes.
-            </p>
+          <:description>Local corrections survive future GeoNames country refreshes.</:description>
 
             <.form
               :if={@postcode_form}
@@ -394,8 +393,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
                 </.button>
               </div>
             </.form>
-          </div>
-        </div>
+        </.modal>
       </.page>
     </Layouts.app>
     """

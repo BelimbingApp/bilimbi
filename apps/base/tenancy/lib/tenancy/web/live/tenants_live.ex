@@ -43,6 +43,7 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
     if can_create?(socket) do
       {:noreply,
        socket
+       |> clear_flash()
        |> assign(:show_create, true)
        |> assign_form(create_changeset(%{}))}
     else

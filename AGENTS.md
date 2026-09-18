@@ -597,7 +597,23 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   (`hover:bg-action-hover`, `lime-600` light / `lime-500` dark). Lime `brand`
   is reserved for orientation and selection, never an action or status. Async actions
   must show in-flight state, reject duplicate work, and truthfully report the data
-  outcome and recovery.
+  outcome and recovery: `phx-disable-with` covers one socket round trip, which
+  `app.js` mirrors onto `aria-busy`. It swaps the control's text, so it belongs
+  on text controls only and never on `<.icon_button>`, whose glyph it would
+  delete. A wait the server knows about (the sign-in handoff, an async delete)
+  is `<.button busy>` or `<.icon_button busy>`, which disables the control,
+  marks it and announces `aria-busy`.
+- **Flash messages:** `put_flash` kinds are `:success`, `:info`, `:warning`,
+  and `:error`. The layout's `flash_group` is the single stacked outlet:
+  only success carries the eight-second timer, while info, warning and error
+  stay until dismissed. That timer is dormant groundwork: no caller emits a
+  success flash, and info stays sticky because callers use it for actionable
+  failure notices, so nothing times out until those call sites migrate.
+  `:success` and `:info` still share the success colouring because
+  most `put_flash(:info, ...)` call sites report a completed write; correcting
+  that means migrating those callers, not repainting `:info`. The shell's
+  preference status line is deliberately not a flash. Do not build a second
+  notification surface.
 - **Compact actions:** Use `<.icon_button>` for familiar repeated secondary
   actions in tables and toolbars. Inline icon controls are `size-6` (24px targets); table and
   toolbar icon controls are `size-7`. Every icon-only action has a truthful
@@ -607,7 +623,7 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
 - **Data tables & inline editing:** Tables use compact density (`py-0.5` row
   cells, `py-1.5` header cells, `px-2` cell horizontal padding,
   `bg-surface-sunken` header background, proper case
-  `text-xs font-semibold text-muted` headers,
+  `text-xs font-semibold text-ink-subtle` headers,
   tabular numbers for numeric/code/date columns). Search filters use an open
   toolbar with an `mb-2` gap above the table card; do not wrap the toolbar in
   another card. Inline editing uses `<.inline_edit>` with

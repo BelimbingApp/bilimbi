@@ -124,6 +124,44 @@ defmodule BilimbiWeb.CompanyLiveTest do
                "Bilimbi Subsidiary"
     end
 
+    test "toolbar search and status filter round-trip through the URL", %{conn: conn} do
+      grant_capabilities!(["admin.company.list"])
+      conn = log_in_as(conn)
+
+      {:ok, view, _html} = live(conn, ~p"/companies")
+
+      # The shared toolbar sends the same search a URL visit would carry.
+      view
+      |> form("#companies-filters", filters: %{"search" => "Subsidiary", "status_filter" => "all"})
+      |> render_change()
+
+      assert_patch(view, ~p"/companies?search=Subsidiary")
+      assert has_element?(view, "#companies td", "Bilimbi Subsidiary")
+      refute has_element?(view, "#companies td a", "Bilimbi Industries")
+
+      # The patched URL reloads to the same rows with the toolbar state retained.
+      {:ok, reloaded, _html} = live(conn, ~p"/companies?search=Subsidiary")
+      assert has_element?(reloaded, "#companies td", "Bilimbi Subsidiary")
+      refute has_element?(reloaded, "#companies td a", "Bilimbi Industries")
+      assert has_element?(reloaded, "#companies-search[value='Subsidiary']")
+
+      # The shared toolbar sends the same status filter a URL visit would carry.
+      reloaded
+      |> form("#companies-filters", filters: %{"search" => "", "status_filter" => "suspended"})
+      |> render_change()
+
+      assert_patch(reloaded, ~p"/companies?status=suspended")
+      assert has_element?(reloaded, "#companies-empty")
+
+      {:ok, filtered, _html} = live(conn, ~p"/companies?status=suspended")
+      assert has_element?(filtered, "#companies-empty")
+
+      assert has_element?(
+               filtered,
+               "#companies-status-filter option[value='suspended'][selected]"
+             )
+    end
+
     test "renders parent, jurisdiction, primary badge, and pagination controls", %{conn: conn} do
       grant_capabilities!(["admin.company.list"])
       CompanyFixtures.assign_primary_company!(41, 73)
@@ -699,6 +737,41 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#flash-info", "Timezone cleared.")
     end
 
+    test "opening a panel dialog dismisses an earlier page flash", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      view
+      |> form("#company-timezone-form", %{"timezone" => "Asia/Kuala_Lumpur"})
+      |> render_change()
+
+      assert has_element?(view, "#flash-info", "Timezone saved: Asia/Kuala_Lumpur")
+
+      # The panel is a LiveComponent, so its dialog owns no flash copy. An
+      # open dialog makes the page inert, so the layout copy must go rather
+      # than sit unreadable behind it.
+      view |> element("#btn-open-attach-address") |> render_click()
+
+      assert_modal_dialog(view, "attach-address-modal", "Attach Address")
+      refute has_element?(view, "#flash-info")
+
+      # The page behind an open dialog is inert, so the second dialog is
+      # reachable only once the first has closed, and needs its own flash.
+      view |> element("button[phx-click='close_attach_modal']") |> render_click()
+      refute has_element?(view, "#attach-address-modal")
+
+      view
+      |> form("#company-timezone-form", %{"timezone" => ""})
+      |> render_change()
+
+      assert has_element?(view, "#flash-info", "Timezone cleared.")
+
+      view |> element("#btn-open-create-address") |> render_click()
+      assert_modal_dialog(view, "company-create-address-modal", "Create & Attach Address")
+      refute has_element?(view, "#flash-info")
+    end
+
     test "creates and attaches a new address through the company.addresses panel", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
 
@@ -707,7 +780,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       # The address behaviour now lives in the core/address-owned panel, reached
       # by manifest key; its events are phx-targeted to the component.
       view |> element("#btn-open-create-address") |> render_click()
-      assert has_element?(view, "#company-create-address-modal")
+      assert_modal_dialog(view, "company-create-address-modal", "Create & Attach Address")
 
       view
       |> form("#create-attach-address-form",
@@ -721,6 +794,18 @@ defmodule BilimbiWeb.CompanyLiveTest do
       |> render_submit()
 
       assert has_element?(view, "#company-addresses-panel", "Head Office")
+
+      assert has_element?(
+               view,
+               "#company-addresses-panel-notice",
+               "Address created and attached."
+             )
+
+      # A success notice is announced politely, and the user can dismiss it.
+      assert has_element?(view, ~s(#company-addresses-panel-notice[role="status"]))
+
+      view |> element("#company-addresses-panel-notice-dismiss") |> render_click()
+      refute has_element?(view, "#company-addresses-panel-notice")
 
       {:ok, scope} = Tenancy.scope(41)
       {:ok, attached} = Bilimbi.Core.Address.list_company_attached_addresses(scope, 73)
@@ -758,6 +843,14 @@ defmodule BilimbiWeb.CompanyLiveTest do
         }
       )
       |> render_submit()
+
+      # The refusal is announced assertively from inside the still-open dialog,
+      # because the page behind a modal dialog is inert.
+      assert has_element?(
+               view,
+               ~s(dialog#company-create-address-modal #company-addresses-panel-notice[role="alert"]),
+               "You do not have permission to edit companies."
+             )
 
       # No attachment and no address row: the write never reached the store.
       {:ok, attached} = Bilimbi.Core.Address.list_company_attached_addresses(scope, 73)
@@ -1397,6 +1490,31 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert Repo.get!(Department, department.id).head_id == nil
       assert has_element?(view, "#company-departments td", "—")
+    end
+
+    test "reports a failed head write inside the open dialog, not behind it", %{conn: conn} do
+      grant_capabilities!(["admin.company.view", "admin.company.update"])
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, type} = Company.create_department_type(%{code: "ENG", name: "Engineering"})
+
+      {:ok, department} =
+        Company.create_department(scope, 73, %{department_type_id: type.id, status: "active"})
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73/departments")
+
+      view |> element("#edit-dept-head-#{department.id}") |> render_click()
+      assert_modal_dialog(view, "department-head-modal", "Set Department Head")
+
+      render_submit(view, "save_head", %{"department_head" => %{"head_id" => "999999"}})
+
+      assert has_element?(view, "dialog#department-head-modal")
+
+      assert has_element?(
+               view,
+               "dialog#department-head-modal #department-head-modal-flash-error",
+               "That employee is not eligible to lead this department."
+             )
     end
 
     test "ignores a forged department head while creating a department", %{conn: conn} do

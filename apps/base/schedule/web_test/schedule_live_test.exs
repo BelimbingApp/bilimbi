@@ -234,6 +234,37 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     refute has_element?(view, "#schedule-history-pagination")
   end
 
+  test "history toolbar filters round-trip through the URL", %{conn: conn} do
+    grant_capabilities!(@view)
+    insert_boundary_runs!()
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule?tab=history")
+
+    # The shared toolbar sends the same bounds a URL visit would carry.
+    filter_runs(view, %{
+      "search" => "",
+      "status" => "",
+      "start_date" => "2026-08-21",
+      "end_date" => "",
+      "page_size" => "25"
+    })
+
+    assert has_element?(view, "#schedule-history-pagination-summary", "1 runs")
+
+    patched = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+    assert patched["tab"] == "history"
+    assert patched["start_date"] == "2026-08-21"
+
+    # The patched URL reloads to the same rows with the toolbar state retained.
+    {:ok, reloaded, _html} =
+      conn |> log_in_as() |> live(~p"/system/schedule?tab=history&start_date=2026-08-21")
+
+    assert has_element?(reloaded, "#schedule-history-pagination-summary", "1 runs")
+    refute has_element?(reloaded, "#schedule-runs", "Late on the twentieth")
+    assert has_element?(reloaded, "#schedule-runs", "Early on the twenty-first")
+    assert has_element?(reloaded, "#schedule-run-start-date[value='2026-08-21']")
+  end
+
   test "history refresh preserves URL filters and never discloses recorded output", %{conn: conn} do
     grant_capabilities!(@view)
 

@@ -107,6 +107,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
       "url_field" => "https://bilimbi.test",
       "number_field" => "25",
       "password_field" => "secret-value",
+      "api_key_field" => "sk-sample-0000",
       "select_field" => "standard",
       "roles" => ["admin", "reviewer"],
       "checkbox_field" => "true",
@@ -145,7 +146,36 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> assign_preview_page(:pattern, 1, 25)
      |> assign(:sample_datetime, ~U[2026-08-17 14:30:00Z])
      |> assign(:inline_value, "Editable entity value")
-     |> assign(:click_count, 0)}
+     |> assign(:click_count, 0)
+     |> assign(:modal_width, nil)
+     |> assign(
+       :modal_form,
+       to_form(%{"name" => "Example Sdn Bhd", "code" => "EX-01"}, as: :example)
+     )
+     |> assign(
+       :filter_toolbar_full_form,
+       to_form(
+         %{
+           "search" => "",
+           "status" => "",
+           "kind" => "",
+           "start_date" => "",
+           "end_date" => ""
+         },
+         as: :toolbar_full
+       )
+     )}
+  end
+
+  @impl true
+  def handle_event("open-modal", params, socket) do
+    width = if params["width"] == "wide", do: :wide, else: :narrow
+    {:noreply, assign(socket, :modal_width, width)}
+  end
+
+  @impl true
+  def handle_event("close-modal", _params, socket) do
+    {:noreply, assign(socket, :modal_width, nil)}
   end
 
   @impl true
@@ -156,6 +186,11 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   @impl true
   def handle_event("sample_change", %{"sample" => sample_data}, socket) do
     {:noreply, assign(socket, :sample_form, to_form(sample_data, as: :sample))}
+  end
+
+  def handle_event("filter-toolbar-preview", %{"toolbar_full" => toolbar_data}, socket) do
+    {:noreply,
+     assign(socket, :filter_toolbar_full_form, to_form(toolbar_data, as: :toolbar_full))}
   end
 
   @impl true

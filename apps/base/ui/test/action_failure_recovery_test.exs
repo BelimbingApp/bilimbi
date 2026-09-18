@@ -33,6 +33,43 @@ defmodule Bilimbi.Base.UI.ActionFailureRecoveryTest do
     assert log =~ "** (RuntimeError) unexpected action failure"
   end
 
+  defmodule DialogComponent do
+    use Bilimbi.Base.UI, :live_component
+
+    def handle_event("raise", _params, _socket), do: raise("unexpected component action failure")
+
+    def report_action_failure(socket, message), do: assign(socket, :notice, {:error, message})
+  end
+
+  defmodule PlainComponent do
+    use Bilimbi.Base.UI, :live_component
+
+    def handle_event("raise", _params, _socket), do: raise("unexpected component action failure")
+  end
+
+  test "a component keeps its recovery message on its own socket when it says so" do
+    capture_log(fn ->
+      assert {:noreply, recovered_socket} =
+               DialogComponent.handle_event("raise", %{}, socket())
+
+      assert recovered_socket.assigns.notice ==
+               {:error,
+                "That action did not finish. The error has been recorded — if it keeps happening, tell your administrator."}
+    end)
+
+    refute_received {Bilimbi.Base.UI.ActionFailureRecovery, :component_failure}
+  end
+
+  test "a component without its own surface still reports through the page" do
+    socket = socket()
+
+    capture_log(fn ->
+      assert {:noreply, ^socket} = PlainComponent.handle_event("raise", %{}, socket)
+    end)
+
+    assert_received {Bilimbi.Base.UI.ActionFailureRecovery, :component_failure}
+  end
+
   test "does not intercept non-exception control flow" do
     assert catch_throw(RecoveryLive.handle_event("throw", %{}, socket())) ==
              :deliberate_control_flow
