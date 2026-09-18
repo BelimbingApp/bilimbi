@@ -179,14 +179,45 @@ defmodule Bilimbi.Base.UI.Components do
       <.button>Send!</.button>
       <.button phx-click="go" variant="primary">Send!</.button>
       <.button navigate={~p"/"}>Home</.button>
+      <.button type="submit" busy={@saving}>Saving…</.button>
+
+  ## In-flight state
+
+  A control that has been activated and is waiting for its outcome is
+  `busy`: it spins, stays at full strength, and renders `aria-busy="true"`
+  and `disabled`, so the wait is visible, is heard by assistive technology,
+  and cannot be started twice. Plain `disabled` dims and never spins, so
+  "not available" never reads as "working". The caller keeps the label
+  truthful ("Saving…", "Opening workspace…").
+
+  `busy` is a button state. It is carried by `disabled`, which an anchor has
+  no equivalent of, so a control rendered as a link ignores `busy` entirely
+  rather than announcing a wait it cannot prevent a second activation of.
+
+  `busy` is the server-known wait that outlives one round trip, such as the
+  sign-in handoff that arms a full form submission. The shorter wait of one
+  `phx-click` or `phx-submit` round trip stays `phx-disable-with`'s job:
+  LiveView disables the control and swaps its label, and `app.js` mirrors
+  LiveView's own loading state onto `aria-busy` while it lasts. That path is
+  announced but not spun: it still wears the dimmed disabled treatment.
   """
   attr(:rest, :global, include: ~w(href navigate patch method download name value disabled type))
 
   attr(:class, :any)
   attr(:variant, :string, values: ~w(primary danger))
+
+  attr(:busy, :boolean,
+    default: false,
+    doc:
+      "the control was activated and is waiting; renders `aria-busy` and disables it. " <>
+        "A button state: a link cannot be disabled, so `busy` is ignored on one."
+  )
+
   slot(:inner_block, required: true)
 
   def button(%{rest: rest} = assigns) do
+    assigns = assign(assigns, :busy, assigns.busy and not link?(rest))
+
     # Each variant owns every color property it sets, including the focus ring;
     # a color defined in both the shared base and a variant is resolved by
     # stylesheet order, not by this list's order (#619's invisible button).
@@ -205,16 +236,21 @@ defmodule Bilimbi.Base.UI.Components do
     # variant, or `<.button variant="primary" class="w-full">` silently
     # renders an unstyled button.
     assigns =
-      assign(assigns, :class, [
+      assigns
+      |> assign(:class, [
         "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
         "transition focus-visible:outline-none focus-visible:ring-2",
         "focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-        "disabled:cursor-not-allowed disabled:opacity-50",
+        if(assigns.busy,
+          do: "cursor-progress",
+          else: "disabled:cursor-not-allowed disabled:opacity-50"
+        ),
         Map.fetch!(variants, assigns[:variant]),
         assigns[:class]
       ])
+      |> assign(:rest, busy_rest(rest, assigns.busy))
 
-    if rest[:href] || rest[:navigate] || rest[:patch] do
+    if link?(rest) do
       ~H"""
       <.link class={@class} {@rest}>
         {render_slot(@inner_block)}
@@ -222,12 +258,22 @@ defmodule Bilimbi.Base.UI.Components do
       """
     else
       ~H"""
-      <button class={@class} {@rest}>
+      <button class={@class} aria-busy={@busy && "true"} {@rest}>
+        <.icon :if={@busy} name="hero-arrow-path" class="size-4 motion-safe:animate-spin" />
         {render_slot(@inner_block)}
       </button>
       """
     end
   end
+
+  defp link?(rest), do: !!(rest[:href] || rest[:navigate] || rest[:patch])
+
+  # A busy control is also disabled: the activation that made it busy is the
+  # one whose outcome is pending, and a second one would duplicate the work.
+  # A link cannot be disabled, so `busy` is already resolved to false on one
+  # and never reaches here.
+  defp busy_rest(rest, false), do: rest
+  defp busy_rest(rest, true), do: Map.put(rest, :disabled, true)
 
   @doc """
   Renders a compact icon-only action.
@@ -237,6 +283,21 @@ defmodule Bilimbi.Base.UI.Components do
   are for familiar operations where the label is still available to assistive
   technology and as a tooltip. Keep primary or unfamiliar actions as text
   buttons.
+
+  `disabled` and `busy` follow `button/1`: a disabled action is not available
+  and dims, a busy one was activated and is waiting for its outcome, so it
+  sits in a sunken ringed well and its glyph becomes a spinner at full
+  strength. The well and the swapped glyph are static, so the states stay
+  distinguishable under `prefers-reduced-motion`, where the spin itself does
+  not render. Both are inert; only the busy one carries `aria-busy`, and its
+  label still names the action so assistive technology can say what is
+  pending. `busy` is a button state here too, and is ignored on a link.
+
+  `phx-disable-with` does not belong here. LiveView implements it by replacing
+  the control's text, which on an icon-only action deletes the glyph and
+  restores an empty string, leaving an empty well behind. Use `busy` for a
+  wait the server knows about; a plain one-round-trip `phx-click` needs no
+  adornment.
   """
   attr(:icon, :string, required: true)
   attr(:label, :string, required: true)
@@ -244,33 +305,54 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:kind, :atom, values: [:neutral, :danger], default: :neutral)
   attr(:class, :any, default: nil)
 
+  attr(:busy, :boolean,
+    default: false,
+    doc:
+      "the action was activated and is waiting; renders `aria-busy` and disables it. " <>
+        "A button state: a link cannot be disabled, so `busy` is ignored on one."
+  )
+
   attr(:rest, :global,
-    include: ~w(href navigate patch method download disabled type name value title)
+    include: ~w(href navigate patch method download disabled type name value title),
+    doc:
+      "`phx-disable-with` is incompatible with an icon-only action: LiveView " <>
+        "implements it by replacing the control's text content, which deletes the " <>
+        "glyph and restores an empty string. Use `busy` instead."
   )
 
   def icon_button(%{rest: rest} = assigns) do
+    assigns = assign(assigns, :busy, assigns.busy and not link?(rest))
+
     assigns =
       assigns
       |> assign(:control_class, [
         "grid shrink-0 place-items-center transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
         assigns.context == :inline && "size-6 rounded-sm",
         assigns.context == :table && "size-7 rounded-md",
-        assigns.kind == :neutral &&
-          "text-ink-muted hover:bg-surface-sunken hover:text-ink disabled:text-ink-faint",
-        assigns.kind == :danger &&
-          "text-danger hover:bg-danger-surface hover:text-danger-ink disabled:text-ink-faint",
-        "disabled:cursor-not-allowed disabled:opacity-50",
+        assigns.kind == :neutral && "text-ink-muted hover:bg-surface-sunken hover:text-ink",
+        assigns.kind == :danger && "text-danger hover:bg-danger-surface hover:text-danger-ink",
+        if(assigns.busy,
+          do: "cursor-progress bg-surface-sunken ring-1 ring-line",
+          else: "disabled:text-ink-faint disabled:cursor-not-allowed disabled:opacity-50"
+        ),
         assigns.class
       ])
-      |> assign(:icon_class, if(assigns.context == :inline, do: "size-3.5", else: "size-4"))
+      |> assign(:icon_name, if(assigns.busy, do: "hero-arrow-path", else: assigns.icon))
+      |> assign(:icon_class, [
+        if(assigns.context == :inline, do: "size-3.5", else: "size-4"),
+        assigns.busy && "motion-safe:animate-spin"
+      ])
       |> assign(:title, rest[:title] || assigns.label)
       |> assign(:control_type, rest[:type] || "button")
-      |> assign(:control_rest, Map.drop(rest, [:title, :type]))
+      |> assign(
+        :control_rest,
+        rest |> Map.drop([:title, :type]) |> busy_rest(assigns.busy)
+      )
 
-    if rest[:href] || rest[:navigate] || rest[:patch] do
+    if link?(rest) do
       ~H"""
       <.link aria-label={@label} title={@title} class={@control_class} {@control_rest}>
-        <.icon name={@icon} class={@icon_class} />
+        <.icon name={@icon_name} class={@icon_class} />
       </.link>
       """
     else
@@ -278,11 +360,12 @@ defmodule Bilimbi.Base.UI.Components do
       <button
         type={@control_type}
         aria-label={@label}
+        aria-busy={@busy && "true"}
         title={@title}
         class={@control_class}
         {@control_rest}
       >
-        <.icon name={@icon} class={@icon_class} />
+        <.icon name={@icon_name} class={@icon_class} />
       </button>
       """
     end
