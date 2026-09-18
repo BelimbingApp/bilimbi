@@ -1,9 +1,9 @@
 # Base UI Design Parity
 
-**Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families. Application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display are merged to `main`; the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
+**Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families (#724). Merged to `main` through 2026-09-15: application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display. Since then the library has been stripped of catalog IDs (#728), and the shared layer has taken much of the accepted action and feedback contract — destructive confirmation (#733), reduced motion with 4.5:1 contrast (#738), stacked flash messages (#741), busy controls and a login screen that reports its progress (#743), the empty and permission region pattern (#740), real dialog semantics on modal overlays (#731), one shared filter toolbar (#745), field shell states (#744), secret reveal and multi-select corrections (#746) and a released shell observer (#747) — alongside icon-name validity (#727, #734), Schedule timestamps and UTC day labels through the datetime component (#735, #737), impersonation reader coverage (#729), corrected catalog rows (#730), drift-guard documentation folded into this plan (#726) and the Belimbing cutover value remap (#725); the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
 **Last Updated:** 2026-09-18
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1)
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1); `fm/parity-plan-checklist-reconcile/muse-spark` (checklist reconciliation on 2026-09-18, not audit authorship); `fm/icon-registry-name-validity/opus-5`; `crewmate scout` (firstmate scout tasks that record no model — the FND-06 icon inventory and the four Phase 2 lane audits of 2026-09-16; separate sessions from the `crewmate/gpt-6` entry above, which is why these rows carry no model)
 
 ## Problem Essence
 
@@ -465,11 +465,12 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     `K Graphics`), so the alphabetical ascending order root `AGENTS.md` §12
     requires and the catalog order that makes the alignment checkable are the
     same sequence. No exception to §12 is claimed or needed. Letters rather than
-    numbers because the page already renders dozens of catalog IDs (`LAY-01`, `OVR-04`
-    and so on): a numeric menu prefix sits beside those as a second numbering
-    system a reader could reasonably think is related, and letters cannot be
-    mistaken for a catalog ID. Letters also need no zero-padding, so a twelfth
-    family cannot silently break the sort the way unpadded numbers would.
+    numbers because the page then rendered dozens of catalog IDs (`LAY-01`,
+    `OVR-04` and so on, since dropped from the product by #728): a numeric menu
+    prefix sat beside those as a second numbering system a reader could
+    reasonably think was related, and letters cannot be mistaken for a catalog
+    ID. Letters also need no zero-padding, so a twelfth family cannot silently
+    break the sort the way unpadded numbers would.
 
 - [x] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source. `{codex-sol-specimens-1/gpt-5.6-sol}`
 - [x] Show the current Bilimbi component in every meaningful state for the active family. `{codex-luna-states-1/gpt-5.6-luna}`
@@ -495,10 +496,10 @@ Validation: The reviewer can reach any catalog family quickly, interact with the
 
 Goal: Complete evidence and recommended dispositions without changing production design prematurely.
 
-- [ ] Lane A — audit FND, LAY and NAV against both applications and representative shell/page routes.
-- [ ] Lane B — audit ACT, FBK and OVR, including loading, dismissal, confirmation and recovery.
-- [ ] Lane C — audit INP and INT, including field shell, keyboard behavior, editing and rich choices.
-- [ ] Lane D — audit DAT, CMP and GFX, including actual index, form, detail, authentication and dashboard flows.
+- [x] Lane A — audit FND, LAY and NAV against both applications and representative shell/page routes. `{crewmate scout, relaunched, model unrecorded}` — FND-06 was excluded from this lane by its brief, which told the scout not to audit it or build an icon inventory; the icon vocabulary was inventoried separately by a crewmate scout (`parity-icon-inventory/report.md`, 48 actions, held outside the repository like the lane reports), implemented through the registry by `{codex-terra-icons-1/gpt-5.6-terra}` (#715) and held to the Heroicons the build emits by `{fm/icon-registry-name-validity/opus-5}` (#727).
+- [x] Lane B — audit ACT, FBK and OVR, including loading, dismissal, confirmation and recovery. `{crewmate scout, unsigned, model unrecorded}`
+- [x] Lane C — audit INP and INT, including field shell, keyboard behavior, editing and rich choices. `{crewmate scout, unsigned, model unrecorded}`
+- [x] Lane D — audit DAT, CMP and GFX, including actual index, form, detail, authentication and dashboard flows. `{crewmate scout, model unrecorded}`
 - [ ] Integration owner consolidates reports into this ledger and removes duplicate or speculative targets.
 
 The four lane audits ran on 2026-09-16 and produced evidence only; their reports are held outside the repository. What landed on 2026-09-17: seven understated rows — LAY-05, ACT-02, DAT-01, CMP-02, CMP-03, CMP-05 and CMP-06 — were restated in the catalog table above; the NAV-01, ACT-01 and OVR-02 corrections and the OVR-01 and CMP-01 additions were recorded under Targets the evidence contradicts; and the two captain rulings were recorded under Design Decisions. Nothing else from the four reports is claimed to be on file: consolidating them into this ledger remains open.
@@ -629,7 +630,7 @@ Delivery: https://github.com/BelimbingApp/bilimbi/pull/714 merged on 2026-09-15,
 
 Goal: Give familiar actions named entries in the icon registry so call sites name the action rather than a raw `hero-*` string.
 
-- [x] Inventory Belimbing's action icons against Bilimbi's registry; 48 actions mapped, 44 of them gaps. `{codex-terra-icons-1/gpt-5.6-terra}`
+- [x] Inventory Belimbing's action icons against Bilimbi's registry; 48 actions mapped, 44 of them gaps. `{crewmate scout, model unrecorded}` — delivered as `parity-icon-inventory/report.md`, which the registry slice below consumed rather than re-gathered; it deliberately chose no glyphs.
 - [x] Populate `IconRegistry` with the named action vocabulary, keeping logout as the recorded Bilimbi exception. `{codex-terra-icons-1/gpt-5.6-terra}`
 - [x] Run the shipping gate and land the change. `{codex-terra-icons-1/gpt-5.6-terra}`
 - [x] Follow-up after #715 — prove each named entry resolves to a Heroicon the build emits. `{fm/icon-registry-name-validity/opus-5}`
@@ -680,8 +681,7 @@ deferred until a workflow needs that sentence; unavailable and reconnect states
 keep the existing Schedule alerts and layout flashes, which the ledger row
 records as Keep Bilimbi.
 
-Delivery: pending. The work is on `fm/empty-and-permission-states` with no child
-issue and no PR yet; whoever merges it records the PR URL and merge date here.
+Delivery: https://github.com/BelimbingApp/bilimbi/pull/740 merged on 2026-09-18.
 
 ### Field shell states slice — INP-01 and INP-02, partial
 
