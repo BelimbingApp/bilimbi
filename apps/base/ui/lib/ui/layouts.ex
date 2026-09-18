@@ -34,8 +34,6 @@ defmodule Bilimbi.Base.UI.Layouts do
   import Bilimbi.Base.UI.Components
   alias Bilimbi.Base.UI.ShellComponents
 
-  alias Phoenix.LiveView.JS
-
   # How long a `:success` or `:info` flash stays before it dismisses itself.
   # Long enough to read a sentence twice.
   @auto_dismiss_ms 8_000
