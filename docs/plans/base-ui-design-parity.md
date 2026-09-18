@@ -3,7 +3,7 @@
 **Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families. Application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display are merged to `main`; the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
 **Last Updated:** 2026-09-18
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`
 
 ## Problem Essence
 
@@ -252,10 +252,15 @@ products were read and the plan forbids treating existence as acceptance.
   it or return it, and that two demo dialogs could be open at once — read together with
   the note below that Belimbing modal focus behaviour beyond dispatched events was not
   verified. Hand-written full-viewport overlays of the same fixed-inset,
-  dimmed-backdrop shape also already ship in production across several modules, none
+  dimmed-backdrop shape also shipped in production across several modules, none
   of them carrying a dialog role, `aria-modal`, Escape or focus containment; Attach
-  Address on `/companies/1` and Add Employee on `/users/1` are the two Lane B
-  exercised live. The shared modal has production adopters waiting across modules.
+  Address on `/companies/1` and Add Employee on `/users/1` were the two Lane B
+  exercised live. The shared `<.modal>` has since replaced every one of them: a native
+  `<dialog>` with a labelled title, focus in, containment and return, Escape, and an
+  inert page behind, adopted by every production workflow overlay and shown at both
+  widths in the Design Library. That meets the accepted target and exceeds Belimbing on
+  focus and Escape, with one deliberate departure from its "backdrop" wording: clicking
+  the dimmed page does not close, so a stray click cannot discard a form.
 - **LAY-02, NAV-05** — the "Bilimbi now" cells describe pre-#711 state; both shipped.
 - **INT-04** — reduced motion was not adoptable when Lane A measured it: neither
   product had a contract. Bilimbi now has one platform-wide under FND-05, so a
@@ -439,9 +444,10 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
 
   What the alignment exposed, recorded so the next slice does not rediscover it:
 
-  - **Overlays is the only family with no specimen anywhere.** OVR-01 to OVR-04
-    are all missing, so `#component-overlays` renders its heading and says "No
-    specimen yet" instead of being dropped from the menu.
+  - **Overlays was the only family with no specimen anywhere.** OVR-01 to OVR-04
+    were all missing, so `#component-overlays` rendered its heading and said "No
+    specimen yet" instead of being dropped from the menu. The shared `<.modal>`
+    has since filled OVR-01 there; OVR-02 to OVR-04 are still missing.
   - **Foundations and Graphics are not empty; they are elsewhere.** The Theme
     area already is FND and the Graphic area already is GFX, so both keep one
     home and the family menu links to their routes rather than showing a second
@@ -469,7 +475,14 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
 - [x] Show the current Bilimbi component in every meaningful state for the active family. `{codex-luna-states-1/gpt-5.6-luna}`
 
   Both landed on 2026-09-15 and neither finished the job: the `:design_library_drift`
-  guards still report four failures on `main`, and this branch left them unchanged.
+  guards still report four failures on `main`, and this branch left the count
+  unchanged. The shared modal (`OVR-01`) does add one name to the coverage guard's
+  missing list: `connection_banners` is layout chrome that every page carries once
+  and every open dialog carries again, so the Design Library presents it through
+  the modal specimen rather than through an anchor of its own. A second live
+  instance on that page would announce a dropped connection twice — the component
+  has no presentational mode, and giving it one to satisfy a guard would be the
+  guard shaping the product.
 - [ ] Correct the four `:design_library_drift` specimen and state failures those two slices left, then move the guards into the default test run and `mix precommit`.
 - [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record the design steward's accepted disposition and rationale.
 - [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
@@ -500,7 +513,8 @@ Goal: Build accepted shared contracts in dependency order.
 - [ ] FND-05 follow-up — make the vendored `topbar` navigation progress bar honor `prefers-reduced-motion` without losing an honest loading signal; it animates a canvas from JavaScript, so the global CSS rule cannot reach it.
 - [ ] Implement accepted navigation, link and action contracts.
 - [ ] Implement accepted native input, choice, feedback and data-display contracts.
-- [ ] Implement accepted combobox, edit-in-place, disclosure, modal and confirmation contracts only after their foundations are stable.
+- [x] Implement the accepted modal contract (`OVR-01`, Adopt adapted) as shared `<.modal>`, adopt it in every production workflow overlay and show both widths in the Design Library. `{fm/modal-a11y-dialog-semantics/opus-5}`
+- [ ] Implement accepted combobox, edit-in-place, disclosure and confirmation contracts only after their foundations are stable.
 - [ ] Add each real component and its state/interaction evidence to the Design Library in the same change.
 - [ ] Keep shared edits under one integration owner; parallel agents prepare independent evidence, tests and module-local adoption work.
 

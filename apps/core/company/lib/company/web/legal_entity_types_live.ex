@@ -39,6 +39,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
 
     {:noreply,
      socket
+     |> clear_flash()
      |> assign(:modal_action, :new)
      |> assign(:editing_type, %LegalEntityType{})
      |> assign_form(changeset)}
@@ -56,6 +57,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
 
             {:noreply,
              socket
+             |> clear_flash()
              |> assign(:modal_action, :edit)
              |> assign(:editing_type, type)
              |> assign_form(changeset)}
@@ -312,22 +314,18 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
           </.table>
         </.card>
 
-        <div
+        <.modal
           :if={@modal_action in [:new, :edit]}
           id="legal-entity-type-modal"
-          class="fixed inset-0 z-40 flex items-start justify-center bg-ink/40 p-6"
+          title={if @modal_action == :new, do: "New Legal Entity Type", else: "Edit Legal Entity Type"}
+          flash={@flash}
+          on_cancel={JS.push("close_modal")}
         >
-          <div class="mt-16 w-full max-w-lg rounded-xl border border-line bg-surface p-6 shadow-sm">
-            <h2 class="text-lg font-medium tracking-tight text-ink-strong">
-              {if @modal_action == :new,
-                do: "New Legal Entity Type",
-                else: "Edit Legal Entity Type"}
-            </h2>
-            <p class="mt-1 text-xs text-ink-subtle">
-              {if @modal_action == :new,
-                do: "Create a new legal structure type for companies.",
-                else: "Update legal entity type details."}
-            </p>
+          <:description>
+            {if @modal_action == :new,
+              do: "Create a new legal structure type for companies.",
+              else: "Update legal entity type details."}
+          </:description>
 
             <.form
               :if={@form}
@@ -376,8 +374,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
                 </.button>
               </div>
             </.form>
-          </div>
-        </div>
+        </.modal>
       </.page>
     </Layouts.app>
     """

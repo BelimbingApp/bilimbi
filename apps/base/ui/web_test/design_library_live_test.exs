@@ -139,8 +139,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
 
     # Nine families are reviewed on this page. Each entry carries its own family
     # label and lands on the section that owns that family's specimens, so a
-    # swapped target fails rather than sending the reviewer to a sibling. A
-    # family nobody can review is still listed, so the gap is visible.
+    # swapped target fails rather than sending the reviewer to a sibling.
     for {slug, family} <- [
           {"page-structure", "Page structure"},
           {"navigation-links", "Navigation and links"},
@@ -170,9 +169,9 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
              "Graphics"
            )
 
-    # Overlays is the one family with no specimen at all, and it says so rather
-    # than disappearing from the menu.
-    assert has_element?(view, "#component-overlays", "No specimen yet")
+    # Overlays reviews the shared modal dialog, so its section owns that
+    # specimen rather than standing empty.
+    assert has_element?(view, "#component-overlays #component-modal")
 
     # The application shell is LAY-02, so it sits inside Page structure and
     # keeps its own deep link. The menu entry is nested under B rather than
@@ -551,6 +550,24 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     |> render_click()
 
     assert has_element?(view, "button", "Clicked: 1")
+  end
+
+  test "opens each modal dialog width and closes it again", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    refute has_element?(view, "#design-library-modal")
+
+    view |> element("#design-library-open-modal") |> render_click()
+    assert_modal_dialog(view, "design-library-modal", "Rename example company")
+
+    view |> element("#design-library-modal button", "Cancel") |> render_click()
+    refute has_element?(view, "#design-library-modal")
+
+    view |> element("#design-library-open-wide-modal") |> render_click()
+    assert_modal_dialog(view, "design-library-wide-modal", "Edit example company")
+
+    view |> form("#design-library-wide-modal-form") |> render_submit()
+    refute has_element?(view, "#design-library-wide-modal")
   end
 
   test "keeps inline editing interactive without persisting business data", %{conn: conn} do

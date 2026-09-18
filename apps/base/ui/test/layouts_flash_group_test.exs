@@ -79,7 +79,7 @@ defmodule Bilimbi.Base.UI.LayoutsFlashGroupTest do
   test "the reconnect notices are errors and never carry a timer" do
     html = render_group(%{})
 
-    for id <- ["client-error", "server-error"] do
+    for id <- ["connection-client-error", "connection-server-error"] do
       assert tag(html, id) =~ ~s(role="alert")
       refute timed?(html, id)
     end

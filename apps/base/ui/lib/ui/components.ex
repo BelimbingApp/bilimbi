@@ -112,6 +112,60 @@ defmodule Bilimbi.Base.UI.Components do
   defp status_icon(:error), do: "error"
 
   @doc """
+  Renders the two connection banners for one container.
+
+  They report a dropped or unreachable websocket, and LiveView reveals them
+  from the client — the server is by definition not reachable to re-render
+  when they matter. Both ids derive from `id`, so a container can carry its
+  own pair without colliding with another's.
+
+  An open modal dialog is promoted to the browser's top layer and makes the
+  rest of the page inert, so the layout's pair can be neither painted above
+  the dimmer, announced nor dismissed while one is open. `modal/1` renders a
+  second pair inside the dialog for that reason, and the layout's is hidden
+  while a dialog is open so the same banner never appears twice.
+  """
+  attr(:id, :string, required: true)
+
+  def connection_banners(assigns) do
+    assigns =
+      assigns
+      |> assign(:client_id, "#{assigns.id}-client-error")
+      |> assign(:server_id, "#{assigns.id}-server-error")
+
+    ~H"""
+    <.flash
+      id={@client_id}
+      kind={:error}
+      title={gettext("Connection interrupted")}
+      phx-disconnected={
+        show(".phx-client-error ##{@client_id}")
+        |> JS.remove_attribute("hidden", to: ".phx-client-error ##{@client_id}")
+      }
+      phx-connected={hide("##{@client_id}") |> JS.set_attribute({"hidden", ""})}
+      hidden
+    >
+      {gettext("Reconnecting…")}
+    </.flash>
+
+    <.flash
+      id={@server_id}
+      kind={:error}
+      title={gettext("Server unavailable")}
+      phx-disconnected={
+        show(".phx-server-error ##{@server_id}")
+        |> JS.remove_attribute("hidden", to: ".phx-server-error ##{@server_id}")
+      }
+      phx-connected={hide("##{@server_id}") |> JS.set_attribute({"hidden", ""})}
+      hidden
+    >
+      {gettext("Attempting to reconnect")}
+      <.icon name="hero-arrow-path" class="ml-1 size-3 animate-spin" />
+    </.flash>
+    """
+  end
+
+  @doc """
   Renders an inline status alert (Belimbing's `x-ui.alert` counterpart).
 
   Kinds map to the honest status roles: `:info`, `:success`, `:warning`,
@@ -1422,6 +1476,116 @@ defmodule Bilimbi.Base.UI.Components do
         {render_slot(@inner_block)}
       </div>
     </div>
+    """
+  end
+
+  @doc """
+  Renders a modal dialog over the current screen.
+
+  The caller decides whether the dialog exists: render it with `:if` while
+  the workflow it hosts is in progress and stop rendering it when that
+  workflow ends. While it exists the browser owns modal behaviour through a
+  native `<dialog>`: focus moves inside on open and stays inside, the page
+  behind is inert to the keyboard and to assistive technology, and Escape
+  asks to close. The `Modal` hook promotes the dialog to modal on mount,
+  forwards Escape to `on_cancel`, and returns focus to the control that
+  opened the dialog once the server has removed it.
+
+  `on_cancel` must reach the same handler as the Cancel button, so Escape
+  and Cancel are one action. Clicking the dimmed page does nothing: a dialog
+  usually holds a form, and a stray click must not discard it.
+
+  The dialog is named by its title and, when given, described by its
+  description, so a screen reader announces both when focus enters.
+
+  A LiveView that can raise a flash while its dialog stays open passes
+  `flash`. The page behind a modal dialog is inert, so the layout's flash
+  group can be neither read nor dismissed while one is open; the dialog
+  renders its own copy instead, and the layout's copy is hidden.
+
+  The dialog also carries its own `connection_banners/1`, because the page
+  behind it is inert and painted under the dimmer: a dropped websocket must
+  still be announced and dismissable while a dialog is open.
+
+  Every production caller dismisses the layout flash as it opens a dialog, so
+  a message about finished work is neither adopted as the new dialog's own
+  feedback nor stranded unreadable behind the inert page. A LiveView does that
+  in the handler that opens the dialog; a LiveComponent cannot reach the
+  page's flash, so its opening control pushes `lv:clear-flash` untargeted
+  before the open event. The Design Library specimen deliberately clears
+  nothing: it raises no flash of its own, so there is none of its own to
+  dismiss.
+
+  ## Examples
+
+      <.modal
+        :if={@show_attach_modal}
+        id="attach-address-modal"
+        title="Attach Address"
+        on_cancel={JS.push("close_attach_modal", target: @myself)}
+      >
+        <:description>Select an address to attach to this company.</:description>
+        <.form for={@attach_form} id="attach-address-modal-form" ...>
+          ...
+        </.form>
+      </.modal>
+  """
+  attr(:id, :string, required: true)
+  attr(:title, :string, required: true)
+
+  attr(:on_cancel, JS,
+    required: true,
+    doc: "the command run when the user asks to close, the same push as the Cancel button"
+  )
+
+  attr(:width, :atom,
+    values: [:narrow, :wide],
+    default: :narrow,
+    doc: "`:narrow` for a single-column form, `:wide` for a two-column one"
+  )
+
+  attr(:flash, :map,
+    default: nil,
+    doc: "the caller's flash, rendered inside the dialog because the page behind it is inert"
+  )
+
+  attr(:rest, :global)
+  slot(:description, doc: "one short line under the title, announced with the dialog")
+  slot(:inner_block, required: true)
+
+  def modal(assigns) do
+    ~H"""
+    <dialog
+      id={@id}
+      open
+      phx-hook="Modal"
+      data-cancel={@on_cancel}
+      data-owns-flash={@flash != nil}
+      aria-modal="true"
+      aria-labelledby={"#{@id}-title"}
+      aria-describedby={@description != [] && "#{@id}-description"}
+      tabindex="-1"
+      class={[
+        "mx-auto mt-16 mb-4 max-h-[calc(100%-5rem)] w-[calc(100%-2rem)] overflow-y-auto",
+        "rounded-xl border border-line bg-surface p-6 text-ink shadow-lg",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/30",
+        "backdrop:bg-ink/40",
+        @width == :narrow && "max-w-lg",
+        @width == :wide && "max-w-2xl"
+      ]}
+      {@rest}
+    >
+      <h2 id={"#{@id}-title"} class="text-lg font-medium tracking-tight text-ink-strong">
+        {@title}
+      </h2>
+      <.flash :if={@flash} kind={:error} id={"#{@id}-flash-error"} flash={@flash} />
+      <.flash :if={@flash} kind={:info} id={"#{@id}-flash-info"} flash={@flash} />
+      <.connection_banners id={@id} />
+      <p :if={@description != []} id={"#{@id}-description"} class="mt-1 text-xs text-ink-subtle">
+        {render_slot(@description)}
+      </p>
+      {render_slot(@inner_block)}
+    </dialog>
     """
   end
 
