@@ -111,6 +111,8 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
       "select_field" => "standard",
       "roles" => ["admin", "reviewer"],
       "required_roles" => ["admin"],
+      "plain_roles" => [],
+      "example_interests" => ["platform"],
       "checkbox_field" => "true",
       "radio_field" => "system",
       "textarea_field" => "Multi-line sample content demonstrating textarea rendering.",

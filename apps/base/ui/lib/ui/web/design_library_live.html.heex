@@ -862,8 +862,8 @@
                 <div class="border-t border-line pt-3">
                   <p class="mb-2 text-xs text-ink-muted">Optional, on its own</p>
                   <.multi_select
+                    field={@sample_form[:plain_roles]}
                     id="design-library-multi-select-plain"
-                    name="plain_roles"
                     options={[
                       {"Administrator", "admin"},
                       {"Operator", "operator"},
@@ -1026,11 +1026,11 @@
                     ]}
                   />
                   <.input
-                    name="example_interests"
+                    field={@sample_form[:example_interests]}
+                    id="example_interests"
                     type="multi_select"
                     label="Interests"
                     selection_label=":count interest selected|:count interests selected"
-                    value={["platform"]}
                     options={[{"Platform", "platform"}, {"Billing", "billing"}]}
                   />
                   <.input
@@ -1293,7 +1293,7 @@
                 <.input
                   field={@sample_filter_form[:search]}
                   type="search"
-                  label="Search example companies"
+                  label="Search the example company table"
                   label_class="sr-only"
                   wrapper_class="mb-0"
                   placeholder="Search by name or code…"

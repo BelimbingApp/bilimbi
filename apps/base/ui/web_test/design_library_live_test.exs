@@ -298,6 +298,8 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
         "select_field" => "advanced",
         "roles" => ["operator"],
         "required_roles" => ["admin", "reviewer"],
+        "plain_roles" => ["admin", "operator"],
+        "example_interests" => ["platform", "billing"],
         "checkbox_field" => "true",
         "radio_field" => "dark",
         "datetime_field" => "2026-08-26T14:30"
@@ -311,6 +313,8 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
 
     assert has_element?(view, "#design-library-multi-select", "1 role selected")
     assert has_element?(view, "#design-library-multi-select-required", "2 roles selected")
+    assert has_element?(view, "#design-library-multi-select-plain", "2 options selected")
+    assert has_element?(view, "#example_interests", "2 interests selected")
   end
 
   test "both pagination specimens update their own rows and page size", %{conn: conn} do
