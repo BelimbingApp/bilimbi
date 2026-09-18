@@ -1,0 +1,54 @@
+# no-mistakes gate configuration for this repository.
+#
+# Schema: the no-mistakes repo-config reference
+# (docs/src/content/docs/reference/repo-config.md in kunchenguid/no-mistakes,
+# read at the installed v1.72.0). Commands run through `sh -c` in the run
+# worktree. The gate reads `commands.*` only from the trusted default-branch
+# copy of this file, so a change here takes effect once it lands on `main`.
+#
+# `.github/workflows/ci.yml` is hand-written and is the source of truth for
+# the checks the `main` ruleset requires (`Elixir quality`, `Elixir types`,
+# `Elixir tests`). Never regenerate it with `no-mistakes ci-workflow`.
+#
+# Toolchain: the README pins Erlang and Elixir through `.mise.toml`, and the
+# daemon's PATH carries `mise` but no `mix`, so every command goes through
+# `mise exec`. A run worktree is a fresh directory whose `.mise.toml` mise has
+# not been told to trust; MISE_TRUSTED_CONFIG_PATHS trusts it for that command
+# only, without writing mise state, and `mise exec` also applies the pinned
+# PGPORT from `.mise.toml`.
+
+commands:
+  # Run worktrees start with tracked files only; materialize locked deps once
+  # before the first configured command, exactly as CI's "Install dependencies".
+  prepare: 'MISE_TRUSTED_CONFIG_PATHS="$PWD" mise exec -- mix deps.get'
+
+  # The test half of CI's `Elixir tests` job. That job runs `mix precommit`,
+  # whose testing member is the `precommit.test` alias in mix.exs: `mix test`
+  # in apps/core, apps/base, and apps/web against the sandboxed test database.
+  # Compile-with-warnings, format, unused-dependency, and contribution checks
+  # stay with the lint step and CI so the test step stays narrow and fast.
+  test: 'MISE_TRUSTED_CONFIG_PATHS="$PWD" MIX_ENV=test mise exec -- mix precommit.test'
+
+# The Test step always runs an evidence agent after `commands.test`. This
+# runbook is injected verbatim into that agent's prompt under the heading
+# "Repository live-validation runbook (trusted, from the default branch)". It
+# is prompt text, not an enforced sandbox, and it cannot change the step's
+# payload contract: a `pass` still needs `live: true`, an `untested` scenario
+# still needs a reason and never parks, and `inconclusive` or `no-surface`
+# still park for a decision. Like `commands.*`, it is read only from the
+# default-branch copy of this file. Runs of whitespace within a line are
+# collapsed and merge-conflict markers are stripped before injection, so keep
+# the text plain prose and bullets.
+test:
+  instructions: |
+    Bilimbi's validation in this gate is the configured test command that already ran as the baseline. `mix precommit.test` runs every ExUnit suite in apps/core, apps/base and apps/web against the Ecto SQL sandbox, including the module-owned `web_test/` LiveView integration tests that exercise the real Phoenix host. Treat its exit code as this step's result; remote CI (`Elixir tests`) runs it again before merge. Finish this turn in a few minutes: the cost of this step is meant to be the configured command, not this turn.
+
+    Do not stand the product up in this gate. Do not create, migrate, seed or drop a database; do not run `mix ecto.setup`, `mix bilimbi.migrate`, `mix bilimbi.dev.seed`, `mix assets.build` or `mix phx.server`; do not open a browser, Chrome DevTools, Playwright or any other driver; do not take screenshots or record video; do not write or edit tests or source in this turn. The PostgreSQL cluster is shared by every concurrent pipeline lane and has 100 connections; each lane's sandbox already takes about 24, and a dev server plus a browser session on top starves the other lanes. Visual review of a UI change happens on the pull request, not here: when a UI-facing change has no screenshot, say in testing_summary that this runbook keeps the gate to the configured command.
+
+    Do not rerun tests the configured command already ran. The one exception is attributing a baseline failure: when the configured command failed, read its output first. A `FATAL 53300 too_many_connections`, `connection not available` or similar pool error is cluster contention, not this change; report that as a warning finding with action no-op and rerun only the failing test file, or at most the one package that aborted, once. An assertion or compile failure is a product finding for the fix round; do not fix it in this turn. Run a focused test from its owning package with the same toolchain wrapper as the configured command, for example `cd apps/base/ui && MISE_TRUSTED_CONFIG_PATHS=<worktree root> MIX_ENV=test mise exec -- mix test test/icon_registry_test.exs`; a module's `web_test/` file runs from apps/web, for example `cd apps/web && MISE_TRUSTED_CONFIG_PATHS=<worktree root> MIX_ENV=test mise exec -- mix test ../core/company/web_test/company_live_test.exs`.
+
+    Scenarios, results and verdict:
+    - Derive the scenarios from the intent and the diff as usual, then map each one to the test file or files, in this change or already in the repository, that the configured command ran and that exercise it through the real host or the module's public API. Reading the diff and the tests is enough; do not run them to find out.
+    - Nothing in this gate is driven against the running product, so every scenario is `untested` with `live: false`. Its reason names the covering test file when there is one, for example "covered by apps/core/company/web_test/company_live_test.exs, which the configured command ran; this repository's runbook does not drive the running product in the gate", or states "no test covers this" when there is none. Never report `pass` for a scenario you did not drive live.
+    - Verdict `go` when the configured command passed, no scenario failed, and every scenario names a covering test that the configured command ran. Verdict `inconclusive` when a scenario that changes what a user sees or does has no covering test; that parks for the person who owns the change, which is cheaper than this turn standing the product up. Verdict `no-go` only when something you ran failed for a product reason. The built-in `no-surface` rule still applies to a change with no runtime surface.
+    - `tested` lists the configured command and any focused rerun you made. Leave `artifacts` empty unless the configured command's output for a scenario directly shows the behaviour a reviewer needs to see; do not manufacture artifacts. Keep testing_summary to which tests cover the change, what the configured command reported, and any coverage gap. Nothing was created, so there is nothing to clean up.

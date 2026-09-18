@@ -67,8 +67,6 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
     "Text and long-form inputs",
     "Choice controls",
     "Date, time, and secret inputs",
-    "Empty workspace",
-    "Permission denied",
     "Connection interrupted",
     "design-library-pattern-table"
   ]

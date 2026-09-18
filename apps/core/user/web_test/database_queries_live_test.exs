@@ -260,6 +260,32 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
              end)
     end
 
+    test "the query result head renders the role pair the contrast gate measures", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.system.database-table.list")
+
+      {:ok, query} =
+        User.create_database_query(scope, 91, %{
+          name: "Header Roles",
+          sql_query: "SELECT id, name FROM users;"
+        })
+
+      {:ok, view, _html} =
+        conn |> log_in_as() |> live(~p"/admin/system/database-queries/#{query.slug}")
+
+      # `theme_contrast_test.exs` gates `ink-subtle` against `surface-muted`
+      # because that is the pair this head renders (parity finding C2). If the
+      # head moves to another surface or another text role, the measured pair
+      # is no longer the rendered one.
+      classes =
+        view |> element("#query-results-table thead") |> render() |> opening_tag_classes()
+
+      assert "bg-surface-muted" in classes
+      assert "text-ink-subtle" in classes
+    end
+
     test "handles execution errors gracefully", %{conn: conn, scope: scope} do
       grant_capabilities!("admin.system.database-table.list")
 
@@ -372,5 +398,12 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       refute db_msg =~ "platform operator"
       assert db_msg =~ "does not exist"
     end
+  end
+
+  defp opening_tag_classes(html) do
+    [opening_tag, _] = String.split(html, ">", parts: 2)
+    [_, class_attribute] = Regex.run(~r/class="([^"]*)"/, opening_tag)
+
+    String.split(class_attribute, ~r/\s+/, trim: true)
   end
 end

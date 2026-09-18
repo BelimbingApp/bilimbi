@@ -358,7 +358,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
            )
 
     postcodes |> element("#postcode-#{source.id}-edit") |> render_click()
-    assert has_element?(postcodes, "#postcode-modal")
+    assert_modal_dialog(postcodes, "postcode-modal", "Edit Postcode")
     assert has_element?(postcodes, "#postcode-place-name[value='Kuala Lumpur City']")
 
     postcodes
@@ -402,6 +402,29 @@ defmodule BilimbiWeb.GeonamesLiveTest do
     assert has_element?(postcodes, "#postcodes-table", "Cyberjaya")
     assert has_element?(postcodes, "#postcodes-table", "Local")
     assert [%{place_name: "Cyberjaya"}] = Geonames.lookup_postcode("MY", "63000")
+  end
+
+  test "opening a postcode dialog drops the previous action's flash", %{conn: conn} do
+    grant_capabilities!(["admin.geonames.list", "admin.geonames.update"])
+
+    {:ok, postcodes, _html} = conn |> log_in_as() |> live(~p"/geonames/postcodes")
+    source = hd(Geonames.page_postcodes(%{search: "50000"}).entries)
+
+    postcodes
+    |> element("#postcode-#{source.id}-place-name")
+    |> render_hook("save-postcode-place", %{
+      "id" => "#{source.id}|#{source.revision}",
+      "place_name" => "Kuala Lumpur City"
+    })
+
+    assert has_element?(postcodes, "#flash-info", "Postcode 50000 updated.")
+
+    postcodes |> element("#postcodes-new") |> render_click()
+    assert_modal_dialog(postcodes, "postcode-modal", "New Postcode")
+
+    refute has_element?(postcodes, "dialog#postcode-modal #postcode-modal-flash-info")
+    refute has_element?(postcodes, "dialog#postcode-modal #postcode-modal-flash-error")
+    refute has_element?(postcodes, "#flash-info")
   end
 
   test "forged postcode writes fail closed without the update capability", %{conn: conn} do

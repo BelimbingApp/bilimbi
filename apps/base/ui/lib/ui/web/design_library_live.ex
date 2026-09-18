@@ -74,9 +74,21 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
                       code: "example-#{id}",
                       status: "active",
                       kind: :success,
-                      updated_at: ~U[2026-08-17 12:00:00Z]
+                      updated_at: DateTime.add(~U[2026-08-14 12:00:00Z], 4 - id, :day)
                     }
                   end)
+
+  # The canonical table sorts the way `/users` does: the column button pushes
+  # a string key, the direction is `"asc"`/`"desc"`, a repeated click flips
+  # it, and the timestamp column opens newest first.
+  @sample_sorts %{
+    "name" => :name,
+    "code" => :code,
+    "status" => :status,
+    "updated_at" => :updated_at
+  }
+  @sample_initial_directions %{"updated_at" => "desc"}
+  @sample_default_sort "name"
 
   @impl true
   def mount(_params, _session, socket) do
@@ -95,6 +107,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
       "url_field" => "https://bilimbi.test",
       "number_field" => "25",
       "password_field" => "secret-value",
+      "api_key_field" => "sk-sample-0000",
       "select_field" => "standard",
       "roles" => ["admin", "reviewer"],
       "checkbox_field" => "true",
@@ -127,11 +140,42 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
        :error_form,
        to_form(error_data, as: :error_sample, errors: [invalid_text: {"can't be blank", []}])
      )
+     |> stream_configure(:sample_rows, dom_id: &"sample-row-#{&1.id}")
+     |> assign(:sample_sort, sort_state(@sample_default_sort))
      |> assign_preview_page(:sample, 1, 25)
      |> assign_preview_page(:pattern, 1, 25)
      |> assign(:sample_datetime, ~U[2026-08-17 14:30:00Z])
      |> assign(:inline_value, "Editable entity value")
-     |> assign(:click_count, 0)}
+     |> assign(:click_count, 0)
+     |> assign(:modal_width, nil)
+     |> assign(
+       :modal_form,
+       to_form(%{"name" => "Example Sdn Bhd", "code" => "EX-01"}, as: :example)
+     )
+     |> assign(
+       :filter_toolbar_full_form,
+       to_form(
+         %{
+           "search" => "",
+           "status" => "",
+           "kind" => "",
+           "start_date" => "",
+           "end_date" => ""
+         },
+         as: :toolbar_full
+       )
+     )}
+  end
+
+  @impl true
+  def handle_event("open-modal", params, socket) do
+    width = if params["width"] == "wide", do: :wide, else: :narrow
+    {:noreply, assign(socket, :modal_width, width)}
+  end
+
+  @impl true
+  def handle_event("close-modal", _params, socket) do
+    {:noreply, assign(socket, :modal_width, nil)}
   end
 
   @impl true
@@ -142,6 +186,11 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   @impl true
   def handle_event("sample_change", %{"sample" => sample_data}, socket) do
     {:noreply, assign(socket, :sample_form, to_form(sample_data, as: :sample))}
+  end
+
+  def handle_event("filter-toolbar-preview", %{"toolbar_full" => toolbar_data}, socket) do
+    {:noreply,
+     assign(socket, :filter_toolbar_full_form, to_form(toolbar_data, as: :toolbar_full))}
   end
 
   @impl true
@@ -161,6 +210,13 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
         {:noreply,
          put_flash(socket, :info, "Example only: #{row.name} · #{row.code} · #{row.status}")}
     end
+  end
+
+  def handle_event("sample-sort", %{"sort" => requested_sort}, socket) do
+    {:noreply,
+     socket
+     |> assign(:sample_sort, next_sort(socket.assigns.sample_sort, requested_sort))
+     |> assign_preview_page(:sample, 1, socket.assigns.sample_page.page_size)}
   end
 
   def handle_event(event, %{"page" => page}, socket)
@@ -208,12 +264,28 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
     form = to_form(%{"perPage" => page_size}, as: :filters)
 
     case preview do
-      :sample -> assign(socket, sample_rows: rows, sample_page: data, sample_page_form: form)
-      :pattern -> assign(socket, pattern_rows: rows, pattern_page: data, pattern_page_form: form)
+      :sample ->
+        socket
+        |> assign(sample_page: data, sample_page_form: form)
+        |> stream(:sample_rows, rows, reset: true)
+
+      :pattern ->
+        assign(socket, pattern_rows: rows, pattern_page: data, pattern_page_form: form)
     end
   end
 
-  defp preview_rows(:sample, _socket), do: @sample_rows
+  defp preview_rows(:sample, socket) do
+    %{sort_by: sort_by, sort_dir: sort_dir} = socket.assigns.sample_sort
+    field = Map.fetch!(@sample_sorts, sort_by)
+    direction = direction_atom(sort_dir)
+
+    sorter =
+      if field == :updated_at,
+        do: {direction, DateTime},
+        else: direction
+
+    Enum.sort_by(@sample_rows, &Map.fetch!(&1, field), sorter)
+  end
 
   defp preview_rows(:pattern, socket) do
     search = socket.assigns.pattern_form[:search].value |> String.trim() |> String.downcase()
@@ -223,6 +295,28 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
       &String.contains?(String.downcase(&1.name <> " " <> &1.code), search)
     )
   end
+
+  defp sort_state(sort_by), do: %{sort_by: sort_by, sort_dir: default_direction(sort_by)}
+
+  defp next_sort(state, requested_sort) when is_map_key(@sample_sorts, requested_sort) do
+    %{
+      sort_by: requested_sort,
+      sort_dir:
+        if(state.sort_by == requested_sort,
+          do: flip_direction(state.sort_dir),
+          else: default_direction(requested_sort)
+        )
+    }
+  end
+
+  defp next_sort(state, _requested_sort), do: state
+
+  defp default_direction(sort_by), do: Map.get(@sample_initial_directions, sort_by, "asc")
+  defp flip_direction("asc"), do: "desc"
+  defp flip_direction(_direction), do: "asc"
+
+  defp direction_atom("desc"), do: :desc
+  defp direction_atom(_direction), do: :asc
 
   defp positive_integer(value, fallback) when is_binary(value) do
     case Integer.parse(value) do

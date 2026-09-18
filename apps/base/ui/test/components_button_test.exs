@@ -113,6 +113,117 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
     assert table =~ "text-danger hover:bg-danger-surface"
   end
 
+  test "a busy button says so to assistive technology and refuses a second activation" do
+    idle = render_button(false)
+    busy = render_button(true)
+
+    refute attribute?(idle, "aria-busy")
+    refute attribute?(idle, "disabled")
+    refute idle =~ "motion-safe:animate-spin"
+
+    assert attribute?(busy, ~s(aria-busy="true"))
+    assert attribute?(busy, "disabled")
+    assert busy =~ "Saving…"
+
+    # Waiting is not the same picture as unavailable: busy spins at full
+    # strength instead of taking the dimmed disabled treatment.
+    assert busy =~ "motion-safe:animate-spin"
+    assert idle =~ "disabled:opacity-50"
+    refute busy =~ "disabled:opacity-50"
+  end
+
+  test "an icon button distinguishes busy from disabled for assistive technology" do
+    disabled =
+      render_component(
+        fn assigns ->
+          ~H"""
+          <.icon_button id="impersonate-btn" icon="bilimbi-impersonate" label="Impersonate user" disabled />
+          """
+        end,
+        %{}
+      )
+
+    busy =
+      render_component(
+        fn assigns ->
+          ~H"""
+          <.icon_button id="delete-btn" icon="delete" label="Delete company" busy />
+          """
+        end,
+        %{}
+      )
+
+    assert attribute?(disabled, "disabled")
+    refute attribute?(disabled, "aria-busy")
+    assert disabled =~ "disabled:opacity-50"
+    refute disabled =~ "motion-safe:animate-spin"
+
+    assert attribute?(busy, ~s(aria-busy="true"))
+    assert attribute?(busy, "disabled")
+    assert attribute?(busy, ~s(aria-label="Delete company"))
+
+    # The glyph becomes a spinner while the action is pending, so the two
+    # inert states are told apart by sight as well as by screen reader.
+    assert busy =~ "hero-arrow-path"
+    assert busy =~ "motion-safe:animate-spin"
+    refute busy =~ "hero-trash"
+    refute busy =~ "disabled:opacity-50"
+
+    # The spin does not render under prefers-reduced-motion, so the well and
+    # the swapped glyph carry the state on their own.
+    assert busy =~ ~r/\sbg-surface-sunken/
+    assert busy =~ "ring-1 ring-line"
+    refute disabled =~ ~r/\sbg-surface-sunken/
+  end
+
+  test "a navigation control ignores busy instead of claiming a wait it cannot enforce" do
+    button =
+      render_component(
+        fn assigns ->
+          ~H"""
+          <.button id="nav-busy-btn" navigate="/users" busy>Go to Users</.button>
+          """
+        end,
+        %{}
+      )
+
+    icon =
+      render_component(
+        fn assigns ->
+          ~H"""
+          <.icon_button id="nav-busy-icon" icon="export" label="Export" href="/export" busy />
+          """
+        end,
+        %{}
+      )
+
+    assert button =~ ~s(<a)
+    assert icon =~ ~s(<a)
+
+    for html <- [button, icon] do
+      refute attribute?(html, "aria-busy")
+      refute attribute?(html, "disabled")
+    end
+  end
+
+  # Whether the control's opening tag carries the attribute. The class list
+  # names `disabled:` variants, so a bare substring check would lie.
+  defp attribute?(html, attribute) do
+    [tag] = Regex.run(~r/<(?:button|a)[^>]*>/, html)
+    tag =~ ~r/\s#{Regex.escape(attribute)}(?=[\s>])/
+  end
+
+  defp render_button(busy) do
+    render_component(
+      fn assigns ->
+        ~H"""
+        <.button id="busy-btn" type="submit" variant="primary" busy={@busy}>Saving…</.button>
+        """
+      end,
+      %{busy: busy}
+    )
+  end
+
   test "caller-supplied class extends variant styling" do
     html =
       render_component(

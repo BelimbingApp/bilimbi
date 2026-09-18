@@ -7,6 +7,13 @@ defmodule Bilimbi.Base.UI.IconRegistry do
   rather than a raw `hero-*` string. `<.icon>` still passes unknown names
   beginning with `hero-` through to generated Heroicons.
 
+  `lookup/1` raises for a name that is neither registered here nor a `hero-*`
+  passthrough, instead of silently rendering a generic fallback glyph. Every
+  name a call site writes must resolve to something meaningful; use a raw
+  `hero-*` name to reach an icon this module does not name. A name that comes
+  from stored data rather than source is filtered through `renderable?/1`
+  first.
+
   Logout is intentionally absent: Bilimbi keeps `hero-arrow-right-on-rectangle`.
   Destination navigation has no single action glyph; menu contributions keep
   their own icons.
@@ -69,6 +76,10 @@ defmodule Bilimbi.Base.UI.IconRegistry do
   @doc "Accepted shell icon meanings; logout preserves Bilimbi's own treatment."
   def shell(action), do: Map.fetch!(@shell, action)
 
+  @doc "Every shell action and the Heroicon it names."
+  @spec shell_actions() :: %{atom() => String.t()}
+  def shell_actions, do: @shell
+
   # One chosen Heroicon per familiar action meaning. Theme and sort keep a
   # name per state because those controls are the meaning, not one glyph.
   @actions %{
@@ -76,6 +87,8 @@ defmodule Bilimbi.Base.UI.IconRegistry do
     "edit" => "hero-pencil",
     "delete" => "hero-trash",
     "view" => "hero-eye",
+    "reveal" => "hero-eye",
+    "conceal" => "hero-eye-slash",
     "filter" => "hero-funnel",
     "search" => "hero-magnifying-glass",
     "sort" => "hero-chevron-up-down",
@@ -131,8 +144,43 @@ defmodule Bilimbi.Base.UI.IconRegistry do
   def action(name) when is_binary(name), do: Map.fetch(@actions, name)
   def action(_name), do: :error
 
+  @doc """
+  Resolves a name to a registered custom SVG or a chosen Heroicon.
+
+  A `hero-*` name with no registry entry returns `:error` so `<.icon>` can
+  pass it straight through to generated Heroicons. Any other unregistered
+  name raises: a fail-soft registry is how a misspelled action name used to
+  render the same meaningless fallback glyph for every caller without anyone
+  noticing. Register the name in `@icons` or `@actions` (or use a raw
+  `hero-*` name) instead of relying on a fallback.
+
+  Names supplied by stored data must be filtered through `renderable?/1`
+  first; a legacy payload is not a source typo to fail loudly on.
+  """
   @spec lookup(String.t()) :: {:svg, icon()} | {:hero, String.t()} | :error
   def lookup(name) when is_binary(name) do
+    case classify(name) do
+      {:svg, _icon} = resolved -> resolved
+      {:hero, _hero_name} = resolved -> resolved
+      :hero_passthrough -> :error
+      :unregistered -> raise ArgumentError, unregistered_message(name)
+    end
+  end
+
+  def lookup(_name), do: :error
+
+  @doc """
+  Returns true when `<.icon>` renders `name` instead of raising.
+
+  This is the one safe entry point for a name that reaches `<.icon>` from
+  data rather than from source — a Laravel-compatible notification payload,
+  for instance — so the caller can substitute its own default.
+  """
+  @spec renderable?(term()) :: boolean()
+  def renderable?(name) when is_binary(name), do: classify(name) != :unregistered
+  def renderable?(_name), do: false
+
+  defp classify(name) do
     case Map.fetch(@icons, name) do
       {:ok, icon} ->
         {:svg, icon}
@@ -140,12 +188,23 @@ defmodule Bilimbi.Base.UI.IconRegistry do
       :error ->
         case Map.fetch(@actions, name) do
           {:ok, hero_name} -> {:hero, hero_name}
-          :error -> :error
+          :error -> classify_unregistered(name)
         end
     end
   end
 
-  def lookup(_name), do: :error
+  defp classify_unregistered("hero-" <> _), do: :hero_passthrough
+  defp classify_unregistered(_name), do: :unregistered
+
+  defp unregistered_message(name) do
+    """
+    Bilimbi.Base.UI.IconRegistry has no icon named #{inspect(name)}.
+
+    Register it in the @icons or @actions map in \
+    apps/base/ui/lib/ui/icon_registry.ex, or use a raw "hero-*" Heroicon \
+    name if no semantic action name applies.
+    """
+  end
 
   @spec actions() :: %{String.t() => String.t()}
   def actions, do: @actions

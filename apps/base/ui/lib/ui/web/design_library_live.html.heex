@@ -337,19 +337,27 @@
       >
         <aside
           id="component-secondary-menu"
-          class="rounded-xl border border-line bg-surface-muted p-2 shadow-xs sm:sticky sm:top-4"
+          class="rounded-xl border border-line bg-surface-muted p-2 shadow-xs sm:sticky sm:top-4 sm:max-h-[calc(100svh-8rem)] sm:overflow-y-auto"
         >
-          <nav aria-label="Component sections" class="space-y-3">
-            <div id="component-menu-structure">
+          <nav aria-label="Component families" class="space-y-0.5">
+            <.link
+              id="component-menu-foundations"
+              navigate={~p"/system/design-library"}
+              class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+            >
+              <.icon
+                name="hero-swatch"
+                class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
+              />
+              <span>
+                <span class="block text-[0.8125rem] leading-5">A Foundations</span>
+                <span class="block text-xs leading-4 text-ink-muted">Colour, type, density and shape, on the Theme page</span>
+              </span>
+            </.link>
+            <div class="space-y-0.5">
               <a
-                href="#component-shell"
-                class="block rounded-md px-2 py-1.5 text-link hover:bg-surface"
-              >Application shell</a>
-              <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                Structure
-              </p>
-              <a
-                href="#component-structure"
+                id="component-menu-page-structure"
+                href="#component-page-structure"
                 class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
               >
                 <.icon
@@ -357,149 +365,181 @@
                   class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
                 />
                 <span>
-                  <span class="block text-[0.8125rem] leading-5">Page structure</span>
-                  <span class="block text-xs leading-4 text-ink-muted">Headers, cards, menus, and tabs</span>
+                  <span class="block text-[0.8125rem] leading-5">B Page structure</span>
+                  <span class="block text-xs leading-4 text-ink-muted">Application shell, page widths and headers</span>
                 </span>
               </a>
+              <a
+                id="component-menu-shell"
+                href="#component-shell"
+                class="ml-8 block rounded-md px-2 py-1 text-xs leading-4 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+              >Application shell</a>
             </div>
-
-            <div id="component-menu-controls">
-              <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                Controls
-              </p>
-              <div class="space-y-0.5">
-                <a
-                  href="#component-inputs"
-                  class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
-                >
-                  <.icon
-                    name="hero-pencil-square"
-                    class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
-                  />
-                  <span>
-                    <span class="block text-[0.8125rem] leading-5">Inputs</span>
-                    <span class="block text-xs leading-4 text-ink-muted">Text, choices, time, and validation</span>
-                  </span>
-                </a>
-                <a
-                  href="#component-actions"
-                  class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
-                >
-                  <.icon
-                    name="hero-cursor-arrow-rays"
-                    class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
-                  />
-                  <span>
-                    <span class="block text-[0.8125rem] leading-5">Actions</span>
-                    <span class="block text-xs leading-4 text-ink-muted">Buttons and compact actions</span>
-                  </span>
-                </a>
-              </div>
-            </div>
-
-            <div id="component-menu-communication">
-              <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                Communication
-              </p>
-              <div class="space-y-0.5">
-                <a
-                  href="#component-feedback"
-                  class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
-                >
-                  <.icon
-                    name="hero-chat-bubble-bottom-center-text"
-                    class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
-                  />
-                  <span>
-                    <span class="block text-[0.8125rem] leading-5">Feedback</span>
-                    <span class="block text-xs leading-4 text-ink-muted">Alerts, status, and recovery</span>
-                  </span>
-                </a>
-                <a
-                  href="#component-states"
-                  class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
-                >
-                  <.icon
-                    name="status"
-                    class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
-                  />
-                  <span>
-                    <span class="block text-[0.8125rem] leading-5">States</span>
-                    <span class="block text-xs leading-4 text-ink-muted">Empty, blocked, and interrupted</span>
-                  </span>
-                </a>
-              </div>
-            </div>
-
-            <div id="component-menu-workflows">
-              <p class="px-2 pb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
-                Workflows
-              </p>
-              <div class="space-y-0.5">
-                <a
-                  href="#component-data"
-                  class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
-                >
-                  <.icon
-                    name="hero-table-cells"
-                    class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
-                  />
-                  <span>
-                    <span class="block text-[0.8125rem] leading-5">Data display</span>
-                    <span class="block text-xs leading-4 text-ink-muted">Tables, facts, dates, and pagination</span>
-                  </span>
-                </a>
-                <a
-                  href="#component-patterns"
-                  class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
-                >
-                  <.icon
-                    name="hero-arrow-path-rounded-square"
-                    class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
-                  />
-                  <span>
-                    <span class="block text-[0.8125rem] leading-5">Interaction patterns</span>
-                    <span class="block text-xs leading-4 text-ink-muted">Filters, editing, and complete flows</span>
-                  </span>
-                </a>
-              </div>
-            </div>
+            <a
+              id="component-menu-navigation-links"
+              href="#component-navigation-links"
+              class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+            >
+              <.icon
+                name="hero-bars-3"
+                class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
+              />
+              <span>
+                <span class="block text-[0.8125rem] leading-5">C Navigation and links</span>
+                <span class="block text-xs leading-4 text-ink-muted">Sidebar rows and tabs</span>
+              </span>
+            </a>
+            <a
+              id="component-menu-actions"
+              href="#component-actions"
+              class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+            >
+              <.icon
+                name="hero-cursor-arrow-rays"
+                class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
+              />
+              <span>
+                <span class="block text-[0.8125rem] leading-5">D Actions</span>
+                <span class="block text-xs leading-4 text-ink-muted">Buttons and compact actions</span>
+              </span>
+            </a>
+            <a
+              id="component-menu-inputs"
+              href="#component-inputs"
+              class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+            >
+              <.icon
+                name="hero-pencil-square"
+                class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
+              />
+              <span>
+                <span class="block text-[0.8125rem] leading-5">E Inputs</span>
+                <span class="block text-xs leading-4 text-ink-muted">Text, choices, time and validation</span>
+              </span>
+            </a>
+            <a
+              id="component-menu-interaction-patterns"
+              href="#component-interaction-patterns"
+              class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+            >
+              <.icon
+                name="hero-arrow-path-rounded-square"
+                class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
+              />
+              <span>
+                <span class="block text-[0.8125rem] leading-5">F Interaction patterns</span>
+                <span class="block text-xs leading-4 text-ink-muted">Inline editing</span>
+              </span>
+            </a>
+            <a
+              id="component-menu-feedback-states"
+              href="#component-feedback-states"
+              class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+            >
+              <.icon
+                name="hero-chat-bubble-bottom-center-text"
+                class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
+              />
+              <span>
+                <span class="block text-[0.8125rem] leading-5">G Feedback and states</span>
+                <span class="block text-xs leading-4 text-ink-muted">Alerts, status, empty, blocked and interrupted</span>
+              </span>
+            </a>
+            <a
+              id="component-menu-overlays"
+              href="#component-overlays"
+              class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+            >
+              <.icon
+                name="hero-square-2-stack"
+                class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
+              />
+              <span>
+                <span class="block text-[0.8125rem] leading-5">H Overlays</span>
+                <span class="block text-xs leading-4 text-ink-muted">The modal dialog</span>
+              </span>
+            </a>
+            <a
+              id="component-menu-data-display"
+              href="#component-data-display"
+              class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+            >
+              <.icon
+                name="hero-table-cells"
+                class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
+              />
+              <span>
+                <span class="block text-[0.8125rem] leading-5">I Data display</span>
+                <span class="block text-xs leading-4 text-ink-muted">Tables, cards, facts, badges and dates</span>
+              </span>
+            </a>
+            <a
+              id="component-menu-composite-patterns"
+              href="#component-composite-patterns"
+              class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+            >
+              <.icon
+                name="hero-squares-2x2"
+                class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
+              />
+              <span>
+                <span class="block text-[0.8125rem] leading-5">J Composite patterns</span>
+                <span class="block text-xs leading-4 text-ink-muted">The operational index page, end to end</span>
+              </span>
+            </a>
+            <.link
+              id="component-menu-graphics"
+              navigate={~p"/system/design-library/graphic"}
+              class="group flex items-start gap-2 rounded-md px-2 py-1.5 text-link hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+            >
+              <.icon
+                name="hero-photo"
+                class="mt-0.5 size-4 shrink-0 text-muted group-hover:text-brand-strong"
+              />
+              <span>
+                <span class="block text-[0.8125rem] leading-5">K Graphics</span>
+                <span class="block text-xs leading-4 text-ink-muted">Mark and icons, on the Graphic page</span>
+              </span>
+            </.link>
           </nav>
         </aside>
 
         <div id="component-content" class="min-w-0 space-y-9">
-          <section id="component-shell" class="scroll-mt-4 space-y-3">
-            <h2 class="text-base font-semibold text-ink">
-              Application shell <span class="text-xs text-muted">LAY-02 · NAV-05</span>
-            </h2>
-            <p class="text-sm text-muted">
-              Your account stays at the bottom left. Open it for company, tenant and account actions. Unusual access stays visible while you work.
-            </p>
-            <div class="rounded-xl border border-line bg-surface p-4">
-              <h3 class="text-sm font-semibold">Display controls</h3>
-              <p class="mt-1 text-xs text-muted">
-                The clock and theme controls live in the top bar of this page. They change your own saved display preferences. The timestamp below is an ordinary &lt;.datetime&gt; with no special wiring, and it changes the moment you change the clock — as does every other &lt;.datetime&gt; already on screen, including rows of a long table you have already scrolled through. A screen that formats its own instants instead keeps the text it rendered until it adopts the component.
-              </p>
-              <p class="mt-3 text-sm">
-                <.datetime id="library-shell-time" value={~U[2026-09-14 07:00:00Z]} />
-              </p>
-            </div>
-            <div class="rounded-xl border border-line bg-surface p-4">
-              <h3 class="text-sm font-semibold">Account disclosure</h3>
-              <p class="mt-1 text-xs text-muted">
-                The accepted disclosure is the circle at the bottom left of this page. Open it for your name, identifier, company, tenant, Change password and Sign out. Every authenticated screen shows the same circle in the same place.
-              </p>
-            </div>
-            <p class="text-xs text-muted">
-              Use the top-left toggle to compare the full sidebar and compact rail. On a narrow screen it opens a drawer; Escape closes the active menu first, then the drawer.
-            </p>
-          </section>
-          <section id="component-structure" class="scroll-mt-4 space-y-4">
+          <section id="component-page-structure" class="scroll-mt-4 space-y-4">
             <div>
-              <h2 class="text-base font-semibold text-ink-strong">Page structure</h2><p class="text-sm text-ink-muted">
-                Page widths, headings, cards, menus, and tabs.
+              <h2 class="text-base font-semibold text-ink-strong">
+                Page structure
+              </h2>
+              <p class="text-sm text-ink-muted">
+                The application shell, the page widths a workflow may use, and the page header. The authentication shell, the page-local side panel and complete index, form and detail assemblies have no specimen yet.
               </p>
             </div>
+            <section id="component-shell" class="scroll-mt-4 space-y-3">
+              <h3 class="text-base font-semibold text-ink">
+                Application shell
+              </h3>
+              <p class="text-sm text-muted">
+                Your account stays at the bottom left. Open it for company, tenant and account actions. Unusual access stays visible while you work.
+              </p>
+              <div class="rounded-xl border border-line bg-surface p-4">
+                <h4 class="text-sm font-semibold">Display controls</h4>
+                <p class="mt-1 text-xs text-muted">
+                  The clock and theme controls live in the top bar of this page. They change your own saved display preferences. The timestamp below is an ordinary &lt;.datetime&gt; with no special wiring, and it changes the moment you change the clock — as does every other &lt;.datetime&gt; already on screen, including rows of a long table you have already scrolled through. A screen that formats its own instants instead keeps the text it rendered until it adopts the component.
+                </p>
+                <p class="mt-3 text-sm">
+                  <.datetime id="library-shell-time" value={~U[2026-09-14 07:00:00Z]} />
+                </p>
+              </div>
+              <div class="rounded-xl border border-line bg-surface p-4">
+                <h4 class="text-sm font-semibold">Account disclosure</h4>
+                <p class="mt-1 text-xs text-muted">
+                  The accepted disclosure is the circle at the bottom left of this page. Open it for your name, identifier, company, tenant, Change password and Sign out. Every authenticated screen shows the same circle in the same place.
+                </p>
+              </div>
+              <p class="text-xs text-muted">
+                Use the top-left toggle to compare the full sidebar and compact rail. On a narrow screen it opens a drawer; Escape closes the active menu first, then the drawer.
+              </p>
+            </section>
             <.card id="component-page" title="Page widths" inner_class="space-y-2 p-4">
               <div id="component-page-stage" class="overflow-x-auto">
                 <div class="w-[1280px] space-y-3">
@@ -536,46 +576,36 @@
                 Each variant is centered on a 1280px stage at full scale; scroll to follow the widest.
               </p>
             </.card>
-            <div class="grid gap-3 lg:grid-cols-2">
-              <.card id="component-header" title="Page header" inner_class="space-y-5 p-4">
-                <div id="component-header-default">
-                  <p class="mb-2 text-xs text-ink-muted">Title, subtitle, and trailing action</p>
-                  <.header>
-                    Company settings<:subtitle>Manage identity and regional defaults.</:subtitle><:actions>
-                      <.button variant="primary">Save changes</.button>
-                    </:actions>
-                  </.header>
-                </div>
-                <div id="component-header-title-action" class="border-t border-line pt-4">
-                  <p class="mb-2 text-xs text-ink-muted">
-                    Title action without a trailing action
-                  </p>
-                  <.header>
-                    Company details<:title_actions>
-                      <.icon_button icon="edit" label="Edit company" context={:inline} />
-                    </:title_actions>
-                  </.header>
-                </div>
-              </.card>
-              <.card id="component-card" title="Card" inner_class="space-y-4 p-4">
-                <div id="component-card-titled">
-                  <p class="mb-2 text-xs text-ink-muted">With a title</p>
-                  <.card title="Company profile" inner_class="p-3">
-                    <p class="text-sm text-ink">A title adds the bordered heading strip.</p>
-                  </.card>
-                </div>
-                <div id="component-card-untitled">
-                  <p class="mb-2 text-xs text-ink-muted">Without a title</p>
-                  <.card inner_class="p-3">
-                    <p class="text-sm text-ink">Without one, the body stands alone.</p>
-                  </.card>
-                </div>
-                <div id="component-card-boundary" class="border-t border-line pt-3">
-                  <p class="text-xs text-ink-muted">
-                    A card has no loading, empty, error, or disabled state; those belong to the content placed inside it.
-                  </p>
-                </div>
-              </.card>
+            <.card id="component-header" title="Page header" inner_class="space-y-5 p-4">
+              <div id="component-header-default">
+                <p class="mb-2 text-xs text-ink-muted">Title, subtitle, and trailing action</p>
+                <.header>
+                  Company settings<:subtitle>Manage identity and regional defaults.</:subtitle><:actions>
+                    <.button variant="primary">Save changes</.button>
+                  </:actions>
+                </.header>
+              </div>
+              <div id="component-header-title-action" class="border-t border-line pt-4">
+                <p class="mb-2 text-xs text-ink-muted">
+                  Title action without a trailing action
+                </p>
+                <.header>
+                  Company details<:title_actions>
+                    <.icon_button icon="edit" label="Edit company" context={:inline} />
+                  </:title_actions>
+                </.header>
+              </div>
+            </.card>
+          </section>
+
+          <section id="component-navigation-links" class="scroll-mt-4 space-y-4">
+            <div>
+              <h2 class="text-base font-semibold text-ink-strong">
+                Navigation and links
+              </h2>
+              <p class="text-sm text-ink-muted">
+                The shell's own navigation rows and the shared tabs. Pagination is shown with the table it pages, under Data display. There is no shared link dictionary yet, and the account menu is part of the application shell above.
+              </p>
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
               <.card id="component-navigation" title="Navigation" inner_class="space-y-2 p-3">
@@ -616,7 +646,7 @@
               <h2 id="component-button" class="text-base font-semibold text-ink-strong">
                 Actions
               </h2><p class="text-sm text-ink-muted">
-                Primary, secondary, destructive, disabled, navigation, and in-flight examples.
+                Primary, secondary, destructive, disabled, navigation, in-flight, and busy examples. Consequence copy and typed acknowledgement are not built.
               </p>
             </div>
             <div class="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-4 shadow-xs">
@@ -626,10 +656,13 @@
                 phx-click="test_click"
                 variant="primary"
                 phx-disable-with="Working…"
-              >Clicked: {@click_count}</.button>
+              >Clicked: {@click_count}</.button><.button variant="primary" busy>Saving…</.button>
             </div>
+            <p class="text-xs text-ink-muted">
+              Clicked goes in flight for one round trip: LiveView disables it and shows "Working…" until the server replies, and the shell mirrors that wait onto <code>aria-busy</code>; it is announced but still wears the dimmed disabled look. Busy is the wait the server knows about, such as a sign-in that is opening the workspace: the control spins at full strength, is disabled and carries <code>aria-busy</code>. Disabled means the action is not available at all, so it dims and never spins.
+            </p>
             <.card id="component-icon-button" title="Compact icon actions" inner_class="p-4">
-              <div class="flex items-center gap-4">
+              <div class="flex flex-wrap items-center gap-4">
                 <div class="flex items-center gap-2 text-sm text-ink-muted">
                   Inline
                   <.icon_button
@@ -642,18 +675,40 @@
                   Table <.icon_button icon="edit" label="Edit company" />
                   <.icon_button icon="delete" label="Delete company" kind={:danger} />
                 </div>
+                <div class="flex items-center gap-2 text-sm text-ink-muted">
+                  Disabled
+                  <.icon_button
+                    id="component-icon-button-disabled"
+                    icon="bilimbi-impersonate"
+                    label="Impersonate user"
+                    disabled
+                  />
+                </div>
+                <div class="flex items-center gap-2 text-sm text-ink-muted">
+                  Busy
+                  <.icon_button
+                    id="component-icon-button-busy"
+                    icon="export"
+                    label="Export companies"
+                    busy
+                  />
+                </div>
               </div>
               <p class="mt-3 text-xs text-ink-muted">
-                Use icon-only controls for familiar repeated actions. Keep primary and unfamiliar actions as words.
+                Use icon-only controls for familiar repeated actions. Keep primary and unfamiliar actions as words. Disabled and busy are both inert, and they do not look alike: disabled dims the glyph, busy sits in a sunken ringed well and replaces the glyph with a spinner at full strength, and carries <code>aria-busy</code>. The well and the swapped glyph are static, so the difference survives <code>prefers-reduced-motion</code>, where the spin does not render. The label still names the action that is pending — the export above reads "Export companies" while it waits.
+                <code>phx-disable-with</code>
+                does not belong here: it replaces the control's text, which on an icon-only action deletes the glyph.
               </p>
             </.card>
           </section>
 
           <section id="component-inputs" class="scroll-mt-4 space-y-4">
             <div>
-              <h2 class="text-base font-semibold text-ink-strong">Inputs</h2>
+              <h2 class="text-base font-semibold text-ink-strong">
+                Inputs
+              </h2>
               <p class="text-sm text-ink-muted">
-                Choose the simplest control that fits the value, then review it in use.
+                Choose the simplest control that fits the value, then review it in use. The searchable combobox, the country and currency lookup and the segmented control have no specimen yet.
               </p>
             </div>
 
@@ -790,7 +845,15 @@
                   type="password"
                   label="Secret"
                   autocomplete="new-password"
+                />
+                <.input
+                  field={@sample_form[:api_key_field]}
+                  type="password"
+                  label="API key"
+                  reveal="API key"
+                  autocomplete="off"
                   wrapper_class="mb-0"
+                  hint="Reveal is a caller option. Sign-in keeps its password masked; a key a user copies from elsewhere earns the control."
                 />
               </.card>
 
@@ -859,6 +922,26 @@
                     value="Managed by Bilimbi"
                     disabled
                   />
+                  <.input
+                    name="required-field"
+                    label="Company name"
+                    value=""
+                    placeholder="Enter a value"
+                    required
+                  />
+                  <.input
+                    name="readonly-field"
+                    label="System identifier"
+                    value="acme-0042"
+                    readonly
+                  />
+                  <.input
+                    name="field-with-help-and-error"
+                    label="Tax ID"
+                    value=""
+                    hint="As printed on the certificate."
+                    errors={["can't be blank"]}
+                  />
                 </div>
                 <.radio_group
                   id="component-radio-disabled"
@@ -876,123 +959,15 @@
               </.card>
             </.form>
           </section>
-          <section id="component-feedback" class="scroll-mt-4 space-y-4">
-            <div>
-              <h2 class="text-base font-semibold text-ink-strong">Feedback</h2><p class="text-sm text-ink-muted">
-                Short-lived messages, inline guidance, and persistent record status.
-              </p>
-            </div>
-            <%!--
-            The real flash is `position: fixed`, so `transform-gpu` on each wrapper
-            makes the wrapper its containing block and keeps the specimen inside the
-            page. The wrapper must stay unclipped: the panel is wider than the wrapper
-            at narrow widths, and a clipping class cuts off its left edge.
-            --%>
-            <div id="component-flash" class="space-y-3">
-              <div class="relative min-h-28 rounded-xl border border-line bg-canvas transform-gpu">
-                <.flash
-                  id="design-library-flash"
-                  kind={:info}
-                  flash={%{"info" => "Your changes were saved."}}
-                  title="Saved"
-                />
-              </div>
-              <div class="relative min-h-28 rounded-xl border border-line bg-canvas transform-gpu">
-                <.flash
-                  id="design-library-flash-error"
-                  kind={:error}
-                  flash={%{"error" => "The changes could not be saved."}}
-                  title="Save failed"
-                />
-              </div>
-            </div>
-            <div id="component-alert" class="grid gap-2 lg:grid-cols-2">
-              <.alert kind={:info}>This change affects future records.</.alert><.alert kind={
-                :success
-              }>
-                The company was created.
-              </.alert><.alert kind={:warning}>
-                Review the missing address before continuing.
-              </.alert><.alert kind={:error}>The record could not be saved.</.alert>
-            </div>
-            <div
-              id="component-badge"
-              class="flex flex-wrap gap-2 rounded-xl border border-line bg-surface p-4 shadow-xs"
-            >
-              <.badge>Archived</.badge><.badge kind={:success}>Active</.badge><.badge kind={
-                :warning
-              }>
-                Pending
-              </.badge><.badge kind={:danger}>Suspended</.badge>
-            </div>
-          </section>
 
-          <section id="component-states" class="scroll-mt-4 space-y-4">
+          <section id="component-interaction-patterns" class="scroll-mt-4 space-y-4">
             <div>
-              <h2 class="text-base font-semibold text-ink-strong">States</h2><p class="text-sm text-ink-muted">
-                These states are part of the product, not exceptions to its design.
+              <h2 class="text-base font-semibold text-ink-strong">
+                Interaction patterns
+              </h2>
+              <p class="text-sm text-ink-muted">
+                Inline text editing is the one shared interaction primitive today. Inline select, combobox and textarea editing, grouped fact editing, disclosure, filter and period patterns, and unsaved-change flows have no specimen yet; the filter composition is shown as part of the index page under Composite patterns.
               </p>
-            </div>
-            <div class="grid gap-3 lg:grid-cols-3">
-              <.card title="Empty workspace" inner_class="p-4 text-center">
-                <.icon name="hero-building-office-2" class="mx-auto size-6 text-ink-faint" /><p class="mt-2 text-sm font-medium text-ink">
-                  No companies yet
-                </p><p class="mt-1 text-xs text-ink-muted">
-                  Create the first company to establish this workspace.
-                </p><.button variant="primary" class="mt-3">Create company</.button>
-              </.card><.card title="Permission denied" inner_class="p-4">
-                <.alert kind={:error}>
-                  You cannot view this area. Ask an operator to review your role.
-                </.alert>
-              </.card><.card title="Connection interrupted" inner_class="p-4">
-                <.alert kind={:warning}>
-                  Bilimbi is reconnecting. Your work has not been submitted twice.
-                </.alert>
-              </.card>
-            </div>
-          </section>
-
-          <section id="component-data" class="scroll-mt-4 space-y-4">
-            <div>
-              <h2 class="text-base font-semibold text-ink-strong">Data display</h2><p class="text-sm text-ink-muted">
-                Tables, inline editing, pagination, key facts, and dates.
-              </p>
-            </div>
-            <div id="component-table" class="space-y-2">
-              <p class="text-xs text-ink-muted">
-                Example companies; changes stay in this preview.
-              </p>
-              <.table id="sample-table" rows={@sample_rows} caption="Example companies">
-                <:col :let={row} label="Company">
-                  <span class="font-medium text-ink-strong">{row.name}</span>
-                </:col><:col :let={row} label="Code">{row.code}</:col><:col
-                  :let={row}
-                  label="Status"
-                >
-                  <.badge kind={row.kind}>{row.status}</.badge>
-                </:col><:col :let={row} label="Updated">
-                  <.datetime
-                    id={"sample-updated-#{row.id}"}
-                    value={row.updated_at}
-                    format={:date}
-                  />
-                </:col><:action :let={row}>
-                  <.icon_button
-                    icon="view"
-                    id={"sample-preview-#{row.id}"}
-                    label={"Preview #{row.name}"}
-                    phx-click="preview-company"
-                    phx-value-id={row.id}
-                  />
-                </:action>
-              </.table>
-              <.pagination
-                id="design-library-pagination"
-                page={@sample_page}
-                filters_form={@sample_page_form}
-                page_event="sample-page"
-                filters_event="sample-page-size"
-              />
             </div>
             <.card id="component-inline-edit" title="Inline edit" inner_class="p-4">
               <p class="mb-2 text-xs text-ink-muted">
@@ -1004,7 +979,284 @@
                 label="Edit company name"
               />
             </.card>
+          </section>
+
+          <section id="component-feedback-states" class="scroll-mt-4 space-y-4">
+            <div>
+              <h2 class="text-base font-semibold text-ink-strong">
+                Feedback and states
+              </h2>
+              <p class="text-sm text-ink-muted">
+                Short-lived messages, inline guidance, and the empty, blocked and interrupted states. These states are part of the product, not exceptions to its design. Validation, disabled and in-flight states are shown with the controls that have them, under Inputs and Actions.
+              </p>
+            </div>
+            <div id="component-flash" class="space-y-3">
+              <p class="text-sm text-ink-muted">
+                One message per severity. The layout's flash group is the single production outlet: it stacks messages in one column at the top right, most severe first, so several stay readable at once. Info, warning and error stay until dismissed, because a message someone must act on must not disappear on a timer. Only a success times out, after eight seconds, and no screen emits one yet: the timer waits on the confirmation callers that still use info. Success and info share one colour and differ by icon: most of the product's info messages still report a completed write, so the neutral colour cannot be applied until those callers move to success.
+              </p>
+              <div class="flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
+                <.flash
+                  id="design-library-flash-error"
+                  kind={:error}
+                  flash={%{"error" => "The changes could not be saved."}}
+                  title="Save failed"
+                />
+                <.flash
+                  id="design-library-flash-warning"
+                  kind={:warning}
+                  flash={%{"warning" => "Two employees still report to the archived department."}}
+                  title="Review before continuing"
+                />
+                <.flash
+                  id="design-library-flash-success"
+                  kind={:success}
+                  flash={%{"success" => "Your changes were saved."}}
+                  title="Saved"
+                />
+                <.flash id="design-library-flash-info" kind={:info}>
+                  This change affects future records only.
+                </.flash>
+              </div>
+              <p class="text-xs text-ink-muted">
+                Deliberately outside this contract: the shell's preference status line under the top bar. It reports the in-flight and settled state of the clock and theme controls in place, written by the shell's own client hook before the server answers, so "Saving…" can show at once and a failure stays beside the control it belongs to. A flash is a server fact rendered after the round trip and cannot do that, so the status line is not folded into this outlet and this outlet does not report preference saves.
+              </p>
+            </div>
+            <div id="component-alert" class="grid gap-2 lg:grid-cols-2">
+              <.alert kind={:info}>This change affects future records.</.alert><.alert kind={
+                :success
+              }>
+                The company was created.
+              </.alert><.alert kind={:warning}>
+                Review the missing address before continuing.
+              </.alert><.alert kind={:error}>The record could not be saved.</.alert>
+            </div>
+            <div id="component-empty-state" class="space-y-2">
+              <p class="text-xs text-ink-muted">
+                An empty region says what is missing, why, and how to recover. Nothing yet, nothing
+                matched, and not permitted are three different sentences; the permission wording is
+                one sentence owned by the component. A table reaches the same pattern through its
+                empty slot.
+              </p>
+              <div class="grid gap-3 lg:grid-cols-3">
+                <.card title="Nothing yet" inner_class="p-4">
+                  <.empty_state
+                    id="design-library-empty-new"
+                    title="No companies yet"
+                    reason="Companies created in this tenant appear here."
+                  >
+                    <:action>
+                      <.button variant="primary">Add Company</.button>
+                    </:action>
+                  </.empty_state>
+                </.card>
+                <.card title="Nothing matched" inner_class="p-4">
+                  <.empty_state
+                    id="design-library-empty-filtered"
+                    title="No companies match “acme”"
+                    reason="Check the spelling, or clear the search to see every company in this tenant."
+                  >
+                    <:action>
+                      <.button>Clear search</.button>
+                    </:action>
+                  </.empty_state>
+                </.card>
+                <.card title="Not permitted" inner_class="p-4">
+                  <.empty_state id="design-library-empty-forbidden" forbidden="view companies" />
+                </.card>
+              </div>
+              <.table id="design-library-empty-table" rows={[]} caption="Example empty table">
+                <:col :let={row} label="Company">{row.name}</:col>
+                <:col :let={row} label="Status">{row.status}</:col>
+                <:empty
+                  title="No suspended companies"
+                  reason="No company in this tenant has this status. Show all statuses to see every company."
+                >
+                  <.button>Show all statuses</.button>
+                </:empty>
+              </.table>
+            </div>
+            <div class="grid gap-3 lg:grid-cols-3">
+              <.card title="Connection interrupted" inner_class="p-4">
+                <.alert kind={:warning}>
+                  Bilimbi is reconnecting. Your work has not been submitted twice.
+                </.alert>
+              </.card>
+            </div>
+          </section>
+
+          <section id="component-overlays" class="scroll-mt-4 space-y-4">
+            <div>
+              <h2 class="text-base font-semibold text-ink-strong">
+                Overlays
+              </h2>
+              <p class="text-sm text-ink-muted">
+                The shared modal dialog is the one overlay Bilimbi has. The confirmation modal, the inspector drawer and the tooltip and popover contract have no specimen yet; the family stays in this menu so those gaps are visible rather than missing.
+              </p>
+            </div>
+            <.card id="component-modal" title="Modal dialog" inner_class="space-y-2 p-4">
+              <p class="text-xs text-ink-muted">
+                A short workflow over the current screen. Focus enters the dialog, the page
+                behind is inert, and Escape or Cancel returns focus to the control that opened it.
+                The open dialog carries its own connection banners, revealed above it rather than
+                dimmed behind it if the connection drops.
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <.button id="design-library-open-modal" type="button" phx-click="open-modal">
+                  Open dialog
+                </.button>
+                <.button
+                  id="design-library-open-wide-modal"
+                  type="button"
+                  phx-click="open-modal"
+                  phx-value-width="wide"
+                >
+                  Open wide dialog
+                </.button>
+              </div>
+              <.modal
+                :if={@modal_width == :narrow}
+                id="design-library-modal"
+                title="Rename example company"
+                width={:narrow}
+                on_cancel={JS.push("close-modal")}
+              >
+                <:description>Changes stay in this preview.</:description>
+                <.form
+                  for={@modal_form}
+                  id="design-library-modal-form"
+                  phx-submit="close-modal"
+                  class="mt-4 space-y-4"
+                >
+                  <.input
+                    field={@modal_form[:name]}
+                    id="design-library-modal-name"
+                    label="Company name"
+                  />
+                  <div class="flex justify-end gap-2">
+                    <.button type="button" phx-click="close-modal">Cancel</.button>
+                    <.button type="submit" variant="primary">Save</.button>
+                  </div>
+                </.form>
+              </.modal>
+              <.modal
+                :if={@modal_width == :wide}
+                id="design-library-wide-modal"
+                title="Edit example company"
+                width={:wide}
+                on_cancel={JS.push("close-modal")}
+              >
+                <.form
+                  for={@modal_form}
+                  id="design-library-wide-modal-form"
+                  phx-submit="close-modal"
+                  class="mt-4 space-y-4"
+                >
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <.input
+                      field={@modal_form[:name]}
+                      id="design-library-wide-modal-name"
+                      label="Company name"
+                    />
+                    <.input
+                      field={@modal_form[:code]}
+                      id="design-library-wide-modal-code"
+                      label="Code"
+                    />
+                  </div>
+                  <div class="flex justify-end gap-2">
+                    <.button type="button" phx-click="close-modal">Cancel</.button>
+                    <.button type="submit" variant="primary">Save</.button>
+                  </div>
+                </.form>
+              </.modal>
+            </.card>
+          </section>
+
+          <section id="component-data-display" class="scroll-mt-4 space-y-4">
+            <div>
+              <h2 class="text-base font-semibold text-ink-strong">
+                Data display
+              </h2>
+              <p class="text-sm text-ink-muted">
+                Tables and their pagination, cards, record facts, status badges, and dates. Statistics and record history have no specimen yet.
+              </p>
+            </div>
+            <div class="space-y-2">
+              <p class="text-xs text-ink-muted">
+                Example companies; sort by any heading. Changes stay in this preview.
+              </p>
+              <.card id="component-table" inner_class="p-0">
+                <.table
+                  id="sample-table"
+                  rows={@streams.sample_rows}
+                  row_id={fn {dom_id, _} -> dom_id end}
+                  row_item={fn {_, row} -> row end}
+                  sort_by={@sample_sort.sort_by}
+                  sort_dir={@sample_sort.sort_dir}
+                  sort_event="sample-sort"
+                  caption="Example companies"
+                  framed={false}
+                >
+                  <:col :let={row} label="Company" sort="name" sort_id="sample-sort-name">
+                    <span class="font-medium text-ink-strong">{row.name}</span>
+                  </:col><:col :let={row} label="Code" sort="code" sort_id="sample-sort-code">
+                    {row.code}
+                  </:col><:col
+                    :let={row}
+                    label="Status"
+                    sort="status"
+                    sort_id="sample-sort-status"
+                  >
+                    <.badge kind={row.kind}>{row.status}</.badge>
+                  </:col><:col
+                    :let={row}
+                    label="Updated"
+                    sort="updated_at"
+                    sort_id="sample-sort-updated"
+                  >
+                    <.datetime
+                      id={"sample-updated-#{row.id}"}
+                      value={row.updated_at}
+                      format={:date}
+                    />
+                  </:col><:action :let={row}>
+                    <.icon_button
+                      icon="view"
+                      id={"sample-preview-#{row.id}"}
+                      label={"Preview #{row.name}"}
+                      phx-click="preview-company"
+                      phx-value-id={row.id}
+                    />
+                  </:action>
+                </.table><.pagination
+                  id="design-library-pagination"
+                  page={@sample_page}
+                  filters_form={@sample_page_form}
+                  page_event="sample-page"
+                  filters_event="sample-page-size"
+                />
+              </.card>
+            </div>
             <div class="grid gap-3 lg:grid-cols-2">
+              <.card id="component-card" title="Card" inner_class="space-y-4 p-4">
+                <div id="component-card-titled">
+                  <p class="mb-2 text-xs text-ink-muted">With a title</p>
+                  <.card title="Company profile" inner_class="p-3">
+                    <p class="text-sm text-ink">A title adds the bordered heading strip.</p>
+                  </.card>
+                </div>
+                <div id="component-card-untitled">
+                  <p class="mb-2 text-xs text-ink-muted">Without a title</p>
+                  <.card inner_class="p-3">
+                    <p class="text-sm text-ink">Without one, the body stands alone.</p>
+                  </.card>
+                </div>
+                <div id="component-card-boundary" class="border-t border-line pt-3">
+                  <p class="text-xs text-ink-muted">
+                    A card has no loading, empty, error, or disabled state; those belong to the content placed inside it.
+                  </p>
+                </div>
+              </.card>
               <.card id="component-list" title="Record facts" inner_class="space-y-4 px-4">
                 <div id="component-list-populated">
                   <p class="mb-1 text-xs text-ink-muted">Facts for one record</p>
@@ -1020,6 +1272,8 @@
                   </p>
                 </div>
               </.card>
+            </div>
+            <div class="grid gap-3 lg:grid-cols-2">
               <.card id="component-datetime" title="Date and time" inner_class="space-y-3 p-4">
                 <div class="flex justify-between gap-4 text-sm">
                   <span class="text-ink-muted">Date and time</span><.datetime
@@ -1045,13 +1299,26 @@
                   />
                 </div>
               </.card>
+              <div
+                id="component-badge"
+                class="flex flex-wrap gap-2 rounded-xl border border-line bg-surface p-4 shadow-xs"
+              >
+                <.badge>Archived</.badge><.badge kind={:success}>Active</.badge><.badge kind={
+                  :warning
+                }>
+                  Pending
+                </.badge><.badge kind={:danger}>Suspended</.badge>
+              </div>
             </div>
           </section>
 
-          <section id="component-patterns" class="scroll-mt-4 space-y-4">
+          <section id="component-composite-patterns" class="scroll-mt-4 space-y-4">
             <div>
-              <h2 class="text-base font-semibold text-ink-strong">Interaction patterns</h2><p class="text-sm text-ink-muted">
-                The current shared composition for search, rows, status, dates, and pagination.
+              <h2 class="text-base font-semibold text-ink-strong">
+                Composite patterns
+              </h2>
+              <p class="text-sm text-ink-muted">
+                One operational index page end to end: search, table, empty result and pagination as a single flow. The form page, detail page, destructive workflow, first arrival and the responsive and theme review have no specimen yet.
               </p>
             </div>
             <.form
@@ -1101,6 +1368,65 @@
                 filters_event="pattern-page-size"
               />
             </.card>
+            <.card
+              id="component-filter-toolbar"
+              title="Filter toolbar"
+              inner_class="space-y-5 p-4"
+            >
+              <p class="text-sm text-ink-muted">
+                One composition for every list's search, selects, and date pair. Every search box carries the same leading magnifier; labels are screen-reader only; helper text sits below its control; cells wrap on narrow screens.
+              </p>
+              <div id="filter-toolbar-full">
+                <h3 class="mb-2 text-sm font-semibold text-ink">
+                  Search, selects, and UTC date pair
+                </h3>
+                <.filter_toolbar
+                  id="design-library-filter-full"
+                  form={@filter_toolbar_full_form}
+                  event="filter-toolbar-preview"
+                >
+                  <:control
+                    type={:search}
+                    field={@filter_toolbar_full_form[:search]}
+                    id="design-library-filter-full-search"
+                    label="Search example companies"
+                    placeholder="Search example companies…"
+                  />
+                  <:control
+                    type={:select}
+                    field={@filter_toolbar_full_form[:status]}
+                    id="design-library-filter-full-status"
+                    label="Status filter"
+                    options={[{"All statuses", ""}, {"Active", "active"}, {"Pending", "pending"}]}
+                  />
+                  <:control
+                    type={:select}
+                    field={@filter_toolbar_full_form[:kind]}
+                    id="design-library-filter-full-kind"
+                    label="Kind filter"
+                    options={[
+                      {"All kinds", ""},
+                      {"Standard", "standard"},
+                      {"Advanced", "advanced"}
+                    ]}
+                  />
+                  <:control
+                    type={:date}
+                    field={@filter_toolbar_full_form[:start_date]}
+                    id="design-library-filter-full-start-date"
+                    label="Start date (UTC)"
+                    hint="UTC"
+                  />
+                  <:control
+                    type={:date}
+                    field={@filter_toolbar_full_form[:end_date]}
+                    id="design-library-filter-full-end-date"
+                    label="End date (UTC)"
+                    hint="UTC"
+                  />
+                </.filter_toolbar>
+              </div>
+            </.card>
           </section>
         </div>
       </section>
@@ -1117,8 +1443,8 @@
           <div class="grid gap-3 sm:grid-cols-3">
             <div class="grid min-h-36 place-items-center rounded-xl border border-line bg-canvas p-4">
               <div class="text-center">
-                <img src={~p"/images/logo.svg"} alt="Bilimbi" class="mx-auto size-12" /><p class="mt-3 text-xs text-ink-muted">
-                  Sign in · 48px
+                <img src={~p"/images/logo.svg"} alt="Bilimbi" class="mx-auto size-9" /><p class="mt-3 text-xs text-ink-muted">
+                  Sign in · 36px
                 </p>
               </div>
             </div>
@@ -1241,7 +1567,7 @@
           </div>
           <section id="spec-shell" class="space-y-3">
             <h2 class="text-base font-semibold text-ink">
-              Application shell · LAY-02 / NAV-05 / FND-06
+              Application shell
             </h2>
             <p class="text-sm text-muted">
               Account details belong behind the bottom-left circle. Platform-operator and impersonated access remain visible above the workspace. An account works in one company and tenant, so the menu shows the current scope and offers no switching.

@@ -49,6 +49,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
      |> assign(:page_title, "Employee Types")
      |> assign(:active_nav, @active_nav)
      |> assign(:page_sizes, @page_sizes)
+     |> assign(:deleting_type_id, nil)
      |> stream(:employee_types, [])}
   end
 
@@ -106,30 +107,10 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
 
   @impl true
   def handle_event("delete", %{"id" => id_str}, socket) do
-    scope = resolve_scope(socket)
-    company_id = resolve_company_id(socket)
-
     if allowed?(socket.assigns.current_scope, "admin.employee-type.delete") do
-      with {type_id, ""} <- Integer.parse(id_str),
-           :ok <- Employee.delete_employee_type(scope, company_id, type_id) do
-        socket = put_flash(socket, :info, "Employee type deleted.")
-        load_page(socket, socket.assigns.index_state)
-      else
-        {:error, :in_use} ->
-          {:noreply, put_flash(socket, :error, "Cannot delete: employees are using this type.")}
-
-        {:error, :is_system} ->
-          {:noreply, put_flash(socket, :error, "System employee types cannot be deleted.")}
-
-        {:error, :type_not_found} ->
-          {:noreply,
-           put_flash(socket, :error, "That employee type does not exist in this company.")}
-
-        {:error, :company_not_found} ->
-          {:noreply,
-           socket
-           |> put_flash(:error, "That company is not in this workspace.")
-           |> push_navigate(to: ~p"/dashboard")}
+      case Integer.parse(id_str) do
+        {type_id, ""} ->
+          request_delete(socket, type_id)
 
         _ ->
           {:noreply, put_flash(socket, :error, "Could not delete employee type.")}
@@ -137,6 +118,95 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
     else
       {:noreply,
        put_flash(socket, :error, "You do not have permission to delete employee types.")}
+    end
+  end
+
+  @impl true
+  def handle_async(:delete_employee_type, {:ok, :ok}, socket) do
+    socket =
+      socket
+      |> assign(:deleting_type_id, nil)
+      |> put_flash(:info, "Employee type deleted.")
+
+    load_page(socket, socket.assigns.index_state)
+  end
+
+  def handle_async(:delete_employee_type, {:ok, {:error, :in_use}}, socket) do
+    {:noreply, delete_failed(socket, "Cannot delete: employees are using this type.")}
+  end
+
+  def handle_async(:delete_employee_type, {:ok, {:error, :is_system}}, socket) do
+    {:noreply, delete_failed(socket, "System employee types cannot be deleted.")}
+  end
+
+  def handle_async(:delete_employee_type, {:ok, {:error, :type_not_found}}, socket) do
+    {:noreply, delete_failed(socket, "That employee type does not exist in this company.")}
+  end
+
+  def handle_async(:delete_employee_type, {:ok, {:error, :company_not_found}}, socket) do
+    {:noreply,
+     socket
+     |> delete_failed("That company is not in this workspace.")
+     |> push_navigate(to: ~p"/dashboard")}
+  end
+
+  def handle_async(:delete_employee_type, _result, socket) do
+    {:noreply, delete_failed(socket, "Could not delete employee type.")}
+  end
+
+  # `start_async/3` is keyed by name, so one delete runs at a time. A repeat of
+  # the row already deleting is the request that is already running and needs
+  # nothing; any other confirmed delete is refused out loud, because a
+  # destructive action the operator confirmed must never be dropped in silence.
+  defp request_delete(socket, type_id) do
+    case socket.assigns.deleting_type_id do
+      nil ->
+        start_delete(socket, type_id)
+
+      ^type_id ->
+        {:noreply, socket}
+
+      _another ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Another employee type is still being deleted. Try again once it finishes."
+         )}
+    end
+  end
+
+  # The delete runs outside the event so the row can paint its in-flight state
+  # first; an icon-only control cannot use `phx-disable-with`, which would
+  # replace its glyph with text.
+  defp start_delete(socket, type_id) do
+    scope = resolve_scope(socket)
+    company_id = resolve_company_id(socket)
+
+    {:noreply,
+     socket
+     |> assign(:deleting_type_id, type_id)
+     |> restream_type(type_id)
+     |> start_async(:delete_employee_type, fn ->
+       Employee.delete_employee_type(scope, company_id, type_id)
+     end)}
+  end
+
+  defp delete_failed(socket, message) do
+    type_id = socket.assigns.deleting_type_id
+
+    socket
+    |> assign(:deleting_type_id, nil)
+    |> restream_type(type_id)
+    |> put_flash(:error, message)
+  end
+
+  # Rows are streamed, so a busy state reaches the DOM only when its own item
+  # is re-inserted.
+  defp restream_type(socket, type_id) do
+    case Enum.find(socket.assigns.employee_types_page.entries, &(&1.id == type_id)) do
+      nil -> socket
+      type -> stream_insert(socket, :employee_types, type)
     end
   end
 
@@ -419,7 +489,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
                   id={"employee-type-delete-#{type.id}"}
                   phx-click="delete"
                   phx-value-id={type.id}
-                  phx-disable-with="Deleting…"
+                  busy={@deleting_type_id == type.id}
                   data-confirm={"Are you sure you want to delete #{type.label}?"}
                 />
               </div>

@@ -1,16 +1,16 @@
 # Base UI Design Library
 
 **Status:** Foundation merged; the parity campaign continues under Issue #709
-**Last Updated:** 2026-09-15
+**Last Updated:** 2026-09-17
 **Tracking:** [Issue #691](https://github.com/BelimbingApp/bilimbi/issues/691)
-**Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`; `fm/parity-designlib-specimens/grok-4.6`
+**Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`; `fm/parity-designlib-specimens/grok-4.6`; `fm/designlib-catalog-ids-in-ui/opus-5`
 **Related:** `docs/plans/base-ui-design-parity.md`
 
 ## Problem
 
 Bilimbi's design is visible in the product, but its choices are spread across theme CSS, shared components and individual screens. Text alone cannot show whether the result feels coherent. It also cannot expose two different treatments that both look reasonable in code.
 
-The Design Library must make Bilimbi's actual design visible, expose contradictions and support evidence-based acceptance. It must not read like developer documentation or explain repository history inside the product. Astra now owns routine design judgment under the user's delegation; humans can inspect the result without becoming a component-by-component approval dependency.
+The Design Library must make Bilimbi's actual design visible, expose contradictions and support evidence-based acceptance. It must not read like developer documentation or explain repository history inside the product. The design steward owns routine design judgment under the user's delegation; humans can inspect the result without becoming a component-by-component approval dependency. The steward is a role, not one agent; `docs/plans/base-ui-design-parity.md` is the single record of who holds it and when. Completed-work attributions below record whoever did the work at the time and are historical facts rather than a statement of the current role.
 
 ## Desired Outcome
 
@@ -43,7 +43,7 @@ The pages render real production components and interactions. They do not show c
 2. List every shared design element in a live state.
 3. Where different treatments exist, show them together and note the product screens where each appears.
 4. Give each open choice a stable number such as `C01` and each option a letter.
-5. Astra records a choice and its evidence using that reference, preserving Bilimbi identity and the user's explicit requirements.
+5. The design steward records a choice and its evidence using that reference, preserving Bilimbi identity and the user's explicit requirements.
 6. A coding change removes the rejected production variation or defines the accepted context rule.
 7. The same decision number moves to Design Spec as accepted design.
 8. Browser review and normal project validation confirm the result before commit.
@@ -60,14 +60,16 @@ The inventory also covers the current shared structure, navigation, tabs, button
 
 The Navigation entry renders `Layouts.nav_branch/1`, the shell's own rail, over an example tree rather than a second definition of it. The shell's nav rules moved from the `#app-sidebar` id to an `.app-nav-rail` class that the sidebar and the library card both carry, so the card cannot drift in type scale, colour, icon suppression or caret direction without the sidebar drifting with it. The card omits the pin control: the shell resolves a pinned row only from the sidebar, so a pin anywhere else is a control that looks live and does nothing. Tabs and radio group are shared `Bilimbi.Base.UI.Components` entries: Schedule uses `<.tabs>` for its Tasks / History / Settings views and Settings uses it for its group strip, so neither is library-only markup.
 
+The canonical table entry shows the sortable single-card composition `/users` uses: the table sits unframed inside one card with its pagination, it lands on name ascending, every data column heading sorts and carries `aria-sort`, a repeated click flips direction, the timestamp column opens newest first, a sort returns to page one, and the rows-per-page control offers 25, 50, 100 and 300. Its example rows carry distinct timestamps so that sort is observable. It keeps that sort and page in LiveView state rather than the URL: the library is a four-area review page navigated by `#component-*` anchors, not an operational list. Because both table specimens now pass `framed={false}`, no specimen shows the framed default that screens such as Audit mutations and the Schedule task board still render; a second specimen for it is open work.
+
 Appearance Settings is the one screen `<.radio_group>` does not describe. It puts each theme choice in a bordered card with a description, which the component does not express, and converting it would redesign that screen. The radio group entry says so on the page, as the Navigation card names the pin control it leaves out and the branch toggle that renders without collapsing outside the sidebar.
 
 ## Rules
 
-- The Design Library supports visual and interaction review by Astra and product reviewers.
+- The Design Library supports visual and interaction review by the design steward and product reviewers.
 - Production UI is the evidence. Old text and legacy provenance do not override what the product actually renders.
 - Every public Base UI component appears in the Design Library in a meaningful state.
-- Variations are inspected and resolved by Astra with recorded evidence and recognizable use cases.
+- Variations are inspected and resolved by the design steward with recorded evidence and recognizable use cases.
 - Source notes name recognisable product screens and routes.
 - Accepted decisions retain their review number so the decision can be traced without exposing development history in normal UI.
 - Feature screens use Base UI semantic meaning rather than library identity, raw palette or private asset paths.
@@ -117,7 +119,7 @@ Final closeout evidence: after integrating #694, `mix precommit` completed with 
 
 The foundation merged at https://github.com/BelimbingApp/bilimbi/pull/696 on 2026-09-14 at 07:02:16 UTC with all seven checks passing.
 
-The shell account menu, top-bar timezone/theme controls and icon parity are recorded requirements for the next slice. The wider parity campaign, optional inspection skill and adopter-owned library are follow-up work and do not block this foundation's closeout.
+The shell account menu, top-bar timezone/theme controls and the named icon vocabulary were the next slice's recorded requirements and shipped on 2026-09-15; `docs/plans/base-ui-design-parity.md` owns their delivery record, and the searchable icon review remains open there. The wider parity campaign, optional inspection skill and adopter-owned library are follow-up work and do not block this foundation's closeout.
 
 ### Phase 1 — Resolve and consolidate the default design
 
@@ -130,6 +132,7 @@ Goal: Turn accepted decisions into one coherent Bilimbi default.
 - [x] Move each accepted component choice to Design Spec under the same number.
 - [x] Issue #720 — give the components shown in only one presentation their real states: the three page widths as live page calls on one wide stage, a header whose action sits beside the title, cards with and without a title, an error flash under the info flash, and the outline, solid and mini icon treatments each drawn at its own natural size, above a separate pair showing that size and colour are chosen where the icon is used. Where the component has no further state — card, record facts and icon — the specimen says so instead of inventing one. `{fm/parity-designlib-states/opus-5}`
 - [x] Replace the Design Library's fake Navigation, Tabs, and Radio group specimens with the real rail and shared Base UI components, and adopt tabs on the Schedule board and the Settings group strip. `{fm/parity-designlib-specimens/grok-4.6}`
+- [x] Drop the parity ledger's row identifiers and family codes from every operator-facing heading, menu entry and description in the Components and Design Spec areas, including the eleven family headings and sidebar descriptions introduced by #724 — the eleven-family grouping and its A–K menu order stay — and give the canonical table specimen the sortable single-card shape `/users` uses. `{fm/designlib-catalog-ids-in-ui/opus-5}`
 - [ ] Complete the approved catalog and parity campaign in `docs/plans/base-ui-design-parity.md`; that plan owns the detailed IDs, agent lanes and acceptance evidence.
 - [ ] Give each changeable design fact one owner in the smallest useful default-library structure.
 - [ ] Create a small Design Library agent skill for inspection, focused edits, browser review and validation.
@@ -153,10 +156,10 @@ Validation: Updating Bilimbi does not modify the adopter's design, and the runni
 
 Goal: Let Bilimbi evolve quickly while making inconsistency visible.
 
-- [ ] Keep reflection-based coverage for every public Base UI component.
+Drift guards are inventoried only in `docs/plans/base-ui-design-parity.md` Phase 6, which owns campaign execution detail; this plan does not keep a second list.
+
 - [ ] Add checks for local assets, contrast, focus, keyboard use, reduced motion and content security.
 - [ ] Add desktop and mobile evidence for first-impression screens and representative workflows.
-- [ ] Guard against raw palette use, duplicated shared markup, local component forks and unregistered icons.
 - [ ] Make the Design Library skill run the same project validators used by normal development.
 
 Validation: A new design variation is either a deliberate numbered decision or a failing drift check; it cannot hide as an unexplained local override.

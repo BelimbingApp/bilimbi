@@ -58,6 +58,17 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     definition: definition
   } do
     grant_capabilities!(@view)
+
+    Repo.insert!(%Run{
+      source: "scheduler",
+      key: definition.key,
+      name: definition.task_name,
+      status: "succeeded",
+      started_at: ~N[2026-08-20 01:30:00],
+      finished_at: ~N[2026-08-20 01:30:02],
+      runtime_ms: 2_000
+    })
+
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule")
 
     assert has_element?(view, "#schedule-board")
@@ -67,6 +78,13 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     assert has_element?(view, "#schedule-task-test-schedule", definition.expression)
     assert has_element?(view, "#schedule-task-test-schedule", definition.timezone)
     assert has_element?(view, "#schedule-task-test-schedule a[href='/system/performance']")
+    assert has_element?(view, "#schedule-task-test-schedule-next-due[data-follow-shell='true']")
+
+    assert has_element?(
+             view,
+             "#schedule-task-test-schedule-last-started[data-follow-shell='true']"
+           )
+
     refute has_element?(view, "#schedule-task-test-schedule button")
 
     assert render_click(view, "run_now", %{"key" => definition.key}) =~
@@ -163,6 +181,90 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     assert {:error, :unreviewed} = Schedule.run_now(definition.key)
   end
 
+  test "history date filters name the UTC day they bound", %{conn: conn} do
+    grant_capabilities!(@view)
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule?tab=history")
+
+    assert has_element?(view, "label[for='schedule-run-start-date']", "Start date (UTC)")
+    assert has_element?(view, "label[for='schedule-run-end-date']", "End date (UTC)")
+    assert has_element?(view, "#schedule-run-start-date + p", "UTC")
+    assert has_element?(view, "#schedule-run-end-date + p", "UTC")
+  end
+
+  test "history date filters still select the runs of a UTC calendar day", %{conn: conn} do
+    grant_capabilities!(@view)
+    insert_boundary_runs!()
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule?tab=history")
+
+    assert has_element?(view, "#schedule-runs", "Late on the twentieth")
+    assert has_element?(view, "#schedule-runs", "Early on the twenty-first")
+
+    filter_runs(view, %{"start_date" => "2026-08-21", "end_date" => ""})
+
+    refute has_element?(view, "#schedule-runs", "Late on the twentieth")
+    assert has_element?(view, "#schedule-runs", "Early on the twenty-first")
+    assert has_element?(view, "#schedule-history-pagination-summary", "1 runs")
+
+    filter_runs(view, %{"start_date" => "", "end_date" => "2026-08-20"})
+
+    assert has_element?(view, "#schedule-runs", "Late on the twentieth")
+    refute has_element?(view, "#schedule-runs", "Early on the twenty-first")
+    assert has_element?(view, "#schedule-history-pagination-summary", "1 runs")
+
+    filter_runs(view, %{"start_date" => "2026-08-20", "end_date" => "2026-08-21"})
+
+    assert has_element?(view, "#schedule-runs", "Late on the twentieth")
+    assert has_element?(view, "#schedule-runs", "Early on the twenty-first")
+    assert has_element?(view, "#schedule-history-pagination-summary", "2 runs")
+  end
+
+  test "an inverted history date range is rejected rather than ignored", %{conn: conn} do
+    grant_capabilities!(@view)
+    insert_boundary_runs!()
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule?tab=history")
+
+    filter_runs(view, %{"start_date" => "2026-08-21", "end_date" => "2026-08-20"})
+
+    assert has_element?(view, "#schedule-history-invalid", "must not be after")
+    refute has_element?(view, "#schedule-runs", "Late on the twentieth")
+    refute has_element?(view, "#schedule-runs", "Early on the twenty-first")
+    refute has_element?(view, "#schedule-history-pagination")
+  end
+
+  test "history toolbar filters round-trip through the URL", %{conn: conn} do
+    grant_capabilities!(@view)
+    insert_boundary_runs!()
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule?tab=history")
+
+    # The shared toolbar sends the same bounds a URL visit would carry.
+    filter_runs(view, %{
+      "search" => "",
+      "status" => "",
+      "start_date" => "2026-08-21",
+      "end_date" => "",
+      "page_size" => "25"
+    })
+
+    assert has_element?(view, "#schedule-history-pagination-summary", "1 runs")
+
+    patched = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+    assert patched["tab"] == "history"
+    assert patched["start_date"] == "2026-08-21"
+
+    # The patched URL reloads to the same rows with the toolbar state retained.
+    {:ok, reloaded, _html} =
+      conn |> log_in_as() |> live(~p"/system/schedule?tab=history&start_date=2026-08-21")
+
+    assert has_element?(reloaded, "#schedule-history-pagination-summary", "1 runs")
+    refute has_element?(reloaded, "#schedule-runs", "Late on the twentieth")
+    assert has_element?(reloaded, "#schedule-runs", "Early on the twenty-first")
+    assert has_element?(reloaded, "#schedule-run-start-date[value='2026-08-21']")
+  end
+
   test "history refresh preserves URL filters and never discloses recorded output", %{conn: conn} do
     grant_capabilities!(@view)
 
@@ -183,6 +285,7 @@ defmodule BilimbiWeb.ScheduleLiveTest do
 
     assert has_element?(view, "#schedule-runs", "Visible run")
     assert has_element?(view, "#schedule-runs", "Exit 7")
+    assert has_element?(view, "#schedule-runs time[data-follow-shell='true']")
     refute render(view) =~ "secret-output-must-not-render"
 
     Repo.insert!(%Run{
@@ -197,6 +300,32 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     assert has_element?(view, "#schedule-runs", "Cross-process refresh")
     assert has_element?(view, "#schedule-run-status option[value='failed'][selected]")
     assert has_element?(view, "#schedule-run-page-size option[value='25'][selected]")
+  end
+
+  # The two instants straddle UTC midnight, so a timezone-shifted Started column
+  # shows them on one day while the filters bound two.
+  defp insert_boundary_runs! do
+    Repo.insert!(%Run{
+      source: "scheduler",
+      key: "test.schedule",
+      name: "Late on the twentieth",
+      status: "succeeded",
+      started_at: ~N[2026-08-20 23:30:00]
+    })
+
+    Repo.insert!(%Run{
+      source: "scheduler",
+      key: "test.schedule",
+      name: "Early on the twenty-first",
+      status: "succeeded",
+      started_at: ~N[2026-08-21 00:30:00]
+    })
+  end
+
+  defp filter_runs(view, params) do
+    view
+    |> form("#schedule-history-filters", run: params)
+    |> render_change()
   end
 
   defp definition do

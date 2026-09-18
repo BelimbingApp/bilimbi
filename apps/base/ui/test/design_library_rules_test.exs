@@ -183,7 +183,7 @@ defmodule Bilimbi.Base.UI.DesignLibraryRulesTest do
     test "reports a declaration that matches no card" do
       problems = Source.specimen_problems(area(""))
 
-      assert Enum.any?(problems, &(&1 =~ "Empty workspace" and &1 =~ "matches no"))
+      assert Enum.any?(problems, &(&1 =~ "Connection interrupted" and &1 =~ "matches no"))
     end
   end
 

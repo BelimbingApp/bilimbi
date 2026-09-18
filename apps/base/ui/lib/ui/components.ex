@@ -34,14 +34,26 @@ defmodule Bilimbi.Base.UI.Components do
   alias Phoenix.LiveView.JS
 
   @doc """
-  Renders flash notices.
+  Renders one flash message.
+
+  The message is the flash entry for `kind`, or the inner block. Every
+  severity is `role="alert"`; announcing success and info politely instead
+  is deliberate follow-up work, not part of this contract.
+  `:success` and `:info` share the success colouring and differ by icon: most
+  `put_flash(:info, ...)` call sites report a completed write, so the two
+  cannot be told apart by colour until those callers move to `:success`.
+
+  Clicking the message clears it on the server and hides it. The component
+  itself never dismisses on a timer; `Bilimbi.Base.UI.Layouts.flash_group/1`,
+  the one production outlet, stacks the messages and decides which of them
+  time out, so a message a person must act on stays until they dismiss it.
 
   ## Examples
 
       <.flash kind={:info} flash={@flash} />
       <.flash
         id="welcome-back"
-        kind={:info}
+        kind={:success}
         phx-mounted={show("#welcome-back") |> JS.remove_attribute("hidden")}
         hidden
       >
@@ -51,7 +63,12 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:id, :string, doc: "the optional id of flash container")
   attr(:flash, :map, default: %{}, doc: "the map of flash messages to display")
   attr(:title, :string, default: nil)
-  attr(:kind, :atom, values: [:info, :error], doc: "used for styling and flash lookup")
+
+  attr(:kind, :atom,
+    values: [:success, :info, :warning, :error],
+    doc: "the severity: it picks the colour role, the icon, the ARIA role, and the flash lookup"
+  )
+
   attr(:rest, :global, doc: "the arbitrary HTML attributes to add to the flash container")
 
   slot(:inner_block, doc: "the optional inner block that renders the flash message")
@@ -65,16 +82,17 @@ defmodule Bilimbi.Base.UI.Components do
       id={@id}
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
-      class="fixed right-4 top-4 z-50 w-[min(24rem,calc(100vw-2rem))]"
+      class="w-full"
       {@rest}
     >
       <div class={[
         "flex items-start gap-3 rounded-2xl border p-4 text-sm shadow-xl shadow-ink/[0.08] backdrop-blur",
-        @kind == :info && "border-success-line bg-success-surface/95 text-success-ink",
+        @kind in [:success, :info] &&
+          "border-success-line bg-success-surface/95 text-success-ink",
+        @kind == :warning && "border-warning-line bg-warning-surface/95 text-warning-ink",
         @kind == :error && "border-danger-line bg-danger-surface/95 text-danger-ink"
       ]}>
-        <.icon :if={@kind == :info} name="information" class="size-5 shrink-0" />
-        <.icon :if={@kind == :error} name="error" class="size-5 shrink-0" />
+        <.icon name={status_icon(@kind)} class="size-5 shrink-0" />
         <div>
           <p :if={@title} class="font-semibold">{@title}</p>
           <p>{msg}</p>
@@ -85,6 +103,65 @@ defmodule Bilimbi.Base.UI.Components do
         </button>
       </div>
     </div>
+    """
+  end
+
+  defp status_icon(:info), do: "information"
+  defp status_icon(:success), do: "success"
+  defp status_icon(:warning), do: "warning"
+  defp status_icon(:error), do: "error"
+
+  @doc """
+  Renders the two connection banners for one container.
+
+  They report a dropped or unreachable websocket, and LiveView reveals them
+  from the client — the server is by definition not reachable to re-render
+  when they matter. Both ids derive from `id`, so a container can carry its
+  own pair without colliding with another's.
+
+  An open modal dialog is promoted to the browser's top layer and makes the
+  rest of the page inert, so the layout's pair can be neither painted above
+  the dimmer, announced nor dismissed while one is open. `modal/1` renders a
+  second pair inside the dialog for that reason, and the layout's is hidden
+  while a dialog is open so the same banner never appears twice.
+  """
+  attr(:id, :string, required: true)
+
+  def connection_banners(assigns) do
+    assigns =
+      assigns
+      |> assign(:client_id, "#{assigns.id}-client-error")
+      |> assign(:server_id, "#{assigns.id}-server-error")
+
+    ~H"""
+    <.flash
+      id={@client_id}
+      kind={:error}
+      title={gettext("Connection interrupted")}
+      phx-disconnected={
+        show(".phx-client-error ##{@client_id}")
+        |> JS.remove_attribute("hidden", to: ".phx-client-error ##{@client_id}")
+      }
+      phx-connected={hide("##{@client_id}") |> JS.set_attribute({"hidden", ""})}
+      hidden
+    >
+      {gettext("Reconnecting…")}
+    </.flash>
+
+    <.flash
+      id={@server_id}
+      kind={:error}
+      title={gettext("Server unavailable")}
+      phx-disconnected={
+        show(".phx-server-error ##{@server_id}")
+        |> JS.remove_attribute("hidden", to: ".phx-server-error ##{@server_id}")
+      }
+      phx-connected={hide("##{@server_id}") |> JS.set_attribute({"hidden", ""})}
+      hidden
+    >
+      {gettext("Attempting to reconnect")}
+      <.icon name="hero-arrow-path" class="ml-1 size-3 animate-spin" />
+    </.flash>
     """
   end
 
@@ -117,17 +194,7 @@ defmodule Bilimbi.Base.UI.Components do
       ]}
       {@rest}
     >
-      <.icon
-        name={
-          case @kind do
-            :info -> "information"
-            :success -> "success"
-            :warning -> "warning"
-            :error -> "error"
-          end
-        }
-        class="mt-0.5 size-4 shrink-0"
-      />
+      <.icon name={status_icon(@kind)} class="mt-0.5 size-4 shrink-0" />
       <div class="min-w-0">{render_slot(@inner_block)}</div>
     </div>
     """
@@ -166,14 +233,45 @@ defmodule Bilimbi.Base.UI.Components do
       <.button>Send!</.button>
       <.button phx-click="go" variant="primary">Send!</.button>
       <.button navigate={~p"/"}>Home</.button>
+      <.button type="submit" busy={@saving}>Saving…</.button>
+
+  ## In-flight state
+
+  A control that has been activated and is waiting for its outcome is
+  `busy`: it spins, stays at full strength, and renders `aria-busy="true"`
+  and `disabled`, so the wait is visible, is heard by assistive technology,
+  and cannot be started twice. Plain `disabled` dims and never spins, so
+  "not available" never reads as "working". The caller keeps the label
+  truthful ("Saving…", "Opening workspace…").
+
+  `busy` is a button state. It is carried by `disabled`, which an anchor has
+  no equivalent of, so a control rendered as a link ignores `busy` entirely
+  rather than announcing a wait it cannot prevent a second activation of.
+
+  `busy` is the server-known wait that outlives one round trip, such as the
+  sign-in handoff that arms a full form submission. The shorter wait of one
+  `phx-click` or `phx-submit` round trip stays `phx-disable-with`'s job:
+  LiveView disables the control and swaps its label, and `app.js` mirrors
+  LiveView's own loading state onto `aria-busy` while it lasts. That path is
+  announced but not spun: it still wears the dimmed disabled treatment.
   """
   attr(:rest, :global, include: ~w(href navigate patch method download name value disabled type))
 
   attr(:class, :any)
   attr(:variant, :string, values: ~w(primary danger))
+
+  attr(:busy, :boolean,
+    default: false,
+    doc:
+      "the control was activated and is waiting; renders `aria-busy` and disables it. " <>
+        "A button state: a link cannot be disabled, so `busy` is ignored on one."
+  )
+
   slot(:inner_block, required: true)
 
   def button(%{rest: rest} = assigns) do
+    assigns = assign(assigns, :busy, assigns.busy and not link?(rest))
+
     # Each variant owns every color property it sets, including the focus ring;
     # a color defined in both the shared base and a variant is resolved by
     # stylesheet order, not by this list's order (#619's invisible button).
@@ -192,16 +290,21 @@ defmodule Bilimbi.Base.UI.Components do
     # variant, or `<.button variant="primary" class="w-full">` silently
     # renders an unstyled button.
     assigns =
-      assign(assigns, :class, [
+      assigns
+      |> assign(:class, [
         "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold",
         "transition focus-visible:outline-none focus-visible:ring-2",
         "focus-visible:ring-offset-2 focus-visible:ring-offset-canvas",
-        "disabled:cursor-not-allowed disabled:opacity-50",
+        if(assigns.busy,
+          do: "cursor-progress",
+          else: "disabled:cursor-not-allowed disabled:opacity-50"
+        ),
         Map.fetch!(variants, assigns[:variant]),
         assigns[:class]
       ])
+      |> assign(:rest, busy_rest(rest, assigns.busy))
 
-    if rest[:href] || rest[:navigate] || rest[:patch] do
+    if link?(rest) do
       ~H"""
       <.link class={@class} {@rest}>
         {render_slot(@inner_block)}
@@ -209,12 +312,22 @@ defmodule Bilimbi.Base.UI.Components do
       """
     else
       ~H"""
-      <button class={@class} {@rest}>
+      <button class={@class} aria-busy={@busy && "true"} {@rest}>
+        <.icon :if={@busy} name="hero-arrow-path" class="size-4 motion-safe:animate-spin" />
         {render_slot(@inner_block)}
       </button>
       """
     end
   end
+
+  defp link?(rest), do: !!(rest[:href] || rest[:navigate] || rest[:patch])
+
+  # A busy control is also disabled: the activation that made it busy is the
+  # one whose outcome is pending, and a second one would duplicate the work.
+  # A link cannot be disabled, so `busy` is already resolved to false on one
+  # and never reaches here.
+  defp busy_rest(rest, false), do: rest
+  defp busy_rest(rest, true), do: Map.put(rest, :disabled, true)
 
   @doc """
   Renders a compact icon-only action.
@@ -224,6 +337,21 @@ defmodule Bilimbi.Base.UI.Components do
   are for familiar operations where the label is still available to assistive
   technology and as a tooltip. Keep primary or unfamiliar actions as text
   buttons.
+
+  `disabled` and `busy` follow `button/1`: a disabled action is not available
+  and dims, a busy one was activated and is waiting for its outcome, so it
+  sits in a sunken ringed well and its glyph becomes a spinner at full
+  strength. The well and the swapped glyph are static, so the states stay
+  distinguishable under `prefers-reduced-motion`, where the spin itself does
+  not render. Both are inert; only the busy one carries `aria-busy`, and its
+  label still names the action so assistive technology can say what is
+  pending. `busy` is a button state here too, and is ignored on a link.
+
+  `phx-disable-with` does not belong here. LiveView implements it by replacing
+  the control's text, which on an icon-only action deletes the glyph and
+  restores an empty string, leaving an empty well behind. Use `busy` for a
+  wait the server knows about; a plain one-round-trip `phx-click` needs no
+  adornment.
   """
   attr(:icon, :string, required: true)
   attr(:label, :string, required: true)
@@ -231,33 +359,54 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:kind, :atom, values: [:neutral, :danger], default: :neutral)
   attr(:class, :any, default: nil)
 
+  attr(:busy, :boolean,
+    default: false,
+    doc:
+      "the action was activated and is waiting; renders `aria-busy` and disables it. " <>
+        "A button state: a link cannot be disabled, so `busy` is ignored on one."
+  )
+
   attr(:rest, :global,
-    include: ~w(href navigate patch method download disabled type name value title)
+    include: ~w(href navigate patch method download disabled type name value title),
+    doc:
+      "`phx-disable-with` is incompatible with an icon-only action: LiveView " <>
+        "implements it by replacing the control's text content, which deletes the " <>
+        "glyph and restores an empty string. Use `busy` instead."
   )
 
   def icon_button(%{rest: rest} = assigns) do
+    assigns = assign(assigns, :busy, assigns.busy and not link?(rest))
+
     assigns =
       assigns
       |> assign(:control_class, [
         "grid shrink-0 place-items-center transition focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40",
         assigns.context == :inline && "size-6 rounded-sm",
         assigns.context == :table && "size-7 rounded-md",
-        assigns.kind == :neutral &&
-          "text-ink-muted hover:bg-surface-sunken hover:text-ink disabled:text-ink-faint",
-        assigns.kind == :danger &&
-          "text-danger hover:bg-danger-surface hover:text-danger-ink disabled:text-ink-faint",
-        "disabled:cursor-not-allowed disabled:opacity-50",
+        assigns.kind == :neutral && "text-ink-muted hover:bg-surface-sunken hover:text-ink",
+        assigns.kind == :danger && "text-danger hover:bg-danger-surface hover:text-danger-ink",
+        if(assigns.busy,
+          do: "cursor-progress bg-surface-sunken ring-1 ring-line",
+          else: "disabled:text-ink-faint disabled:cursor-not-allowed disabled:opacity-50"
+        ),
         assigns.class
       ])
-      |> assign(:icon_class, if(assigns.context == :inline, do: "size-3.5", else: "size-4"))
+      |> assign(:icon_name, if(assigns.busy, do: "hero-arrow-path", else: assigns.icon))
+      |> assign(:icon_class, [
+        if(assigns.context == :inline, do: "size-3.5", else: "size-4"),
+        assigns.busy && "motion-safe:animate-spin"
+      ])
       |> assign(:title, rest[:title] || assigns.label)
       |> assign(:control_type, rest[:type] || "button")
-      |> assign(:control_rest, Map.drop(rest, [:title, :type]))
+      |> assign(
+        :control_rest,
+        rest |> Map.drop([:title, :type]) |> busy_rest(assigns.busy)
+      )
 
-    if rest[:href] || rest[:navigate] || rest[:patch] do
+    if link?(rest) do
       ~H"""
       <.link aria-label={@label} title={@title} class={@control_class} {@control_rest}>
-        <.icon name={@icon} class={@icon_class} />
+        <.icon name={@icon_name} class={@icon_class} />
       </.link>
       """
     else
@@ -265,11 +414,12 @@ defmodule Bilimbi.Base.UI.Components do
       <button
         type={@control_type}
         aria-label={@label}
+        aria-busy={@busy && "true"}
         title={@title}
         class={@control_class}
         {@control_rest}
       >
-        <.icon name={@icon} class={@icon_class} />
+        <.icon name={@icon_name} class={@icon_class} />
       </button>
       """
     end
@@ -341,6 +491,11 @@ defmodule Bilimbi.Base.UI.Components do
     doc: "visible rows for a `multiple` select; defaults to 5 so no row is half-painted"
   )
 
+  attr(:selection_label, :string,
+    default: nil,
+    doc: "the singular|plural summary template for a `multi_select` input"
+  )
+
   attr(:class, :any, default: nil, doc: "the input class to use over defaults")
   attr(:error_class, :any, default: nil, doc: "the input error class to use over defaults")
 
@@ -358,6 +513,16 @@ defmodule Bilimbi.Base.UI.Components do
 
   attr(:wrapper_class, :any, default: nil, doc: "the class for the control wrapper")
   attr(:label_class, :any, default: nil, doc: "the class for the control label")
+
+  attr(:reveal, :any,
+    default: false,
+    doc: """
+    adds a show/hide control to a `password` input. `false` keeps the value
+    masked with no control, which is right for sign-in. `true` names the value
+    a secret; a string such as `"password"` or `"API key"` is the noun the
+    control's accessible name uses instead. Any other type rejects it.
+    """
+  )
 
   attr(:rest, :global,
     include: ~w(accept autocomplete capture cols disabled form list max maxlength min minlength
@@ -379,6 +544,12 @@ defmodule Bilimbi.Base.UI.Components do
   # empty and the label would announce to nothing. Fall back to the input name.
   def input(%{id: nil, name: name} = assigns) when is_binary(name) do
     assigns |> assign(:id, name) |> input()
+  end
+
+  def input(%{reveal: reveal, type: type})
+      when reveal not in [false, nil] and type != "password" do
+    raise ArgumentError,
+          "reveal only applies to a password input; got reveal=#{inspect(reveal)} on type=#{inspect(type)}"
   end
 
   def input(%{type: "hidden"} = assigns) do
@@ -409,15 +580,20 @@ defmodule Bilimbi.Base.UI.Components do
           name={@name}
           value="true"
           checked={@checked}
+          aria-invalid={@errors != [] && "true"}
+          aria-describedby={described_by(@id, @hint, @errors)}
           class={
             @class ||
-              "size-4 shrink-0 rounded border-high-contrast-line accent-action focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
+              [
+                "size-4 shrink-0 rounded accent-action focus:outline-none focus:ring-2",
+                field_state_class(@errors, "border-high-contrast-line focus:ring-brand-strong/30")
+              ]
           }
           {@rest}
-        />{@label}
+        />{@label}<span :if={@rest[:required]} aria-hidden="true">*</span>
       </label>
-      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
     </div>
     """
   end
@@ -430,11 +606,13 @@ defmodule Bilimbi.Base.UI.Components do
         for={@id}
         class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
       >
-        {@label}
+        {@label}<span :if={@rest[:required]} aria-hidden="true">*</span>
       </label>
       <select
         id={@id}
         name={@name}
+        aria-invalid={@errors != [] && "true"}
+        aria-describedby={described_by(@id, @hint, @errors)}
         class={
           [
             field_class(@class, @error_class, @errors),
@@ -453,14 +631,32 @@ defmodule Bilimbi.Base.UI.Components do
         <option :if={@prompt} value="" selected={@value in [nil, ""]}>{@prompt}</option>
         {Phoenix.HTML.Form.options_for_select(@options, @value)}
       </select>
-      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
     </div>
     """
   end
 
   def input(%{type: "multi_select"} = assigns) do
-    multi_select(assigns)
+    {required, rest} = Map.pop(assigns.rest, :required, false)
+
+    # `placeholder` names the empty-selection summary here rather than an HTML
+    # attribute, and a button has none to render. An absent key lets
+    # `multi_select/1` merge its own declared default; a nil one replaces that
+    # default with nothing, so what the caller omitted is dropped outright.
+    {placeholder, rest} = Map.pop(rest, :placeholder)
+
+    {omitted, supplied} =
+      Enum.split_with(
+        [placeholder: placeholder, selection_label: assigns.selection_label],
+        fn {_key, value} -> is_nil(value) end
+      )
+
+    assigns
+    |> Map.drop(Keyword.keys(omitted))
+    |> assign(required: required == true, rest: rest)
+    |> assign(supplied)
+    |> multi_select()
   end
 
   def input(%{type: "textarea"} = assigns) do
@@ -471,14 +667,94 @@ defmodule Bilimbi.Base.UI.Components do
         for={@id}
         class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
       >
-        {@label}
+        {@label}<span :if={@rest[:required]} aria-hidden="true">*</span>
       </label>
       <textarea
         id={@id}
         name={@name}
-        class={field_class(@class, @error_class, @errors, "min-h-24")}
+        aria-invalid={@errors != [] && "true"}
+        aria-describedby={described_by(@id, @hint, @errors)}
+        class={
+          field_class(@class, @error_class, @errors, extra: "min-h-24", readonly: @rest[:readonly])
+        }
         {@rest}
       >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
+      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
+    </div>
+    """
+  end
+
+  # A secret whose caller asked for a reveal control. The toggle is a real
+  # button whose accessible name states the action and the current state.
+  #
+  # The input's own `type` is the only record of masked-or-shown, and the
+  # click is the single JS command that flips it. LiveView keeps that
+  # attribute sticky across patches, so a form re-render never silently
+  # re-masks a value the user chose to see. The button's accessible name,
+  # title and glyph are derived from `type` by the `SecretReveal` hook rather
+  # than swapped alongside it: LiveView applies an attribute op synchronously
+  # but defers a class op to a later animation frame, so toggling both at once
+  # could invert them -- two clicks inside one frame flipped `type` twice and
+  # the glyph once, leaving a masked input showing the "hide" eye with no path
+  # back. The hook also keeps a pointer press from pulling focus out of the
+  # input.
+  def input(%{type: "password", reveal: reveal} = assigns) when reveal not in [false, nil] do
+    subject = if is_binary(reveal), do: reveal, else: gettext("secret")
+    show_label = gettext("Show %{subject}, currently hidden", subject: subject)
+    hide_label = gettext("Hide %{subject}, currently shown", subject: subject)
+    show_title = gettext("Show %{subject}", subject: subject)
+    hide_title = gettext("Hide %{subject}", subject: subject)
+
+    assigns =
+      assigns
+      |> assign(:show_label, show_label)
+      |> assign(:hide_label, hide_label)
+      |> assign(:show_title, show_title)
+      |> assign(:hide_title, hide_title)
+      |> assign(:toggle, JS.toggle_attribute({"type", "text", "password"}, to: "##{assigns.id}"))
+
+    ~H"""
+    <div class={@wrapper_class || "mb-4"}>
+      <label
+        :if={@label}
+        for={@id}
+        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
+      >
+        {@label}
+      </label>
+      <div class="flex items-center">
+        <input
+          type="password"
+          name={@name}
+          id={@id}
+          value={Phoenix.HTML.Form.normalize_value(@type, @value)}
+          class={[field_class(@class, @error_class, @errors), "pr-10"]}
+          {@rest}
+        />
+        <button
+          id={"#{@id}-reveal"}
+          type="button"
+          phx-hook="SecretReveal"
+          phx-click={@toggle}
+          aria-label={@show_label}
+          aria-controls={@id}
+          title={@show_title}
+          data-show-label={@show_label}
+          data-hide-label={@hide_label}
+          data-show-title={@show_title}
+          data-hide-title={@hide_title}
+          disabled={@rest[:disabled]}
+          class="-ml-[1.875rem] grid size-6 shrink-0 place-items-center rounded-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:text-ink-faint"
+        >
+          <span id={"#{@id}-reveal-show"} class="grid">
+            <.icon name="reveal" class="size-4" />
+          </span>
+          <span id={"#{@id}-reveal-hide"} class="grid hidden">
+            <.icon name="conceal" class="size-4" />
+          </span>
+        </button>
+      </div>
       <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
       <.error :for={msg <- @errors}>{msg}</.error>
     </div>
@@ -494,41 +770,66 @@ defmodule Bilimbi.Base.UI.Components do
         for={@id}
         class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
       >
-        {@label}
+        {@label}<span :if={@rest[:required]} aria-hidden="true">*</span>
       </label>
       <input
         type={@type}
         name={@name}
         id={@id}
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
-        class={field_class(@class, @error_class, @errors)}
+        aria-invalid={@errors != [] && "true"}
+        aria-describedby={described_by(@id, @hint, @errors)}
+        class={field_class(@class, @error_class, @errors, readonly: @rest[:readonly])}
         {@rest}
       />
-      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
     </div>
     """
   end
 
+  # Relationships a person depends on: hint and error text must be announced
+  # with the control, not stranded beside it. Returns the space-separated id
+  # list for `aria-describedby`, or nil when there is nothing to point at so
+  # no dangling reference is rendered.
+  defp described_by(id, hint, errors) do
+    error_ids = errors |> Enum.with_index() |> Enum.map(fn {_, i} -> "#{id}-error-#{i}" end)
+
+    [if(hint, do: "#{id}-hint") | error_ids]
+    |> Enum.filter(& &1)
+    |> case do
+      [] -> nil
+      ids -> Enum.join(ids, " ")
+    end
+  end
+
   # One control family for every field type. `class` replaces the default
   # entirely; `error_class` replaces only the invalid-state styling.
-  defp field_class(class, error_class, errors, extra \\ nil) do
+  defp field_class(class, error_class, errors, opts \\ []) do
     [
-      class || field_base_class(),
-      is_nil(class) && extra,
-      if errors == [] do
-        "border-high-contrast-line"
-      else
-        error_class || "border-danger focus:border-danger focus:ring-danger/20"
-      end
+      class || field_base_class(opts[:readonly]),
+      is_nil(class) && opts[:extra],
+      field_state_class(errors, "border-high-contrast-line", error_class)
     ]
   end
 
-  defp field_base_class do
-    "block w-full rounded-md border bg-surface px-3 py-1.5 text-sm text-ink shadow-xs " <>
+  # A field in error reads the same whichever control draws it, so the invalid
+  # appearance is decided once here rather than per control family.
+  defp field_state_class(errors, valid_class, error_class \\ nil)
+  defp field_state_class([], valid_class, _error_class), do: valid_class
+
+  defp field_state_class(_errors, _valid_class, error_class),
+    do: error_class || "border-danger focus:border-danger focus:ring-danger/20"
+
+  # `readonly` is a statement the caller made about this field. The CSS
+  # `:read-only` pseudo-class is not the same statement: it matches every
+  # immutable control, including every `select`, `color` and `file` input.
+  defp field_base_class(readonly, padding \\ "px-3") do
+    "block w-full rounded-md border #{padding} py-1.5 text-sm text-ink shadow-xs " <>
       "transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none " <>
       "focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed " <>
-      "disabled:bg-surface-sunken disabled:text-ink-subtle"
+      "disabled:bg-surface-sunken disabled:text-ink-subtle " <>
+      if(readonly, do: "bg-surface-sunken", else: "bg-surface")
   end
 
   @doc """
@@ -537,6 +838,12 @@ defmodule Bilimbi.Base.UI.Components do
   Displays a button showing the selection summary (e.g. "All roles", "1 role selected",
   or "3 roles selected") with a chevron icon, and toggles a floating menu containing
   checkboxes for each option.
+
+  The trigger's `aria-expanded` follows the menu. Clicking the trigger again,
+  clicking outside, or moving focus out of the field closes it. While it is
+  open, Escape closes it from anywhere on the page; focus returns to the
+  trigger only when focus was already inside the field, and otherwise stays
+  where the user put it.
 
   ## Examples
 
@@ -575,6 +882,7 @@ defmodule Bilimbi.Base.UI.Components do
   )
 
   attr(:hint, :string, default: nil)
+  attr(:required, :boolean, default: false)
   attr(:rest, :global, doc: "arbitrary HTML attributes for the button")
 
   def multi_select(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
@@ -639,6 +947,47 @@ defmodule Bilimbi.Base.UI.Components do
         assigns.selection_label
       )
 
+    # `aria-expanded` follows the list because the same command moves both.
+    # Click-away sits on the wrapper: LiveView dispatches click-away before
+    # the click it belongs to, so a click-away on the list itself would close
+    # and the trigger's toggle would reopen in the same click. Escape is the
+    # only path that returns focus to the trigger, and only from a press that
+    # was already inside the field: the hook runs plain `dismiss` otherwise,
+    # so Escape typed into a search box elsewhere on the page closes the list
+    # without taking the caret. Every other path leaves focus where the user
+    # put it.
+    #
+    # Dismiss and escape are published on the wrapper for the
+    # `MultiSelectDismiss` hook, which owns the two dismissals LiveView has
+    # no binding for: focus leaving the field, and Escape from wherever focus
+    # actually is -- a list opened by mouse in Safari or macOS Firefox is open
+    # with focus still on `body`. LiveView reads a key binding from the event
+    # target alone, so an element-level `phx-keydown` here would also stop
+    # every key ever reaching the page's `phx-window-keydown` handlers. The
+    # list is focusable so a click on its padding lands inside the field
+    # rather than on `body`.
+    #
+    # The trigger carries `aria-expanded` and `aria-controls` and no
+    # `aria-haspopup`: the list is a disclosure of checkboxes, not a menu, and
+    # `aria-haspopup="true"` would announce menu semantics with arrow-key
+    # navigation that nothing here implements.
+    #
+    # The trigger's `aria-expanded` is the only record of open, and every
+    # command below writes that one attribute and nothing else. The list's
+    # visibility and the chevron's rotation are CSS derived from it through
+    # the `peer`/`group` relationships the markup already has, so they cannot
+    # disagree with it. Toggling them alongside the attribute is what they
+    # used to do, and it could invert: LiveView applies an attribute op
+    # synchronously but defers a class op to a later animation frame, so two
+    # activations landing in one frame flipped the attribute twice and the
+    # classes once, leaving an open list announcing `aria-expanded="false"`.
+    # Deriving is also why the accessible state survives a patch for free --
+    # only the attribute has to be sticky.
+    id = assigns.id
+
+    dismiss = JS.set_attribute({"aria-expanded", "false"}, to: "##{id}")
+    toggle = JS.toggle_attribute({"aria-expanded", "true", "false"}, to: "##{id}")
+
     assigns =
       assigns
       |> assign(:input_name, input_name)
@@ -646,10 +995,17 @@ defmodule Bilimbi.Base.UI.Components do
       |> assign(:normalized_options, normalized_options)
       |> assign(:selected_count, selected_count)
       |> assign(:summary_label, summary_label)
+      |> assign(:dismiss, dismiss)
+      |> assign(:toggle, toggle)
+      |> assign(:escape, JS.focus(dismiss, to: "##{id}"))
 
     ~H"""
     <div
       id={"#{@id}-wrapper"}
+      phx-hook="MultiSelectDismiss"
+      data-dismiss={@dismiss}
+      data-escape={@escape}
+      phx-click-away={@dismiss}
       class={["relative", @wrapper_class || "mb-4"]}
     >
       <input type="hidden" name={@input_name} value="" />
@@ -659,21 +1015,24 @@ defmodule Bilimbi.Base.UI.Components do
         for={@id}
         class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
       >
-        {@label}
+        {@label}<span :if={@required} aria-hidden="true">*</span>
       </label>
 
       <button
         id={@id}
         type="button"
-        aria-haspopup="true"
         aria-expanded="false"
         aria-controls={"#{@id}-options"}
-        phx-click={
-          JS.toggle_class("hidden", to: "##{@id}-options")
-          |> JS.toggle_class("rotate-180", to: "##{@id}-chevron")
-        }
+        aria-required={@required && "true"}
+        aria-invalid={@errors != [] && "true"}
+        aria-describedby={described_by(@id, @hint, @errors)}
+        phx-click={@toggle}
         class={[
-          "flex w-full items-center justify-between gap-3 rounded-md border border-line bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30",
+          "peer group flex w-full items-center justify-between gap-3 rounded-md border bg-surface py-1.5 px-3 text-left text-sm text-ink shadow-xs transition hover:bg-surface-muted focus:outline-none focus:ring-2",
+          field_state_class(
+            @errors,
+            "border-line focus:border-brand-strong focus:ring-brand-strong/30"
+          ),
           @class
         ]}
         {@rest}
@@ -683,7 +1042,7 @@ defmodule Bilimbi.Base.UI.Components do
         </span>
         <span
           id={"#{@id}-chevron"}
-          class="inline-flex shrink-0 transition-transform duration-200"
+          class="inline-flex shrink-0 transition-transform duration-200 group-aria-expanded:rotate-180"
         >
           <.icon
             name="hero-chevron-down"
@@ -694,11 +1053,8 @@ defmodule Bilimbi.Base.UI.Components do
 
       <div
         id={"#{@id}-options"}
-        phx-click-away={
-          JS.add_class("hidden", to: "##{@id}-options")
-          |> JS.remove_class("rotate-180", to: "##{@id}-chevron")
-        }
-        class="hidden absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg space-y-0.5"
+        tabindex="-1"
+        class="hidden peer-aria-expanded:block absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg space-y-0.5 focus:outline-none"
       >
         <label
           :for={{opt_label, opt_value} <- @normalized_options}
@@ -723,8 +1079,8 @@ defmodule Bilimbi.Base.UI.Components do
         </div>
       </div>
 
-      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
     </div>
     """
   end
@@ -952,6 +1308,178 @@ defmodule Bilimbi.Base.UI.Components do
     """
   end
 
+  @doc """
+  Renders the shared list filter toolbar: search fields, selects, and date
+  inputs framed as one open toolbar above the list surface (Design Spec C04).
+
+  Controls are declared through one repeating `control` slot and render in the
+  order they are written, so the template reads the way the toolbar looks.
+
+  Filter state itself stays where it already lives — the caller's form, event,
+  and URL round-trip are untouched, so the same inputs return the same rows.
+  This component owns only composition and presentation:
+
+    * Every control's framing comes from one shared field rule. The toolbar
+      takes no per-control class, because a per-control class is how five
+      controls end up laid out by two rules with nothing declaring which is
+      correct.
+    * Every search box carries the same leading magnifier, the same room that
+      clears it, and the same debounce, length cap, and autocomplete answer.
+      None of them is a caller's choice, so an operator who learns one list
+      recognises the search box on the next.
+    * Enter filters in place on every toolbar. The form carries the caller's
+      event as both `phx-change` and `phx-submit`, because a form with only a
+      change binding falls back to a native submit that reloads the page with
+      the form's own param names and drops the filter the operator typed.
+    * Labels are always screen-reader only. A page that shows some and hides
+      others drops the labelled controls below their row-mates, because a
+      visible label adds a row of height only some cells carry.
+    * Helper text sits below its control in one shape. A select's and a date's
+      rides its own `input`; a search box's sits below the box the magnifier
+      is centred in, so helper text never stretches that box and drags the
+      magnifier off the input.
+    * Cells wrap instead of squeezing. Each control is its own flex item, so
+      native date inputs stack on a narrow viewport rather than holding a
+      grid row wider than the page.
+
+  ## Examples
+
+      <.filter_toolbar id="companies-filters" form={@filters_form} event="filters">
+        <:control
+          type={:search}
+          field={@filters_form[:search]}
+          id="companies-search"
+          label="Search companies"
+          placeholder="Search by name, code, legal name, email, or jurisdiction..."
+        />
+        <:control
+          type={:select}
+          field={@filters_form[:status_filter]}
+          id="companies-status-filter"
+          label="Status filter"
+          options={[{"All statuses", "all"}, {"Active", "active"}]}
+        />
+      </.filter_toolbar>
+  """
+  attr(:id, :string, required: true, doc: "the toolbar form's DOM id")
+
+  attr(:form, :any,
+    required: true,
+    doc: "the caller's Phoenix form; field names and params are unchanged"
+  )
+
+  attr(:event, :string,
+    required: true,
+    doc: "the event the caller already handles; bound to both phx-change and phx-submit"
+  )
+
+  attr(:class, :any,
+    default: nil,
+    doc:
+      "extra classes for page context (for example mt-4 below tabs); the open-toolbar framing stays owned here"
+  )
+
+  slot :control, doc: "one filter control per entry, rendered in the order declared" do
+    attr(:type, :atom,
+      values: [:search, :select, :date],
+      required: true,
+      doc: "which control to render"
+    )
+
+    attr(:field, :any, required: true, doc: "the control's form field")
+    attr(:id, :string, required: true, doc: "the control's DOM id")
+    attr(:label, :string, required: true, doc: "the control's screen-reader-only label")
+
+    attr(:options, :list,
+      doc: "`:select` options passed to `Phoenix.HTML.Form.options_for_select/2`"
+    )
+
+    attr(:placeholder, :string, doc: "`:search` prompt text")
+    attr(:hint, :string, doc: "helper text rendered below the control")
+  end
+
+  def filter_toolbar(assigns) do
+    ~H"""
+    <.form
+      for={@form}
+      id={@id}
+      phx-change={@event}
+      phx-submit={@event}
+      class={["mb-2 flex flex-wrap items-start gap-x-3 gap-y-2", @class]}
+    >
+      <.toolbar_control :for={control <- @control} control={control} />
+    </.form>
+    """
+  end
+
+  attr(:control, :map, required: true)
+
+  defp toolbar_control(%{control: %{type: :search}} = assigns) do
+    ~H"""
+    <div class="min-w-52 flex-1 basis-64">
+      <.toolbar_label id={@control[:id]} label={@control[:label]} />
+      <div class="relative">
+        <.icon
+          name="search"
+          class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
+        />
+        <.input
+          field={@control[:field]}
+          id={@control[:id]}
+          type="search"
+          wrapper_class="mb-0"
+          placeholder={@control[:placeholder]}
+          phx-debounce="300"
+          maxlength="255"
+          autocomplete="off"
+          class={field_base_class(false, "pl-8 pr-3")}
+        />
+      </div>
+      <p :if={@control[:hint]} class="mt-1.5 text-xs text-ink-subtle">{@control[:hint]}</p>
+    </div>
+    """
+  end
+
+  defp toolbar_control(%{control: %{type: :select}} = assigns) do
+    ~H"""
+    <div class="w-full min-w-0 sm:w-auto sm:min-w-36">
+      <.toolbar_label id={@control[:id]} label={@control[:label]} />
+      <.input
+        field={@control[:field]}
+        id={@control[:id]}
+        type="select"
+        wrapper_class="mb-0"
+        options={@control[:options]}
+        hint={@control[:hint]}
+      />
+    </div>
+    """
+  end
+
+  defp toolbar_control(%{control: %{type: :date}} = assigns) do
+    ~H"""
+    <div class="w-full min-w-0 sm:w-auto">
+      <.toolbar_label id={@control[:id]} label={@control[:label]} />
+      <.input
+        field={@control[:field]}
+        id={@control[:id]}
+        type="date"
+        wrapper_class="mb-0"
+        hint={@control[:hint]}
+      />
+    </div>
+    """
+  end
+
+  attr(:id, :string, required: true)
+  attr(:label, :string, required: true)
+
+  defp toolbar_label(assigns) do
+    ~H"""
+    <label for={@id} class="sr-only">{@label}</label>
+    """
+  end
+
   defp page_summary(%{total_entries: 0}), do: "No results"
 
   defp page_summary(%{page: page, page_size: page_size, total_entries: total_entries}) do
@@ -1126,11 +1654,12 @@ defmodule Bilimbi.Base.UI.Components do
     do: Calendar.strftime(value, "%d/%m/%Y, %H:%M ") <> value.zone_abbr
 
   # Helper used by inputs to generate form errors
+  attr(:id, :string, default: nil)
   slot(:inner_block, required: true)
 
   defp error(assigns) do
     ~H"""
-    <p class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink">
+    <p id={@id} class="mt-1.5 flex items-center gap-1.5 text-sm text-danger-ink">
       <.icon name="error" class="size-4 shrink-0 text-danger" />
       {render_slot(@inner_block)}
     </p>
@@ -1161,6 +1690,116 @@ defmodule Bilimbi.Base.UI.Components do
         {render_slot(@inner_block)}
       </div>
     </div>
+    """
+  end
+
+  @doc """
+  Renders a modal dialog over the current screen.
+
+  The caller decides whether the dialog exists: render it with `:if` while
+  the workflow it hosts is in progress and stop rendering it when that
+  workflow ends. While it exists the browser owns modal behaviour through a
+  native `<dialog>`: focus moves inside on open and stays inside, the page
+  behind is inert to the keyboard and to assistive technology, and Escape
+  asks to close. The `Modal` hook promotes the dialog to modal on mount,
+  forwards Escape to `on_cancel`, and returns focus to the control that
+  opened the dialog once the server has removed it.
+
+  `on_cancel` must reach the same handler as the Cancel button, so Escape
+  and Cancel are one action. Clicking the dimmed page does nothing: a dialog
+  usually holds a form, and a stray click must not discard it.
+
+  The dialog is named by its title and, when given, described by its
+  description, so a screen reader announces both when focus enters.
+
+  A LiveView that can raise a flash while its dialog stays open passes
+  `flash`. The page behind a modal dialog is inert, so the layout's flash
+  group can be neither read nor dismissed while one is open; the dialog
+  renders its own copy instead, and the layout's copy is hidden.
+
+  The dialog also carries its own `connection_banners/1`, because the page
+  behind it is inert and painted under the dimmer: a dropped websocket must
+  still be announced and dismissable while a dialog is open.
+
+  Every production caller dismisses the layout flash as it opens a dialog, so
+  a message about finished work is neither adopted as the new dialog's own
+  feedback nor stranded unreadable behind the inert page. A LiveView does that
+  in the handler that opens the dialog; a LiveComponent cannot reach the
+  page's flash, so its opening control pushes `lv:clear-flash` untargeted
+  before the open event. The Design Library specimen deliberately clears
+  nothing: it raises no flash of its own, so there is none of its own to
+  dismiss.
+
+  ## Examples
+
+      <.modal
+        :if={@show_attach_modal}
+        id="attach-address-modal"
+        title="Attach Address"
+        on_cancel={JS.push("close_attach_modal", target: @myself)}
+      >
+        <:description>Select an address to attach to this company.</:description>
+        <.form for={@attach_form} id="attach-address-modal-form" ...>
+          ...
+        </.form>
+      </.modal>
+  """
+  attr(:id, :string, required: true)
+  attr(:title, :string, required: true)
+
+  attr(:on_cancel, JS,
+    required: true,
+    doc: "the command run when the user asks to close, the same push as the Cancel button"
+  )
+
+  attr(:width, :atom,
+    values: [:narrow, :wide],
+    default: :narrow,
+    doc: "`:narrow` for a single-column form, `:wide` for a two-column one"
+  )
+
+  attr(:flash, :map,
+    default: nil,
+    doc: "the caller's flash, rendered inside the dialog because the page behind it is inert"
+  )
+
+  attr(:rest, :global)
+  slot(:description, doc: "one short line under the title, announced with the dialog")
+  slot(:inner_block, required: true)
+
+  def modal(assigns) do
+    ~H"""
+    <dialog
+      id={@id}
+      open
+      phx-hook="Modal"
+      data-cancel={@on_cancel}
+      data-owns-flash={@flash != nil}
+      aria-modal="true"
+      aria-labelledby={"#{@id}-title"}
+      aria-describedby={@description != [] && "#{@id}-description"}
+      tabindex="-1"
+      class={[
+        "mx-auto mt-16 mb-4 max-h-[calc(100%-5rem)] w-[calc(100%-2rem)] overflow-y-auto",
+        "rounded-xl border border-line bg-surface p-6 text-ink shadow-lg",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/30",
+        "backdrop:bg-ink/40",
+        @width == :narrow && "max-w-lg",
+        @width == :wide && "max-w-2xl"
+      ]}
+      {@rest}
+    >
+      <h2 id={"#{@id}-title"} class="text-lg font-medium tracking-tight text-ink-strong">
+        {@title}
+      </h2>
+      <.flash :if={@flash} kind={:error} id={"#{@id}-flash-error"} flash={@flash} />
+      <.flash :if={@flash} kind={:info} id={"#{@id}-flash-info"} flash={@flash} />
+      <.connection_banners id={@id} />
+      <p :if={@description != []} id={"#{@id}-description"} class="mt-1 text-xs text-ink-subtle">
+        {render_slot(@description)}
+      </p>
+      {render_slot(@inner_block)}
+    </dialog>
     """
   end
 
@@ -1380,7 +2019,18 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   slot(:action, doc: "the slot for showing user actions in the last table column")
-  slot(:empty, doc: "row shown in a sibling tbody when the caller decides the table is empty")
+
+  slot :empty,
+    doc: """
+    row shown in a sibling tbody when the caller decides the table is empty.
+    Plain content renders as given. With `title` or `forbidden` the row is an
+    `empty_state/1` and the slot body is its recovery action, so a table says
+    what is missing and why without a second component.
+    """ do
+    attr(:title, :string, doc: "what is missing, as `empty_state/1` takes it")
+    attr(:reason, :string, doc: "why it is missing")
+    attr(:forbidden, :string, doc: "the action the actor lacks permission for")
+  end
 
   def table(assigns) do
     assigns =
@@ -1450,7 +2100,19 @@ defmodule Bilimbi.Base.UI.Components do
               colspan={table_empty_colspan(@col, @action)}
               class="px-2 py-8 text-center text-sm text-ink-muted"
             >
-              {render_slot(@empty)}
+              <%= for empty <- @empty do %>
+                <%= if empty[:title] || empty[:forbidden] do %>
+                  <.empty_state
+                    title={empty[:title]}
+                    reason={empty[:reason]}
+                    forbidden={empty[:forbidden]}
+                  >
+                    <:action :if={empty[:inner_block]}>{render_slot(empty)}</:action>
+                  </.empty_state>
+                <% else %>
+                  {render_slot(empty)}
+                <% end %>
+              <% end %>
             </td>
           </tr>
         </tbody>
@@ -1458,6 +2120,107 @@ defmodule Bilimbi.Base.UI.Components do
     </div>
     """
   end
+
+  @doc """
+  Renders an empty region: what is missing, why it is missing, and an
+  optional way to recover.
+
+  A region with nothing to show is one of three situations, and the person in
+  front of it has to tell them apart because each asks something different of
+  them:
+
+    * nothing has been created yet: `title` and `reason`, usually with the
+      action that creates the first record;
+    * a search or filter matched nothing: `title` and `reason`, with the
+      action that clears it;
+    * they may not look: `forbidden`.
+
+  The first two are the caller's own sentences, and they must not be one
+  sentence. The third is one wording owned here so that every region that is
+  out of reach says the same plain thing: "You do not have permission to
+  <forbidden>." followed by the recovery, "Ask an operator to review your
+  role." It does not suggest trying again and it does not imply the data is
+  absent.
+
+  `title` and `forbidden` are the two modes, and a call gives one of them: a
+  region either says what is missing or says it is out of reach.
+
+  `<.table>` reaches this from its `<:empty>` slot, so a table needs no second
+  component. The block carries no padding of its own; the table cell or the
+  caller's region supplies it.
+
+  ## Examples
+
+      <.empty_state title="No companies yet" reason="Companies you create appear here.">
+        <:action>
+          <.button variant="primary" navigate={~p"/companies/create"}>Add Company</.button>
+        </:action>
+      </.empty_state>
+
+      <.empty_state title="No companies match “acme”" reason="Clear the search to see every company.">
+        <:action><.button patch={~p"/companies"}>Clear search</.button></:action>
+      </.empty_state>
+
+      <.empty_state forbidden="view companies" />
+  """
+  attr(:id, :string, default: nil)
+
+  attr(:title, :string,
+    default: nil,
+    doc: "what is missing; give this or `forbidden`, never both"
+  )
+
+  attr(:reason, :string, default: nil, doc: "why it is missing")
+
+  attr(:forbidden, :string,
+    default: nil,
+    doc: "the action the actor lacks permission for, such as \"view companies\""
+  )
+
+  attr(:class, :any, default: nil)
+
+  slot(:action,
+    doc: "an optional recovery, such as clearing the search or creating the first record"
+  )
+
+  def empty_state(%{title: nil, forbidden: nil}) do
+    raise ArgumentError,
+          "<.empty_state> needs a title (what is missing) or forbidden (the action the actor lacks)"
+  end
+
+  def empty_state(%{title: title, forbidden: forbidden})
+      when is_binary(title) and is_binary(forbidden) do
+    raise ArgumentError,
+          "<.empty_state> takes a title (what is missing) or forbidden (the action the actor lacks), not both"
+  end
+
+  def empty_state(assigns) do
+    assigns = assign(assigns, empty_state_copy(assigns))
+
+    ~H"""
+    <div id={@id} class={["text-center text-sm", @class]}>
+      <p class="font-medium text-ink">{@heading}</p>
+      <p :for={line <- @details} class="mt-1 text-ink-muted">{line}</p>
+      <div :if={@action != []} class="mt-3 flex flex-wrap items-center justify-center gap-2">
+        {render_slot(@action)}
+      </div>
+    </div>
+    """
+  end
+
+  # The one permission wording. A region the actor may not see states that
+  # plainly and names the recovery; it never says to try again, and never
+  # implies the records do not exist.
+  defp empty_state_copy(%{title: nil, forbidden: forbidden}) do
+    %{heading: permission_wording(forbidden), details: [permission_recovery()]}
+  end
+
+  defp empty_state_copy(%{title: title, reason: reason, forbidden: nil}) do
+    %{heading: title, details: Enum.reject([reason], &is_nil/1)}
+  end
+
+  defp permission_wording(action), do: "You do not have permission to #{action}."
+  defp permission_recovery, do: "Ask an operator to review your role."
 
   @doc """
   Renders an inline-editable text cell (Belimbing inline-edit pattern).
@@ -1615,8 +2378,9 @@ defmodule Bilimbi.Base.UI.Components do
   Prefer a name from `Bilimbi.Base.UI.IconRegistry` so the action meaning is
   explicit. Unknown names beginning with `hero-` still pass through to
   generated Heroicons. Custom product glyphs such as `bilimbi-pin` render as
-  inline SVG. A name that is neither registered nor `hero-`-prefixed falls back
-  to the generic `hero-square-3-stack-3d` glyph rather than failing.
+  inline SVG. A name that is neither registered nor `hero-`-prefixed raises
+  `ArgumentError` rather than rendering a meaningless fallback glyph; pass a
+  name that came from stored data through `IconRegistry.renderable?/1` first.
 
   Heroicons come in three styles – outline, solid, and mini.
   By default, the outline style is used, but solid and mini may

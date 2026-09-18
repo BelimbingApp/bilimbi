@@ -121,6 +121,28 @@ defmodule BilimbiWeb.EmployeeFormTest do
              conn |> log_in_as() |> live(~p"/employees/new")
   end
 
+  test "a required field is marked once, by the shared field shell", %{conn: conn} do
+    grant_capabilities!(["admin.employee.create", "admin.employee.view"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/new")
+
+    for id <- ["employee-number", "employee-full-name"] do
+      assert has_element?(view, "##{id}[required]")
+
+      label = render(element(view, "label[for='#{id}']"))
+
+      assert label |> String.graphemes() |> Enum.count(&(&1 == "*")) == 1,
+             """
+             The #{id} label must carry exactly one required marker.
+
+             The shell appends its own, so a hand-written one in `label=`
+             renders a second asterisk beside it.
+
+             #{label}
+             """
+    end
+  end
+
   test "renders full 2-column form structure with all 14 fields matching Belimbing parity", %{
     conn: conn
   } do

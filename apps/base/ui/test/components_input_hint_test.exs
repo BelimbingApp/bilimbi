@@ -50,10 +50,11 @@ defmodule Bilimbi.Base.UI.ComponentsInputHintTest do
   test "no hint means no empty paragraph" do
     html = render_component(&field/1, hint: nil, errors: [])
 
-    # Matching on "text-ink-subtle" alone is not enough: `field_class/3`
+    # Matching on "text-ink-subtle" alone is not enough: `field_class/4`
     # already carries `disabled:text-ink-subtle` on every input, so that
-    # assertion passes for the wrong reason. Match the hint paragraph itself.
-    refute html =~ ~s(<p class="mt-1.5),
+    # assertion passes for the wrong reason. Match the hint paragraph itself,
+    # by the id it is given so the control can point `aria-describedby` at it.
+    refute html =~ ~s(id="f-hint"),
            "a nil hint must not leave an empty helper paragraph behind"
   end
 

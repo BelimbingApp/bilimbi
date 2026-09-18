@@ -131,9 +131,11 @@
             <p class="text-xs text-ink-muted">{task.timezone}</p>
           </:col>
           <:col :let={task} label="Next run" sort="next_due" sort_id="schedule-tasks-sort-next_due">
-            <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">
-              {format_datetime(task.next_due_at)}
-            </span>
+            <.datetime
+              id={"#{task_dom_id(task)}-next-due"}
+              value={task.next_due_at}
+              class="whitespace-nowrap text-xs text-ink-muted"
+            />
           </:col>
           <:col :let={task} label="Status">
             <.badge kind={task_status_kind(task)}>{task_status_label(task)}</.badge>
@@ -142,9 +144,11 @@
             </p>
           </:col>
           <:col :let={task} label="Last run" sort="last_run" sort_id="schedule-tasks-sort-last_run">
-            <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">
-              {format_datetime(task.last_started_at)}
-            </span>
+            <.datetime
+              id={"#{task_dom_id(task)}-last-started"}
+              value={task.last_started_at}
+              class="whitespace-nowrap text-xs text-ink-muted"
+            />
           </:col>
           <:col :let={task} label="Result">
             <span class="text-xs text-ink">{status_label(task.last_status)}</span>
@@ -213,65 +217,54 @@
     </section>
 
     <section :if={@state.tab == "history"} id="schedule-history-panel" aria-labelledby="schedule-tab-history">
-      <.form
-        for={@run_form}
+      <.filter_toolbar
         id="schedule-history-filters"
-        phx-change="filter_runs"
-        phx-submit="filter_runs"
-        class="mt-4 grid gap-3 lg:grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto]"
+        form={@run_form}
+        event="filter_runs"
+        class="mt-4"
       >
-        <div>
-          <.input
-            field={@run_form[:search]}
-            id="schedule-run-search"
-            type="search"
-            label="Search run name"
-            label_class="sr-only"
-            wrapper_class="mb-0"
-            placeholder="Search run name…"
-            maxlength="255"
-            phx-debounce="300"
-            autocomplete="off"
-            class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
-          />
-        </div>
-        <div>
-          <.input
-            field={@run_form[:status]}
-            id="schedule-run-status"
-            type="select"
-            label="Filter run status"
-            label_class="sr-only"
-            wrapper_class="mb-0"
-            options={[
-              {"All run statuses", ""},
-              {"Running", "running"},
-              {"Succeeded", "succeeded"},
-              {"Failed", "failed"},
-              {"Skipped", "skipped"}
-            ]}
-            class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
-          />
-        </div>
-        <div>
-          <.input field={@run_form[:start_date]} id="schedule-run-start-date" type="date" label="Start date" label_class="sr-only" wrapper_class="mb-0" class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink" />
-        </div>
-        <div>
-          <.input field={@run_form[:end_date]} id="schedule-run-end-date" type="date" label="End date" label_class="sr-only" wrapper_class="mb-0" class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink" />
-        </div>
-        <div>
-          <.input
-            field={@run_form[:page_size]}
-            id="schedule-run-page-size"
-            type="select"
-            label="Runs per page"
-            label_class="sr-only"
-            wrapper_class="mb-0"
-            options={[{"25 / page", 25}, {"50 / page", 50}, {"100 / page", 100}]}
-            class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
-          />
-        </div>
-      </.form>
+        <:control
+          type={:search}
+          field={@run_form[:search]}
+          id="schedule-run-search"
+          label="Search run name"
+          placeholder="Search run name…"
+        />
+        <:control
+          type={:select}
+          field={@run_form[:status]}
+          id="schedule-run-status"
+          label="Filter run status"
+          options={[
+            {"All run statuses", ""},
+            {"Running", "running"},
+            {"Succeeded", "succeeded"},
+            {"Failed", "failed"},
+            {"Skipped", "skipped"}
+          ]}
+        />
+        <:control
+          type={:date}
+          field={@run_form[:start_date]}
+          id="schedule-run-start-date"
+          label="Start date (UTC)"
+          hint="UTC"
+        />
+        <:control
+          type={:date}
+          field={@run_form[:end_date]}
+          id="schedule-run-end-date"
+          label="End date (UTC)"
+          hint="UTC"
+        />
+        <:control
+          type={:select}
+          field={@run_form[:page_size]}
+          id="schedule-run-page-size"
+          label="Runs per page"
+          options={[{"25 / page", 25}, {"50 / page", 50}, {"100 / page", 100}]}
+        />
+      </.filter_toolbar>
 
       <.alert :if={@run_state == :invalid_filters} id="schedule-history-invalid" kind={:warning} class="mt-4">
         The start date must not be after the end date.
@@ -291,7 +284,11 @@
           caption="Schedule run history"
         >
           <:col :let={run} label="Started" sort="started_at" sort_id="schedule-runs-sort-started_at">
-            <span class="whitespace-nowrap text-xs tabular-nums text-ink-muted">{format_datetime(run.started_at)}</span>
+            <.datetime
+              id={"#{run_dom_id(run)}-started-at"}
+              value={run.started_at}
+              class="whitespace-nowrap text-xs text-ink-muted"
+            />
             <p class="text-xs text-ink-muted">{duration(run.runtime_ms)}</p>
           </:col>
           <:col :let={run} label="Name" sort="name" sort_id="schedule-runs-sort-name">
