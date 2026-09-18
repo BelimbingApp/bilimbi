@@ -212,7 +212,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-radio-disabled[disabled]")
     assert has_element?(view, "#component-radio-disabled-system[checked][disabled]")
     assert has_element?(view, "#design-library-radio-locked[aria-label='Data region'][disabled]")
-    assert has_element?(view, "#design-library-multi-select-plain[aria-label='Roles']")
+    assert has_element?(view, "#design-library-multi-select-plain[aria-label='Optional roles']")
 
     assert has_element?(
              view,

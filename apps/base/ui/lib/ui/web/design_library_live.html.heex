@@ -854,7 +854,7 @@
                   <.multi_select
                     field={@sample_form[:plain_roles]}
                     id="design-library-multi-select-plain"
-                    aria-label="Roles"
+                    aria-label="Optional roles"
                     options={[
                       {"Administrator", "admin"},
                       {"Operator", "operator"},
@@ -1058,9 +1058,10 @@
                   />
                 </div>
                 <p class="mt-3 border-t border-line pt-3 text-xs text-ink-muted">
-                  A prompt names the empty choice, both multi-value controls report how
-                  many are chosen, and the search box takes an <code>aria-label</code>
-                  rather than a visible one.
+                  A prompt names the empty choice, the native multiple select shows what
+                  is chosen by highlighting its rows, the multi-select reports the count on
+                  its trigger, and the search box takes an <code>aria-label</code> rather
+                  than a visible one.
                 </p>
               </.card>
             </.form>
