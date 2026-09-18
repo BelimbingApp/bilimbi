@@ -495,10 +495,10 @@ Validation: The reviewer can reach any catalog family quickly, interact with the
 
 Goal: Complete evidence and recommended dispositions without changing production design prematurely.
 
-- [ ] Lane A — audit FND, LAY and NAV against both applications and representative shell/page routes.
-- [ ] Lane B — audit ACT, FBK and OVR, including loading, dismissal, confirmation and recovery.
-- [ ] Lane C — audit INP and INT, including field shell, keyboard behavior, editing and rich choices.
-- [ ] Lane D — audit DAT, CMP and GFX, including actual index, form, detail, authentication and dashboard flows.
+- [x] Lane A — audit FND, LAY and NAV against both applications and representative shell/page routes.
+- [x] Lane B — audit ACT, FBK and OVR, including loading, dismissal, confirmation and recovery.
+- [x] Lane C — audit INP and INT, including field shell, keyboard behavior, editing and rich choices.
+- [x] Lane D — audit DAT, CMP and GFX, including actual index, form, detail, authentication and dashboard flows.
 - [ ] Integration owner consolidates reports into this ledger and removes duplicate or speculative targets.
 
 The four lane audits ran on 2026-09-16 and produced evidence only; their reports are held outside the repository. What landed on 2026-09-17: seven understated rows — LAY-05, ACT-02, DAT-01, CMP-02, CMP-03, CMP-05 and CMP-06 — were restated in the catalog table above; the NAV-01, ACT-01 and OVR-02 corrections and the OVR-01 and CMP-01 additions were recorded under Targets the evidence contradicts; and the two captain rulings were recorded under Design Decisions. Nothing else from the four reports is claimed to be on file: consolidating them into this ledger remains open.
