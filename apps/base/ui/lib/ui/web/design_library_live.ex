@@ -150,18 +150,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> assign(
        :modal_form,
        to_form(%{"name" => "Example Sdn Bhd", "code" => "EX-01"}, as: :example)
-     )}
-  end
-
-  @impl true
-  def handle_event("open-modal", params, socket) do
-    width = if params["width"] == "wide", do: :wide, else: :narrow
-    {:noreply, assign(socket, :modal_width, width)}
-  end
-
-  @impl true
-  def handle_event("close-modal", _params, socket) do
-    {:noreply, assign(socket, :modal_width, nil)}
+     )
      |> assign(
        :filter_toolbar_full_form,
        to_form(
@@ -174,8 +163,18 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
          },
          as: :toolbar_full
        )
-     )
-     |> assign(:click_count, 0)}
+     )}
+  end
+
+  @impl true
+  def handle_event("open-modal", params, socket) do
+    width = if params["width"] == "wide", do: :wide, else: :narrow
+    {:noreply, assign(socket, :modal_width, width)}
+  end
+
+  @impl true
+  def handle_event("close-modal", _params, socket) do
+    {:noreply, assign(socket, :modal_width, nil)}
   end
 
   @impl true
