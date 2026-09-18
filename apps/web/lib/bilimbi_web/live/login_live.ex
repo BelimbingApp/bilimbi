@@ -5,17 +5,26 @@ defmodule BilimbiWeb.LoginLive do
   Behavior mirrors Belimbing's `Core/User/Livewire/Auth/Login`:
 
     * email + password, both required, email format checked live;
-    * a neutral credential failure on the email field
-      ("These credentials do not match our records.");
+    * a neutral credential failure on the email field ("These credentials do
+      not match our records.");
     * five attempts per email+IP per minute, then a lockout that names the
       remaining seconds;
     * a session-expired notice when an expired session is bounced here;
     * on success, a painted "Signed in. Opening your workspace…" state while
-      the session form submits and the browser navigates.
+      the session form submits and the browser navigates; the submit button
+      is busy and both fields are readonly until the workspace appears. That
+      state is painted first and the form armed second, because arming it
+      stops LiveView patching the controls inside it.
 
   What differs is Bilimbi's own: the workspace strip under the card names
   the platform this is signing into, and the geometry follows `DESIGN.md`'s
-  compact ledger rules rather than Belimbing's arid pill styling.
+  compact ledger rules rather than Belimbing's arid pill styling. The
+  credential and lockout failures are announced above the form through the
+  same `<.alert>` the forgot-password confirmation uses, so a screen reader
+  hears that every attempt failed, including a repeat of the same message.
+  Belimbing pins the message under the email field, where nothing announces
+  it; Bilimbi keeps that field-level mark as well, so a scan sees which
+  field the failure concerns and a screen reader still hears it.
   """
 
   use BilimbiWeb, :live_view
@@ -36,6 +45,7 @@ defmodule BilimbiWeb.LoginLive do
      |> assign(:trigger_action, false)
      |> assign(:login_token, nil)
      |> assign(:form_error, nil)
+     |> assign(:form_error_seq, 0)
      |> assign_workspace()
      |> assign_form(login_changeset(%{}))}
   end
@@ -47,6 +57,7 @@ defmodule BilimbiWeb.LoginLive do
 
   def handle_event("login", %{"login" => params}, socket) do
     changeset = login_changeset(params)
+    socket = assign(socket, :form_error, nil)
 
     if changeset.valid? do
       attempt_login(socket, changeset)
@@ -80,23 +91,38 @@ defmodule BilimbiWeb.LoginLive do
     end
   end
 
+  # The handoff takes two patches, not one. Once a form carries
+  # `phx-trigger-action` LiveView freezes its controls: every one of them
+  # merges attributes and keeps the children it already has, so a submit
+  # button first painted busy in that same patch would keep the label and
+  # glyph it wore before it was pressed, for the whole POST to /session. The
+  # busy paint therefore lands on its own, and the form is armed by the next
+  # message.
   defp complete_login(socket, user, key) do
     case UserAuth.session_user(user) do
       {:ok, session_user} ->
         :ok = RateLimit.reset(key)
+        send(self(), :arm_session_form)
 
         {:noreply,
          socket
          |> assign(:phase, :opening)
-         |> assign(:login_token, UserAuth.sign_login_token(session_user))
-         |> assign(:trigger_action, true)}
+         |> assign(:login_token, UserAuth.sign_login_token(session_user))}
 
       {:error, :tenant_unavailable} ->
-        {:noreply,
-         assign(socket, :form_error, "This account is not attached to an active workspace.")}
+        {:noreply, put_form_error(socket, "This account is not attached to an active workspace.")}
     end
   end
 
+  @impl true
+  def handle_info(:arm_session_form, socket) do
+    {:noreply, assign(socket, :trigger_action, true)}
+  end
+
+  # The failure is reported twice over: the announced `#login-form-error`
+  # alert carries it to assistive technology, and the email field's own error
+  # slot marks where the attempt went wrong. The submitted values stay in the
+  # form for another attempt.
   defp reject(socket, changeset, message) do
     changeset =
       changeset
@@ -104,8 +130,18 @@ defmodule BilimbiWeb.LoginLive do
       |> Map.put(:action, :validate)
 
     socket
-    |> assign(:form_error, nil)
+    |> put_form_error(message)
     |> assign_form(changeset)
+  end
+
+  # An assertive live region speaks when its node changes, so a second wrong
+  # password with the same message would be silent. Each failure gets its own
+  # `#login-form-error-N` node, which the patch replaces rather than leaves
+  # alone.
+  defp put_form_error(socket, message) do
+    socket
+    |> assign(:form_error, message)
+    |> assign(:form_error_seq, socket.assigns.form_error_seq + 1)
   end
 
   defp throttle_message(seconds) do
@@ -170,7 +206,7 @@ defmodule BilimbiWeb.LoginLive do
         </div>
 
         <div :if={@form_error} id="login-form-error">
-          <.alert kind={:error}>{@form_error}</.alert>
+          <.alert id={"login-form-error-#{@form_error_seq}"} kind={:error}>{@form_error}</.alert>
         </div>
 
         <.form
@@ -193,6 +229,7 @@ defmodule BilimbiWeb.LoginLive do
             placeholder="email@example.com"
             autocomplete="email"
             phx-debounce="blur"
+            readonly={@phase == :opening}
             required
             autofocus
           />
@@ -205,6 +242,7 @@ defmodule BilimbiWeb.LoginLive do
               label="Password"
               placeholder="Password"
               autocomplete="current-password"
+              readonly={@phase == :opening}
               required
             />
             <.link
@@ -222,7 +260,7 @@ defmodule BilimbiWeb.LoginLive do
             id="login-submit"
             class="w-full"
             phx-disable-with="Signing in…"
-            disabled={@phase == :opening}
+            busy={@phase == :opening}
           >
             <%= if @phase == :opening do %>
               Opening workspace…
