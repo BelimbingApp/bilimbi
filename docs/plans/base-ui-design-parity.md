@@ -68,8 +68,8 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | ACT-01 [(contradicted)](#targets-the-evidence-contradicts) | Buttons | Primary, secondary and destructive basics | Cover emphasis, compact size, disabled, loading, navigation and truthful completion. |
 | ACT-02 | Icon actions and groups | Shared icon button ships with inline and table sizes, accessible labels, native titles, and disabled and busy (spinner plus `aria-busy`) specimens; grouping is ad hoc (dashboard customize clusters) | Add grouping, context sizing, disabled/loading behavior and accessible tooltips. |
 | ACT-03 | Destructive entry and acknowledgement | Inconsistent screen patterns | Standardize consequence copy, confirmation and typed acknowledgement where risk requires it. |
-| INP-01 | Shared field shell | Generic input has labels, hints and errors | Standardize required, help, error, disabled, read-only, prefix and suffix placement. |
-| INP-02 | Text, email, URL, telephone, number and textarea | Available through the generic input | Complete state and sizing contracts and validate realistic long content. |
+| INP-01 | Shared field shell | Shell ships label, hint, error, disabled and read-only placement, a visible required marker, `aria-invalid` on the control, and `aria-describedby` linking the control to its own hint and error ids; prefix and suffix do not exist | Standardize required, help, error, disabled, read-only, prefix and suffix placement. |
+| INP-02 | Text, email, URL, telephone, number and textarea | Available through the generic input, which carries the INP-01 state contract (required, invalid, described-by, read-only) on text and textarea; the sizing contract and realistic long-content validation are untouched | Complete state and sizing contracts and validate realistic long content. |
 | INP-03 [(contradicted)](#targets-the-evidence-contradicts) | Search | Generic search type | Add clear, empty, loading and result-update behavior. |
 | INP-04 | Select, multi-select, checkbox and radio | Shared components for all four, including `<.radio_group>`; state coverage partial | Complete open/close, summary, no-options, outside-click, Escape and keyboard behavior. |
 | INP-05 | Date, time, datetime and integer entry | Mostly native generic inputs | Define tabular display, step controls, validation and locale/timezone behavior. |
@@ -682,3 +682,27 @@ records as Keep Bilimbi.
 
 Delivery: pending. The work is on `fm/empty-and-permission-states` with no child
 issue and no PR yet; whoever merges it records the PR URL and merge date here.
+
+### Field shell states slice — INP-01 and INP-02, partial
+
+Goal: Make the shared field shell state what it is, so a person using assistive
+technology hears what a sighted person sees.
+
+Shipped in `Bilimbi.Base.UI.Components.input/1` and `multi_select/1`, exercised on
+the Design Library and adopted by `/companies/create` and `/employees/new`:
+
+| Gap | Delivered |
+|---|---|
+| A required field is not visibly marked | A marker on the label, `aria-hidden` because the control's own `required` attribute already announces it |
+| An invalid field tells assistive technology nothing | `aria-invalid` on the control itself |
+| Hint and error text are not associated with the control | Hint and error elements carry ids and the control points `aria-describedby` at them, so a field with both reaches the person with both |
+| There is no read-only state | A read-only appearance driven by the `readonly` attribute the caller set, not by the CSS `:read-only` pseudo-class, which also matches every `select`, `color` and `file` control |
+| A server-side required failure renders no field error appearance | Submitting an empty required field marks the control invalid and points it at its error, not only the message beside it |
+
+Neither row is closed, and the code is what closes a row:
+
+- **INP-01 remains open** for prefix and suffix placement. Neither exists in the
+  shell. The disabled appearance and the red invalid border shipped before this
+  slice and are unchanged by it.
+- **INP-02 remains open** for the sizing contract and for validation against
+  realistic long content. This slice touched neither.

@@ -568,7 +568,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
               <.input
                 field={@form[:employee_number]}
                 id="employee-number"
-                label="EMPLOYEE NUMBER *"
+                label="EMPLOYEE NUMBER"
                 label_class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
                 placeholder="Employee ID or number"
                 autocomplete="off"
@@ -580,7 +580,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
               <.input
                 field={@form[:full_name]}
                 id="employee-full-name"
-                label="FULL NAME *"
+                label="FULL NAME"
                 label_class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
                 placeholder="Full legal name"
                 autocomplete="off"
