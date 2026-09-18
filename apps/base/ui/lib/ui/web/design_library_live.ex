@@ -162,6 +162,20 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   @impl true
   def handle_event("close-modal", _params, socket) do
     {:noreply, assign(socket, :modal_width, nil)}
+     |> assign(
+       :filter_toolbar_full_form,
+       to_form(
+         %{
+           "search" => "",
+           "status" => "",
+           "kind" => "",
+           "start_date" => "",
+           "end_date" => ""
+         },
+         as: :toolbar_full
+       )
+     )
+     |> assign(:click_count, 0)}
   end
 
   @impl true
@@ -172,6 +186,11 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   @impl true
   def handle_event("sample_change", %{"sample" => sample_data}, socket) do
     {:noreply, assign(socket, :sample_form, to_form(sample_data, as: :sample))}
+  end
+
+  def handle_event("filter-toolbar-preview", %{"toolbar_full" => toolbar_data}, socket) do
+    {:noreply,
+     assign(socket, :filter_toolbar_full_form, to_form(toolbar_data, as: :toolbar_full))}
   end
 
   @impl true

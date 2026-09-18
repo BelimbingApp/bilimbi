@@ -194,6 +194,9 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-input-guidance", "Choice guidance")
     assert has_element?(view, "#component-input-live-state", "Live state")
     assert has_element?(view, "#component-icon-button", "Compact icon actions")
+    assert has_element?(view, "#component-actions button[aria-busy='true'][disabled]", "Saving…")
+    assert has_element?(view, "#component-icon-button-disabled[disabled]:not([aria-busy])")
+    assert has_element?(view, "#component-icon-button-busy[aria-busy='true'][disabled]")
     assert has_element?(view, "#example-nav[aria-label='Example menu']")
     assert has_element?(view, "#example-nav #nav-example-companies", "Companies")
     assert has_element?(view, "#example-nav [data-nav-branch='example.system']")
@@ -240,9 +243,12 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
              "#component-header-title-action button.size-6[aria-label='Edit company']"
            )
 
-    assert has_element?(view, "#component-flash > .transform-gpu > #design-library-flash")
-    assert has_element?(view, "#component-flash > .transform-gpu > #design-library-flash-error")
+    for kind <- ~w(error warning success info) do
+      assert has_element?(view, "#component-flash #design-library-flash-#{kind}")
+    end
+
     assert has_element?(view, "#component-flash", "Save failed")
+    assert has_element?(view, "#component-flash", "preference status line")
     assert has_element?(view, "#component-card-titled .border-b h3", "Company profile")
     refute has_element?(view, "#component-card-untitled h3")
     assert has_element?(view, "#component-card-boundary", "no loading, empty, error, or disabled")
@@ -256,13 +262,29 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     refute has_element?(view, "#graphics")
     refute has_element?(view, "#specifications")
 
-    for component <- ~w(header button badge alert table inputs datetime) do
+    for component <- ~w(header button badge alert table inputs datetime filter-toolbar) do
       assert has_element?(view, "#component-#{component}")
     end
 
     assert has_element?(view, "#sample-table", "Acme Holdings")
     assert has_element?(view, "#sample-table", "Example Company 10")
     assert has_element?(view, "#nav-admin-system-design-library-components[aria-current='page']")
+  end
+
+  test "the filter toolbar specimen shows every control type under one rule", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    assert has_element?(view, "#filter-toolbar-full label.sr-only", "Search example companies")
+    assert has_element?(view, "#filter-toolbar-full label.sr-only", "Status filter")
+    assert has_element?(view, "#filter-toolbar-full label.sr-only", "Start date (UTC)")
+    assert has_element?(view, "#filter-toolbar-full .hero-magnifying-glass")
+    assert has_element?(view, "#design-library-filter-full-start-date + p", "UTC")
+
+    view
+    |> form("#design-library-filter-full", %{"toolbar_full" => %{"search" => "Acme"}})
+    |> render_change()
+
+    assert has_element?(view, "#design-library-filter-full-search[value='Acme']")
   end
 
   test "Components input examples update their visible state", %{conn: conn} do

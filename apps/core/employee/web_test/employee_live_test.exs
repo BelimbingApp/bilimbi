@@ -465,6 +465,26 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       assert has_element?(view, "#employee-email", "john@example.test")
     end
 
+    test "the subordinates head renders the role pair the contrast gate measures", %{
+      conn: conn,
+      employee: employee
+    } do
+      grant_capabilities!("admin.employee.view")
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+      # `theme_contrast_test.exs` gates `ink-subtle` against `surface` because
+      # that is the pair this hand-written head renders: the card supplies the
+      # background the head inherits (parity finding C2).
+      card_classes = view |> element("#subordinates-card") |> render() |> opening_tag_classes()
+
+      head_classes =
+        view |> element("#subordinates-table thead tr") |> render() |> opening_tag_classes()
+
+      assert "bg-surface" in card_classes
+      assert "text-ink-subtle" in head_classes
+    end
+
     test "supports inline editing of employee text fields", %{
       conn: conn,
       scope: scope,
@@ -754,5 +774,12 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       assert render(view) =~ "The platform orchestrator cannot be deleted."
       assert {:ok, _still_exists} = Employee.get_employee(scope, 73, orchestrator.id)
     end
+  end
+
+  defp opening_tag_classes(html) do
+    [opening_tag, _] = String.split(html, ">", parts: 2)
+    [_, class_attribute] = Regex.run(~r/class="([^"]*)"/, opening_tag)
+
+    String.split(class_attribute, ~r/\s+/, trim: true)
   end
 end

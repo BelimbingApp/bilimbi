@@ -106,6 +106,11 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     # who an employee acted for is the wrong kind of terse, and the read model
     # already carries it, so nothing had to be plumbed to keep it.
     assert has_element?(view, "#decision-logs", "(as #91)")
+
+    # The delegation note is the whole point of the row, so it may not render
+    # in the faint role the rest of the template reserves for the search icon
+    # and its placeholder: that is 2.59:1 light and 2.29:1 dark (finding C3).
+    refute has_element?(view, "#decision-logs .text-ink-faint.tabular-nums")
   end
 
   test "shows no delegation note when a user acted for themselves", %{

@@ -116,6 +116,22 @@ defmodule Bilimbi.Base.UI.ComponentsTableTest do
     refute html =~ "uppercase tracking-wider"
   end
 
+  test "header cells render the role pair the contrast gate measures" do
+    html = render_component(&preview/1, rows: [%{name: "Ada", count: 1, note: "n"}])
+
+    [_, head_tag] = String.split(html, "<thead", parts: 2)
+    [head_tag, after_head] = String.split(head_tag, ">", parts: 2)
+    [_, first_header] = String.split(after_head, "<th", parts: 2)
+    [first_header, _] = String.split(first_header, ">", parts: 2)
+
+    # `theme_contrast_test.exs` gates `ink-subtle` against `surface-sunken`
+    # because that is the pair this header renders (parity finding C2). If the
+    # head moves to another surface or the cells to another text role, the
+    # measured pair is no longer the rendered one.
+    assert head_tag =~ "bg-surface-sunken"
+    assert first_header =~ "text-ink-subtle"
+  end
+
   test "a multiple select is sized in rows, so no row is painted in half" do
     html =
       render_component(&Bilimbi.Base.UI.Components.input/1,

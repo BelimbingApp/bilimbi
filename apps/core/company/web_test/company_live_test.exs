@@ -123,6 +123,44 @@ defmodule BilimbiWeb.CompanyLiveTest do
                "Bilimbi Subsidiary"
     end
 
+    test "toolbar search and status filter round-trip through the URL", %{conn: conn} do
+      grant_capabilities!(["admin.company.list"])
+      conn = log_in_as(conn)
+
+      {:ok, view, _html} = live(conn, ~p"/companies")
+
+      # The shared toolbar sends the same search a URL visit would carry.
+      view
+      |> form("#companies-filters", filters: %{"search" => "Subsidiary", "status_filter" => "all"})
+      |> render_change()
+
+      assert_patch(view, ~p"/companies?search=Subsidiary")
+      assert has_element?(view, "#companies td", "Bilimbi Subsidiary")
+      refute has_element?(view, "#companies td a", "Bilimbi Industries")
+
+      # The patched URL reloads to the same rows with the toolbar state retained.
+      {:ok, reloaded, _html} = live(conn, ~p"/companies?search=Subsidiary")
+      assert has_element?(reloaded, "#companies td", "Bilimbi Subsidiary")
+      refute has_element?(reloaded, "#companies td a", "Bilimbi Industries")
+      assert has_element?(reloaded, "#companies-search[value='Subsidiary']")
+
+      # The shared toolbar sends the same status filter a URL visit would carry.
+      reloaded
+      |> form("#companies-filters", filters: %{"search" => "", "status_filter" => "suspended"})
+      |> render_change()
+
+      assert_patch(reloaded, ~p"/companies?status=suspended")
+      assert has_element?(reloaded, "#companies-empty")
+
+      {:ok, filtered, _html} = live(conn, ~p"/companies?status=suspended")
+      assert has_element?(filtered, "#companies-empty")
+
+      assert has_element?(
+               filtered,
+               "#companies-status-filter option[value='suspended'][selected]"
+             )
+    end
+
     test "renders parent, jurisdiction, primary badge, and pagination controls", %{conn: conn} do
       grant_capabilities!(["admin.company.list"])
       CompanyFixtures.assign_primary_company!(41, 73)
