@@ -676,7 +676,7 @@ defmodule BilimbiWeb.UserShowTest do
 
     # Open add employee modal and create new employee
     view |> element("#open-add-employee-modal-btn") |> render_click()
-    assert has_element?(view, "#add-employee-modal")
+    assert_modal_dialog(view, "add-employee-modal", "Add Employee Record")
 
     view
     |> form("#modal-create-employee-form")

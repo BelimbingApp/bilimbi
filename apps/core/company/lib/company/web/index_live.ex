@@ -244,6 +244,42 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
   defp maybe_put(params, _key, nil), do: params
   defp maybe_put(params, key, value), do: params ++ [{key, value}]
 
+  # The empty row's copy. A search and a status filter are the two ways the
+  # person narrowed the list, so the sentence names whichever applies and the
+  # recovery undoes exactly that, keeping sort and page size.
+  defp filtered?(%State{search: search, status_filter: status_filter}) do
+    search not in [nil, ""] or status_filter != :all
+  end
+
+  defp cleared(%State{} = state), do: %{state | search: nil, status_filter: :all, page: 1}
+
+  defp filtered_empty_title(%State{search: search, status_filter: status_filter}) do
+    status = if status_filter == :all, do: "", else: "#{status_filter} "
+    match = if search in [nil, ""], do: "", else: " match \u201C#{search}\u201D"
+    "No #{status}companies#{match}"
+  end
+
+  defp filtered_empty_reason(%State{search: search, status_filter: status_filter}) do
+    case {search in [nil, ""], status_filter == :all} do
+      {false, true} ->
+        "Check the spelling, or clear the search to see every company in this tenant."
+
+      {true, false} ->
+        "No company in this tenant has this status. Show all statuses to see every company."
+
+      {false, false} ->
+        "Clear the search and the status filter to see every company in this tenant."
+    end
+  end
+
+  defp clear_label(%State{search: search, status_filter: status_filter}) do
+    case {search in [nil, ""], status_filter == :all} do
+      {false, true} -> "Clear search"
+      {true, false} -> "Show all statuses"
+      {false, false} -> "Clear search and filter"
+    end
+  end
+
   defp status_badge_kind("active"), do: :success
   defp status_badge_kind("suspended"), do: :danger
   defp status_badge_kind("pending"), do: :warning
@@ -285,43 +321,28 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
           </:actions>
         </.header>
 
-        <.form for={@filters_form} id="companies-filters" phx-change="filters" class="mb-2">
-          <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(10rem,13rem)]">
-            <div class="relative">
-              <.icon
-                name="search"
-                class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-              />
-              <.input
-                field={@filters_form[:search]}
-                id="companies-search"
-                type="search"
-                phx-debounce="300"
-                maxlength="255"
-                label="Search companies"
-                label_class="sr-only"
-                wrapper_class="mb-0"
-                placeholder="Search by name, code, legal name, email, or jurisdiction..."
-                class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-              />
-            </div>
-            <.input
-              field={@filters_form[:status_filter]}
-              id="companies-status-filter"
-              type="select"
-              label="Status filter"
-              label_class="sr-only"
-              wrapper_class="mb-0"
-              options={[
-                {"All statuses", "all"},
-                {"Active", "active"},
-                {"Suspended", "suspended"},
-                {"Pending", "pending"},
-                {"Archived", "archived"}
-              ]}
-            />
-          </div>
-        </.form>
+        <.filter_toolbar id="companies-filters" form={@filters_form} event="filters">
+          <:control
+            type={:search}
+            field={@filters_form[:search]}
+            id="companies-search"
+            label="Search companies"
+            placeholder="Search by name, code, legal name, email, or jurisdiction..."
+          />
+          <:control
+            type={:select}
+            field={@filters_form[:status_filter]}
+            id="companies-status-filter"
+            label="Status filter"
+            options={[
+              {"All statuses", "all"},
+              {"Active", "active"},
+              {"Suspended", "suspended"},
+              {"Pending", "pending"},
+              {"Archived", "archived"}
+            ]}
+          />
+        </.filter_toolbar>
 
         <.card id="companies-card" inner_class="p-0">
           <h2 id="companies-table-title" class="sr-only">Companies</h2>
@@ -392,8 +413,32 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
               </div>
             </:action>
 
-            <:empty :if={@companies_page.entries == []}>
-              No companies found.
+            <%!-- Two different absences, two different sentences: a search or
+                 filter that matched nothing offers the way back; a tenant with no
+                 companies yet offers the first create to an actor who may make
+                 one. --%>
+            <:empty
+              :if={@companies_page.entries == [] and filtered?(@index_state)}
+              title={filtered_empty_title(@index_state)}
+              reason={filtered_empty_reason(@index_state)}
+            >
+              <.button id="companies-clear-search" patch={companies_path(cleared(@index_state))}>
+                {clear_label(@index_state)}
+              </.button>
+            </:empty>
+            <:empty
+              :if={@companies_page.entries == [] and not filtered?(@index_state)}
+              title="No companies yet"
+              reason="Companies created in this tenant appear here."
+            >
+              <.button
+                :if={allowed?(@current_scope, "admin.company.create")}
+                id="companies-empty-add"
+                variant="primary"
+                navigate={~p"/companies/create"}
+              >
+                <.icon name="create" class="size-4" /> Add Company
+              </.button>
             </:empty>
           </.table>
 

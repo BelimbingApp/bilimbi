@@ -141,6 +141,37 @@ table view:
   `border-brand-strong`, autofocusing and selecting the text.
 - **Save & Cancel:** Pressing `Enter` or blurring saves the field, updates the LiveView stream item (`stream_insert/3`), clears edit state, and flashes feedback (`"<Entity> saved."`). Pressing `Escape` cancels editing and reverts to display mode.
 
+## Modal dialogs
+
+A short workflow that must finish or be abandoned before the screen continues
+(attach an address, add an employee, edit a postcode) opens in the shared
+`<.modal>`, never in hand-written overlay markup:
+
+- **Semantics:** A native `<dialog>` opened as modal, named by its visible
+  title (`aria-labelledby`) and, when it has one, described by its one-line
+  description (`aria-describedby`), so a screen reader announces both.
+- **Focus:** Focus enters the dialog when it opens, stays inside while it is
+  open, and returns to the control that opened it when it closes. The page
+  behind is inert to the keyboard and to assistive technology.
+- **Closing:** `Escape` and the Cancel button are one action and reach the
+  same server handler. Clicking the dimmed page does nothing: the dialog
+  usually holds a form, and a stray click must not discard it.
+- **Feedback:** Because the page behind is inert and the dialog paints above
+  it in the top layer, an outcome raised while the dialog stays open renders
+  inside it — a LiveView passes `flash`, and a panel renders its own notice in
+  the dialog. Every dialog also carries its own connection banners, so a
+  dropped websocket is still announced and dismissable while one is open. The
+  layout's copy of whatever the dialog carries is hidden, so the same message
+  never appears twice; a dialog that carries no `flash` copy leaves the
+  layout's `:info` and `:error` in the DOM, dimmed behind the backdrop until it
+  closes. Opening a
+  dialog in a production workflow dismisses an earlier action's flash, so a
+  message about finished work is neither announced as this dialog's own nor
+  left stranded and unreadable behind the inert page; the Design Library
+  specimen, which raises no flash of its own, deliberately dismisses none.
+- **Geometry:** A `rounded-xl` surface at `max-w-lg` for a single-column form
+  or `max-w-2xl` for two columns, over an `ink/40` dimmer.
+
 ## Subtle depth and motion
 
 Use contrast, borders, and shadows with restraint. Motion should clarify state,

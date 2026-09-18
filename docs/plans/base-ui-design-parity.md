@@ -3,7 +3,7 @@
 **Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families. Application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display are merged to `main`; the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
 **Last Updated:** 2026-09-18
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1)
 
 ## Problem Essence
 
@@ -86,7 +86,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | FBK-01 | Inline alerts | Shared primitive exists | Verify status semantics, copy, contrast, icons and dismissibility. |
 | FBK-02 | Flash and notification behavior | `Layouts.flash_group/1` is the one production outlet, restated 2026-09-17: four severities stack in one column, most severe first, click-to-dismiss throughout, info, warning, error and the reconnect notices stay until dismissed, and the Design Library presents all four; the shell's preference status line is a recorded exception. Still open: auto-dismiss, whose mechanism ships but lies dormant because only `:success` carries the eight-second timer and no caller emits a `:success` flash; the `:info` call sites (most report a completed write, which is why the colour repaint was reverted, while others report actionable failures, which is why `:info` stays sticky — both close, and the timer starts running, once those callers move to `:success`); and redirect continuity | Define stacking, timing, sticky warning/error, manual dismissal and redirect continuity. |
 | FBK-03 | Validation, disabled and loading states | Partial: `<.button>` and `<.icon_button>` carry a `busy` state that spins, disables and announces `aria-busy`, distinct from plain disabled without depending on animation; the icon-button vocabulary now covers in-flight — `<.icon_button>` documents `phx-disable-with` as incompatible, because it deleted their glyph, and the employee-type delete runs async on `busy` instead — but that delete is so far its only adopter, and every other destructive icon action still shows nothing while its write runs; a `phx-disable-with` round trip is mirrored onto `aria-busy` by the shell but keeps the dimmed disabled look, so on that path loading and disabled are still one picture; login goes busy with readonly fields and announces credential and lockout failures through `role="alert"` on every attempt, a repeated identical message included; validation states are untouched | Make the states visibly distinct and prevent duplicate work. |
-| FBK-04 | Empty, permission, unavailable, error and recovery states | Library specimens exist | Establish reusable page and region patterns with truthful recovery. |
+| FBK-04 | Empty, permission, unavailable, error and recovery states | Shared `<.empty_state>` (what is missing, why, optional recovery) reachable from `<.table>`'s `<:empty>` slot, with one owned permission wording; `/companies` adopts its nothing-yet and nothing-matched states and offers the first create only to an actor who may make one. Unavailable and error states remain the Schedule alerts and layout flashes | Adopt the region pattern on the remaining index and show-page tables; a nothing-yet region that also explains a missing create right is deferred until a workflow needs that sentence; unavailable/reconnect stays unverified. |
 | OVR-01 [(contradicted)](#targets-the-evidence-contradicts) | Standard modal | Missing | Add accessible open, close, Escape, backdrop, focus containment and focus return. |
 | OVR-02 [(contradicted)](#targets-the-evidence-contradicts) | Confirmation modal | Missing | Add consequence-first confirmation without copying Belimbing's accessibility gaps. |
 | OVR-03 | Inspector drawer | Missing | Add only for a real inspector workflow; cover mobile width, resizing and remembered width. |
@@ -172,7 +172,7 @@ rather than being quietly reconciled.
 | FBK-01 Inline alerts | Adopt adapted | none |
 | FBK-02 Flash | Adopt adapted | z-order agreed with OVR-01 |
 | FBK-03 Validation, disabled, loading | Adopt adapted | ACT-01 |
-| FBK-04 Empty, permission, error, recovery | Keep Bilimbi | none |
+| FBK-04 Empty, permission, error, recovery | Adopt adapted (empty and permission regions — one shared `<.empty_state>` with one owned permission wording; revised 2026-09-18 by the FBK-04 slice, from the Phase 0 "Keep Bilimbi") / Keep Bilimbi (unavailable and error — the existing alerts and layout flashes) | none |
 | OVR-01 Standard modal | Adopt adapted — share the shell drawer's containment, do not re-add | extract containment hook from `app_shell.js` |
 | OVR-02 Confirmation modal | Adopt adapted | OVR-01, ACT-03 |
 | OVR-03 Inspector drawer | Not applicable — no workflow needs it | a real inspector workflow |
@@ -252,10 +252,15 @@ products were read and the plan forbids treating existence as acceptance.
   it or return it, and that two demo dialogs could be open at once — read together with
   the note below that Belimbing modal focus behaviour beyond dispatched events was not
   verified. Hand-written full-viewport overlays of the same fixed-inset,
-  dimmed-backdrop shape also already ship in production across several modules, none
+  dimmed-backdrop shape also shipped in production across several modules, none
   of them carrying a dialog role, `aria-modal`, Escape or focus containment; Attach
-  Address on `/companies/1` and Add Employee on `/users/1` are the two Lane B
-  exercised live. The shared modal has production adopters waiting across modules.
+  Address on `/companies/1` and Add Employee on `/users/1` were the two Lane B
+  exercised live. The shared `<.modal>` has since replaced every one of them: a native
+  `<dialog>` with a labelled title, focus in, containment and return, Escape, and an
+  inert page behind, adopted by every production workflow overlay and shown at both
+  widths in the Design Library. That meets the accepted target and exceeds Belimbing on
+  focus and Escape, with one deliberate departure from its "backdrop" wording: clicking
+  the dimmed page does not close, so a stray click cannot discard a form.
 - **LAY-02, NAV-05** — the "Bilimbi now" cells describe pre-#711 state; both shipped.
 - **INT-04** — reduced motion was not adoptable when Lane A measured it: neither
   product had a contract. Bilimbi now has one platform-wide under FND-05, so a
@@ -439,9 +444,10 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
 
   What the alignment exposed, recorded so the next slice does not rediscover it:
 
-  - **Overlays is the only family with no specimen anywhere.** OVR-01 to OVR-04
-    are all missing, so `#component-overlays` renders its heading and says "No
-    specimen yet" instead of being dropped from the menu.
+  - **Overlays was the only family with no specimen anywhere.** OVR-01 to OVR-04
+    were all missing, so `#component-overlays` rendered its heading and said "No
+    specimen yet" instead of being dropped from the menu. The shared `<.modal>`
+    has since filled OVR-01 there; OVR-02 to OVR-04 are still missing.
   - **Foundations and Graphics are not empty; they are elsewhere.** The Theme
     area already is FND and the Graphic area already is GFX, so both keep one
     home and the family menu links to their routes rather than showing a second
@@ -469,7 +475,14 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
 - [x] Show the current Bilimbi component in every meaningful state for the active family. `{codex-luna-states-1/gpt-5.6-luna}`
 
   Both landed on 2026-09-15 and neither finished the job: the `:design_library_drift`
-  guards still report four failures on `main`, and this branch left them unchanged.
+  guards still report four failures on `main`, and this branch left the count
+  unchanged. The shared modal (`OVR-01`) does add one name to the coverage guard's
+  missing list: `connection_banners` is layout chrome that every page carries once
+  and every open dialog carries again, so the Design Library presents it through
+  the modal specimen rather than through an anchor of its own. A second live
+  instance on that page would announce a dropped connection twice — the component
+  has no presentational mode, and giving it one to satisfy a guard would be the
+  guard shaping the product.
 - [ ] Correct the four `:design_library_drift` specimen and state failures those two slices left, then move the guards into the default test run and `mix precommit`.
 - [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record the design steward's accepted disposition and rationale.
 - [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
@@ -500,7 +513,8 @@ Goal: Build accepted shared contracts in dependency order.
 - [ ] FND-05 follow-up — make the vendored `topbar` navigation progress bar honor `prefers-reduced-motion` without losing an honest loading signal; it animates a canvas from JavaScript, so the global CSS rule cannot reach it.
 - [ ] Implement accepted navigation, link and action contracts.
 - [ ] Implement accepted native input, choice, feedback and data-display contracts.
-- [ ] Implement accepted combobox, edit-in-place, disclosure, modal and confirmation contracts only after their foundations are stable.
+- [x] Implement the accepted modal contract (`OVR-01`, Adopt adapted) as shared `<.modal>`, adopt it in every production workflow overlay and show both widths in the Design Library. `{fm/modal-a11y-dialog-semantics/opus-5}`
+- [ ] Implement accepted combobox, edit-in-place, disclosure and confirmation contracts only after their foundations are stable.
 - [ ] Add each real component and its state/interaction evidence to the Design Library in the same change.
 - [ ] Keep shared edits under one integration owner; parallel agents prepare independent evidence, tests and module-local adoption work.
 
@@ -646,6 +660,28 @@ Not finished by #719 and #720: the `:design_library_drift` guards report four fa
 on `main`, so #722's guards land excluded from the default test run and from
 `mix precommit`. Correcting those four and activating the guards is the open Phase 1
 checklist row above. #722 being merged does not mean the guards are active.
+
+### Empty and permission region slice — no child issue
+
+Goal: Close FBK-04's empty and permission half so a region with nothing in it
+says which absence it is. Nothing created yet, nothing matched and not
+permitted ask three different things of the person in front of them, and only
+one of them is a dead end.
+
+- [x] Add one shared `<.empty_state>` in `Bilimbi.Base.UI.Components`: a caller's `title` and `reason` with an optional recovery action, or the one permission wording the component owns (`forbidden`), never both. `apps/base/ui/test/components_empty_state_test.exs` holds the two modes, the different first-run and no-match sentences, and the raise on a call that says both or neither. `{fm/empty-and-permission-states/claude-fable-5-1}`
+- [x] Reach the same pattern from `<.table>`'s `<:empty>` slot through `title`/`reason`/`forbidden` attrs, so a table says what is missing without a second component and plain slot content still renders as given. `{fm/empty-and-permission-states/claude-fable-5-1}`
+- [x] Adopt it on `/companies`, the operational index page this slice canaries for Phase 4 — one accepted pattern on it, not yet the whole Phase 4 row: a search or status filter that matched nothing names what was narrowed and offers the way back, keeping sort and page size; an empty tenant says so and offers the first create only to an actor holding `admin.company.create`. Covered in `apps/core/company/web_test/company_live_test.exs`. `{fm/empty-and-permission-states/claude-fable-5-1}`
+- [x] Present the three states in the Design Library's Feedback and states family as one `component-empty-state` block, retiring the hand-written `Empty workspace` and `Permission denied` specimen cards and their `DesignLibrarySource` declarations. `{fm/empty-and-permission-states/claude-fable-5-1}`
+
+Not delivered by this slice, and still open under FBK-04: the remaining index and
+show-page tables keep their own empty rows; a nothing-yet region that also
+explains a missing create right was built and then removed in review, and stays
+deferred until a workflow needs that sentence; unavailable and reconnect states
+keep the existing Schedule alerts and layout flashes, which the ledger row
+records as Keep Bilimbi.
+
+Delivery: pending. The work is on `fm/empty-and-permission-states` with no child
+issue and no PR yet; whoever merges it records the PR URL and merge date here.
 
 ### Field shell states slice — INP-01 and INP-02, partial
 

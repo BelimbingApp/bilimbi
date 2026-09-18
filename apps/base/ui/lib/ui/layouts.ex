@@ -34,8 +34,6 @@ defmodule Bilimbi.Base.UI.Layouts do
   import Bilimbi.Base.UI.Components
   alias Bilimbi.Base.UI.ShellComponents
 
-  alias Phoenix.LiveView.JS
-
   # How long a `:success` or `:info` flash stays before it dismisses itself.
   # Long enough to read a sentence twice.
   @auto_dismiss_ms 8_000
@@ -574,34 +572,7 @@ defmodule Bilimbi.Base.UI.Layouts do
       />
       <.flash kind={:info} flash={@flash} />
 
-      <.flash
-        id="client-error"
-        kind={:error}
-        title={gettext("Connection interrupted")}
-        phx-disconnected={
-          show(".phx-client-error #client-error")
-          |> JS.remove_attribute("hidden", to: ".phx-client-error #client-error")
-        }
-        phx-connected={hide("#client-error") |> JS.set_attribute({"hidden", ""})}
-        hidden
-      >
-        {gettext("Reconnecting…")}
-      </.flash>
-
-      <.flash
-        id="server-error"
-        kind={:error}
-        title={gettext("Server unavailable")}
-        phx-disconnected={
-          show(".phx-server-error #server-error")
-          |> JS.remove_attribute("hidden", to: ".phx-server-error #server-error")
-        }
-        phx-connected={hide("#server-error") |> JS.set_attribute({"hidden", ""})}
-        hidden
-      >
-        {gettext("Attempting to reconnect")}
-        <.icon name="hero-arrow-path" class="ml-1 size-3 animate-spin" />
-      </.flash>
+      <.connection_banners id="connection" />
     </div>
     """
   end

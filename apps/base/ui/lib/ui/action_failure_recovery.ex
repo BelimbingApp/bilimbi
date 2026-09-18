@@ -6,6 +6,13 @@ defmodule Bilimbi.Base.UI.ActionFailureRecovery do
   callback, so they cannot rescue a failure raised by that callback. This
   compile-time wrapper surrounds the completed callback instead. Rendering and
   every other lifecycle callback remain outside the recovery boundary.
+
+  A LiveView reports the failure through its own flash. A LiveComponent cannot,
+  so it reports through `report_action_failure/2`, which this module defines
+  and the component may override. The default asks the parent LiveView for a
+  page flash. A component that can render a modal dialog must override it and
+  keep the message inside its own markup: the page behind an open dialog is
+  inert, so a flash raised there could be neither read nor dismissed.
   """
 
   require Logger
@@ -27,6 +34,13 @@ defmodule Bilimbi.Base.UI.ActionFailureRecovery do
 
       if unquote(kind) == :live_view do
         Phoenix.LiveView.on_mount(Bilimbi.Base.UI.ActionFailureRecovery)
+      else
+        @doc false
+        def report_action_failure(socket, message) do
+          Bilimbi.Base.UI.ActionFailureRecovery.report_through_parent(socket, message)
+        end
+
+        defoverridable report_action_failure: 2
       end
     end
   end
@@ -46,7 +60,8 @@ defmodule Bilimbi.Base.UI.ActionFailureRecovery do
               exception,
               __STACKTRACE__,
               socket,
-              unquote(kind)
+              unquote(kind),
+              __MODULE__
             )
         end
       end
@@ -81,25 +96,33 @@ defmodule Bilimbi.Base.UI.ActionFailureRecovery do
           Exception.t(),
           Exception.stacktrace(),
           Phoenix.LiveView.Socket.t(),
-          :live_view | :live_component
+          :live_view | :live_component,
+          module()
         ) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
-  def recover(exception, stacktrace, socket, kind) do
+  def recover(exception, stacktrace, socket, kind, module) do
     if exception.__struct__ |> Atom.to_string() |> Kernel.in(@outcome_exceptions) do
       reraise exception, stacktrace
     end
 
     Logger.error(Exception.format(:error, exception, stacktrace))
 
-    recover_socket(socket, kind)
+    recover_socket(socket, kind, module)
   end
 
-  defp recover_socket(socket, :live_view) do
+  @doc false
+  @spec report_through_parent(Phoenix.LiveView.Socket.t(), String.t()) ::
+          Phoenix.LiveView.Socket.t()
+  def report_through_parent(socket, _message) do
+    send(self(), @component_failure_message)
+    socket
+  end
+
+  defp recover_socket(socket, :live_view, _module) do
     {:noreply, Phoenix.LiveView.put_flash(socket, :error, @message)}
   end
 
-  defp recover_socket(socket, :live_component) do
-    send(self(), @component_failure_message)
-    {:noreply, socket}
+  defp recover_socket(socket, :live_component, module) do
+    {:noreply, module.report_action_failure(socket, @message)}
   end
 end

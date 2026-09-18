@@ -12,7 +12,11 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
   every write re-evaluates the actor's current grants through `Authz.can/2`
   (the #482/#541 pattern) — mount-time capability state is presentation, not
   an authorization decision. Outcomes render as a panel-local notice because a
-  LiveComponent cannot reach the page's flash without a parent contract.
+  LiveComponent cannot reach the page's flash without a parent contract. While
+  the attach dialog is open the notice renders inside it instead of above the
+  cards: the page behind a modal dialog is inert, so a notice left outside
+  could be neither read nor dismissed. An unexpected failure recovered by
+  `Bilimbi.Base.UI` reports through the same notice for that reason.
   """
 
   use Bilimbi.Base.UI, :live_component
@@ -60,6 +64,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
   def handle_event("open_attach_modal", _params, socket) do
     {:noreply,
      socket
+     |> assign(:notice, nil)
      |> assign(:show_attach_modal, true)
      |> assign(
        :attach_form,
@@ -306,6 +311,10 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
     end
   end
 
+  def handle_event("clear_notice", _params, socket) do
+    {:noreply, assign(socket, :notice, nil)}
+  end
+
   def handle_event("sort_addresses", params, socket) do
     sort_col = params["sort_by"] || params["sort"] || "label"
     current_dir = socket.assigns.addresses_sort_dir
@@ -365,21 +374,47 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
   defp notice(socket, kind, message), do: assign(socket, :notice, {kind, message})
 
+  def report_action_failure(socket, message), do: notice(socket, :error, message)
+
+  attr(:id, :string, required: true)
+  attr(:notice, :any, required: true)
+  attr(:target, :any, required: true)
+
+  defp panel_notice(assigns) do
+    ~H"""
+    <div
+      :if={@notice}
+      id={@id}
+      role={if elem(@notice, 0) == :error, do: "alert", else: "status"}
+      class={[
+        "mb-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm",
+        elem(@notice, 0) == :info && "border-line bg-brand-surface text-ink",
+        elem(@notice, 0) == :error && "border-danger/40 bg-surface text-danger"
+      ]}
+    >
+      <span class="flex-1">{elem(@notice, 1)}</span>
+      <.icon_button
+        id={"#{@id}-dismiss"}
+        icon="close"
+        label="Dismiss notice"
+        context={:inline}
+        phx-click="clear_notice"
+        phx-target={@target}
+      />
+    </div>
+    """
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
     <div id={@id} class="contents">
-      <div
-        :if={@notice}
+      <.panel_notice
+        :if={not @show_attach_modal}
         id={"#{@id}-notice"}
-        class={[
-          "mb-3 rounded-lg border px-3 py-2 text-sm",
-          elem(@notice, 0) == :info && "border-line bg-brand-surface text-ink",
-          elem(@notice, 0) == :error && "border-danger/40 bg-surface text-danger"
-        ]}
-      >
-        {elem(@notice, 1)}
-      </div>
+        notice={@notice}
+        target={@myself}
+      />
           <!-- Card 4: Attached Addresses -->
           <.card id="addresses-card">
             <div class="p-5 sm:p-6 space-y-4">
@@ -394,7 +429,10 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                 <.button
                   :if={@can_manage?}
                   id="btn-open-attach-address"
-                  phx-click="open_attach_modal" phx-target={@myself}
+                  phx-click={
+                    JS.push("lv:clear-flash")
+                    |> JS.push("open_attach_modal", target: @myself)
+                  }
                   variant="primary"
                   class="text-xs px-2.5 py-1"
                 >
@@ -696,26 +734,19 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
               </div>
             </div>
           </.card>
-              <!-- Attach Address Modal Dialog -->
-              <div
-          :if={@show_attach_modal}
-          id="attach-address-modal"
-          class="fixed inset-0 z-40 flex items-start justify-center bg-ink/40 p-6"
-              >
-          <div class="mt-16 w-full max-w-lg rounded-2xl border border-line bg-surface p-6 shadow-lg space-y-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-              Attach Address
-            </h3>
-
-            <p class="text-xs text-ink-muted">
-              Select an address from the company to attach to this employee.
-            </p>
-
+      <.modal
+        :if={@show_attach_modal}
+        id="attach-address-modal"
+        title="Attach Address"
+        on_cancel={JS.push("close_attach_modal", target: @myself)}
+      >
+        <:description>Select an address from the company to attach to this employee.</:description>
+        <.panel_notice id={"#{@id}-notice"} notice={@notice} target={@myself} />
             <.form
               for={@attach_form}
               phx-submit="attach_address" phx-target={@myself}
               id="attach-address-modal-form"
-              class="space-y-4"
+              class="mt-4 space-y-4"
             >
               <div>
                 <label
@@ -816,8 +847,8 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                 </.button>
               </div>
             </.form>
-          </div>
-              </div>    </div>
+      </.modal>
+    </div>
     """
   end
 
