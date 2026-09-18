@@ -244,6 +244,42 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
   defp maybe_put(params, _key, nil), do: params
   defp maybe_put(params, key, value), do: params ++ [{key, value}]
 
+  # The empty row's copy. A search and a status filter are the two ways the
+  # person narrowed the list, so the sentence names whichever applies and the
+  # recovery undoes exactly that, keeping sort and page size.
+  defp filtered?(%State{search: search, status_filter: status_filter}) do
+    search not in [nil, ""] or status_filter != :all
+  end
+
+  defp cleared(%State{} = state), do: %{state | search: nil, status_filter: :all, page: 1}
+
+  defp filtered_empty_title(%State{search: search, status_filter: status_filter}) do
+    status = if status_filter == :all, do: "", else: "#{status_filter} "
+    match = if search in [nil, ""], do: "", else: " match \u201C#{search}\u201D"
+    "No #{status}companies#{match}"
+  end
+
+  defp filtered_empty_reason(%State{search: search, status_filter: status_filter}) do
+    case {search in [nil, ""], status_filter == :all} do
+      {false, true} ->
+        "Check the spelling, or clear the search to see every company in this tenant."
+
+      {true, false} ->
+        "No company in this tenant has this status. Show all statuses to see every company."
+
+      {false, false} ->
+        "Clear the search and the status filter to see every company in this tenant."
+    end
+  end
+
+  defp clear_label(%State{search: search, status_filter: status_filter}) do
+    case {search in [nil, ""], status_filter == :all} do
+      {false, true} -> "Clear search"
+      {true, false} -> "Show all statuses"
+      {false, false} -> "Clear search and filter"
+    end
+  end
+
   defp status_badge_kind("active"), do: :success
   defp status_badge_kind("suspended"), do: :danger
   defp status_badge_kind("pending"), do: :warning
@@ -377,8 +413,32 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
               </div>
             </:action>
 
-            <:empty :if={@companies_page.entries == []}>
-              No companies found.
+            <%!-- Two different absences, two different sentences: a search or
+                 filter that matched nothing offers the way back; a tenant with no
+                 companies yet offers the first create to an actor who may make
+                 one. --%>
+            <:empty
+              :if={@companies_page.entries == [] and filtered?(@index_state)}
+              title={filtered_empty_title(@index_state)}
+              reason={filtered_empty_reason(@index_state)}
+            >
+              <.button id="companies-clear-search" patch={companies_path(cleared(@index_state))}>
+                {clear_label(@index_state)}
+              </.button>
+            </:empty>
+            <:empty
+              :if={@companies_page.entries == [] and not filtered?(@index_state)}
+              title="No companies yet"
+              reason="Companies created in this tenant appear here."
+            >
+              <.button
+                :if={allowed?(@current_scope, "admin.company.create")}
+                id="companies-empty-add"
+                variant="primary"
+                navigate={~p"/companies/create"}
+              >
+                <.icon name="create" class="size-4" /> Add Company
+              </.button>
             </:empty>
           </.table>
 
