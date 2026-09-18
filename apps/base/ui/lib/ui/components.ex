@@ -1627,10 +1627,6 @@ defmodule Bilimbi.Base.UI.Components do
   defp display_mode(%{mode: mode}) when mode in [:company, :local, :utc], do: mode
   defp display_mode(_display), do: :local
 
-  defp policy_datetime(value, format, :local, _display), do: server_datetime(value, format)
-
-  defp policy_datetime(value, format, :utc, _display), do: server_datetime(value, format)
-
   defp policy_datetime(value, format, :company, display) do
     with %{timezone: timezone, tz_db: tz_db} when is_binary(timezone) and is_atom(tz_db) <-
            display,
