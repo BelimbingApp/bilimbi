@@ -409,6 +409,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     |> form("#design-library-table-search", %{"sample_filters" => %{"search" => "Globex"}})
     |> render_change()
 
+    assert has_element?(view, "#design-library-table-search .hero-magnifying-glass")
     assert has_element?(view, "#sample-table", "Globex Corporation")
     assert has_element?(view, "#component-pagination-summary", "Showing 1 to 1 of 1 results")
     refute has_element?(view, "#sample-table-empty")

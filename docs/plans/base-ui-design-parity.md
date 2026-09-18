@@ -1,9 +1,9 @@
 # Base UI Design Parity
 
-**Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families (#724). Merged to `main` through 2026-09-15: application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display. Since then the library has been stripped of catalog IDs (#728), and the shared layer has taken much of the accepted action and feedback contract — destructive confirmation (#733), reduced motion with 4.5:1 contrast (#738), stacked flash messages (#741), busy controls and a login screen that reports its progress (#743), the empty and permission region pattern (#740), real dialog semantics on modal overlays (#731), one shared filter toolbar (#745), field shell states (#744), secret reveal and multi-select corrections (#746) and a released shell observer (#747) — alongside icon-name validity (#727, #734), Schedule timestamps and UTC day labels through the datetime component (#735, #737), impersonation reader coverage (#729), corrected catalog rows (#730), drift-guard documentation folded into this plan (#726) and the Belimbing cutover value remap (#725); the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
+**Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families (#724). Merged to `main` through 2026-09-15: application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display. Since then the library has been stripped of catalog IDs (#728), and the shared layer has taken much of the accepted action and feedback contract — destructive confirmation (#733), reduced motion with 4.5:1 contrast (#738), stacked flash messages (#741), busy controls and a login screen that reports its progress (#743), the empty and permission region pattern (#740), real dialog semantics on modal overlays (#731), one shared filter toolbar (#745), field shell states (#744), secret reveal and multi-select corrections (#746) and a released shell observer (#747) — alongside icon-name validity (#727, #734), Schedule timestamps and UTC day labels through the datetime component (#735, #737), impersonation reader coverage (#729), corrected catalog rows (#730), drift-guard documentation folded into this plan (#726) and the Belimbing cutover value remap (#725); the drift guards stay excluded from the default run — the Design Library state-coverage slice of 2026-09-18 corrected all but two of the uncovered names and axes the coverage guard reports and records those two as accepted rather than pending, while the imitation guard's anchor and control-markup failures are still open
 **Last Updated:** 2026-09-18
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1); `fm/parity-plan-checklist-reconcile/muse-spark` (checklist reconciliation on 2026-09-18, not audit authorship); `fm/icon-registry-name-validity/opus-5`; `crewmate scout` (firstmate scout tasks that record no model — the FND-06 icon inventory and the four Phase 2 lane audits of 2026-09-16; separate sessions from the `crewmate/gpt-6` entry above, which is why these rows carry no model)
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1); `fm/parity-plan-checklist-reconcile/muse-spark` (checklist reconciliation on 2026-09-18, not audit authorship); `fm/icon-registry-name-validity/opus-5`; `fm/designlib-state-coverage-gaps/opus-5` (Design Library state coverage on 2026-09-18); `crewmate scout` (firstmate scout tasks that record no model — the FND-06 icon inventory and the four Phase 2 lane audits of 2026-09-16; separate sessions from the `crewmate/gpt-6` entry above, which is why these rows carry no model)
 
 ## Problem Essence
 
@@ -458,9 +458,10 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
   - **`<.card>` and `<.badge>` moved to Data display** (DAT-01, DAT-02) and the
     application shell moved under Page structure (LAY-02), keeping its own
     `#component-shell` deep link as a nested menu-linked section.
-  - **NAV-04 pagination still has no specimen of its own.** It renders twice,
-    both times inside the table it pages, so it stays with Data display and
-    Composite patterns; the coverage guard reports it as unpresented.
+  - **NAV-04 pagination has no card of its own.** It renders twice, both times
+    inside the table it pages, so it stays with Data display and Composite
+    patterns. The canonical table's call now carries the `component-pagination`
+    anchor, so the coverage guard no longer reports it as unpresented.
   - The eleven family entries carry letter prefixes (`A Foundations` through
     `K Graphics`), so the alphabetical ascending order root `AGENTS.md` §12
     requires and the catalog order that makes the alignment checkable are the
@@ -484,7 +485,38 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
   instance on that page would announce a dropped connection twice — the component
   has no presentational mode, and giving it one to satisfy a guard would be the
   guard shaping the product.
-- [ ] Correct the four `:design_library_drift` specimen and state failures those two slices left, then move the guards into the default test run and `mix precommit`.
+- [ ] Correct the `:design_library_drift` failures those two slices left, then move the guards into the default test run and `mix precommit`.
+
+  Reconciled by the Design Library state-coverage slice of 2026-09-18, measured
+  with `mix test --include design_library_drift` against `2b4a7e8` and against
+  the slice. The same four guard tests fail before and after; what changed is
+  what two of them report, from twenty-five uncovered names and axes down to two
+  accepted gaps. `{fm/designlib-state-coverage-gaps/opus-5}`
+
+  - **Coverage, component presence — three of four closed.** `icon`,
+    `multi_select` and `pagination` had no `component-<name>` entry of their own
+    and now have one; `pagination`'s sits on the canonical table's own call
+    rather than on a second copy of the control. The fourth,
+    `connection_banners`, is accepted rather than pending, for the reason
+    recorded above: the layout renders one pair on every page, so a second live
+    pair here would tell an operator "Connection interrupted" twice on a real
+    disconnect. Presenting it honestly needs a suppression seam in the shared
+    component and in `app.css`, which is its own slice.
+  - **Coverage, declared states — all but one closed.** Twenty-one axes across
+    `filter_toolbar`, `icon`, `input`, `list`, `multi_select`, `radio_group`,
+    `table` and `tabs` were presented in a single state; every one is varied now
+    except `<.filter_toolbar>`'s optional `<:control>` slot, which is accepted.
+    A toolbar with no control renders an empty form, a state no production
+    screen builds, so the specimen that carried that reading was removed rather
+    than kept as decoration. Closing it means declaring the slot required in the
+    shared component, which is a component decision rather than a library one.
+  - **Imitation, anchor claims and hand-written control markup — unchanged.**
+    The same eleven `component-*` anchors that name no shared component or never
+    call the one they name, and the same two raw elements (the example `<nav>`
+    rail and the live-state `<dl>`), still fail. Both stay open.
+
+  Both guards therefore still fail, stay tagged `:design_library_drift`, and stay
+  out of the default run and `mix precommit`.
 - [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record the design steward's accepted disposition and rationale.
 - [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
 
@@ -660,7 +692,9 @@ All four merged on 2026-09-15 and closed their issues:
 Not finished by #719 and #720: the `:design_library_drift` guards report four failures
 on `main`, so #722's guards land excluded from the default test run and from
 `mix precommit`. Correcting those four and activating the guards is the open Phase 1
-checklist row above. #722 being merged does not mean the guards are active.
+checklist row above. #722 being merged does not mean the guards are active. The
+state-coverage slice of 2026-09-18 corrected most of what those four report; that
+row records what it closed, what it leaves accepted and what stays open.
 
 ### Empty and permission region slice — no child issue
 
