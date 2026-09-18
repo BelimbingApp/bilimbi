@@ -465,6 +465,26 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       assert has_element?(view, "#employee-email", "john@example.test")
     end
 
+    test "the subordinates head renders the role pair the contrast gate measures", %{
+      conn: conn,
+      employee: employee
+    } do
+      grant_capabilities!("admin.employee.view")
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+      # `theme_contrast_test.exs` gates `ink-subtle` against `surface` because
+      # that is the pair this hand-written head renders: the card supplies the
+      # background the head inherits (parity finding C2).
+      card_classes = view |> element("#subordinates-card") |> render() |> opening_tag_classes()
+
+      head_classes =
+        view |> element("#subordinates-table thead tr") |> render() |> opening_tag_classes()
+
+      assert "bg-surface" in card_classes
+      assert "text-ink-subtle" in head_classes
+    end
+
     test "supports inline editing of employee text fields", %{
       conn: conn,
       scope: scope,
@@ -636,9 +656,20 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
 
+      # A page flash raised before the dialog opens would sit unreadable behind
+      # the inert page, so opening the dialog dismisses it.
+      view |> element("#employee-status-display") |> render_click()
+
+      view
+      |> form("#employee-status-form")
+      |> render_change(%{"status" => "probation"})
+
+      assert has_element?(view, "#flash-info", "Status updated.")
+
       # Open modal
       view |> element("#btn-open-attach-address") |> render_click()
-      assert has_element?(view, "#attach-address-modal")
+      assert_modal_dialog(view, "attach-address-modal", "Attach Address")
+      refute has_element?(view, "#flash-info")
 
       # Attach address with shipping kind and priority 5
       view
@@ -701,6 +732,12 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       view |> element("#unlink-address-#{address.id}") |> render_click()
       assert render(view) =~ "Address unlinked."
       refute has_element?(view, "#address-row-#{address.id}")
+      assert has_element?(view, "#addresses-panel-notice", "Address unlinked.")
+      assert has_element?(view, ~s(#addresses-panel-notice[role="status"]))
+
+      view |> element("#btn-open-attach-address") |> render_click()
+      assert_modal_dialog(view, "attach-address-modal", "Attach Address")
+      refute has_element?(view, "#addresses-panel-notice")
 
       {:ok, attached} = Address.list_employee_attached_addresses(scope, employee.id)
       assert attached == []
@@ -737,5 +774,12 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       assert render(view) =~ "The platform orchestrator cannot be deleted."
       assert {:ok, _still_exists} = Employee.get_employee(scope, 73, orchestrator.id)
     end
+  end
+
+  defp opening_tag_classes(html) do
+    [opening_tag, _] = String.split(html, ">", parts: 2)
+    [_, class_attribute] = Regex.run(~r/class="([^"]*)"/, opening_tag)
+
+    String.split(class_attribute, ~r/\s+/, trim: true)
   end
 end

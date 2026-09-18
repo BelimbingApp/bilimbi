@@ -34,7 +34,9 @@ defmodule Bilimbi.Base.UI.Layouts do
   import Bilimbi.Base.UI.Components
   alias Bilimbi.Base.UI.ShellComponents
 
-  alias Phoenix.LiveView.JS
+  # How long a `:success` or `:info` flash stays before it dismisses itself.
+  # Long enough to read a sentence twice.
+  @auto_dismiss_ms 8_000
 
   use Phoenix.VerifiedRoutes,
     router: Bilimbi.Base.UI.RouteContract,
@@ -530,43 +532,47 @@ defmodule Bilimbi.Base.UI.Layouts do
   defp operator_company_missing?(%{operator_company_missing: true}), do: true
   defp operator_company_missing?(_current_scope), do: false
 
+  @doc """
+  The one production outlet for flash messages.
+
+  Messages stack in one column at the top right, most severe first, so several
+  are readable at once. Dismissal splits by severity: only `:success` carries
+  the eight-second timer, while `:info`, `:warning` and `:error` stay until
+  the person dismisses them, because a message someone must act on must not
+  disappear on a timer. The timer is dormant groundwork today: no caller emits
+  a `:success` flash, and `:info` stays sticky while callers use it for
+  actionable failure notices, so nothing times out until those call sites move
+  to `:success`. The reconnect notices are errors and keep that rule.
+
+  The group is a permanent polite live region, so a message inserted into it
+  is announced; every message is an alert, whatever its severity.
+
+  The shell's preference status line under the top bar is deliberately not
+  part of this outlet: see the Design Library's Feedback section.
+  """
   attr(:flash, :map, required: true)
   attr(:id, :string, default: "flash-group")
 
   def flash_group(assigns) do
+    assigns = assign(assigns, :auto_dismiss_ms, @auto_dismiss_ms)
+
     ~H"""
-    <div id={@id} aria-live="polite">
-      <.flash kind={:info} flash={@flash} />
+    <div
+      id={@id}
+      aria-live="polite"
+      class="fixed right-4 top-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
+    >
       <.flash kind={:error} flash={@flash} />
-
+      <.flash kind={:warning} flash={@flash} />
       <.flash
-        id="client-error"
-        kind={:error}
-        title={gettext("Connection interrupted")}
-        phx-disconnected={
-          show(".phx-client-error #client-error")
-          |> JS.remove_attribute("hidden", to: ".phx-client-error #client-error")
-        }
-        phx-connected={hide("#client-error") |> JS.set_attribute({"hidden", ""})}
-        hidden
-      >
-        {gettext("Reconnecting…")}
-      </.flash>
+        kind={:success}
+        flash={@flash}
+        phx-hook="FlashAutoDismiss"
+        data-auto-dismiss-ms={@auto_dismiss_ms}
+      />
+      <.flash kind={:info} flash={@flash} />
 
-      <.flash
-        id="server-error"
-        kind={:error}
-        title={gettext("Server unavailable")}
-        phx-disconnected={
-          show(".phx-server-error #server-error")
-          |> JS.remove_attribute("hidden", to: ".phx-server-error #server-error")
-        }
-        phx-connected={hide("#server-error") |> JS.set_attribute({"hidden", ""})}
-        hidden
-      >
-        {gettext("Attempting to reconnect")}
-        <.icon name="hero-arrow-path" class="ml-1 size-3 animate-spin" />
-      </.flash>
+      <.connection_banners id="connection" />
     </div>
     """
   end

@@ -31,6 +31,14 @@ defmodule BilimbiWeb.LoginLiveTest do
     assert has_element?(view, "#login-submit", "Log in")
   end
 
+  test "the fields are editable and the button idle before a submit", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    refute has_element?(view, "#login-submit[aria-busy]")
+    refute has_element?(view, "#login-email[readonly]")
+    refute has_element?(view, "#login-password[readonly]")
+  end
+
   test "validates required fields without leaving the page", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/")
 
@@ -54,6 +62,93 @@ defmodule BilimbiWeb.LoginLiveTest do
       |> render_submit()
 
     assert html =~ "These credentials do not match our records."
+
+    # The failure is announced the way the forgot-password confirmation is:
+    # through an alert region, so a screen reader hears that the attempt failed.
+    assert has_element?(
+             view,
+             "#login-form-error [role='alert']",
+             "These credentials do not match our records."
+           )
+
+    # It is also pinned under the email field, so a scan sees which field the
+    # attempt went wrong on.
+    assert has_element?(view, "#login-form p", "These credentials do not match our records.")
+  end
+
+  test "a repeated identical credential failure is announced again", %{conn: conn} do
+    Company.TestFixtures.insert_tenant!(%{id: 41})
+    Company.TestFixtures.insert_company!(%{id: 73, tenant_id: 41})
+
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    view
+    |> form("#login-form", login: %{email: "ada@example.com", password: "wr0ng-wr0ng"})
+    |> render_submit()
+
+    first = alert_node_id(view)
+
+    view
+    |> form("#login-form", login: %{email: "ada@example.com", password: "wr0ng-again"})
+    |> render_submit()
+
+    second = alert_node_id(view)
+
+    # Same message both times, so an assertive region only speaks again if the
+    # node itself was replaced.
+    assert has_element?(
+             view,
+             "#login-form-error [role='alert']",
+             "These credentials do not match our records."
+           )
+
+    assert first
+    assert second
+    refute first == second
+
+    BilimbiWeb.RateLimit.reset({:login, "ada@example.com", "127.0.0.1"})
+  end
+
+  defp alert_node_id(view) do
+    html = view |> element("#login-form-error [role='alert']") |> render()
+
+    case Regex.run(~r/\sid="([^"]+)"/, html) do
+      [_, id] -> id
+      nil -> nil
+    end
+  end
+
+  test "a new attempt clears the previous failure alert", %{conn: conn} do
+    Company.TestFixtures.insert_tenant!(%{id: 41})
+    Company.TestFixtures.insert_company!(%{id: 73, tenant_id: 41})
+    Company.TestFixtures.assign_primary_company!(41, 73)
+
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    assert {:ok, _user} =
+             Bilimbi.Core.User.register_user(scope, 73, %{
+               name: "Ada Lovelace",
+               email: "ada@example.com",
+               password: "c0rrect-horse-battery"
+             })
+
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    view
+    |> form("#login-form", login: %{email: "ada@example.com", password: "wr0ng-wr0ng"})
+    |> render_submit()
+
+    assert has_element?(view, "#login-form-error", "These credentials do not match our records.")
+
+    view
+    |> form("#login-form",
+      login: %{email: "ada@example.com", password: "c0rrect-horse-battery"}
+    )
+    |> render_submit()
+
+    # The stale credential alert must not sit beside the signed-in notice.
+    assert has_element?(view, "#login-opening", "Signed in. Opening your workspace…")
+    refute has_element?(view, "#login-form-error")
   end
 
   test "signs in with valid credentials and opens the workspace", %{conn: conn} do
@@ -72,17 +167,38 @@ defmodule BilimbiWeb.LoginLiveTest do
 
     {:ok, view, _html} = live(conn, ~p"/")
 
-    view
-    |> form("#login-form",
-      login: %{email: "ada@example.com", password: "c0rrect-horse-battery"}
-    )
-    |> render_submit()
+    handoff =
+      view
+      |> form("#login-form",
+        login: %{email: "ada@example.com", password: "c0rrect-horse-battery"}
+      )
+      |> render_submit()
+
+    # The reply to the submit is the busy paint, and it arrives before the
+    # form is armed. Arming it stops LiveView patching the controls inside
+    # it: from then on they merge attributes and keep the children they
+    # already have, so a button first painted busy in that patch would read
+    # "Log in" at full strength for the whole POST to /session.
+    painted = LazyHTML.from_fragment(handoff)
+
+    assert painted
+           |> LazyHTML.query("#login-submit[aria-busy='true'][disabled]")
+           |> LazyHTML.text() =~ "Opening workspace…"
+
+    assert Enum.empty?(LazyHTML.query(painted, "#login-form[phx-trigger-action]"))
 
     # The two-phase Belimbing handoff: the LiveView paints the confirmed
     # state and arms the session form for full navigation.
     assert has_element?(view, "#login-opening", "Signed in. Opening your workspace…")
     assert has_element?(view, "#login-submit[disabled]")
     assert has_element?(view, "#login-form[phx-trigger-action]")
+
+    # While the handoff is in flight the button says so to assistive
+    # technology and the fields can no longer be edited, but they stay
+    # readonly rather than disabled so their values still submit.
+    assert has_element?(view, "#login-submit[aria-busy='true']", "Opening workspace…")
+    assert has_element?(view, "#login-email[readonly]:not([disabled])")
+    assert has_element?(view, "#login-password[readonly]:not([disabled])")
 
     # The armed form carries a token the session controller accepts.
     assert render(view) =~ "login[_token]"
@@ -106,6 +222,7 @@ defmodule BilimbiWeb.LoginLiveTest do
       |> render_submit()
 
     assert html =~ "Too many sign-in attempts"
+    assert has_element?(view, "#login-form-error [role='alert']", "Too many sign-in attempts")
 
     BilimbiWeb.RateLimit.reset({:login, "ada@example.com", "127.0.0.1"})
   end

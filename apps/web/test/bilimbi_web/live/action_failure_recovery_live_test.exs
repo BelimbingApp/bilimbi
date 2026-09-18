@@ -25,6 +25,44 @@ defmodule BilimbiWeb.ActionFailureRecoveryLiveTest do
     end
   end
 
+  defmodule DialogRecoveryComponent do
+    use Bilimbi.Base.UI, :live_component
+
+    alias Phoenix.LiveView.JS
+
+    @impl true
+    def update(assigns, socket) do
+      {:ok, socket |> assign(assigns) |> assign_new(:notice, fn -> nil end)}
+    end
+
+    @impl true
+    def render(assigns) do
+      ~H"""
+      <div>
+        <.modal
+          id="panel-dialog"
+          title="Panel workflow"
+          on_cancel={JS.push("close-dialog", target: @myself)}
+        >
+          <p :if={@notice} id="panel-dialog-notice">{elem(@notice, 1)}</p>
+          <button id="raise-in-dialog" phx-click="raise-in-dialog" phx-target={@myself}>
+            Save
+          </button>
+        </.modal>
+      </div>
+      """
+    end
+
+    @impl true
+    def handle_event("raise-in-dialog", _params, _socket) do
+      raise "unexpected dialog action failure"
+    end
+
+    def report_action_failure(socket, message) do
+      Phoenix.Component.assign(socket, :notice, {:error, message})
+    end
+  end
+
   defmodule RecoveryLive do
     use BilimbiWeb, :live_view
 
@@ -40,6 +78,7 @@ defmodule BilimbiWeb.ActionFailureRecoveryLiveTest do
         <span id="count">{@count}</span>
         <p id="action-error">{Phoenix.Flash.get(@flash, :error)}</p>
         <.live_component module={RecoveryComponent} id="recovery-component" />
+        <.live_component module={DialogRecoveryComponent} id="dialog-recovery-component" />
       </div>
       """
     end
@@ -115,6 +154,25 @@ defmodule BilimbiWeb.ActionFailureRecoveryLiveTest do
              "#action-error",
              "That action did not finish. The error has been recorded — if it keeps happening, tell your administrator."
            )
+  end
+
+  test "a component that owns a dialog keeps its recovery message inside the dialog", %{
+    conn: conn
+  } do
+    {:ok, view, _html} = live_isolated(conn, RecoveryLive)
+
+    log =
+      capture_log(fn ->
+        view |> element("#raise-in-dialog") |> render_click()
+      end)
+
+    assert log =~ "** (RuntimeError) unexpected dialog action failure"
+
+    message =
+      "That action did not finish. The error has been recorded — if it keeps happening, tell your administrator."
+
+    assert has_element?(view, "dialog#panel-dialog #panel-dialog-notice", message)
+    refute has_element?(view, "#action-error", message)
   end
 
   test "authorization denial still propagates" do

@@ -456,7 +456,7 @@
               />
               <span>
                 <span class="block text-[0.8125rem] leading-5">H Overlays</span>
-                <span class="block text-xs leading-4 text-ink-muted">No specimen yet</span>
+                <span class="block text-xs leading-4 text-ink-muted">The modal dialog</span>
               </span>
             </a>
             <a
@@ -646,7 +646,7 @@
               <h2 id="component-button" class="text-base font-semibold text-ink-strong">
                 Actions
               </h2><p class="text-sm text-ink-muted">
-                Primary, secondary, destructive, disabled, navigation, and in-flight examples. Consequence copy and typed acknowledgement are not built.
+                Primary, secondary, destructive, disabled, navigation, in-flight, and busy examples. Consequence copy and typed acknowledgement are not built.
               </p>
             </div>
             <div class="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-4 shadow-xs">
@@ -656,10 +656,13 @@
                 phx-click="test_click"
                 variant="primary"
                 phx-disable-with="Working…"
-              >Clicked: {@click_count}</.button>
+              >Clicked: {@click_count}</.button><.button variant="primary" busy>Saving…</.button>
             </div>
+            <p class="text-xs text-ink-muted">
+              Clicked goes in flight for one round trip: LiveView disables it and shows "Working…" until the server replies, and the shell mirrors that wait onto <code>aria-busy</code>; it is announced but still wears the dimmed disabled look. Busy is the wait the server knows about, such as a sign-in that is opening the workspace: the control spins at full strength, is disabled and carries <code>aria-busy</code>. Disabled means the action is not available at all, so it dims and never spins.
+            </p>
             <.card id="component-icon-button" title="Compact icon actions" inner_class="p-4">
-              <div class="flex items-center gap-4">
+              <div class="flex flex-wrap items-center gap-4">
                 <div class="flex items-center gap-2 text-sm text-ink-muted">
                   Inline
                   <.icon_button
@@ -672,9 +675,29 @@
                   Table <.icon_button icon="edit" label="Edit company" />
                   <.icon_button icon="delete" label="Delete company" kind={:danger} />
                 </div>
+                <div class="flex items-center gap-2 text-sm text-ink-muted">
+                  Disabled
+                  <.icon_button
+                    id="component-icon-button-disabled"
+                    icon="bilimbi-impersonate"
+                    label="Impersonate user"
+                    disabled
+                  />
+                </div>
+                <div class="flex items-center gap-2 text-sm text-ink-muted">
+                  Busy
+                  <.icon_button
+                    id="component-icon-button-busy"
+                    icon="export"
+                    label="Export companies"
+                    busy
+                  />
+                </div>
               </div>
               <p class="mt-3 text-xs text-ink-muted">
-                Use icon-only controls for familiar repeated actions. Keep primary and unfamiliar actions as words.
+                Use icon-only controls for familiar repeated actions. Keep primary and unfamiliar actions as words. Disabled and busy are both inert, and they do not look alike: disabled dims the glyph, busy sits in a sunken ringed well and replaces the glyph with a spinner at full strength, and carries <code>aria-busy</code>. The well and the swapped glyph are static, so the difference survives <code>prefers-reduced-motion</code>, where the spin does not render. The label still names the action that is pending — the export above reads "Export companies" while it waits.
+                <code>phx-disable-with</code>
+                does not belong here: it replaces the control's text, which on an icon-only action deletes the glyph.
               </p>
             </.card>
           </section>
@@ -947,29 +970,36 @@
                 Short-lived messages, inline guidance, and the empty, blocked and interrupted states. These states are part of the product, not exceptions to its design. Validation, disabled and in-flight states are shown with the controls that have them, under Inputs and Actions.
               </p>
             </div>
-            <%!--
-            The real flash is `position: fixed`, so `transform-gpu` on each wrapper
-            makes the wrapper its containing block and keeps the specimen inside the
-            page. The wrapper must stay unclipped: the panel is wider than the wrapper
-            at narrow widths, and a clipping class cuts off its left edge.
-            --%>
             <div id="component-flash" class="space-y-3">
-              <div class="relative min-h-28 rounded-xl border border-line bg-canvas transform-gpu">
-                <.flash
-                  id="design-library-flash"
-                  kind={:info}
-                  flash={%{"info" => "Your changes were saved."}}
-                  title="Saved"
-                />
-              </div>
-              <div class="relative min-h-28 rounded-xl border border-line bg-canvas transform-gpu">
+              <p class="text-sm text-ink-muted">
+                One message per severity. The layout's flash group is the single production outlet: it stacks messages in one column at the top right, most severe first, so several stay readable at once. Info, warning and error stay until dismissed, because a message someone must act on must not disappear on a timer. Only a success times out, after eight seconds, and no screen emits one yet: the timer waits on the confirmation callers that still use info. Success and info share one colour and differ by icon: most of the product's info messages still report a completed write, so the neutral colour cannot be applied until those callers move to success.
+              </p>
+              <div class="flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
                 <.flash
                   id="design-library-flash-error"
                   kind={:error}
                   flash={%{"error" => "The changes could not be saved."}}
                   title="Save failed"
                 />
+                <.flash
+                  id="design-library-flash-warning"
+                  kind={:warning}
+                  flash={%{"warning" => "Two employees still report to the archived department."}}
+                  title="Review before continuing"
+                />
+                <.flash
+                  id="design-library-flash-success"
+                  kind={:success}
+                  flash={%{"success" => "Your changes were saved."}}
+                  title="Saved"
+                />
+                <.flash id="design-library-flash-info" kind={:info}>
+                  This change affects future records only.
+                </.flash>
               </div>
+              <p class="text-xs text-ink-muted">
+                Deliberately outside this contract: the shell's preference status line under the top bar. It reports the in-flight and settled state of the clock and theme controls in place, written by the shell's own client hook before the server answers, so "Saving…" can show at once and a failure stays beside the control it belongs to. A flash is a server fact rendered after the round trip and cannot do that, so the status line is not folded into this outlet and this outlet does not report preference saves.
+              </p>
             </div>
             <div id="component-alert" class="grid gap-2 lg:grid-cols-2">
               <.alert kind={:info}>This change affects future records.</.alert><.alert kind={
@@ -1005,11 +1035,86 @@
                 Overlays
               </h2>
               <p class="text-sm text-ink-muted">
-                No specimen yet. Bilimbi has no shared modal, confirmation, inspector drawer or
-                tooltip, so there is nothing here to review. The family stays in this menu so the
-                gap is visible rather than missing, and it fills when those components are built.
+                The shared modal dialog is the one overlay Bilimbi has. The confirmation modal, the inspector drawer and the tooltip and popover contract have no specimen yet; the family stays in this menu so those gaps are visible rather than missing.
               </p>
             </div>
+            <.card id="component-modal" title="Modal dialog" inner_class="space-y-2 p-4">
+              <p class="text-xs text-ink-muted">
+                A short workflow over the current screen. Focus enters the dialog, the page
+                behind is inert, and Escape or Cancel returns focus to the control that opened it.
+                The open dialog carries its own connection banners, revealed above it rather than
+                dimmed behind it if the connection drops.
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <.button id="design-library-open-modal" type="button" phx-click="open-modal">
+                  Open dialog
+                </.button>
+                <.button
+                  id="design-library-open-wide-modal"
+                  type="button"
+                  phx-click="open-modal"
+                  phx-value-width="wide"
+                >
+                  Open wide dialog
+                </.button>
+              </div>
+              <.modal
+                :if={@modal_width == :narrow}
+                id="design-library-modal"
+                title="Rename example company"
+                width={:narrow}
+                on_cancel={JS.push("close-modal")}
+              >
+                <:description>Changes stay in this preview.</:description>
+                <.form
+                  for={@modal_form}
+                  id="design-library-modal-form"
+                  phx-submit="close-modal"
+                  class="mt-4 space-y-4"
+                >
+                  <.input
+                    field={@modal_form[:name]}
+                    id="design-library-modal-name"
+                    label="Company name"
+                  />
+                  <div class="flex justify-end gap-2">
+                    <.button type="button" phx-click="close-modal">Cancel</.button>
+                    <.button type="submit" variant="primary">Save</.button>
+                  </div>
+                </.form>
+              </.modal>
+              <.modal
+                :if={@modal_width == :wide}
+                id="design-library-wide-modal"
+                title="Edit example company"
+                width={:wide}
+                on_cancel={JS.push("close-modal")}
+              >
+                <.form
+                  for={@modal_form}
+                  id="design-library-wide-modal-form"
+                  phx-submit="close-modal"
+                  class="mt-4 space-y-4"
+                >
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <.input
+                      field={@modal_form[:name]}
+                      id="design-library-wide-modal-name"
+                      label="Company name"
+                    />
+                    <.input
+                      field={@modal_form[:code]}
+                      id="design-library-wide-modal-code"
+                      label="Code"
+                    />
+                  </div>
+                  <div class="flex justify-end gap-2">
+                    <.button type="button" phx-click="close-modal">Cancel</.button>
+                    <.button type="submit" variant="primary">Save</.button>
+                  </div>
+                </.form>
+              </.modal>
+            </.card>
           </section>
 
           <section id="component-data-display" class="scroll-mt-4 space-y-4">
@@ -1207,6 +1312,65 @@
                 page_event="pattern-page"
                 filters_event="pattern-page-size"
               />
+            </.card>
+            <.card
+              id="component-filter-toolbar"
+              title="Filter toolbar"
+              inner_class="space-y-5 p-4"
+            >
+              <p class="text-sm text-ink-muted">
+                One composition for every list's search, selects, and date pair. Every search box carries the same leading magnifier; labels are screen-reader only; helper text sits below its control; cells wrap on narrow screens.
+              </p>
+              <div id="filter-toolbar-full">
+                <h3 class="mb-2 text-sm font-semibold text-ink">
+                  Search, selects, and UTC date pair
+                </h3>
+                <.filter_toolbar
+                  id="design-library-filter-full"
+                  form={@filter_toolbar_full_form}
+                  event="filter-toolbar-preview"
+                >
+                  <:control
+                    type={:search}
+                    field={@filter_toolbar_full_form[:search]}
+                    id="design-library-filter-full-search"
+                    label="Search example companies"
+                    placeholder="Search example companies…"
+                  />
+                  <:control
+                    type={:select}
+                    field={@filter_toolbar_full_form[:status]}
+                    id="design-library-filter-full-status"
+                    label="Status filter"
+                    options={[{"All statuses", ""}, {"Active", "active"}, {"Pending", "pending"}]}
+                  />
+                  <:control
+                    type={:select}
+                    field={@filter_toolbar_full_form[:kind]}
+                    id="design-library-filter-full-kind"
+                    label="Kind filter"
+                    options={[
+                      {"All kinds", ""},
+                      {"Standard", "standard"},
+                      {"Advanced", "advanced"}
+                    ]}
+                  />
+                  <:control
+                    type={:date}
+                    field={@filter_toolbar_full_form[:start_date]}
+                    id="design-library-filter-full-start-date"
+                    label="Start date (UTC)"
+                    hint="UTC"
+                  />
+                  <:control
+                    type={:date}
+                    field={@filter_toolbar_full_form[:end_date]}
+                    id="design-library-filter-full-end-date"
+                    label="End date (UTC)"
+                    hint="UTC"
+                  />
+                </.filter_toolbar>
+              </div>
             </.card>
           </section>
         </div>

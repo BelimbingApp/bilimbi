@@ -139,8 +139,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
 
     # Nine families are reviewed on this page. Each entry carries its own family
     # label and lands on the section that owns that family's specimens, so a
-    # swapped target fails rather than sending the reviewer to a sibling. A
-    # family nobody can review is still listed, so the gap is visible.
+    # swapped target fails rather than sending the reviewer to a sibling.
     for {slug, family} <- [
           {"page-structure", "Page structure"},
           {"navigation-links", "Navigation and links"},
@@ -170,9 +169,9 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
              "Graphics"
            )
 
-    # Overlays is the one family with no specimen at all, and it says so rather
-    # than disappearing from the menu.
-    assert has_element?(view, "#component-overlays", "No specimen yet")
+    # Overlays reviews the shared modal dialog, so its section owns that
+    # specimen rather than standing empty.
+    assert has_element?(view, "#component-overlays #component-modal")
 
     # The application shell is LAY-02, so it sits inside Page structure and
     # keeps its own deep link. The menu entry is nested under B rather than
@@ -195,6 +194,9 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-input-guidance", "Choice guidance")
     assert has_element?(view, "#component-input-live-state", "Live state")
     assert has_element?(view, "#component-icon-button", "Compact icon actions")
+    assert has_element?(view, "#component-actions button[aria-busy='true'][disabled]", "Saving…")
+    assert has_element?(view, "#component-icon-button-disabled[disabled]:not([aria-busy])")
+    assert has_element?(view, "#component-icon-button-busy[aria-busy='true'][disabled]")
     assert has_element?(view, "#example-nav[aria-label='Example menu']")
     assert has_element?(view, "#example-nav #nav-example-companies", "Companies")
     assert has_element?(view, "#example-nav [data-nav-branch='example.system']")
@@ -241,9 +243,12 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
              "#component-header-title-action button.size-6[aria-label='Edit company']"
            )
 
-    assert has_element?(view, "#component-flash > .transform-gpu > #design-library-flash")
-    assert has_element?(view, "#component-flash > .transform-gpu > #design-library-flash-error")
+    for kind <- ~w(error warning success info) do
+      assert has_element?(view, "#component-flash #design-library-flash-#{kind}")
+    end
+
     assert has_element?(view, "#component-flash", "Save failed")
+    assert has_element?(view, "#component-flash", "preference status line")
     assert has_element?(view, "#component-card-titled .border-b h3", "Company profile")
     refute has_element?(view, "#component-card-untitled h3")
     assert has_element?(view, "#component-card-boundary", "no loading, empty, error, or disabled")
@@ -257,13 +262,29 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     refute has_element?(view, "#graphics")
     refute has_element?(view, "#specifications")
 
-    for component <- ~w(header button badge alert table inputs datetime) do
+    for component <- ~w(header button badge alert table inputs datetime filter-toolbar) do
       assert has_element?(view, "#component-#{component}")
     end
 
     assert has_element?(view, "#sample-table", "Acme Holdings")
     assert has_element?(view, "#sample-table", "Example Company 10")
     assert has_element?(view, "#nav-admin-system-design-library-components[aria-current='page']")
+  end
+
+  test "the filter toolbar specimen shows every control type under one rule", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    assert has_element?(view, "#filter-toolbar-full label.sr-only", "Search example companies")
+    assert has_element?(view, "#filter-toolbar-full label.sr-only", "Status filter")
+    assert has_element?(view, "#filter-toolbar-full label.sr-only", "Start date (UTC)")
+    assert has_element?(view, "#filter-toolbar-full .hero-magnifying-glass")
+    assert has_element?(view, "#design-library-filter-full-start-date + p", "UTC")
+
+    view
+    |> form("#design-library-filter-full", %{"toolbar_full" => %{"search" => "Acme"}})
+    |> render_change()
+
+    assert has_element?(view, "#design-library-filter-full-search[value='Acme']")
   end
 
   test "Components input examples update their visible state", %{conn: conn} do
@@ -529,6 +550,24 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     |> render_click()
 
     assert has_element?(view, "button", "Clicked: 1")
+  end
+
+  test "opens each modal dialog width and closes it again", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    refute has_element?(view, "#design-library-modal")
+
+    view |> element("#design-library-open-modal") |> render_click()
+    assert_modal_dialog(view, "design-library-modal", "Rename example company")
+
+    view |> element("#design-library-modal button", "Cancel") |> render_click()
+    refute has_element?(view, "#design-library-modal")
+
+    view |> element("#design-library-open-wide-modal") |> render_click()
+    assert_modal_dialog(view, "design-library-wide-modal", "Edit example company")
+
+    view |> form("#design-library-wide-modal-form") |> render_submit()
+    refute has_element?(view, "#design-library-wide-modal")
   end
 
   test "keeps inline editing interactive without persisting business data", %{conn: conn} do

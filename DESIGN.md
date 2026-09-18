@@ -63,6 +63,11 @@ module may add a semantic role only when its workflow genuinely needs one.
 - **`action` / `action-hover` / `action-ink`**: Confident primary action
   colours used for primary buttons and page `<h1>` headings. The base remains
   distinct from its brighter hover in both themes.
+- **`success` / `warning` / `danger`** (each with `-surface`, `-line`,
+  `-ink`): Honest status roles for real feedback. A neutral statement has no
+  status role of its own yet: an `:info` flash is painted with `success` and
+  an `:info` alert stays on the neutral surface, because most of the
+  product's `:info` messages report a completed write.
 
 ## Compact typography
 
@@ -118,7 +123,7 @@ during long operational sessions:
 - **Row padding:** `py-0.5` (`0.125rem` / `2px`), `px-2` (`0.5rem` / `8px`) horizontal cell padding.
 - **Header padding:** `py-1.5` (`0.375rem` / `6px`), `px-2` horizontal header padding.
 - **Header background:** `bg-surface-sunken`.
-- **Header typography:** Proper case `text-xs font-semibold text-muted` (`text-ink-subtle`).
+- **Header typography:** Proper case `text-xs font-semibold text-ink-subtle`.
 - **Body typography:** `text-sm text-ink`, with `tabular-nums text-muted` (`text-ink-muted`) for codes, IDs, currencies, phones, populations, dates, and measurements.
 - **Search & filter toolbar:** Search and filters sit together in an open
   toolbar with `mb-2` above the table surface. Do not wrap the toolbar in a
@@ -136,11 +141,53 @@ table view:
   `border-brand-strong`, autofocusing and selecting the text.
 - **Save & Cancel:** Pressing `Enter` or blurring saves the field, updates the LiveView stream item (`stream_insert/3`), clears edit state, and flashes feedback (`"<Entity> saved."`). Pressing `Escape` cancels editing and reverts to display mode.
 
+## Modal dialogs
+
+A short workflow that must finish or be abandoned before the screen continues
+(attach an address, add an employee, edit a postcode) opens in the shared
+`<.modal>`, never in hand-written overlay markup:
+
+- **Semantics:** A native `<dialog>` opened as modal, named by its visible
+  title (`aria-labelledby`) and, when it has one, described by its one-line
+  description (`aria-describedby`), so a screen reader announces both.
+- **Focus:** Focus enters the dialog when it opens, stays inside while it is
+  open, and returns to the control that opened it when it closes. The page
+  behind is inert to the keyboard and to assistive technology.
+- **Closing:** `Escape` and the Cancel button are one action and reach the
+  same server handler. Clicking the dimmed page does nothing: the dialog
+  usually holds a form, and a stray click must not discard it.
+- **Feedback:** Because the page behind is inert and the dialog paints above
+  it in the top layer, an outcome raised while the dialog stays open renders
+  inside it — a LiveView passes `flash`, and a panel renders its own notice in
+  the dialog. Every dialog also carries its own connection banners, so a
+  dropped websocket is still announced and dismissable while one is open. The
+  layout's copy of whatever the dialog carries is hidden, so the same message
+  never appears twice; a dialog that carries no `flash` copy leaves the
+  layout's `:info` and `:error` in the DOM, dimmed behind the backdrop until it
+  closes. Opening a
+  dialog in a production workflow dismisses an earlier action's flash, so a
+  message about finished work is neither announced as this dialog's own nor
+  left stranded and unreadable behind the inert page; the Design Library
+  specimen, which raises no flash of its own, deliberately dismisses none.
+- **Geometry:** A `rounded-xl` surface at `max-w-lg` for a single-column form
+  or `max-w-2xl` for two columns, over an `ink/40` dimmer.
+
 ## Subtle depth and motion
 
 Use contrast, borders, and shadows with restraint. Motion should clarify state,
 continuity, or completion at roughly 60fps. It must not delay work or create
 attention noise.
+
+Motion is opt-out at the platform, not per component. A single
+`prefers-reduced-motion: reduce` rule in `apps/web/assets/css/app.css` collapses
+every CSS transition and animation to one frame, so anyone whose operating
+system asks for reduced motion gets a still product wherever the motion is CSS.
+Components and templates do not carry their own `motion-reduce` variants.
+
+One known exception is outstanding: the vendored `topbar` navigation progress
+bar paints itself onto a canvas from JavaScript, so no CSS duration reaches it
+and it still slides and fades under reduce. Teaching it the preference without
+losing an honest loading signal is open parity work under FND-05.
 
 Use Phoenix and LiveView loading states honestly. Users should know when work is
 in flight, waiting, blocked, or complete.
@@ -274,6 +321,12 @@ flight, give every action a visible and timely response, and keep outcomes
 honest and transparent. Never fail silently. An empty navigation is a
 permission-denied state: say that no destinations are available and name
 the recovery (an operator must assign a role), not a blank rail.
+
+Flash messages stack at the top right, most severe first, so several stay
+readable at once. Info, warning and error stay until the person dismisses
+them, because a message someone must act on must not disappear on a timer.
+Only a success times out, after eight seconds, and nothing emits one yet: the
+timer waits on the confirmation callers that still use info.
 
 ## Reduce anxiety
 

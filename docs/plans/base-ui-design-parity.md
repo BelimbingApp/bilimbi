@@ -1,9 +1,9 @@
 # Base UI Design Parity
 
 **Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families. Application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display are merged to `main`; the drift guards stay excluded from the default run until the four specimen and state failures they report are corrected
-**Last Updated:** 2026-09-17
+**Last Updated:** 2026-09-18
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`
 
 ## Problem Essence
 
@@ -66,7 +66,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | NAV-04 | Pagination | Shared component exists | Compare narrow layout, disabled states, page-size control, URL state and accessible labels. |
 | NAV-05 [(contradicted)](#targets-the-evidence-contradicts) | User account and scope menu | Partial user footer exists | On user-circle activation, show signed-in name and identifier, current company and tenant, change password and sign out. Show scope switching only when more than one permitted scope exists. |
 | ACT-01 [(contradicted)](#targets-the-evidence-contradicts) | Buttons | Primary, secondary and destructive basics | Cover emphasis, compact size, disabled, loading, navigation and truthful completion. |
-| ACT-02 | Icon actions and groups | Shared icon button ships with inline and table sizes, accessible labels and native titles; grouping is ad hoc (dashboard customize clusters) and disabled/loading have no specimen | Add grouping, context sizing, disabled/loading behavior and accessible tooltips. |
+| ACT-02 | Icon actions and groups | Shared icon button ships with inline and table sizes, accessible labels, native titles, and disabled and busy (spinner plus `aria-busy`) specimens; grouping is ad hoc (dashboard customize clusters) | Add grouping, context sizing, disabled/loading behavior and accessible tooltips. |
 | ACT-03 | Destructive entry and acknowledgement | Inconsistent screen patterns | Standardize consequence copy, confirmation and typed acknowledgement where risk requires it. |
 | INP-01 | Shared field shell | Generic input has labels, hints and errors | Standardize required, help, error, disabled, read-only, prefix and suffix placement. |
 | INP-02 | Text, email, URL, telephone, number and textarea | Available through the generic input | Complete state and sizing contracts and validate realistic long content. |
@@ -84,8 +84,8 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | INT-05 | Filter and period patterns | Repeated local compositions | Standardize the shared composition while keeping URL state and production meaning. |
 | INT-06 | Unsaved-change and template selection flows | Missing | Defer until a real Bilimbi workflow proves the need. |
 | FBK-01 | Inline alerts | Shared primitive exists | Verify status semantics, copy, contrast, icons and dismissibility. |
-| FBK-02 | Flash and notification behavior | Basic fixed flash | Define stacking, timing, sticky warning/error, manual dismissal and redirect continuity. |
-| FBK-03 | Validation, disabled and loading states | Partial | Make the states visibly distinct and prevent duplicate work. |
+| FBK-02 | Flash and notification behavior | `Layouts.flash_group/1` is the one production outlet, restated 2026-09-17: four severities stack in one column, most severe first, click-to-dismiss throughout, info, warning, error and the reconnect notices stay until dismissed, and the Design Library presents all four; the shell's preference status line is a recorded exception. Still open: auto-dismiss, whose mechanism ships but lies dormant because only `:success` carries the eight-second timer and no caller emits a `:success` flash; the `:info` call sites (most report a completed write, which is why the colour repaint was reverted, while others report actionable failures, which is why `:info` stays sticky — both close, and the timer starts running, once those callers move to `:success`); and redirect continuity | Define stacking, timing, sticky warning/error, manual dismissal and redirect continuity. |
+| FBK-03 | Validation, disabled and loading states | Partial: `<.button>` and `<.icon_button>` carry a `busy` state that spins, disables and announces `aria-busy`, distinct from plain disabled without depending on animation; the icon-button vocabulary now covers in-flight — `<.icon_button>` documents `phx-disable-with` as incompatible, because it deleted their glyph, and the employee-type delete runs async on `busy` instead — but that delete is so far its only adopter, and every other destructive icon action still shows nothing while its write runs; a `phx-disable-with` round trip is mirrored onto `aria-busy` by the shell but keeps the dimmed disabled look, so on that path loading and disabled are still one picture; login goes busy with readonly fields and announces credential and lockout failures through `role="alert"` on every attempt, a repeated identical message included; validation states are untouched | Make the states visibly distinct and prevent duplicate work. |
 | FBK-04 | Empty, permission, unavailable, error and recovery states | Library specimens exist | Establish reusable page and region patterns with truthful recovery. |
 | OVR-01 [(contradicted)](#targets-the-evidence-contradicts) | Standard modal | Missing | Add accessible open, close, Escape, backdrop, focus containment and focus return. |
 | OVR-02 [(contradicted)](#targets-the-evidence-contradicts) | Confirmation modal | Missing | Add consequence-first confirmation without copying Belimbing's accessibility gaps. |
@@ -101,7 +101,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | CMP-02 | Form page | Complete production form ships (`/companies/create`: field rhythm, inline validation, save/cancel); no unsaved-navigation guard exists, and that criterion depends on INT-06, which is deferred until a real Bilimbi workflow proves the need; the shared composition is not extracted | Standardize field rhythm, validation, save/cancel, loading, success and unsaved navigation. |
 | CMP-03 | Detail and settings page | Complete production detail ships (`/companies/1`: facts, explicit edit modes, related navigation, permission states); the shared assembly is not extracted | Standardize facts, inline/grouped editing, related navigation and permission states. |
 | CMP-04 | Destructive workflow | No complete specimen | Show entry, consequence, acknowledgement, in-flight, success, failure and recovery together. |
-| CMP-05 | Authentication and first arrival | Login, recovery and dashboard arrival ship and were audited live against Belimbing (Lanes A and D); only the submit in-flight state is unverified | Treat login, recovery and dashboard arrival as first-impression acceptance surfaces. |
+| CMP-05 | Authentication and first arrival | Login, recovery and dashboard arrival ship and were audited live against Belimbing (Lanes A and D); the sign-in handoff is a busy submit with readonly fields | Treat login, recovery and dashboard arrival as first-impression acceptance surfaces. |
 | CMP-06 | Responsive and theme coverage | The `/companies` index and the shell were verified live at narrow width and in dark theme (Lane D); narrow detail, narrow form and a full keyboard pass remain | Review representative assemblies at desktop/narrow widths and in light/dark themes. |
 | GFX-01 | Mark and wordmark | Present | Keep Bilimbi identity and verify size, surface and contrast uses. |
 | GFX-02 | Product and interface icons | Registry and Heroicons exist | Make the approved FND-06 icon set searchable and verify size, alignment and meaning without copying Belimbing assets or framework markup. |
@@ -139,7 +139,7 @@ rather than being quietly reconciled.
 | FND-02 Typography | Keep Bilimbi | none |
 | FND-03 Spacing rhythm | Adopt adapted — named spacing roles, Bilimbi values | before LAY-05, CMP-01…03 |
 | FND-04 Shape and elevation | Keep Bilimbi | none |
-| FND-05 Focus and motion | Adopt adapted — one focus contract, per-transition `motion-reduce` | before ACT-01, INP-01 |
+| FND-05 Focus and motion | Adopt adapted — one focus contract; reduced motion shipped as a single global `prefers-reduced-motion` rule in `app.css`, so no component carries `motion-reduce` | before ACT-01, INP-01 |
 | FND-06 Icon language | Adopt adapted — searchable catalog; finish the migration | #719 |
 | LAY-01 Authentication shell | Keep Bilimbi | none |
 | LAY-02 Application shell | Adopt adapted — shipped in #711, confirmed live | none |
@@ -252,12 +252,19 @@ products were read and the plan forbids treating existence as acceptance.
   it or return it, and that two demo dialogs could be open at once — read together with
   the note below that Belimbing modal focus behaviour beyond dispatched events was not
   verified. Hand-written full-viewport overlays of the same fixed-inset,
-  dimmed-backdrop shape also already ship in production across several modules, none
+  dimmed-backdrop shape also shipped in production across several modules, none
   of them carrying a dialog role, `aria-modal`, Escape or focus containment; Attach
-  Address on `/companies/1` and Add Employee on `/users/1` are the two Lane B
-  exercised live. The shared modal has production adopters waiting across modules.
+  Address on `/companies/1` and Add Employee on `/users/1` were the two Lane B
+  exercised live. The shared `<.modal>` has since replaced every one of them: a native
+  `<dialog>` with a labelled title, focus in, containment and return, Escape, and an
+  inert page behind, adopted by every production workflow overlay and shown at both
+  widths in the Design Library. That meets the accepted target and exceeds Belimbing on
+  focus and Escape, with one deliberate departure from its "backdrop" wording: clicking
+  the dimmed page does not close, so a stray click cannot discard a form.
 - **LAY-02, NAV-05** — the "Bilimbi now" cells describe pre-#711 state; both shipped.
-- **INT-04** — reduced motion is not adoptable; neither product has a contract.
+- **INT-04** — reduced motion was not adoptable when Lane A measured it: neither
+  product had a contract. Bilimbi now has one platform-wide under FND-05, so a
+  disclosure primitive inherits it instead of defining its own.
 - **NAV-01** — "reorder" in the target has no observed counterpart in Belimbing's
   navigation; pin-to-top covers the keep-favourites-handy need on both sides (Lane A).
   Dropped from parity acceptance rather than built to. Bilimbi does ship pinned drag
@@ -267,9 +274,10 @@ products were read and the plan forbids treating existence as acceptance.
   `sort_order` and `reorder_user_pins/2` stay in scope when pins are wired. The
   mouse-only limitation is recorded below as a defect, not adopted here as a target.
 - **ACT-01** — "basics" understates what ships: disabled, navigation-as-button and an
-  in-flight `Working…` primary already render on the Design Library (Lane B). The open
+  in-flight `Working…` primary already render on the Design Library (Lane B), and a
+  `busy` state that spins and announces `aria-busy` now ships beside them. The open
   work is a compact size and an in-flight treatment that stays visibly distinct from
-  disabled, not the basics.
+  disabled on the `phx-disable-with` path, not the basics.
 - **OVR-02** — "Missing" is true of a shared confirmation overlay only. Destructive
   work already confirms through the browser's native dialog, with consequence copy on
   some screens (Lane B), so the work is one accessible shared component rather than
@@ -389,7 +397,7 @@ Keeping company and tenant in the top strip makes known context compete with the
 
 ### Brand-strong text contrast (FND-01) is accepted
 
-`text-brand-strong` text, measured by Lane A at 3.06:1 against the 4.5:1 bar at its real 12–13px size, was shown to the captain with both remedies, a darker text lime and reserving brand-strong text for large or bold use, and ruled: "Leave it; the current contrast is acceptable for this product." This is a deliberate accepted decision, not an open defect: later audits cite it instead of reopening it. The ruling covers both call-site families Lane A measured — active-navigation text in `layouts.ex` and the timezone panel's pressed choices in `shell_components.ex` — and nothing else. Lane A's other contrast findings remain open evidence for Phase 3: C2, dark table-header ink at 3.64:1, and C3, faint ink used as real text. A separate in-flight change is addressing both; this ruling closes neither, and neither has landed here. Phase 0 recorded that it did not verify contrast beyond the automated test.
+`text-brand-strong` text, measured by Lane A at 3.06:1 against the 4.5:1 bar at its real 12–13px size, was shown to the captain with both remedies, a darker text lime and reserving brand-strong text for large or bold use, and ruled: "Leave it; the current contrast is acceptable for this product." This is a deliberate accepted decision, not an open defect: later audits cite it instead of reopening it. The ruling covers both call-site families Lane A measured — active-navigation text in `layouts.ex` and the timezone panel's pressed choices in `shell_components.ex` — and nothing else. Lane A's other two contrast findings are now closed, by the separate palette change rather than by this ruling. C2, dark table-header ink at 3.64:1, closed by raising `--color-ink-subtle` in both dark blocks of `app.css`: it measures 5.35:1 on `surface`, 4.88:1 on `surface-sunken` and 4.64:1 on `surface-muted`, with light `ink-subtle` raised alongside it to 6.02:1, 4.79:1 and 5.52:1 on those same three surfaces, and `theme_contrast_test.exs` now gating each header pair at 4.5:1. C3, faint ink used as real text, closed at the one site Lane A measured as real text: the decision-log acting-for line moved from `text-ink-faint` (2.59:1 light, 2.29:1 dark on `surface`) to `text-ink-muted` (7.64:1 light, 6.76:1 dark, and 6.08:1 / 6.17:1 on the `surface-sunken` row hover). The other `text-ink-faint` uses are non-essential icons and placeholders and were never part of C3. Phase 0 recorded that it did not verify contrast beyond the automated test.
 
 ### Unseen-by-you markers (K05) are orientation
 
@@ -436,9 +444,10 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
 
   What the alignment exposed, recorded so the next slice does not rediscover it:
 
-  - **Overlays is the only family with no specimen anywhere.** OVR-01 to OVR-04
-    are all missing, so `#component-overlays` renders its heading and says "No
-    specimen yet" instead of being dropped from the menu.
+  - **Overlays was the only family with no specimen anywhere.** OVR-01 to OVR-04
+    were all missing, so `#component-overlays` rendered its heading and said "No
+    specimen yet" instead of being dropped from the menu. The shared `<.modal>`
+    has since filled OVR-01 there; OVR-02 to OVR-04 are still missing.
   - **Foundations and Graphics are not empty; they are elsewhere.** The Theme
     area already is FND and the Graphic area already is GFX, so both keep one
     home and the family menu links to their routes rather than showing a second
@@ -466,7 +475,14 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
 - [x] Show the current Bilimbi component in every meaningful state for the active family. `{codex-luna-states-1/gpt-5.6-luna}`
 
   Both landed on 2026-09-15 and neither finished the job: the `:design_library_drift`
-  guards still report four failures on `main`, and this branch left them unchanged.
+  guards still report four failures on `main`, and this branch left the count
+  unchanged. The shared modal (`OVR-01`) does add one name to the coverage guard's
+  missing list: `connection_banners` is layout chrome that every page carries once
+  and every open dialog carries again, so the Design Library presents it through
+  the modal specimen rather than through an anchor of its own. A second live
+  instance on that page would announce a dropped connection twice — the component
+  has no presentational mode, and giving it one to satisfy a guard would be the
+  guard shaping the product.
 - [ ] Correct the four `:design_library_drift` specimen and state failures those two slices left, then move the guards into the default test run and `mix precommit`.
 - [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record the design steward's accepted disposition and rationale.
 - [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
@@ -494,9 +510,11 @@ Validation: Every catalog item has evidence, a recommended disposition, dependen
 Goal: Build accepted shared contracts in dependency order.
 
 - [ ] Stabilize identity tokens, focus, field shell, card, icon and action foundations.
+- [ ] FND-05 follow-up — make the vendored `topbar` navigation progress bar honor `prefers-reduced-motion` without losing an honest loading signal; it animates a canvas from JavaScript, so the global CSS rule cannot reach it.
 - [ ] Implement accepted navigation, link and action contracts.
 - [ ] Implement accepted native input, choice, feedback and data-display contracts.
-- [ ] Implement accepted combobox, edit-in-place, disclosure, modal and confirmation contracts only after their foundations are stable.
+- [x] Implement the accepted modal contract (`OVR-01`, Adopt adapted) as shared `<.modal>`, adopt it in every production workflow overlay and show both widths in the Design Library. `{fm/modal-a11y-dialog-semantics/opus-5}`
+- [ ] Implement accepted combobox, edit-in-place, disclosure and confirmation contracts only after their foundations are stable.
 - [ ] Add each real component and its state/interaction evidence to the Design Library in the same change.
 - [ ] Keep shared edits under one integration owner; parallel agents prepare independent evidence, tests and module-local adoption work.
 
