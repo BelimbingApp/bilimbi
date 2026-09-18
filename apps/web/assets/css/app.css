@@ -233,6 +233,7 @@ body:has(dialog:modal[data-owns-flash]) #flash-group > #flash-error,
 body:has(dialog:modal) #flash-group > #connection-client-error,
 body:has(dialog:modal) #flash-group > #connection-server-error {
   visibility: hidden;
+}
 
 /* Reduced motion (parity finding M1). One global rule, not a per-component
  * opt-out: a person who asked their operating system to reduce motion gets no
