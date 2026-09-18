@@ -110,6 +110,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
       "api_key_field" => "sk-sample-0000",
       "select_field" => "standard",
       "roles" => ["admin", "reviewer"],
+      "required_roles" => ["admin"],
       "checkbox_field" => "true",
       "radio_field" => "system",
       "textarea_field" => "Multi-line sample content demonstrating textarea rendering.",
@@ -142,6 +143,8 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      )
      |> stream_configure(:sample_rows, dom_id: &"sample-row-#{&1.id}")
      |> assign(:sample_sort, sort_state(@sample_default_sort))
+     |> assign(:sample_filter_form, to_form(%{"search" => ""}, as: :sample_filters))
+     |> assign(:sample_id_rows, Enum.take(@sample_rows, 5))
      |> assign_preview_page(:sample, 1, 25)
      |> assign_preview_page(:pattern, 1, 25)
      |> assign(:sample_datetime, ~U[2026-08-17 14:30:00Z])
@@ -219,6 +222,14 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> assign_preview_page(:sample, 1, socket.assigns.sample_page.page_size)}
   end
 
+  def handle_event("sample-search", %{"sample_filters" => %{"search" => search}}, socket) do
+    {:noreply, assign_sample_search(socket, search)}
+  end
+
+  def handle_event("sample-clear-search", _params, socket) do
+    {:noreply, assign_sample_search(socket, "")}
+  end
+
   def handle_event(event, %{"page" => page}, socket)
       when event in ["sample-page", "pattern-page"] do
     {preview, current} = preview_page(event, socket)
@@ -240,6 +251,12 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      socket
      |> assign(:pattern_form, to_form(%{"search" => search}, as: :pattern))
      |> assign_preview_page(:pattern, 1, socket.assigns.pattern_page.page_size)}
+  end
+
+  defp assign_sample_search(socket, search) do
+    socket
+    |> assign(:sample_filter_form, to_form(%{"search" => search}, as: :sample_filters))
+    |> assign_preview_page(:sample, 1, socket.assigns.sample_page.page_size)
   end
 
   defp preview_page(event, socket) when event in ["sample-page", "sample-page-size"],
@@ -284,11 +301,15 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
         do: {direction, DateTime},
         else: direction
 
-    Enum.sort_by(@sample_rows, &Map.fetch!(&1, field), sorter)
+    rows = matching_rows(socket.assigns.sample_filter_form)
+
+    Enum.sort_by(rows, &Map.fetch!(&1, field), sorter)
   end
 
-  defp preview_rows(:pattern, socket) do
-    search = socket.assigns.pattern_form[:search].value |> String.trim() |> String.downcase()
+  defp preview_rows(:pattern, socket), do: matching_rows(socket.assigns.pattern_form)
+
+  defp matching_rows(form) do
+    search = form[:search].value |> String.trim() |> String.downcase()
 
     Enum.filter(
       @sample_rows,

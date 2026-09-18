@@ -297,6 +297,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
         "search_field" => "company",
         "select_field" => "advanced",
         "roles" => ["operator"],
+        "required_roles" => ["admin", "reviewer"],
         "checkbox_field" => "true",
         "radio_field" => "dark",
         "datetime_field" => "2026-08-26T14:30"
@@ -307,11 +308,14 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-input-live-state", "Bilimbi Holdings")
     assert has_element?(view, "#component-input-live-state", "operator")
     assert has_element?(view, "#component-input-live-state", "dark")
+
+    assert has_element?(view, "#design-library-multi-select", "1 role selected")
+    assert has_element?(view, "#design-library-multi-select-required", "2 roles selected")
   end
 
   test "both pagination specimens update their own rows and page size", %{conn: conn} do
     for {pagination, table, other_table} <- [
-          {"design-library-pagination", "sample-table", "design-library-pattern-table"},
+          {"component-pagination", "sample-table", "design-library-pattern-table"},
           {"design-library-pattern-pagination", "design-library-pattern-table", "sample-table"}
         ] do
       {:ok, view, _html} = open(conn, "/system/design-library/components")
@@ -393,6 +397,34 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
            )
   end
 
+  test "the canonical table searches, reports no match, and recovers", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+    view |> element("#component-pagination-next") |> render_click()
+
+    view
+    |> form("#design-library-table-search", %{"sample_filters" => %{"search" => "Globex"}})
+    |> render_change()
+
+    assert has_element?(view, "#sample-table", "Globex Corporation")
+    assert has_element?(view, "#component-pagination-summary", "Showing 1 to 1 of 1 results")
+    refute has_element?(view, "#sample-table-empty")
+
+    view
+    |> form("#design-library-table-search", %{
+      "sample_filters" => %{"search" => "no such company"}
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#sample-table-empty", "No companies match")
+    assert has_element?(view, "#sample-table-empty", "no such company")
+
+    view |> element("#sample-clear-search") |> render_click()
+
+    refute has_element?(view, "#sample-table-empty")
+    assert has_element?(view, "#sample-table", "Acme Holdings")
+    assert has_element?(view, "#component-pagination-summary", "Showing 1 to 25 of 120 results")
+  end
+
   test "the canonical table sorts by its headings and starts each sort on page one", %{
     conn: conn
   } do
@@ -423,10 +455,10 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#sample-table tr:first-child", "Initech LLC")
     assert has_element?(view, "#sample-table tr:nth-child(2)", "Globex Corporation")
 
-    view |> element("#design-library-pagination-page-5") |> render_click()
-    assert has_element?(view, "#design-library-pagination-summary", "Showing 101 to 120")
+    view |> element("#component-pagination-page-5") |> render_click()
+    assert has_element?(view, "#component-pagination-summary", "Showing 101 to 120")
     view |> element("#sample-sort-status") |> render_click()
-    assert has_element?(view, "#design-library-pagination-summary", "Showing 1 to 25")
+    assert has_element?(view, "#component-pagination-summary", "Showing 1 to 25")
     assert has_element?(view, "th[aria-sort='ascending'] #sample-sort-status")
     assert has_element?(view, "#sample-table tr:first-child", "active")
     assert has_element?(view, "#sample-table tr:nth-child(25)")
@@ -473,7 +505,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     {:ok, view, _html} = open(conn, "/system/design-library/components")
 
     for {event, pagination} <- [
-          {"sample", "design-library-pagination"},
+          {"sample", "component-pagination"},
           {"pattern", "design-library-pattern-pagination"}
         ] do
       render_click(view, "#{event}-page", %{"page" => "999"})

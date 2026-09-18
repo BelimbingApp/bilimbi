@@ -847,7 +847,7 @@
               <.card id="component-multi-select" title="Multi-select" inner_class="p-4">
                 <p class="mb-2 text-xs text-ink-muted">Required, with helper text</p>
                 <.multi_select
-                  field={@sample_form[:roles]}
+                  field={@sample_form[:required_roles]}
                   id="design-library-multi-select-required"
                   label="Roles"
                   hint="Everyone needs at least one role."
@@ -874,35 +874,20 @@
                 </div>
               </.card>
 
-              <.card
-                id="component-radio-group-states"
-                title="Locked and unlabeled groups"
-                inner_class="p-4"
-              >
-                <p class="mb-2 text-xs text-ink-muted">Locked, with helper text</p>
+              <.card id="component-radio-group-states" title="Data region" inner_class="p-4">
                 <.radio_group
                   id="design-library-radio-locked"
-                  name="locked_appearance"
-                  label="Locked appearance"
-                  value="system"
+                  name="locked_region"
+                  value="sg"
                   disabled
-                  hint="Managed by your organization."
-                  options={[
-                    {"System", "system"},
-                    {"Light", "light"},
-                    {"Dark", "dark"}
-                  ]}
+                  hint="Your organization set this for everyone."
+                  options={[{"Singapore", "sg"}, {"Malaysia", "my"}]}
+                  wrapper_class="mb-0"
                 />
-                <div class="border-t border-line pt-3">
-                  <p class="mb-2 text-xs text-ink-muted">Without a label</p>
-                  <.radio_group
-                    id="design-library-radio-plain"
-                    name="plain_choice"
-                    value="a"
-                    options={[{"Choice A", "a"}, {"Choice B", "b"}]}
-                    wrapper_class="mb-0"
-                  />
-                </div>
+                <p class="mt-3 border-t border-line pt-3 text-xs text-ink-muted">
+                  Locked, so every choice is inert. The card heading names the group, so it
+                  carries no label of its own, and the hint says who decided.
+                </p>
               </.card>
 
               <.card title="Date, time, and secret inputs" inner_class="p-4">
@@ -1020,12 +1005,6 @@
                     errors={["can't be blank"]}
                   />
                   <.input
-                    name="notify_email"
-                    type="email"
-                    label="Notification email"
-                    value="ops@example.com"
-                  />
-                  <.input
                     name="example_role"
                     type="select"
                     label="Role"
@@ -1034,7 +1013,8 @@
                     options={[{"Administrator", "admin"}, {"Operator", "operator"}]}
                   />
                   <.input
-                    name="example_teams"
+                    id="example_teams"
+                    name="example_teams[]"
                     type="select"
                     label="Teams"
                     multiple
@@ -1199,18 +1179,6 @@
                   Bilimbi is reconnecting. Your work has not been submitted twice.
                 </.alert>
               </.card>
-              <.card
-                id="component-connection-banners"
-                title="Connection banners"
-                inner_class="p-4"
-              >
-                <.connection_banners id="design-library-connection" />
-                <p class="text-xs text-ink-muted">
-                  Hidden until the connection drops, so there is nothing to see here
-                  while it holds. The pair above is wired to the page's websocket
-                  state and reveals itself from the client.
-                </p>
-              </.card>
             </div>
           </section>
 
@@ -1313,8 +1281,24 @@
             </div>
             <div class="space-y-2">
               <p class="text-xs text-ink-muted">
-                Example companies; sort by any heading. Changes stay in this preview.
+                Example companies; search, sort by any heading, and page below. Changes stay in this preview.
               </p>
+              <.form
+                for={@sample_filter_form}
+                id="design-library-table-search"
+                phx-change="sample-search"
+                phx-submit="sample-search"
+                class="mb-2"
+              >
+                <.input
+                  field={@sample_filter_form[:search]}
+                  type="search"
+                  label="Search example companies"
+                  label_class="sr-only"
+                  wrapper_class="mb-0"
+                  placeholder="Search by name or code…"
+                />
+              </.form>
               <.card id="component-table" inner_class="p-0">
                 <.table
                   id="sample-table"
@@ -1358,8 +1342,17 @@
                       phx-value-id={row.id}
                     />
                   </:action>
+                  <:empty
+                    :if={@sample_page.total_entries == 0}
+                    title={"No companies match “#{@sample_filter_form[:search].value}”"}
+                    reason="Check the spelling, or clear the search to see every example company."
+                  >
+                    <.button id="sample-clear-search" phx-click="sample-clear-search">
+                      Clear search
+                    </.button>
+                  </:empty>
                 </.table><.pagination
-                  id="design-library-pagination"
+                  id="component-pagination"
                   page={@sample_page}
                   filters_form={@sample_page_form}
                   page_event="sample-page"
@@ -1367,32 +1360,19 @@
                 />
               </.card>
               <div id="component-table-framed">
-                <h3 class="mb-2 text-sm font-semibold text-ink">Archived companies</h3>
+                <h3 class="mb-2 text-sm font-semibold text-ink">Company IDs</h3>
                 <p class="mb-2 text-xs text-ink-muted">
-                  Framed, with one right-aligned column and its empty state. No
-                  caption and no row actions.
+                  The first five example companies, by id. A framed table brings its
+                  own panel, so it stands outside a card; one numeric column
+                  right-aligns, and with no caption and no row actions this is the
+                  plainest shape the table takes.
                 </p>
-                <.table id="sample-archived-table" rows={[]}>
-                  <:col :let={row} label="Company" align={:right}>{row.name}</:col>
-                  <:empty
-                    title="No archived companies"
-                    reason="Companies you archive appear here for review."
-                  />
+                <.table id="sample-id-table" rows={@sample_id_rows}>
+                  <:col :let={row} label="Company ID" align={:right}>
+                    <span class="tabular-nums">{row.id}</span>
+                  </:col>
                 </.table>
               </div>
-              <.card id="component-pagination" title="Pagination" inner_class="p-4">
-                <p class="mb-2 text-xs text-ink-muted">
-                  The same control the example table uses, shown on its own. It
-                  pages the example rows above.
-                </p>
-                <.pagination
-                  id="design-library-pagination-standalone"
-                  page={@sample_page}
-                  filters_form={@sample_page_form}
-                  page_event="sample-page"
-                  filters_event="sample-page-size"
-                />
-              </.card>
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
               <.card id="component-card" title="Card" inner_class="space-y-4 p-4">
