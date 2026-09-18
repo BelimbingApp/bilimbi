@@ -824,7 +824,7 @@ defmodule Bilimbi.Base.UI.Components do
   # `readonly` is a statement the caller made about this field. The CSS
   # `:read-only` pseudo-class is not the same statement: it matches every
   # immutable control, including every `select`, `color` and `file` input.
-  defp field_base_class(readonly \\ false, padding \\ "px-3") do
+  defp field_base_class(readonly, padding \\ "px-3") do
     "block w-full rounded-md border #{padding} py-1.5 text-sm text-ink shadow-xs " <>
       "transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none " <>
       "focus:ring-2 focus:ring-brand-strong/30 disabled:cursor-not-allowed " <>
