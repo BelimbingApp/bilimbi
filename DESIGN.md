@@ -195,12 +195,17 @@ same way: it is an icon action in the header, never a button.
 Reaching a related workflow is demoted too. A section that lists records
 another page manages — a company's Departments and Relationships — carries
 one `<.action_link>` ("Manage") in its own heading row, with the registry's
-`manage` glyph, the cog Belimbing uses for the same action. The page header
-never repeats a section's link as a button; on `/companies/:id` it holds the
-status badge, the history icon and the back link and nothing else.
-`<.action_link>` is the general form of `<.back_link>`: the same `text-link`
-treatment, free text, and an optional registry glyph. A related-workflow
-`<.button>` that is not the page's primary action is a defect.
+`manage` glyph, the cog Belimbing uses for the same action. When the related
+workflow belongs to the whole page rather than one section, the link sits
+beside the primary action instead: `/companies` reaches Department Types and
+Legal Entity Types through `<.action_link>`, so "Add Company" is the only
+button its header carries. The page header never repeats a
+section's link as a button; on `/companies/:id` its actions row holds the
+status badge, the history icon action and the back link and no button, while
+the title row keeps the pin icon action. `<.action_link>` is the general form
+of `<.back_link>`: the same `text-link` treatment, free text, and a registry
+glyph. A related-workflow `<.button>` that is not the page's primary action is
+a defect.
 
 ## Modal dialogs
 

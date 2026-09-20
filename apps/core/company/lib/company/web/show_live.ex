@@ -4,11 +4,12 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   departments, relationships, external accesses, users, and employees —
   all accessed through declared public domain APIs.
 
-  The header carries the record's status, record history as the demoted
-  `history` icon action and a plain "← Back" link; it holds no button. The
-  Departments and Relationships workflows are reached through the demoted
-  "Manage" link on the section that lists them, carrying the registry's
-  `manage` glyph, which is the cog Belimbing uses for the same action.
+  The header's actions row carries the record's status, record history as the
+  demoted `history` icon action and a plain "← Back" link, and no button; the
+  title row keeps the pin icon action. The Departments and Relationships
+  workflows are reached through the demoted "Manage" link on the section that
+  lists them, carrying the registry's `manage` glyph, which is the cog
+  Belimbing uses for the same action.
   """
 
   use Bilimbi.Base.UI, :live_view
@@ -830,10 +831,11 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           <:actions>
             <%!-- Status is record metadata, not an action: it leads the row so
                  the demoted actions (History, then Back) cluster after it
-                 (#685). The header holds no button: Departments and
-                 Relationships are reached from the sections that list them,
-                 as Belimbing's admin/companies/show does, so the header never
-                 duplicates a section's own "Manage" link. --%>
+                 (#685). This row holds no button — the pin icon action sits
+                 in the title row above: Departments and Relationships are
+                 reached from the sections that list them, as Belimbing's
+                 admin/companies/show does, so the header never duplicates a
+                 section's own "Manage" link. --%>
             <.badge kind={
               case @company.status do
                 "active" -> :success

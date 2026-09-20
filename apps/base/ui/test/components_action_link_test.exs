@@ -30,20 +30,26 @@ defmodule Bilimbi.Base.UI.ComponentsActionLinkTest do
     assert html =~ "text-link"
   end
 
-  test "carries no glyph when the action has none, and names itself through title" do
+  test "names its destination to assistive technology, not only to the mouse" do
     assigns = %{}
 
     html =
       rendered_to_string(~H"""
-      <.action_link id="employee-types" navigate="/employee-types" title="Manage employee types">
-        Employee types
+      <.action_link
+        id="companies-department-types"
+        icon="manage"
+        navigate="/companies/department-types"
+        title="Manage department types"
+      >
+        Department Types
       </.action_link>
       """)
 
-    refute html =~ "<svg"
-    refute html =~ "hero-"
-    assert html =~ ~s(title="Manage employee types")
-    assert visible_text(html) == "Employee types"
+    assert html =~ ~s(href="/companies/department-types")
+    assert html =~ "hero-cog-6-tooth"
+    assert html =~ ~s(title="Manage department types")
+    assert html =~ ~s(aria-label="Manage department types")
+    assert visible_text(html) == "Department Types"
   end
 
   test "shares the back link's treatment so the two cannot drift apart" do
@@ -51,7 +57,7 @@ defmodule Bilimbi.Base.UI.ComponentsActionLinkTest do
 
     action =
       rendered_to_string(~H"""
-      <.action_link id="a" navigate="/x">Manage</.action_link>
+      <.action_link id="a" icon="manage" navigate="/x">Manage</.action_link>
       """)
 
     back =

@@ -312,12 +312,22 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
             >
               <.icon name="create" class="size-4" /> Add Company
             </.button>
-            <.button navigate={~p"/companies/department-types"} class="text-xs">
+            <.action_link
+              id="companies-department-types"
+              icon="manage"
+              navigate={~p"/companies/department-types"}
+              title="Manage department types"
+            >
               Department Types
-            </.button>
-            <.button navigate={~p"/companies/legal-entity-types"} class="text-xs">
+            </.action_link>
+            <.action_link
+              id="companies-legal-entity-types"
+              icon="manage"
+              navigate={~p"/companies/legal-entity-types"}
+              title="Manage legal entity types"
+            >
               Legal Entity Types
-            </.button>
+            </.action_link>
           </:actions>
         </.header>
 

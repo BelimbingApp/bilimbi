@@ -106,6 +106,37 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#nav-children-admin:not([hidden])")
     end
 
+    test "reaches the type lists through demoted links, keeping Add Company the only button",
+         %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.create"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies")
+
+      assert has_element?(
+               view,
+               "a#companies-department-types[href='/companies/department-types'][title='Manage department types']",
+               "Department Types"
+             )
+
+      assert has_element?(view, "#companies-department-types .hero-cog-6-tooth")
+
+      assert has_element?(
+               view,
+               "a#companies-legal-entity-types[href='/companies/legal-entity-types'][title='Manage legal entity types']",
+               "Legal Entity Types"
+             )
+
+      assert has_element?(view, "#companies-legal-entity-types .hero-cog-6-tooth")
+
+      refute has_element?(view, "button#companies-department-types")
+      refute has_element?(view, "button#companies-legal-entity-types")
+
+      # The page's own primary action stays a button; the type lists are a
+      # related workflow, so they demote to links (DESIGN.md, "Demoted
+      # secondary actions").
+      assert has_element?(view, "main header a#companies-add", "Add Company")
+    end
+
     test "search, status filter, and sort live in the URL", %{conn: conn} do
       grant_capabilities!(["admin.company.list"])
       conn = log_in_as(conn)
@@ -132,7 +163,9 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       # The shared toolbar sends the same search a URL visit would carry.
       view
-      |> form("#companies-filters", filters: %{"search" => "Subsidiary", "status_filter" => "all"})
+      |> form("#companies-filters",
+        filters: %{"search" => "Subsidiary", "status_filter" => "all"}
+      )
       |> render_change()
 
       assert_patch(view, ~p"/companies?search=Subsidiary")
@@ -416,7 +449,13 @@ defmodule BilimbiWeb.CompanyLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
       assert has_element?(view, "h1", "Bilimbi Industries")
-      assert has_element?(view, "#company-back[href='/companies'][title='Back to companies']", "Back")
+
+      assert has_element?(
+               view,
+               "#company-back[href='/companies'][title='Back to companies']",
+               "Back"
+             )
+
       assert has_element?(view, "#company-users-table td", "Ada Lovelace")
 
       assert has_element?(

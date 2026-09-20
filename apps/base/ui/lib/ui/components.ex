@@ -2435,33 +2435,49 @@ defmodule Bilimbi.Base.UI.Components do
   A page's buttons are for the work the page is about. An action that only
   takes the operator to a related workflow — "Manage" on the Departments
   section of a company, the list of types beside the list that uses them — is
-  a link in `text-link`, never a button. It sits on the section it belongs to
-  rather than in the page header, and an optional leading glyph is named
-  through the icon registry so the link keeps the icon Belimbing uses for the
-  same action. `<.back_link>` is the fixed-text member of the same family.
+  a link in `text-link`, never a button. It sits on the section it belongs to,
+  or beside the page's primary action when the whole list is what it relates
+  to, and its leading glyph is named through the icon registry so the link
+  keeps the icon Belimbing uses for the same action. `<.back_link>` is the
+  fixed-text member of the same family.
 
   ## Examples
 
       <.action_link id="company-departments-manage" icon="manage" navigate={~p"/companies/1/departments"}>
         Manage
       </.action_link>
+
+      <.action_link id="companies-department-types" icon="manage" navigate={~p"/companies/department-types"} title="Manage department types">
+        Department Types
+      </.action_link>
   """
   attr(:id, :string, default: nil)
 
   attr(:icon, :string,
+    required: true,
+    doc: "a registry action name rendered before the text"
+  )
+
+  attr(:title, :string,
     default: nil,
     doc:
-      "a registry action name rendered before the text; omit it when the action has no established glyph"
+      "names the destination; it must contain the visible text so the label does not replace it"
   )
 
   attr(:class, :any, default: nil)
-  attr(:rest, :global, include: ~w(href navigate patch title))
+  attr(:rest, :global, include: ~w(href navigate patch))
   slot(:inner_block, required: true)
 
   def action_link(assigns) do
     ~H"""
-    <.link id={@id} class={[secondary_link_class(), @class]} {@rest}>
-      <.icon :if={@icon} name={@icon} class="size-4" />
+    <.link
+      id={@id}
+      title={@title}
+      aria-label={@title}
+      class={[secondary_link_class(), @class]}
+      {@rest}
+    >
+      <.icon name={@icon} class="size-4" />
       {render_slot(@inner_block)}
     </.link>
     """
