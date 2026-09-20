@@ -386,7 +386,9 @@
               />
               <span>
                 <span class="block text-[0.8125rem] leading-5">C Navigation and links</span>
-                <span class="block text-xs leading-4 text-ink-muted">Sidebar rows and tabs</span>
+                <span class="block text-xs leading-4 text-ink-muted">
+                  Sidebar rows, tabs and the back link
+                </span>
               </span>
             </a>
             <a
@@ -604,7 +606,7 @@
                 Navigation and links
               </h2>
               <p class="text-sm text-ink-muted">
-                The shell's own navigation rows and the shared tabs. Pagination is shown with the table it pages, under Data display. There is no shared link dictionary yet, and the account menu is part of the application shell above.
+                The shell's own navigation rows, the shared tabs and the demoted back link. Pagination is shown with the table it pages, under Data display. The back link is the only entry in the shared link dictionary so far, and the account menu is part of the application shell above.
               </p>
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
@@ -642,6 +644,19 @@
                   <.tabs id="example-single-tab" aria-label="Example single view">
                     <:tab href="#component-tabs" current={true}>Overview</:tab>
                   </.tabs>
+                </div>
+              </.card>
+              <.card id="component-back-link" title="Back link" inner_class="p-3">
+                <p class="mb-2 text-xs text-ink-muted">
+                  Returning is a secondary action, so it is a plain link, never a button. The text is always "← Back"; a title names the destination when the page has more than one way back.
+                </p>
+                <div class="flex flex-wrap items-center gap-6">
+                  <.back_link id="design-library-back-link" navigate={~p"/system/design-library"} />
+                  <.back_link
+                    id="design-library-back-link-titled"
+                    navigate={~p"/system/design-library"}
+                    title="Back to Design Library"
+                  />
                 </div>
               </.card>
             </div>
@@ -1073,7 +1088,7 @@
                 Interaction patterns
               </h2>
               <p class="text-sm text-ink-muted">
-                Inline text editing and the demoted back link are the shared interaction primitives today. Inline select, combobox and textarea editing, grouped fact editing, disclosure, filter and period patterns, and unsaved-change flows have no specimen yet; the filter composition is shown as part of the index page under Composite patterns.
+                Inline text editing is the shared interaction primitive today; the demoted back link is a link, so it sits under Navigation and links. Inline select, combobox and textarea editing, grouped fact editing, disclosure, filter and period patterns, and unsaved-change flows have no specimen yet; the filter composition is shown as part of the index page under Composite patterns.
               </p>
             </div>
             <.card id="component-inline-edit" title="Inline edit" inner_class="space-y-4 p-4">
@@ -1109,19 +1124,6 @@
                     }
                   />
                 </div>
-              </div>
-            </.card>
-            <.card id="component-back-link" title="Back link" inner_class="p-4">
-              <p class="mb-2 text-xs text-ink-muted">
-                Returning is a secondary action, so it is a plain link, never a button. The text is always "← Back"; a title names the destination when the page has more than one way back.
-              </p>
-              <div class="flex flex-wrap items-center gap-6">
-                <.back_link id="design-library-back-link" navigate={~p"/system/design-library"} />
-                <.back_link
-                  id="design-library-back-link-titled"
-                  navigate={~p"/system/design-library"}
-                  title="Back to Design Library"
-                />
               </div>
             </.card>
           </section>

@@ -457,9 +457,9 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     copy under Components.
   - **The section headed "Interaction patterns" was CMP-01.** Its search, table,
     empty result and pagination are one operational index flow, so it is now
-    Composite patterns; Interaction patterns kept INT-01 inline editing alone
-    until the read-first detail slice put the demoted back link specimen beside
-    it.
+    Composite patterns; Interaction patterns keeps INT-01 inline editing alone.
+    The read-first detail slice added the demoted back link under Navigation and
+    links (NAV-03), beside Navigation and Tabs, rather than here.
   - **`<.card>` and `<.badge>` moved to Data display** (DAT-01, DAT-02) and the
     application shell moved under Page structure (LAY-02), keeping its own
     `#component-shell` deep link as a nested menu-linked section.
@@ -761,7 +761,7 @@ Shipped in `Bilimbi.Base.UI.Components` and adopted on `/addresses/:id`:
 
 - [x] `<.inline_edit>` keeps the stored value on screen for the whole round trip, marks the field `aria-busy` beside a "Saving…" line, renders `—` for a blank value, and commits an emptied input only where the owner passes `allow_empty`, so a required fact is never blanked by a stray Enter. `{fm/addresses-detail-read-first/opus-5}`
 - [x] One shared `<.commit_status>` is the single voice for every write that saves by itself — the inline edit, the choice that commits on change and the grouped Apply all render it, so "Saved" and a named refusal cannot drift into three dialects. `{fm/addresses-detail-read-first/opus-5}`
-- [x] `<.back_link>` replaces every "Back to …" button — Base Authz roles, Core Address, Company, Employee and User screens, and the credential pages — so returning is a plain "← Back" link rather than a button competing with the work of the page. `{fm/addresses-detail-read-first/opus-5}`
+- [x] `<.back_link>` replaces every "Back to …" button and every hand-written return link — Base Authz roles, Core Address, Company, Employee and User screens, and the credential pages — so returning is a plain "← Back" link in the header rather than a button competing with the work of the page, or prose above the header in its own colour. `{fm/addresses-detail-read-first/opus-5}`
 - [x] The `record.history` trigger is demoted to the registry's new `history` clock at the toolbar icon size, the glyph Belimbing uses for the same action, keeping "History" for assistive technology and the tooltip. `{fm/addresses-detail-read-first/opus-5}`
 - [x] `/addresses/:id` adopts all of it: text facts in place, the verification status committing on change, the four interdependent location facts behind one grouped Apply, viewers without `admin.address.update` seeing values with no affordance, and history reading both Belimbing-era and Bilimbi-written mutation rows. `{fm/addresses-detail-read-first/opus-5}`
 
@@ -775,10 +775,6 @@ Not delivered by this slice:
   `allow_empty`, so they keep reporting through a flash.
 - **INT-01's focus restore is still open**, and with it the `document.body`
   focus drop recorded under Defects found while verifying.
-- **Two hand-written return links survive.** `/employee-types` and the
-  employee-type form render their own `← Employees` and `← Employee Types`
-  links above the header in `text-ink-muted`, so the one wording, colour and
-  header placement `<.back_link>` owns have not reached them.
 - **The Phase 4 detail row stays open.** This is one accepted pattern on one
   detail page, not the recorded narrow-width, dark-theme and keyboard review
   that row asks for.

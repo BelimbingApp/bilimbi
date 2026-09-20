@@ -35,12 +35,28 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     assert has_element?(view, "#employee-types td", "Full Time")
     assert has_element?(view, "#employee-types td", "Agent")
     refute has_element?(view, "#employee-type-new")
+
+    assert has_element?(
+             view,
+             "a#employee-types-back[href='/employees'][title='Back to employees']",
+             "Back"
+           )
+
+    refute has_element?(view, "button#employee-types-back")
   end
 
   test "creates a custom type", %{conn: conn} do
     grant_capabilities!(["admin.employee-type.list", "admin.employee-type.create"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types/new")
+
+    assert has_element?(
+             view,
+             "a#employee-type-form-back[href='/employee-types'][title='Back to employee types']",
+             "Back"
+           )
+
+    refute has_element?(view, "button#employee-type-form-back")
 
     view
     |> form("#employee-type-form", employee_type: %{code: "seasonal", label: "Seasonal"})

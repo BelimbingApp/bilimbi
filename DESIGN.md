@@ -170,9 +170,11 @@ and is the same for every fact of that kind on the page:
   inputs. Use a group only where the facts genuinely change together; a
   group is not a way to bring back the edit mode.
 - **Outcome per fact:** "Saving…" while in flight, "Saved" for the most recent
-  commit only, and a refusal that stays on its fact until that fact is
-  committed again. A success elsewhere never clears another fact's refusal.
-  Success does not flash: the fact already says so.
+  commit only — any later write clears it, including one the server refuses,
+  so no stale "Saved" stands beside a rejected form — and a refusal that stays
+  on its fact until that fact is committed again. A success elsewhere never
+  clears another fact's refusal. Success does not flash: the fact already says
+  so.
 - **Viewers without the update capability** see the value with no affordance,
   not a disabled control. Every write handler still re-asks Authz.
 - **Record history** is a demoted icon action in the header: the registry's
