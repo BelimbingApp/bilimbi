@@ -139,6 +139,22 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     refute has_element?(view, "button#employee-types")
   end
 
+  test "puts the primary action before the demoted link, as /companies does", %{conn: conn} do
+    grant_capabilities!([
+      "admin.employee.list",
+      "admin.employee.create",
+      "admin.employee-type.list"
+    ])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
+
+    header = view |> element("main header") |> render()
+
+    assert {primary, _} = :binary.match(header, ~s(id="employee-new"))
+    assert {demoted, _} = :binary.match(header, ~s(id="employee-types"))
+    assert primary < demoted
+  end
+
   test "hides the employee type link from an actor who may not list types", %{conn: conn} do
     grant_capabilities!("admin.employee.list")
 
