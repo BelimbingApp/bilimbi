@@ -346,7 +346,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
           <:subtitle>People employed by {@current_scope.user["company_name"]}</:subtitle>
 
           <:actions>
-            <div class="flex flex-wrap items-center gap-6">
+            <div class="flex items-center gap-3">
               <.button
                 :if={allowed?(@current_scope, "admin.employee.create")}
                 id="employee-new"

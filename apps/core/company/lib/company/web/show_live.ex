@@ -836,23 +836,25 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                  reached from the sections that list them, as Belimbing's
                  admin/companies/show does, so the header never duplicates a
                  section's own "Manage" link. --%>
-            <.badge kind={
-              case @company.status do
-                "active" -> :success
-                "suspended" -> :danger
-                "pending" -> :warning
-                _ -> :neutral
-              end
-            }>
-              {String.capitalize(@company.status)}
-            </.badge>
-            <.discovered_panel
-              key="record.history"
-              id="company-record-history"
-              current_scope={@current_scope}
-              opts={%{auditable_types: company_auditable_types(), auditable_id: @company.id}}
-            />
-            <.back_link id="company-back" navigate={~p"/companies"} title="Back to companies" />
+            <div class="flex items-center gap-3">
+              <.badge kind={
+                case @company.status do
+                  "active" -> :success
+                  "suspended" -> :danger
+                  "pending" -> :warning
+                  _ -> :neutral
+                end
+              }>
+                {String.capitalize(@company.status)}
+              </.badge>
+              <.discovered_panel
+                key="record.history"
+                id="company-record-history"
+                current_scope={@current_scope}
+                opts={%{auditable_types: company_auditable_types(), auditable_id: @company.id}}
+              />
+              <.back_link id="company-back" navigate={~p"/companies"} title="Back to companies" />
+            </div>
           </:actions>
         </.header>
 

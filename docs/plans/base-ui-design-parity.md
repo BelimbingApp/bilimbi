@@ -823,9 +823,11 @@ Left as arguable and unchanged:
 
 Not delivered by this slice:
 
-- **`departments_live.ex` and `relationships_live.ex` still place
-  `<.back_link>` before their primary button**, against the order settled
-  above. That placement pre-dates this slice and is deliberately left for a
-  later change.
+- **Seven shipped pages still place `<.back_link>` before their primary
+  button**, against the order settled above: Core Company's
+  `departments_live.ex`, `relationships_live.ex`, `legal_entity_types_live.ex`
+  and `department_types_live.ex`; Core Employee's `type_index_live.ex` and
+  `show_live.ex`; and Core User's `show_live.ex`. That placement pre-dates this
+  slice and is deliberately left for a later change.
 - **CMP-03 stays open.** `/companies/:id` still keeps its facts behind explicit
   edit modes; only the header and the section affordances were settled here.

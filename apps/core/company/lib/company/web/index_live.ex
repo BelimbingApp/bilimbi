@@ -304,7 +304,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
           </:title_actions>
           <:subtitle>Every live company in this tenant</:subtitle>
           <:actions>
-            <div class="flex flex-wrap items-center gap-6">
+            <div class="flex items-center gap-3">
               <.button
                 :if={allowed?(@current_scope, "admin.company.create")}
                 id="companies-add"
