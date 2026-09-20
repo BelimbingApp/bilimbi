@@ -203,7 +203,11 @@ Types the same way, so the only button each actions row carries is that page's
 primary create action — and only for an actor permitted to create. In that row
 the primary action comes first and the demoted related-workflow links follow
 it, so an operator moving between `/companies` and `/employees` finds them on
-the same side. The title
+the same side. The shared `<.header>` actions container sets no gap, so a row
+holding a primary action and demoted links wraps them in a
+`flex flex-wrap items-center gap-6` row at the call site; without it two
+adjacent links sit one collapsed space apart and read as a single run of text.
+The title
 row keeps its pin icon action. The page header never repeats a section's link
 as a button; on `/companies/:id` its actions row holds the status badge, the
 history icon action and the back link and no button, while the title row keeps

@@ -346,24 +346,26 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
           <:subtitle>People employed by {@current_scope.user["company_name"]}</:subtitle>
 
           <:actions>
-            <.button
-              :if={allowed?(@current_scope, "admin.employee.create")}
-              id="employee-new"
-              navigate={~p"/employees/new"}
-              variant="primary"
-            >
-              New Employee
-            </.button>
+            <div class="flex flex-wrap items-center gap-6">
+              <.button
+                :if={allowed?(@current_scope, "admin.employee.create")}
+                id="employee-new"
+                navigate={~p"/employees/new"}
+                variant="primary"
+              >
+                New Employee
+              </.button>
 
-            <.action_link
-              :if={allowed?(@current_scope, "admin.employee-type.list")}
-              id="employee-types"
-              icon="manage"
-              navigate={~p"/employee-types"}
-              title="Manage employee types"
-            >
-              Employee Types
-            </.action_link>
+              <.action_link
+                :if={allowed?(@current_scope, "admin.employee-type.list")}
+                id="employee-types"
+                icon="manage"
+                navigate={~p"/employee-types"}
+                title="Manage employee types"
+              >
+                Employee Types
+              </.action_link>
+            </div>
           </:actions>
         </.header>
 

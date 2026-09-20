@@ -304,30 +304,32 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
           </:title_actions>
           <:subtitle>Every live company in this tenant</:subtitle>
           <:actions>
-            <.button
-              :if={allowed?(@current_scope, "admin.company.create")}
-              id="companies-add"
-              variant="primary"
-              navigate={~p"/companies/create"}
-            >
-              <.icon name="create" class="size-4" /> Add Company
-            </.button>
-            <.action_link
-              id="companies-department-types"
-              icon="manage"
-              navigate={~p"/companies/department-types"}
-              title="Manage department types"
-            >
-              Department Types
-            </.action_link>
-            <.action_link
-              id="companies-legal-entity-types"
-              icon="manage"
-              navigate={~p"/companies/legal-entity-types"}
-              title="Manage legal entity types"
-            >
-              Legal Entity Types
-            </.action_link>
+            <div class="flex flex-wrap items-center gap-6">
+              <.button
+                :if={allowed?(@current_scope, "admin.company.create")}
+                id="companies-add"
+                variant="primary"
+                navigate={~p"/companies/create"}
+              >
+                <.icon name="create" class="size-4" /> Add Company
+              </.button>
+              <.action_link
+                id="companies-department-types"
+                icon="manage"
+                navigate={~p"/companies/department-types"}
+                title="Manage department types"
+              >
+                Department Types
+              </.action_link>
+              <.action_link
+                id="companies-legal-entity-types"
+                icon="manage"
+                navigate={~p"/companies/legal-entity-types"}
+                title="Manage legal entity types"
+              >
+                Legal Entity Types
+              </.action_link>
+            </div>
           </:actions>
         </.header>
 

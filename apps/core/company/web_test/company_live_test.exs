@@ -106,7 +106,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#nav-children-admin:not([hidden])")
     end
 
-    test "reaches the type lists through demoted links, keeping Add Company the only button",
+    test "reaches the type lists through links carrying the demoted treatment, not a button's",
          %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.create"])
 
@@ -128,13 +128,19 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(view, "#companies-legal-entity-types .hero-cog-6-tooth")
 
-      refute has_element?(view, "button#companies-department-types")
-      refute has_element?(view, "button#companies-legal-entity-types")
+      # A navigating <.button> renders an anchor too, so the tag proves
+      # nothing; the treatment is what demotion changed.
+      for id <- ~w(companies-department-types companies-legal-entity-types) do
+        assert has_element?(view, "a##{id}.text-link")
+        refute has_element?(view, "a##{id}.border")
+        refute has_element?(view, "a##{id}.bg-action")
+        refute has_element?(view, "a##{id}.shadow-sm")
+      end
 
-      # The page's own primary action stays a button; the type lists are a
-      # related workflow, so they demote to links (DESIGN.md, "Demoted
+      # The page's own primary action keeps the button treatment; the type
+      # lists are a related workflow, so they demote (DESIGN.md, "Demoted
       # secondary actions").
-      assert has_element?(view, "main header a#companies-add", "Add Company")
+      assert has_element?(view, "main header a#companies-add.bg-action", "Add Company")
     end
 
     test "search, status filter, and sort live in the URL", %{conn: conn} do
@@ -491,8 +497,12 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(view, "#company-relationships-manage .hero-cog-6-tooth")
 
-      refute has_element?(view, "button#company-departments-manage")
-      refute has_element?(view, "button#company-relationships-manage")
+      for id <- ~w(company-departments-manage company-relationships-manage) do
+        assert has_element?(view, "a##{id}.text-link")
+        refute has_element?(view, "a##{id}.border")
+        refute has_element?(view, "a##{id}.bg-action")
+        refute has_element?(view, "a##{id}.shadow-sm")
+      end
 
       # The page header (inside <main>; the shell's top bar is its own
       # <header>) holds no button and no Departments or Relationships link:

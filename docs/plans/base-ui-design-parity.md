@@ -779,3 +779,53 @@ Not delivered by this slice:
 - **The Phase 4 detail row stays open.** This is one accepted pattern on one
   detail page, not the recorded narrow-width, dark-theme and keyboard review
   that row asks for.
+
+### Demoted related-workflow link slice — NAV-03 and CMP-03, partial
+
+Goal: Finish the canonical "secondary actions are links rather than buttons"
+instruction globally, so a control that only carries the operator to a related
+workflow never competes with the work its page is about.
+
+Shipped in `Bilimbi.Base.UI.Components`:
+
+- [x] `<.action_link>` is the general form of `<.back_link>` — the same
+  `text-link` treatment and free text. It takes `navigate`, `icon` and `title`,
+  all three required, and declares no global attrs, so a link with no
+  destination, no glyph or no accessible name is unrepresentable. `title` is
+  mirrored onto `aria-label`, which is what lets two "Manage" links on one page
+  announce different destinations. The Design Library presents it as one titled
+  specimen. `{fm/companies-detail-belimbing-parity/claude-fable-5-1}`
+
+Converted call sites: the Departments and Relationships **Manage** links on
+`/companies/:id`; **Department Types** and **Legal Entity Types** on
+`/companies`; **Employee Types** on `/employees`, keeping its
+`admin.employee-type.list` guard. A multi-line sweep of `<.button>` with
+`navigate`, `href` or `patch` across `apps/*/lib`, `apps/*/*/lib` and
+`apps/web/lib` found no other production violation — every survivor is its
+page's own primary action.
+
+**Placement decision.** Belimbing has no counterpart: every operational index
+there carries only its primary create button in the page-header actions slot
+and places no demoted related-workflow link beside it. The `/companies` order
+therefore decided — primary action first, demoted links after — and
+`/employees` was reordered to match, so the two indexes read identically. The
+shared `<.header>` actions container sets no gap, so each such row wraps its
+controls in a `flex flex-wrap items-center gap-6` row at the call site; the
+shared component is untouched because every other page depends on it.
+
+Left as arguable and unchanged:
+
+- **`companies-clear-search`** and the `/companies` empty-state recovery patch
+  button recover from a filter rather than navigating to a sibling workflow.
+- **The Design Library's own "Navigation" button specimen** exists to present
+  `<.button>`'s navigation mode; demoting it would delete the thing under
+  review.
+
+Not delivered by this slice:
+
+- **`departments_live.ex` and `relationships_live.ex` still place
+  `<.back_link>` before their primary button**, against the order settled
+  above. That placement pre-dates this slice and is deliberately left for a
+  later change.
+- **CMP-03 stays open.** `/companies/:id` still keeps its facts behind explicit
+  edit modes; only the header and the section affordances were settled here.
