@@ -102,6 +102,7 @@ defmodule Bilimbi.Base.UI.IconRegistry do
     "collapse" => "hero-chevron-down",
     "close" => "hero-x-mark",
     "settings" => "hero-cog-6-tooth",
+    "manage" => "hero-cog-6-tooth",
     "theme-light" => "hero-sun",
     "theme-dark" => "hero-moon",
     "theme-system" => "hero-computer-desktop",

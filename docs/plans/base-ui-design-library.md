@@ -3,7 +3,7 @@
 **Status:** Foundation merged; the parity campaign continues under Issue #709
 **Last Updated:** 2026-09-20
 **Tracking:** [Issue #691](https://github.com/BelimbingApp/bilimbi/issues/691)
-**Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`; `fm/parity-designlib-specimens/grok-4.6`; `fm/designlib-catalog-ids-in-ui/opus-5`; `fm/designlib-state-coverage-gaps/opus-5`; `fm/addresses-detail-read-first/opus-5`
+**Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`; `fm/parity-designlib-specimens/grok-4.6`; `fm/designlib-catalog-ids-in-ui/opus-5`; `fm/designlib-state-coverage-gaps/opus-5`; `fm/addresses-detail-read-first/opus-5`; `fm/companies-detail-belimbing-parity/claude-fable-5-1`
 **Related:** `docs/plans/base-ui-design-parity.md`
 
 ## Problem
@@ -56,7 +56,7 @@ Routine design decisions do not pause for user approval. Escalate only a new bus
 
 `T01` and `C01`–`C06` were resolved in the merged foundation, implemented in production UI and moved to Design Spec. Root guidance and the parity baseline now preserve those decisions and the intentional content-sized pagination correction from #304. The subsequent #694 integration preserves 24px inline icon targets through the shared component, with table/toolbar controls still 28px, and retains status-first company actions and the pin-state regression test.
 
-The inventory also covers the current shared structure, navigation, tabs, buttons, form fields, multi-select, choice controls, inline editing, the demoted back link, in-place commit status, flash messages, alerts, badges, tables, pagination, record facts, dates, operational lists, empty states, permission states, recovery states, the Bilimbi mark and icons.
+The inventory also covers the current shared structure, navigation, tabs, buttons, form fields, multi-select, choice controls, inline editing, the demoted back and action links, in-place commit status, flash messages, alerts, badges, tables, pagination, record facts, dates, operational lists, empty states, permission states, recovery states, the Bilimbi mark and icons.
 
 The Navigation entry renders `Layouts.nav_branch/1`, the shell's own rail, over an example tree rather than a second definition of it. The shell's nav rules moved from the `#app-sidebar` id to an `.app-nav-rail` class that the sidebar and the library card both carry, so the card cannot drift in type scale, colour, icon suppression or caret direction without the sidebar drifting with it. The card omits the pin control: the shell resolves a pinned row only from the sidebar, so a pin anywhere else is a control that looks live and does nothing. Tabs and radio group are shared `Bilimbi.Base.UI.Components` entries: Schedule uses `<.tabs>` for its Tasks / History / Settings views and Settings uses it for its group strip, so neither is library-only markup.
 

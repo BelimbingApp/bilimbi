@@ -595,7 +595,9 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   passed back as `status`), a choice commits on change, and only genuinely
   interdependent facts share a grouped Apply; see "Read-first detail pages"
   in `DESIGN.md`. Returning is a secondary action: use `<.back_link>`
-  ("← Back"), never a "Back to …" button, and render record history through
+  ("← Back"), never a "Back to …" button; a related workflow such as
+  Manage is an `<.action_link>` on the section it belongs to, carrying its
+  registry glyph, never a header button; and render record history through
   the `record.history` panel, whose trigger is the registry's `history`
   icon. Primary actions use
   `<.button variant="primary">` with deep olive base (`bg-action`, `lime-950`

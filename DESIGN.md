@@ -192,6 +192,16 @@ one way back. This holds for every page — list, form and detail — so a
 "Back to …" `<.button>` anywhere is a defect. Record history is demoted the
 same way: it is an icon action in the header, never a button.
 
+Reaching a related workflow is demoted too. A section that lists records
+another page manages — a company's Departments and Relationships — carries
+one `<.action_link>` ("Manage") in its own heading row, with the registry's
+`manage` glyph, the cog Belimbing uses for the same action. The page header
+never repeats a section's link as a button; on `/companies/:id` it holds the
+status badge, the history icon and the back link and nothing else.
+`<.action_link>` is the general form of `<.back_link>`: the same `text-link`
+treatment, free text, and an optional registry glyph. A related-workflow
+`<.button>` that is not the page's primary action is a defect.
+
 ## Modal dialogs
 
 A short workflow that must finish or be abandoned before the screen continues

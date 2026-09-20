@@ -13,6 +13,14 @@ Company publishes `addressable_identity/0` as the source of truth for its
 durable Belimbing polymorphic identity. Modules that attach data to a Company
 must use that API instead of duplicating the persisted string.
 
+The module-owned detail page header carries the record's status, record
+history as the demoted `history` icon action and a plain "← Back" link, and
+holds no button. Departments and Relationships are reached through the demoted
+"Manage" link on the section that lists them, carrying the registry's `manage`
+glyph, as Belimbing's company page does. `Bilimbi.Core.Company.Web.ShowLive`'s
+moduledoc owns that contract, and DESIGN.md's "Demoted secondary actions" owns
+the pattern.
+
 ## Tenant-wide reads
 
 | Function | Soft-deleted companies |
