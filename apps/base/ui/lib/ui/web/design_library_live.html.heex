@@ -606,7 +606,7 @@
                 Navigation and links
               </h2>
               <p class="text-sm text-ink-muted">
-                The shell's own navigation rows, the shared tabs and the demoted back link. Pagination is shown with the table it pages, under Data display. The back link is the only entry in the shared link dictionary so far, and the account menu is part of the application shell above.
+                The shell's own navigation rows, the shared tabs and the demoted secondary actions: the back link and the action link. Pagination is shown with the table it pages, under Data display. Those two links are the shared link dictionary so far, and the account menu is part of the application shell above.
               </p>
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
@@ -657,6 +657,21 @@
                     navigate={~p"/system/design-library"}
                     title="Back to Design Library"
                   />
+                </div>
+              </.card>
+              <.card id="component-action-link" title="Action link" inner_class="p-3">
+                <p class="mb-2 text-xs text-ink-muted">
+                  Reaching a related workflow is a secondary action, so it is a plain link on the section it belongs to or beside the page's primary action, never a button. The glyph is the registry's name for the action, so Manage keeps the cog Belimbing uses, and the title names the destination the short text alone does not.
+                </p>
+                <div class="flex flex-wrap items-center gap-6">
+                  <.action_link
+                    id="design-library-action-link"
+                    icon="manage"
+                    navigate={~p"/system/design-library"}
+                    title="Manage department types"
+                  >
+                    Department Types
+                  </.action_link>
                 </div>
               </.card>
             </div>

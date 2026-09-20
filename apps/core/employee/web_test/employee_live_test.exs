@@ -124,6 +124,53 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     assert has_element?(view, "#employee-types")
   end
 
+  test "reaches the employee type list through a link carrying the demoted treatment", %{
+    conn: conn
+  } do
+    grant_capabilities!(["admin.employee.list", "admin.employee-type.list"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
+
+    assert has_element?(
+             view,
+             "a#employee-types[href='/employee-types'][title='Manage employee types']",
+             "Employee Types"
+           )
+
+    assert has_element?(view, "#employee-types .hero-cog-6-tooth")
+
+    # A navigating <.button> renders an anchor too, so the tag proves
+    # nothing; the treatment is what demotion changed.
+    assert has_element?(view, "a#employee-types.text-link")
+    refute has_element?(view, "a#employee-types.border")
+    refute has_element?(view, "a#employee-types.bg-action")
+    refute has_element?(view, "a#employee-types.shadow-sm")
+  end
+
+  test "puts the primary action before the demoted link, as /companies does", %{conn: conn} do
+    grant_capabilities!([
+      "admin.employee.list",
+      "admin.employee.create",
+      "admin.employee-type.list"
+    ])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
+
+    header = view |> element("main header") |> render()
+
+    assert {primary, _} = :binary.match(header, ~s(id="employee-new"))
+    assert {demoted, _} = :binary.match(header, ~s(id="employee-types"))
+    assert primary < demoted
+  end
+
+  test "hides the employee type link from an actor who may not list types", %{conn: conn} do
+    grant_capabilities!("admin.employee.list")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
+
+    refute has_element?(view, "#employee-types")
+  end
+
   test "shows empty state when company has no employees", %{conn: conn} do
     CompanyFixtures.insert_company!(%{
       id: 75,

@@ -106,6 +106,43 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#nav-children-admin:not([hidden])")
     end
 
+    test "reaches the type lists through links carrying the demoted treatment, not a button's",
+         %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.create"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies")
+
+      assert has_element?(
+               view,
+               "a#companies-department-types[href='/companies/department-types'][title='Manage department types']",
+               "Department Types"
+             )
+
+      assert has_element?(view, "#companies-department-types .hero-cog-6-tooth")
+
+      assert has_element?(
+               view,
+               "a#companies-legal-entity-types[href='/companies/legal-entity-types'][title='Manage legal entity types']",
+               "Legal Entity Types"
+             )
+
+      assert has_element?(view, "#companies-legal-entity-types .hero-cog-6-tooth")
+
+      # A navigating <.button> renders an anchor too, so the tag proves
+      # nothing; the treatment is what demotion changed.
+      for id <- ~w(companies-department-types companies-legal-entity-types) do
+        assert has_element?(view, "a##{id}.text-link")
+        refute has_element?(view, "a##{id}.border")
+        refute has_element?(view, "a##{id}.bg-action")
+        refute has_element?(view, "a##{id}.shadow-sm")
+      end
+
+      # The page's own primary action keeps the button treatment; the type
+      # lists are a related workflow, so they demote (DESIGN.md, "Demoted
+      # secondary actions").
+      assert has_element?(view, "main header a#companies-add.bg-action", "Add Company")
+    end
+
     test "search, status filter, and sort live in the URL", %{conn: conn} do
       grant_capabilities!(["admin.company.list"])
       conn = log_in_as(conn)
@@ -132,7 +169,9 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       # The shared toolbar sends the same search a URL visit would carry.
       view
-      |> form("#companies-filters", filters: %{"search" => "Subsidiary", "status_filter" => "all"})
+      |> form("#companies-filters",
+        filters: %{"search" => "Subsidiary", "status_filter" => "all"}
+      )
       |> render_change()
 
       assert_patch(view, ~p"/companies?search=Subsidiary")
@@ -410,13 +449,19 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert render(view) =~ "Bilimbi Industries"
     end
 
-    test "renders the company with its users and back button", %{conn: conn} do
+    test "renders the company with its users and back link", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
       assert has_element?(view, "h1", "Bilimbi Industries")
-      assert has_element?(view, "#company-back[href='/companies'][title='Back to companies']", "Back")
+
+      assert has_element?(
+               view,
+               "#company-back[href='/companies'][title='Back to companies']",
+               "Back"
+             )
+
       assert has_element?(view, "#company-users-table td", "Ada Lovelace")
 
       assert has_element?(
@@ -424,6 +469,50 @@ defmodule BilimbiWeb.CompanyLiveTest do
                "#company-employees-table-empty",
                "No employees found for this company."
              )
+    end
+
+    test "reaches Departments and Relationships through demoted links on their sections, not header buttons",
+         %{conn: conn} do
+      # Belimbing's admin/companies/show puts one quiet "Manage" affordance,
+      # carrying the cog, on each of these sections and nothing in the header.
+      # A viewer holding only admin.company.view may open both pages, which
+      # are gated on that same capability, so the links show for them too.
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      assert has_element?(
+               view,
+               "#company-departments-card a#company-departments-manage[href='/companies/73/departments'][title='Manage departments']",
+               "Manage"
+             )
+
+      assert has_element?(view, "#company-departments-manage .hero-cog-6-tooth")
+
+      assert has_element?(
+               view,
+               "#company-relationships-card a#company-relationships-manage[href='/companies/73/relationships'][title='Manage relationships']",
+               "Manage"
+             )
+
+      assert has_element?(view, "#company-relationships-manage .hero-cog-6-tooth")
+
+      for id <- ~w(company-departments-manage company-relationships-manage) do
+        assert has_element?(view, "a##{id}.text-link")
+        refute has_element?(view, "a##{id}.border")
+        refute has_element?(view, "a##{id}.bg-action")
+        refute has_element?(view, "a##{id}.shadow-sm")
+      end
+
+      # The page header (inside <main>; the shell's top bar is its own
+      # <header>) holds no button and no Departments or Relationships link:
+      # only the pin, the history icon and the back link.
+      refute has_element?(view, "main header a[href='/companies/73/departments']")
+      refute has_element?(view, "main header a[href='/companies/73/relationships']")
+      refute has_element?(view, "main header", "Departments")
+      refute has_element?(view, "main header", "Relationships")
+      refute has_element?(view, "main header button:not(#company-pin)")
+      assert has_element?(view, "main header #company-back", "Back")
     end
 
     test "shows record history only with audit permission and filters to this company", %{
@@ -463,11 +552,23 @@ defmodule BilimbiWeb.CompanyLiveTest do
       grant_capabilities!(["admin.company.list", "admin.company.view"])
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
       refute has_element?(view, "#company-record-history-toggle")
+      refute has_element?(view, "#company-record-history .hero-clock")
 
       grant_capabilities!("admin.audit.log.list")
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      assert has_element?(view, "#company-record-history-toggle", "History")
+      # History is a demoted icon action carrying Belimbing's clock, not a
+      # button: the word stays for assistive technology and the tooltip only.
+      assert has_element?(
+               view,
+               "summary#company-record-history-toggle[title='History'][aria-label='History']",
+               "History"
+             )
+
+      assert has_element?(view, "#company-record-history-toggle .hero-clock")
+      assert has_element?(view, "#company-record-history-toggle .sr-only", "History")
+      refute has_element?(view, "button#company-record-history-toggle")
+      refute has_element?(view, "#company-record-history-toggle.bg-action")
       assert has_element?(view, "#company-record-history-panel", "Old Name")
       assert has_element?(view, "#company-record-history-panel", "Bilimbi Industries")
       refute has_element?(view, "#company-record-history-panel", "Other Old")

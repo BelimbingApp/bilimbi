@@ -3,6 +3,13 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   Company profile: identity, addresses, timezone settings, subsidiaries,
   departments, relationships, external accesses, users, and employees —
   all accessed through declared public domain APIs.
+
+  The header's actions row carries the record's status, record history as the
+  demoted `history` icon action and a plain "← Back" link, and no button; the
+  title row keeps the pin icon action. The Departments and Relationships
+  workflows are reached through the demoted "Manage" link on the section that
+  lists them, carrying the registry's `manage` glyph, which is the cog
+  Belimbing uses for the same action.
   """
 
   use Bilimbi.Base.UI, :live_view
@@ -823,36 +830,31 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           </:subtitle>
           <:actions>
             <%!-- Status is record metadata, not an action: it leads the row so
-                 the buttons (History onward) cluster after it (#685). --%>
-            <.badge kind={
-              case @company.status do
-                "active" -> :success
-                "suspended" -> :danger
-                "pending" -> :warning
-                _ -> :neutral
-              end
-            }>
-              {String.capitalize(@company.status)}
-            </.badge>
-            <.discovered_panel
-              key="record.history"
-              id="company-record-history"
-              current_scope={@current_scope}
-              opts={%{auditable_types: company_auditable_types(), auditable_id: @company.id}}
-            />
-            <.button
-              navigate={~p"/companies/#{@company.id}/departments"}
-              class="text-xs"
-            >
-              Departments
-            </.button>
-            <.button
-              navigate={~p"/companies/#{@company.id}/relationships"}
-              class="text-xs"
-            >
-              Relationships
-            </.button>
-            <.back_link id="company-back" navigate={~p"/companies"} title="Back to companies" />
+                 the demoted actions (History, then Back) cluster after it
+                 (#685). This row holds no button — the pin icon action sits
+                 in the title row above: Departments and Relationships are
+                 reached from the sections that list them, as Belimbing's
+                 admin/companies/show does, so the header never duplicates a
+                 section's own "Manage" link. --%>
+            <div class="flex items-center gap-3">
+              <.badge kind={
+                case @company.status do
+                  "active" -> :success
+                  "suspended" -> :danger
+                  "pending" -> :warning
+                  _ -> :neutral
+                end
+              }>
+                {String.capitalize(@company.status)}
+              </.badge>
+              <.discovered_panel
+                key="record.history"
+                id="company-record-history"
+                current_scope={@current_scope}
+                opts={%{auditable_types: company_auditable_types(), auditable_id: @company.id}}
+              />
+              <.back_link id="company-back" navigate={~p"/companies"} title="Back to companies" />
+            </div>
           </:actions>
         </.header>
 
@@ -1167,12 +1169,14 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               </h3>
               <.badge>{length(@departments)}</.badge>
             </div>
-            <.button
+            <.action_link
+              id="company-departments-manage"
+              icon="manage"
               navigate={~p"/companies/#{@company.id}/departments"}
-              class="text-xs"
+              title="Manage departments"
             >
               Manage
-            </.button>
+            </.action_link>
           </div>
 
           <.table
@@ -1213,12 +1217,14 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               </h3>
               <.badge>{length(@relationships)}</.badge>
             </div>
-            <.button
+            <.action_link
+              id="company-relationships-manage"
+              icon="manage"
               navigate={~p"/companies/#{@company.id}/relationships"}
-              class="text-xs"
+              title="Manage relationships"
             >
               Manage
-            </.button>
+            </.action_link>
           </div>
 
           <.table

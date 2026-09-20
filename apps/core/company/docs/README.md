@@ -13,6 +13,10 @@ Company publishes `addressable_identity/0` as the source of truth for its
 durable Belimbing polymorphic identity. Modules that attach data to a Company
 must use that API instead of duplicating the persisted string.
 
+The module-owned detail and list page headers follow DESIGN.md's "Demoted
+secondary actions" pattern; `Bilimbi.Core.Company.Web.ShowLive`'s moduledoc owns
+the detail header contract.
+
 ## Tenant-wide reads
 
 | Function | Soft-deleted companies |

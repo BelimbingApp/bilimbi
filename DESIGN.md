@@ -192,6 +192,30 @@ one way back. This holds for every page — list, form and detail — so a
 "Back to …" `<.button>` anywhere is a defect. Record history is demoted the
 same way: it is an icon action in the header, never a button.
 
+Reaching a related workflow is demoted too. A section that lists records
+another page manages — a company's Departments and Relationships — carries
+one `<.action_link>` ("Manage") in its own heading row, with the registry's
+`manage` glyph, the cog Belimbing uses for the same action. When the related
+workflow belongs to the whole page rather than one section, the link sits
+beside the primary action instead: `/companies` reaches Department Types and
+Legal Entity Types through `<.action_link>`, and `/employees` reaches Employee
+Types the same way, so the only button each actions row carries is that page's
+primary create action — and only for an actor permitted to create. In that row
+the primary action comes first and the demoted related-workflow links follow
+it, so an operator moving between `/companies` and `/employees` finds them on
+the same side. The shared `<.header>` actions container is a plain block with
+no gap, so a page header's actions row wraps its controls in a
+`flex items-center gap-3` row at the call site — whether it holds a primary
+action followed by demoted links (`/companies`, `/employees`) or only demoted
+actions and record metadata (`/companies/:id`, `/addresses/:id`). Without it
+the controls sit one collapsed space apart and read as a single run of text.
+The page header never repeats a section's link as a button; on
+`/companies/:id` its actions row holds the status badge, the history icon
+action and the back link and no button, while the title row keeps the pin
+icon action. `<.action_link>` is the general form of `<.back_link>`: the same
+`text-link` treatment, free text, and a registry glyph. A related-workflow
+`<.button>` that is not the page's primary action is a defect.
+
 ## Modal dialogs
 
 A short workflow that must finish or be abandoned before the screen continues

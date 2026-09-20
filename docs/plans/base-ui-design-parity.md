@@ -3,7 +3,7 @@
 **Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families (#724). Merged to `main` through 2026-09-15: application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display. Since then the library has been stripped of catalog IDs (#728), and the shared layer has taken much of the accepted action and feedback contract — destructive confirmation (#733), reduced motion with 4.5:1 contrast (#738), stacked flash messages (#741), busy controls and a login screen that reports its progress (#743), the empty and permission region pattern (#740), real dialog semantics on modal overlays (#731), one shared filter toolbar (#745), field shell states (#744), secret reveal and multi-select corrections (#746) and a released shell observer (#747) — alongside icon-name validity (#727, #734), Schedule timestamps and UTC day labels through the datetime component (#735, #737), impersonation reader coverage (#729), corrected catalog rows (#730), drift-guard documentation folded into this plan (#726) and the Belimbing cutover value remap (#725); the drift guards stay excluded from the default run — the Design Library state-coverage slice of 2026-09-18 corrected all but two of the uncovered names and axes the coverage guard reports and records those two as accepted rather than pending, while the imitation guard's anchor and control-markup failures are still open
 **Last Updated:** 2026-09-20
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1); `fm/parity-plan-checklist-reconcile/muse-spark` (checklist reconciliation on 2026-09-18, not audit authorship); `fm/icon-registry-name-validity/opus-5`; `fm/designlib-state-coverage-gaps/opus-5` (Design Library state coverage on 2026-09-18); `fm/addresses-detail-read-first/opus-5` (read-first detail page, shared commit status and demoted back link on 2026-09-20); `crewmate scout` (firstmate scout tasks that record no model — the FND-06 icon inventory and the four Phase 2 lane audits of 2026-09-16; separate sessions from the `crewmate/gpt-6` entry above, which is why these rows carry no model)
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1); `fm/parity-plan-checklist-reconcile/muse-spark` (checklist reconciliation on 2026-09-18, not audit authorship); `fm/icon-registry-name-validity/opus-5`; `fm/designlib-state-coverage-gaps/opus-5` (Design Library state coverage on 2026-09-18); `fm/addresses-detail-read-first/opus-5` (read-first detail page, shared commit status and demoted back link on 2026-09-20); `fm/companies-detail-belimbing-parity/claude-fable-5-1` (company detail header settled against Belimbing on 2026-09-20: the history icon, demoted Manage links and no header buttons); `crewmate scout` (firstmate scout tasks that record no model — the FND-06 icon inventory and the four Phase 2 lane audits of 2026-09-16; separate sessions from the `crewmate/gpt-6` entry above, which is why these rows carry no model)
 
 ## Problem Essence
 
@@ -62,7 +62,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | LAY-05 | Index, form and detail geometry | Shared `<.page>` enforces one width per list, form and detail archetype; each screen still composes its assembly locally | Define complete assemblies rather than leaving every screen to compose them differently. |
 | NAV-01 [(contradicted)](#targets-the-evidence-contradicts) | Main menu tree | Exists | Verify active ancestry, pinned items, reorder, collapse, mobile drawer and persistence. |
 | NAV-02 | Tabs | Shared `<.tabs>` used by Schedule and Settings | Provide shared semantics, keyboard navigation, active state and URL/history rules. |
-| NAV-03 | Link dictionary and related-link groups | No shared contract beyond `<.back_link>`, the demoted "← Back" return link every list, form and detail page now uses instead of a "Back to …" button | Adopt internal, anchor, external, new-tab and download behavior; mutations remain buttons. |
+| NAV-03 | Link dictionary and related-link groups | Two shared entries: `<.back_link>`, the demoted "← Back" return link every list, form and detail page uses instead of a "Back to …" button, and `<.action_link>`, the demoted related-workflow link with its registry glyph that the Departments and Relationships sections of `/companies/1`, the Department Types and Legal Entity Types links on `/companies` and the Employee Types link on `/employees` use instead of buttons | Adopt internal, anchor, external, new-tab and download behavior; mutations remain buttons. |
 | NAV-04 | Pagination | Shared component exists | Compare narrow layout, disabled states, page-size control, URL state and accessible labels. |
 | NAV-05 [(contradicted)](#targets-the-evidence-contradicts) | User account and scope menu | Partial user footer exists | On user-circle activation, show signed-in name and identifier, current company and tenant, change password and sign out. Show scope switching only when more than one permitted scope exists. |
 | ACT-01 [(contradicted)](#targets-the-evidence-contradicts) | Buttons | Primary, secondary and destructive basics | Cover emphasis, compact size, disabled, loading, navigation and truthful completion. |
@@ -99,7 +99,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | DAT-06 | Record history, timeline and comparisons | Local or missing | Keep specialist behavior with the owning workflow; share only the generic presentation seam. |
 | CMP-01 [(contradicted)](#targets-the-evidence-contradicts) | Operational index page | Partial specimen | Standardize header, filters, table, actions, empty/loading/error and pagination as one flow. |
 | CMP-02 | Form page | Complete production form ships (`/companies/create`: field rhythm, inline validation, save/cancel); no unsaved-navigation guard exists, and that criterion depends on INT-06, which is deferred until a real Bilimbi workflow proves the need; the shared composition is not extracted | Standardize field rhythm, validation, save/cancel, loading, success and unsaved navigation. |
-| CMP-03 | Detail and settings page | Two production details ship: `/addresses/1` is read-first (every fact edits in place and saves by itself, one grouped Apply for the interdependent location facts, the outcome on the fact rather than in a flash, a demoted back link and history icon), while `/companies/1` keeps facts behind explicit edit modes; related navigation and permission states exist on both, and the shared assembly is not extracted | Standardize facts, inline/grouped editing, related navigation and permission states. |
+| CMP-03 | Detail and settings page | Two production details ship: `/addresses/1` is read-first (every fact edits in place and saves by itself, one grouped Apply for the interdependent location facts, the outcome on the fact rather than in a flash, a demoted back link and history icon), while `/companies/1` keeps facts behind explicit edit modes, though its header now matches Belimbing's history-and-back actions — the history icon and a back link, with Departments and Relationships reached through each section's demoted Manage link, and the status badge leading that row is Bilimbi's own #685 decision that Belimbing does not present; related navigation and permission states exist on both, and the shared assembly is not extracted | Standardize facts, inline/grouped editing, related navigation and permission states. |
 | CMP-04 | Destructive workflow | No complete specimen | Show entry, consequence, acknowledgement, in-flight, success, failure and recovery together. |
 | CMP-05 | Authentication and first arrival | Login, recovery and dashboard arrival ship and were audited live against Belimbing (Lanes A and D); the sign-in handoff is a busy submit with readonly fields | Treat login, recovery and dashboard arrival as first-impression acceptance surfaces. |
 | CMP-06 | Responsive and theme coverage | The `/companies` index and the shell were verified live at narrow width and in dark theme (Lane D); narrow detail, narrow form and a full keyboard pass remain | Review representative assemblies at desktop/narrow widths and in light/dark themes. |
@@ -459,7 +459,8 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     empty result and pagination are one operational index flow, so it is now
     Composite patterns; Interaction patterns keeps INT-01 inline editing alone.
     The read-first detail slice added the demoted back link under Navigation and
-    links (NAV-03), beside Navigation and Tabs, rather than here.
+    links (NAV-03), beside Navigation and Tabs, rather than here, and the
+    company header parity slice added the action link beside it.
   - **`<.card>` and `<.badge>` moved to Data display** (DAT-01, DAT-02) and the
     application shell moved under Page structure (LAY-02), keeping its own
     `#component-shell` deep link as a nested menu-linked section.
@@ -778,3 +779,59 @@ Not delivered by this slice:
 - **The Phase 4 detail row stays open.** This is one accepted pattern on one
   detail page, not the recorded narrow-width, dark-theme and keyboard review
   that row asks for.
+
+### Demoted related-workflow link slice — NAV-03 and CMP-03, partial
+
+Goal: Finish the canonical "secondary actions are links rather than buttons"
+instruction globally, so a control that only carries the operator to a related
+workflow never competes with the work its page is about.
+
+Shipped in `Bilimbi.Base.UI.Components`:
+
+- [x] `<.action_link>` is the general form of `<.back_link>` — the same
+  `text-link` treatment and free text. Its surface is closed: `id`, `icon`,
+  `navigate` and `title`, all four required, with no `class` override and no
+  global attrs, so a demoted action that is unaddressable, unreachable,
+  glyphless, unnamed or styled out of the family is unrepresentable. `title` is
+  mirrored onto `aria-label`, which is what lets two "Manage" links on one page
+  announce different destinations. The Design Library presents it as one titled
+  specimen. `{fm/companies-detail-belimbing-parity/claude-fable-5-1}`
+
+Converted call sites: the Departments and Relationships **Manage** links on
+`/companies/:id`; **Department Types** and **Legal Entity Types** on
+`/companies`; **Employee Types** on `/employees`, keeping its
+`admin.employee-type.list` guard. A multi-line sweep of `<.button>` with
+`navigate`, `href` or `patch` across `apps/*/lib`, `apps/*/*/lib` and
+`apps/web/lib` found no other production violation — every survivor is its
+page's own primary action.
+
+**Placement decision.** Belimbing has no counterpart: every operational index
+there carries only its primary create button in the page-header actions slot
+and places no demoted related-workflow link beside it. The `/companies` order
+therefore decided — primary action first, demoted links after — and
+`/employees` was reordered to match, so the two indexes read identically. The
+shared `<.header>` actions container is a plain block with no gap, so each such
+row wraps its controls in a `flex items-center gap-3` row at the call site —
+the value `/addresses/:id` already shipped with; the shared component is
+untouched because every other page depends on it.
+
+Left as arguable and unchanged:
+
+- **`companies-clear-search`** and the `/companies` empty-state recovery patch
+  button recover from a filter rather than navigating to a sibling workflow.
+- **The Design Library's own "Navigation" button specimen** exists to present
+  `<.button>`'s navigation mode; demoting it would delete the thing under
+  review.
+
+Not delivered by this slice:
+
+- **Seven shipped pages still place `<.back_link>` before their primary
+  button**, against the order settled above: Core Company's
+  `departments_live.ex`, `relationships_live.ex`, `legal_entity_types_live.ex`
+  and `department_types_live.ex`; Core Employee's `type_index_live.ex` and
+  `show_live.ex`; and Core User's `show_live.ex`. The same seven header rows
+  also still lack the `flex items-center gap-3` wrapper the rule above settles,
+  so their controls sit one collapsed space apart. Both gaps pre-date this
+  slice and are deferred together for a later change.
+- **CMP-03 stays open.** `/companies/:id` still keeps its facts behind explicit
+  edit modes; only the header and the section affordances were settled here.

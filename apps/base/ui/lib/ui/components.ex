@@ -2422,14 +2422,77 @@ defmodule Bilimbi.Base.UI.Components do
       navigate={@navigate}
       title={@title}
       aria-label={@title}
-      class={[
-        "inline-flex items-center gap-1 whitespace-nowrap text-sm text-link transition-colors hover:text-ink focus-visible:outline-none focus-visible:rounded-sm focus-visible:ring-1 focus-visible:ring-brand-strong/40",
-        @class
-      ]}
+      class={[secondary_link_class(), @class]}
     >
       <span aria-hidden="true">←</span> Back
     </.link>
     """
+  end
+
+  @doc """
+  Renders a demoted secondary action as a plain link.
+
+  A page's buttons are for the work the page is about. An action that only
+  takes the operator to a related workflow — "Manage" on the Departments
+  section of a company, the list of types beside the list that uses them — is
+  a link in `text-link`, never a button. It sits on the section it belongs to,
+  or beside the page's primary action when the whole list is what it relates
+  to, as the type lists of `/companies` and `/employees` do, and its leading
+  glyph is named through the icon registry so the link keeps the icon
+  Belimbing uses for the same action. `<.back_link>` is the fixed-text member
+  of the same family.
+
+  The surface is closed: `id`, `icon`, `navigate` and `title` are all
+  required and there is nothing else, so every demoted action is addressable,
+  reachable, glyphed and named, and none can style itself away from the one
+  treatment the family shares.
+
+  ## Examples
+
+      <.action_link
+        id="company-departments-manage"
+        icon="manage"
+        navigate={~p"/companies/1/departments"}
+        title="Manage departments"
+      >
+        Manage
+      </.action_link>
+  """
+  attr(:id, :string, required: true)
+  attr(:navigate, :string, required: true)
+
+  attr(:icon, :string,
+    required: true,
+    doc: "a registry action name rendered before the text"
+  )
+
+  attr(:title, :string,
+    required: true,
+    doc:
+      "names the destination; it must contain the visible text so the label does not replace it"
+  )
+
+  slot(:inner_block, required: true)
+
+  def action_link(assigns) do
+    ~H"""
+    <.link
+      id={@id}
+      navigate={@navigate}
+      title={@title}
+      aria-label={@title}
+      class={secondary_link_class()}
+    >
+      <.icon name={@icon} class="size-4" />
+      {render_slot(@inner_block)}
+    </.link>
+    """
+  end
+
+  # One treatment for every demoted secondary action rendered as a link, so
+  # "← Back" and "Manage" cannot drift apart.
+  defp secondary_link_class do
+    "inline-flex items-center gap-1 whitespace-nowrap text-sm text-link transition-colors hover:text-ink focus-visible:outline-none focus-visible:rounded-sm focus-visible:ring-1 focus-visible:ring-brand-strong/40"
   end
 
   attr(:col, :map, required: true)
