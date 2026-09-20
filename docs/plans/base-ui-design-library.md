@@ -1,9 +1,9 @@
 # Base UI Design Library
 
 **Status:** Foundation merged; the parity campaign continues under Issue #709
-**Last Updated:** 2026-09-17
+**Last Updated:** 2026-09-18
 **Tracking:** [Issue #691](https://github.com/BelimbingApp/bilimbi/issues/691)
-**Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`; `fm/parity-designlib-specimens/grok-4.6`; `fm/designlib-catalog-ids-in-ui/opus-5`
+**Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`; `fm/parity-designlib-specimens/grok-4.6`; `fm/designlib-catalog-ids-in-ui/opus-5`; `fm/designlib-state-coverage-gaps/opus-5`
 **Related:** `docs/plans/base-ui-design-parity.md`
 
 ## Problem
@@ -60,7 +60,7 @@ The inventory also covers the current shared structure, navigation, tabs, button
 
 The Navigation entry renders `Layouts.nav_branch/1`, the shell's own rail, over an example tree rather than a second definition of it. The shell's nav rules moved from the `#app-sidebar` id to an `.app-nav-rail` class that the sidebar and the library card both carry, so the card cannot drift in type scale, colour, icon suppression or caret direction without the sidebar drifting with it. The card omits the pin control: the shell resolves a pinned row only from the sidebar, so a pin anywhere else is a control that looks live and does nothing. Tabs and radio group are shared `Bilimbi.Base.UI.Components` entries: Schedule uses `<.tabs>` for its Tasks / History / Settings views and Settings uses it for its group strip, so neither is library-only markup.
 
-The canonical table entry shows the sortable single-card composition `/users` uses: the table sits unframed inside one card with its pagination, it lands on name ascending, every data column heading sorts and carries `aria-sort`, a repeated click flips direction, the timestamp column opens newest first, a sort returns to page one, and the rows-per-page control offers 25, 50, 100 and 300. Its example rows carry distinct timestamps so that sort is observable. It keeps that sort and page in LiveView state rather than the URL: the library is a four-area review page navigated by `#component-*` anchors, not an operational list. Because both table specimens now pass `framed={false}`, no specimen shows the framed default that screens such as Audit mutations and the Schedule task board still render; a second specimen for it is open work.
+The canonical table entry shows the sortable single-card composition `/users` uses: a search above an unframed table that sits inside one card with its pagination, it lands on name ascending, every data column heading sorts and carries `aria-sort`, a repeated click flips direction, the timestamp column opens newest first, a sort returns to page one, the rows-per-page control offers 25, 50, 100 and 300, and a search that matches nothing replaces the rows with an empty state naming the term and offering to clear it. That search runs through the shared `<.filter_toolbar>` rather than the hand-written filter form `/users` still carries, so the reference surface cannot contradict the search rules it presents. Its example rows carry distinct timestamps so that sort is observable. It keeps search, sort and page in LiveView state rather than the URL: the library is a four-area review page navigated by `#component-*` anchors, not an operational list. The framed default that screens such as Audit mutations and the Schedule task board render now has its own `#component-table-framed` specimen beside the canonical one: one right-aligned numeric column with no caption and no row actions, standing outside a card because a framed table brings its own panel.
 
 Appearance Settings is the one screen `<.radio_group>` does not describe. It puts each theme choice in a bordered card with a description, which the component does not express, and converting it would redesign that screen. The radio group entry says so on the page, as the Navigation card names the pin control it leaves out and the branch toggle that renders without collapsing outside the sidebar.
 
