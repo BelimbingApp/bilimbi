@@ -85,7 +85,7 @@ defmodule BilimbiWeb.AddressLiveTest do
 
     assert_patch(
       view,
-      ~p"/addresses?#{%{search: "Head", page: 1, sortBy: "label", sortDir: "asc"}}"
+      ~p"/addresses?#{%{search: "Head", page: 1, perPage: 25, sortBy: "label", sortDir: "asc"}}"
     )
 
     assert has_element?(view, "#address-#{hq.id}")
@@ -95,7 +95,7 @@ defmodule BilimbiWeb.AddressLiveTest do
 
     assert_patch(
       view,
-      ~p"/addresses?#{%{search: "Head", page: 1, sortBy: "verification_status", sortDir: "asc"}}"
+      ~p"/addresses?#{%{search: "Head", page: 1, perPage: 25, sortBy: "verification_status", sortDir: "asc"}}"
     )
 
     assert has_element?(view, "th[aria-sort='ascending'] #addresses-sort-status")
@@ -205,10 +205,45 @@ defmodule BilimbiWeb.AddressLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses")
 
-    assert has_element?(view, "#addresses-pagination-summary", "Showing 1–1 of 1")
-    refute has_element?(view, "#addresses-page-previous")
-    refute has_element?(view, "#addresses-page-next")
+    assert has_element?(view, "#addresses-pagination-summary", "Showing 1 to 1 of 1 results")
+    refute has_element?(view, "#addresses-pagination-previous")
+    refute has_element?(view, "#addresses-pagination-next")
     refute render(view) =~ "Page 1 of 1"
+  end
+
+  test "paginates and keeps rows per page in URL state", %{conn: conn, scope: scope} do
+    for index <- 1..26 do
+      label = "Site #{String.pad_leading("#{index}", 2, "0")}"
+      {:ok, _address} = Address.create_address(scope, %{label: label})
+    end
+
+    grant_capabilities!("admin.address.list")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses")
+
+    assert has_element?(view, "#addresses-pagination-summary", "Showing 1 to 25 of 26 results")
+    assert has_element?(view, "#addresses-pagination-previous[disabled]")
+    assert has_element?(view, "#addresses-pagination-next")
+
+    view |> element("#addresses-pagination-next") |> render_click()
+
+    assert has_element?(view, "#addresses-pagination-summary", "Showing 26 to 26 of 26 results")
+    assert has_element?(view, "#addresses-pagination-next[disabled]")
+
+    view
+    |> form("#addresses-pagination-page-size-form", %{"filters" => %{"perPage" => "50"}})
+    |> render_change()
+
+    assert has_element?(view, "#addresses-pagination-summary", "Showing 1 to 26 of 26 results")
+    refute has_element?(view, "#addresses-pagination-next")
+
+    {:ok, reloaded, _html} = conn |> log_in_as() |> live(~p"/addresses?perPage=50")
+
+    assert has_element?(
+             reloaded,
+             "#addresses-pagination-summary",
+             "Showing 1 to 26 of 26 results"
+           )
   end
 
   test "requires admin.address.view capability to view address show page", %{

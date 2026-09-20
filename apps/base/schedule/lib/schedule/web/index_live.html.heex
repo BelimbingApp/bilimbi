@@ -318,7 +318,7 @@
         class="mt-3 flex items-center justify-between text-sm"
       >
         <p id="schedule-history-pagination-summary" class="text-ink-subtle">
-          Page {@run_page.page} of {@run_page.total_pages} · {@run_page.total_entries} runs
+          <span :if={@run_page.total_pages > 1}>Page {@run_page.page} of {@run_page.total_pages} · </span>{@run_page.total_entries} runs
         </p>
         <div :if={@run_page.total_pages > 1} class="flex gap-2">
           <.button :if={@run_page.page > 1} id="schedule-history-prev" phx-click="page" phx-value-page={@run_page.page - 1}>

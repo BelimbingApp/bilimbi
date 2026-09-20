@@ -206,6 +206,7 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     refute has_element?(view, "#schedule-runs", "Late on the twentieth")
     assert has_element?(view, "#schedule-runs", "Early on the twenty-first")
     assert has_element?(view, "#schedule-history-pagination-summary", "1 runs")
+    refute render(view) =~ "Page 1 of 1"
 
     filter_runs(view, %{"start_date" => "", "end_date" => "2026-08-20"})
 

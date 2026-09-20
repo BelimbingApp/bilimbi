@@ -44,6 +44,8 @@ defmodule BilimbiWeb.SystemMenuInspectorLiveTest do
 
     assert has_element?(view, "#menu-inspector", "admin.system.menu-inspector")
     refute has_element?(view, "#menu-inspector", "admin.system.info")
+    assert has_element?(view, "#menu-inspector-pagination-summary", "item")
+    refute render(view) =~ "Page 1 of 1"
   end
 
   test "source filter narrows by contributing module", %{conn: conn} do

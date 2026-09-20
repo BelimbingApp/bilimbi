@@ -191,6 +191,38 @@ defmodule BilimbiWeb.AuditLiveTest do
       view |> element("#mutations-sort-event") |> render_click()
       assert %{"sort_by" => "event", "sort_dir" => "asc"} = patched_params(view)
     end
+
+    test "keeps the result count but omits navigation for a single page", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.audit.log.list")
+
+      {:ok, _mutation} =
+        Audit.record_mutation(scope, %{
+          company_id: 73,
+          actor_type: "user",
+          actor_id: 91,
+          auditable_type: "Bilimbi.Core.Company",
+          auditable_id: "73",
+          event: "updated",
+          occurred_at: ~N[2026-08-18 10:00:00]
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
+
+      {:ok, mutations} = Audit.list_mutations(scope)
+
+      assert has_element?(
+               view,
+               "#mutations-pagination-summary",
+               "#{length(mutations)} mutations"
+             )
+
+      refute has_element?(view, "#mutations-prev")
+      refute has_element?(view, "#mutations-next")
+      refute render(view) =~ "Page 1 of 1"
+    end
   end
 
   describe "Audit Actions (/audit/actions)" do
@@ -363,6 +395,29 @@ defmodule BilimbiWeb.AuditLiveTest do
 
       assert has_element?(view, "#actions-table", "bilimbi.migrate")
       refute has_element?(view, "#actions-table", "hacker@example.test")
+    end
+
+    test "keeps the result count but omits navigation for a single page", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.audit.log.list")
+
+      {:ok, _action} =
+        Audit.record_action(scope, %{
+          company_id: 73,
+          actor_type: "user",
+          actor_id: 91,
+          event: "employee.updated",
+          occurred_at: ~N[2026-08-18 10:15:00]
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/actions")
+
+      assert has_element?(view, "#actions-pagination-summary", "1 actions")
+      refute has_element?(view, "#actions-prev")
+      refute has_element?(view, "#actions-next")
+      refute render(view) =~ "Page 1 of 1"
     end
   end
 
