@@ -501,6 +501,7 @@ defmodule BilimbiWeb.AddressLiveTest do
 
     assert has_element?(view, "#address-location-form")
     assert has_element?(view, "#address-location-postcode-error-0", "should be at most 255 character(s)")
+    refute has_element?(view, "#address-location-status[role='status']")
     assert {:ok, %{postcode: "50000"}} = Address.get_address(scope, address.id)
   end
 

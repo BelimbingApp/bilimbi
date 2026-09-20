@@ -98,13 +98,12 @@ defmodule BilimbiWeb.ForgotPasswordLive do
           </.button>
         </.form>
 
-        <.link
-          navigate={~p"/"}
+        <.back_link
           id="forgot-back"
-          class="text-center text-sm text-action hover:underline"
-        >
-          Back to sign in
-        </.link>
+          navigate={~p"/"}
+          title="Back to sign in"
+          class="justify-center"
+        />
       </div>
     </Layouts.auth>
     """

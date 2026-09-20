@@ -1166,6 +1166,28 @@
                 Deliberately outside this contract: the shell's preference status line under the top bar. It reports the in-flight and settled state of the clock and theme controls in place, written by the shell's own client hook before the server answers, so "Saving…" can show at once and a failure stays beside the control it belongs to. A flash is a server fact rendered after the round trip and cannot do that, so the status line is not folded into this outlet and this outlet does not report preference saves.
               </p>
             </div>
+            <div id="component-commit-status" class="space-y-2">
+              <p class="text-xs text-ink-muted">
+                The outcome of one in-place commit, reported beside the fact that made it rather
+                than in a flash. Every write that saves by itself — an inline edit, a choice that
+                commits on change, a group with one Apply — speaks in this one voice: "Saved" for
+                the most recent commit, and a refusal that names the rejected value and stays on
+                its fact until that fact is committed again.
+              </p>
+              <div class="grid gap-3 lg:grid-cols-2">
+                <.card title="Stored" inner_class="p-4">
+                  <.commit_status id="design-library-commit-status-saved" status={:saved} />
+                </.card>
+                <.card title="Refused" inner_class="p-4">
+                  <.commit_status
+                    id="design-library-commit-status-error"
+                    status={
+                      {:error, "\"+60 3\" was not saved: Phone should be at most 3 character(s)."}
+                    }
+                  />
+                </.card>
+              </div>
+            </div>
             <div id="component-alert" class="grid gap-2 lg:grid-cols-2">
               <.alert kind={:info}>This change affects future records.</.alert><.alert kind={
                 :success

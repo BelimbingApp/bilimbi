@@ -590,7 +590,6 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   follows a saved clock change on instants that are already on screen,
   streamed rows included; do not thread a `display` assign to achieve
   that. Pass `display` only to pin one instant to a context of your own.
-  Primary actions use
   Detail pages are read-first: facts edit in place and commit by themselves
   through `<.inline_edit>` (`allow_empty` on nullable columns, the outcome
   passed back as `status`), a choice commits on change, and only genuinely

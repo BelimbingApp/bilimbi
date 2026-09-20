@@ -103,13 +103,11 @@ const InlineEdit = {
   // the saved or failed outcome and `settle` clears the in-flight marks.
   markSaving() {
     this.el.setAttribute("aria-busy", "true")
-    this.el.setAttribute("data-state", "saving")
     if (this.savingEl) this.savingEl.classList.remove("hidden")
   },
 
   settle() {
     this.el.removeAttribute("aria-busy")
-    this.el.removeAttribute("data-state")
     if (this.savingEl) this.savingEl.classList.add("hidden")
   },
 

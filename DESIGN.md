@@ -135,7 +135,7 @@ during long operational sessions:
 Inline editing allows quick modifications to entity fields without leaving the
 table view:
 
-- **Display mode:** Shows the field value in `text-ink` alongside a subtle hover pencil icon (`size-3.5 text-muted opacity-0 group-hover:opacity-100 transition-opacity`). A blank value shows the `empty` placeholder (`—`) in `text-ink-muted`.
+- **Display mode:** Shows the field value in `text-ink` alongside a subtle hover pencil icon (`size-3.5 text-muted opacity-0 group-hover:opacity-100 transition-opacity`). A blank value shows `—` in `text-ink-muted`.
 - **Activation:** Clicking the cell or pressing Enter when focused activates edit mode.
 - **Editing mode:** Replaces the cell with an inline `<input>` styled with
   `border-brand-strong`, autofocusing and selecting the text.
@@ -185,10 +185,8 @@ the operator came from is a secondary action and is always a plain link, never
 a button: `<.back_link navigate={...}>` renders "← Back" in `text-link`, and its
 `title` names the destination ("Back to company") when the page has more than
 one way back. This holds for every page — list, form and detail — so a
-"Back to …" `<.button>` anywhere is a defect. The same demotion applies to any
-familiar secondary action a header carries: history is an icon action, and
-navigation to a sibling view is a link, so that the remaining buttons are the
-page's real actions.
+"Back to …" `<.button>` anywhere is a defect. Record history is demoted the
+same way: it is an icon action in the header, never a button.
 
 ## Modal dialogs
 

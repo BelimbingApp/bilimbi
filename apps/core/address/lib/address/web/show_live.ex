@@ -305,7 +305,10 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
         {:error, %Ecto.Changeset{} = changeset} ->
           # The grouped form reports each refused field on its own input, so
           # the operator corrects it where they typed it.
-          {:noreply, assign(socket, :location_form, to_form(changeset, as: :location))}
+          {:noreply,
+           socket
+           |> put_field_status("location", nil)
+           |> assign(:location_form, to_form(changeset, as: :location))}
 
         {:error, reason} ->
           {:noreply, put_field_status(socket, "location", {:error, failure_message(reason)})}
@@ -573,7 +576,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                     <.verification_badge status={@address.verification_status} />
                   </span>
 
-                  <.fact_status id="address-verification-status-status" status={@field_status["verification_status"]} />
+                  <.commit_status id="address-verification-status-status" status={@field_status["verification_status"]} />
                 </dd>
               </div>
 
@@ -624,7 +627,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                 <p class="mt-0.5 text-xs text-ink-subtle">
                   Linked to GeoNames reference database for standardization and lookup. Country, division, postcode and locality depend on one another, so they are applied together.
                 </p>
-                <.fact_status id="address-location-status" status={@field_status["location"]} />
+                <.commit_status id="address-location-status" status={@field_status["location"]} />
               </div>
             </div>
 
@@ -958,32 +961,6 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
       <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">{@label}</dt>
       {render_slot(@inner_block)}
     </div>
-    """
-  end
-
-  # The outcome of a grouped or choice commit, in the same voice as
-  # `<.inline_edit>` reports its own.
-  attr(:id, :string, required: true)
-  attr(:status, :any, required: true)
-
-  defp fact_status(%{status: nil} = assigns), do: ~H""
-
-  defp fact_status(%{status: :saved} = assigns) do
-    ~H"""
-    <p id={@id} role="status" class="mt-0.5 flex items-center gap-1 text-xs text-success-ink">
-      <.icon name="success" class="size-3" /> Saved
-    </p>
-    """
-  end
-
-  defp fact_status(%{status: {:error, message}} = assigns) do
-    assigns = assign(assigns, :message, message)
-
-    ~H"""
-    <p id={@id} role="alert" class="mt-0.5 flex items-start gap-1 text-xs text-danger-ink">
-      <.icon name="error" class="mt-0.5 size-3 shrink-0" />
-      <span class="min-w-0 [overflow-wrap:anywhere]">{@message}</span>
-    </p>
     """
   end
 

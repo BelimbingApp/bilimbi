@@ -2268,11 +2268,6 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:name, :string, default: "value")
   attr(:label, :string, default: "Edit value")
 
-  attr(:empty, :string,
-    default: "—",
-    doc: "what the display shows while the value is blank; never pushed as the value"
-  )
-
   attr(:allow_empty, :boolean,
     default: false,
     doc: "an emptied input is a real edit and pushes the empty string"
@@ -2288,7 +2283,7 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:rest, :global)
 
   def inline_edit(assigns) do
-    assigns = assign(assigns, :status, normalize_inline_status(assigns.status))
+    assigns = assign(assigns, :status, normalize_commit_status(assigns.status))
 
     ~H"""
     <div
@@ -2309,7 +2304,7 @@ defmodule Bilimbi.Base.UI.Components do
         class="group flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 -mx-1.5 text-left hover:bg-surface-sunken transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
       >
         <span :if={@value != ""} data-role="text" class="text-ink">{@value}</span>
-        <span :if={@value == ""} data-role="text" class="text-ink-muted">{@empty}</span>
+        <span :if={@value == ""} data-role="text" class="text-ink-muted">—</span>
         <.icon
           name="edit"
           class="size-3.5 text-ink-muted opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity"
@@ -2333,37 +2328,70 @@ defmodule Bilimbi.Base.UI.Components do
         <.icon name="refresh" class="size-3 motion-safe:animate-spin" /> Saving…
       </span>
 
-      <p
-        :if={@status == :saved}
-        id={"#{@id}-status"}
-        data-role="status"
-        role="status"
-        class="mt-0.5 flex items-center gap-1 text-xs text-success-ink"
-      >
-        <.icon name="success" class="size-3" /> Saved
-      </p>
-
-      <p
-        :for={{:error, message} <- List.wrap(@status)}
-        id={"#{@id}-status"}
-        data-role="status"
-        role="alert"
-        class="mt-0.5 flex items-start gap-1 text-xs text-danger-ink"
-      >
-        <.icon name="error" class="mt-0.5 size-3 shrink-0" />
-        <span class="min-w-0 [overflow-wrap:anywhere]">{message}</span>
-      </p>
+      <.commit_status id={"#{@id}-status"} status={@status} data-role="status" />
     </div>
     """
   end
 
-  defp normalize_inline_status(nil), do: nil
-  defp normalize_inline_status(:saved), do: :saved
-  defp normalize_inline_status({:error, message}) when is_binary(message), do: {:error, message}
+  @doc """
+  Renders the outcome of one commit beside the fact that made it.
 
-  defp normalize_inline_status(other) do
+  This is the single voice every in-place write reports in, whether the fact
+  is an `<.inline_edit>`, a choice that commits on change, or a group of
+  interdependent facts with one Apply:
+
+    * `nil` — nothing to report;
+    * `:saved` — the last commit was stored, announced as a `role="status"`;
+    * `{:error, message}` — the last commit was refused, announced as a
+      `role="alert"`, with `message` naming the rejected value and why.
+
+  ## Examples
+
+      <.commit_status id="address-location-status" status={@field_status["location"]} />
+  """
+  attr(:id, :string, required: true)
+
+  attr(:status, :any,
+    required: true,
+    doc: "the outcome of the last commit: `nil`, `:saved`, or `{:error, message}`"
+  )
+
+  attr(:rest, :global)
+
+  def commit_status(assigns) do
+    assigns = assign(assigns, :status, normalize_commit_status(assigns.status))
+
+    ~H"""
+    <p
+      :if={@status == :saved}
+      id={@id}
+      role="status"
+      class="mt-0.5 flex items-center gap-1 text-xs text-success-ink"
+      {@rest}
+    >
+      <.icon name="success" class="size-3" /> Saved
+    </p>
+
+    <p
+      :for={{:error, message} <- List.wrap(@status)}
+      id={@id}
+      role="alert"
+      class="mt-0.5 flex items-start gap-1 text-xs text-danger-ink"
+      {@rest}
+    >
+      <.icon name="error" class="mt-0.5 size-3 shrink-0" />
+      <span class="min-w-0 [overflow-wrap:anywhere]">{message}</span>
+    </p>
+    """
+  end
+
+  defp normalize_commit_status(nil), do: nil
+  defp normalize_commit_status(:saved), do: :saved
+  defp normalize_commit_status({:error, message}) when is_binary(message), do: {:error, message}
+
+  defp normalize_commit_status(other) do
     raise ArgumentError,
-          "<.inline_edit> status must be nil, :saved, or {:error, message}, got: #{inspect(other)}"
+          "status must be nil, :saved, or {:error, message}, got: #{inspect(other)}"
   end
 
   @doc """
