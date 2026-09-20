@@ -789,9 +789,10 @@ workflow never competes with the work its page is about.
 Shipped in `Bilimbi.Base.UI.Components`:
 
 - [x] `<.action_link>` is the general form of `<.back_link>` — the same
-  `text-link` treatment and free text. It takes `navigate`, `icon` and `title`,
-  all three required, and declares no global attrs, so a link with no
-  destination, no glyph or no accessible name is unrepresentable. `title` is
+  `text-link` treatment and free text. Its surface is closed: `id`, `icon`,
+  `navigate` and `title`, all four required, with no `class` override and no
+  global attrs, so a demoted action that is unaddressable, unreachable,
+  glyphless, unnamed or styled out of the family is unrepresentable. `title` is
   mirrored onto `aria-label`, which is what lets two "Manage" links on one page
   announce different destinations. The Design Library presents it as one titled
   specimen. `{fm/companies-detail-belimbing-parity/claude-fable-5-1}`
@@ -809,9 +810,10 @@ there carries only its primary create button in the page-header actions slot
 and places no demoted related-workflow link beside it. The `/companies` order
 therefore decided — primary action first, demoted links after — and
 `/employees` was reordered to match, so the two indexes read identically. The
-shared `<.header>` actions container sets no gap, so each such row wraps its
-controls in a `flex flex-wrap items-center gap-6` row at the call site; the
-shared component is untouched because every other page depends on it.
+shared `<.header>` actions container is a plain block with no gap, so each such
+row wraps its controls in a `flex items-center gap-3` row at the call site —
+the value `/addresses/:id` already shipped with; the shared component is
+untouched because every other page depends on it.
 
 Left as arguable and unchanged:
 
@@ -827,7 +829,9 @@ Not delivered by this slice:
   button**, against the order settled above: Core Company's
   `departments_live.ex`, `relationships_live.ex`, `legal_entity_types_live.ex`
   and `department_types_live.ex`; Core Employee's `type_index_live.ex` and
-  `show_live.ex`; and Core User's `show_live.ex`. That placement pre-dates this
-  slice and is deliberately left for a later change.
+  `show_live.ex`; and Core User's `show_live.ex`. The same seven header rows
+  also still lack the `flex items-center gap-3` wrapper the rule above settles,
+  so their controls sit one collapsed space apart. Both gaps pre-date this
+  slice and are deferred together for a later change.
 - **CMP-03 stays open.** `/companies/:id` still keeps its facts behind explicit
   edit modes; only the header and the section affordances were settled here.

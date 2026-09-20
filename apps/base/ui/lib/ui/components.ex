@@ -2442,6 +2442,11 @@ defmodule Bilimbi.Base.UI.Components do
   Belimbing uses for the same action. `<.back_link>` is the fixed-text member
   of the same family.
 
+  The surface is closed: `id`, `icon`, `navigate` and `title` are all
+  required and there is nothing else, so every demoted action is addressable,
+  reachable, glyphed and named, and none can style itself away from the one
+  treatment the family shares.
+
   ## Examples
 
       <.action_link
@@ -2453,7 +2458,7 @@ defmodule Bilimbi.Base.UI.Components do
         Manage
       </.action_link>
   """
-  attr(:id, :string, default: nil)
+  attr(:id, :string, required: true)
   attr(:navigate, :string, required: true)
 
   attr(:icon, :string,
@@ -2467,7 +2472,6 @@ defmodule Bilimbi.Base.UI.Components do
       "names the destination; it must contain the visible text so the label does not replace it"
   )
 
-  attr(:class, :any, default: nil)
   slot(:inner_block, required: true)
 
   def action_link(assigns) do
@@ -2477,7 +2481,7 @@ defmodule Bilimbi.Base.UI.Components do
       navigate={@navigate}
       title={@title}
       aria-label={@title}
-      class={[secondary_link_class(), @class]}
+      class={secondary_link_class()}
     >
       <.icon name={@icon} class="size-4" />
       {render_slot(@inner_block)}
