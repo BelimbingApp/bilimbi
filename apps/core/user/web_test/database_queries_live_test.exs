@@ -179,6 +179,14 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       refute has_element?(view, "#btn-duplicate-query")
       refute has_element?(view, "#btn-delete-query")
 
+      assert has_element?(
+               view,
+               "a#database-query-back[href='/admin/system/database-queries'][title='Back to database queries']",
+               "Back"
+             )
+
+      refute has_element?(view, "button#database-query-back")
+
       # Server-side event authorization rejection
       assert render_click(view, "save") =~ "You are not authorized to modify queries."
       assert render_click(view, "duplicate") =~ "You are not authorized to modify queries."

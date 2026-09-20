@@ -80,6 +80,14 @@ defmodule BilimbiWeb.PlatformOperatorSetupLiveTest do
     assert has_element?(view, "#platform-operator-select")
     refute has_element?(view, "#platform-operator-company option", "Elsewhere")
 
+    assert has_element?(
+             view,
+             "a#platform-operator-back[href='/companies'][title='Back to companies']",
+             "Back"
+           )
+
+    refute has_element?(view, "button#platform-operator-back")
+
     view
     |> form("#platform-operator-designate-form", company_id: "73")
     |> render_submit()

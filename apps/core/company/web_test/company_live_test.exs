@@ -1158,6 +1158,14 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#nav-admin-company-legal-entity-type[aria-current='page']")
       assert has_element?(view, "#legal-entity-types-empty", "No legal entity types defined yet.")
 
+      assert has_element?(
+               view,
+               "a#legal-entity-types-back[href='/companies'][title='Back to companies']",
+               "Back"
+             )
+
+      refute has_element?(view, "button#legal-entity-types-back")
+
       # Open new modal
       view |> element("#new-legal-entity-type-btn") |> render_click()
       assert has_element?(view, "#legal-entity-type-modal")
@@ -1272,6 +1280,14 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(view, "h1", "Department Types")
       assert has_element?(view, "#nav-admin-company-department-type[aria-current='page']")
+
+      assert has_element?(
+               view,
+               "a#department-types-back[href='/companies'][title='Back to companies']",
+               "Back"
+             )
+
+      refute has_element?(view, "button#department-types-back")
 
       # Create Operational Type
       view |> element("#new-department-type-btn") |> render_click()
@@ -1400,6 +1416,14 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(view, "h1", "Bilimbi Industries — Departments")
       assert has_element?(view, "#company-departments-empty")
+
+      assert has_element?(
+               view,
+               "a#departments-back[href='/companies/73'][title='Back to Bilimbi Industries']",
+               "Back"
+             )
+
+      refute has_element?(view, "button#departments-back")
 
       # Add Department
       view |> element("#add-dept-btn") |> render_click()
@@ -1688,6 +1712,14 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(view, "h1", "Bilimbi Industries — Relationships")
       assert has_element?(view, "#company-relationships-empty")
+
+      assert has_element?(
+               view,
+               "a#relationships-back[href='/companies/73'][title='Back to Bilimbi Industries']",
+               "Back"
+             )
+
+      refute has_element?(view, "button#relationships-back")
 
       # Add Relationship
       view |> element("#add-rel-btn") |> render_click()

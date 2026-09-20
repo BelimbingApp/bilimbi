@@ -535,6 +535,10 @@ defmodule BilimbiWeb.AddressLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
 
+    # A commit that did land, so the refusal below has a stale "Saved" to clear.
+    render_hook(view, "save_field", %{"id" => to_string(address.id), "label" => "HQ North"})
+    assert has_element?(view, "#address-label-status[role='status']", "Saved")
+
     grant =
       Bilimbi.Base.Authz.list_principal_capabilities(scope, page_size: 100)
       |> Map.fetch!(:entries)
@@ -545,13 +549,17 @@ defmodule BilimbiWeb.AddressLiveTest do
     render_hook(view, "save_field", %{"id" => to_string(address.id), "label" => "Forged"})
     assert has_element?(view, "#flash-group", "You do not have permission to update addresses.")
 
+    # The refusal is the whole outcome: no "Saved" from the earlier commit
+    # stands beside it.
+    refute has_element?(view, "#address-label-status")
+
     render_hook(view, "save_verification_status", %{"verification_status" => "verified"})
 
     render_hook(view, "save_location", %{
       "location" => %{"country_iso" => "MY", "admin1_code" => "", "postcode" => "", "locality" => ""}
     })
 
-    assert {:ok, %{label: "HQ", verification_status: "unverified", country_iso: nil}} =
+    assert {:ok, %{label: "HQ North", verification_status: "unverified", country_iso: nil}} =
              Address.get_address(scope, address.id)
   end
 
