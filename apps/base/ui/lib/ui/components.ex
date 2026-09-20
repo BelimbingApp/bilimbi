@@ -2437,21 +2437,24 @@ defmodule Bilimbi.Base.UI.Components do
   section of a company, the list of types beside the list that uses them — is
   a link in `text-link`, never a button. It sits on the section it belongs to,
   or beside the page's primary action when the whole list is what it relates
-  to, and its leading glyph is named through the icon registry so the link
-  keeps the icon Belimbing uses for the same action. `<.back_link>` is the
-  fixed-text member of the same family.
+  to, as the type lists of `/companies` and `/employees` do, and its leading
+  glyph is named through the icon registry so the link keeps the icon
+  Belimbing uses for the same action. `<.back_link>` is the fixed-text member
+  of the same family.
 
   ## Examples
 
-      <.action_link id="company-departments-manage" icon="manage" navigate={~p"/companies/1/departments"}>
+      <.action_link
+        id="company-departments-manage"
+        icon="manage"
+        navigate={~p"/companies/1/departments"}
+        title="Manage departments"
+      >
         Manage
-      </.action_link>
-
-      <.action_link id="companies-department-types" icon="manage" navigate={~p"/companies/department-types"} title="Manage department types">
-        Department Types
       </.action_link>
   """
   attr(:id, :string, default: nil)
+  attr(:navigate, :string, required: true)
 
   attr(:icon, :string,
     required: true,
@@ -2459,23 +2462,22 @@ defmodule Bilimbi.Base.UI.Components do
   )
 
   attr(:title, :string,
-    default: nil,
+    required: true,
     doc:
       "names the destination; it must contain the visible text so the label does not replace it"
   )
 
   attr(:class, :any, default: nil)
-  attr(:rest, :global, include: ~w(href navigate patch))
   slot(:inner_block, required: true)
 
   def action_link(assigns) do
     ~H"""
     <.link
       id={@id}
+      navigate={@navigate}
       title={@title}
       aria-label={@title}
       class={[secondary_link_class(), @class]}
-      {@rest}
     >
       <.icon name={@icon} class="size-4" />
       {render_slot(@inner_block)}

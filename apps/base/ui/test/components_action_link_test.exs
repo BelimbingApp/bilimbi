@@ -14,7 +14,12 @@ defmodule Bilimbi.Base.UI.ComponentsActionLinkTest do
 
     html =
       rendered_to_string(~H"""
-      <.action_link id="company-departments-manage" icon="manage" navigate="/companies/7/departments">
+      <.action_link
+        id="company-departments-manage"
+        icon="manage"
+        navigate="/companies/7/departments"
+        title="Manage departments"
+      >
         Manage
       </.action_link>
       """)
@@ -47,8 +52,8 @@ defmodule Bilimbi.Base.UI.ComponentsActionLinkTest do
 
     assert html =~ ~s(href="/companies/department-types")
     assert html =~ "hero-cog-6-tooth"
-    assert html =~ ~s(title="Manage department types")
-    assert html =~ ~s(aria-label="Manage department types")
+    assert attribute(html, "title") == "Manage department types"
+    assert attribute(html, "aria-label") == attribute(html, "title")
     assert visible_text(html) == "Department Types"
   end
 
@@ -57,7 +62,7 @@ defmodule Bilimbi.Base.UI.ComponentsActionLinkTest do
 
     action =
       rendered_to_string(~H"""
-      <.action_link id="a" icon="manage" navigate="/x">Manage</.action_link>
+      <.action_link id="a" icon="manage" navigate="/x" title="Manage x">Manage</.action_link>
       """)
 
     back =
@@ -68,9 +73,11 @@ defmodule Bilimbi.Base.UI.ComponentsActionLinkTest do
     assert class_of(action) == class_of(back)
   end
 
-  defp class_of(html) do
-    [_, class] = Regex.run(~r/class="([^"]*)"/, html)
-    class
+  defp class_of(html), do: attribute(html, "class")
+
+  defp attribute(html, name) do
+    [_, value] = Regex.run(~r/\b#{name}="([^"]*)"/, html)
+    value
   end
 
   defp visible_text(html) do

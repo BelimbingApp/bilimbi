@@ -124,6 +124,29 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     assert has_element?(view, "#employee-types")
   end
 
+  test "reaches the employee type list through a demoted link, not a button", %{conn: conn} do
+    grant_capabilities!(["admin.employee.list", "admin.employee-type.list"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
+
+    assert has_element?(
+             view,
+             "a#employee-types[href='/employee-types'][title='Manage employee types']",
+             "Employee Types"
+           )
+
+    assert has_element?(view, "#employee-types .hero-cog-6-tooth")
+    refute has_element?(view, "button#employee-types")
+  end
+
+  test "hides the employee type link from an actor who may not list types", %{conn: conn} do
+    grant_capabilities!("admin.employee.list")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees")
+
+    refute has_element?(view, "#employee-types")
+  end
+
   test "shows empty state when company has no employees", %{conn: conn} do
     CompanyFixtures.insert_company!(%{
       id: 75,
