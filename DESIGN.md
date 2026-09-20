@@ -209,13 +209,12 @@ no gap, so a page header's actions row wraps its controls in a
 action followed by demoted links (`/companies`, `/employees`) or only demoted
 actions and record metadata (`/companies/:id`, `/addresses/:id`). Without it
 the controls sit one collapsed space apart and read as a single run of text.
-The page header never repeats a section's link
-as a button; on `/companies/:id` its actions row holds the status badge, the
-history icon action and the back link and no button, while the title row keeps
-the pin icon action. `<.action_link>` is the general form of `<.back_link>`:
-the same `text-link` treatment, free text, and a registry glyph. A
-related-workflow `<.button>` that is not the page's primary action is a
-defect.
+The page header never repeats a section's link as a button; on
+`/companies/:id` its actions row holds the status badge, the history icon
+action and the back link and no button, while the title row keeps the pin
+icon action. `<.action_link>` is the general form of `<.back_link>`: the same
+`text-link` treatment, free text, and a registry glyph. A related-workflow
+`<.button>` that is not the page's primary action is a defect.
 
 ## Modal dialogs
 

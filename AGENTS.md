@@ -598,9 +598,8 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   ("← Back"), never a "Back to …" button; a related workflow such as
   Manage is an `<.action_link>` carrying its registry glyph, on the section
   it belongs to or beside the page's primary action, never a button; and
-  render record history through
-  the `record.history` panel, whose trigger is the registry's `history`
-  icon. Primary actions use
+  render record history through the `record.history` panel, whose trigger is
+  the registry's `history` icon. Primary actions use
   `<.button variant="primary">` with deep olive base (`bg-action`, `lime-950`
   light / `lime-600` dark), high-contrast text (`text-action-ink`, `lime-50`
   light / `lime-950` dark), and a brighter lime hover
