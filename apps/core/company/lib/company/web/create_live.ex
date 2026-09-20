@@ -105,9 +105,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
           Create Company
           <:subtitle>Add a company record and business context</:subtitle>
           <:actions>
-            <.button id="company-create-back" navigate={~p"/companies"}>
-              Back
-            </.button>
+            <.back_link id="company-create-back" navigate={~p"/companies"} title="Back to companies" />
           </:actions>
         </.header>
 

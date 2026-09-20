@@ -238,9 +238,7 @@ defmodule Bilimbi.Core.Company.Web.LegalEntityTypesLive do
           Legal Entity Types
           <:subtitle>Manage corporate and legal forms recognized in this platform</:subtitle>
           <:actions>
-            <.button navigate={~p"/companies"} class="text-xs">
-              Back to companies
-            </.button>
+            <.back_link id="legal-entity-types-back" navigate={~p"/companies"} title="Back to companies" />
             <.button
               :if={@can_create?}
               id="new-legal-entity-type-btn"

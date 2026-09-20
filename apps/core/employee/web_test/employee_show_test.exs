@@ -50,6 +50,14 @@ defmodule BilimbiWeb.EmployeeShowTest do
     assert has_element?(view, "#app-content", "EMP-001")
     refute has_element?(view, "#employee-edit")
     refute has_element?(view, "#employee-danger")
+
+    assert has_element?(
+             view,
+             "a#employee-back[href='/employees'][title='Back to employees']",
+             "Back"
+           )
+
+    refute has_element?(view, "button#employee-back")
   end
 
   test "shows record history and impersonation attribution when the actor can list audit logs", %{

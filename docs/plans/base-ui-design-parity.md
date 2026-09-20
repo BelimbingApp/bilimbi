@@ -1,9 +1,9 @@
 # Base UI Design Parity
 
 **Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families (#724). Merged to `main` through 2026-09-15: application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display. Since then the library has been stripped of catalog IDs (#728), and the shared layer has taken much of the accepted action and feedback contract — destructive confirmation (#733), reduced motion with 4.5:1 contrast (#738), stacked flash messages (#741), busy controls and a login screen that reports its progress (#743), the empty and permission region pattern (#740), real dialog semantics on modal overlays (#731), one shared filter toolbar (#745), field shell states (#744), secret reveal and multi-select corrections (#746) and a released shell observer (#747) — alongside icon-name validity (#727, #734), Schedule timestamps and UTC day labels through the datetime component (#735, #737), impersonation reader coverage (#729), corrected catalog rows (#730), drift-guard documentation folded into this plan (#726) and the Belimbing cutover value remap (#725); the drift guards stay excluded from the default run — the Design Library state-coverage slice of 2026-09-18 corrected all but two of the uncovered names and axes the coverage guard reports and records those two as accepted rather than pending, while the imitation guard's anchor and control-markup failures are still open
-**Last Updated:** 2026-09-18
+**Last Updated:** 2026-09-20
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1); `fm/parity-plan-checklist-reconcile/muse-spark` (checklist reconciliation on 2026-09-18, not audit authorship); `fm/icon-registry-name-validity/opus-5`; `fm/designlib-state-coverage-gaps/opus-5` (Design Library state coverage on 2026-09-18); `crewmate scout` (firstmate scout tasks that record no model — the FND-06 icon inventory and the four Phase 2 lane audits of 2026-09-16; separate sessions from the `crewmate/gpt-6` entry above, which is why these rows carry no model)
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1); `fm/parity-plan-checklist-reconcile/muse-spark` (checklist reconciliation on 2026-09-18, not audit authorship); `fm/icon-registry-name-validity/opus-5`; `fm/designlib-state-coverage-gaps/opus-5` (Design Library state coverage on 2026-09-18); `fm/addresses-detail-read-first/opus-5` (read-first detail page, shared commit status and demoted back link on 2026-09-20); `crewmate scout` (firstmate scout tasks that record no model — the FND-06 icon inventory and the four Phase 2 lane audits of 2026-09-16; separate sessions from the `crewmate/gpt-6` entry above, which is why these rows carry no model)
 
 ## Problem Essence
 
@@ -62,7 +62,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | LAY-05 | Index, form and detail geometry | Shared `<.page>` enforces one width per list, form and detail archetype; each screen still composes its assembly locally | Define complete assemblies rather than leaving every screen to compose them differently. |
 | NAV-01 [(contradicted)](#targets-the-evidence-contradicts) | Main menu tree | Exists | Verify active ancestry, pinned items, reorder, collapse, mobile drawer and persistence. |
 | NAV-02 | Tabs | Shared `<.tabs>` used by Schedule and Settings | Provide shared semantics, keyboard navigation, active state and URL/history rules. |
-| NAV-03 | Link dictionary and related-link groups | No shared contract | Adopt internal, anchor, external, new-tab and download behavior; mutations remain buttons. |
+| NAV-03 | Link dictionary and related-link groups | No shared contract beyond `<.back_link>`, the demoted "← Back" return link every list, form and detail page now uses instead of a "Back to …" button | Adopt internal, anchor, external, new-tab and download behavior; mutations remain buttons. |
 | NAV-04 | Pagination | Shared component exists | Compare narrow layout, disabled states, page-size control, URL state and accessible labels. |
 | NAV-05 [(contradicted)](#targets-the-evidence-contradicts) | User account and scope menu | Partial user footer exists | On user-circle activation, show signed-in name and identifier, current company and tenant, change password and sign out. Show scope switching only when more than one permitted scope exists. |
 | ACT-01 [(contradicted)](#targets-the-evidence-contradicts) | Buttons | Primary, secondary and destructive basics | Cover emphasis, compact size, disabled, loading, navigation and truthful completion. |
@@ -77,7 +77,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | INP-07 | Searchable and editable combobox | Missing | Adopt the useful Belimbing behavior with full keyboard, async, no-result and commit/cancel states. |
 | INP-08 | Country and currency lookup | Missing | Build only the generic visual/interaction seam; domain data stays with its owning module. |
 | INP-09 | Segmented control | Missing | Add for short peer choices when a real Bilimbi workflow needs it. |
-| INT-01 | Inline text editing | Shared primitive exists | Complete F2/typing entry, Enter/blur save, Escape cancel, focus restore and error recovery. |
+| INT-01 | Inline text editing | Shared `<.inline_edit>` commits on Enter or blur, cancels on Escape, shows `—` for a blank value, keeps the stored value on screen for the whole round trip, marks that trip `aria-busy` beside a "Saving…" line, and reports the commit outcome on the field itself through the shared `<.commit_status>`; an emptied input is a real edit only where the owner passes `allow_empty`. `/addresses/:id` adopts all of it; the other inline-edit screens still report through a flash. F2 entry and focus restore after a commit do not exist | Complete F2/typing entry, Enter/blur save, Escape cancel, focus restore and error recovery. |
 | INT-02 | Inline select, combobox and textarea editing | Missing | Add after their underlying controls are accepted. |
 | INT-03 [(contradicted)](#targets-the-evidence-contradicts) | Grouped fact editing | Missing | Support Apply/Cancel where facts must change atomically. |
 | INT-04 [(contradicted)](#targets-the-evidence-contradicts) | Disclosure | No shared primitive | Define open/closed semantics, `aria-expanded`, keyboard behavior and reduced motion. |
@@ -99,7 +99,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | DAT-06 | Record history, timeline and comparisons | Local or missing | Keep specialist behavior with the owning workflow; share only the generic presentation seam. |
 | CMP-01 [(contradicted)](#targets-the-evidence-contradicts) | Operational index page | Partial specimen | Standardize header, filters, table, actions, empty/loading/error and pagination as one flow. |
 | CMP-02 | Form page | Complete production form ships (`/companies/create`: field rhythm, inline validation, save/cancel); no unsaved-navigation guard exists, and that criterion depends on INT-06, which is deferred until a real Bilimbi workflow proves the need; the shared composition is not extracted | Standardize field rhythm, validation, save/cancel, loading, success and unsaved navigation. |
-| CMP-03 | Detail and settings page | Complete production detail ships (`/companies/1`: facts, explicit edit modes, related navigation, permission states); the shared assembly is not extracted | Standardize facts, inline/grouped editing, related navigation and permission states. |
+| CMP-03 | Detail and settings page | Two production details ship: `/addresses/1` is read-first (every fact edits in place and saves by itself, one grouped Apply for the interdependent location facts, the outcome on the fact rather than in a flash, a demoted back link and history icon), while `/companies/1` keeps facts behind explicit edit modes; related navigation and permission states exist on both, and the shared assembly is not extracted | Standardize facts, inline/grouped editing, related navigation and permission states. |
 | CMP-04 | Destructive workflow | No complete specimen | Show entry, consequence, acknowledgement, in-flight, success, failure and recovery together. |
 | CMP-05 | Authentication and first arrival | Login, recovery and dashboard arrival ship and were audited live against Belimbing (Lanes A and D); the sign-in handoff is a busy submit with readonly fields | Treat login, recovery and dashboard arrival as first-impression acceptance surfaces. |
 | CMP-06 | Responsive and theme coverage | The `/companies` index and the shell were verified live at narrow width and in dark theme (Lane D); narrow detail, narrow form and a full keyboard pass remain | Review representative assemblies at desktop/narrow widths and in light/dark themes. |
@@ -306,8 +306,9 @@ lost inside a design ledger:
   `aria-expanded` is the literal `"false"` at `components.ex:669` — it never changes,
   so assistive technology is told the panel is shut while it is open.
 - `<.inline_edit>` drops focus to `document.body` on every Enter-commit; Escape
-  returns focus correctly. A blank commit is silently discarded under a stale success
-  flash.
+  returns focus correctly. The blank-commit half of this defect is closed: an emptied
+  input is a real edit where the owner passes `allow_empty`, and the outcome of a
+  commit is reported on the field rather than by a flash that can go stale.
 - Four icon names — `bilimbi-plus`, `bilimbi-pencil`, `bilimbi-link-slash`,
   `bilimbi-x-mark` — are unregistered across 11 call sites, so "add", "edit", "unlink"
   and "remove" all render the registry's fallback glyph.
@@ -329,7 +330,9 @@ lost inside a design ledger:
 ##### Corrections to this document
 
 - The Icon vocabulary slice below claimed `IconRegistry` carried 73 glyph entries.
-  Corrected in place: it holds 3 glyph entries, 9 shell names and 49 named actions.
+  Corrected in place: it holds 3 glyph entries and 9 shell names beside the named
+  action vocabulary, which later slices keep extending — `IconRegistry.actions/0`
+  is the count, not this document.
 
 ##### Inaccurate claims found in other project files
 
@@ -455,6 +458,8 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
   - **The section headed "Interaction patterns" was CMP-01.** Its search, table,
     empty result and pagination are one operational index flow, so it is now
     Composite patterns; Interaction patterns keeps INT-01 inline editing alone.
+    The read-first detail slice added the demoted back link under Navigation and
+    links (NAV-03), beside Navigation and Tabs, rather than here.
   - **`<.card>` and `<.badge>` moved to Data display** (DAT-01, DAT-02) and the
     application shell moved under Page structure (LAY-02), keeping its own
     `#component-shell` deep link as a nested menu-linked section.
@@ -672,7 +677,7 @@ Goal: Give familiar actions named entries in the icon registry so call sites nam
 - [x] Run the shipping gate and land the change. `{codex-terra-icons-1/gpt-5.6-terra}`
 - [x] Follow-up after #715 — prove each named entry resolves to a Heroicon the build emits. `{fm/icon-registry-name-validity/opus-5}`
 
-`IconRegistry` now carries 49 named actions on `main`, alongside the 3 Bilimbi glyph entries and 9 shell names it already had. The slice added the action vocabulary; the glyph count is unchanged by it.
+The slice added the named action vocabulary beside the 3 Bilimbi glyph entries and 9 shell names the registry already had, and left the glyph count unchanged. Later slices keep naming actions in it — `history` landed with the read-first detail page — so `IconRegistry.actions/0` is what counts them.
 
 Not delivered by this slice, and still open under FND-06 and GFX-02: the searchable visual icon review with empty-result, copy and copied feedback. The registry holds the vocabulary; no review surface presents it yet.
 
@@ -745,3 +750,31 @@ Neither row is closed, and the code is what closes a row:
   slice and are unchanged by it.
 - **INP-02 remains open** for the sizing contract and for validation against
   realistic long content. This slice touched neither.
+
+### Read-first detail page slice — INT-01, INT-03, CMP-03 and NAV-03, partial
+
+Goal: Let an operator change a fact where they read it, and let the fact itself
+say what happened, so a detail page needs neither an edit mode nor a flash to
+report a write.
+
+Shipped in `Bilimbi.Base.UI.Components` and adopted on `/addresses/:id`:
+
+- [x] `<.inline_edit>` keeps the stored value on screen for the whole round trip, marks the field `aria-busy` beside a "Saving…" line, renders `—` for a blank value, and commits an emptied input only where the owner passes `allow_empty`, so a required fact is never blanked by a stray Enter. `{fm/addresses-detail-read-first/opus-5}`
+- [x] One shared `<.commit_status>` is the single voice for every write that saves by itself — the inline edit, the choice that commits on change and the grouped Apply all render it, so "Saved" and a named refusal cannot drift into three dialects. `{fm/addresses-detail-read-first/opus-5}`
+- [x] `<.back_link>` replaces every "Back to …" button and every hand-written return link — Base Authz roles, Core Address, Company, Employee and User screens, and the credential pages — so returning is a plain "← Back" link in the header rather than a button competing with the work of the page, or prose above the header in its own colour. `{fm/addresses-detail-read-first/opus-5}`
+- [x] The `record.history` trigger is demoted to the registry's new `history` clock at the toolbar icon size, the glyph Belimbing uses for the same action, keeping "History" for assistive technology and the tooltip. `{fm/addresses-detail-read-first/opus-5}`
+- [x] `/addresses/:id` adopts all of it: text facts in place, the verification status committing on change, the four interdependent location facts behind one grouped Apply, viewers without `admin.address.update` seeing values with no affordance, and history reading both Belimbing-era and Bilimbi-written mutation rows. `{fm/addresses-detail-read-first/opus-5}`
+
+Not delivered by this slice:
+
+- **INT-02 stays missing.** The verification-status choice is a page-local
+  select, not a shared inline-select primitive; inline combobox and textarea
+  editing are untouched.
+- **The other inline-edit screens are unmigrated.** `/employees/:id`,
+  `/users/:id` and the Geonames lists still pass no `status` and no
+  `allow_empty`, so they keep reporting through a flash.
+- **INT-01's focus restore is still open**, and with it the `document.body`
+  focus drop recorded under Defects found while verifying.
+- **The Phase 4 detail row stays open.** This is one accepted pattern on one
+  detail page, not the recorded narrow-width, dark-theme and keyboard review
+  that row asks for.

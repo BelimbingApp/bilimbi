@@ -379,12 +379,6 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
       <.page id="employee-types-index">
-        <p class="mb-2 text-xs">
-          <.link navigate={~p"/employees"} class="font-medium text-ink-muted hover:text-ink">
-            ← Employees
-          </.link>
-        </p>
-
         <.header>
           Employee Types
           <:title_actions>
@@ -400,6 +394,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
           <:subtitle>Manage employee type reference data</:subtitle>
 
           <:actions>
+            <.back_link id="employee-types-back" navigate={~p"/employees"} title="Back to employees" />
             <.button
               :if={allowed?(@current_scope, "admin.employee-type.create")}
               id="employee-type-new"

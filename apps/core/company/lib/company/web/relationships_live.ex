@@ -256,9 +256,11 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
             <code class="text-xs font-medium">{@company.code}</code>
           </:subtitle>
           <:actions>
-            <.button navigate={~p"/companies/#{@company.id}"} class="text-xs">
-              Back to {Company.Summary.display_name(@company)}
-            </.button>
+            <.back_link
+              id="relationships-back"
+              navigate={~p"/companies/#{@company.id}"}
+              title={"Back to #{Company.Summary.display_name(@company)}"}
+            />
             <.button
               :if={@can_update?}
               id="add-rel-btn"

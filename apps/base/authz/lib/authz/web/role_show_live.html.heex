@@ -6,9 +6,7 @@
         <span class="font-mono text-xs">{@role.code}</span>
       </:subtitle>
       <:actions>
-        <.button id="role-back" navigate={~p"/authz/roles"}>
-          Back to roles
-        </.button>
+        <.back_link id="role-back" navigate={~p"/authz/roles"} title="Back to roles" />
       </:actions>
     </.header>
 

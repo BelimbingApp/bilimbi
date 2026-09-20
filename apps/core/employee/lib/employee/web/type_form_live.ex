@@ -171,12 +171,6 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
       <.page variant={:form}>
-        <p class="mb-2 text-xs">
-          <.link navigate={~p"/employee-types"} class="font-medium text-ink-muted hover:text-ink">
-            ← Employee Types
-          </.link>
-        </p>
-
         <.header>
           {@page_title}
           <:subtitle>
@@ -186,6 +180,14 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
               Update the display label for this custom employee type. The code is permanent.
             <% end %>
           </:subtitle>
+
+          <:actions>
+            <.back_link
+              id="employee-type-form-back"
+              navigate={~p"/employee-types"}
+              title="Back to employee types"
+            />
+          </:actions>
         </.header>
 
         <.form

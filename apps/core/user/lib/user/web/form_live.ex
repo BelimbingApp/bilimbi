@@ -169,9 +169,7 @@ defmodule Bilimbi.Core.User.Web.FormLive do
           {@page_title}
           <:subtitle>{if @mode == :new, do: "Add a new user to the system", else: "Update user information"}</:subtitle>
           <:actions>
-            <.button id="user-back" navigate={~p"/users"}>
-              Back to users
-            </.button>
+            <.back_link id="user-back" navigate={~p"/users"} title="Back to users" />
           </:actions>
         </.header>
 

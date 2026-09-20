@@ -20,6 +20,9 @@ defmodule BilimbiWeb.ResetPasswordLiveTest do
     {:ok, view, _html} =
       live(conn, ~p"/reset-password/#{token}?#{[email: "ada@example.com"]}")
 
+    assert has_element?(view, "a#reset-back[href='/'][title='Back to sign in']", "Back")
+    refute has_element?(view, "#reset-back", "Back to sign in")
+
     result =
       view
       |> form("#reset-form",

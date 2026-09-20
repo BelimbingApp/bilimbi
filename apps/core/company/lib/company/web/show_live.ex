@@ -852,9 +852,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             >
               Relationships
             </.button>
-            <.button id="company-back" navigate={~p"/companies"}>
-              Back to companies
-            </.button>
+            <.back_link id="company-back" navigate={~p"/companies"} title="Back to companies" />
           </:actions>
         </.header>
 

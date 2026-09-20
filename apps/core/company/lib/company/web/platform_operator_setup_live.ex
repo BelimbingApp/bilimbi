@@ -117,7 +117,7 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
             Designate the primary company of the tenant operating this deployment
           </:subtitle>
           <:actions>
-            <.button id="platform-operator-back" navigate={~p"/companies"}>Back</.button>
+            <.back_link id="platform-operator-back" navigate={~p"/companies"} title="Back to companies" />
           </:actions>
         </.header>
 

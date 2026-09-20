@@ -4,6 +4,9 @@ const InlineEdit = {
   },
 
   updated() {
+    // A patch from the server is the reply the pending save was waiting for
+    // (or a change from elsewhere); either way nothing is in flight any more.
+    this.settle()
     this.syncValue()
   },
 
@@ -11,6 +14,7 @@ const InlineEdit = {
     this.triggerEl = this.el.querySelector('[data-role="trigger"]')
     this.inputEl = this.el.querySelector('input[data-role="input"]')
     this.textEl = this.el.querySelector('[data-role="text"]')
+    this.savingEl = this.el.querySelector('[data-role="saving"]')
 
     if (!this.triggerEl || !this.inputEl) return
 
@@ -72,6 +76,10 @@ const InlineEdit = {
     const id = this.el.dataset.id
     const field = this.el.dataset.field || "value"
     const saveEvent = this.el.dataset.saveEvent || "save"
+    // Clearing a value is a real edit only where the owner says the field may
+    // be empty; elsewhere an emptied input is treated as "no change" so a
+    // required value is never blanked by a stray Enter.
+    const allowEmpty = this.el.hasAttribute("data-allow-empty")
 
     this.inputEl.classList.add("hidden")
     this.triggerEl.classList.remove("invisible", "pointer-events-none")
@@ -81,11 +89,26 @@ const InlineEdit = {
     // while the row showed the new name indefinitely, because the error branch
     // sends no patch. Leaving the text alone means a failure needs no rollback
     // -- the row simply never changed (#302).
-    if (newValue !== "" && newValue !== this.originalValue) {
-      this.pushEvent(saveEvent, {id: id, [field]: newValue})
+    if ((newValue !== "" || allowEmpty) && newValue !== this.originalValue) {
+      this.markSaving()
+      this.pushEvent(saveEvent, {id: id, [field]: newValue}, () => this.settle())
     } else {
       this.inputEl.value = this.originalValue
     }
+  },
+
+  // The wait between commit and the server's reply is the one state the server
+  // cannot render, so the hook announces it: `aria-busy` on the field and the
+  // owner's "Saving…" text, if the markup carries one. The reply patch renders
+  // the saved or failed outcome and `settle` clears the in-flight marks.
+  markSaving() {
+    this.el.setAttribute("aria-busy", "true")
+    if (this.savingEl) this.savingEl.classList.remove("hidden")
+  },
+
+  settle() {
+    this.el.removeAttribute("aria-busy")
+    if (this.savingEl) this.savingEl.classList.add("hidden")
   },
 
   cancel() {

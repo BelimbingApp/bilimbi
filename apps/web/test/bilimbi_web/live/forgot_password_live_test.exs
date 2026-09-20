@@ -17,6 +17,9 @@ defmodule BilimbiWeb.ForgotPasswordLiveTest do
     register_user!()
     {:ok, view, _html} = live(conn, ~p"/forgot-password")
 
+    assert has_element?(view, "a#forgot-back[href='/'][title='Back to sign in']", "Back")
+    refute has_element?(view, "#forgot-back", "Back to sign in")
+
     view
     |> form("#forgot-form", forgot: %{email: "ada@example.com"})
     |> render_submit()

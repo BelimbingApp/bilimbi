@@ -110,6 +110,7 @@ defmodule Bilimbi.Base.UI.IconRegistry do
     "save" => "hero-check-circle",
     "confirm" => "hero-check",
     "back" => "hero-arrow-left",
+    "history" => "hero-clock",
     "forward" => "hero-arrow-right",
     "page-previous" => "hero-chevron-left",
     "page-next" => "hero-chevron-right",

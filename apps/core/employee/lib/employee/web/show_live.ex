@@ -581,9 +581,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
               current_scope={@current_scope}
               opts={%{auditable_types: employee_auditable_types(), auditable_id: @employee.id}}
             />
-            <.button id="employee-back" navigate={~p"/employees"}>
-              Back to List
-            </.button>
+            <.back_link id="employee-back" navigate={~p"/employees"} title="Back to employees" />
 
             <.button
               :if={@can_manage?}
