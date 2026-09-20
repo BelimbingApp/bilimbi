@@ -1960,7 +1960,7 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
-  Renders a table with compact Belimbing-parity styling.
+  Renders a table with compact Belimbing-parity styling and a flat outer frame.
 
   Pass `sort` on a column to render a header button that pushes `"sort"`
   with `phx-value-sort`. The active column gets `aria-sort`. Density is
@@ -1999,7 +1999,7 @@ defmodule Bilimbi.Base.UI.Components do
 
   attr(:framed, :boolean,
     default: true,
-    doc: "when false, omit the outer card chrome so the table can sit in an existing panel"
+    doc: "when false, omit the flat outer frame so the table can sit in an existing panel"
   )
 
   attr(:caption, :string,
@@ -2035,7 +2035,7 @@ defmodule Bilimbi.Base.UI.Components do
       end
 
     ~H"""
-    <div class={["overflow-x-auto", @framed && "rounded-xl border border-line bg-surface"]}>
+    <div class={["overflow-x-auto", @framed && "border border-line bg-surface"]}>
       <table class="w-full text-left text-sm">
         <caption :if={@caption} class="sr-only">{@caption}</caption>
         <thead class="border-b border-line bg-surface-sunken">

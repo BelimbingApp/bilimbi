@@ -189,7 +189,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
             <p id="addresses-pagination-summary" class="text-xs text-ink-subtle">
               {page_summary(@addresses_page)}
             </p>
-            <div class="flex items-center gap-2">
+            <div :if={@addresses_page.total_pages > 1} class="flex items-center gap-2">
               <.button
                 id="addresses-page-previous"
                 phx-click="page"

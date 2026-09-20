@@ -196,6 +196,21 @@ defmodule BilimbiWeb.AddressLiveTest do
     refute has_element?(view, "#addresses-pagination")
   end
 
+  test "keeps the result count but omits navigation for a single page", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, _address} = Address.create_address(scope, %{label: "Head Office"})
+    grant_capabilities!("admin.address.list")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses")
+
+    assert has_element?(view, "#addresses-pagination-summary", "Showing 1–1 of 1")
+    refute has_element?(view, "#addresses-page-previous")
+    refute has_element?(view, "#addresses-page-next")
+    refute render(view) =~ "Page 1 of 1"
+  end
+
   test "requires admin.address.view capability to view address show page", %{
     conn: conn,
     scope: scope
