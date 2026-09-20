@@ -186,9 +186,7 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
           Create Role
           <:subtitle>A custom role owned by a company in your tenant</:subtitle>
           <:actions>
-            <.button id="role-back" navigate={~p"/authz/roles"}>
-              Back to roles
-            </.button>
+            <.back_link id="role-back" navigate={~p"/authz/roles"} title="Back to roles" />
           </:actions>
         </.header>
 

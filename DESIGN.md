@@ -135,11 +135,60 @@ during long operational sessions:
 Inline editing allows quick modifications to entity fields without leaving the
 table view:
 
-- **Display mode:** Shows the field value in `text-ink` alongside a subtle hover pencil icon (`size-3.5 text-muted opacity-0 group-hover:opacity-100 transition-opacity`).
+- **Display mode:** Shows the field value in `text-ink` alongside a subtle hover pencil icon (`size-3.5 text-muted opacity-0 group-hover:opacity-100 transition-opacity`). A blank value shows the `empty` placeholder (`—`) in `text-ink-muted`.
 - **Activation:** Clicking the cell or pressing Enter when focused activates edit mode.
 - **Editing mode:** Replaces the cell with an inline `<input>` styled with
   `border-brand-strong`, autofocusing and selecting the text.
-- **Save & Cancel:** Pressing `Enter` or blurring saves the field, updates the LiveView stream item (`stream_insert/3`), clears edit state, and flashes feedback (`"<Entity> saved."`). Pressing `Escape` cancels editing and reverts to display mode.
+- **Save & Cancel:** Pressing `Enter` or blurring commits the field; pressing `Escape` cancels editing and reverts to display mode. An unchanged value commits nothing, and an emptied value commits nothing unless the owner passes `allow_empty`, so a nullable fact has to say so. In a list the owner updates the LiveView stream item (`stream_insert/3`).
+- **Outcome on the field:** The hook never paints the typed value; the stored
+  value stays on screen until the server confirms a change. The field reads
+  "Saving…" and carries `aria-busy` for the round trip, then the owner's
+  `status` renders the outcome where the operator typed: `:saved` as a
+  `role="status"` line, `{:error, message}` as a `role="alert"` naming the
+  rejected value and the validation error. A refused commit is never a
+  silent revert, and a validation error never lands only in a flash.
+
+## Read-first detail pages
+
+A detail page (`/addresses/:id` is the exemplar; `/employees/:id` and
+`/users/:id` follow it) shows the record as facts and lets an authorized
+operator change each fact in place. There is no edit mode and no save button:
+a committed edit saves by itself. What "committed" means follows the control
+and is the same for every fact of that kind on the page:
+
+- **Text facts** use `<.inline_edit>` and commit on Enter or on leaving the
+  field. Every nullable column passes `allow_empty`.
+- **Choice facts** show the read state (a badge, a name) as the trigger; the
+  select commits on change, and Escape or leaving it cancels.
+- **Interdependent facts** — the address location, where a country change
+  invalidates the division, postcode and locality — commit together through
+  one grouped editor with a primary Apply and a Cancel. The group is opened
+  by a demoted `<.icon_button icon="edit" context={:inline}>` beside its
+  heading, not by an "Edit …" button, and refused fields report on their own
+  inputs. Use a group only where the facts genuinely change together; a
+  group is not a way to bring back the edit mode.
+- **Outcome per fact:** "Saving…" while in flight, "Saved" for the most recent
+  commit only, and a refusal that stays on its fact until that fact is
+  committed again. A success elsewhere never clears another fact's refusal.
+  Success does not flash: the fact already says so.
+- **Viewers without the update capability** see the value with no affordance,
+  not a disabled control. Every write handler still re-asks Authz.
+- **Record history** is a demoted icon action in the header: the registry's
+  `history` glyph (Belimbing's clock) at the toolbar icon size, with the word
+  "History" for assistive technology and the tooltip. The
+  `record.history` panel renders it; a page never builds its own.
+
+## Demoted secondary actions
+
+A page header's buttons are for the work the page is about. Returning to where
+the operator came from is a secondary action and is always a plain link, never
+a button: `<.back_link navigate={...}>` renders "← Back" in `text-link`, and its
+`title` names the destination ("Back to company") when the page has more than
+one way back. This holds for every page — list, form and detail — so a
+"Back to …" `<.button>` anywhere is a defect. The same demotion applies to any
+familiar secondary action a header carries: history is an icon action, and
+navigation to a sibling view is a link, so that the remaining buttons are the
+page's real actions.
 
 ## Modal dialogs
 

@@ -45,6 +45,15 @@ defmodule Bilimbi.Core.Address do
   @spec employee_attachment_kinds() :: [String.t()]
   def employee_attachment_kinds, do: Addressable.company_kinds()
 
+  @doc """
+  The durable polymorphic identity Laravel persists for an address.
+
+  Belimbing registers no morph map, so its audit rows name the model class
+  itself. Record history for an address is read under this identity.
+  """
+  @spec auditable_identity() :: String.t()
+  def auditable_identity, do: "App\\Core\\Address\\Models\\Address"
+
   @spec list_addresses(Scope.t()) :: {:ok, [Summary.t()]}
   def list_addresses(%Scope{} = scope) do
     addresses =

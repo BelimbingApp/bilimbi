@@ -1,6 +1,11 @@
 defmodule Bilimbi.Base.Audit.Web.RecordHistory do
   @moduledoc """
   Header affordance for a single auditable record's recent mutation trail.
+
+  The trigger is a demoted icon action, not a button: history is a familiar
+  secondary action, so it takes the registry's `history` glyph (the clock
+  Belimbing uses for the same action) at the table/toolbar icon size, with
+  the word "History" kept for assistive technology and the tooltip.
   """
 
   use Bilimbi.Base.UI, :live_component
@@ -30,10 +35,12 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
       <details class="group">
         <summary
           id={"#{@id}-toggle"}
-          class="inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-high-contrast-line bg-surface px-4 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/30 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas [&::-webkit-details-marker]:hidden"
+          title="History"
+          aria-label="History"
+          class="grid size-7 shrink-0 cursor-pointer list-none place-items-center rounded-md text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 [&::-webkit-details-marker]:hidden"
         >
-          <.icon name="hero-clipboard-document-list" class="size-4" />
-          <span>History</span>
+          <.icon name="history" class="size-4" />
+          <span class="sr-only">History</span>
         </summary>
 
         <div

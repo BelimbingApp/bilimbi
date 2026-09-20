@@ -521,12 +521,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
           </:subtitle>
 
           <:actions>
-            <.link
-              navigate={~p"/employees"}
-              class="inline-flex items-center gap-1 text-sm font-medium text-action-base hover:text-action transition-colors"
-            >
-              ← Back
-            </.link>
+            <.back_link id="employee-form-back" navigate={~p"/employees"} title="Back to employees" />
           </:actions>
         </.header>
 

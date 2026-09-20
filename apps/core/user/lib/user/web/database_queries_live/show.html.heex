@@ -31,11 +31,11 @@
         </form>
       </:subtitle>
       <:actions>
-        <.button
+        <.back_link
+          id="database-query-back"
           navigate={~p"/admin/system/database-queries"}
-        >
-          Back
-        </.button>
+          title="Back to database queries"
+        />
 
         <%= if allowed?(@current_scope, "admin.system.database-table.edit") do %>
           <%= if not @is_new do %>

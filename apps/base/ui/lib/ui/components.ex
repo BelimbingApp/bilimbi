@@ -2219,12 +2219,26 @@ defmodule Bilimbi.Base.UI.Components do
   defp permission_recovery, do: "Ask an operator to review your role."
 
   @doc """
-  Renders an inline-editable text cell (Belimbing inline-edit pattern).
+  Renders an inline-editable text value (Belimbing inline-edit pattern).
 
   In display mode, shows the text with a pencil icon that appears on hover.
-  Clicking immediately reveals an input box. On blur or Enter, it commits the
-  change and pushes `@save_event` to LiveView with `%{id: @id_value, <@name>: new_value}`.
-  Pressing Escape cancels and reverts to the original value without pushing.
+  Clicking immediately reveals an input box. Enter or leaving the field
+  commits the change and pushes `@save_event` to LiveView with
+  `%{id: @id_value, <@name>: new_value}`; Escape cancels and reverts to the
+  original value without pushing. An unchanged value pushes nothing, and an
+  emptied value pushes nothing unless the owner passes `allow_empty`, so a
+  field that may legitimately be blank has to say so.
+
+  The displayed text is always the server's: the hook never paints the typed
+  value, so a failed save leaves the stored value on screen. While the save is
+  in flight the hook marks the field `aria-busy` and reveals the "Saving…"
+  text; the reply patch renders the outcome the owner passes as `status`:
+
+    * `nil` — nothing to report;
+    * `:saved` — the last commit was stored;
+    * `{:error, message}` — the last commit was refused, and `message` says
+      why, naming the rejected value where that helps. It renders as an alert
+      on this field, so validation reaches the operator where they typed.
 
   ## Examples
 
@@ -2236,6 +2250,16 @@ defmodule Bilimbi.Base.UI.Components do
         name="country"
         label="Country name"
       />
+
+      <.inline_edit
+        id="address-label"
+        value={@address.label || ""}
+        name="label"
+        label="Label"
+        allow_empty
+        status={@field_status["label"]}
+        save_event="save_field"
+      />
   """
   attr(:id, :string, required: true)
   attr(:value, :string, required: true)
@@ -2243,11 +2267,29 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:save_event, :string, default: "save")
   attr(:name, :string, default: "value")
   attr(:label, :string, default: "Edit value")
+
+  attr(:empty, :string,
+    default: "—",
+    doc: "what the display shows while the value is blank; never pushed as the value"
+  )
+
+  attr(:allow_empty, :boolean,
+    default: false,
+    doc: "an emptied input is a real edit and pushes the empty string"
+  )
+
+  attr(:status, :any,
+    default: nil,
+    doc: "the outcome of the last commit: `nil`, `:saved`, or `{:error, message}`"
+  )
+
   attr(:class, :any, default: nil)
   attr(:input_class, :any, default: nil)
   attr(:rest, :global)
 
   def inline_edit(assigns) do
+    assigns = assign(assigns, :status, normalize_inline_status(assigns.status))
+
     ~H"""
     <div
       id={@id}
@@ -2255,6 +2297,7 @@ defmodule Bilimbi.Base.UI.Components do
       data-id={@id_value || @id}
       data-field={@name}
       data-save-event={@save_event}
+      data-allow-empty={@allow_empty && ""}
       class={["relative min-w-0 max-w-full text-sm text-ink", @class]}
       {@rest}
     >
@@ -2262,9 +2305,11 @@ defmodule Bilimbi.Base.UI.Components do
         type="button"
         data-role="trigger"
         aria-label={@label}
+        aria-describedby={@status && "#{@id}-status"}
         class="group flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 -mx-1.5 text-left hover:bg-surface-sunken transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
       >
-        <span data-role="text" class="text-ink">{@value}</span>
+        <span :if={@value != ""} data-role="text" class="text-ink">{@value}</span>
+        <span :if={@value == ""} data-role="text" class="text-ink-muted">{@empty}</span>
         <.icon
           name="edit"
           class="size-3.5 text-ink-muted opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity"
@@ -2277,12 +2322,89 @@ defmodule Bilimbi.Base.UI.Components do
         name={@name}
         value={@value}
         aria-label={@label}
+        aria-invalid={match?({:error, _}, @status) && "true"}
         class={[
           "absolute left-0 top-0 hidden w-full min-w-0 max-w-full box-border rounded border border-brand-strong bg-surface px-1.5 py-0.5 -mx-1.5 text-sm text-ink focus:outline-none focus:border-brand-strong focus:ring-1 focus:ring-brand-strong/30",
           @input_class
         ]}
       />
+
+      <span data-role="saving" class="hidden mt-0.5 flex items-center gap-1 text-xs text-ink-muted">
+        <.icon name="refresh" class="size-3 motion-safe:animate-spin" /> Saving…
+      </span>
+
+      <p
+        :if={@status == :saved}
+        id={"#{@id}-status"}
+        data-role="status"
+        role="status"
+        class="mt-0.5 flex items-center gap-1 text-xs text-success-ink"
+      >
+        <.icon name="success" class="size-3" /> Saved
+      </p>
+
+      <p
+        :for={{:error, message} <- List.wrap(@status)}
+        id={"#{@id}-status"}
+        data-role="status"
+        role="alert"
+        class="mt-0.5 flex items-start gap-1 text-xs text-danger-ink"
+      >
+        <.icon name="error" class="mt-0.5 size-3 shrink-0" />
+        <span class="min-w-0 [overflow-wrap:anywhere]">{message}</span>
+      </p>
     </div>
+    """
+  end
+
+  defp normalize_inline_status(nil), do: nil
+  defp normalize_inline_status(:saved), do: :saved
+  defp normalize_inline_status({:error, message}) when is_binary(message), do: {:error, message}
+
+  defp normalize_inline_status(other) do
+    raise ArgumentError,
+          "<.inline_edit> status must be nil, :saved, or {:error, message}, got: #{inspect(other)}"
+  end
+
+  @doc """
+  Renders the demoted "← Back" navigation of a page header.
+
+  Returning to where the operator came from is a secondary action, so it is a
+  plain link, never a button: the header's buttons are for the work the page
+  is about. The visible text is always "← Back"; `title` names the
+  destination for the tooltip and assistive technology when the page has more
+  than one way back (for example "Back to company" beside "Back to list").
+
+  ## Examples
+
+      <.back_link id="address-back-list" navigate={~p"/addresses"} />
+      <.back_link id="address-back-company" navigate={~p"/companies/1"} title="Back to company" />
+  """
+  attr(:id, :string, default: nil)
+  attr(:navigate, :string, required: true)
+
+  attr(:title, :string,
+    default: nil,
+    doc:
+      "names the destination; it must start with \"Back\" so the label contains the visible text"
+  )
+
+  attr(:class, :any, default: nil)
+
+  def back_link(assigns) do
+    ~H"""
+    <.link
+      id={@id}
+      navigate={@navigate}
+      title={@title}
+      aria-label={@title}
+      class={[
+        "inline-flex items-center gap-1 whitespace-nowrap text-sm text-link transition-colors hover:text-ink focus-visible:outline-none focus-visible:rounded-sm focus-visible:ring-1 focus-visible:ring-brand-strong/40",
+        @class
+      ]}
+    >
+      <span aria-hidden="true">←</span> Back
+    </.link>
     """
   end
 

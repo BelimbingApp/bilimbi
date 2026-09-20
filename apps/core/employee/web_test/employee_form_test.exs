@@ -153,7 +153,7 @@ defmodule BilimbiWeb.EmployeeFormTest do
     # Header elements
     assert html =~ "Add Employee"
     assert html =~ "Create a new employment record"
-    assert html =~ "← Back"
+    assert has_element?(view, "#employee-form-back[href='/employees']", "Back")
 
     # 14 Form fields with Belimbing-parity IDs and placeholders
     assert has_element?(view, "#employee-company-id")

@@ -1,23 +1,34 @@
 defmodule Bilimbi.Core.Address.Web.ShowLive do
   @moduledoc """
-  LiveView adapter for displaying and managing a tenant-owned address.
+  Read-first LiveView adapter for one tenant-owned address.
 
-  Presents address attributes, location normalization, provenance metadata, and
-  polymorphically linked owner entities (Companies, Employees).
+  The page shows the address as facts. An operator holding
+  `admin.address.update` edits each fact in place and a committed edit saves
+  by itself; there is no edit mode and no save button. What "committed" means
+  follows the control, and is the same for every fact of that kind:
 
-  In strict alignment with Belimbing's `admin/addresses/show` screen, this view
-  surfaces:
-  - Address details editing (label, phone, verification status, street lines);
-  - Geographic location editing with live GeoNames country, division, postcode,
-    and locality autocompletion;
-  - Provenance audit editing (source, source reference, parser metadata, raw input);
-  - Live linked entities table with multi-column sorting (`type`, `name`, `kind`,
-    `is_primary`, `priority`, `valid_from`, `valid_to`);
-  - Contextual navigation back to an owning Company when `?company=ID` is present.
+  - a text fact (label, phone, street lines, source, source reference) commits
+    on Enter or on leaving the field, through `<.inline_edit>`; Escape cancels;
+  - a choice fact (verification status) commits on change, and Escape or
+    leaving the select cancels;
+  - the location facts (country, division, postcode, locality) depend on one
+    another — a country change invalidates the other three — so they commit
+    together through one grouped editor with Apply and Cancel, as Belimbing's
+    `admin/addresses/show` does.
+
+  Each fact reports its own outcome: "Saving…" while the round trip is in
+  flight, "Saved" once stored, and an alert on the fact naming the rejected
+  value and the validation error when the save was refused. The stored value
+  stays on screen until the server confirms a change.
+
+  The header carries the record history as a demoted icon action and plain
+  "← Back" links: to the owning Company when `?company=ID` names a linked
+  Company, and to the address list.
   """
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.UI.Layouts
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.Detail
@@ -25,6 +36,30 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
 
   @sortable_linked_fields ~w(type name kind is_primary priority valid_from valid_to)a
   @verification_statuses ~w(unverified suggested verified)
+
+  # The facts an inline text edit may write, keyed by the form name the hook
+  # pushes. A name outside this map is ignored; user input never becomes an atom.
+  @inline_fields %{
+    "label" => :label,
+    "phone" => :phone,
+    "line1" => :line1,
+    "line2" => :line2,
+    "line3" => :line3,
+    "source" => :source,
+    "source_ref" => :source_ref
+  }
+
+  @fact_labels %{
+    "label" => "Label",
+    "phone" => "Phone",
+    "line1" => "Address Line 1",
+    "line2" => "Address Line 2",
+    "line3" => "Address Line 3",
+    "source" => "Source",
+    "source_ref" => "Source Reference",
+    "verification_status" => "Verification Status",
+    "location" => "Location"
+  }
 
   @impl true
   def mount(%{"id" => id_param} = params, _session, socket) do
@@ -39,20 +74,19 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
 
         {:ok,
          socket
-         |> assign(:page_title, address.label || "Address ##{address.id}")
+         |> assign(:page_title, page_title(address))
          |> assign(:active_nav, :addresses)
          |> assign(:address_id, address_id)
          |> assign(:address, address)
+         |> assign(:can_update?, allowed?(current_scope, "admin.address.update"))
          |> assign(:company_context_id, company_context_id)
          |> assign(:countries, countries)
          |> assign(:linked_sort_by, :type)
          |> assign(:linked_sort_dir, :asc)
-         |> assign(:editing_details?, false)
+         |> assign(:field_status, %{})
+         |> assign(:editing_field, nil)
          |> assign(:editing_location?, false)
-         |> assign(:editing_provenance?, false)
-         |> assign_details_form(address)
-         |> assign_location_form(address)
-         |> assign_provenance_form(address)}
+         |> assign_location_form(address)}
       else
         _ ->
           {:ok,
@@ -97,84 +131,82 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   end
 
   # ============================================================================
-  # Event Handlers: Details Card
+  # Event Handlers: Inline Text Facts
   # ============================================================================
 
   @impl true
-  def handle_event("edit_details", _params, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.address.update") do
-      {:noreply,
-       socket
-       |> assign(:editing_details?, true)
-       |> assign_details_form(socket.assigns.address)}
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to update addresses.")}
-    end
-  end
+  def handle_event("save_field", params, socket) do
+    if can_update?(socket) do
+      case inline_field(params) do
+        {:ok, name, field, value} ->
+          {:noreply, save_fact(socket, name, %{field => normalize_param(value)}, value)}
 
-  def handle_event("cancel_edit_details", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:editing_details?, false)
-     |> assign_details_form(socket.assigns.address)}
-  end
-
-  def handle_event("validate_details", %{"details" => params}, socket) do
-    form =
-      params
-      |> sanitize_details_params()
-      |> to_form(as: :details)
-
-    {:noreply, assign(socket, :details_form, form)}
-  end
-
-  def handle_event("save_details", %{"details" => params}, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.address.update") do
-      scope = socket.assigns.current_scope.scope
-      attrs = sanitize_details_params(params)
-
-      case Address.update_address(scope, socket.assigns.address_id, attrs) do
-        {:ok, _summary} ->
-          {:ok, refreshed} =
-            Address.get_address_detail(scope, socket.assigns.address_id,
-              owner_sort_by: socket.assigns.linked_sort_by,
-              owner_sort_dir: socket.assigns.linked_sort_dir
-            )
-
-          {:noreply,
-           socket
-           |> put_flash(:info, "Address details updated successfully.")
-           |> assign(:address, refreshed)
-           |> assign(:page_title, refreshed.label || "Address ##{refreshed.id}")
-           |> assign(:editing_details?, false)
-           |> assign_details_form(refreshed)}
-
-        {:error, %Ecto.Changeset{} = changeset} ->
-          {:noreply,
-           socket
-           |> assign(:details_form, to_form(changeset, as: :details))
-           |> put_flash(:error, "Could not update address details.")}
-
-        {:error, reason} ->
-          {:noreply, put_flash(socket, :error, "Failed to update address: #{inspect(reason)}")}
+        :error ->
+          {:noreply, socket}
       end
     else
-      {:noreply, put_flash(socket, :error, "You do not have permission to update addresses.")}
+      {:noreply, write_forbidden(socket)}
     end
   end
 
   # ============================================================================
-  # Event Handlers: Location Card
+  # Event Handlers: Verification Status Choice
+  # ============================================================================
+
+  def handle_event("edit_field", %{"field" => "verification_status"}, socket) do
+    if can_update?(socket) do
+      {:noreply, assign(socket, :editing_field, "verification_status")}
+    else
+      {:noreply, write_forbidden(socket)}
+    end
+  end
+
+  def handle_event("edit_field", _params, socket), do: {:noreply, socket}
+
+  def handle_event("cancel_edit_field", _params, socket) do
+    {:noreply, assign(socket, :editing_field, nil)}
+  end
+
+  def handle_event("save_verification_status", %{"verification_status" => status}, socket)
+      when status in @verification_statuses do
+    if can_update?(socket) do
+      socket =
+        socket
+        |> assign(:editing_field, nil)
+        |> save_fact("verification_status", %{verification_status: status}, status)
+
+      {:noreply, socket}
+    else
+      {:noreply, write_forbidden(socket)}
+    end
+  end
+
+  def handle_event("save_verification_status", _params, socket) do
+    if can_update?(socket) do
+      {:noreply,
+       socket
+       |> assign(:editing_field, nil)
+       |> put_field_status(
+         "verification_status",
+         {:error, "Verification status must be unverified, suggested, or verified."}
+       )}
+    else
+      {:noreply, write_forbidden(socket)}
+    end
+  end
+
+  # ============================================================================
+  # Event Handlers: Location Group
   # ============================================================================
 
   def handle_event("edit_location", _params, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.address.update") do
+    if can_update?(socket) do
       {:noreply,
        socket
        |> assign(:editing_location?, true)
        |> assign_location_form(socket.assigns.address)}
     else
-      {:noreply, put_flash(socket, :error, "You do not have permission to update addresses.")}
+      {:noreply, write_forbidden(socket)}
     end
   end
 
@@ -251,7 +283,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   end
 
   def handle_event("save_location", %{"location" => params}, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.address.update") do
+    if can_update?(socket) do
       scope = socket.assigns.current_scope.scope
 
       attrs = %{
@@ -263,95 +295,23 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
 
       case Address.update_address(scope, socket.assigns.address_id, attrs) do
         {:ok, _summary} ->
-          {:ok, refreshed} =
-            Address.get_address_detail(scope, socket.assigns.address_id,
-              owner_sort_by: socket.assigns.linked_sort_by,
-              owner_sort_dir: socket.assigns.linked_sort_dir
-            )
-
           {:noreply,
            socket
-           |> put_flash(:info, "Address location updated successfully.")
-           |> assign(:address, refreshed)
+           |> refresh_address()
            |> assign(:editing_location?, false)
-           |> assign_location_form(refreshed)}
+           |> put_field_status("location", :saved)
+           |> then(&assign_location_form(&1, &1.assigns.address))}
 
         {:error, %Ecto.Changeset{} = changeset} ->
-          {:noreply,
-           socket
-           |> assign(:location_form, to_form(changeset, as: :location))
-           |> put_flash(:error, "Could not update address location.")}
+          # The grouped form reports each refused field on its own input, so
+          # the operator corrects it where they typed it.
+          {:noreply, assign(socket, :location_form, to_form(changeset, as: :location))}
 
         {:error, reason} ->
-          {:noreply, put_flash(socket, :error, "Failed to update location: #{inspect(reason)}")}
+          {:noreply, put_field_status(socket, "location", {:error, failure_message(reason)})}
       end
     else
-      {:noreply, put_flash(socket, :error, "You do not have permission to update addresses.")}
-    end
-  end
-
-  # ============================================================================
-  # Event Handlers: Provenance Card
-  # ============================================================================
-
-  def handle_event("edit_provenance", _params, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.address.update") do
-      {:noreply,
-       socket
-       |> assign(:editing_provenance?, true)
-       |> assign_provenance_form(socket.assigns.address)}
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to update addresses.")}
-    end
-  end
-
-  def handle_event("cancel_edit_provenance", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:editing_provenance?, false)
-     |> assign_provenance_form(socket.assigns.address)}
-  end
-
-  def handle_event("validate_provenance", %{"provenance" => params}, socket) do
-    form =
-      params
-      |> sanitize_provenance_params()
-      |> to_form(as: :provenance)
-
-    {:noreply, assign(socket, :provenance_form, form)}
-  end
-
-  def handle_event("save_provenance", %{"provenance" => params}, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.address.update") do
-      scope = socket.assigns.current_scope.scope
-      attrs = sanitize_provenance_params(params)
-
-      case Address.update_address(scope, socket.assigns.address_id, attrs) do
-        {:ok, _summary} ->
-          {:ok, refreshed} =
-            Address.get_address_detail(scope, socket.assigns.address_id,
-              owner_sort_by: socket.assigns.linked_sort_by,
-              owner_sort_dir: socket.assigns.linked_sort_dir
-            )
-
-          {:noreply,
-           socket
-           |> put_flash(:info, "Provenance updated successfully.")
-           |> assign(:address, refreshed)
-           |> assign(:editing_provenance?, false)
-           |> assign_provenance_form(refreshed)}
-
-        {:error, %Ecto.Changeset{} = changeset} ->
-          {:noreply,
-           socket
-           |> assign(:provenance_form, to_form(changeset, as: :provenance))
-           |> put_flash(:error, "Could not update provenance.")}
-
-        {:error, reason} ->
-          {:noreply, put_flash(socket, :error, "Failed to update provenance: #{inspect(reason)}")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to update addresses.")}
+      {:noreply, write_forbidden(socket)}
     end
   end
 
@@ -387,6 +347,111 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   end
 
   # ============================================================================
+  # Saving
+  # ============================================================================
+
+  # One commit, one outcome on the fact that made it. Success refreshes the
+  # detail so every projection (title, country name, linked owners) is the
+  # server's; refusal keeps the stored value on screen and says what was
+  # rejected and why.
+  defp save_fact(socket, name, attrs, submitted) do
+    scope = socket.assigns.current_scope.scope
+
+    case Address.update_address(scope, socket.assigns.address_id, attrs) do
+      {:ok, _summary} ->
+        socket
+        |> refresh_address()
+        |> put_field_status(name, :saved)
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        put_field_status(socket, name, {:error, refusal_message(name, submitted, changeset)})
+
+      {:error, reason} ->
+        put_field_status(socket, name, {:error, failure_message(reason)})
+    end
+  end
+
+  defp refresh_address(socket) do
+    {:ok, refreshed} =
+      Address.get_address_detail(socket.assigns.current_scope.scope, socket.assigns.address_id,
+        owner_sort_by: socket.assigns.linked_sort_by,
+        owner_sort_dir: socket.assigns.linked_sort_dir
+      )
+
+    socket
+    |> assign(:address, refreshed)
+    |> assign(:page_title, page_title(refreshed))
+  end
+
+  # "Saved" belongs to the most recent commit only; a refusal stays on its
+  # fact until that fact is committed again, so an unsaved edit is never
+  # quietly forgotten.
+  defp put_field_status(socket, name, status) do
+    statuses =
+      socket.assigns.field_status
+      |> Enum.reject(fn {_name, value} -> value == :saved end)
+      |> Map.new()
+      |> Map.put(name, status)
+
+    assign(socket, :field_status, statuses)
+  end
+
+  defp refusal_message(name, submitted, %Ecto.Changeset{} = changeset) do
+    field = Map.get(@inline_fields, name, :verification_status)
+
+    reasons =
+      case translate_errors(changeset.errors, field) do
+        [] -> ["could not be saved"]
+        messages -> messages
+      end
+
+    "#{inspect(rejected_value(submitted))} was not saved: #{fact_label(name)} #{Enum.join(reasons, ", ")}."
+  end
+
+  # The alert names what was typed so the refusal is never anonymous, but a
+  # long rejected value would push the reason off screen; the first characters
+  # identify it and the reason carries the rule that refused it.
+  @rejected_value_limit 60
+  defp rejected_value(submitted) do
+    trimmed = String.trim(to_string(submitted))
+
+    if String.length(trimmed) > @rejected_value_limit do
+      String.slice(trimmed, 0, @rejected_value_limit) <> "…"
+    else
+      trimmed
+    end
+  end
+
+  defp failure_message(:address_not_found),
+    do: "This address no longer exists. Return to the list to find its replacement."
+
+  defp failure_message(_reason),
+    do: "The change was not saved. Try again, and tell your administrator if it keeps failing."
+
+  defp write_forbidden(socket) do
+    put_flash(socket, :error, "You do not have permission to update addresses.")
+  end
+
+  # Every write re-asks Authz: the `can_update?` assign decides what the page
+  # shows, and a grant revoked while the page is open must still be refused.
+  defp can_update?(socket) do
+    Authz.can(socket.assigns.current_scope.actor, "admin.address.update").allowed
+  end
+
+  defp inline_field(params) when is_map(params) do
+    Enum.find_value(@inline_fields, :error, fn {name, field} ->
+      case Map.fetch(params, name) do
+        {:ok, value} when is_binary(value) -> {:ok, name, field, value}
+        _ -> nil
+      end
+    end)
+  end
+
+  defp inline_field(_params), do: :error
+
+  defp fact_label(name), do: Map.fetch!(@fact_labels, name)
+
+  # ============================================================================
   # Template Rendering
   # ============================================================================
 
@@ -399,175 +464,170 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
           Address Details
           <:subtitle>{@address.label || "Address ##{@address.id}"}</:subtitle>
           <:actions>
-            <.button
-              :if={@company_context_id}
-              id="address-back-company"
-              navigate={~p"/companies/#{@company_context_id}"}
-            >
-              <.icon name="back" class="mr-1.5 size-4" /> Back to Company
-            </.button>
-            <.button id="address-back-list" navigate={~p"/addresses"}>
-              <.icon name="back" class="mr-1.5 size-4" /> Back to List
-            </.button>
+            <div class="flex items-center gap-3">
+              <.discovered_panel
+                key="record.history"
+                id="address-record-history"
+                current_scope={@current_scope}
+                opts={%{
+                  auditable_types: [Address.auditable_identity()],
+                  auditable_id: @address.id,
+                  title: "History for address ##{@address.id}"
+                }}
+              />
+              <.back_link
+                :if={@company_context_id}
+                id="address-back-company"
+                navigate={~p"/companies/#{@company_context_id}"}
+                title="Back to company"
+              />
+              <.back_link id="address-back-list" navigate={~p"/addresses"} title="Back to addresses" />
+            </div>
           </:actions>
         </.header>
 
         <div class="space-y-6">
-          <!-- CARD 1: Address Details -->
           <section
             id="address-details-card"
             class="rounded-2xl border border-line bg-surface p-6 shadow-xs"
             aria-labelledby="address-details-heading"
           >
-            <div class="mb-4 flex items-center justify-between">
-              <h2
-                id="address-details-heading"
-                class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
-              >
-                Address Details
-              </h2>
-              <div :if={allowed?(@current_scope, "admin.address.update")}>
-                <.button
-                  :if={not @editing_details?}
-                  id="address-edit-details-button"
-                  type="button"
-                  phx-click="edit_details"
-                >
-                  <.icon name="edit" class="mr-1 size-3.5" /> Edit Details
-                </.button>
-              </div>
-            </div>
+            <h2
+              id="address-details-heading"
+              class="mb-4 text-xs font-semibold uppercase tracking-wider text-ink-muted"
+            >
+              Address Details
+            </h2>
 
-            <!-- Details Form (Edit Mode) -->
-            <div :if={@editing_details?}>
-              <.form
-                for={@details_form}
-                id="address-details-form"
-                phx-change="validate_details"
-                phx-submit="save_details"
-                class="space-y-4"
-              >
-                <div class="grid gap-x-4 sm:grid-cols-2">
-                  <.input
-                    field={@details_form[:label]}
-                    id="address-details-label"
-                    label="Label"
-                    maxlength="255"
-                  />
-                  <.input
-                    field={@details_form[:phone]}
-                    id="address-details-phone"
-                    type="tel"
-                    label="Phone"
-                    maxlength="255"
-                  />
-                </div>
-
-                <div class="grid gap-x-4 sm:grid-cols-2">
-                  <.input
-                    field={@details_form[:verification_status]}
-                    id="address-details-verification-status"
-                    type="select"
-                    label="Verification Status"
-                    options={verification_status_options()}
-                  />
-                </div>
-
-                <div class="grid gap-x-4 sm:grid-cols-3">
-                  <.input field={@details_form[:line1]} id="address-details-line1" label="Address Line 1" />
-                  <.input field={@details_form[:line2]} id="address-details-line2" label="Address Line 2" />
-                  <.input field={@details_form[:line3]} id="address-details-line3" label="Address Line 3" />
-                </div>
-
-                <div class="flex items-center gap-3 pt-2">
-                  <.button id="address-save-details" type="submit" variant="primary">
-                    Save Details
-                  </.button>
-                  <.button
-                    id="address-cancel-details"
+            <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+              <.text_fact
+                name="label"
+                address={@address}
+                can_update?={@can_update?}
+                field_status={@field_status}
+                class="font-medium"
+              />
+              <.text_fact
+                name="phone"
+                address={@address}
+                can_update?={@can_update?}
+                field_status={@field_status}
+              />
+              <div>
+                <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                  Verification Status
+                </dt>
+                <dd id="address-view-verification-status" class="mt-1 text-sm">
+                  <button
+                    :if={@can_update? and @editing_field != "verification_status"}
                     type="button"
-                    phx-click="cancel_edit_details"
+                    id="address-verification-status-display"
+                    phx-click="edit_field"
+                    phx-value-field="verification_status"
+                    aria-label="Edit verification status"
+                    aria-describedby={
+                      @field_status["verification_status"] && "address-verification-status-status"
+                    }
+                    class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
                   >
-                    Cancel
-                  </.button>
-                </div>
-              </.form>
-            </div>
+                    <.verification_badge status={@address.verification_status} />
+                    <.icon
+                      name="edit"
+                      class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                    />
+                  </button>
 
-            <!-- Details View (Read Mode) -->
-            <div :if={not @editing_details?}>
-              <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-                <div>
-                  <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">Label</dt>
-                  <dd id="address-view-label" class="mt-1 text-sm font-medium text-ink">
-                    {@address.label || "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">Phone</dt>
-                  <dd id="address-view-phone" class="mt-1 text-sm text-ink">
-                    {@address.phone || "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                    Verification Status
-                  </dt>
-                  <dd id="address-view-verification-status" class="mt-1 text-sm">
-                    <.badge kind={verification_badge_kind(@address.verification_status)}>
-                      {String.capitalize(@address.verification_status || "unverified")}
-                    </.badge>
-                  </dd>
-                </div>
-                <div class="sm:col-span-2 md:col-span-3">
-                  <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                    Street Address
-                  </dt>
-                  <dd id="address-view-lines" class="mt-1 space-y-0.5 text-sm text-ink">
-                    <p :if={@address.line1}>{@address.line1}</p>
-                    <p :if={@address.line2}>{@address.line2}</p>
-                    <p :if={@address.line3}>{@address.line3}</p>
-                    <p :if={is_nil(@address.line1) and is_nil(@address.line2) and is_nil(@address.line3)} class="text-ink-muted">
-                      —
-                    </p>
-                  </dd>
-                </div>
-              </dl>
-            </div>
+                  <%!-- Window-scoped: the select may not hold focus (JS.focus is
+                       best-effort), and Escape must cancel regardless. Only one
+                       editor mounts at a time, so the listener is unambiguous. --%>
+                  <div
+                    :if={@can_update? and @editing_field == "verification_status"}
+                    phx-window-keydown="cancel_edit_field"
+                    phx-key="Escape"
+                  >
+                    <form
+                      id="address-verification-status-form"
+                      phx-change="save_verification_status"
+                      class="inline-block"
+                    >
+                      <select
+                        id="address-verification-status"
+                        name="verification_status"
+                        aria-label="Verification status"
+                        phx-mounted={JS.focus()}
+                        phx-blur="cancel_edit_field"
+                        class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                      >
+                        <option
+                          :for={{label, value} <- verification_status_options()}
+                          value={value}
+                          selected={@address.verification_status == value}
+                        >
+                          {label}
+                        </option>
+                      </select>
+                    </form>
+                  </div>
+
+                  <span :if={not @can_update?}>
+                    <.verification_badge status={@address.verification_status} />
+                  </span>
+
+                  <.fact_status id="address-verification-status-status" status={@field_status["verification_status"]} />
+                </dd>
+              </div>
+
+              <.text_fact
+                name="line1"
+                address={@address}
+                can_update?={@can_update?}
+                field_status={@field_status}
+              />
+              <.text_fact
+                name="line2"
+                address={@address}
+                can_update?={@can_update?}
+                field_status={@field_status}
+              />
+              <.text_fact
+                name="line3"
+                address={@address}
+                can_update?={@can_update?}
+                field_status={@field_status}
+              />
+            </dl>
           </section>
 
-          <!-- CARD 2: Geographic Location -->
           <section
             id="address-location-card"
             class="rounded-2xl border border-line bg-surface p-6 shadow-xs"
             aria-labelledby="address-location-heading"
           >
-            <div class="mb-4 flex items-center justify-between">
+            <div class="mb-4 flex items-start justify-between gap-3">
               <div>
-                <h2
-                  id="address-location-heading"
-                  class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
-                >
-                  Geographic Location
-                </h2>
+                <div class="flex items-center gap-2">
+                  <h2
+                    id="address-location-heading"
+                    class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
+                  >
+                    Geographic Location
+                  </h2>
+                  <.icon_button
+                    :if={@can_update? and not @editing_location?}
+                    id="address-edit-location-button"
+                    icon="edit"
+                    label="Edit location"
+                    context={:inline}
+                    phx-click="edit_location"
+                  />
+                </div>
                 <p class="mt-0.5 text-xs text-ink-subtle">
-                  Linked to GeoNames reference database for standardization and lookup.
+                  Linked to GeoNames reference database for standardization and lookup. Country, division, postcode and locality depend on one another, so they are applied together.
                 </p>
-              </div>
-
-              <div :if={allowed?(@current_scope, "admin.address.update")}>
-                <.button
-                  :if={not @editing_location?}
-                  id="address-edit-location-button"
-                  type="button"
-                  phx-click="edit_location"
-                >
-                  <.icon name="edit" class="mr-1 size-3.5" /> Edit Location
-                </.button>
+                <.fact_status id="address-location-status" status={@field_status["location"]} />
               </div>
             </div>
 
-            <!-- Location Form (Edit Mode) -->
             <div :if={@editing_location?} class="mt-4 border-t border-line pt-4">
               <.form
                 for={@location_form}
@@ -642,7 +702,12 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                 </div>
 
                 <div class="flex items-center gap-3 pt-2">
-                  <.button id="address-save-location" type="submit" variant="primary">
+                  <.button
+                    id="address-save-location"
+                    type="submit"
+                    variant="primary"
+                    phx-disable-with="Applying…"
+                  >
                     Apply Location
                   </.button>
                   <.button
@@ -656,164 +721,86 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
               </.form>
             </div>
 
-            <!-- Location View (Read Mode) -->
             <div :if={not @editing_location?} class="mt-4 border-t border-line pt-4">
               <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-                <div>
-                  <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                    Country
-                  </dt>
+                <.fact label="Country">
                   <dd id="address-view-country" class="mt-1 text-sm text-ink">
                     {@address.country_name || @address.country_iso || "—"}
                   </dd>
-                </div>
-                <div>
-                  <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                    State / Province
-                  </dt>
+                </.fact>
+                <.fact label="State / Province">
                   <dd id="address-view-admin1" class="mt-1 text-sm text-ink">
                     {@address.admin1_name || @address.admin1_code || "—"}
                   </dd>
-                </div>
-                <div>
-                  <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                    Postal Code
-                  </dt>
+                </.fact>
+                <.fact label="Postal Code">
                   <dd id="address-view-postcode" class="mt-1 text-sm tabular-nums text-ink">
                     {@address.postcode || "—"}
                   </dd>
-                </div>
-                <div>
-                  <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                    Locality
-                  </dt>
+                </.fact>
+                <.fact label="Locality">
                   <dd id="address-view-locality" class="mt-1 text-sm text-ink">
                     {@address.locality || "—"}
                   </dd>
-                </div>
+                </.fact>
               </dl>
             </div>
           </section>
 
-          <!-- CARD 3: Provenance -->
           <section
             id="address-provenance-card"
             class="rounded-2xl border border-line bg-surface p-6 shadow-xs"
             aria-labelledby="address-provenance-heading"
           >
-            <div class="mb-4 flex items-start justify-between">
-              <div>
-                <h2
-                  id="address-provenance-heading"
-                  class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
-                >
-                  Provenance
-                </h2>
-                <p class="mt-0.5 text-xs text-ink-subtle">
-                  Tracks where this address came from and how it was processed — useful for auditing data quality and imports.
-                </p>
-              </div>
-
-              <div :if={allowed?(@current_scope, "admin.address.update")}>
-                <.button
-                  :if={not @editing_provenance?}
-                  id="address-edit-provenance-button"
-                  type="button"
-                  phx-click="edit_provenance"
-                >
-                  <.icon name="edit" class="mr-1 size-3.5" /> Edit Provenance
-                </.button>
-              </div>
-            </div>
-
-            <!-- Provenance Form (Edit Mode) -->
-            <div :if={@editing_provenance?}>
-              <.form
-                for={@provenance_form}
-                id="address-provenance-form"
-                phx-change="validate_provenance"
-                phx-submit="save_provenance"
-                class="space-y-4"
+            <div class="mb-4">
+              <h2
+                id="address-provenance-heading"
+                class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
               >
-                <div class="grid gap-x-4 sm:grid-cols-2">
-                  <.input
-                    field={@provenance_form[:source]}
-                    id="address-provenance-source"
-                    label="Source"
-                    maxlength="255"
-                  />
-                  <.input
-                    field={@provenance_form[:source_ref]}
-                    id="address-provenance-source-ref"
-                    label="Source Reference"
-                    maxlength="255"
-                  />
-                </div>
-
-                <div class="flex items-center gap-3 pt-2">
-                  <.button id="address-save-provenance" type="submit" variant="primary">
-                    Save Provenance
-                  </.button>
-                  <.button
-                    id="address-cancel-provenance"
-                    type="button"
-                    phx-click="cancel_edit_provenance"
-                  >
-                    Cancel
-                  </.button>
-                </div>
-              </.form>
+                Provenance
+              </h2>
+              <p class="mt-0.5 text-xs text-ink-subtle">
+                Tracks where this address came from and how it was processed — useful for auditing data quality and imports.
+              </p>
             </div>
 
-            <!-- Provenance View (Read Mode) -->
-            <div :if={not @editing_provenance?}>
-              <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-                <div>
-                  <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">Source</dt>
-                  <dd id="address-view-source" class="mt-1 text-sm text-ink">
-                    {@address.source || "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                    Source Reference
-                  </dt>
-                  <dd id="address-view-source-ref" class="mt-1 text-sm text-ink">
-                    {@address.source_ref || "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                    Parser Version
-                  </dt>
-                  <dd id="address-view-parser-version" class="mt-1 text-sm text-ink">
-                    {@address.parser_version || "—"}
-                  </dd>
-                </div>
-                <div>
-                  <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                    Parse Confidence
-                  </dt>
-                  <dd id="address-view-parse-confidence" class="mt-1 text-sm tabular-nums text-ink">
-                    {@address.parse_confidence || "—"}
-                  </dd>
-                </div>
-                <div :if={@address.raw_input} class="sm:col-span-2 md:col-span-4 mt-2 border-t border-line pt-4">
-                  <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                    Raw Input
-                  </dt>
-                  <dd class="mt-1">
-                    <pre
-                      id="address-view-raw-input"
-                      class="overflow-x-auto rounded-xl border border-line bg-surface-muted p-3 font-mono text-xs text-ink"
-                    >{@address.raw_input}</pre>
-                  </dd>
-                </div>
-              </dl>
-            </div>
+            <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+              <.text_fact
+                name="source"
+                address={@address}
+                can_update?={@can_update?}
+                field_status={@field_status}
+              />
+              <.text_fact
+                name="source_ref"
+                address={@address}
+                can_update?={@can_update?}
+                field_status={@field_status}
+              />
+              <.fact label="Parser Version">
+                <dd id="address-view-parser-version" class="mt-1 text-sm text-ink">
+                  {@address.parser_version || "—"}
+                </dd>
+              </.fact>
+              <.fact label="Parse Confidence">
+                <dd id="address-view-parse-confidence" class="mt-1 text-sm tabular-nums text-ink">
+                  {@address.parse_confidence || "—"}
+                </dd>
+              </.fact>
+              <div :if={@address.raw_input} class="sm:col-span-2 md:col-span-4 mt-2 border-t border-line pt-4">
+                <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
+                  Raw Input
+                </dt>
+                <dd class="mt-1">
+                  <pre
+                    id="address-view-raw-input"
+                    class="overflow-x-auto rounded-xl border border-line bg-surface-muted p-3 font-mono text-xs text-ink"
+                  >{@address.raw_input}</pre>
+                </dd>
+              </div>
+            </dl>
           </section>
 
-          <!-- CARD 4: Linked Entities -->
           <section
             id="address-linked-entities-card"
             class="rounded-2xl border border-line bg-surface p-6 shadow-xs"
@@ -920,8 +907,101 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   end
 
   # ============================================================================
+  # Fact Components
+  # ============================================================================
+
+  # A read-first text fact. An operator who may update edits it in place; the
+  # emptied value is a real edit because every one of these columns is
+  # nullable. Anyone else sees the stored value with no affordance.
+  attr(:name, :string, required: true)
+  attr(:address, Detail, required: true)
+  attr(:can_update?, :boolean, required: true)
+  attr(:field_status, :map, required: true)
+  attr(:class, :any, default: nil)
+
+  defp text_fact(assigns) do
+    assigns =
+      assigns
+      |> assign(:label, fact_label(assigns.name))
+      |> assign(:value, Map.fetch!(assigns.address, Map.fetch!(@inline_fields, assigns.name)))
+      |> assign(:dom_id, "address-#{String.replace(assigns.name, "_", "-")}")
+
+    ~H"""
+    <div>
+      <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">{@label}</dt>
+      <dd id={String.replace(@dom_id, "address-", "address-view-")} class={["mt-1 text-sm text-ink", @class]}>
+        <.inline_edit
+          :if={@can_update?}
+          id={@dom_id}
+          name={@name}
+          label={@label}
+          value={@value || ""}
+          id_value={@address.id}
+          save_event="save_field"
+          allow_empty
+          status={@field_status[@name]}
+        />
+        <span :if={not @can_update?} class={[is_nil(@value) && "text-ink-muted"]}>
+          {@value || "—"}
+        </span>
+      </dd>
+    </div>
+    """
+  end
+
+  attr(:label, :string, required: true)
+  slot(:inner_block, required: true)
+
+  defp fact(assigns) do
+    ~H"""
+    <div>
+      <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">{@label}</dt>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  # The outcome of a grouped or choice commit, in the same voice as
+  # `<.inline_edit>` reports its own.
+  attr(:id, :string, required: true)
+  attr(:status, :any, required: true)
+
+  defp fact_status(%{status: nil} = assigns), do: ~H""
+
+  defp fact_status(%{status: :saved} = assigns) do
+    ~H"""
+    <p id={@id} role="status" class="mt-0.5 flex items-center gap-1 text-xs text-success-ink">
+      <.icon name="success" class="size-3" /> Saved
+    </p>
+    """
+  end
+
+  defp fact_status(%{status: {:error, message}} = assigns) do
+    assigns = assign(assigns, :message, message)
+
+    ~H"""
+    <p id={@id} role="alert" class="mt-0.5 flex items-start gap-1 text-xs text-danger-ink">
+      <.icon name="error" class="mt-0.5 size-3 shrink-0" />
+      <span class="min-w-0 [overflow-wrap:anywhere]">{@message}</span>
+    </p>
+    """
+  end
+
+  attr(:status, :string, required: true)
+
+  defp verification_badge(assigns) do
+    ~H"""
+    <.badge kind={verification_badge_kind(@status)}>
+      {String.capitalize(@status || "unverified")}
+    </.badge>
+    """
+  end
+
+  # ============================================================================
   # Internal Helpers
   # ============================================================================
+
+  defp page_title(%Detail{} = address), do: address.label || "Address ##{address.id}"
 
   defp parse_id(id) when is_integer(id) and id > 0, do: {:ok, id}
 
@@ -969,19 +1049,6 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
 
   defp resolve_company_context(_scope, _address, _param), do: nil
 
-  defp assign_details_form(socket, %Detail{} = address) do
-    data = %{
-      "label" => address.label || "",
-      "phone" => address.phone || "",
-      "verification_status" => address.verification_status || "unverified",
-      "line1" => address.line1 || "",
-      "line2" => address.line2 || "",
-      "line3" => address.line3 || ""
-    }
-
-    assign(socket, :details_form, to_form(data, as: :details))
-  end
-
   defp assign_location_form(socket, %Detail{} = address) do
     country_iso = address.country_iso || ""
     admin1_options = if country_iso != "", do: Geonames.list_admin1(country_iso), else: []
@@ -1000,33 +1067,6 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
     |> assign(:auto_location, %{admin1_code: nil, locality: nil})
     |> assign(:location_params, data)
     |> assign(:location_form, to_form(data, as: :location))
-  end
-
-  defp assign_provenance_form(socket, %Detail{} = address) do
-    data = %{
-      "source" => address.source || "",
-      "source_ref" => address.source_ref || ""
-    }
-
-    assign(socket, :provenance_form, to_form(data, as: :provenance))
-  end
-
-  defp sanitize_details_params(params) do
-    %{
-      "label" => normalize_param(params["label"]),
-      "phone" => normalize_param(params["phone"]),
-      "verification_status" => normalize_param(params["verification_status"]) || "unverified",
-      "line1" => normalize_param(params["line1"]),
-      "line2" => normalize_param(params["line2"]),
-      "line3" => normalize_param(params["line3"])
-    }
-  end
-
-  defp sanitize_provenance_params(params) do
-    %{
-      "source" => normalize_param(params["source"]),
-      "source_ref" => normalize_param(params["source_ref"])
-    }
   end
 
   defp matching_admin1_code(_country_iso, []), do: nil

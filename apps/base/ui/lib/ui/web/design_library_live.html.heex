@@ -1073,18 +1073,56 @@
                 Interaction patterns
               </h2>
               <p class="text-sm text-ink-muted">
-                Inline text editing is the one shared interaction primitive today. Inline select, combobox and textarea editing, grouped fact editing, disclosure, filter and period patterns, and unsaved-change flows have no specimen yet; the filter composition is shown as part of the index page under Composite patterns.
+                Inline text editing and the demoted back link are the shared interaction primitives today. Inline select, combobox and textarea editing, grouped fact editing, disclosure, filter and period patterns, and unsaved-change flows have no specimen yet; the filter composition is shown as part of the index page under Composite patterns.
               </p>
             </div>
-            <.card id="component-inline-edit" title="Inline edit" inner_class="p-4">
+            <.card id="component-inline-edit" title="Inline edit" inner_class="space-y-4 p-4">
+              <div>
+                <p class="mb-2 text-xs text-ink-muted">
+                  Click the value, type, then press Enter or leave the field. Nothing is painted until the server replies: the field reads "Saving…" for the round trip, then reports the outcome on itself.
+                </p><.inline_edit
+                  id="design-library-inline-edit"
+                  value={@inline_value}
+                  save_event="preview-inline-edit"
+                  label="Edit company name"
+                />
+              </div>
+              <div class="grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
+                <div>
+                  <p class="mb-2 text-xs text-ink-muted">Saved</p><.inline_edit
+                    id="design-library-inline-edit-saved"
+                    value="Bilimbi Industries"
+                    save_event="preview-inline-edit"
+                    label="Edit company name"
+                    status={:saved}
+                  />
+                </div>
+                <div>
+                  <p class="mb-2 text-xs text-ink-muted">Refused, empty allowed</p><.inline_edit
+                    id="design-library-inline-edit-error"
+                    value=""
+                    save_event="preview-inline-edit"
+                    label="Edit phone"
+                    allow_empty
+                    status={
+                      {:error, "\"+60 3\" was not saved: Phone should be at most 3 character(s)."}
+                    }
+                  />
+                </div>
+              </div>
+            </.card>
+            <.card id="component-back-link" title="Back link" inner_class="p-4">
               <p class="mb-2 text-xs text-ink-muted">
-                Click the value, type, then press Enter or leave the field.
-              </p><.inline_edit
-                id="design-library-inline-edit"
-                value={@inline_value}
-                save_event="preview-inline-edit"
-                label="Edit company name"
-              />
+                Returning is a secondary action, so it is a plain link, never a button. The text is always "← Back"; a title names the destination when the page has more than one way back.
+              </p>
+              <div class="flex flex-wrap items-center gap-6">
+                <.back_link id="design-library-back-link" navigate={~p"/system/design-library"} />
+                <.back_link
+                  id="design-library-back-link-titled"
+                  navigate={~p"/system/design-library"}
+                  title="Back to Design Library"
+                />
+              </div>
             </.card>
           </section>
 

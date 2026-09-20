@@ -591,6 +591,14 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   streamed rows included; do not thread a `display` assign to achieve
   that. Pass `display` only to pin one instant to a context of your own.
   Primary actions use
+  Detail pages are read-first: facts edit in place and commit by themselves
+  through `<.inline_edit>` (`allow_empty` on nullable columns, the outcome
+  passed back as `status`), a choice commits on change, and only genuinely
+  interdependent facts share a grouped Apply; see "Read-first detail pages"
+  in `DESIGN.md`. Returning is a secondary action: use `<.back_link>`
+  ("← Back"), never a "Back to …" button, and render record history through
+  the `record.history` panel, whose trigger is the registry's `history`
+  icon. Primary actions use
   `<.button variant="primary">` with deep olive base (`bg-action`, `lime-950`
   light / `lime-600` dark), high-contrast text (`text-action-ink`, `lime-50`
   light / `lime-950` dark), and a brighter lime hover

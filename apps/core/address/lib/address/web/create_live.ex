@@ -94,9 +94,7 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
           Create Address
           <:subtitle>Add a tenant-owned address</:subtitle>
           <:actions>
-            <.button id="address-back" navigate={~p"/addresses"}>
-              Back to addresses
-            </.button>
+            <.back_link id="address-back" navigate={~p"/addresses"} title="Back to addresses" />
           </:actions>
         </.header>
 

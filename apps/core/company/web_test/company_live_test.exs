@@ -416,7 +416,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
       assert has_element?(view, "h1", "Bilimbi Industries")
-      assert has_element?(view, "#company-back[href='/companies']", "Back to companies")
+      assert has_element?(view, "#company-back[href='/companies'][title='Back to companies']", "Back")
       assert has_element?(view, "#company-users-table td", "Ada Lovelace")
 
       assert has_element?(

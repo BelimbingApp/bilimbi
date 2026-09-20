@@ -273,9 +273,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
           Department Types
           <:subtitle>Manage standard department categories and organizational functions</:subtitle>
           <:actions>
-            <.button navigate={~p"/companies"} class="text-xs">
-              Back to companies
-            </.button>
+            <.back_link id="department-types-back" navigate={~p"/companies"} title="Back to companies" />
             <.button
               :if={@can_create?}
               id="new-department-type-btn"

@@ -3,6 +3,8 @@ defmodule BilimbiWeb.AddressLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
@@ -120,7 +122,7 @@ defmodule BilimbiWeb.AddressLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/create")
 
     assert has_element?(view, "#address-form")
-    assert has_element?(view, "#address-back[href='/addresses']", "Back to addresses")
+    assert has_element?(view, "#address-back[href='/addresses'][title='Back to addresses']", "Back")
     assert has_element?(view, "#address-cancel[href='/addresses']", "Cancel")
     assert has_element?(view, "#nav-admin-address[aria-current='page']")
     assert has_element?(view, "#address-country option[value='MY']", "Malaysia")
@@ -229,7 +231,7 @@ defmodule BilimbiWeb.AddressLiveTest do
              conn |> log_in_as() |> live(~p"/addresses/999999")
   end
 
-  test "renders address details, location, provenance, linked entities, and company back link", %{
+  test "renders address facts, location, provenance, linked entities, history and back links", %{
     conn: conn,
     scope: scope
   } do
@@ -259,19 +261,48 @@ defmodule BilimbiWeb.AddressLiveTest do
         priority: 1
       })
 
+    AuditFixtures.create_audit_tables!()
+
+    {:ok, mutation} =
+      Audit.record_mutation(scope, %{
+        company_id: 73,
+        actor_type: "user",
+        actor_id: 91,
+        auditable_type: Address.auditable_identity(),
+        auditable_id: to_string(address.id),
+        subject_name: "Headquarters",
+        event: "updated",
+        occurred_at: ~N[2026-09-18 09:00:00],
+        old_values: %{"label" => "Head Office"},
+        new_values: %{"label" => "Headquarters"}
+      })
+
     grant_capabilities!(["admin.address.view", "admin.company.view"])
 
     {:ok, view, _html} =
       conn |> log_in_as() |> live(~p"/addresses/#{address.id}?company=73")
 
     assert has_element?(view, "#address-show-page")
-    assert has_element?(view, "#address-back-company[href='/companies/73']")
-    assert has_element?(view, "#address-back-list[href='/addresses']")
+
+    # Back navigation is demoted to plain links reading "← Back".
+    assert has_element?(view, "a#address-back-company[href='/companies/73'][title='Back to company']", "Back")
+    assert has_element?(view, "a#address-back-list[href='/addresses'][title='Back to addresses']", "Back")
+    refute has_element?(view, "#address-back-list", "Back to List")
+    refute has_element?(view, "button#address-back-list")
+
+    # Record history is hidden until the actor may list audit logs.
+    refute has_element?(view, "#address-record-history-toggle")
+
+    # A viewer sees the facts with no edit affordance.
     assert has_element?(view, "#address-view-label", "Headquarters")
+    refute has_element?(view, "#address-label[phx-hook='InlineEdit']")
+    refute has_element?(view, "#address-verification-status-display")
+    refute has_element?(view, "#address-edit-location-button")
     assert has_element?(view, "#address-view-phone", "+60 3 1234 5678")
-    assert has_element?(view, "#address-view-lines", "1 Platform Road")
-    assert has_element?(view, "#address-view-lines", "Level 2")
-    assert has_element?(view, "#address-view-lines", "Tower B")
+    assert has_element?(view, "#address-view-verification-status", "Verified")
+    assert has_element?(view, "#address-view-line1", "1 Platform Road")
+    assert has_element?(view, "#address-view-line2", "Level 2")
+    assert has_element?(view, "#address-view-line3", "Tower B")
     assert has_element?(view, "#address-view-country", "Malaysia")
     assert has_element?(view, "#address-view-admin1", "Kuala Lumpur")
     assert has_element?(view, "#address-view-postcode", "50000")
@@ -285,9 +316,21 @@ defmodule BilimbiWeb.AddressLiveTest do
     assert has_element?(view, "#address-linked-entities-table", "Billing")
     assert has_element?(view, "#address-linked-entities-table", "Shipping")
     assert has_element?(view, "#address-linked-entities-table", "Yes")
+
+    grant_capabilities!("admin.audit.log.list")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+
+    # History is a demoted icon action carrying Belimbing's clock, not a button.
+    assert has_element?(view, "summary#address-record-history-toggle[title='History']", "History")
+    assert has_element?(view, "#address-record-history-toggle .hero-clock")
+    refute has_element?(view, "#address-record-history-toggle .hero-clipboard-document-list")
+    assert has_element?(view, "#address-record-history-panel", "History for address ##{address.id}")
+    assert has_element?(view, "#address-record-history-entry-#{mutation.id}", "Head Office")
+    assert has_element?(view, "#address-record-history-entry-#{mutation.id}", "Headquarters")
   end
 
-  test "allows editing details, location, and provenance when authorized", %{
+  test "saves each committed text fact in place and reports the outcome on that fact", %{
     conn: conn,
     scope: scope
   } do
@@ -296,6 +339,7 @@ defmodule BilimbiWeb.AddressLiveTest do
         label: "Old Label",
         phone: "+60 1",
         line1: "Old Line 1",
+        line2: "Old Line 2",
         verification_status: "unverified"
       })
 
@@ -303,29 +347,111 @@ defmodule BilimbiWeb.AddressLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
 
-    # 1. Edit Details
-    view |> element("#address-edit-details-button") |> render_click()
-    assert has_element?(view, "#address-details-form")
+    # Every text fact is an in-place editor; there is no edit mode and no save button.
+    for id <- ~w(address-label address-phone address-line1 address-line2 address-line3 address-source address-source-ref) do
+      assert has_element?(view, "##{id}[phx-hook='InlineEdit'][data-save-event='save_field'][data-allow-empty]")
+    end
+
+    refute has_element?(view, "#address-edit-details-button")
+    refute has_element?(view, "#address-save-details")
+    refute has_element?(view, "#address-details-form")
+    refute has_element?(view, "#address-provenance-form")
+
+    # A committed edit saves by itself and the fact reports "Saved".
+    render_hook(view, "save_field", %{"id" => to_string(address.id), "label" => "  Updated HQ  "})
+
+    assert has_element?(view, "#address-view-label", "Updated HQ")
+    assert has_element?(view, "#address-label-status[role='status']", "Saved")
+    assert page_title(view) == "Updated HQ"
+    assert {:ok, %{label: "Updated HQ"}} = Address.get_address(scope, address.id)
+
+    # Clearing a nullable fact is a real edit.
+    render_hook(view, "save_field", %{"id" => to_string(address.id), "line2" => ""})
+
+    assert has_element?(view, "#address-line2-status[role='status']", "Saved")
+    refute has_element?(view, "#address-label-status")
+    assert has_element?(view, "#address-line2 [data-role='text']", "—")
+    assert {:ok, %{line2: nil}} = Address.get_address(scope, address.id)
+
+    # Provenance facts follow the same rule.
+    render_hook(view, "save_field", %{"id" => to_string(address.id), "source_ref" => "CRM-888"})
+
+    assert has_element?(view, "#address-view-source-ref", "CRM-888")
+    assert has_element?(view, "#address-source-ref-status", "Saved")
+
+    # A field the page does not edit in place is ignored, not written.
+    render_hook(view, "save_field", %{"id" => to_string(address.id), "postcode" => "99999"})
+    assert {:ok, %{postcode: nil}} = Address.get_address(scope, address.id)
+  end
+
+  test "a refused commit keeps the stored value on screen and reports the reason on the fact", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, address} = Address.create_address(scope, %{label: "HQ", phone: "+60 1"})
+
+    grant_capabilities!(["admin.address.view", "admin.address.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+
+    too_long = String.duplicate("x", 256)
+    render_hook(view, "save_field", %{"id" => to_string(address.id), "phone" => too_long})
+
+    assert has_element?(view, "#address-phone-status[role='alert']", "was not saved")
+    assert has_element?(view, "#address-phone-status", "Phone should be at most 255 character(s)")
+    assert has_element?(view, "#address-phone-status", String.slice(too_long, 0, 40))
+    assert has_element?(view, "#address-view-phone", "+60 1")
+    refute has_element?(view, "#address-phone-status", "Saved")
+    refute has_element?(view, "#flash-group", "was not saved")
+    assert {:ok, %{phone: "+60 1"}} = Address.get_address(scope, address.id)
+
+    # The alert stays until that fact is committed again, and then gives way
+    # to the new outcome; a success elsewhere does not clear it.
+    render_hook(view, "save_field", %{"id" => to_string(address.id), "label" => "New HQ"})
+    assert has_element?(view, "#address-phone-status[role='alert']")
+    assert has_element?(view, "#address-label-status", "Saved")
+
+    render_hook(view, "save_field", %{"id" => to_string(address.id), "phone" => "+60 2"})
+    refute has_element?(view, "#address-phone-status[role='alert']")
+    assert has_element?(view, "#address-phone-status", "Saved")
+    assert has_element?(view, "#address-view-phone", "+60 2")
+  end
+
+  test "commits the verification status on change and the location group on apply", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, address} = Address.create_address(scope, %{label: "HQ", verification_status: "unverified"})
+
+    grant_capabilities!(["admin.address.view", "admin.address.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+
+    # Choice fact: the badge is the trigger, the select commits on change.
+    assert has_element?(view, "#address-verification-status-display", "Unverified")
+    refute has_element?(view, "#address-verification-status-form")
+
+    view |> element("#address-verification-status-display") |> render_click()
+    assert has_element?(view, "#address-verification-status-form select#address-verification-status")
 
     view
-    |> element("#address-details-form")
-    |> render_submit(%{
-      "details" => %{
-        "label" => "Updated HQ",
-        "phone" => "+60 12 3456789",
-        "verification_status" => "verified",
-        "line1" => "10 Innovation Blvd",
-        "line2" => "Suite 300",
-        "line3" => ""
-      }
-    })
+    |> element("#address-verification-status-form")
+    |> render_change(%{"verification_status" => "verified"})
 
-    assert render(view) =~ "Address details updated successfully."
-    assert has_element?(view, "#address-view-label", "Updated HQ")
-    assert has_element?(view, "#address-view-phone", "+60 12 3456789")
-    assert has_element?(view, "#address-view-lines", "10 Innovation Blvd")
+    refute has_element?(view, "#address-verification-status-form")
+    assert has_element?(view, "#address-verification-status-display", "Verified")
+    assert has_element?(view, "#address-verification-status-status[role='status']", "Saved")
+    assert {:ok, %{verification_status: "verified"}} = Address.get_address(scope, address.id)
 
-    # 2. Edit Location with Geonames
+    # Escape or leaving the select cancels without writing.
+    view |> element("#address-verification-status-display") |> render_click()
+    render_hook(view, "cancel_edit_field", %{})
+    refute has_element?(view, "#address-verification-status-form")
+    assert {:ok, %{verification_status: "verified"}} = Address.get_address(scope, address.id)
+
+    # Location facts depend on one another, so they commit together from a
+    # demoted icon action, with GeoNames suggestions while editing.
+    assert has_element?(view, "button#address-edit-location-button[aria-label='Edit location']")
     view |> element("#address-edit-location-button") |> render_click()
     assert has_element?(view, "#address-location-form")
 
@@ -354,25 +480,55 @@ defmodule BilimbiWeb.AddressLiveTest do
       }
     })
 
-    assert render(view) =~ "Address location updated successfully."
+    refute has_element?(view, "#address-location-form")
+    assert has_element?(view, "#address-location-status[role='status']", "Saved")
     assert has_element?(view, "#address-view-locality", "Kuala Lumpur")
+    assert has_element?(view, "#address-view-country", "Malaysia")
 
-    # 3. Edit Provenance
-    view |> element("#address-edit-provenance-button") |> render_click()
-    assert has_element?(view, "#address-provenance-form")
+    # A refused group keeps the editor open with the error on its field.
+    view |> element("#address-edit-location-button") |> render_click()
 
     view
-    |> element("#address-provenance-form")
+    |> element("#address-location-form")
     |> render_submit(%{
-      "provenance" => %{
-        "source" => "crm_sync",
-        "source_ref" => "CRM-888"
+      "location" => %{
+        "country_iso" => "MY",
+        "admin1_code" => "MY.14",
+        "postcode" => String.duplicate("9", 256),
+        "locality" => "Kuala Lumpur"
       }
     })
 
-    assert render(view) =~ "Provenance updated successfully."
-    assert has_element?(view, "#address-view-source", "crm_sync")
-    assert has_element?(view, "#address-view-source-ref", "CRM-888")
+    assert has_element?(view, "#address-location-form")
+    assert has_element?(view, "#address-location-postcode-error-0", "should be at most 255 character(s)")
+    assert {:ok, %{postcode: "50000"}} = Address.get_address(scope, address.id)
+  end
+
+  test "refuses in-place writes once the update capability is gone", %{conn: conn, scope: scope} do
+    {:ok, address} = Address.create_address(scope, %{label: "HQ", verification_status: "unverified"})
+
+    grant_capabilities!(["admin.address.view", "admin.address.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+
+    grant =
+      Bilimbi.Base.Authz.list_principal_capabilities(scope, page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == "admin.address.update"))
+
+    assert {:ok, :removed} = Bilimbi.Base.Authz.remove_principal_capability(scope, grant.id)
+
+    render_hook(view, "save_field", %{"id" => to_string(address.id), "label" => "Forged"})
+    assert has_element?(view, "#flash-group", "You do not have permission to update addresses.")
+
+    render_hook(view, "save_verification_status", %{"verification_status" => "verified"})
+
+    render_hook(view, "save_location", %{
+      "location" => %{"country_iso" => "MY", "admin1_code" => "", "postcode" => "", "locality" => ""}
+    })
+
+    assert {:ok, %{label: "HQ", verification_status: "unverified", country_iso: nil}} =
+             Address.get_address(scope, address.id)
   end
 
   test "supports sorting linked entities column headers", %{conn: conn, scope: scope} do

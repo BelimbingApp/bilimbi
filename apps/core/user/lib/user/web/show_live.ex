@@ -911,9 +911,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               opts={%{auditable_types: user_auditable_types(), auditable_id: @user.id}}
             />
 
-            <.button id="user-back" navigate={~p"/users"}>
-              Back
-            </.button>
+            <.back_link id="user-back" navigate={~p"/users"} title="Back to users" />
             <.link
               :if={
                 allowed?(@current_scope, "admin.user.impersonate") and
