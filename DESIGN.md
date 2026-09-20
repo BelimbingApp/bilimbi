@@ -133,7 +133,7 @@ during long operational sessions:
 ## Inline editing
 
 Inline editing allows quick modifications to entity fields without leaving the
-table view:
+surface they are read on — a table row or a detail page fact:
 
 - **Display mode:** Shows the field value in `text-ink` alongside a subtle hover pencil icon (`size-3.5 text-muted opacity-0 group-hover:opacity-100 transition-opacity`). A blank value shows `—` in `text-ink-muted`.
 - **Activation:** Clicking the cell or pressing Enter when focused activates edit mode.
@@ -150,9 +150,11 @@ table view:
 
 ## Read-first detail pages
 
-A detail page (`/addresses/:id` is the exemplar; `/employees/:id` and
-`/users/:id` follow it) shows the record as facts and lets an authorized
-operator change each fact in place. There is no edit mode and no save button:
+A detail page shows the record as facts and lets an authorized operator change
+each fact in place. `/addresses/:id` is the exemplar and the only full adopter
+today; `/employees/:id` and `/users/:id` already edit facts in place but still
+report the outcome in a flash and pass no `allow_empty`, and adopt the rest of
+this section as they are migrated. There is no edit mode and no save button:
 a committed edit saves by itself. What "committed" means follows the control
 and is the same for every fact of that kind on the page:
 
