@@ -330,6 +330,29 @@ defmodule BilimbiWeb.AddressLiveTest do
     assert has_element?(view, "#address-record-history-entry-#{mutation.id}", "Headquarters")
   end
 
+  test "shows an in-place save in the record history panel", %{conn: conn, scope: scope} do
+    {:ok, address} = Address.create_address(scope, %{label: "Head Office"})
+
+    AuditFixtures.create_audit_tables!()
+
+    grant_capabilities!([
+      "admin.address.view",
+      "admin.address.update",
+      "admin.audit.log.list"
+    ])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+
+    render_hook(view, "save_field", %{"id" => to_string(address.id), "label" => "Headquarters"})
+    assert has_element?(view, "#address-label-status[role='status']", "Saved")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+
+    refute has_element?(view, "#address-record-history-empty")
+    assert has_element?(view, "#address-record-history-panel", "Head Office")
+    assert has_element?(view, "#address-record-history-panel", "Headquarters")
+  end
+
   test "saves each committed text fact in place and reports the outcome on that fact", %{
     conn: conn,
     scope: scope

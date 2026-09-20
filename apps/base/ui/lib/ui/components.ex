@@ -2328,7 +2328,7 @@ defmodule Bilimbi.Base.UI.Components do
         <.icon name="refresh" class="size-3 motion-safe:animate-spin" /> Saving…
       </span>
 
-      <.commit_status id={"#{@id}-status"} status={@status} data-role="status" />
+      <.commit_status id={"#{@id}-status"} status={@status} />
     </div>
     """
   end
@@ -2356,8 +2356,6 @@ defmodule Bilimbi.Base.UI.Components do
     doc: "the outcome of the last commit: `nil`, `:saved`, or `{:error, message}`"
   )
 
-  attr(:rest, :global)
-
   def commit_status(assigns) do
     assigns = assign(assigns, :status, normalize_commit_status(assigns.status))
 
@@ -2367,7 +2365,6 @@ defmodule Bilimbi.Base.UI.Components do
       id={@id}
       role="status"
       class="mt-0.5 flex items-center gap-1 text-xs text-success-ink"
-      {@rest}
     >
       <.icon name="success" class="size-3" /> Saved
     </p>
@@ -2377,7 +2374,6 @@ defmodule Bilimbi.Base.UI.Components do
       id={@id}
       role="alert"
       class="mt-0.5 flex items-start gap-1 text-xs text-danger-ink"
-      {@rest}
     >
       <.icon name="error" class="mt-0.5 size-3 shrink-0" />
       <span class="min-w-0 [overflow-wrap:anywhere]">{message}</span>

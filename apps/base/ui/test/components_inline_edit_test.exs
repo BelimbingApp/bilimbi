@@ -36,7 +36,6 @@ defmodule Bilimbi.Base.UI.ComponentsInlineEditTest do
     assert html =~ ~s(value="Malaysia")
     assert html =~ "hero-pencil"
     refute html =~ "data-allow-empty"
-    refute html =~ ~s(data-role="status")
     assert html =~ ~s(data-role="saving")
   end
 

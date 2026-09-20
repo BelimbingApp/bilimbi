@@ -473,7 +473,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                 id="address-record-history"
                 current_scope={@current_scope}
                 opts={%{
-                  auditable_types: [Address.auditable_identity()],
+                  auditable_types: address_auditable_types(),
                   auditable_id: @address.id,
                   title: "History for address ##{@address.id}"
                 }}
@@ -979,6 +979,9 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   # ============================================================================
 
   defp page_title(%Detail{} = address), do: address.label || "Address ##{address.id}"
+
+  defp address_auditable_types,
+    do: ["Bilimbi.Core.Address.Schema", Address.auditable_identity()]
 
   defp parse_id(id) when is_integer(id) and id > 0, do: {:ok, id}
 
