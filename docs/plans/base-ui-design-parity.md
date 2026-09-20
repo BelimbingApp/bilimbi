@@ -460,8 +460,9 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     `#component-shell` deep link as a nested menu-linked section.
   - **NAV-04 pagination has no card of its own.** It renders twice, both times
     inside the table it pages, so it stays with Data display and Composite
-    patterns. The canonical table's call now carries the `component-pagination`
-    anchor, so the coverage guard no longer reports it as unpresented.
+    patterns. The `<.pagination>` call that pages the canonical table now
+    carries the `component-pagination` anchor as its own id, so the coverage
+    guard no longer reports it as unpresented.
   - The eleven family entries carry letter prefixes (`A Foundations` through
     `K Graphics`), so the alphabetical ascending order root `AGENTS.md` §12
     requires and the catalog order that makes the alignment checkable are the
@@ -496,15 +497,16 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
   - **Coverage, component presence — three of four closed.** `icon`,
     `multi_select` and `pagination` had no `component-<name>` entry of their own
     and now have one. Two needed no new drawing: `pagination`'s sits on the
-    canonical table's own call rather than on a second copy of the control, and
-    `icon`'s spans the Graphic page's registered glyphs and Heroicons rather
-    than a second drawing under Actions. `multi_select` earned a specimen of its
-    own, because its `hint` and `label` states had to be shown. The fourth,
-    `connection_banners`, is accepted rather than pending, for the reason
-    recorded above: the layout renders one pair on every page, so a second live
-    pair here would tell an operator "Connection interrupted" twice on a real
-    disconnect. Presenting it honestly needs a suppression seam in the shared
-    component and in `app.css`, which is its own slice.
+    `<.pagination>` call the canonical table already had rather than on a
+    second copy of the control, and `icon`'s spans the Graphic page's
+    registered glyphs and Heroicons rather than a second drawing under Actions.
+    `multi_select` earned a specimen of its own, because its `hint` and `label`
+    states had to be shown. The fourth, `connection_banners`, is accepted
+    rather than pending, for the reason recorded above: the layout renders one
+    pair on every page, so a second live pair here would tell an operator
+    "Connection interrupted" twice on a real disconnect. Presenting it honestly
+    needs a suppression seam in the shared component and in `app.css`, which is
+    its own slice.
   - **Coverage, declared states — all but one closed.** Twenty-one axes across
     `filter_toolbar`, `icon`, `input`, `list`, `multi_select`, `radio_group`,
     `table` and `tabs` were presented in a single state; every one is varied now
