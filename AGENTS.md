@@ -600,8 +600,7 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   in `DESIGN.md`. The per-fact outcome bookkeeping behind that `status` —
   which "Saved" stands, the refusal wording, the rejected-value truncation —
   is `Bilimbi.Base.UI.CommitStatus`; a page adopts it and never keeps a
-  copy, and `apps/base/ui/test/commit_status_owner_guard_test.exs` fails on
-  one. Returning is a secondary action: use `<.back_link>`
+  copy. Returning is a secondary action: use `<.back_link>`
   ("← Back"), never a "Back to …" button; a related workflow such as
   Manage is an `<.action_link>` carrying its registry glyph, on the section
   it belongs to or beside the page's primary action, never a button; and

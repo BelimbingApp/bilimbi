@@ -30,5 +30,4 @@ and `<.commit_status>`; `Bilimbi.Base.UI.CommitStatus` owns the bookkeeping
 those components render — the `:field_status` assign, the rule that "Saved"
 belongs to the most recent commit only, the refusal wording and the
 rejected-value truncation — and its moduledoc lists what an adopting page
-does. `test/commit_status_owner_guard_test.exs` fails a page that carries its
-own copy.
+does.
