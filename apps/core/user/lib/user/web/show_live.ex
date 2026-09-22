@@ -12,7 +12,20 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   - the company is a choice fact: it reads as the company name (or "None")
     and becomes a select on click; the select commits on change, and Escape
     or leaving it cancels, as Belimbing's `admin/users/show` edit-in-place
-    select does.
+    select does. Choosing "None" is the one destructive choice — it ends
+    every session the account holds and takes it off every user screen — so
+    it arms a confirmation on the fact instead of writing, and the write
+    happens on the confirmed click.
+
+  An account with no company has no company for Core User to write its facts
+  through, so its name and email show no editor and an info notice says so.
+  The notice states only what is reachable: inside the platform-operator
+  tenant an operator holding `admin.user.unaffiliated.manage` can affiliate
+  the account again from this page while it is open; in any other tenant the
+  affiliation is refused outright. In both cases leaving the page is final —
+  `User.get_tenant_user/2` resolves a user through its company, so no user
+  screen can reopen an account with none, and neither the notice nor a
+  refusal offers a recovery that does not exist.
 
   Each fact reports its own outcome through the shared commit status:
   "Saving…" while the round trip is in flight, "Saved" once stored, and an
@@ -76,6 +89,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     socket
     |> assign(:field_status, %{})
     |> assign(:editing_field, nil)
+    |> assign(:confirm_clear_company?, false)
     |> assign(:show_assign_roles, false)
     |> assign(:role_search, "")
     |> assign(:selected_role_ids, [])
@@ -322,87 +336,76 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   def handle_event("edit_field", _params, socket), do: {:noreply, socket}
 
   def handle_event("cancel_edit_field", _params, socket) do
-    {:noreply, assign(socket, :editing_field, nil)}
+    {:noreply, close_company_editor(socket)}
   end
 
   # The company choice commits on change. Belimbing's saveCompany routes the
   # same three transitions — reassign, clear, and affiliate an unaffiliated
   # account — and each stays its own audited Core User operation here.
+  # Clearing is the destructive one and is the only one this event does not
+  # perform: it arms the confirmation the operator then clicks.
   def handle_event("save_company", params, socket) do
     if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
+      target_company_id = chosen_company_id(params)
+      choice = company_choice_label(socket, target_company_id)
 
-      company_id_param =
-        case params do
-          %{"company_id" => cid} -> cid
-          %{"user" => %{"company_id" => cid}} -> cid
-          cid when is_binary(cid) -> cid
-          _ -> ""
-        end
+      cond do
+        user.company_id == target_company_id ->
+          {:noreply, commit_company(socket, :unchanged, {:ok, user}, choice)}
 
-      target_company_id =
-        case Integer.parse(to_string(company_id_param)) do
-          {cid, ""} when cid > 0 -> cid
-          _ -> nil
-        end
+        is_nil(target_company_id) ->
+          {:noreply, assign(socket, :confirm_clear_company?, true)}
 
-      result =
-        cond do
-          user.company_id == target_company_id ->
-            {:ok, user}
+        is_nil(user.company_id) ->
+          actor = current_actor(socket, target_company_id)
 
-          not is_nil(user.company_id) and not is_nil(target_company_id) ->
-            actor = current_actor(socket, user.company_id)
-            User.reassign_user_company(actor, scope, user.company_id, user.id, target_company_id)
-
-          not is_nil(user.company_id) and is_nil(target_company_id) ->
-            actor = current_actor(socket, user.company_id)
-            User.clear_user_company(actor, scope, user.company_id, user.id)
-
-          is_nil(user.company_id) and not is_nil(target_company_id) ->
-            actor = current_actor(socket, target_company_id)
-            User.assign_unaffiliated_user(actor, scope, user.id, target_company_id)
-
-          true ->
-            {:ok, user}
-        end
-
-      socket = assign(socket, :editing_field, nil)
-
-      case result do
-        {:ok, updated_user} ->
           {:noreply,
-           socket
-           |> load_data(updated_user)
-           |> put_field_status("company", :saved)}
-
-        {:error, %Ecto.Changeset{} = changeset} ->
-          {:noreply,
-           put_field_status(
+           commit_company(
              socket,
-             "company",
-             {:error,
-              refusal_message(
-                "company",
-                company_choice_label(socket, target_company_id),
-                changeset
-              )}
+             :affiliate,
+             User.assign_unaffiliated_user(actor, scope, user.id, target_company_id),
+             choice
            )}
 
-        {:error, reason} ->
+        true ->
+          actor = current_actor(socket, user.company_id)
+
           {:noreply,
-           put_field_status(
+           commit_company(
              socket,
-             "company",
-             {:error,
-              company_failure_message(
-                reason,
-                company_choice_label(socket, target_company_id),
-                user
-              )}
+             :reassign,
+             User.reassign_user_company(
+               actor,
+               scope,
+               user.company_id,
+               user.id,
+               target_company_id
+             ),
+             choice
            )}
       end
+    else
+      {:noreply, write_forbidden(socket)}
+    end
+  end
+
+  # The confirmed clear. The confirmation decides only what the page shows;
+  # this write re-asks Authz like every other one.
+  def handle_event("clear_company", _params, socket) do
+    if can_manage?(socket) do
+      scope = socket.assigns.current_scope.scope
+      user = socket.assigns.user
+      actor = current_actor(socket, user.company_id)
+
+      {:noreply,
+       commit_company(
+         socket,
+         :clear,
+         User.clear_user_company(actor, scope, user.company_id, user.id),
+         "None"
+       )}
     else
       {:noreply, write_forbidden(socket)}
     end
@@ -995,12 +998,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             >
               <%= if @platform_operator? do %>
                 This account has no company. Its name and email can be edited once a company is
-                assigned, and affiliating an unaffiliated account needs the
-                admin.user.unaffiliated.manage capability.
+                assigned, and affiliating it again needs the
+                admin.user.unaffiliated.manage capability. Do it here, while this page is open:
+                once you leave, no user screen can reopen this account.
               <% else %>
                 This account has no company. Its name and email can be edited once a company is
-                assigned, and it can only be re-affiliated from
-                the platform-operator tenant.
+                assigned, and this tenant may not affiliate an unaffiliated account. Once you
+                leave, no user screen can reopen this account.
               <% end %>
             </.alert>
 
@@ -1049,7 +1053,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     phx-window-keydown="cancel_edit_field"
                     phx-key="Escape"
                   >
-                    <form id="user-company-form" phx-change="save_company" class="inline-block">
+                    <form
+                      :if={not @confirm_clear_company?}
+                      id="user-company-form"
+                      phx-change="save_company"
+                      class="inline-block"
+                    >
                       <select
                         id="user-company-select"
                         name="company_id"
@@ -1068,6 +1077,27 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                         </option>
                       </select>
                     </form>
+
+                    <%!-- phoenix_html confirms a click, never a select's
+                         change, so the blank choice arms this control and the
+                         write happens on the confirmed click. --%>
+                    <div
+                      :if={@confirm_clear_company?}
+                      id="user-company-clear"
+                      class="flex flex-wrap items-center gap-2"
+                    >
+                      <.button
+                        id="user-company-clear-confirm"
+                        variant="danger"
+                        phx-click="clear_company"
+                        data-confirm={company_clear_confirmation(@user.name, @company_name)}
+                      >
+                        Remove from company
+                      </.button>
+                      <.button id="user-company-clear-cancel" phx-click="cancel_edit_field">
+                        Cancel
+                      </.button>
+                    </div>
                   </div>
 
                   <%= if not @can_manage? do %>
@@ -2032,31 +2062,84 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   defp failure_message(_reason),
     do: "The change was not saved. Try again, and tell your administrator if it keeps failing."
 
-  # Affiliating an unaffiliated account is the operator-only transition: it is
-  # performed from the platform-operator tenant and needs
-  # `admin.user.unaffiliated.manage` there. The other two need
-  # `admin.user.update` on the companies involved. The refusal names the rule
-  # that applied, and never offers a retry that cannot clear it.
-  defp company_failure_message(:not_platform_operator, choice, _user),
-    do:
-      "#{inspect(choice)} was not saved: affiliating an unaffiliated account is done from " <>
-        "the platform-operator tenant, and this tenant is not it."
+  # Each refusal names the rule that applied to the transition that was asked
+  # for, and the company that rule was evaluated against. Reassign and clear
+  # both authorize `admin.user.update` on the account's CURRENT company, so
+  # naming the chosen one — or "None", which names no company at all — would
+  # point at the wrong rule. Affiliating is the operator-only transition and
+  # is refused by the tenant before the capability.
+  defp company_failure_message(:not_platform_operator, _transition, choice, _company_name),
+    do: "#{inspect(choice)} was not saved: this tenant may not affiliate an unaffiliated account."
 
-  defp company_failure_message(:unauthorized, choice, %{company_id: nil}),
+  defp company_failure_message(:unauthorized, :affiliate, choice, _company_name),
     do:
       "#{inspect(choice)} was not saved: affiliating an unaffiliated account needs the " <>
         "admin.user.unaffiliated.manage capability."
 
-  defp company_failure_message(:unauthorized, choice, _user),
-    do: "#{inspect(choice)} was not saved: you may not manage users of that company."
+  defp company_failure_message(:unauthorized, :clear, _choice, company_name),
+    do: "The change was not saved: you may not manage users of #{company_name}."
 
-  defp company_failure_message(:company_not_found, choice, _user),
-    do: "#{inspect(choice)} was not saved: that company is not in this workspace."
+  defp company_failure_message(:unauthorized, _transition, choice, company_name),
+    do: "#{inspect(choice)} was not saved: you may not manage users of #{company_name}."
 
-  defp company_failure_message(:employee_not_found, choice, _user),
-    do: "#{inspect(choice)} was not saved: the linked employee record could not be found."
+  defp company_failure_message(:company_not_found, transition, choice, _company_name)
+       when transition in [:affiliate, :reassign],
+       do: "#{inspect(choice)} was not saved: that company is not in this workspace."
 
-  defp company_failure_message(reason, _choice, _user), do: failure_message(reason)
+  defp company_failure_message(reason, _transition, _choice, _company_name),
+    do: failure_message(reason)
+
+  defp company_clear_confirmation(user_name, company_name) do
+    "Remove #{user_name} from #{company_name}? Every session this account holds ends " <>
+      "immediately, and afterwards it is not reachable from any user screen."
+  end
+
+  defp commit_company(socket, transition, result, choice) do
+    company_name = socket.assigns.company_name
+    socket = close_company_editor(socket)
+
+    case result do
+      {:ok, updated_user} ->
+        socket
+        |> load_data(updated_user)
+        |> put_field_status("company", :saved)
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        put_field_status(
+          socket,
+          "company",
+          {:error, refusal_message("company", choice, changeset)}
+        )
+
+      {:error, reason} ->
+        put_field_status(
+          socket,
+          "company",
+          {:error, company_failure_message(reason, transition, choice, company_name)}
+        )
+    end
+  end
+
+  defp close_company_editor(socket) do
+    socket
+    |> assign(:editing_field, nil)
+    |> assign(:confirm_clear_company?, false)
+  end
+
+  defp chosen_company_id(params) do
+    company_id_param =
+      case params do
+        %{"company_id" => cid} -> cid
+        %{"user" => %{"company_id" => cid}} -> cid
+        cid when is_binary(cid) -> cid
+        _ -> ""
+      end
+
+    case Integer.parse(to_string(company_id_param)) do
+      {cid, ""} when cid > 0 -> cid
+      _ -> nil
+    end
+  end
 
   defp unaffiliated_message,
     do: "The change was not saved: this account has no company to write it through."

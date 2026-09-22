@@ -938,13 +938,37 @@ Shipped:
   `flex flex-wrap items-center gap-3` row of History, Impersonate and "← Back"
   and no button. An unaffiliated account has no company for Core User to
   write its facts through, so its name and email show no editor and an info
-  notice says why; the company choice stays, and a refused affiliation names
-  the operator-only `admin.user.unaffiliated.manage` rule. Web tests cover a
+  notice says why; the company choice stays. Web tests cover a
   saved and a refused text commit (format and uniqueness), a saved, cancelled
   and refused company choice, the unaffiliated state, the viewer without
   `admin.user.update` seeing plain values, and History and Impersonate staying
   hidden from an actor without `admin.audit.log.list` and
   `admin.user.impersonate`. `{fm/users-detail-belimbing-parity/claude-fable-5-1}`
+- [x] The company fact tells the truth about which rule refused it and about
+  what clearing it costs. Reassign and clear both authorize
+  `admin.user.update` against the account's **current** company, so their
+  refusals name that company; the earlier "you may not manage users of that
+  company" pointed at the chosen one, and on a clear at nothing at all. The
+  unaffiliated notice has two branches because the rule has two outcomes:
+  inside the platform-operator tenant it names
+  `admin.user.unaffiliated.manage`, elsewhere `assign_unaffiliated_user/5`
+  refuses on `tenants.is_platform_operator` before the capability. Neither
+  branch, and neither refusal, offers re-affiliation as a recovery —
+  `get_tenant_user/2` resolves a user through its company and no route
+  reaches `list_unaffiliated_users/2`, so an unaffiliated account is
+  reachable only from the LiveView that cleared it, and both say so. Because
+  that is irreversible, choosing "None" no longer commits on change: it
+  replaces the select with a
+  `<.button variant="danger" id="user-company-clear-confirm">` whose
+  `data-confirm` names the account, the sessions ended and the loss of every
+  screen, beside a Cancel that restores the read state; `phoenix_html`
+  confirms a click and not a select's change (PR #733), and the confirmed
+  click re-asks Authz. The unreachable `:employee_not_found` refusal is gone
+  — the page passes no `employee_id` to any of the three transitions. Web
+  tests cover the armed-but-unwritten blank choice, the `data-confirm` copy,
+  Cancel, the confirmed clear, a refused clear naming the current company,
+  and the notice in both a platform-operator and an ordinary tenant.
+  `{fm/users-detail-belimbing-parity/claude-fable-5-1}`
 
 Not delivered by this slice, reported as follow-up:
 
@@ -955,6 +979,18 @@ Not delivered by this slice, reported as follow-up:
   separate slice.
 - **`/users/:id/edit` still exists** as a route and form; nothing on the
   detail page reaches it. Removing it is a product decision.
+- **No unaffiliated-users surface.** Nothing routes to
+  `list_unaffiliated_users/2` or `get_unaffiliated_user/3`, so an account
+  cleared of its company can only be affiliated again from the page that
+  cleared it. Shipping that surface, and deciding whether "None" should be
+  offered at all outside the platform-operator tenant, are captain decisions
+  and are not taken here; the page's copy states the limit instead of
+  implying a recovery.
+- **The commit-status plumbing stays duplicated.** `put_field_status/3`,
+  `drop_saved/1`, `refusal_message/3`, `rejected_value/1` and `fact_label/1`
+  exist on both `/addresses/:id` and `/users/:id`. Extracting them beside
+  `<.commit_status>` in Base UI is its own task, so that `/addresses/:id` is
+  not edited from this change.
 - **`/employees/:id`** still carries an "Edit employee" primary button and
   reports in-place edits through a flash; **`/companies/:id`** still keeps its
   facts behind edit modes (CMP-03 stays partial).

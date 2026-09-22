@@ -432,12 +432,48 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(view, "main header", "Beta Industries")
     assert {:ok, %{company_id: 75}} = User.get_user(scope, 75, 92)
 
-    # Clear company to unaffiliated
+    # Choosing "None" is destructive — it ends every session and takes the
+    # account off every user screen — so it arms a confirmation and writes
+    # nothing until the confirmed click.
     view |> element("#user-company-display") |> render_click()
 
     view
     |> form("#user-company-form")
     |> render_change(%{"company_id" => ""})
+
+    refute has_element?(view, "#user-company-form")
+    assert has_element?(view, "#user-company-clear-confirm")
+    assert {:ok, %{company_id: 75}} = User.get_user(scope, 75, 92)
+
+    # The confirmation names the account and what the write actually does.
+    assert has_element?(
+             view,
+             ~s(#user-company-clear-confirm[data-confirm*="Remove Grace Hopper from Beta Industries?"])
+           )
+
+    assert has_element?(
+             view,
+             ~s(#user-company-clear-confirm[data-confirm*="Every session this account holds ends immediately"])
+           )
+
+    assert has_element?(
+             view,
+             ~s(#user-company-clear-confirm[data-confirm*="not reachable from any user screen"])
+           )
+
+    # Cancel restores the read state and writes nothing.
+    view |> element("#user-company-clear-cancel") |> render_click()
+    refute has_element?(view, "#user-company-clear-confirm")
+    assert has_element?(view, "#user-company-display", "Beta Industries")
+    assert {:ok, %{company_id: 75}} = User.get_user(scope, 75, 92)
+
+    view |> element("#user-company-display") |> render_click()
+
+    view
+    |> form("#user-company-form")
+    |> render_change(%{"company_id" => ""})
+
+    view |> element("#user-company-clear-confirm") |> render_click()
 
     assert has_element?(view, "#user-company-display", "None")
     assert has_element?(view, "#user-company-status[role='status']", "Saved")
@@ -447,8 +483,16 @@ defmodule BilimbiWeb.UserShowTest do
     # An unaffiliated account has no company to write its facts through, so
     # the name and email lose their editors and the page says why, while the
     # company choice stays. Affiliating it again is the operator-only
-    # transition, which this actor may not perform.
+    # transition, which this actor may not perform, and leaving the page is
+    # final: no user screen resolves an account with no company.
     assert has_element?(view, "#user-unaffiliated-notice", "admin.user.unaffiliated.manage")
+
+    assert has_element?(
+             view,
+             "#user-unaffiliated-notice",
+             "no user screen can reopen this account"
+           )
+
     refute has_element?(view, "#user-name[phx-hook='InlineEdit']")
     refute has_element?(view, "#user-email[phx-hook='InlineEdit']")
     assert has_element?(view, "#user-view-name", "Grace Hopper")
@@ -489,20 +533,34 @@ defmodule BilimbiWeb.UserShowTest do
     {:ok, view, _html} = live(conn, ~p"/users/96")
 
     # admin.user.update on the current company is enough to clear it, so an
-    # ordinary tenant can reach the unaffiliated state.
+    # ordinary tenant can reach the unaffiliated state — behind the same
+    # confirmation.
     view |> element("#user-company-display") |> render_click()
 
     view
     |> form("#user-company-form")
     |> render_change(%{"company_id" => ""})
 
+    view |> element("#user-company-clear-confirm") |> render_click()
+
     assert has_element?(view, "#user-company-display", "None")
     assert has_element?(view, "#user-company-status[role='status']", "Saved")
     assert has_element?(view, "main header", "Unaffiliated")
 
     # Outside the platform-operator tenant the blocker is the tenant, not the
-    # capability, and the notice says so.
-    assert has_element?(view, "#user-unaffiliated-notice", "platform-operator tenant")
+    # capability, and the notice offers no recovery that does not exist.
+    assert has_element?(
+             view,
+             "#user-unaffiliated-notice",
+             "may not affiliate an unaffiliated account"
+           )
+
+    assert has_element?(
+             view,
+             "#user-unaffiliated-notice",
+             "no user screen can reopen this account"
+           )
+
     refute has_element?(view, "#user-unaffiliated-notice", "admin.user.unaffiliated.manage")
 
     # Re-affiliating is refused by tenants.is_platform_operator; retrying can
@@ -514,9 +572,72 @@ defmodule BilimbiWeb.UserShowTest do
     |> render_change(%{"company_id" => "74"})
 
     assert has_element?(view, "#user-company-status[role='alert']", "was not saved")
-    assert has_element?(view, "#user-company-status", "platform-operator tenant")
+
+    assert has_element?(
+             view,
+             "#user-company-status",
+             "this tenant may not affiliate an unaffiliated account"
+           )
+
     refute has_element?(view, "#user-company-status", "Try again")
     assert has_element?(view, "#user-company-display", "None")
+  end
+
+  test "a refused clear names the company the rule was evaluated against", %{conn: conn} do
+    CompanyFixtures.insert_company!(%{
+      id: 75,
+      tenant_id: 41,
+      name: "Beta Industries",
+      code: "beta"
+    })
+
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    # admin.user.update on company 73 only. The reassign authorizes against
+    # 73 and lands; every later write on this account authorizes against 75.
+    grant_capabilities!(["admin.user.view", "admin.user.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    view |> element("#user-company-display") |> render_click()
+
+    view
+    |> form("#user-company-form")
+    |> render_change(%{"company_id" => "75"})
+
+    assert has_element?(view, "#user-company-status[role='status']", "Saved")
+    assert {:ok, %{company_id: 75}} = User.get_user(scope, 75, 92)
+
+    # Clearing authorizes against Beta Industries, the account's CURRENT
+    # company. The choice was "None", which names no company, so the refusal
+    # must name the company the rule was actually evaluated against.
+    view |> element("#user-company-display") |> render_click()
+
+    view
+    |> form("#user-company-form")
+    |> render_change(%{"company_id" => ""})
+
+    view |> element("#user-company-clear-confirm") |> render_click()
+
+    assert has_element?(view, "#user-company-status[role='alert']", "was not saved")
+
+    assert has_element?(
+             view,
+             "#user-company-status",
+             "you may not manage users of Beta Industries"
+           )
+
+    refute has_element?(view, "#user-company-status", "that company")
+    assert has_element?(view, "#user-company-display", "Beta Industries")
+    assert {:ok, %{company_id: 75}} = User.get_user(scope, 75, 92)
   end
 
   test "a refused company choice keeps the stored company and reports the reason on the fact",
