@@ -1,8 +1,42 @@
 defmodule Bilimbi.Core.Company.Web.ShowLive do
   @moduledoc """
-  Company profile: identity, addresses, timezone settings, subsidiaries,
-  departments, relationships, external accesses, users, and employees —
-  all accessed through declared public domain APIs.
+  Read-first company profile: identity, addresses, timezone, subsidiaries,
+  departments, relationships, external accesses, users, and employees — all
+  accessed through declared public domain APIs.
+
+  The page shows the company as facts. An operator holding
+  `admin.company.update` edits each fact in place and a committed edit saves
+  by itself; there is no edit mode, no "Edit Details" button and no modal, as
+  Belimbing's `admin/companies/show` edits the same facts in place:
+
+  - a text fact (name, code, legal name, registration number, tax ID, email,
+    website) commits on Enter or on leaving the field, through
+    `<.inline_edit>`; Escape cancels. Name and code are required columns, so
+    an emptied value commits nothing; the other five are nullable and pass
+    `allow_empty`;
+  - a choice fact (status, legal entity type, jurisdiction, parent company,
+    default timezone) reads as its badge or name and becomes a select on
+    click; the select commits on change, and Escape or leaving it cancels.
+    The default timezone reads the company's own setting; without one it
+    reads "Not configured" beside the zone `Bilimbi.Base.DateTime` renders
+    its dates in through the tenant and platform settings, so UTC is named
+    only when that resolution ends at UTC or the stored zone is
+    unconvertible;
+  - a business activity is added through the same in-place text control:
+    its "Add activity" trigger opens an input that commits on Enter or on
+    leaving it, as Belimbing's "+ Add" chip does, and an activity is removed
+    from its chip;
+  - the metadata JSON is a multi-line document, which Enter cannot commit, so
+    it is the one fact with an explicit Apply: the demoted pencil beside the
+    value opens a textarea with Apply and Cancel, and Escape cancels.
+
+  Each fact reports its own outcome through the shared commit status that
+  `Bilimbi.Base.UI.CommitStatus` keeps: "Saving…" while the round trip is in
+  flight, "Saved" once stored, and an alert on the fact naming the rejected
+  value and the reason when the save was refused. The stored value stays on
+  screen until the server confirms a change, and success does not flash. A
+  viewer without `admin.company.update` sees every fact with no editor, and
+  every write re-asks Authz before it lands.
 
   The header's actions row carries the record's status, record history as the
   demoted labelled action — the registry's `history` clock beside the visible
@@ -17,24 +51,76 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   the Company Details facts are the shared `<.list>`, with Business
   Activities and Metadata as rows of that same list, as Belimbing's
   company-details partial keeps them. Section tables sit unframed inside
-  their card. Company Details still edits through the "Edit Details" modal;
-  moving those facts to in-place editing is the follow-up that will make
-  this page a full read-first adopter (see DESIGN.md).
+  their card. Subsidiaries, departments, relationships and external accesses
+  are relations with workflows of their own, and whether the company is its
+  tenant's primary company is Core Company's own assignment, so those stay
+  read-only here.
   """
 
   use Bilimbi.Base.UI, :live_view
 
-  # Assign-only staging for the activity and metadata forms: these events
-  # mirror the input into socket assigns and write nothing to the domain.
-  # The persisting events (`add_activity`, `save_metadata`) sit behind the
-  # `@write_events` deny clause below (#420).
-  @write_guard_opt_out ~w(update_metadata_input update_new_activity)
-
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.PrincipalDirectory
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
+  alias Bilimbi.Base.UI.CommitStatus
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Geonames
+
+  @update_capability "admin.company.update"
+
+  # The facts an inline text edit may write, keyed by the form name the hook
+  # pushes. A name outside this map is ignored; user input never becomes an
+  # atom.
+  @inline_fields %{
+    "name" => :name,
+    "code" => :code,
+    "legal_name" => :legal_name,
+    "registration_number" => :registration_number,
+    "tax_id" => :tax_id,
+    "email" => :email,
+    "website" => :website
+  }
+
+  # Name and code are required columns; an emptied value of any other text
+  # fact is a real edit.
+  @nullable_inline_facts ~w(legal_name registration_number tax_id email website)
+
+  # The choice facts a select commits on change, keyed the same way. The
+  # default timezone is a company setting rather than a column, so it is a
+  # choice fact with its own event.
+  @choice_fields %{
+    "status" => :status,
+    "legal_entity_type_id" => :legal_entity_type_id,
+    "jurisdiction" => :jurisdiction,
+    "parent_id" => :parent_id
+  }
+
+  @choice_facts Map.keys(@choice_fields) ++ ["timezone"]
+
+  @fact_labels %{
+    "name" => "Name",
+    "code" => "Code",
+    "legal_name" => "Legal Name",
+    "status" => "Status",
+    "legal_entity_type_id" => "Legal Entity Type",
+    "registration_number" => "Registration Number",
+    "tax_id" => "Tax ID",
+    "jurisdiction" => "Jurisdiction",
+    "email" => "Email",
+    "website" => "Website",
+    "parent_id" => "Parent Company",
+    "activities" => "Business Activities",
+    "metadata" => "Metadata",
+    "timezone" => "Default Timezone"
+  }
+
+  @status_options [
+    {"Active", "active"},
+    {"Suspended", "suspended"},
+    {"Pending", "pending"},
+    {"Archived", "archived"}
+  ]
 
   @common_timezones [
     "UTC",
@@ -127,7 +213,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         relationships = Company.list_relationships(scope, company_id) |> elem(1)
         external_accesses = Company.list_external_accesses(scope, company_id) |> elem(1)
         external_access_names = resolve_external_access_names(scope, external_accesses)
-        company_timezone = get_company_timezone(company)
 
         {:ok,
          socket
@@ -135,7 +220,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:active_nav, "admin.company")
          |> assign(:company, company)
          |> assign(:is_primary, is_primary)
-         |> assign(:can_update?, allowed?(socket.assigns.current_scope, "admin.company.update"))
+         |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
          |> assign(:legal_entity_types, legal_entity_types)
          |> assign(:countries, countries)
          |> assign(:parent_companies, parent_companies)
@@ -147,11 +232,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:external_access_names, external_access_names)
          |> assign(:page_sizes, @page_sizes)
          |> assign(:table_state, default_table_state())
-         |> assign(:company_timezone, company_timezone || "")
-         |> assign(:timezone_options, @common_timezones)
-         |> assign(:modal_action, nil)
-         |> assign(:details_form, nil)
-         |> assign(:new_activity, "")
+         |> assign_timezone(company)
+         |> assign(:status_options, @status_options)
+         |> CommitStatus.init()
+         |> assign(:editing_field, nil)
          |> assign(:editing_metadata?, false)
          |> assign(:metadata_input, format_metadata(company.metadata))
          |> refresh_show_table_pages()}
@@ -188,10 +272,23 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     end
   end
 
-  defp get_company_timezone(company) do
-    Settings.get("localization.timezone", SettingsScope.company(company.id, company.tenant_id))
-  rescue
-    _ -> nil
+  # The company's own explicit setting, as Belimbing's
+  # `explicitCompanyTimezone` reads it, decides whether the company has
+  # configured a timezone; the zone its dates display in is the one
+  # `Bilimbi.Base.DateTime` renders them in, company then tenant then platform
+  # default, UTC for an unconvertible value. An unset company under a
+  # tenant-level zone reads "Not configured (<that zone>)", never UTC.
+  defp assign_timezone(socket, company) do
+    scope = SettingsScope.company(company.id, company.tenant_id)
+
+    explicit =
+      if Settings.overridden?("localization.timezone", scope),
+        do: Settings.get("localization.timezone", scope),
+        else: ""
+
+    socket
+    |> assign(:company_timezone, explicit)
+    |> assign(:resolved_timezone, Bilimbi.Base.DateTime.company_timezone(scope))
   end
 
   # ============================================================================
@@ -253,42 +350,12 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   defp format_metadata(_), do: ""
 
   # ============================================================================
-  # Handlers: Company Details Edit Modal
+  # Handlers: In-place Facts
   # ============================================================================
-
-  defp remove_activity_at(socket, scope, company, current, index) do
-    new_activities =
-      current
-      |> List.delete_at(index)
-      |> case do
-        [] -> nil
-        list -> list
-      end
-
-    case Company.update_company(scope, company.id, %{scope_activities: new_activities}) do
-      {:ok, updated} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Activity removed.")
-         |> assign(:company, updated)}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to remove activity.")}
-    end
-  end
-
-  defp write_forbidden(socket) do
-    {:noreply,
-     put_flash(
-       socket,
-       :error,
-       "You do not have permission to change company administration data."
-     )}
-  end
 
   # `String.to_integer/1` raises on anything non-numeric, so a forged id crashed
   # the LiveView rather than being refused. Returns nil for junk; callers treat
-  # a nil id as "no such address", which is what a forged id is.
+  # a nil index as "no such activity", which is what a forged index is.
   defp parse_index(value, length) do
     case Integer.parse(to_string(value)) do
       {index, ""} when index >= 0 and index < length -> index
@@ -296,24 +363,44 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     end
   end
 
-  # Same shape as `DepartmentsLive`, `RelationshipsLive` and
-  # `DepartmentTypesLive`: one clause ahead of the rest, so a write event cannot
-  # be added later without deciding whether it belongs on this list. `:if=
-  # {@can_update?}` in the template hides the controls, but a hidden control is
-  # not a guard -- this route is gated on `admin.company.view`, a read
-  # capability, so every one of these was reachable by forging the event.
+  # One gate ahead of every persisting event, in the shape `DepartmentsLive`,
+  # `RelationshipsLive` and `DepartmentTypesLive` share: `:if={@can_update?}`
+  # in the template hides the controls, but a hidden control is not a guard --
+  # this route is gated on `admin.company.view`, a read capability, so each
+  # of these is reachable by forging the event. The gate re-asks Authz on
+  # every write, so a grant revoked while the page is open is refused too,
+  # and a write event cannot be added later without deciding whether it
+  # belongs on this list.
   @write_events ~w(
-    save_details
+    save_field
+    edit_field
+    save_choice
     add_activity
     remove_activity
+    edit_metadata
     save_metadata
     save_timezone
   )
 
   @impl true
-  def handle_event(event, _params, %{assigns: %{can_update?: false}} = socket)
-      when event in @write_events,
-      do: write_forbidden(socket)
+  def handle_event(event, params, socket) when event in @write_events do
+    if can_update?(socket) do
+      write_event(event, params, socket)
+    else
+      {:noreply, write_forbidden(socket)}
+    end
+  end
+
+  def handle_event("cancel_edit_field", _params, socket) do
+    {:noreply, assign(socket, :editing_field, nil)}
+  end
+
+  def handle_event("cancel_edit_metadata", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:editing_metadata?, false)
+     |> assign(:metadata_input, format_metadata(socket.assigns.company.metadata))}
+  end
 
   def handle_event("users_filters", params, socket),
     do: apply_table_filters(socket, :users, params)
@@ -333,187 +420,257 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   def handle_event("employees_page", %{"page" => page}, socket),
     do: apply_table_page(socket, :employees, page)
 
-  def handle_event("edit_details", _params, socket) do
-    company = socket.assigns.company
+  # A text fact: the hook pushes `%{"id" => _, <name> => value}`, and only a
+  # declared name is written.
+  defp write_event("save_field", params, socket) do
+    case CommitStatus.inline_field(params, @inline_fields) do
+      {:ok, name, field, value} ->
+        {:noreply, save_fact(socket, name, %{field => normalize_param(value)}, value)}
 
-    params = %{
-      "name" => company.name,
-      "code" => company.code || "",
-      "legal_name" => company.legal_name || "",
-      "status" => company.status || "active",
-      "legal_entity_type_id" => company.legal_entity_type_id,
-      "registration_number" => company.registration_number || "",
-      "tax_id" => company.tax_id || "",
-      "jurisdiction" => company.jurisdiction || "",
-      "email" => company.email || "",
-      "website" => company.website || "",
-      "parent_id" => company.parent_id
-    }
-
-    changeset = Company.Schema.update_changeset(company_to_schema(company), params)
-
-    {:noreply,
-     socket
-     |> clear_flash()
-     |> assign(:modal_action, :edit_details)
-     |> assign(:details_form, to_form(changeset, as: :company))}
-  end
-
-  def handle_event("close_modal", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:modal_action, nil)
-     |> assign(:details_form, nil)}
-  end
-
-  def handle_event("validate_details", %{"company" => params}, socket) do
-    company = socket.assigns.company
-
-    changeset =
-      company_to_schema(company)
-      |> Company.Schema.update_changeset(params)
-      |> Map.put(:action, :validate)
-
-    {:noreply, assign(socket, :details_form, to_form(changeset, as: :company))}
-  end
-
-  def handle_event("save_details", %{"company" => params}, socket) do
-    scope = socket.assigns.current_scope.scope
-    company = socket.assigns.company
-
-    case Company.update_company(scope, company.id, params) do
-      {:ok, updated_company} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Company details updated successfully.")
-         |> assign(:company, updated_company)
-         |> assign(:page_title, Company.Summary.display_name(updated_company))
-         |> assign(:modal_action, nil)
-         |> assign(:details_form, nil)}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign(socket, :details_form, to_form(changeset, as: :company))}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Could not update company: #{inspect(reason)}")}
+      :error ->
+        {:noreply, socket}
     end
   end
 
-  # ============================================================================
-  # Handlers: Metadata JSON
-  # ============================================================================
+  # A choice fact: the read state opens the select, which commits on change.
+  defp write_event("edit_field", %{"field" => field}, socket) when field in @choice_facts do
+    {:noreply, assign(socket, :editing_field, field)}
+  end
 
-  def handle_event("edit_metadata", _params, socket) do
+  defp write_event("edit_field", _params, socket), do: {:noreply, socket}
+
+  defp write_event("save_choice", params, socket) do
+    socket = assign(socket, :editing_field, nil)
+
+    case CommitStatus.inline_field(params, @choice_fields) do
+      {:ok, name, field, value} ->
+        attrs = %{field => normalize_param(value)}
+        {:noreply, save_fact(socket, name, attrs, choice_label(socket, name, value))}
+
+      :error ->
+        {:noreply, socket}
+    end
+  end
+
+  # The activities fact: adding appends the committed text, removing drops
+  # the chip's index, and both report on the fact. Belimbing keeps the list
+  # unique and stores an emptied list as null; so does this.
+  defp write_event("add_activity", %{"activity" => raw}, socket) when is_binary(raw) do
+    activity = String.trim(raw)
+    current = socket.assigns.company.scope_activities || []
+
+    if activity == "" do
+      {:noreply, socket}
+    else
+      attrs = %{scope_activities: Enum.uniq(current ++ [activity])}
+      {:noreply, save_fact(socket, "activities", attrs, activity)}
+    end
+  end
+
+  defp write_event("add_activity", _params, socket), do: {:noreply, socket}
+
+  defp write_event("remove_activity", %{"index" => index_param}, socket) do
+    current = socket.assigns.company.scope_activities || []
+
+    case parse_index(index_param, length(current)) do
+      nil ->
+        {:noreply, socket}
+
+      index ->
+        {removed, remaining} = List.pop_at(current, index)
+        attrs = %{scope_activities: if(remaining == [], do: nil, else: remaining)}
+        {:noreply, save_fact(socket, "activities", attrs, removed)}
+    end
+  end
+
+  defp write_event("remove_activity", _params, socket), do: {:noreply, socket}
+
+  # The metadata fact: a JSON document edited in a textarea with an explicit
+  # Apply. A refusal keeps the editor open with what was typed, so the
+  # operator corrects it where they typed it.
+  defp write_event("edit_metadata", _params, socket) do
     {:noreply,
      socket
      |> assign(:editing_metadata?, true)
      |> assign(:metadata_input, format_metadata(socket.assigns.company.metadata))}
   end
 
-  # ============================================================================
-  # Handlers: Activities (Tags)
-  # ============================================================================
+  defp write_event("save_metadata", %{"metadata" => json}, socket) when is_binary(json) do
+    trimmed = String.trim(json)
 
-  def handle_event("update_new_activity", %{"value" => value}, socket) do
-    {:noreply, assign(socket, :new_activity, value)}
-  end
+    # The reply patch re-renders the textarea, so what was typed has to be
+    # the assign's value or a refusal would hand the operator the stored
+    # document back instead of the text to correct.
+    socket = assign(socket, :metadata_input, json)
 
-  def handle_event("add_activity", %{"activity" => value}, socket) do
-    add_activity_internal(socket, value)
-  end
-
-  def handle_event("add_activity", _params, socket) do
-    add_activity_internal(socket, socket.assigns.new_activity)
-  end
-
-  def handle_event("remove_activity", %{"index" => index_str}, socket) do
-    scope = socket.assigns.current_scope.scope
-    company = socket.assigns.company
-    current = company.scope_activities || []
-
-    case parse_index(index_str, length(current)) do
-      nil -> {:noreply, socket}
-      index -> remove_activity_at(socket, scope, company, current, index)
-    end
-  end
-
-  def handle_event("cancel_edit_metadata", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:editing_metadata?, false)
-     |> assign(:metadata_input, format_metadata(socket.assigns.company.metadata))}
-  end
-
-  def handle_event("update_metadata_input", %{"value" => value}, socket) do
-    {:noreply, assign(socket, :metadata_input, value)}
-  end
-
-  def handle_event("save_metadata", %{"metadata" => json_str}, socket) do
-    trimmed = String.trim(json_str)
-    scope = socket.assigns.current_scope.scope
-    company = socket.assigns.company
-
-    if trimmed == "" do
-      case Company.update_company(scope, company.id, %{metadata: nil}) do
-        {:ok, updated} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Metadata cleared.")
-           |> assign(:company, updated)
-           |> assign(:editing_metadata?, false)
-           |> assign(:metadata_input, "")}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to clear metadata.")}
-      end
+    with {:ok, metadata} <- decode_metadata(trimmed),
+         {:ok, socket} <- commit_company(socket, "metadata", %{metadata: metadata}, trimmed) do
+      {:noreply,
+       socket
+       |> assign(:editing_metadata?, false)
+       |> assign(:metadata_input, format_metadata(socket.assigns.company.metadata))
+       |> CommitStatus.put("metadata", :saved)}
     else
-      case Jason.decode(trimmed) do
-        {:ok, decoded} when is_map(decoded) ->
-          case Company.update_company(scope, company.id, %{metadata: decoded}) do
-            {:ok, updated} ->
-              {:noreply,
-               socket
-               |> put_flash(:info, "Metadata saved.")
-               |> assign(:company, updated)
-               |> assign(:editing_metadata?, false)
-               |> assign(:metadata_input, format_metadata(updated.metadata))}
+      {:error, %Phoenix.LiveView.Socket{} = socket} ->
+        {:noreply, socket}
 
-            {:error, _} ->
-              {:noreply, put_flash(socket, :error, "Failed to save metadata.")}
-          end
+      :invalid ->
+        rejected = CommitStatus.rejected_value(trimmed)
 
-        _ ->
-          {:noreply, put_flash(socket, :error, "Metadata was not saved. Enter valid JSON.")}
-      end
+        {:noreply,
+         CommitStatus.put(
+           socket,
+           "metadata",
+           {:error, "#{inspect(rejected)} was not saved: Metadata must be a JSON object."}
+         )}
     end
   end
 
-  # ============================================================================
-  # Handlers: Timezone
-  # ============================================================================
+  defp write_event("save_metadata", _params, socket), do: {:noreply, socket}
 
-  def handle_event("save_timezone", %{"timezone" => tz}, socket) do
+  # The default timezone is a company setting, not a column: it commits
+  # through Base Settings and reports on its own fact like the rest.
+  defp write_event("save_timezone", params, socket) do
+    socket = assign(socket, :editing_field, nil)
+    tz = params |> Map.get("timezone", "") |> to_string() |> String.trim()
     company = socket.assigns.company
-    tz = String.trim(to_string(tz))
-
-    scope = SettingsScope.company(company.id, company.tenant_id)
+    settings_scope = SettingsScope.company(company.id, company.tenant_id)
 
     cond do
       tz == "" ->
-        Settings.delete("localization.timezone", scope)
+        Settings.delete("localization.timezone", settings_scope)
 
         {:noreply,
          socket
-         |> put_flash(:info, "Timezone cleared.")
-         |> assign(:company_timezone, "")}
+         |> assign_timezone(company)
+         |> CommitStatus.put("timezone", :saved)}
 
       # The stdlib database is UTC-only; validity means the real IANA
       # database can convert it (#459). A forged value never persists.
       not Bilimbi.Base.DateTime.valid_timezone?(tz) ->
-        {:noreply, put_flash(socket, :error, "Choose a valid IANA timezone.")}
+        rejected = CommitStatus.rejected_value(tz)
+
+        {:noreply,
+         CommitStatus.put(
+           socket,
+           "timezone",
+           {:error,
+            "#{inspect(rejected)} was not saved: #{fact_label("timezone")} must be a valid IANA timezone."}
+         )}
 
       true ->
-        save_valid_timezone(socket, scope, tz)
+        case Settings.put("localization.timezone", tz, settings_scope) do
+          {:ok, _} ->
+            {:noreply,
+             socket
+             |> assign_timezone(company)
+             |> CommitStatus.put("timezone", :saved)}
+
+          {:error, _} ->
+            {:noreply, CommitStatus.put(socket, "timezone", {:error, failure_message(:settings)})}
+        end
+    end
+  end
+
+  # ============================================================================
+  # Saving
+  # ============================================================================
+
+  # One commit, one outcome on the fact that made it. Success replaces the
+  # company so every projection (title, header badge, parent name) is the
+  # server's; refusal keeps the stored value on screen and says what was
+  # rejected and why.
+  defp save_fact(socket, name, attrs, submitted) do
+    case commit_company(socket, name, attrs, submitted) do
+      {:ok, socket} -> CommitStatus.put(socket, name, :saved)
+      {:error, socket} -> socket
+    end
+  end
+
+  defp commit_company(socket, name, attrs, submitted) do
+    scope = socket.assigns.current_scope.scope
+    company = socket.assigns.company
+
+    case Company.update_company(scope, company.id, attrs) do
+      {:ok, updated} ->
+        {:ok,
+         socket
+         |> assign(:company, updated)
+         |> assign(:page_title, Company.Summary.display_name(updated))}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        message = refusal_message(name, submitted, changeset)
+        {:error, CommitStatus.put(socket, name, {:error, message})}
+
+      {:error, reason} ->
+        {:error, CommitStatus.put(socket, name, {:error, failure_message(reason)})}
+    end
+  end
+
+  defp decode_metadata(""), do: {:ok, nil}
+
+  defp decode_metadata(json) do
+    case Jason.decode(json) do
+      {:ok, decoded} when is_map(decoded) -> {:ok, decoded}
+      _ -> :invalid
+    end
+  end
+
+  # The shared wording names the rejected value, the fact's label and the
+  # changeset's reasons for the field the fact writes.
+  defp refusal_message(name, submitted, %Ecto.Changeset{} = changeset) do
+    CommitStatus.refusal_message(fact_label(name), fact_field(name), submitted, changeset.errors)
+  end
+
+  defp fact_field("activities"), do: :scope_activities
+  defp fact_field("metadata"), do: :metadata
+  defp fact_field(name), do: Map.get(@inline_fields, name) || Map.fetch!(@choice_fields, name)
+
+  defp failure_message(:not_found),
+    do: "This company no longer exists in this workspace. Return to the list to find it."
+
+  defp failure_message(_reason), do: CommitStatus.failure_message()
+
+  defp write_forbidden(socket) do
+    CommitStatus.write_forbidden(
+      socket,
+      "You do not have permission to change company administration data."
+    )
+  end
+
+  # Every write re-asks Authz: the `can_update?` assign decides what the page
+  # shows, and a grant revoked while the page is open must still be refused.
+  defp can_update?(socket) do
+    Authz.can(socket.assigns.current_scope.actor, @update_capability).allowed
+  end
+
+  defp fact_label(name), do: Map.fetch!(@fact_labels, name)
+
+  # What the operator chose, as a refusal names it: the option's label when it
+  # came from this page's list, "None" for the blank option, and the raw
+  # value for anything else.
+  defp choice_label(_socket, _name, ""), do: "None"
+  defp choice_label(_socket, "status", value), do: String.capitalize(value)
+
+  defp choice_label(socket, "legal_entity_type_id", value),
+    do: option_label(legal_entity_type_options(socket.assigns.legal_entity_types), value)
+
+  defp choice_label(socket, "jurisdiction", value),
+    do: option_label(country_options(socket.assigns.countries), value)
+
+  defp choice_label(socket, "parent_id", value),
+    do: option_label(parent_company_options(socket.assigns.parent_companies), value)
+
+  defp option_label(options, value) do
+    Enum.find_value(options, value, fn {label, option} ->
+      if to_string(option) == value, do: label
+    end)
+  end
+
+  defp normalize_param(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
     end
   end
 
@@ -711,46 +868,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   defp table_param_prefix(:employees), do: "employees"
 
   # ============================================================================
-  # Helpers: Activities, Forms and Autocompletion
+  # Helpers: Options and names
   # ============================================================================
-
-  defp save_valid_timezone(socket, scope, tz) do
-    case Settings.put("localization.timezone", tz, scope) do
-      {:ok, _} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, "Timezone saved: #{tz}")
-         |> assign(:company_timezone, tz)}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to save timezone.")}
-    end
-  end
-
-  defp add_activity_internal(socket, raw_activity) do
-    activity = String.trim(to_string(raw_activity))
-
-    if activity == "" do
-      {:noreply, socket}
-    else
-      scope = socket.assigns.current_scope.scope
-      company = socket.assigns.company
-      current = company.scope_activities || []
-      new_activities = Enum.uniq(current ++ [activity])
-
-      case Company.update_company(scope, company.id, %{scope_activities: new_activities}) do
-        {:ok, updated} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Activity added.")
-           |> assign(:company, updated)
-           |> assign(:new_activity, "")}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to add activity.")}
-      end
-    end
-  end
 
   defp country_options(countries),
     do: Enum.map(countries, &{"#{&1.country} (#{&1.iso})", &1.iso})
@@ -784,26 +903,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
       nil -> nil
       parent -> parent.name
     end
-  end
-
-  defp company_to_schema(%Company.Summary{} = company) do
-    %Company.Schema{
-      id: company.id,
-      tenant_id: company.tenant_id,
-      name: company.name,
-      code: company.code,
-      status: company.status,
-      legal_name: company.legal_name,
-      registration_number: company.registration_number,
-      tax_id: company.tax_id,
-      legal_entity_type_id: company.legal_entity_type_id,
-      jurisdiction: company.jurisdiction,
-      email: company.email,
-      website: company.website,
-      parent_id: company.parent_id,
-      scope_activities: company.scope_activities,
-      metadata: company.metadata
-    }
   end
 
   # ============================================================================
@@ -847,16 +946,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                  admin/companies/show does, so the header never duplicates a
                  section's own "Manage" link. --%>
             <div class="flex items-center gap-3">
-              <.badge kind={
-                case @company.status do
-                  "active" -> :success
-                  "suspended" -> :danger
-                  "pending" -> :warning
-                  _ -> :neutral
-                end
-              }>
-                {String.capitalize(@company.status)}
-              </.badge>
+              <.status_badge status={@company.status} />
               <.discovered_panel
                 key="record.history"
                 id="company-record-history"
@@ -876,7 +966,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
              and the heading row is the shared `<.section_heading>`, as on
              every section of this page; Business Activities and Metadata are
              facts of the same record, so they are rows of the same list, as
-             Belimbing's company-details partial renders them. --%>
+             Belimbing's company-details partial renders them. Each fact edits
+             in place and reports on itself; the heading carries no button. --%>
         <.card
           id="company-details-card"
           class="mt-6"
@@ -884,54 +975,112 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           role="region"
           aria-labelledby="company-details-heading"
         >
-          <.section_heading id="company-details-heading" title="Company Details">
-            <:actions :if={@can_update?}>
-              <.button id="edit-company-details-btn" phx-click="edit_details" class="text-xs">
-                Edit Details
-              </.button>
-            </:actions>
-          </.section_heading>
+          <.section_heading id="company-details-heading" title="Company Details" />
 
           <.list>
-            <:item title="Name" id="detail-name">
-              <span class="font-semibold text-ink-strong">{@company.name}</span>
+            <:item title={fact_label("name")} id="detail-name">
+              <.text_fact
+                name="name"
+                company={@company}
+                can_update?={@can_update?}
+                field_status={@field_status}
+                class="font-semibold"
+              />
             </:item>
-            <:item title="Code" id="detail-code">
-              <span class="font-mono">{@company.code || "—"}</span>
+            <:item title={fact_label("code")} id="detail-code">
+              <.text_fact
+                name="code"
+                company={@company}
+                can_update?={@can_update?}
+                field_status={@field_status}
+                class="font-mono"
+              />
             </:item>
-            <:item title="Legal Name" id="detail-legal-name">
-              {@company.legal_name || "—"}
+            <:item title={fact_label("legal_name")} id="detail-legal-name">
+              <.text_fact
+                name="legal_name"
+                company={@company}
+                can_update?={@can_update?}
+                field_status={@field_status}
+              />
             </:item>
-            <:item title="Status" id="detail-status">
-              <.badge kind={
-                case @company.status do
-                  "active" -> :success
-                  "suspended" -> :danger
-                  "pending" -> :warning
-                  _ -> :neutral
-                end
-              }>
-                {String.capitalize(@company.status)}
-              </.badge>
+            <:item title={fact_label("status")} id="detail-status">
+              <.choice_fact
+                id="company-status"
+                name="status"
+                value={@company.status}
+                options={@status_options}
+                editing?={@editing_field == "status"}
+                can_update?={@can_update?}
+                status={@field_status["status"]}
+              >
+                <.status_badge status={@company.status} />
+              </.choice_fact>
             </:item>
-            <:item title="Legal Entity Type" id="detail-legal-entity-type">
-              {legal_entity_type_name(@company.legal_entity_type_id, @legal_entity_types) || "—"}
+            <:item title={fact_label("legal_entity_type_id")} id="detail-legal-entity-type">
+              <.choice_fact
+                id="company-legal-entity-type"
+                name="legal_entity_type_id"
+                value={@company.legal_entity_type_id}
+                options={legal_entity_type_options(@legal_entity_types)}
+                prompt="None"
+                editing?={@editing_field == "legal_entity_type_id"}
+                can_update?={@can_update?}
+                status={@field_status["legal_entity_type_id"]}
+              >
+                <.read_value value={
+                  legal_entity_type_name(@company.legal_entity_type_id, @legal_entity_types)
+                } />
+              </.choice_fact>
             </:item>
-            <:item title="Registration Number" id="detail-registration-number">
-              {@company.registration_number || "—"}
+            <:item title={fact_label("registration_number")} id="detail-registration-number">
+              <.text_fact
+                name="registration_number"
+                company={@company}
+                can_update?={@can_update?}
+                field_status={@field_status}
+              />
             </:item>
-            <:item title="Tax ID" id="detail-tax-id">
-              {@company.tax_id || "—"}
+            <:item title={fact_label("tax_id")} id="detail-tax-id">
+              <.text_fact
+                name="tax_id"
+                company={@company}
+                can_update?={@can_update?}
+                field_status={@field_status}
+              />
             </:item>
-            <:item title="Jurisdiction" id="detail-jurisdiction">
-              {country_name(@company.jurisdiction, @countries) || "—"}
+            <:item title={fact_label("jurisdiction")} id="detail-jurisdiction">
+              <.choice_fact
+                id="company-jurisdiction"
+                name="jurisdiction"
+                value={@company.jurisdiction}
+                options={country_options(@countries)}
+                prompt="None"
+                editing?={@editing_field == "jurisdiction"}
+                can_update?={@can_update?}
+                status={@field_status["jurisdiction"]}
+              >
+                <.read_value value={country_name(@company.jurisdiction, @countries)} />
+              </.choice_fact>
             </:item>
-            <:item title="Email" id="detail-email">
-              {@company.email || "—"}
+            <:item title={fact_label("email")} id="detail-email">
+              <.text_fact
+                name="email"
+                company={@company}
+                can_update?={@can_update?}
+                field_status={@field_status}
+              />
             </:item>
-            <:item title="Website" id="detail-website">
+            <:item title={fact_label("website")} id="detail-website">
+              <.text_fact
+                :if={@can_update?}
+                name="website"
+                company={@company}
+                can_update?={@can_update?}
+                field_status={@field_status}
+              />
               <a
-                :if={@company.website}
+                :if={not @can_update? and @company.website}
                 href={@company.website}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -939,13 +1088,24 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               >
                 {@company.website}
               </a>
-              <span :if={!@company.website}>—</span>
+              <span :if={not @can_update? and !@company.website} class="text-ink-muted">—</span>
             </:item>
-            <:item title="Parent Company" id="detail-parent">
-              {parent_name(@company.parent_id, @parent_companies) || "None"}
+            <:item title={fact_label("parent_id")} id="detail-parent">
+              <.choice_fact
+                id="company-parent"
+                name="parent_id"
+                value={@company.parent_id}
+                options={parent_company_options(@parent_companies)}
+                prompt="None"
+                editing?={@editing_field == "parent_id"}
+                can_update?={@can_update?}
+                status={@field_status["parent_id"]}
+              >
+                {parent_name(@company.parent_id, @parent_companies) || "None"}
+              </.choice_fact>
             </:item>
 
-            <:item title="Business Activities" id="scope-activities-section">
+            <:item title={fact_label("activities")} id="scope-activities-section">
               <p class="text-xs text-ink-subtle">
                 Industry, services, and business focus areas of this company.
               </p>
@@ -970,36 +1130,34 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                   </span>
                 <% end %>
                 <span
-                  :if={is_nil(@company.scope_activities) or @company.scope_activities == []}
+                  :if={
+                    not @can_update? and
+                      (is_nil(@company.scope_activities) or @company.scope_activities == [])
+                  }
                   class="text-ink-muted"
                 >
                   —
                 </span>
-              </div>
-
-              <form
-                :if={@can_update?}
-                id="add-activity-form"
-                phx-submit="add_activity"
-                class="mt-3 flex items-center gap-2"
-              >
-                <input
-                  type="text"
-                  name="activity"
+                <%!-- Belimbing adds an activity through a "+ Add" chip that
+                     opens an input committing on Enter or blur; the shared
+                     in-place text control is that same flow, and the fact
+                     reports adding and removing on it. --%>
+                <.inline_edit
+                  :if={@can_update?}
                   id="company-new-activity"
-                  value={@new_activity}
-                  phx-change="update_new_activity"
-                  placeholder="e.g. manufacturing"
-                  aria-label="New business activity"
-                  class="w-64 rounded-md border border-line px-3 py-1.5 text-sm bg-surface text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
+                  name="activity"
+                  label="Add business activity"
+                  value=""
+                  placeholder="Add activity"
+                  id_value={@company.id}
+                  save_event="add_activity"
+                  status={@field_status["activities"]}
+                  class="min-w-56"
                 />
-                <.button type="submit" class="text-xs">
-                  Add activity
-                </.button>
-              </form>
+              </div>
             </:item>
 
-            <:item title="Metadata" id="company-metadata">
+            <:item title={fact_label("metadata")} id="company-metadata">
               <div :if={not @editing_metadata?} class="flex items-start gap-2">
                 <%= if @company.metadata do %>
                   <pre
@@ -1009,9 +1167,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 <% else %>
                   <span class="text-ink-muted">—</span>
                 <% end %>
-                <%!-- Belimbing edits metadata behind a pencil beside the
-                     label; here the demoted icon action sits beside the
-                     value, where the edit lands. --%>
+                <%!-- A JSON document is the one fact Enter cannot commit, so
+                     it keeps an explicit Apply. Belimbing opens its textarea
+                     from a pencil beside the label; here the demoted icon
+                     action sits beside the value, where the edit lands. --%>
                 <.icon_button
                   :if={@can_update?}
                   id="edit-metadata-btn"
@@ -1022,29 +1181,46 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 />
               </div>
 
-              <form
-                :if={@editing_metadata?}
-                id="metadata-form"
-                phx-submit="save_metadata"
-                class="space-y-2"
+              <%!-- Window-scoped, as the choice editors are: Escape cancels
+                   wherever focus is. --%>
+              <div
+                :if={@can_update? and @editing_metadata?}
+                phx-window-keydown="cancel_edit_metadata"
+                phx-key="Escape"
               >
-                <textarea
-                  name="metadata"
-                  id="company-metadata-json"
-                  rows="5"
-                  aria-label="Company metadata JSON"
-                  class="w-full rounded-md border border-line bg-surface p-3 text-xs font-mono text-ink focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
-                  placeholder='{"employee_count": 120, "founded_year": 2014}'
-                >{@metadata_input}</textarea>
-                <div class="flex items-center gap-2">
-                  <.button type="submit" variant="primary" class="text-xs">
-                    Save Metadata
-                  </.button>
-                  <.button type="button" phx-click="cancel_edit_metadata" class="text-xs">
-                    Cancel
-                  </.button>
-                </div>
-              </form>
+                <form id="metadata-form" phx-submit="save_metadata" class="space-y-2">
+                  <textarea
+                    name="metadata"
+                    id="company-metadata-json"
+                    rows="5"
+                    aria-label="Company metadata JSON"
+                    phx-mounted={JS.focus()}
+                    class="w-full rounded-md border border-line bg-surface p-3 text-xs font-mono text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
+                    placeholder='{"employee_count": 120, "founded_year": 2014}'
+                  >{@metadata_input}</textarea>
+                  <div class="flex items-center gap-2">
+                    <.button
+                      id="company-metadata-apply"
+                      type="submit"
+                      variant="primary"
+                      class="text-xs"
+                      phx-disable-with="Applying…"
+                    >
+                      Apply
+                    </.button>
+                    <.button
+                      id="company-metadata-cancel"
+                      type="button"
+                      phx-click="cancel_edit_metadata"
+                      class="text-xs"
+                    >
+                      Cancel
+                    </.button>
+                  </div>
+                </form>
+              </div>
+
+              <.commit_status id="company-metadata-status" status={@field_status["metadata"]} />
             </:item>
           </.list>
         </.card>
@@ -1061,7 +1237,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           opts={%{company_id: @company.id}}
         />
 
-        <%!-- Section 3: Timezone Settings --%>
+        <%!-- Section 3: Timezone. A company setting rather than a column,
+             presented as one choice fact of its own section: Belimbing keeps
+             its combobox always visible with a saved note beside it; here the
+             read state is the trigger, as every choice fact on this page. --%>
         <.card
           id="company-timezone-card"
           class="mt-6"
@@ -1069,22 +1248,36 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           role="region"
           aria-labelledby="company-timezone-heading"
         >
-          <.section_heading id="company-timezone-heading" title="Timezone" />
-          <form id="company-timezone-form" phx-change="save_timezone" class="max-w-md space-y-2">
-            <.input
-              type="select"
-              id="company-timezone-select"
-              name="timezone"
-              value={@company_timezone}
-              prompt="Not configured (UTC)"
-              options={@timezone_options}
-              label="Company Default Timezone"
-              hint="Default timezone for this company. Used when displaying dates and times in Company mode."
-            />
-          </form>
-          <div :if={@company_timezone == ""} class="mt-2">
+          <.section_heading id="company-timezone-heading" title="Timezone">
+            <:description>
+              Default timezone for this company. Used when displaying dates and times in Company mode.
+            </:description>
+          </.section_heading>
+
+          <.list>
+            <:item title={fact_label("timezone")} id="detail-timezone">
+              <.choice_fact
+                id="company-timezone"
+                name="timezone"
+                value={@company_timezone}
+                options={timezone_options(@company_timezone)}
+                prompt={"Not configured (#{@resolved_timezone})"}
+                save_event="save_timezone"
+                editing?={@editing_field == "timezone"}
+                can_update?={@can_update?}
+                status={@field_status["timezone"]}
+              >
+                <span :if={@company_timezone != ""}>{@company_timezone}</span>
+                <span :if={@company_timezone == ""} class="text-ink-muted">
+                  Not configured ({@resolved_timezone})
+                </span>
+              </.choice_fact>
+            </:item>
+          </.list>
+
+          <div :if={@company_timezone == ""} class="mt-4">
             <.alert kind={:info}>
-              No timezone is configured for this company. Dates and times will display in UTC until a timezone is set.
+              No timezone is configured for this company. Dates and times will display in {@resolved_timezone} until a timezone is set.
             </.alert>
           </div>
         </.card>
@@ -1121,16 +1314,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               </.link>
             </:col>
             <:col :let={child} label="Status">
-              <.badge kind={
-                case child.status do
-                  "active" -> :success
-                  "suspended" -> :danger
-                  "pending" -> :warning
-                  _ -> :neutral
-                end
-              }>
-                {String.capitalize(child.status)}
-              </.badge>
+              <.status_badge status={child.status} />
             </:col>
             <:col :let={child} label="Legal Entity Type">
               <span class="text-sm text-ink-subtle">
@@ -1358,127 +1542,152 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             %{company_id: @company.id, table_state: @employees_table_state, page_sizes: @page_sizes}
           }
         />
-
-        <%!-- MODAL 1: Edit Company Details --%>
-        <.modal
-          :if={@modal_action == :edit_details}
-          id="company-details-modal"
-          title="Edit Company Details"
-          width={:wide}
-          flash={@flash}
-          on_cancel={JS.push("close_modal")}
-        >
-            <.form
-              for={@details_form}
-              id="company-details-form"
-              phx-change="validate_details"
-              phx-submit="save_details"
-              class="mt-4 space-y-4"
-            >
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <.input
-                  field={@details_form[:name]}
-                  id="company-name-input"
-                  label="Name"
-                  required
-                />
-                <.input
-                  field={@details_form[:code]}
-                  id="company-code-input"
-                  label="Code"
-                />
-              </div>
-
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <.input
-                  field={@details_form[:legal_name]}
-                  id="company-legal-name-input"
-                  label="Legal Name"
-                />
-                <.input
-                  type="select"
-                  field={@details_form[:status]}
-                  id="company-status-select"
-                  label="Status"
-                  options={[
-                    {"Active", "active"},
-                    {"Suspended", "suspended"},
-                    {"Pending", "pending"},
-                    {"Archived", "archived"}
-                  ]}
-                />
-              </div>
-
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <.input
-                  type="select"
-                  field={@details_form[:legal_entity_type_id]}
-                  id="company-legal-entity-type-select"
-                  label="Legal Entity Type"
-                  prompt="None"
-                  options={legal_entity_type_options(@legal_entity_types)}
-                />
-                <.input
-                  type="select"
-                  field={@details_form[:jurisdiction]}
-                  id="company-jurisdiction-select"
-                  label="Jurisdiction"
-                  prompt="None"
-                  options={country_options(@countries)}
-                />
-              </div>
-
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <.input
-                  field={@details_form[:registration_number]}
-                  id="company-registration-number-input"
-                  label="Registration Number"
-                />
-                <.input
-                  field={@details_form[:tax_id]}
-                  id="company-tax-id-input"
-                  label="Tax ID"
-                />
-              </div>
-
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <.input
-                  field={@details_form[:email]}
-                  id="company-email-input"
-                  type="email"
-                  label="Email"
-                />
-                <.input
-                  field={@details_form[:website]}
-                  id="company-website-input"
-                  type="url"
-                  label="Website"
-                />
-              </div>
-
-              <div>
-                <.input
-                  type="select"
-                  field={@details_form[:parent_id]}
-                  id="company-parent-select"
-                  label="Parent Company"
-                  prompt="None"
-                  options={parent_company_options(@parent_companies)}
-                />
-              </div>
-
-              <div class="flex items-center justify-end gap-3 pt-4 border-t border-line">
-                <.button type="button" phx-click="close_modal">
-                  Cancel
-                </.button>
-                <.button type="submit" variant="primary">
-                  Save Changes
-                </.button>
-              </div>
-            </.form>
-        </.modal>
       </.page>
     </Layouts.app>
     """
+  end
+
+  # ============================================================================
+  # Fact Components
+  # ============================================================================
+
+  # A read-first text fact's value cell. An operator who may update edits it in
+  # place; an emptied value is a real edit only on a nullable column. Anyone
+  # else sees the stored value with no affordance. The row around it — label,
+  # value cell and its id — is the shared `<.list>` item.
+  attr(:name, :string, required: true)
+  attr(:company, Company.Summary, required: true)
+  attr(:can_update?, :boolean, required: true)
+  attr(:field_status, :map, required: true)
+  attr(:class, :any, default: nil)
+
+  defp text_fact(assigns) do
+    assigns =
+      assigns
+      |> assign(:label, fact_label(assigns.name))
+      |> assign(:value, Map.fetch!(assigns.company, Map.fetch!(@inline_fields, assigns.name)))
+      |> assign(:dom_id, "company-#{String.replace(assigns.name, "_", "-")}")
+      |> assign(:allow_empty, assigns.name in @nullable_inline_facts)
+
+    ~H"""
+    <.inline_edit
+      :if={@can_update?}
+      id={@dom_id}
+      name={@name}
+      label={@label}
+      value={@value || ""}
+      id_value={@company.id}
+      save_event="save_field"
+      allow_empty={@allow_empty}
+      status={@field_status[@name]}
+      class={@class}
+    />
+    <span :if={not @can_update?} class={[@class, is_nil(@value) && "text-ink-muted"]}>
+      {@value || "—"}
+    </span>
+    """
+  end
+
+  # A read-first choice fact's value cell, in the shape `/addresses/:id` and
+  # `/users/:id` give theirs: the read state (the inner block) is the trigger
+  # for an operator who may update, the select appears on click and commits
+  # on change, and Escape or leaving it cancels. Anyone else sees the read
+  # state alone. The outcome of the last commit renders beneath.
+  attr(:id, :string, required: true)
+  attr(:name, :string, required: true)
+  attr(:value, :any, required: true)
+  attr(:options, :list, required: true)
+  attr(:prompt, :string, default: nil)
+  attr(:save_event, :string, default: "save_choice")
+  attr(:editing?, :boolean, required: true)
+  attr(:can_update?, :boolean, required: true)
+  attr(:status, :any, required: true)
+  slot(:inner_block, required: true)
+
+  defp choice_fact(assigns) do
+    assigns =
+      assigns
+      |> assign(:label, fact_label(assigns.name))
+      |> assign(:current, to_string(assigns.value || ""))
+
+    ~H"""
+    <button
+      :if={@can_update? and not @editing?}
+      type="button"
+      id={"#{@id}-display"}
+      phx-click="edit_field"
+      phx-value-field={@name}
+      aria-label={"Edit #{String.downcase(@label)}"}
+      aria-describedby={@status && "#{@id}-status"}
+      class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
+    >
+      {render_slot(@inner_block)}
+      <.icon
+        name="edit"
+        class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+      />
+    </button>
+
+    <%!-- Window-scoped: the select may not hold focus (JS.focus is
+         best-effort), and Escape must cancel regardless. Only one choice
+         editor mounts at a time, so the listener is unambiguous. --%>
+    <div :if={@can_update? and @editing?} phx-window-keydown="cancel_edit_field" phx-key="Escape">
+      <form id={"#{@id}-form"} phx-change={@save_event} class="inline-block">
+        <select
+          id={"#{@id}-select"}
+          name={@name}
+          aria-label={@label}
+          phx-mounted={JS.focus()}
+          phx-blur="cancel_edit_field"
+          class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+        >
+          <option :if={@prompt} value="" selected={@current == ""}>{@prompt}</option>
+          <option
+            :for={{label, option} <- @options}
+            value={option}
+            selected={to_string(option) == @current}
+          >
+            {label}
+          </option>
+        </select>
+      </form>
+    </div>
+
+    <span :if={not @can_update?}>{render_slot(@inner_block)}</span>
+
+    <.commit_status id={"#{@id}-status"} status={@status} />
+    """
+  end
+
+  # A choice fact's read state for a nullable relation: the resolved name, or
+  # the muted em dash.
+  attr(:value, :string, default: nil)
+
+  defp read_value(assigns) do
+    ~H"""
+    <span :if={@value}>{@value}</span>
+    <span :if={is_nil(@value)} class="text-ink-muted">—</span>
+    """
+  end
+
+  attr(:status, :string, required: true)
+
+  defp status_badge(assigns) do
+    ~H"""
+    <.badge kind={status_badge_kind(@status)}>{String.capitalize(@status)}</.badge>
+    """
+  end
+
+  defp status_badge_kind("active"), do: :success
+  defp status_badge_kind("suspended"), do: :danger
+  defp status_badge_kind("pending"), do: :warning
+  defp status_badge_kind(_status), do: :neutral
+
+  # The stored timezone stays choosable even when it is not one of the common
+  # options this page offers.
+  defp timezone_options(""), do: Enum.map(@common_timezones, &{&1, &1})
+
+  defp timezone_options(current) do
+    [current | @common_timezones] |> Enum.uniq() |> Enum.map(&{&1, &1})
   end
 end

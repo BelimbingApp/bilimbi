@@ -201,27 +201,46 @@ this anatomy as they are migrated.
 
 A detail page shows the record as facts and lets an authorized operator change
 each fact in place. `/addresses/:id` is the exemplar, `/users/:id` the second
-full adopter (its name, email and company) and `/employees/:id` the third
+full adopter (its name, email and company), `/employees/:id` the third
 (seven text facts and the department, supervisor, employee type and status
-choices). `/companies/:id` presents its facts on the shared list but still
-edits them through the "Edit Details" modal; moving those facts to in-place
-editing is the outstanding step for that page. There is no edit mode and no
-save button: a committed edit saves by itself, and an "Edit …" button that
-opens a separate edit form for the same facts is a defect. What "committed"
-means follows the control and is the same for every fact of that kind on the
-page:
+choices) and `/companies/:id` the fourth (every Company Details fact, its
+business activities and metadata, and its default timezone). There is no edit
+mode and no save button: a committed edit saves by itself, and an "Edit …"
+button that opens a separate edit form for the same facts is a defect. What
+"committed" means follows the control and is the same for every fact of that
+kind on the page:
 
 - **Text facts** use `<.inline_edit>` and commit on Enter or on leaving the
-  field. Every nullable column passes `allow_empty`.
+  field. Every nullable column passes `allow_empty`; a required column (a
+  company's name and code) does not, so an emptied value commits nothing.
+- **A fact that adds rather than edits** — a company's business activities,
+  which Belimbing grows through a "+ Add" chip that opens an input committing
+  on Enter or blur — is the same `<.inline_edit>` with an always-empty value
+  and a `placeholder` naming the addition ("Add activity"), so the trigger
+  says what committing it does instead of reading as an empty value. The
+  fact reports adding and removing on that one control; removal stays on the
+  chip.
 - **Choice facts** show the read state (a badge, a name) as the trigger; the
   select appears on click, commits on change, and Escape or leaving it
   cancels. A permanently visible `<select>` beside read-only facts is a
-  defect: the address verification status, the user's company and the
-  employee's department, supervisor, employee type and status are the shipped
-  choice facts. One option of a choice may be irreversible — the
-  user's company offers "None", after which the account leaves every user
-  screen and nothing can reopen it — and an irreversible option does not
-  commit on change. Irreversibility is the test, not cost: every company
+  defect: the address verification status, the user's company, the
+  employee's department, supervisor, employee type and status, and the
+  company's status, legal entity type, jurisdiction, parent company and
+  default timezone are the shipped choice facts. A fact that is a setting
+  rather than a column — the company's default timezone, read and written
+  through Base Settings — is still a choice fact of its own section and
+  reads its explicit value to decide whether it is configured, as Belimbing's
+  `explicitCompanyTimezone` does, and names beside an unset one the zone
+  `Bilimbi.Base.DateTime` renders its dates in (company, then tenant, then
+  platform default, UTC for an unconvertible value) — "Not configured
+  (Asia/Kuala_Lumpur)" under a tenant-level zone, "Not configured (UTC)" only
+  when the resolution ends at UTC. Belimbing always says UTC there, which is
+  untrue under a tenant-level setting; Belimbing keeps that one control
+  always visible with a saved note beside it, and Bilimbi's read-state
+  trigger is the deliberate shape. One option of a choice may be
+  irreversible — the user's company offers "None", after which the account
+  leaves every user screen and nothing can reopen it — and an irreversible
+  option does not commit on change. Irreversibility is the test, not cost: every company
   change ends the account's sessions, so that alone does not earn a
   confirmation. `phoenix_html` confirms a click and never a select's
   change, so choosing it replaces the select on the fact with a
@@ -241,6 +260,14 @@ page:
   "Edit …" button, and refused fields report on their own inputs. Use a
   group only where the facts genuinely change together; a group is not a way
   to bring back the edit mode.
+- **A document fact** — a company's metadata JSON — is one multi-line value
+  that Enter cannot commit and a half-typed document must not commit on
+  blur, so it keeps the grouped editor's shape for a single fact: the demoted
+  `<.icon_button icon="edit" context={:inline}>` beside the value opens a
+  textarea with a primary Apply and a Cancel, Escape cancels, a refusal
+  ("must be a JSON object") reports on the fact and keeps the editor open
+  with what was typed, and an applied empty document clears the value. This
+  is Belimbing's own shape for that fact, with its Save renamed to Apply.
 - **Outcome per fact:** "Saving…" while in flight, "Saved" for the most recent
   commit only — any later write clears it, including one the server refuses,
   so no stale "Saved" stands beside a rejected form — and a refusal that stays

@@ -8,6 +8,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
   alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
@@ -413,22 +415,26 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      refute has_element?(view, "#company-edit-details")
+      refute has_element?(view, "#company-details-card [phx-hook='InlineEdit']")
+      refute has_element?(view, "#company-status-display")
 
-      render_submit(view, "save_details", %{
-        "company" => %{"name" => "Forged Name", "status" => "archived"}
-      })
-
-      render_click(view, "add_activity", %{"activity" => "forged"})
+      render_hook(view, "save_field", %{"id" => "73", "name" => "Forged Name"})
+      render_hook(view, "edit_field", %{"field" => "status"})
+      render_change(view, "save_choice", %{"status" => "archived"})
+      render_hook(view, "add_activity", %{"id" => "73", "activity" => "forged"})
       render_click(view, "remove_activity", %{"index" => "0"})
+      render_click(view, "edit_metadata", %{})
       render_submit(view, "save_metadata", %{"metadata" => ~s({"forged":true})})
-      render_click(view, "save_timezone", %{"timezone" => "Etc/UTC"})
+      render_change(view, "save_timezone", %{"timezone" => "Etc/UTC"})
 
       assert has_element?(
                view,
                "#flash-error",
                "You do not have permission to change company administration data."
              )
+
+      refute has_element?(view, "#company-status-form")
+      refute has_element?(view, "#metadata-form")
 
       stored = Repo.get!(Bilimbi.Core.Company.Schema, 73)
       assert stored.name == "Bilimbi Industries"
@@ -642,7 +648,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#detail-tax-id", "TAX-98765")
       assert has_element?(view, "#detail-jurisdiction", "Malaysia (MY)")
       assert has_element?(view, "#detail-email", "hq@bilimbi.test")
-      assert has_element?(view, "#detail-website a", "https://bilimbi.test")
+      assert has_element?(view, "#detail-website", "https://bilimbi.test")
 
       # Activities
       assert has_element?(view, "#company-details-card", "Software Development")
@@ -737,36 +743,54 @@ defmodule BilimbiWeb.CompanyLiveTest do
       end
 
       assert has_element?(view, "#company-departments-heading + span", "0")
-
-      # A viewer sees the facts with no edit affordance anywhere in the list.
-      refute has_element?(view, "#edit-company-details-btn")
-      refute has_element?(view, "#edit-metadata-btn")
-      refute has_element?(view, "#add-activity-form")
     end
 
-    test "the metadata fact edits behind a demoted icon action, not a text button", %{
-      conn: conn
-    } do
-      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+    test "a viewer without admin.company.update sees the facts with no editors", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, _updated} =
+        Company.update_company(scope, 73, %{
+          legal_name: "Bilimbi Industries Sdn Bhd",
+          jurisdiction: "MY",
+          website: "https://bilimbi.test",
+          scope_activities: ["Software Development"],
+          metadata: %{"employees_count" => 50}
+        })
+
+      {:ok, _} =
+        Settings.put("localization.timezone", "Asia/Kuala_Lumpur", SettingsScope.company(73, 41))
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      assert has_element?(
-               view,
-               "button#edit-metadata-btn[aria-label='Edit metadata'] .hero-pencil"
-             )
+      # Every fact is on screen as its stored value...
+      assert has_element?(view, "#detail-name", "Bilimbi Industries")
+      assert has_element?(view, "#detail-code", "bilimbi_industries")
+      assert has_element?(view, "#detail-legal-name", "Bilimbi Industries Sdn Bhd")
+      assert has_element?(view, "#detail-status", "Active")
+      assert has_element?(view, "#detail-legal-entity-type", "—")
+      assert has_element?(view, "#detail-jurisdiction", "Malaysia (MY)")
+      assert has_element?(view, "#detail-website a[href='https://bilimbi.test']")
+      assert has_element?(view, "#detail-parent", "None")
+      assert has_element?(view, "#scope-activities-section", "Software Development")
+      assert has_element?(view, "#company-metadata-display", "employees_count")
+      assert has_element?(view, "#detail-timezone", "Asia/Kuala_Lumpur")
 
-      refute has_element?(view, "#edit-metadata-btn", "Edit Metadata")
+      # ...and nothing edits it: no in-place text control, no choice trigger,
+      # no select, no form, no pencil and no chip removal in either fact
+      # section -- the value, not a disabled control.
+      for card <- ~w(company-details-card company-timezone-card) do
+        refute has_element?(view, "##{card} [phx-hook='InlineEdit']")
+        refute has_element?(view, "##{card} button")
+        refute has_element?(view, "##{card} select")
+        refute has_element?(view, "##{card} form")
+        refute has_element?(view, "##{card} input")
+        refute has_element?(view, "##{card} textarea")
+      end
 
-      view |> element("#edit-metadata-btn") |> render_click()
-      assert has_element?(view, "dd#company-metadata form#metadata-form")
-
-      view
-      |> form("#metadata-form", %{"metadata" => ~s({"founded_year": 2014})})
-      |> render_submit()
-
-      assert has_element?(view, "dd#company-metadata #company-metadata-display", "founded_year")
-      refute has_element?(view, "#metadata-form")
+      refute has_element?(view, "#edit-metadata-btn")
+      refute has_element?(view, "#company-new-activity")
+      refute has_element?(view, "#remove-activity-0")
     end
 
     test "the addresses panel is the shared table, sorted by the panel and edited in place", %{
@@ -932,67 +956,244 @@ defmodule BilimbiWeb.CompanyLiveTest do
       refute has_element?(view, "#company-addresses-panel th", "Actions")
     end
 
-    test "edits company details via modal and validates fields", %{conn: conn} do
+    test "edits the company facts in place and each reports its own outcome", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, type} =
+        Company.create_legal_entity_type(%{code: "SDN_BHD", name: "Sdn Bhd", is_active: true})
+
+      CompanyFixtures.insert_company!(%{
+        id: 76,
+        tenant_id: 41,
+        name: "Bilimbi Holdings",
+        code: "bilimbi_holdings"
+      })
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      # Open modal
-      view |> element("#edit-company-details-btn") |> render_click()
-      assert has_element?(view, "#company-details-modal")
-
-      # Validate blank name error
-      view
-      |> form("#company-details-form", %{"company" => %{"name" => ""}})
-      |> render_change()
-
-      assert has_element?(view, "#company-name-input + p", "can't be blank")
-
-      # Save valid update
-      view
-      |> form("#company-details-form", %{
-        "company" => %{
-          "name" => "Bilimbi Global",
-          "legal_name" => "Bilimbi Global Inc",
-          "registration_number" => "REG-9999",
-          "email" => "contact@bilimbi.global"
-        }
-      })
-      |> render_submit()
-
+      # No edit mode: the heading carries no button and no modal exists; each
+      # text fact is the shared in-place control.
+      refute has_element?(view, "#edit-company-details-btn")
       refute has_element?(view, "#company-details-modal")
+
+      for id <-
+            ~w(company-name company-code company-legal-name company-registration-number company-tax-id company-email company-website) do
+        assert has_element?(view, "##{id}[phx-hook='InlineEdit'][data-save-event='save_field']")
+      end
+
+      # Required columns are never blanked; the nullable ones may be.
+      refute has_element?(view, "#company-name[data-allow-empty]")
+      refute has_element?(view, "#company-code[data-allow-empty]")
+      assert has_element?(view, "#company-legal-name[data-allow-empty]")
+      assert has_element?(view, "#company-website[data-allow-empty]")
+
+      # A text fact commits by itself and reports "Saved" on itself; the
+      # header follows the stored value. Success does not flash.
+      render_hook(view, "save_field", %{"id" => "73", "name" => "  Bilimbi Global  "})
       assert has_element?(view, "h1", "Bilimbi Global")
       assert has_element?(view, "#detail-name", "Bilimbi Global")
-      assert has_element?(view, "#detail-legal-name", "Bilimbi Global Inc")
-      assert has_element?(view, "#detail-registration-number", "REG-9999")
+      assert has_element?(view, "#company-name-status[role='status']", "Saved")
+      refute has_element?(view, "#flash-info")
+
+      # "Saved" belongs to the most recent commit only.
+      render_hook(view, "save_field", %{"id" => "73", "registration_number" => "REG-9999"})
+      assert has_element?(view, "#company-registration-number-status", "Saved")
+      refute has_element?(view, "#company-name-status")
+
+      # A choice fact: the badge is the trigger, the select appears on click,
+      # commits on change and gives way to the read state.
+      refute has_element?(view, "#company-status-form")
+      view |> element("#company-status-display") |> render_click()
+
+      assert has_element?(
+               view,
+               "#company-status-form select#company-status-select[name='status']"
+             )
+
+      view |> form("#company-status-form", %{"status" => "suspended"}) |> render_change()
+      refute has_element?(view, "#company-status-form")
+      assert has_element?(view, "#company-status-display", "Suspended")
+      assert has_element?(view, "#company-status-status[role='status']", "Saved")
+
+      view |> element("#company-legal-entity-type-display") |> render_click()
+
+      view
+      |> form("#company-legal-entity-type-form", %{"legal_entity_type_id" => to_string(type.id)})
+      |> render_change()
+
+      assert has_element?(view, "#company-legal-entity-type-display", "Sdn Bhd")
+
+      view |> element("#company-jurisdiction-display") |> render_click()
+      view |> form("#company-jurisdiction-form", %{"jurisdiction" => "MY"}) |> render_change()
+      assert has_element?(view, "#company-jurisdiction-display", "Malaysia (MY)")
+
+      view |> element("#company-parent-display") |> render_click()
+      view |> form("#company-parent-form", %{"parent_id" => "76"}) |> render_change()
+      assert has_element?(view, "#company-parent-display", "Bilimbi Holdings")
+      assert has_element?(view, "#company-parent-status", "Saved")
+
+      # Escape or leaving the select cancels without writing.
+      view |> element("#company-parent-display") |> render_click()
+      assert has_element?(view, "#company-parent-form")
+      render_hook(view, "cancel_edit_field", %{})
+      refute has_element?(view, "#company-parent-form")
+      assert has_element?(view, "#company-parent-display", "Bilimbi Holdings")
+
+      # The blank option clears a nullable relation.
+      view |> element("#company-parent-display") |> render_click()
+      view |> form("#company-parent-form", %{"parent_id" => ""}) |> render_change()
+      assert has_element?(view, "#company-parent-display", "None")
+
+      assert {:ok, stored} = Company.get_company(scope, 73)
+      assert stored.name == "Bilimbi Global"
+      assert stored.registration_number == "REG-9999"
+      assert stored.status == "suspended"
+      assert stored.legal_entity_type_id == type.id
+      assert stored.jurisdiction == "MY"
+      assert stored.parent_id == nil
     end
 
-    test "adds and removes business activities", %{conn: conn} do
+    test "a refused commit keeps the stored value on screen and reports the reason on the fact",
+         %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, _updated} = Company.update_company(scope, 73, %{email: "hq@bilimbi.test"})
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      render_hook(view, "save_field", %{"id" => "73", "email" => "not-an-address"})
+
+      assert has_element?(
+               view,
+               "#company-email-status[role='alert']",
+               ~s("not-an-address" was not saved: Email must be an email address.)
+             )
+
+      assert has_element?(view, "#detail-email", "hq@bilimbi.test")
+      refute has_element?(view, "#company-email-status", "Saved")
+      refute has_element?(view, "#flash-error")
+      assert {:ok, %{email: "hq@bilimbi.test"}} = Company.get_company(scope, 73)
+
+      # The hook never pushes a blanked required value; a forged one is
+      # refused by the domain and the header keeps the stored name.
+      render_hook(view, "save_field", %{"id" => "73", "name" => ""})
+      assert has_element?(view, "#company-name-status[role='alert']", "Name can't be blank")
+      assert has_element?(view, "h1", "Bilimbi Industries")
+
+      # A long rejected value is cut so the reason stays on screen.
+      too_long = String.duplicate("x", 300)
+      render_hook(view, "save_field", %{"id" => "73", "tax_id" => too_long})
+
+      assert has_element?(
+               view,
+               "#company-tax-id-status[role='alert']",
+               "Tax ID should be at most 255 character(s)"
+             )
+
+      assert has_element?(view, "#company-tax-id-status", String.duplicate("x", 60) <> "…")
+      refute has_element?(view, "#company-tax-id-status", String.duplicate("x", 61))
+
+      # A forged choice outside the vocabulary is refused on its fact.
+      render_change(view, "save_choice", %{"status" => "bogus"})
+
+      assert has_element?(
+               view,
+               "#company-status-status[role='alert']",
+               ~s("Bogus" was not saved: Status is invalid.)
+             )
+
+      assert has_element?(view, "#company-status-display", "Active")
+
+      # The alert stays until that fact is committed again -- a success
+      # elsewhere does not clear it -- and then gives way to the new outcome.
+      render_hook(view, "save_field", %{
+        "id" => "73",
+        "legal_name" => "Bilimbi Industries Sdn Bhd"
+      })
+
+      assert has_element?(view, "#company-email-status[role='alert']")
+      assert has_element?(view, "#company-legal-name-status", "Saved")
+
+      render_hook(view, "save_field", %{"id" => "73", "email" => "ops@bilimbi.test"})
+      refute has_element?(view, "#company-email-status[role='alert']")
+      assert has_element?(view, "#company-email-status", "Saved")
+      assert has_element?(view, "#detail-email", "ops@bilimbi.test")
+    end
+
+    test "refuses in-place writes once the update capability is gone", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # A commit that did land, so the refusal below has a stale "Saved" to
+      # clear.
+      render_hook(view, "save_field", %{
+        "id" => "73",
+        "legal_name" => "Bilimbi Industries Sdn Bhd"
+      })
+
+      assert has_element?(view, "#company-legal-name-status[role='status']", "Saved")
+
+      revoke_capability!(scope, "admin.company.update")
+
+      render_hook(view, "save_field", %{"id" => "73", "name" => "Forged"})
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "You do not have permission to change company administration data."
+             )
+
+      # The refusal is the whole outcome: no "Saved" from the earlier commit
+      # stands beside it.
+      refute has_element?(view, "#company-legal-name-status")
+
+      render_change(view, "save_choice", %{"status" => "archived"})
+      render_hook(view, "add_activity", %{"id" => "73", "activity" => "forged"})
+      render_submit(view, "save_metadata", %{"metadata" => ~s({"forged": true})})
+      render_change(view, "save_timezone", %{"timezone" => "Asia/Tokyo"})
+
+      assert {:ok, stored} = Company.get_company(scope, 73)
+      assert stored.name == "Bilimbi Industries"
+      assert stored.legal_name == "Bilimbi Industries Sdn Bhd"
+      assert stored.status == "active"
+      assert stored.scope_activities in [nil, []]
+      assert stored.metadata in [nil, %{}]
+      assert has_element?(view, "#company-timezone-display", "Not configured (UTC)")
+    end
+
+    test "adds and removes business activities in place", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      # Add activity
-      view
-      |> form("#add-activity-form", %{"activity" => "consulting"})
-      |> render_submit()
+      # Adding is the shared in-place text control with an "Add activity"
+      # trigger -- Belimbing's "+ Add" flow -- not a form with a button.
+      assert has_element?(
+               view,
+               "#company-new-activity[phx-hook='InlineEdit'][data-save-event='add_activity']",
+               "Add activity"
+             )
 
-      assert has_element?(view, "#company-details-card", "consulting")
+      refute has_element?(view, "#add-activity-form")
 
-      # Add another activity
-      view
-      |> form("#add-activity-form", %{"activity" => "training"})
-      |> render_submit()
+      render_hook(view, "add_activity", %{"id" => "73", "activity" => " consulting "})
+      assert has_element?(view, "#scope-activities-section", "consulting")
+      assert has_element?(view, "#company-new-activity-status[role='status']", "Saved")
+      refute has_element?(view, "#flash-info")
 
-      assert has_element?(view, "#company-details-card", "training")
+      render_hook(view, "add_activity", %{"id" => "73", "activity" => "training"})
+      assert has_element?(view, "#scope-activities-section", "training")
 
-      # Remove first activity
-      view
-      |> element("button[phx-click='remove_activity'][phx-value-index='0']")
-      |> render_click()
+      view |> element("#remove-activity-0") |> render_click()
+      refute has_element?(view, "#scope-activities-section", "consulting")
+      assert has_element?(view, "#scope-activities-section", "training")
+      assert has_element?(view, "#company-new-activity-status", "Saved")
 
-      refute has_element?(view, "#company-details-card", "consulting")
-      assert has_element?(view, "#company-details-card", "training")
+      {:ok, scope} = Tenancy.scope(41)
+      assert {:ok, %{scope_activities: ["training"]}} = Company.get_company(scope, 73)
     end
 
     # `remove_activity` writes the company row immediately -- there is no
@@ -1003,9 +1204,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      view
-      |> form("#add-activity-form", %{"activity" => "consulting"})
-      |> render_submit()
+      render_hook(view, "add_activity", %{"id" => "73", "activity" => "consulting"})
 
       assert has_element?(
                view,
@@ -1014,66 +1213,171 @@ defmodule BilimbiWeb.CompanyLiveTest do
              )
     end
 
-    test "edits, validates, and clears metadata JSON", %{conn: conn} do
+    test "edits, validates, and clears metadata JSON in place", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      # Open edit metadata
+      # The document opens from the demoted pencil beside the value, never a
+      # text button, into an editor with an explicit Apply.
+      assert has_element?(
+               view,
+               "button#edit-metadata-btn[aria-label='Edit metadata'] .hero-pencil"
+             )
+
+      refute has_element?(view, "#edit-metadata-btn", "Edit Metadata")
+      refute has_element?(view, "#metadata-form")
+
       view |> element("#edit-metadata-btn") |> render_click()
+
+      assert has_element?(
+               view,
+               "dd#company-metadata form#metadata-form textarea#company-metadata-json"
+             )
+
+      assert has_element?(view, "#metadata-form #company-metadata-apply", "Apply")
+
+      # A refusal reports on the fact, not in a flash, and keeps the editor
+      # open so the operator corrects it where they typed it.
+      view |> form("#metadata-form", %{"metadata" => "invalid-json-text"}) |> render_submit()
+
+      assert has_element?(
+               view,
+               "#company-metadata-status[role='alert']",
+               ~s("invalid-json-text" was not saved: Metadata must be a JSON object.)
+             )
+
       assert has_element?(view, "#metadata-form")
+      assert has_element?(view, "#company-metadata-json", "invalid-json-text")
+      refute has_element?(view, "#flash-error")
 
-      # Save invalid JSON
-      view
-      |> form("#metadata-form", %{"metadata" => "invalid-json-text"})
-      |> render_submit()
-
-      assert has_element?(view, "#flash-error", "Metadata was not saved. Enter valid JSON.")
-
-      # Save valid JSON
       view
       |> form("#metadata-form", %{"metadata" => ~s({"founded": 2020, "tier": "enterprise"})})
       |> render_submit()
 
       refute has_element?(view, "#metadata-form")
+      assert has_element?(view, "dd#company-metadata #company-metadata-display", "enterprise")
+      assert has_element?(view, "#company-metadata-status[role='status']", "Saved")
+      refute has_element?(view, "#flash-info")
+
+      # Cancel restores the read state without writing.
+      view |> element("#edit-metadata-btn") |> render_click()
+      view |> element("#company-metadata-cancel") |> render_click()
+      refute has_element?(view, "#metadata-form")
       assert has_element?(view, "#company-metadata-display", "enterprise")
 
-      # Clear metadata by submitting empty
+      # Applying an empty document clears it.
       view |> element("#edit-metadata-btn") |> render_click()
       view |> form("#metadata-form", %{"metadata" => ""}) |> render_submit()
       refute has_element?(view, "#company-metadata-display")
+      assert has_element?(view, "#company-metadata-status", "Saved")
+
+      {:ok, scope} = Tenancy.scope(41)
+      assert {:ok, %{metadata: nil}} = Company.get_company(scope, 73)
     end
 
-    test "updates and clears company default timezone", %{conn: conn} do
+    test "commits the default timezone on change and reports on the fact", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      # Select timezone
+      # The read state is the trigger; no select stands beside the facts.
+      assert has_element?(view, "#company-timezone-display", "Not configured (UTC)")
+      refute has_element?(view, "#company-timezone-card select")
+      assert has_element?(view, "#company-timezone-card", "No timezone is configured")
+
+      view |> element("#company-timezone-display") |> render_click()
+      assert has_element?(view, "#company-timezone-form select#company-timezone-select")
+
       view
       |> form("#company-timezone-form", %{"timezone" => "Asia/Kuala_Lumpur"})
       |> render_change()
 
-      assert has_element?(view, "#flash-info", "Timezone saved: Asia/Kuala_Lumpur")
+      refute has_element?(view, "#company-timezone-form")
+      assert has_element?(view, "#company-timezone-display", "Asia/Kuala_Lumpur")
+      assert has_element?(view, "#company-timezone-status[role='status']", "Saved")
+      refute has_element?(view, "#flash-info")
+      refute has_element?(view, "#company-timezone-card", "No timezone is configured")
 
-      # Clear timezone
-      view
-      |> form("#company-timezone-form", %{"timezone" => ""})
-      |> render_change()
+      # A forged value outside the IANA database is refused on the fact.
+      render_change(view, "save_timezone", %{"timezone" => "Mars/Olympus"})
 
-      assert has_element?(view, "#flash-info", "Timezone cleared.")
+      assert has_element?(
+               view,
+               "#company-timezone-status[role='alert']",
+               ~s("Mars/Olympus" was not saved: Default Timezone must be a valid IANA timezone.)
+             )
+
+      assert has_element?(view, "#company-timezone-display", "Asia/Kuala_Lumpur")
+
+      view |> element("#company-timezone-display") |> render_click()
+      view |> form("#company-timezone-form", %{"timezone" => ""}) |> render_change()
+      assert has_element?(view, "#company-timezone-display", "Not configured (UTC)")
+      assert has_element?(view, "#company-timezone-status", "Saved")
+      assert has_element?(view, "#company-timezone-card", "No timezone is configured")
+    end
+
+    test "an unset company names the tenant-level zone its dates resolve to", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, _} =
+        Settings.put("localization.timezone", "Asia/Kuala_Lumpur", SettingsScope.tenant(41))
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      assert has_element?(
+               view,
+               "#company-timezone-display",
+               "Not configured (Asia/Kuala_Lumpur)"
+             )
+
+      refute has_element?(view, "#company-timezone-display", "UTC")
+
+      assert has_element?(
+               view,
+               "#company-timezone-card",
+               "Dates and times will display in Asia/Kuala_Lumpur until a timezone is set."
+             )
+
+      refute has_element?(view, "#company-timezone-card", "display in UTC")
+    end
+
+    test "an unset company under an unconvertible tenant zone names UTC", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, _} = Settings.put("localization.timezone", "Mars/Olympus", SettingsScope.tenant(41))
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      assert has_element?(view, "#company-timezone-display", "Not configured (UTC)")
+      refute has_element?(view, "#company-timezone-display", "Mars/Olympus")
+
+      assert has_element?(
+               view,
+               "#company-timezone-card",
+               "Dates and times will display in UTC until a timezone is set."
+             )
     end
 
     test "opening a panel dialog dismisses an earlier page flash", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+      {:ok, scope} = Tenancy.scope(41)
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      view
-      |> form("#company-timezone-form", %{"timezone" => "Asia/Kuala_Lumpur"})
-      |> render_change()
+      # Success reports on the fact, so the page's remaining flash is the
+      # refusal of a write the actor may no longer perform: revoke the grant
+      # the page mounted with, then forge a commit. The panel's controls were
+      # rendered while the grant stood, so its dialogs still open.
+      revoke_capability!(scope, "admin.company.update")
 
-      assert has_element?(view, "#flash-info", "Timezone saved: Asia/Kuala_Lumpur")
+      render_hook(view, "save_field", %{"id" => "73", "name" => "Forged"})
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "You do not have permission to change company administration data."
+             )
 
       # The panel is a LiveComponent, so its dialog owns no flash copy. An
       # open dialog makes the page inert, so the layout copy must go rather
@@ -1081,22 +1385,19 @@ defmodule BilimbiWeb.CompanyLiveTest do
       view |> element("#btn-open-attach-address") |> render_click()
 
       assert_modal_dialog(view, "attach-address-modal", "Attach Address")
-      refute has_element?(view, "#flash-info")
+      refute has_element?(view, "#flash-error")
 
       # The page behind an open dialog is inert, so the second dialog is
       # reachable only once the first has closed, and needs its own flash.
       view |> element("button[phx-click='close_attach_modal']") |> render_click()
       refute has_element?(view, "#attach-address-modal")
 
-      view
-      |> form("#company-timezone-form", %{"timezone" => ""})
-      |> render_change()
-
-      assert has_element?(view, "#flash-info", "Timezone cleared.")
+      render_hook(view, "save_field", %{"id" => "73", "name" => "Forged again"})
+      assert has_element?(view, "#flash-error")
 
       view |> element("#btn-open-create-address") |> render_click()
       assert_modal_dialog(view, "company-create-address-modal", "Create & Attach Address")
-      refute has_element?(view, "#flash-info")
+      refute has_element?(view, "#flash-error")
     end
 
     test "creates and attaches a new address through the company.addresses panel", %{conn: conn} do
@@ -1192,9 +1493,11 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      refute has_element?(view, "#edit-company-details-btn")
-      refute has_element?(view, "#add-activity-form")
+      refute has_element?(view, "#company-details-card [phx-hook='InlineEdit']")
+      refute has_element?(view, "#company-status-display")
+      refute has_element?(view, "#company-new-activity")
       refute has_element?(view, "#edit-metadata-btn")
+      refute has_element?(view, "#company-timezone-display")
       refute has_element?(view, "#btn-open-create-address")
       refute has_element?(view, "#btn-open-attach-address")
     end
@@ -2128,5 +2431,16 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert is_nil(Repo.get!(Relationship, relationship.id).deleted_at)
       assert Repo.aggregate(Relationship, :count) == 1
     end
+  end
+
+  # Drops the signed-in user's direct grant of `capability`, so a page that
+  # mounted with it must refuse the next write on its own.
+  defp revoke_capability!(scope, capability) do
+    grant =
+      Authz.list_principal_capabilities(scope, page_size: 100)
+      |> Map.fetch!(:entries)
+      |> Enum.find(&(&1.capability == capability))
+
+    {:ok, :removed} = Authz.remove_principal_capability(scope, grant.id)
   end
 end
