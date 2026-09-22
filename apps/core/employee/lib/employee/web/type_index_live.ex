@@ -474,7 +474,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
                   icon="edit"
                   label={"Edit #{type.label}"}
                   id={"employee-type-edit-#{type.id}"}
-                  navigate={~p"/employee-types/#{type.id}/edit"}
+                  navigate={~p"/employee-types/#{type.id}"}
                 />
                 <.icon_button
                   :if={allowed?(@current_scope, "admin.employee-type.delete")}

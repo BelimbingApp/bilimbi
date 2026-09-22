@@ -469,7 +469,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
                   icon="edit"
                   label={"Edit #{employee.full_name}"}
                   id={"employee-#{employee.id}-edit"}
-                  navigate={~p"/employees/#{employee.id}/edit"}
+                  navigate={~p"/employees/#{employee.id}"}
                 />
                 <.icon_button
                   :if={allowed?(@current_scope, "admin.employee.delete")}

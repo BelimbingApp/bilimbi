@@ -50,8 +50,8 @@ defmodule Bilimbi.Base.UI.CommitStatus do
      `<.inline_edit>` or `<.commit_status>`.
 
   `Bilimbi.Core.Address.Web.ShowLive`, `Bilimbi.Core.User.Web.ShowLive`,
-  `Bilimbi.Core.Employee.Web.ShowLive` and `Bilimbi.Core.Company.Web.ShowLive`
-  are the four adopters.
+  `Bilimbi.Core.Employee.Web.ShowLive`, `Bilimbi.Core.Company.Web.ShowLive`
+  and `Bilimbi.Core.Employee.Web.TypeShowLive` are the five adopters.
   """
 
   import Phoenix.Component, only: [assign: 3]

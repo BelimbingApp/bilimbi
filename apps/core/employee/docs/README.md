@@ -82,9 +82,21 @@ is how an in-place clear lands; the platform orchestrator's identity is
 refused by the domain, and by Core User's `change_employee_type/4` as
 `:invariant_violation`, and the page reports both on the fact.
 `Bilimbi.Core.Employee.Web.ShowLive`'s moduledoc owns the per-fact rules and
-DESIGN.md's "Read-first detail pages" owns the pattern. The standalone
-`/employees/:id/edit` form still exists for the list's edit link, but nothing
-on the detail page reaches it.
+DESIGN.md's "Read-first detail pages" owns the pattern. There is no
+`/employees/:id/edit` route: the list's Edit action opens the record page,
+and `FormLive` is reached only through `/employees/new` (its edit branch is
+unrouted code until it is pruned).
+
+**An employee type's record page is read-first too.** Belimbing gives a type
+no detail page — its edit form is the record's page — and the rule reaches a
+record whether or not its page is called a detail page. `/employee-types/:id`
+(`Bilimbi.Core.Employee.Web.TypeShowLive`, under `admin.employee-type.list`)
+shows the code, label and kind as facts; an operator holding
+`admin.employee-type.update` edits the label in place through
+`<.inline_edit>` and the outcome reports on the fact through
+`Bilimbi.Base.UI.CommitStatus`. The code is permanent and a system type reads
+as text for everyone. `/employee-types/new` (`TypeFormLive`) is create-only,
+and the list's Edit action opens the record page.
 
 ## Employee Types administration
 

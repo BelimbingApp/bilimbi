@@ -203,12 +203,26 @@ A detail page shows the record as facts and lets an authorized operator change
 each fact in place. `/addresses/:id` is the exemplar, `/users/:id` the second
 full adopter (its name, email and company), `/employees/:id` the third
 (seven text facts and the department, supervisor, employee type and status
-choices) and `/companies/:id` the fourth (every Company Details fact, its
-business activities and metadata, and its default timezone). There is no edit
-mode and no save button: a committed edit saves by itself, and an "Edit …"
-button that opens a separate edit form for the same facts is a defect. What
-"committed" means follows the control and is the same for every fact of that
-kind on the page:
+choices), `/companies/:id` the fourth (every Company Details fact, its
+business activities and metadata, and its default timezone) and
+`/employee-types/:id` the fifth (its label; the code is permanent). There is
+no edit mode and no save button: a committed edit saves by itself, and an
+"Edit …" button that opens a separate edit form for the same facts is a
+defect.
+
+**A record's page is read-first whether or not the codebase calls it a
+detail page.** The rule is about the record, not the route name: a record
+whose only page was an edit form — Belimbing gives an employee type no
+`show`, so `admin/employee-types/{id}/edit` is that record's page — gets a
+read-first record page at `/<records>/:id` in this same shape, at the detail
+width, and the edit route is retired. Once a record's page edits in place, a
+separate `/:id/edit` route for the same facts is a second surface for one
+workflow, so a list's Edit action opens the record page; `/employees/:id/edit`
+and `/employee-types/:id/edit` are gone for that reason. The `:form` width
+belongs to a genuine create form. `/users/:id/edit` is the one remaining edit
+route and is an open decision, not an exception to the rule. What "committed"
+means follows the control and is the same for every fact of that kind on the
+page:
 
 - **Text facts** use `<.inline_edit>` and commit on Enter or on leaving the
   field. Every nullable column passes `allow_empty`; a required column (a

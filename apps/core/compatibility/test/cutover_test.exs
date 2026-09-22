@@ -36,6 +36,19 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
       assert Cutover.classify_url("/admin/users/5/edit") == {:mapped, "/users/5/edit"}
     end
 
+    test "lands a retired edit page on the record page that edits in place" do
+      # Belimbing's employee type record is its edit form; Bilimbi's is the
+      # read-first `/employee-types/:id`, so the pin follows the record.
+      assert Cutover.classify_url("/admin/employee-types/5/edit") ==
+               {:mapped, "/employee-types/5"}
+
+      assert Cutover.classify_url("/admin/employee-types/5/edit?tab=x") ==
+               {:mapped, "/employee-types/5?tab=x"}
+
+      # A bare `/edit` with no record before it is not a record page.
+      assert {:unmappable, _} = Cutover.classify_url("/admin/employee-types/edit")
+    end
+
     test "renames create to new only where Bilimbi uses new" do
       assert Cutover.classify_url("/admin/users/create") == {:mapped, "/users/new"}
       assert Cutover.classify_url("/admin/employees/create") == {:mapped, "/employees/new"}

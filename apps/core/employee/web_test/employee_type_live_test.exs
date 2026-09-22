@@ -73,7 +73,7 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     assert Enum.any?(types, &(&1.code == "seasonal" and not &1.is_system))
   end
 
-  test "updates a custom type", %{conn: conn} do
+  test "the list's Edit action opens the type's read-first record page", %{conn: conn} do
     {:ok, scope} = Tenancy.scope(41)
 
     {:ok, type} =
@@ -84,37 +84,35 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     grant_capabilities!(["admin.employee-type.list", "admin.employee-type.update"])
 
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types/#{type.id}/edit")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
 
-    view
-    |> form("#employee-type-form", employee_type: %{label: "Independent Contractor"})
-    |> render_submit()
+    # The action keeps its capability gate and its glyph; it leads to the
+    # record page, where the label edits in place, not to a separate form.
+    assert has_element?(view, "a#employee-type-edit-#{type.id}[href='/employee-types/#{type.id}']")
+    refute has_element?(view, "a[href$='/edit']")
 
-    {path, _flash} = assert_redirect(view)
-    assert path == "/employee-types"
+    {:ok, show, _html} =
+      view
+      |> element("#employee-type-edit-#{type.id}")
+      |> render_click()
+      |> follow_redirect(conn |> log_in_as(), ~p"/employee-types/#{type.id}")
 
-    {:ok, index, _html} = conn |> log_in_as() |> live(path)
-    assert has_element?(index, "#employee-types td", "Independent Contractor")
-
-    assert {:ok, updated} = Employee.get_employee_type(scope, 73, type.id)
-    assert updated.label == "Independent Contractor"
-    assert updated.code == "temp_contractor"
+    assert has_element?(show, "#employee-type-label[phx-hook='InlineEdit']")
   end
 
-  test "forbids editing a system type", %{conn: conn} do
+  test "the edit route is retired for custom and system types alike", %{conn: conn} do
     {:ok, scope} = Tenancy.scope(41)
     {:ok, types} = Employee.list_employee_types(scope, 73)
     system_type = Enum.find(types, & &1.is_system)
+    {:ok, custom} = Employee.create_employee_type(scope, 73, %{code: "temp", label: "Temporary"})
 
     grant_capabilities!(["admin.employee-type.list", "admin.employee-type.update"])
 
-    assert {:error,
-            {:live_redirect,
-             %{
-               to: "/employee-types",
-               flash: %{"error" => "System employee types cannot be edited."}
-             }}} =
-             conn |> log_in_as() |> live(~p"/employee-types/#{system_type.id}/edit")
+    for type <- [system_type, custom] do
+      retired = "/employee-types/#{type.id}/edit"
+      assert Phoenix.Router.route_info(BilimbiWeb.Router, "GET", retired, "localhost") == :error
+      assert conn |> log_in_as() |> get(retired) |> Map.fetch!(:status) == 404
+    end
   end
 
   test "deletes a custom type", %{conn: conn} do
