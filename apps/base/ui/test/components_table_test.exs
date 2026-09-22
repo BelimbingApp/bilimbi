@@ -114,6 +114,28 @@ defmodule Bilimbi.Base.UI.ComponentsTableTest do
     assert html =~ "people-sort-count"
   end
 
+  test "sort_target addresses the sort event to a LiveComponent" do
+    assigns = %{rows: [%{name: "Ada", note: "ok", count: 3}]}
+
+    targeted =
+      rendered_to_string(~H"""
+      <.table id="people" rows={@rows} sort_target={7}>
+        <:col :let={row} label="Name" sort="name">{row.name}</:col>
+      </.table>
+      """)
+
+    assert targeted =~ ~r/<button\b[^>]*\bid="people-sort-name"[^>]*\bphx-target="7"/
+
+    untargeted =
+      rendered_to_string(~H"""
+      <.table id="people" rows={@rows}>
+        <:col :let={row} label="Name" sort="name">{row.name}</:col>
+      </.table>
+      """)
+
+    refute untargeted =~ "phx-target"
+  end
+
   test "sort_event overrides the default phx-click name" do
     html =
       render_component(&preview/1, %{

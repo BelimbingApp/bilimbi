@@ -122,7 +122,13 @@ defmodule BilimbiWeb.AddressLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/create")
 
     assert has_element?(view, "#address-form")
-    assert has_element?(view, "#address-back[href='/addresses'][title='Back to addresses']", "Back")
+
+    assert has_element?(
+             view,
+             "#address-back[href='/addresses'][title='Back to addresses']",
+             "Back"
+           )
+
     assert has_element?(view, "#address-cancel[href='/addresses']", "Cancel")
     assert has_element?(view, "#nav-admin-address[aria-current='page']")
     assert has_element?(view, "#address-country option[value='MY']", "Malaysia")
@@ -403,8 +409,18 @@ defmodule BilimbiWeb.AddressLiveTest do
     assert has_element?(view, "#address-show-page")
 
     # Back navigation is demoted to plain links reading "← Back".
-    assert has_element?(view, "a#address-back-company[href='/companies/73'][title='Back to company']", "Back")
-    assert has_element?(view, "a#address-back-list[href='/addresses'][title='Back to addresses']", "Back")
+    assert has_element?(
+             view,
+             "a#address-back-company[href='/companies/73'][title='Back to company']",
+             "Back"
+           )
+
+    assert has_element?(
+             view,
+             "a#address-back-list[href='/addresses'][title='Back to addresses']",
+             "Back"
+           )
+
     refute has_element?(view, "#address-back-list", "Back to List")
     refute has_element?(view, "button#address-back-list")
 
@@ -443,9 +459,114 @@ defmodule BilimbiWeb.AddressLiveTest do
     assert has_element?(view, "summary#address-record-history-toggle[title='History']", "History")
     assert has_element?(view, "#address-record-history-toggle .hero-clock")
     refute has_element?(view, "#address-record-history-toggle .hero-clipboard-document-list")
-    assert has_element?(view, "#address-record-history-panel", "History for address ##{address.id}")
+
+    assert has_element?(
+             view,
+             "#address-record-history-panel",
+             "History for address ##{address.id}"
+           )
+
     assert has_element?(view, "#address-record-history-entry-#{mutation.id}", "Head Office")
     assert has_element?(view, "#address-record-history-entry-#{mutation.id}", "Headquarters")
+  end
+
+  test "presents the facts as the shared list without disturbing in-place editing", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, address} =
+      Address.create_address(scope, %{
+        label: "Head Office",
+        phone: "+60 1",
+        verification_status: "verified",
+        country_iso: "MY",
+        postcode: "50000",
+        locality: "Kuala Lumpur"
+      })
+
+    grant_capabilities!(["admin.address.view", "admin.address.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+
+    # Every section is a named region opened by the one shared heading; no
+    # section writes its own h3 or hand-rolled panel.
+    for id <- ~w(address-details address-location address-provenance address-linked-entities) do
+      assert has_element?(
+               view,
+               "##{id}-card[role='region'][aria-labelledby='#{id}-heading'] h2##{id}-heading"
+             )
+    end
+
+    refute has_element?(view, "#address-show-page h3")
+    refute has_element?(view, "#address-show-page section")
+
+    # The facts are rows of the shared list; the value cell hosts the editor
+    # and, after a commit, the status it reports.
+    assert has_element?(view, "#address-details-card dl dt", "Label")
+
+    assert has_element?(
+             view,
+             "#address-details-card dl dd#address-view-label #address-label[phx-hook='InlineEdit'][data-allow-empty]"
+           )
+
+    render_hook(view, "save_field", %{"id" => to_string(address.id), "label" => "Updated HQ"})
+
+    assert has_element?(
+             view,
+             "dd#address-view-label #address-label-status[role='status']",
+             "Saved"
+           )
+
+    assert has_element?(
+             view,
+             "dd#address-view-label #address-label [data-role='text']",
+             "Updated HQ"
+           )
+
+    # The choice fact keeps its trigger and status in its own row.
+    assert has_element?(
+             view,
+             "dd#address-view-verification-status button#address-verification-status-display",
+             "Verified"
+           )
+
+    view |> element("#address-verification-status-display") |> render_click()
+
+    view
+    |> form("#address-verification-status-form", %{"verification_status" => "suggested"})
+    |> render_change()
+
+    assert has_element?(
+             view,
+             "dd#address-view-verification-status #address-verification-status-status[role='status']",
+             "Saved"
+           )
+
+    # The grouped location editor opens from the demoted icon beside its
+    # heading and replaces the list while it is open.
+    assert has_element?(view, "h2#address-location-heading + button#address-edit-location-button")
+    assert has_element?(view, "#address-location-card dl dd#address-view-postcode", "50000")
+
+    view |> element("#address-edit-location-button") |> render_click()
+
+    assert has_element?(view, "#address-location-form")
+    refute has_element?(view, "#address-location-card dl")
+
+    view |> element("#address-cancel-location") |> render_click()
+
+    assert has_element?(
+             view,
+             "#address-location-card dl dd#address-view-locality",
+             "Kuala Lumpur"
+           )
+
+    # Provenance facts are rows of the same list shape.
+    assert has_element?(
+             view,
+             "#address-provenance-card dl dd#address-view-source-ref #address-source-ref[phx-hook='InlineEdit']"
+           )
+
+    refute has_element?(view, "#address-provenance-card dd#address-view-raw-input")
   end
 
   test "shows an in-place save in the record history panel", %{conn: conn, scope: scope} do
@@ -489,8 +610,12 @@ defmodule BilimbiWeb.AddressLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
 
     # Every text fact is an in-place editor; there is no edit mode and no save button.
-    for id <- ~w(address-label address-phone address-line1 address-line2 address-line3 address-source address-source-ref) do
-      assert has_element?(view, "##{id}[phx-hook='InlineEdit'][data-save-event='save_field'][data-allow-empty]")
+    for id <-
+          ~w(address-label address-phone address-line1 address-line2 address-line3 address-source address-source-ref) do
+      assert has_element?(
+               view,
+               "##{id}[phx-hook='InlineEdit'][data-save-event='save_field'][data-allow-empty]"
+             )
     end
 
     refute has_element?(view, "#address-edit-details-button")
@@ -562,7 +687,8 @@ defmodule BilimbiWeb.AddressLiveTest do
     conn: conn,
     scope: scope
   } do
-    {:ok, address} = Address.create_address(scope, %{label: "HQ", verification_status: "unverified"})
+    {:ok, address} =
+      Address.create_address(scope, %{label: "HQ", verification_status: "unverified"})
 
     grant_capabilities!(["admin.address.view", "admin.address.update"])
 
@@ -573,7 +699,11 @@ defmodule BilimbiWeb.AddressLiveTest do
     refute has_element?(view, "#address-verification-status-form")
 
     view |> element("#address-verification-status-display") |> render_click()
-    assert has_element?(view, "#address-verification-status-form select#address-verification-status")
+
+    assert has_element?(
+             view,
+             "#address-verification-status-form select#address-verification-status"
+           )
 
     view
     |> element("#address-verification-status-form")
@@ -641,13 +771,20 @@ defmodule BilimbiWeb.AddressLiveTest do
     })
 
     assert has_element?(view, "#address-location-form")
-    assert has_element?(view, "#address-location-postcode-error-0", "should be at most 255 character(s)")
+
+    assert has_element?(
+             view,
+             "#address-location-postcode-error-0",
+             "should be at most 255 character(s)"
+           )
+
     refute has_element?(view, "#address-location-status[role='status']")
     assert {:ok, %{postcode: "50000"}} = Address.get_address(scope, address.id)
   end
 
   test "refuses in-place writes once the update capability is gone", %{conn: conn, scope: scope} do
-    {:ok, address} = Address.create_address(scope, %{label: "HQ", verification_status: "unverified"})
+    {:ok, address} =
+      Address.create_address(scope, %{label: "HQ", verification_status: "unverified"})
 
     grant_capabilities!(["admin.address.view", "admin.address.update"])
 
@@ -674,7 +811,12 @@ defmodule BilimbiWeb.AddressLiveTest do
     render_hook(view, "save_verification_status", %{"verification_status" => "verified"})
 
     render_hook(view, "save_location", %{
-      "location" => %{"country_iso" => "MY", "admin1_code" => "", "postcode" => "", "locality" => ""}
+      "location" => %{
+        "country_iso" => "MY",
+        "admin1_code" => "",
+        "postcode" => "",
+        "locality" => ""
+      }
     })
 
     assert {:ok, %{label: "HQ North", verification_status: "unverified", country_iso: nil}} =

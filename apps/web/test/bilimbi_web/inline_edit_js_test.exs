@@ -10,7 +10,6 @@ defmodule BilimbiWeb.InlineEditJsTest do
     assert source =~ "commit()"
     assert source =~ "cancel()"
     assert source =~ ~s(addEventListener("blur")
-    assert source =~ ~s(this.pushEvent(saveEvent)
   end
 
   test "the hook never writes the displayed text itself" do

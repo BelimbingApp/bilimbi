@@ -106,8 +106,9 @@ fit more columns. A detail page shares the list width: Belimbing's
 column beside the sidebar at every viewport, and a detail's sections carry
 the same tables an index does. Inside a section, only prose keeps a reading
 limit (`max-w-prose` on a description paragraph); the cards themselves fill.
-The fact grid inside a card is `grid-cols-1 md:grid-cols-2`, one column on a
-phone and two from tablet width, as Belimbing lays the same facts out.
+The facts inside a section are the shared `<.list>` (see "Detail sections and
+facts"); `/users/:id` still lays its facts out in a hand-written
+`grid-cols-1 md:grid-cols-2` grid and adopts the list as it is migrated.
 
 ### Input controls
 
@@ -129,14 +130,14 @@ during long operational sessions:
 - **Row padding:** `py-0.5` (`0.125rem` / `2px`), `px-2` (`0.5rem` / `8px`) horizontal cell padding.
 - **Header padding:** `py-1.5` (`0.375rem` / `6px`), `px-2` horizontal header padding.
 - **Header background:** `bg-surface-sunken`.
-- **Table geometry:** Table frames use flat angles, including their overflow wrapper. `Bilimbi.Base.UI.Components.table/1` enforces this: neither framing mode carries a radius and the component takes no attribute that can add one, so a rounded table can only come from hand-written markup. The card that frames a table is the same shape, so `card/1` enforces the other half: `inner_class` carrying `p-0` is read as the flat-corner signal and drops the radius, while any other card keeps it. The signal changes the corner and nothing else — the card still emits `p-2`, so those cards keep the 8px they render today, and the `p-2`/`p-0` cascade behind that is tracked as its own defect. Neither rule is a per-screen class.
+- **Table geometry:** Table frames use flat angles, including their overflow wrapper. `Bilimbi.Base.UI.Components.table/1` enforces this: neither framing mode carries a radius and the component takes no attribute that can add one, so a rounded table can only come from hand-written markup. A card is flat only where it is the table's frame — the full-bleed case where the card edge and the table edge are the same line — so `card/1` enforces the other half: `inner_class` carrying `p-0` is read as the flat-corner signal and drops the radius, while any other card keeps it, including a padded section card around an inset table. The signal changes the corner and nothing else — the card still emits `p-2`, so those cards keep the 8px they render today, and the `p-2`/`p-0` cascade behind that is tracked as its own defect. Neither rule is a per-screen class.
 - **Header typography:** Proper case `text-xs font-semibold text-ink-subtle`.
 - **Body typography:** `text-sm text-ink`, with `tabular-nums text-muted` (`text-ink-muted`) for codes, IDs, currencies, phones, populations, dates, and measurements.
 - **Search & filter toolbar:** Search and filters sit together in an open
   toolbar with `mb-2` above the table surface. Do not wrap the toolbar in a
   second card; the list is the common region.
 - **Pagination controls:** Rows per page selector uses compact geometry (`w-auto`, `h-7`, `pl-2 pr-6`) — sized to its content, because the options run to three digits and a fixed `w-14` clipped even `25` behind the dropdown arrow (#304) with accent focus styling (`focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30`). Render page navigation only when another page exists. Navigation buttons use `size-7` with accent focus rings (`focus-visible:ring-1 focus-visible:ring-brand-strong/40`) and active page highlight (`border-selection-line bg-brand-surface text-brand-ink`). Operational lists reach all of this through `Bilimbi.Base.UI.Components.pagination/1` rather than a hand-rolled pager; the address list uses it, rows-per-page selector included, by captain decision, so that is settled rather than open. The audit action and mutation logs use it the same way: the rows-per-page selector lives in the component rather than the filter toolbar, the URL keeps each screen's own page-size key, and a single page shows the result count and the selector with no navigation, exactly as the address list does.
-- **Record facts:** the read-only facts of one record — a detail summary, the System Info cards, the Language & Region provenance card — render through `<.list>`: one `<dl>`, label left and value right, with an `id` on the list and on any row a test or an anchor must reach. A screen never hand-writes its own `<dl>` rows for that. A value the screen could not read says so in muted text (`text-ink-faint`) rather than disappearing.
+- **Record facts:** the read-only facts of one record — a detail summary, the System Info cards, the Language & Region provenance card — render through `<.list>`: one `<dl>`, label beside a left-aligned value (see "Detail sections and facts"), with an `id` on the list and on any value cell a test or an anchor must reach. A screen never hand-writes its own `<dl>` rows for that. A value the screen could not read says so in muted text (`text-ink-faint`) rather than disappearing.
 
 ## Inline editing
 
@@ -156,17 +157,59 @@ surface they are read on — a table row or a detail page fact:
   rejected value and the validation error. A refused commit is never a
   silent revert, and a validation error never lands only in a flash.
 
+## Detail sections and facts
+
+A detail page is the page header followed by a stack of sections. Every
+section has the same anatomy, so an operator reads `/companies/:id`,
+`/addresses/:id` and the panels a page embeds (the company and employee
+address panels) as one surface:
+
+- **The section is a `<.card>`** with `inner_class="p-5 sm:p-6"`, a
+  `role="region"` and an `aria-labelledby` naming its heading. Nothing
+  hand-writes a rounded panel.
+- **It opens with `<.section_heading>`**, the one heading treatment: a
+  small-caps `<h2>` (`text-xs font-semibold uppercase tracking-wider
+  text-ink-subtle`, the heading Belimbing's `admin/*/show` cards carry), an
+  optional `count` badge, an optional `description` line, `title_actions`
+  right beside the title (the demoted edit icon that opens a grouped editor)
+  and `actions` at the end of the row (the section's "Manage" link or its own
+  buttons). A hand-written `<h2>`/`<h3>` in a section body is a defect; so is
+  a `<dt>` doing a heading's job.
+- **Its facts are `<.list>`**: one row per fact, the label in a fixed
+  `10rem` column and the value left-aligned in a cell that fills the rest of
+  the row. The value cell can name itself (`<:item id="detail-name">`), and
+  it is a block the width of the row, which is what lets `<.inline_edit>`
+  open its input at full width and report "Saved" or its refusal underneath.
+  A hand-written `<dl>` grid of facts is a defect. Facts that are not one
+  line — a company's business activities, its metadata JSON, an address's raw
+  input — are still rows of the same list, as Belimbing renders them.
+- **Its table is `<.table framed={false}>`**, unframed because the card is
+  the panel. The table is flat; the padded card keeps its radius, because
+  the inset table does not touch the card edge.
+
+The address panels follow the same anatomy inside their owner's page. Their
+sort buttons are addressed to the panel through `sort_target={@myself}`, the
+priority cell commits in place through `<.inline_edit>` (the hook addresses
+its event to its own element, so it reaches the LiveComponent that rendered
+the field, or the LiveView when none did), the kinds are a choice fact whose
+read state is the trigger, and unlinking is a demoted `<.icon_button>` with
+Belimbing's link-slash glyph. `/employees/:id`, `/users/:id`, the
+departments and relationships pages still hand-write their sections and adopt
+this anatomy as they are migrated.
+
 ## Read-first detail pages
 
 A detail page shows the record as facts and lets an authorized operator change
 each fact in place. `/addresses/:id` is the exemplar and `/users/:id` the
 second full adopter (its name, email and company); `/employees/:id` already
 edits facts in place but still reports the outcome in a flash and passes no
-`allow_empty`, and adopts the rest of this section as it is migrated. There
-is no edit mode and no save button: a committed edit saves by itself, and an
-"Edit …" button that opens a separate edit form for the same facts is a
-defect. What "committed" means follows the control
-and is the same for every fact of that kind on the page:
+`allow_empty`, and adopts the rest of this section as it is migrated.
+`/companies/:id` presents its facts on the shared list but still edits them
+through the "Edit Details" modal; moving those facts to in-place editing is
+the outstanding step for that page. There is no edit mode and no save button:
+a committed edit saves by itself, and an "Edit …" button that opens a separate
+edit form for the same facts is a defect. What "committed" means follows the
+control and is the same for every fact of that kind on the page:
 
 - **Text facts** use `<.inline_edit>` and commit on Enter or on leaving the
   field. Every nullable column passes `allow_empty`.
@@ -193,9 +236,10 @@ and is the same for every fact of that kind on the page:
   invalidates the division, postcode and locality — commit together through
   one grouped editor with a primary Apply and a Cancel. The group is opened
   by a demoted `<.icon_button icon="edit" context={:inline}>` beside its
-  heading, not by an "Edit …" button, and refused fields report on their own
-  inputs. Use a group only where the facts genuinely change together; a
-  group is not a way to bring back the edit mode.
+  heading — the `title_actions` slot of `<.section_heading>` — not by an
+  "Edit …" button, and refused fields report on their own inputs. Use a
+  group only where the facts genuinely change together; a group is not a way
+  to bring back the edit mode.
 - **Outcome per fact:** "Saving…" while in flight, "Saved" for the most recent
   commit only — any later write clears it, including one the server refuses,
   so no stale "Saved" stands beside a rejected form — and a refusal that stays

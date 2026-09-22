@@ -11,6 +11,15 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   workflows are reached through the demoted "Manage" link on the section that
   lists them, carrying the registry's `manage` glyph, which is the cog
   Belimbing uses for the same action.
+
+  Every section below the header is a `<.card>` opened by the shared
+  `<.section_heading>` — the one heading treatment a detail page has — and
+  the Company Details facts are the shared `<.list>`, with Business
+  Activities and Metadata as rows of that same list, as Belimbing's
+  company-details partial keeps them. Section tables sit unframed inside
+  their card. Company Details still edits through the "Edit Details" modal;
+  moving those facts to in-place editing is the follow-up that will make
+  this page a full read-first adopter (see DESIGN.md).
   """
 
   use Bilimbi.Base.UI, :live_view
@@ -863,217 +872,181 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           This is the primary company representing its tenant.
         </.alert>
 
-        <%!-- Section 1: Company Details --%>
-        <.card id="company-details-card" class="mt-6">
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-              Company Details
-            </h3>
-            <.button
-              :if={@can_update?}
-              id="edit-company-details-btn"
-              phx-click="edit_details"
-              class="text-xs"
-            >
-              Edit Details
-            </.button>
-          </div>
-
-          <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <dt class="text-xs font-medium text-ink-subtle">Name</dt>
-              <dd id="detail-name" class="mt-1 text-sm font-semibold text-ink-strong">
-                {@company.name}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-xs font-medium text-ink-subtle">Code</dt>
-              <dd id="detail-code" class="mt-1 text-sm font-mono text-ink">
-                {@company.code || "—"}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-xs font-medium text-ink-subtle">Legal Name</dt>
-              <dd id="detail-legal-name" class="mt-1 text-sm text-ink">
-                {@company.legal_name || "—"}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-xs font-medium text-ink-subtle">Status</dt>
-              <dd id="detail-status" class="mt-1">
-                <.badge kind={
-                  case @company.status do
-                    "active" -> :success
-                    "suspended" -> :danger
-                    "pending" -> :warning
-                    _ -> :neutral
-                  end
-                }>
-                  {String.capitalize(@company.status)}
-                </.badge>
-              </dd>
-            </div>
-            <div>
-              <dt class="text-xs font-medium text-ink-subtle">Legal Entity Type</dt>
-              <dd id="detail-legal-entity-type" class="mt-1 text-sm text-ink">
-                {legal_entity_type_name(@company.legal_entity_type_id, @legal_entity_types) || "—"}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-xs font-medium text-ink-subtle">Registration Number</dt>
-              <dd id="detail-registration-number" class="mt-1 text-sm text-ink">
-                {@company.registration_number || "—"}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-xs font-medium text-ink-subtle">Tax ID</dt>
-              <dd id="detail-tax-id" class="mt-1 text-sm text-ink">
-                {@company.tax_id || "—"}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-xs font-medium text-ink-subtle">Jurisdiction</dt>
-              <dd id="detail-jurisdiction" class="mt-1 text-sm text-ink">
-                {country_name(@company.jurisdiction, @countries) || "—"}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-xs font-medium text-ink-subtle">Email</dt>
-              <dd id="detail-email" class="mt-1 text-sm text-ink">
-                {@company.email || "—"}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-xs font-medium text-ink-subtle">Website</dt>
-              <dd id="detail-website" class="mt-1 text-sm text-ink">
-                <a
-                  :if={@company.website}
-                  href={@company.website}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-action hover:underline"
-                >
-                  {@company.website}
-                </a>
-                <span :if={!@company.website}>—</span>
-              </dd>
-            </div>
-            <div class="sm:col-span-2">
-              <dt class="text-xs font-medium text-ink-subtle">Parent Company</dt>
-              <dd id="detail-parent" class="mt-1 text-sm text-ink">
-                {parent_name(@company.parent_id, @parent_companies) || "None"}
-              </dd>
-            </div>
-          </dl>
-
-          <%!-- Business Activities Tags --%>
-          <div id="scope-activities-section" class="mt-6 border-t border-line pt-4">
-            <dt class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-              Business Activities
-            </dt>
-            <p class="mt-0.5 text-xs text-ink-subtle">
-              Industry, services, and business focus areas of this company.
-            </p>
-            <div class="mt-2 flex flex-wrap items-center gap-2">
-              <%= for {activity, idx} <- Enum.with_index(@company.scope_activities || []) do %>
-                <span class="inline-flex items-center gap-1 rounded-full border border-line bg-surface-sunken px-3 py-1 text-xs font-medium text-ink">
-                  {activity}
-                  <.icon_button
-                    :if={@can_update?}
-                    icon="close"
-                    label={"Remove #{activity}"}
-                    context={:inline}
-                    kind={:danger}
-                    id={"remove-activity-#{idx}"}
-                    phx-click="remove_activity"
-                    phx-value-index={idx}
-                    data-confirm={
-                      "Remove the business activity #{activity}? " <>
-                        "The change is saved immediately."
-                    }
-                  />
-                </span>
-              <% end %>
-              <span
-                :if={is_nil(@company.scope_activities) or @company.scope_activities == []}
-                class="text-sm text-ink-subtle"
-              >
-                —
-              </span>
-            </div>
-
-            <form
-              :if={@can_update?}
-              id="add-activity-form"
-              phx-submit="add_activity"
-              class="mt-3 flex items-center gap-2"
-            >
-              <input
-                type="text"
-                name="activity"
-                id="company-new-activity"
-                value={@new_activity}
-                phx-change="update_new_activity"
-                placeholder="e.g. manufacturing"
-                class="w-64 rounded-md border border-line px-3 py-1.5 text-sm bg-surface text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
-              />
-              <.button type="submit" class="text-xs">
-                Add activity
+        <%!-- Section 1: Company Details. The facts are the shared `<.list>`
+             and the heading row is the shared `<.section_heading>`, as on
+             every section of this page; Business Activities and Metadata are
+             facts of the same record, so they are rows of the same list, as
+             Belimbing's company-details partial renders them. --%>
+        <.card
+          id="company-details-card"
+          class="mt-6"
+          inner_class="p-5 sm:p-6"
+          role="region"
+          aria-labelledby="company-details-heading"
+        >
+          <.section_heading id="company-details-heading" title="Company Details">
+            <:actions :if={@can_update?}>
+              <.button id="edit-company-details-btn" phx-click="edit_details" class="text-xs">
+                Edit Details
               </.button>
-            </form>
-          </div>
+            </:actions>
+          </.section_heading>
 
-          <%!-- Metadata JSON --%>
-          <div class="mt-6 border-t border-line pt-4">
-            <div class="flex items-center justify-between">
-              <dt class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Metadata
-              </dt>
-              <button
-                :if={@can_update? and not @editing_metadata?}
-                type="button"
-                id="edit-metadata-btn"
-                phx-click="edit_metadata"
-                class="text-xs text-action hover:underline"
+          <.list>
+            <:item title="Name" id="detail-name">
+              <span class="font-semibold text-ink-strong">{@company.name}</span>
+            </:item>
+            <:item title="Code" id="detail-code">
+              <span class="font-mono">{@company.code || "—"}</span>
+            </:item>
+            <:item title="Legal Name" id="detail-legal-name">
+              {@company.legal_name || "—"}
+            </:item>
+            <:item title="Status" id="detail-status">
+              <.badge kind={
+                case @company.status do
+                  "active" -> :success
+                  "suspended" -> :danger
+                  "pending" -> :warning
+                  _ -> :neutral
+                end
+              }>
+                {String.capitalize(@company.status)}
+              </.badge>
+            </:item>
+            <:item title="Legal Entity Type" id="detail-legal-entity-type">
+              {legal_entity_type_name(@company.legal_entity_type_id, @legal_entity_types) || "—"}
+            </:item>
+            <:item title="Registration Number" id="detail-registration-number">
+              {@company.registration_number || "—"}
+            </:item>
+            <:item title="Tax ID" id="detail-tax-id">
+              {@company.tax_id || "—"}
+            </:item>
+            <:item title="Jurisdiction" id="detail-jurisdiction">
+              {country_name(@company.jurisdiction, @countries) || "—"}
+            </:item>
+            <:item title="Email" id="detail-email">
+              {@company.email || "—"}
+            </:item>
+            <:item title="Website" id="detail-website">
+              <a
+                :if={@company.website}
+                href={@company.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-action hover:underline"
               >
-                Edit Metadata
-              </button>
-            </div>
+                {@company.website}
+              </a>
+              <span :if={!@company.website}>—</span>
+            </:item>
+            <:item title="Parent Company" id="detail-parent">
+              {parent_name(@company.parent_id, @parent_companies) || "None"}
+            </:item>
 
-            <div :if={not @editing_metadata?} class="mt-2">
-              <%= if @company.metadata do %>
-                <pre
-                  id="company-metadata-display"
-                  class="overflow-x-auto rounded-xl bg-surface-sunken p-3 text-xs font-mono text-ink"
-                >{format_metadata(@company.metadata)}</pre>
-              <% else %>
-                <span class="text-sm text-ink-subtle">—</span>
-              <% end %>
-            </div>
-
-            <form
-              :if={@editing_metadata?}
-              id="metadata-form"
-              phx-submit="save_metadata"
-              class="mt-2 space-y-2"
-            >
-              <textarea
-                name="metadata"
-                id="company-metadata-json"
-                rows="5"
-                class="w-full rounded-md border border-line bg-surface p-3 text-xs font-mono text-ink focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
-                placeholder='{"employee_count": 120, "founded_year": 2014}'
-              >{@metadata_input}</textarea>
-              <div class="flex items-center gap-2">
-                <.button type="submit" variant="primary" class="text-xs">
-                  Save Metadata
-                </.button>
-                <.button type="button" phx-click="cancel_edit_metadata" class="text-xs">
-                  Cancel
-                </.button>
+            <:item title="Business Activities" id="scope-activities-section">
+              <p class="text-xs text-ink-subtle">
+                Industry, services, and business focus areas of this company.
+              </p>
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <%= for {activity, idx} <- Enum.with_index(@company.scope_activities || []) do %>
+                  <span class="inline-flex items-center gap-1 rounded-full border border-line bg-surface-sunken px-3 py-1 text-xs font-medium text-ink">
+                    {activity}
+                    <.icon_button
+                      :if={@can_update?}
+                      icon="close"
+                      label={"Remove #{activity}"}
+                      context={:inline}
+                      kind={:danger}
+                      id={"remove-activity-#{idx}"}
+                      phx-click="remove_activity"
+                      phx-value-index={idx}
+                      data-confirm={
+                        "Remove the business activity #{activity}? " <>
+                          "The change is saved immediately."
+                      }
+                    />
+                  </span>
+                <% end %>
+                <span
+                  :if={is_nil(@company.scope_activities) or @company.scope_activities == []}
+                  class="text-ink-muted"
+                >
+                  —
+                </span>
               </div>
-            </form>
-          </div>
+
+              <form
+                :if={@can_update?}
+                id="add-activity-form"
+                phx-submit="add_activity"
+                class="mt-3 flex items-center gap-2"
+              >
+                <input
+                  type="text"
+                  name="activity"
+                  id="company-new-activity"
+                  value={@new_activity}
+                  phx-change="update_new_activity"
+                  placeholder="e.g. manufacturing"
+                  aria-label="New business activity"
+                  class="w-64 rounded-md border border-line px-3 py-1.5 text-sm bg-surface text-ink placeholder:text-ink-subtle focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
+                />
+                <.button type="submit" class="text-xs">
+                  Add activity
+                </.button>
+              </form>
+            </:item>
+
+            <:item title="Metadata" id="company-metadata">
+              <div :if={not @editing_metadata?} class="flex items-start gap-2">
+                <%= if @company.metadata do %>
+                  <pre
+                    id="company-metadata-display"
+                    class="min-w-0 flex-1 overflow-x-auto rounded-xl bg-surface-sunken p-3 text-xs font-mono text-ink"
+                  >{format_metadata(@company.metadata)}</pre>
+                <% else %>
+                  <span class="text-ink-muted">—</span>
+                <% end %>
+                <%!-- Belimbing edits metadata behind a pencil beside the
+                     label; here the demoted icon action sits beside the
+                     value, where the edit lands. --%>
+                <.icon_button
+                  :if={@can_update?}
+                  id="edit-metadata-btn"
+                  icon="edit"
+                  label="Edit metadata"
+                  context={:inline}
+                  phx-click="edit_metadata"
+                />
+              </div>
+
+              <form
+                :if={@editing_metadata?}
+                id="metadata-form"
+                phx-submit="save_metadata"
+                class="space-y-2"
+              >
+                <textarea
+                  name="metadata"
+                  id="company-metadata-json"
+                  rows="5"
+                  aria-label="Company metadata JSON"
+                  class="w-full rounded-md border border-line bg-surface p-3 text-xs font-mono text-ink focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
+                  placeholder='{"employee_count": 120, "founded_year": 2014}'
+                >{@metadata_input}</textarea>
+                <div class="flex items-center gap-2">
+                  <.button type="submit" variant="primary" class="text-xs">
+                    Save Metadata
+                  </.button>
+                  <.button type="button" phx-click="cancel_edit_metadata" class="text-xs">
+                    Cancel
+                  </.button>
+                </div>
+              </form>
+            </:item>
+          </.list>
         </.card>
 
         <%!-- Section 2: Addresses — core/address-owned discovered embed (#595).
@@ -1089,10 +1062,14 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         />
 
         <%!-- Section 3: Timezone Settings --%>
-        <.card id="company-timezone-card" class="mt-6">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle mb-3">
-            Timezone
-          </h3>
+        <.card
+          id="company-timezone-card"
+          class="mt-6"
+          inner_class="p-5 sm:p-6"
+          role="region"
+          aria-labelledby="company-timezone-heading"
+        >
+          <.section_heading id="company-timezone-heading" title="Timezone" />
           <form id="company-timezone-form" phx-change="save_timezone" class="max-w-md space-y-2">
             <.input
               type="select"
@@ -1113,13 +1090,19 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         </.card>
 
         <%!-- Section 4: Subsidiaries (Child Companies) --%>
-        <.card :if={@children != []} id="company-subsidiaries-card" class="mt-6">
-          <div class="flex items-center gap-2 mb-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-              Subsidiaries
-            </h3>
-            <.badge>{length(@children)}</.badge>
-          </div>
+        <.card
+          :if={@children != []}
+          id="company-subsidiaries-card"
+          class="mt-6"
+          inner_class="p-5 sm:p-6"
+          role="region"
+          aria-labelledby="company-subsidiaries-heading"
+        >
+          <.section_heading
+            id="company-subsidiaries-heading"
+            title="Subsidiaries"
+            count={length(@children)}
+          />
 
           <.table
             id="company-subsidiaries-table"
@@ -1127,6 +1110,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             row_id={fn child -> "child-company-#{child.id}" end}
             row_item={fn child -> child end}
             caption="Subsidiaries"
+            framed={false}
           >
             <:col :let={child} label="Name">
               <.link
@@ -1162,23 +1146,29 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         </.card>
 
         <%!-- Section 5: Departments --%>
-        <.card id="company-departments-card" class="mt-6">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-2">
-              <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Departments
-              </h3>
-              <.badge>{length(@departments)}</.badge>
-            </div>
-            <.action_link
-              id="company-departments-manage"
-              icon="manage"
-              navigate={~p"/companies/#{@company.id}/departments"}
-              title="Manage departments"
-            >
-              Manage
-            </.action_link>
-          </div>
+        <.card
+          id="company-departments-card"
+          class="mt-6"
+          inner_class="p-5 sm:p-6"
+          role="region"
+          aria-labelledby="company-departments-heading"
+        >
+          <.section_heading
+            id="company-departments-heading"
+            title="Departments"
+            count={length(@departments)}
+          >
+            <:actions>
+              <.action_link
+                id="company-departments-manage"
+                icon="manage"
+                navigate={~p"/companies/#{@company.id}/departments"}
+                title="Manage departments"
+              >
+                Manage
+              </.action_link>
+            </:actions>
+          </.section_heading>
 
           <.table
             id="company-departments-table"
@@ -1186,6 +1176,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             row_id={fn dept -> "department-#{dept.id}" end}
             row_item={fn dept -> dept end}
             caption="Departments"
+            framed={false}
           >
             <:col :let={dept} label="Department Type">
               <span class="font-medium text-ink-strong">{dept.type.name}</span>
@@ -1210,23 +1201,29 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         </.card>
 
         <%!-- Section 6: Relationships --%>
-        <.card id="company-relationships-card" class="mt-6">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-2">
-              <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-                Relationships
-              </h3>
-              <.badge>{length(@relationships)}</.badge>
-            </div>
-            <.action_link
-              id="company-relationships-manage"
-              icon="manage"
-              navigate={~p"/companies/#{@company.id}/relationships"}
-              title="Manage relationships"
-            >
-              Manage
-            </.action_link>
-          </div>
+        <.card
+          id="company-relationships-card"
+          class="mt-6"
+          inner_class="p-5 sm:p-6"
+          role="region"
+          aria-labelledby="company-relationships-heading"
+        >
+          <.section_heading
+            id="company-relationships-heading"
+            title="Relationships"
+            count={length(@relationships)}
+          >
+            <:actions>
+              <.action_link
+                id="company-relationships-manage"
+                icon="manage"
+                navigate={~p"/companies/#{@company.id}/relationships"}
+                title="Manage relationships"
+              >
+                Manage
+              </.action_link>
+            </:actions>
+          </.section_heading>
 
           <.table
             id="company-relationships-table"
@@ -1234,6 +1231,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             row_id={fn rel -> "rel-#{rel.id}" end}
             row_item={fn rel -> rel end}
             caption="Relationships"
+            framed={false}
           >
             <:col :let={rel} label="Company">
               <.link
@@ -1273,13 +1271,18 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
              above it at `:41`, which is guarded and matches here). A card that
              disappears when empty reads as "this company cannot have external
              access" rather than "it has none". --%>
-        <.card id="company-external-accesses-card" class="mt-6">
-          <div class="flex items-center gap-2 mb-4">
-            <h3 class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-              External Accesses
-            </h3>
-            <.badge>{length(@external_accesses)}</.badge>
-          </div>
+        <.card
+          id="company-external-accesses-card"
+          class="mt-6"
+          inner_class="p-5 sm:p-6"
+          role="region"
+          aria-labelledby="company-external-accesses-heading"
+        >
+          <.section_heading
+            id="company-external-accesses-heading"
+            title="External Accesses"
+            count={length(@external_accesses)}
+          />
 
           <.table
             id="company-external-accesses-table"
@@ -1287,6 +1290,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             row_id={fn access -> "access-#{access.id}" end}
             row_item={fn access -> access end}
             caption="External Accesses"
+            framed={false}
           >
             <:col :let={access} label="User">
               <%= if name = @external_access_names[access.user_id] do %>

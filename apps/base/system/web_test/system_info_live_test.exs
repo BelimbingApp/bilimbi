@@ -59,16 +59,12 @@ defmodule BilimbiWeb.SystemInfoLiveTest do
              "the #{card} card does not render its facts as one shared list"
     end
 
-    # A row is the shared list's label/value pair, reachable by its own id.
-    assert has_element?(
-             view,
-             "dl#system-info-runtime-facts #system-info-runtime-elixir dt",
-             "Elixir"
-           )
+    # A row is the shared list's label/value pair; its value cell has its own id.
+    assert has_element?(view, "dl#system-info-runtime-facts dt", "Elixir")
 
     assert has_element?(
              view,
-             "dl#system-info-runtime-facts #system-info-runtime-elixir dd",
+             "dl#system-info-runtime-facts dd#system-info-runtime-elixir",
              System.version()
            )
   end
