@@ -56,6 +56,7 @@ defmodule Bilimbi.Base.UI.CommitStatus do
   import Phoenix.Component, only: [assign: 3]
   import Phoenix.LiveView, only: [put_flash: 3]
 
+  alias Bilimbi.Base.UI.Components
   alias Phoenix.LiveView.Socket
 
   @type name :: String.t()
@@ -134,7 +135,7 @@ defmodule Bilimbi.Base.UI.CommitStatus do
   def refusal_message(label, field, submitted, errors)
       when is_binary(label) and is_atom(field) and is_list(errors) do
     reasons =
-      case Bilimbi.Base.UI.Components.translate_errors(errors, field) do
+      case Components.translate_errors(errors, field) do
         [] -> ["could not be saved"]
         messages -> messages
       end
