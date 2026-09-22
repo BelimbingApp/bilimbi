@@ -18,9 +18,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     default timezone) reads as its badge or name and becomes a select on
     click; the select commits on change, and Escape or leaving it cancels.
     The default timezone reads the company's own setting; without one it
-    reads "Not configured" beside the zone its dates resolve to through the
-    tenant and platform settings, so UTC is named only when that resolution
-    ends at UTC;
+    reads "Not configured" beside the zone `Bilimbi.Base.DateTime` renders
+    its dates in through the tenant and platform settings, so UTC is named
+    only when that resolution ends at UTC or the stored zone is
+    unconvertible;
   - a business activity is added through the same in-place text control:
     its "Add activity" trigger opens an input that commits on Enter or on
     leaving it, as Belimbing's "+ Add" chip does, and an activity is removed

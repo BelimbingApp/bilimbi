@@ -77,7 +77,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | INP-07 | Searchable and editable combobox | Missing | Adopt the useful Belimbing behavior with full keyboard, async, no-result and commit/cancel states. |
 | INP-08 | Country and currency lookup | Missing | Build only the generic visual/interaction seam; domain data stays with its owning module. |
 | INP-09 | Segmented control | Missing | Add for short peer choices when a real Bilimbi workflow needs it. |
-| INT-01 | Inline text editing | Shared `<.inline_edit>` commits on Enter or blur, cancels on Escape, shows `—` for a blank value, keeps the stored value on screen for the whole round trip, marks that trip `aria-busy` beside a "Saving…" line, and reports the commit outcome on the field itself through the shared `<.commit_status>`; an emptied input is a real edit only where the owner passes `allow_empty`. `/addresses/:id` adopts all of it; the other inline-edit screens still report through a flash. F2 entry and focus restore after a commit do not exist | Complete F2/typing entry, Enter/blur save, Escape cancel, focus restore and error recovery. |
+| INT-01 | Inline text editing | Shared `<.inline_edit>` commits on Enter or blur, cancels on Escape, shows `—` for a blank value, keeps the stored value on screen for the whole round trip, marks that trip `aria-busy` beside a "Saving…" line, and reports the commit outcome on the field itself through the shared `<.commit_status>`; an emptied input is a real edit only where the owner passes `allow_empty`. `/addresses/:id`, `/users/:id` and `/companies/:id` adopt all of it, and `/companies/:id` also passes `placeholder` so an always-empty control that adds rather than edits names its addition instead of `—`; the other inline-edit screens still report through a flash. F2 entry and focus restore after a commit do not exist | Complete F2/typing entry, Enter/blur save, Escape cancel, focus restore and error recovery. |
 | INT-02 | Inline select, combobox and textarea editing | Two page-local inline selects ship on the same rule — the address verification status and the user's company read as their value and become a select on click, commit on change, cancel on Escape or blur and report through `<.commit_status>` — but no shared inline-select primitive, combobox or textarea exists | Add after their underlying controls are accepted. |
 | INT-03 [(contradicted)](#targets-the-evidence-contradicts) | Grouped fact editing | Missing | Support Apply/Cancel where facts must change atomically. |
 | INT-04 [(contradicted)](#targets-the-evidence-contradicts) | Disclosure | No shared primitive | Define open/closed semantics, `aria-expanded`, keyboard behavior and reduced motion. |
@@ -1156,9 +1156,10 @@ Shipped:
 - [x] The default timezone is a choice fact of its own section, reading the
   company's explicit setting through `Settings.overridden?/2` to decide
   whether it is configured, rather than presenting the resolved value as a
-  chosen one; an unset company names the zone its dates resolve to through
-  the tenant and platform settings — "Not configured (Asia/Kuala_Lumpur)"
-  under a tenant-level zone, UTC only when the resolution ends there — where
+  chosen one; an unset company names the zone `Bilimbi.Base.DateTime`
+  renders its dates in through the tenant and platform settings — "Not
+  configured (Asia/Kuala_Lumpur)" under a tenant-level zone, UTC only when
+  the resolution ends there or the stored zone is unconvertible — where
   Belimbing always says UTC, which is untrue under a tenant-level setting;
   a forged zone outside the IANA database is refused on the fact. The
   always-visible select is gone; the read-state trigger is the deliberate
