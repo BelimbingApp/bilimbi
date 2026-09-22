@@ -39,22 +39,22 @@ defmodule Bilimbi.Base.UI.ComponentsCardTest do
     assert inner_classes(html) == ["p-2"]
   end
 
-  test "asking for no inner padding drops the radius" do
+  test "the p-0 signal drops the radius" do
     html = render_component(&preview/1, %{inner_class: "p-0"})
 
     refute html =~ "rounded"
     assert html =~ "border border-line bg-surface shadow-xs"
   end
 
-  test "the corner is the only geometry the full-bleed signal changes" do
+  test "the corner is the only geometry the signal changes" do
     padded = render_component(&preview/1, %{})
-    full_bleed = render_component(&preview/1, %{inner_class: "p-0"})
+    flat = render_component(&preview/1, %{inner_class: "p-0"})
 
     assert inner_classes(padded) == ["p-2"]
-    assert inner_classes(full_bleed) == ["p-2", "p-0"]
+    assert inner_classes(flat) == ["p-2", "p-0"]
 
     assert String.replace(padded, "rounded-xl ", "") ==
-             String.replace(full_bleed, "p-2 p-0", "p-2 ")
+             String.replace(flat, "p-2 p-0", "p-2 ")
   end
 
   test "a card that chooses different padding keeps its radius" do

@@ -1665,13 +1665,18 @@ defmodule Bilimbi.Base.UI.Components do
   @doc """
   Renders a card container with a subtle border (Belimbing's `x-ui.card` counterpart).
 
-  A caller that asks for no inner padding (`inner_class` carrying `p-0`) is
-  framing one full-bleed block rather than laying out a panel. In practice
-  that is the list-page shape, a card holding nothing but a table and its
-  pager, so the frame renders flat: a table must not pick up a radius from
-  the card around it. This is the only place that decision is made, which is
-  why no list screen passes a corner class of its own. A card that keeps its
-  padding keeps its radius.
+  `inner_class` carrying `p-0` is the flat-corner signal and nothing more.
+  It is what every list-page card already passes — a card framing a table
+  and its pager — so the card reads it to drop the radius: a table must not
+  pick up a corner from the frame around it. This is the only place that
+  decision is made, which is why no list screen passes a corner class of its
+  own. Any other card keeps its radius.
+
+  The signal does not change padding. The card emits `p-2` either way, so a
+  card passing `p-0` renders `class="p-2 p-0"` and still shows 8px, because
+  the generated `.p-2` follows `.p-0` in the stylesheet. That cascade is
+  tracked as its own defect: do not resolve it by dropping the `p-2` here,
+  which would reflow every list screen at once.
   """
   attr(:id, :string, default: nil)
   attr(:title, :string, default: nil)
@@ -1681,12 +1686,12 @@ defmodule Bilimbi.Base.UI.Components do
   slot(:inner_block, required: true)
 
   def card(assigns) do
-    assigns = assign(assigns, :full_bleed, no_inner_padding?(assigns.inner_class))
+    assigns = assign(assigns, :flat, flat_corner_signal?(assigns.inner_class))
 
     ~H"""
     <div
       id={@id}
-      class={[!@full_bleed && "rounded-xl", "border border-line bg-surface shadow-xs", @class]}
+      class={[!@flat && "rounded-xl", "border border-line bg-surface shadow-xs", @class]}
       {@rest}
     >
       <div :if={@title} class="border-b border-line px-4 py-3">
@@ -1699,7 +1704,7 @@ defmodule Bilimbi.Base.UI.Components do
     """
   end
 
-  defp no_inner_padding?(inner_class) do
+  defp flat_corner_signal?(inner_class) do
     inner_class
     |> List.wrap()
     |> Enum.flat_map(&String.split(to_string(&1)))

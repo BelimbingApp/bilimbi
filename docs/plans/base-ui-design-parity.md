@@ -32,7 +32,7 @@ The identity baseline records the characteristics that parity work must preserve
 | ID | Identity to keep | Contract |
 |---|---|---|
 | K01 | Warm semantic colour system | Keep the warm neutral canvas, olive action colour, lime orientation accent and separate success, warning and danger roles. |
-| K02 | Bilimbi geometry | Keep `rounded-xl` primary surfaces, compact `rounded-md` fields and table controls, the accepted action hierarchy, and hairline ledger structure. |
+| K02 | Bilimbi geometry | Keep `rounded-xl` primary surfaces — table frames and the cards that frame them excepted, which are flat — compact `rounded-md` fields and table controls, the accepted action hierarchy, and hairline ledger structure. |
 | K03 | Compact operational density | Preserve fast scanning, dense tables, compact controls and restrained spacing without becoming cramped. |
 | K04 | Instrument Sans hierarchy | Preserve the current typeface, compact navigation scale and tabular numerals for comparable data. |
 | K05 | Brand means orientation | Lime identifies orientation — selection, focus, active navigation, location and unseen-by-you markers (the aggregate unread count badge and the per-item unread dot); it never represents status. |

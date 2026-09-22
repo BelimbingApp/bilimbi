@@ -575,10 +575,13 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
 - **UI consistency:** Reuse Base UI before local markup. Field, search, and
   filter controls are compact (`rounded-md`, `py-1.5`) and use `brand-strong`
   focus borders and rings; compact pagination and icon controls are
-  `rounded-md`; surfaces are `rounded-xl`. Operational lists default to 25
-  rows and only offer 25, 50, 100, or 300; their sortable headers expose
-  `aria-sort`, and page, search, filters, sort, and page size stay in URL
-  state. Use `<.datetime>` for timestamps and `<.icon>` for all icons.
+  `rounded-md`; surfaces are `rounded-xl`, except a table frame and the card
+  that frames one, which are flat and owned by `table/1` and `card/1` — read
+  DESIGN.md's Table geometry bullet before writing a radius near a table.
+  Operational lists default to 25 rows and only offer 25, 50, 100, or 300;
+  their sortable headers expose `aria-sort`, and page, search, filters, sort,
+  and page size stay in URL state. Use `<.datetime>` for timestamps and
+  `<.icon>` for all icons.
   Name user-facing actions through `Bilimbi.Base.UI.IconRegistry` rather than
   raw `hero-*` strings; put product-only SVGs in the same registry. Logout
   keeps `hero-arrow-right-on-rectangle`. An empty region says what is
