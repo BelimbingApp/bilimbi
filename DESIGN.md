@@ -130,7 +130,7 @@ during long operational sessions:
 - **Row padding:** `py-0.5` (`0.125rem` / `2px`), `px-2` (`0.5rem` / `8px`) horizontal cell padding.
 - **Header padding:** `py-1.5` (`0.375rem` / `6px`), `px-2` horizontal header padding.
 - **Header background:** `bg-surface-sunken`.
-- **Table geometry:** Table frames use flat angles, including their overflow wrapper. `Bilimbi.Base.UI.Components.table/1` enforces this: neither framing mode carries a radius and the component takes no attribute that can add one, so a rounded table can only come from hand-written markup. The card that frames a table is the same shape, so `card/1` enforces the other half: `inner_class` carrying `p-0` is read as the flat-corner signal and drops the radius, while any other card keeps it. The signal changes the corner and nothing else — the card still emits `p-2`, so those cards keep the 8px they render today, and the `p-2`/`p-0` cascade behind that is tracked as its own defect. Neither rule is a per-screen class.
+- **Table geometry:** Table frames use flat angles, including their overflow wrapper. `Bilimbi.Base.UI.Components.table/1` enforces this: neither framing mode carries a radius and the component takes no attribute that can add one, so a rounded table can only come from hand-written markup. A card is flat only where it is the table's frame — the full-bleed case where the card edge and the table edge are the same line — so `card/1` enforces the other half: `inner_class` carrying `p-0` is read as the flat-corner signal and drops the radius, while any other card keeps it, including a padded section card around an inset table. The signal changes the corner and nothing else — the card still emits `p-2`, so those cards keep the 8px they render today, and the `p-2`/`p-0` cascade behind that is tracked as its own defect. Neither rule is a per-screen class.
 - **Header typography:** Proper case `text-xs font-semibold text-ink-subtle`.
 - **Body typography:** `text-sm text-ink`, with `tabular-nums text-muted` (`text-ink-muted`) for codes, IDs, currencies, phones, populations, dates, and measurements.
 - **Search & filter toolbar:** Search and filters sit together in an open
@@ -184,7 +184,8 @@ address panels) as one surface:
   line — a company's business activities, its metadata JSON, an address's raw
   input — are still rows of the same list, as Belimbing renders them.
 - **Its table is `<.table framed={false}>`**, unframed because the card is
-  the panel. It keeps its flat corners either way.
+  the panel. The table is flat; the padded card keeps its radius, because
+  the inset table does not touch the card edge.
 
 The address panels follow the same anatomy inside their owner's page. Their
 sort buttons are addressed to the panel through `sort_target={@myself}`, the
