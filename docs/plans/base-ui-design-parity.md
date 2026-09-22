@@ -991,8 +991,8 @@ Not delivered by this slice, reported as follow-up:
   sections — keep their existing buttons, flashes and permanent controls.
   Belimbing's page has the same sections; their own read-first migration is a
   separate slice.
-- **`/users/:id/edit` still exists** as a route and form; nothing on the
-  detail page reaches it. Removing it is a product decision.
+- **`/users/:id/edit` is retired** by the records-whose-only-page-is-a-form
+  slice below; `FormLive` is create-only.
 - **No unaffiliated-users surface.** Nothing routes to
   `list_unaffiliated_users/2` or `get_unaffiliated_user/3`, so an account
   cleared of its company can only be affiliated again from the page that
@@ -1254,13 +1254,23 @@ Shipped:
   stays for `/employees/new`; its edit branch is unrouted code until it is
   pruned, and the module's own docs say so.
   `{fm/records-whose-only-page-is-a-form/claude-fable-5-1}`
+- [x] `/users/:id/edit` is retired and the user `FormLive` is create-only;
+  `/users/:id` already edits every fact in place. A Belimbing pin to
+  `/admin/users/{id}/edit` remaps to `/users/{id}` at cutover. All three
+  edit routes are now gone.
+  `{fm/records-whose-only-page-is-a-form/claude-fable-5-1}`
+- [x] The employee type list links every row's label to its record page,
+  so a list-only viewer and a system type reach it; the Edit action keeps
+  its capability gate and stays off system types.
+  `{fm/records-whose-only-page-is-a-form/claude-fable-5-1}`
 - [x] Web tests cover a viewer without the update capability seeing the
   facts and no editors (and a forged commit refused), the saved label with
   the title following it, a refused blank and an overlong value reported on
   the fact with the rejected value truncated, the alert clearing only on the
   next commit, a system type, a type outside the company, the revoked
-  grant, both list Edit links leading to the record pages, and both retired
-  routes unreachable through the router.
+  grant, both list Edit links and the type list's label links leading to
+  the record pages, and all three retired routes unreachable through the
+  router.
   `{fm/records-whose-only-page-is-a-form/claude-fable-5-1}`
 
 Not delivered by this slice, reported as follow-up:
@@ -1271,7 +1281,5 @@ Not delivered by this slice, reported as follow-up:
 - **The company type lists** (department types, legal entity types) already
   edit inline and were not touched.
 - **The native `data-confirm`** on the list delete actions stays as it was.
-- **`/users/:id/edit`** is the one remaining edit route and is an open
-  decision; this slice left it alone.
 - **`FormLive`'s unrouted edit branch** is the documented drift to prune
   once the employee create form is looked at on its own.

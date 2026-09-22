@@ -18,7 +18,6 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
           "/companies/73",
           "/users",
           "/users/new",
-          "/users/91/edit",
           "/settings/profile",
           "/system/sessions"
         ] do
@@ -32,8 +31,7 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
   @user_routes [
     {"/users", "/users", Bilimbi.Core.UserAdministration.Web.IndexLive},
     {"/users/new", "/users/new", Bilimbi.Core.User.Web.FormLive},
-    {"/users/:id", "/users/91", Bilimbi.Core.User.Web.ShowLive},
-    {"/users/:id/edit", "/users/91/edit", Bilimbi.Core.User.Web.FormLive}
+    {"/users/:id", "/users/91", Bilimbi.Core.User.Web.ShowLive}
   ]
 
   test "module_routes/1 drops host-owned routes" do
@@ -96,7 +94,7 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
     assert MapSet.disjoint?(host_paths, module_paths)
   end
 
-  test "router reaches the transferred index and three retained User routes exactly once" do
+  test "router reaches the transferred index and two retained User routes exactly once" do
     registered_routes = BilimbiWeb.Router.__routes__()
 
     Enum.each(@user_routes, fn {route_path, request_path, live_view} ->
@@ -119,7 +117,7 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
 
     assert Enum.count(routes, &(&1.path == "/users")) == 1
 
-    for path <- ["/users/new", "/users/:id", "/users/:id/edit"] do
+    for path <- ["/users/new", "/users/:id"] do
       assert Enum.count(routes, &(&1.path == path and &1.source == "core/user")) == 1
     end
   end

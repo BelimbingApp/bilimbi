@@ -3,7 +3,7 @@
 `Bilimbi.Core.UserAdministration` owns the bounded Users administration index
 read and web adapter established by ADR 0007. It contributes exactly the
 capability-gated `/users` route. Core User continues to own account commands
-and the `/users/new`, `/users/:id`, and `/users/:id/edit` adapters. This package
+and the `/users/new` and `/users/:id` adapters. This package
 owns no command, migration, schema contract, menu, or capability contribution.
 Callers pass a validated `%Bilimbi.Base.Tenancy.Scope{}` and strict normalized
 options to `list_users/2`; the only result is a schema-free `%Page{}` containing

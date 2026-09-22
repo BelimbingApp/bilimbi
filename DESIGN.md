@@ -217,10 +217,9 @@ whose only page was an edit form — Belimbing gives an employee type no
 read-first record page at `/<records>/:id` in this same shape, at the detail
 width, and the edit route is retired. Once a record's page edits in place, a
 separate `/:id/edit` route for the same facts is a second surface for one
-workflow, so a list's Edit action opens the record page; `/employees/:id/edit`
-and `/employee-types/:id/edit` are gone for that reason. The `:form` width
-belongs to a genuine create form. `/users/:id/edit` is the one remaining edit
-route and is an open decision, not an exception to the rule. What "committed"
+workflow, so a list's Edit action opens the record page; `/employees/:id/edit`,
+`/employee-types/:id/edit` and `/users/:id/edit` are gone for that reason. The
+`:form` width belongs to a genuine create form. What "committed"
 means follows the control and is the same for every fact of that kind on the
 page:
 

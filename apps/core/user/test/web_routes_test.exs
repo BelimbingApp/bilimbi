@@ -9,7 +9,7 @@ defmodule Bilimbi.Core.User.WebRoutesTest do
   # Embed contributions share the manifest with routes and carry no :path.
   defp route!(path), do: Enum.find(routes(), &(&1[:path] == path))
 
-  test "retains the capability-gated create, show, and edit routes" do
+  test "retains the capability-gated create and show routes" do
     assert %{
              live: Bilimbi.Core.User.Web.FormLive,
              session: :auth,
@@ -22,11 +22,7 @@ defmodule Bilimbi.Core.User.WebRoutesTest do
              capability: "admin.user.view"
            } = route!("/users/:id")
 
-    assert %{
-             live: Bilimbi.Core.User.Web.FormLive,
-             session: :auth,
-             capability: "admin.user.update"
-           } = route!("/users/:id/edit")
+    refute route!("/users/:id/edit")
   end
 
   test "every administrative route carries a capability" do

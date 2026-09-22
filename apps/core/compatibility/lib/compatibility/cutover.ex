@@ -135,7 +135,11 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
   # Literal segments doubled as route words (new, create, edit, …) can never
   # be a param: `/companies/new` is not a company show page. Without this,
   # the param wildcard would bless reserved words as already-clean paths.
-  @literal_segments @known_paths |> List.flatten() |> Enum.filter(&is_binary/1) |> MapSet.new()
+  @literal_segments @known_paths
+                    |> List.flatten()
+                    |> Enum.filter(&is_binary/1)
+                    |> MapSet.new()
+                    |> MapSet.put("edit")
 
   @icon_regex ~r/^heroicon-([osm])-(.+)$/
 
@@ -180,8 +184,7 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
   # A Belimbing edit page whose Bilimbi record edits in place has no `/edit`
   # route any more: `/admin/employee-types/5/edit` lands on `/employee-types/5`,
   # the record's read-first page. The rename applies only where the `/edit`
-  # path is unknown and the record path is known, so `/users/5/edit`, which
-  # Bilimbi still routes, is carried through unchanged.
+  # path is unknown and the record path is known.
   defp known_or_record_path(mapped_path) do
     cond do
       known_bilimbi_path?(mapped_path) -> {:ok, mapped_path}

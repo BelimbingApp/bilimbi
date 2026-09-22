@@ -12,12 +12,6 @@
     capability: "admin.user.view"
   },
   %{
-    path: "/users/:id/edit",
-    live: Bilimbi.Core.User.Web.FormLive,
-    session: :auth,
-    capability: "admin.user.update"
-  },
-  %{
     path: "/settings/profile",
     live: Bilimbi.Core.User.Web.ProfileLive,
     session: :auth

@@ -23,23 +23,6 @@ defmodule BilimbiWeb.UserFormTest do
   end
 
   describe "new" do
-    test "a same-view patch cannot borrow the create capability to edit", %{conn: conn} do
-      UserFixtures.insert_user!(%{id: 91, company_id: 73})
-      grant_capabilities!(["admin.user.create"])
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/new")
-
-      assert {:error, {:redirect, %{to: "/dashboard"}}} = render_patch(view, "/users/91/edit")
-    end
-
-    test "live navigation between routes sharing a view checks the destination capability", %{conn: conn} do
-      UserFixtures.insert_user!(%{id: 91, company_id: 73})
-      grant_capabilities!(["admin.user.create"])
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/new")
-
-      assert {:error, {:redirect, %{to: "/dashboard"}}} =
-               live_redirect(view, to: "/users/91/edit")
-    end
-
     test "requires authentication", %{conn: conn} do
       assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/users/new")
     end
@@ -112,102 +95,15 @@ defmodule BilimbiWeb.UserFormTest do
     end
   end
 
-  describe "edit" do
-    test "refuses the write when the user's company is archived", %{conn: conn} do
-      CompanyFixtures.insert_company!(%{
-        id: 76,
-        tenant_id: 41,
-        code: "archived",
-        deleted_at: ~N[2026-08-11 12:00:00]
-      })
+  test "the edit route is retired: a user's facts change on their record page", %{conn: conn} do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+    grant_capabilities!(["admin.user.update", "admin.user.view"])
 
-      UserFixtures.insert_user!(%{id: 91, company_id: 73})
+    retired = "/users/91/edit"
+    assert Phoenix.Router.route_info(BilimbiWeb.Router, "GET", retired, "localhost") == :error
+    assert conn |> log_in_as() |> get(retired) |> Map.fetch!(:status) == 404
 
-      UserFixtures.insert_user!(%{
-        id: 95,
-        company_id: 76,
-        name: "Ada Archived",
-        email: "archived@example.com"
-      })
-
-      grant_capabilities!(["admin.user.update"])
-
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/95/edit")
-
-      assert has_element?(view, "#user-name[value='Ada Archived']")
-
-      view
-      |> form("#user-form", user: %{name: "Ada Renamed", email: "archived@example.com"})
-      |> render_submit()
-
-      assert has_element?(view, "#flash-group", "while their company is archived")
-    end
-
-    test "redirects away when the actor lacks admin.user.update", %{conn: conn} do
-      UserFixtures.insert_user!(%{id: 91, company_id: 73})
-
-      assert {:error, {:redirect, %{to: "/dashboard"}}} =
-               conn |> log_in_as() |> live(~p"/users/91/edit")
-    end
-
-    test "prefills the form and never offers a password field", %{conn: conn} do
-      UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
-      grant_capabilities!(["admin.user.update"])
-
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/91/edit")
-
-      assert has_element?(view, "#user-name[value='Ada Lovelace']")
-      refute has_element?(view, "#user-password")
-    end
-
-    test "updates the name and lands on the user page", %{conn: conn} do
-      UserFixtures.insert_user!(%{id: 91, company_id: 73})
-
-      UserFixtures.insert_user!(%{
-        id: 92,
-        company_id: 73,
-        name: "Grace Hopper",
-        email: "grace@example.com"
-      })
-
-      grant_capabilities!(["admin.user.update", "admin.user.view"])
-
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92/edit")
-
-      view
-      |> form("#user-form", user: %{name: "Grace M. Hopper", email: "grace@example.com"})
-      |> render_submit()
-
-      {path, _flash} = assert_redirect(view)
-      assert path == "/users/92"
-
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
-      assert has_element?(view, "h1", "Grace M. Hopper")
-    end
-
-    test "marks the account unverified when the email changes", %{conn: conn} do
-      UserFixtures.insert_user!(%{id: 91, company_id: 73})
-
-      UserFixtures.insert_user!(%{
-        id: 92,
-        company_id: 73,
-        name: "Grace Hopper",
-        email: "grace@example.com",
-        email_verified_at: ~N[2026-01-01 00:00:00]
-      })
-
-      grant_capabilities!(["admin.user.update", "admin.user.view"])
-
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92/edit")
-
-      view
-      |> form("#user-form", user: %{name: "Grace Hopper", email: "grace.hopper@example.com"})
-      |> render_submit()
-
-      {"/users/92", _flash} = assert_redirect(view)
-
-      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
-      assert has_element?(view, "#app-content", "unverified")
-    end
+    {:ok, show, _html} = conn |> log_in_as() |> live(~p"/users/91")
+    assert has_element?(show, "#user-name[phx-hook='InlineEdit']")
   end
 end

@@ -100,6 +100,43 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     assert has_element?(show, "#employee-type-label[phx-hook='InlineEdit']")
   end
 
+  test "a list-only viewer reaches a type's record page from its label", %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+    {:ok, type} = Employee.create_employee_type(scope, 73, %{code: "temp", label: "Temporary"})
+
+    grant_capabilities!(["admin.employee-type.list"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+
+    refute has_element?(view, "#employee-type-edit-#{type.id}")
+
+    {:ok, show, _html} =
+      view
+      |> element("a#employee-type-#{type.id}-link[href='/employee-types/#{type.id}']", "Temporary")
+      |> render_click()
+      |> follow_redirect(conn |> log_in_as(), ~p"/employee-types/#{type.id}")
+
+    assert has_element?(show, "h1", "Temporary")
+  end
+
+  test "a system type's label links to its record page", %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+    {:ok, types} = Employee.list_employee_types(scope, 73)
+    system_type = Enum.find(types, & &1.is_system)
+
+    grant_capabilities!(["admin.employee-type.list", "admin.employee-type.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
+
+    refute has_element?(view, "#employee-type-edit-#{system_type.id}")
+
+    assert has_element?(
+             view,
+             "a#employee-type-#{system_type.id}-link[href='/employee-types/#{system_type.id}']",
+             system_type.label
+           )
+  end
+
   test "the edit route is retired for custom and system types alike", %{conn: conn} do
     {:ok, scope} = Tenancy.scope(41)
     {:ok, types} = Employee.list_employee_types(scope, 73)

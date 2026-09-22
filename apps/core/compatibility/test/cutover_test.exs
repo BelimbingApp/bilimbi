@@ -33,7 +33,6 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
 
       assert Cutover.classify_url("/admin/system/performance") == {:mapped, "/system/performance"}
       assert Cutover.classify_url("/admin/employee-types") == {:mapped, "/employee-types"}
-      assert Cutover.classify_url("/admin/users/5/edit") == {:mapped, "/users/5/edit"}
     end
 
     test "lands a retired edit page on the record page that edits in place" do
@@ -44,6 +43,8 @@ defmodule Bilimbi.Core.Compatibility.CutoverTest do
 
       assert Cutover.classify_url("/admin/employee-types/5/edit?tab=x") ==
                {:mapped, "/employee-types/5?tab=x"}
+
+      assert Cutover.classify_url("/admin/users/5/edit") == {:mapped, "/users/5"}
 
       # A bare `/edit` with no record before it is not a record page.
       assert {:unmappable, _} = Cutover.classify_url("/admin/employee-types/edit")
