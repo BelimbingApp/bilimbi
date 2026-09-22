@@ -40,7 +40,7 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
   # resetting to the default.
   def handle_event("filter", params, socket) do
     current = socket.assigns.state
-    per_page = get_in(params, ["filters", "perPage"]) || Map.get(params, "perPage")
+    per_page = get_in(params, ["filters", "perPage"])
 
     state = %{
       current
