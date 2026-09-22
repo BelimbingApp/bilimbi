@@ -24,3 +24,10 @@ action glyph; menu contributions keep their own icons. A name that is neither
 registered nor `hero-*`-prefixed raises instead of rendering a fallback glyph,
 so a name that reaches `<.icon>` from stored data is filtered through
 `IconRegistry.renderable?/1` first; that module's doc owns the lookup contract.
+
+Read-first detail pages report each in-place commit through `<.inline_edit>`
+and `<.commit_status>`; `Bilimbi.Base.UI.CommitStatus` owns the bookkeeping
+those components render — the `:field_status` assign, the rule that "Saved"
+belongs to the most recent commit only, the refusal wording and the
+rejected-value truncation — and its moduledoc lists what an adopting page
+does.

@@ -597,7 +597,10 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   through `<.inline_edit>` (`allow_empty` on nullable columns, the outcome
   passed back as `status`), a choice commits on change, and only genuinely
   interdependent facts share a grouped Apply; see "Read-first detail pages"
-  in `DESIGN.md`. Returning is a secondary action: use `<.back_link>`
+  in `DESIGN.md`. The per-fact outcome bookkeeping behind that `status` —
+  which "Saved" stands, the refusal wording, the rejected-value truncation —
+  is `Bilimbi.Base.UI.CommitStatus`; a page adopts it and never keeps a
+  copy. Returning is a secondary action: use `<.back_link>`
   ("← Back"), never a "Back to …" button; a related workflow such as
   Manage is an `<.action_link>` carrying its registry glyph, on the section
   it belongs to or beside the page's primary action, never a button; and

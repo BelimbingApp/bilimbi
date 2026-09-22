@@ -201,7 +201,10 @@ and is the same for every fact of that kind on the page:
   so no stale "Saved" stands beside a rejected form — and a refusal that stays
   on its fact until that fact is committed again. A success elsewhere never
   clears another fact's refusal. Success does not flash: the fact already says
-  so.
+  so. `Bilimbi.Base.UI.CommitStatus` owns this bookkeeping — the `:field_status`
+  assign, which "Saved" stands, the refusal sentence and how much of a rejected
+  value it repeats — and every adopter calls it; a page keeps only its own
+  write, its failure nouns and its forbidden-flash wording.
 - **Viewers without the update capability** see the value with no affordance,
   not a disabled control. Every write handler still re-asks Authz.
 - **Record history** is a demoted labelled action in the header: the
