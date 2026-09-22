@@ -442,13 +442,18 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     assert {:ok, _found} = Employee.get_employee(scope, 73, employee.id)
   end
 
-  test "renders show page with standard edit button", %{conn: conn, employee: employee} do
+  test "renders show page header with the pin and no edit button", %{
+    conn: conn,
+    employee: employee
+  } do
     grant_capabilities!(["admin.employee.view", "admin.employee.update"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
 
     assert has_element?(view, "h1", "John Doe")
-    assert has_element?(view, "#employee-edit")
+    # The facts edit in place, so an "Edit employee" button would be YAGNI.
+    refute has_element?(view, "#employee-edit")
+    refute has_element?(view, "main header button:not(#employee-pin)")
 
     assert has_element?(
              view,
@@ -542,11 +547,12 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
 
       render_hook(view, "save_field", %{
-        "field" => "designation",
-        "value" => "Principal Architect"
+        "id" => to_string(employee.id),
+        "designation" => "Principal Architect"
       })
 
-      assert render(view) =~ "Designation updated successfully."
+      assert has_element?(view, "#employee-designation-status[role='status']", "Saved")
+      refute has_element?(view, "#flash-group", "updated")
       assert has_element?(view, "#employee-designation", "Principal Architect")
 
       {:ok, updated} = Employee.get_employee(scope, 73, employee.id)
@@ -573,7 +579,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       |> form("#employee-status-form")
       |> render_change(%{"status" => "probation"})
 
-      assert render(view) =~ "Status updated."
+      assert has_element?(view, "#employee-status-status[role='status']", "Saved")
       {:ok, updated} = Employee.get_employee(scope, 73, employee.id)
       assert updated.status == "probation"
 
@@ -587,7 +593,8 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       |> form("#employee-type-form")
       |> render_change(%{"employee_type" => "part_time"})
 
-      assert render(view) =~ "Employee type updated."
+      assert has_element?(view, "#employee-employee-type-status[role='status']", "Saved")
+      refute has_element?(view, "#employee-status-status")
       {:ok, updated2} = Employee.get_employee(scope, 73, employee.id)
       assert updated2.employee_type == "part_time"
     end
@@ -609,7 +616,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       |> form("#employee-department-form")
       |> render_change(%{"department_id" => "101"})
 
-      assert render(view) =~ "Department assignment saved."
+      assert has_element?(view, "#employee-department-status[role='status']", "Saved")
       {:ok, updated} = Employee.get_employee(scope, 73, employee.id)
       assert updated.department_id == 101
 
@@ -620,7 +627,9 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       |> form("#employee-supervisor-form")
       |> render_change(%{"supervisor_id" => to_string(peer.id)})
 
-      assert render(view) =~ "Supervisor assignment saved."
+      assert has_element?(view, "#employee-supervisor-status[role='status']", "Saved")
+      assert has_element?(view, "#employee-view-supervisor", "Peer Pete")
+      refute has_element?(view, "#employee-department-status")
       {:ok, updated2} = Employee.get_employee(scope, 73, employee.id)
       assert updated2.supervisor_id == peer.id
     end
@@ -697,6 +706,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       conn: conn,
       scope: scope,
       employee: employee,
+      subordinate: subordinate,
       address: address
     } do
       grant_capabilities!(["admin.employee.view", "admin.employee.update"])
@@ -704,14 +714,15 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
 
       # A page flash raised before the dialog opens would sit unreadable behind
-      # the inert page, so opening the dialog dismisses it.
-      view |> element("#employee-status-display") |> render_click()
+      # the inert page, so opening the dialog dismisses it. The facts report in
+      # place now, so the subordinate assignment supplies the flash.
+      view |> element("#btn-toggle-add-subordinate") |> render_click()
 
       view
-      |> form("#employee-status-form")
-      |> render_change(%{"status" => "probation"})
+      |> form("#add-subordinate-form")
+      |> render_submit(%{"subordinate_id" => to_string(subordinate.id)})
 
-      assert has_element?(view, "#flash-info", "Status updated.")
+      assert has_element?(view, "#flash-info", "Subordinate assigned.")
 
       # Open modal
       view |> element("#btn-open-attach-address") |> render_click()

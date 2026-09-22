@@ -1,19 +1,53 @@
 defmodule Bilimbi.Core.Employee.Web.ShowLive do
   @moduledoc """
-  Shows one employee in the signed-in company and provides administrative management:
-  in-place field editing, lifecycle status and type selection, department/supervisor
-  assignments, and direct subordinates management with sortable table. Account
-  linking and address attachments render as discovered embeds owned by Core User
-  and Core Address (`employee.accounts`, `employee.addresses`); this page names
-  neither module.
+  Read-first LiveView adapter for one employee in the signed-in company.
 
-  Deleting the platform orchestrator (`SYS-001` / `agent`) is refused by the domain as
-  `:invariant_violation`; this screen reports that honestly rather than hiding the row.
+  The page shows the employee as facts. An operator holding
+  `admin.employee.update` edits each fact in place and a committed edit saves
+  by itself; there is no edit mode and no "Edit employee" button, as on
+  `/addresses/:id` and `/users/:id` and as Belimbing's `admin/employees/show`
+  presents the same record:
+
+  - the text facts (full name, short name, employee number, designation,
+    email, mobile number, and the job description of an agent) commit on
+    Enter or on leaving the field, through `<.inline_edit>`; Escape cancels.
+    Every nullable column passes `allow_empty`, so clearing a short name or
+    an email is a real edit; the full name and employee number are required,
+    so an emptied input commits nothing;
+  - the choice facts (department, supervisor, employee type, status) read as
+    a name or a badge with a hover pencil, become a focused select on click,
+    commit on change, and Escape or leaving the select cancels. The employee
+    type commits through the manifest-declared `employee.accounts` operation
+    because Core User owns the account transition that a switch to `agent`
+    performs in the same transaction.
+
+  Each fact reports its own outcome through the shared commit status that
+  `Bilimbi.Base.UI.CommitStatus` keeps: "Saving…" while the round trip is in
+  flight, "Saved" once stored, and an alert on the fact naming the rejected
+  value and the validation error when the save was refused. The stored value
+  stays on screen until the server confirms a change, and success does not
+  flash. The platform orchestrator's identity is refused by the domain, and
+  that refusal lands on the fact like any other.
+
+  Facts the page cannot save in place stay read-only: the company (a
+  relation Core Company owns), employment start and end (dates, which the
+  text editor cannot commit truthfully), and the linked account, subordinates
+  and addresses, which are their own workflows — the last two render as
+  discovered embeds owned by Core User and Core Address (`employee.accounts`,
+  `employee.addresses`); this page names neither module.
+
+  The header is the quiet labelled row Belimbing's page carries — the record
+  history beside the word "History" and "← Back" — and no button.
+
+  Deleting the platform orchestrator (`SYS-001` / `agent`) is refused by the
+  domain as `:invariant_violation`; this screen reports that honestly rather
+  than hiding the row.
   """
 
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.CommitStatus
   alias Bilimbi.Base.UI.DiscoveredPanels
   alias Phoenix.LiveView.JS
 
@@ -27,6 +61,45 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   # `save_*` family, which are capability-guarded (#420).
   @write_guard_opt_out ~w(toggle_add_subordinate edit_field cancel_edit_field)
 
+  # The facts an inline text edit may write, keyed by the form name the hook
+  # pushes. A name outside this map is ignored; user input never becomes an atom.
+  @inline_fields %{
+    "full_name" => :full_name,
+    "short_name" => :short_name,
+    "employee_number" => :employee_number,
+    "job_description" => :job_description,
+    "designation" => :designation,
+    "email" => :email,
+    "mobile_number" => :mobile_number
+  }
+
+  # The text facts whose column is nullable: clearing one is a real edit.
+  @nullable_fields ~w(short_name job_description designation email mobile_number)
+
+  # The choice facts and the schema field each one writes.
+  @choice_fields %{
+    "department" => :department_id,
+    "supervisor" => :supervisor_id,
+    "employee_type" => :employee_type,
+    "status" => :status
+  }
+
+  @statuses ~w(pending probation active inactive terminated)
+
+  @fact_labels %{
+    "full_name" => "Full Name",
+    "short_name" => "Short Name",
+    "employee_number" => "Employee Number",
+    "job_description" => "Job Description",
+    "designation" => "Designation",
+    "email" => "Email",
+    "mobile_number" => "Mobile Number",
+    "department" => "Department",
+    "supervisor" => "Supervisor",
+    "employee_type" => "Employee Type",
+    "status" => "Status"
+  }
+
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     scope = socket.assigns.current_scope.scope
@@ -39,6 +112,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
         |> assign(:page_title, Employee.Summary.display_name(employee))
         |> assign(:active_nav, "admin.employee")
         |> assign(:employee_id, employee_id)
+        |> CommitStatus.init()
         |> init_ui_state()
         |> load_data(employee)
 
@@ -123,10 +197,9 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       )
 
     socket
-    # A save reloads through here, so the just-edited select folds back to
-    # its read state; a failed save skips load_data and stays open to retry.
     |> assign(:editing_field, nil)
     |> assign(:employee, employee)
+    |> assign(:page_title, Employee.Summary.display_name(employee))
     |> assign(:can_manage?, can_manage?)
     |> assign(:can_delete?, can_delete?)
     |> assign(:company_name, company_name)
@@ -150,53 +223,33 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     ["Bilimbi.Core.Employee.Schema", "Bilimbi.Core.Employee", Employee.addressable_identity()]
   end
 
-  # --- Event Handlers: Inline Editing of Text Fields ---
+  # --- Event Handlers: Inline Text Facts ---
 
+  # One commit, one outcome on the fact that made it. Every write re-asks
+  # Authz; the `can_manage?` assign only decides what the page shows.
   @impl true
   def handle_event("save_field", params, socket) do
     if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      employee = socket.assigns.employee
+      case CommitStatus.inline_field(params, @inline_fields) do
+        {:ok, name, field, value} ->
+          {:noreply, save_fact(socket, name, %{field => normalize_param(value)}, value)}
 
-      {field, value} = extract_field_and_value(params)
-
-      if field do
-        case Employee.update_employee(scope, employee.company_id, employee.id, %{field => value}) do
-          {:ok, updated_employee} ->
-            field_label = humanize_field(field)
-
-            {:noreply,
-             socket
-             |> put_flash(:info, "#{field_label} updated successfully.")
-             |> load_data(updated_employee)}
-
-          {:error, %Ecto.Changeset{} = changeset} ->
-            error_msg = format_changeset_error(changeset, field)
-            {:noreply, put_flash(socket, :error, error_msg)}
-
-          {:error, :invariant_violation} ->
-            {:noreply,
-             put_flash(socket, :error, "Cannot modify protected platform orchestrator identity.")}
-
-          {:error, _reason} ->
-            {:noreply, put_flash(socket, :error, "Failed to update #{humanize_field(field)}.")}
-        end
-      else
-        {:noreply, socket}
+        :error ->
+          {:noreply, socket}
       end
     else
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit employees.")}
+      {:noreply, write_forbidden(socket)}
     end
   end
 
-  @editable_selects ~w(department supervisor employee_type status)
+  # --- Event Handlers: Choice Facts ---
 
   def handle_event("edit_field", %{"field" => field}, socket)
-      when field in @editable_selects do
+      when is_map_key(@choice_fields, field) do
     if can_manage?(socket) do
       {:noreply, assign(socket, :editing_field, field)}
     else
-      {:noreply, socket}
+      {:noreply, write_forbidden(socket)}
     end
   end
 
@@ -208,115 +261,70 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   def handle_event("save_status", params, socket) do
     if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      employee = socket.assigns.employee
-      status = params["status"] || params["value"] || ""
+      status = to_string(params["status"] || "")
 
-      case Employee.update_employee(scope, employee.company_id, employee.id, %{status: status}) do
-        {:ok, updated_employee} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Status updated.")
-           |> load_data(updated_employee)}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to update status.")}
-      end
+      {:noreply,
+       save_choice(socket, "status", %{status: status}, choice_label(socket, "status", status))}
     else
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit employees.")}
-    end
-  end
-
-  def handle_event("save_employee_type", params, socket) do
-    if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      employee = socket.assigns.employee
-      type = params["employee_type"] || params["value"] || ""
-
-      # The manifest-declared account operation owns the cross-module account
-      # transition. It is not probing: a missing provider fails honestly, and
-      # Core User performs the unlink and Employee write in one transaction.
-      case DiscoveredPanels.dispatch("employee.accounts", :change_employee_type, [
-             scope,
-             employee.company_id,
-             employee.id,
-             type
-           ]) do
-        {:ok, updated_employee} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Employee type updated.")
-           |> load_data(updated_employee)}
-
-        {:error, :invariant_violation} ->
-          {:noreply,
-           put_flash(socket, :error, "Cannot modify protected platform orchestrator identity.")}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to update employee type.")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit employees.")}
+      {:noreply, write_forbidden(socket)}
     end
   end
 
   def handle_event("save_department", params, socket) do
     if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      employee = socket.assigns.employee
+      department_id = parse_optional_id(params["department_id"])
 
-      dept_id_val = params["department_id"] || params["value"] || ""
-
-      dept_id =
-        case Integer.parse(to_string(dept_id_val)) do
-          {id, ""} when id > 0 -> id
-          _ -> nil
-        end
-
-      case Employee.update_employee(scope, employee.company_id, employee.id, %{
-             department_id: dept_id
-           }) do
-        {:ok, updated_employee} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Department assignment saved.")
-           |> load_data(updated_employee)}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to update department assignment.")}
-      end
+      {:noreply,
+       save_choice(
+         socket,
+         "department",
+         %{department_id: department_id},
+         choice_label(socket, "department", department_id)
+       )}
     else
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit employees.")}
+      {:noreply, write_forbidden(socket)}
     end
   end
 
   def handle_event("save_supervisor", params, socket) do
     if can_manage?(socket) do
+      supervisor_id = parse_optional_id(params["supervisor_id"])
+
+      {:noreply,
+       save_choice(
+         socket,
+         "supervisor",
+         %{supervisor_id: supervisor_id},
+         choice_label(socket, "supervisor", supervisor_id)
+       )}
+    else
+      {:noreply, write_forbidden(socket)}
+    end
+  end
+
+  # The manifest-declared account operation owns the cross-module account
+  # transition. It is not probing: a missing provider fails honestly, and
+  # Core User performs the unlink and Employee write in one transaction.
+  def handle_event("save_employee_type", params, socket) do
+    if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       employee = socket.assigns.employee
+      type = to_string(params["employee_type"] || "")
 
-      sup_id_val = params["supervisor_id"] || params["value"] || ""
+      result =
+        DiscoveredPanels.dispatch("employee.accounts", :change_employee_type, [
+          scope,
+          employee.company_id,
+          employee.id,
+          type
+        ])
 
-      sup_id =
-        case Integer.parse(to_string(sup_id_val)) do
-          {id, ""} when id > 0 -> id
-          _ -> nil
-        end
-
-      case Employee.update_employee(scope, employee.company_id, employee.id, %{
-             supervisor_id: sup_id
-           }) do
-        {:ok, updated_employee} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Supervisor assignment saved.")
-           |> load_data(updated_employee)}
-
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to update supervisor assignment.")}
-      end
+      {:noreply,
+       socket
+       |> assign(:editing_field, nil)
+       |> commit("employee_type", result, choice_label(socket, "employee_type", type))}
     else
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit employees.")}
+      {:noreply, write_forbidden(socket)}
     end
   end
 
@@ -356,7 +364,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
            put_flash(socket, :error, "Please select an employee to assign as subordinate.")}
       end
     else
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit employees.")}
+      {:noreply, write_forbidden(socket)}
     end
   end
 
@@ -382,7 +390,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
           {:noreply, socket}
       end
     else
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit employees.")}
+      {:noreply, write_forbidden(socket)}
     end
   end
 
@@ -439,36 +447,111 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     end
   end
 
-  # --- Private Extraction & Formatting Helpers ---
+  # --- Saving ---
 
-  defp extract_field_and_value(params) do
-    fields =
-      ~w(full_name short_name employee_number designation job_description email mobile_number)
+  # A text fact: the write, then the outcome on the fact that made it.
+  defp save_fact(socket, name, attrs, submitted) do
+    scope = socket.assigns.current_scope.scope
+    employee = socket.assigns.employee
 
-    Enum.find_value(fields, {nil, nil}, fn f ->
-      cond do
-        Map.has_key?(params, f) -> {String.to_existing_atom(f), Map.get(params, f)}
-        Map.get(params, "field") == f -> {String.to_existing_atom(f), Map.get(params, "value")}
-        true -> nil
-      end
-    end)
+    commit(
+      socket,
+      name,
+      Employee.update_employee(scope, employee.company_id, employee.id, attrs),
+      submitted
+    )
   end
 
-  defp humanize_field(:full_name), do: "Full name"
-  defp humanize_field(:short_name), do: "Short name"
-  defp humanize_field(:employee_number), do: "Employee number"
-  defp humanize_field(:designation), do: "Designation"
-  defp humanize_field(:job_description), do: "Job description"
-  defp humanize_field(:email), do: "Email"
-  defp humanize_field(:mobile_number), do: "Mobile number"
-  defp humanize_field(f), do: to_string(f)
+  # A choice fact commits on change and closes its select first, so the
+  # outcome — stored or refused — reads beside the read state, as on
+  # `/addresses/:id`. Each caller has already re-asked Authz.
+  defp save_choice(socket, name, attrs, choice) do
+    socket
+    |> assign(:editing_field, nil)
+    |> save_fact(name, attrs, choice)
+  end
 
-  defp format_changeset_error(changeset, field) do
-    case changeset.errors[field] do
-      {msg, _} -> "#{humanize_field(field)} #{msg}."
-      _ -> "Failed to update #{humanize_field(field)}."
+  # One commit, one outcome. Success reloads the page's projections (title,
+  # subtitle, supervisor and subordinate lists) from the server; refusal keeps
+  # the stored value on screen and says what was rejected and why.
+  defp commit(socket, name, result, submitted) do
+    case result do
+      {:ok, updated_employee} ->
+        socket
+        |> load_data(updated_employee)
+        |> CommitStatus.put(name, :saved)
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        CommitStatus.put(socket, name, {:error, refusal_message(name, submitted, changeset)})
+
+      {:error, reason} ->
+        CommitStatus.put(socket, name, {:error, failure_message(reason, submitted)})
     end
   end
+
+  # A choice fact reports on the schema field it writes; the shared wording
+  # names the rejected value and the label.
+  defp refusal_message(name, submitted, %Ecto.Changeset{} = changeset) do
+    field = Map.get(@inline_fields, name) || Map.fetch!(@choice_fields, name)
+    CommitStatus.refusal_message(fact_label(name), field, submitted, changeset.errors)
+  end
+
+  defp failure_message(:employee_not_found, _submitted),
+    do: "This employee no longer exists. Return to the list to find their replacement."
+
+  defp failure_message(:company_not_found, _submitted),
+    do: "The change was not saved because this employee's company could not be found."
+
+  # The domain refuses the change outright for the platform orchestrator
+  # (`SYS-001` / `agent`); the fact says so rather than a generic sentence.
+  defp failure_message(:invariant_violation, submitted),
+    do:
+      "#{inspect(CommitStatus.rejected_value(submitted))} was not saved: " <>
+        "the platform orchestrator's identity is protected."
+
+  defp failure_message(_reason, _submitted), do: CommitStatus.failure_message()
+
+  defp write_forbidden(socket),
+    do: CommitStatus.write_forbidden(socket, "You do not have permission to edit employees.")
+
+  # What the operator chose, as the alert names it: the option's visible
+  # label when it came from this page's list, "None" for the blank option,
+  # and the raw value for anything else.
+  defp choice_label(_socket, name, nil) when name in ["department", "supervisor"], do: "None"
+
+  defp choice_label(socket, "department", id),
+    do: Map.get(socket.assigns.department_map, id, Integer.to_string(id))
+
+  defp choice_label(socket, "supervisor", id),
+    do: Map.get(socket.assigns.supervisor_map, id, Integer.to_string(id))
+
+  defp choice_label(socket, "employee_type", code),
+    do: employee_type_label(socket.assigns.employee_types, code)
+
+  defp choice_label(_socket, "status", status) when status in @statuses,
+    do: String.capitalize(status)
+
+  defp choice_label(_socket, "status", status), do: status
+
+  defp fact_label(name), do: Map.fetch!(@fact_labels, name)
+
+  defp parse_optional_id(value) do
+    case Integer.parse(to_string(value || "")) do
+      {id, ""} when id > 0 -> id
+      _ -> nil
+    end
+  end
+
+  # A trimmed, emptied value writes NULL; the required columns then refuse it
+  # as blank, and the nullable ones clear.
+  defp normalize_param(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp normalize_param(other), do: other
 
   # --- Sorting Helpers ---
 
@@ -508,21 +591,72 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     end
   end
 
-  # --- Render Template ---
+  # --- Fact Components ---
+
+  # A read-first text fact. An operator who may update edits it in place and
+  # the fact reports its own outcome; a nullable column may be emptied. Anyone
+  # else sees the stored value with no affordance.
+  attr(:name, :string, required: true)
+  attr(:employee, :map, required: true)
+  attr(:can_manage?, :boolean, required: true)
+  attr(:field_status, :map, required: true)
+  attr(:class, :any, default: nil)
+
+  defp text_fact(assigns) do
+    assigns =
+      assigns
+      |> assign(:label, fact_label(assigns.name))
+      |> assign(:value, Map.fetch!(assigns.employee, Map.fetch!(@inline_fields, assigns.name)))
+      |> assign(:allow_empty?, assigns.name in @nullable_fields)
+      |> assign(:dom_id, fact_dom_id(assigns.name))
+      |> assign(:view_id, "employee-view-" <> String.replace(assigns.name, "_", "-"))
+
+    ~H"""
+    <div>
+      <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">{@label}</dt>
+      <dd id={@view_id} class="mt-0.5 text-sm text-ink">
+        <.inline_edit
+          :if={@can_manage?}
+          id={@dom_id}
+          name={@name}
+          label={@label}
+          value={@value || ""}
+          id_value={@employee.id}
+          save_event="save_field"
+          allow_empty={@allow_empty?}
+          status={@field_status[@name]}
+          class={@class}
+        />
+        <span :if={not @can_manage?} class={[is_nil(@value) && "text-ink-muted", @class]}>
+          {@value || "—"}
+        </span>
+      </dd>
+    </div>
+    """
+  end
+
+  # `employee-number` keeps the id Belimbing gives the same fact; every other
+  # fact derives its id from its name.
+  defp fact_dom_id("employee_number"), do: "employee-number"
+  defp fact_dom_id(name), do: "employee-" <> String.replace(name, "_", "-")
 
   # Edit-in-place shell for the employment-info selects (#619): managers see
   # the read state (badge, name, or link — the scan layer a raw `<select>`
   # loses) with a hover pencil; clicking swaps in the `:editor` slot, whose
-  # existing `save_*` form closes it through `load_data/2`. Escape or blur
-  # cancels. Read-only visitors get the `:display` slot without the trigger.
-  attr :field, :string, required: true
-  attr :label, :string, required: true
-  attr :editing, :boolean, required: true
-  attr :can_manage?, :boolean, required: true
-  slot :display, required: true
-  slot :editor, required: true
+  # `save_*` form commits on change and closes it. Escape or blur cancels.
+  # Read-only visitors get the `:display` slot without the trigger. The
+  # outcome of the last commit renders beneath, on the fact that made it.
+  attr(:field, :string, required: true)
+  attr(:label, :string, required: true)
+  attr(:editing, :boolean, required: true)
+  attr(:can_manage?, :boolean, required: true)
+  attr(:status, :any, required: true)
+  slot(:display, required: true)
+  slot(:editor, required: true)
 
-  defp eip_field(assigns) do
+  defp choice_fact(assigns) do
+    assigns = assign(assigns, :status_id, "#{fact_dom_id(assigns.field)}-status")
+
     ~H"""
     <button
       :if={@can_manage? and not @editing}
@@ -531,6 +665,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       phx-click="edit_field"
       phx-value-field={@field}
       aria-label={@label}
+      aria-describedby={@status && @status_id}
       class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
     >
       {render_slot(@display)}
@@ -547,8 +682,12 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       {render_slot(@editor)}
     </div>
     <span :if={not @can_manage?}>{render_slot(@display)}</span>
+
+    <.commit_status id={@status_id} status={@status} />
     """
   end
+
+  # --- Render Template ---
 
   @impl true
   def render(assigns) do
@@ -575,27 +714,23 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
           </:subtitle>
 
           <:actions>
-            <.discovered_panel
-              key="record.history"
-              id="employee-record-history"
-              current_scope={@current_scope}
-              opts={%{auditable_types: employee_auditable_types(), auditable_id: @employee.id}}
-            />
-            <.back_link id="employee-back" navigate={~p"/employees"} title="Back to employees" />
-
-            <.button
-              :if={@can_manage?}
-              id="employee-edit"
-              navigate={~p"/employees/#{@employee.id}/edit"}
-              variant="primary"
-            >
-              Edit employee
-            </.button>
+            <%!-- Belimbing's admin/employees/show header: History and Back as
+                 one quiet labelled row, each glyph beside its word, and no
+                 button. The row wraps at narrow widths instead of clipping. --%>
+            <div class="flex flex-wrap items-center gap-3">
+              <.discovered_panel
+                key="record.history"
+                id="employee-record-history"
+                current_scope={@current_scope}
+                opts={%{auditable_types: employee_auditable_types(), auditable_id: @employee.id}}
+              />
+              <.back_link id="employee-back" navigate={~p"/employees"} title="Back to employees" />
+            </div>
           </:actions>
         </.header>
 
         <div class="mt-6 space-y-6">
-          <!-- Card 1: Employee Details with In-place Editing -->
+          <!-- Card 1: Employee Details, read-first -->
           <.card id="employee-details-card">
             <div class="p-5 sm:p-6 space-y-4">
               <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
@@ -603,155 +738,50 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
               </h3>
 
               <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                    Full Name
-                  </dt>
-
-                  <dd class="mt-0.5 text-sm text-ink">
-                    <%= if @can_manage? do %>
-                      <.inline_edit
-                        id="employee-full-name"
-                        name="full_name"
-                        label="Full Name"
-                        value={@employee.full_name}
-                        id_value={@employee.id}
-                        save_event="save_field"
-                      />
-                    <% else %>
-                      <span>{@employee.full_name}</span>
-                    <% end %>
-                  </dd>
-                </div>
-
-                <div>
-                  <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                    Short Name
-                  </dt>
-
-                  <dd class="mt-0.5 text-sm text-ink">
-                    <%= if @can_manage? do %>
-                      <.inline_edit
-                        id="employee-short-name"
-                        name="short_name"
-                        label="Short Name"
-                        value={@employee.short_name || ""}
-                        id_value={@employee.id}
-                        save_event="save_field"
-                      />
-                    <% else %>
-                      <span>{display_or_dash(@employee.short_name)}</span>
-                    <% end %>
-                  </dd>
-                </div>
-
-                <div>
-                  <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                    Employee Number
-                  </dt>
-
-                  <dd class="mt-0.5 text-sm text-ink">
-                    <%= if @can_manage? do %>
-                      <.inline_edit
-                        id="employee-number"
-                        name="employee_number"
-                        label="Employee Number"
-                        value={@employee.employee_number}
-                        id_value={@employee.id}
-                        save_event="save_field"
-                        class="font-mono"
-                      />
-                    <% else %>
-                      <code class="font-mono text-ink-subtle">{@employee.employee_number}</code>
-                    <% end %>
-                  </dd>
-                </div>
-
-                <%= if @employee.employee_type == "agent" do %>
-                  <div>
-                    <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                      Job Description
-                    </dt>
-
-                    <dd class="mt-0.5 text-sm text-ink">
-                      <%= if @can_manage? do %>
-                        <.inline_edit
-                          id="employee-job-description"
-                          name="job_description"
-                          label="Job Description"
-                          value={@employee.job_description || ""}
-                          id_value={@employee.id}
-                          save_event="save_field"
-                        />
-                      <% else %>
-                        <span>{display_or_dash(@employee.job_description)}</span>
-                      <% end %>
-                    </dd>
-                  </div>
-                <% end %>
-
-                <div>
-                  <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                    Designation
-                  </dt>
-
-                  <dd class="mt-0.5 text-sm text-ink">
-                    <%= if @can_manage? do %>
-                      <.inline_edit
-                        id="employee-designation"
-                        name="designation"
-                        label="Designation"
-                        value={@employee.designation || ""}
-                        id_value={@employee.id}
-                        save_event="save_field"
-                      />
-                    <% else %>
-                      <span>{display_or_dash(@employee.designation)}</span>
-                    <% end %>
-                  </dd>
-                </div>
-
-                <div>
-                  <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                    Email
-                  </dt>
-
-                  <dd class="mt-0.5 text-sm text-ink">
-                    <%= if @can_manage? do %>
-                      <.inline_edit
-                        id="employee-email"
-                        name="email"
-                        label="Email"
-                        value={@employee.email || ""}
-                        id_value={@employee.id}
-                        save_event="save_field"
-                      />
-                    <% else %>
-                      <span>{display_or_dash(@employee.email)}</span>
-                    <% end %>
-                  </dd>
-                </div>
-
-                <div>
-                  <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                    Mobile Number
-                  </dt>
-
-                  <dd class="mt-0.5 text-sm text-ink">
-                    <%= if @can_manage? do %>
-                      <.inline_edit
-                        id="employee-mobile-number"
-                        name="mobile_number"
-                        label="Mobile Number"
-                        value={@employee.mobile_number || ""}
-                        id_value={@employee.id}
-                        save_event="save_field"
-                      />
-                    <% else %>
-                      <span>{display_or_dash(@employee.mobile_number)}</span>
-                    <% end %>
-                  </dd>
-                </div>
+                <.text_fact
+                  name="full_name"
+                  employee={@employee}
+                  can_manage?={@can_manage?}
+                  field_status={@field_status}
+                />
+                <.text_fact
+                  name="short_name"
+                  employee={@employee}
+                  can_manage?={@can_manage?}
+                  field_status={@field_status}
+                />
+                <.text_fact
+                  name="employee_number"
+                  employee={@employee}
+                  can_manage?={@can_manage?}
+                  field_status={@field_status}
+                  class="font-mono"
+                />
+                <.text_fact
+                  :if={@employee.employee_type == "agent"}
+                  name="job_description"
+                  employee={@employee}
+                  can_manage?={@can_manage?}
+                  field_status={@field_status}
+                />
+                <.text_fact
+                  name="designation"
+                  employee={@employee}
+                  can_manage?={@can_manage?}
+                  field_status={@field_status}
+                />
+                <.text_fact
+                  name="email"
+                  employee={@employee}
+                  can_manage?={@can_manage?}
+                  field_status={@field_status}
+                />
+                <.text_fact
+                  name="mobile_number"
+                  employee={@employee}
+                  can_manage?={@can_manage?}
+                  field_status={@field_status}
+                />
               </dl>
             </div>
           </.card>
@@ -768,7 +798,9 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     Company
                   </dt>
 
-                  <dd class="mt-0.5 text-sm text-ink px-1 -mx-1 py-0.5">{@company_name}</dd>
+                  <dd id="employee-view-company" class="mt-0.5 text-sm text-ink px-1 -mx-1 py-0.5">
+                    {@company_name}
+                  </dd>
                 </div>
 
                 <div>
@@ -776,12 +808,13 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     Department
                   </dt>
 
-                  <dd class="mt-0.5 text-sm text-ink">
-                    <.eip_field
+                  <dd id="employee-view-department" class="mt-0.5 text-sm text-ink">
+                    <.choice_fact
                       field="department"
                       label="Edit department"
                       editing={@editing_field == "department"}
                       can_manage?={@can_manage?}
+                      status={@field_status["department"]}
                     >
                       <:display>
                         <span class={[
@@ -800,6 +833,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <select
                             id="employee-department"
                             name="department_id"
+                            aria-label="Department"
                             phx-mounted={JS.focus()}
                             phx-blur="cancel_edit_field"
                             class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
@@ -814,7 +848,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           </select>
                         </form>
                       </:editor>
-                    </.eip_field>
+                    </.choice_fact>
                   </dd>
                 </div>
 
@@ -823,12 +857,13 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     Supervisor
                   </dt>
 
-                  <dd class="mt-0.5 text-sm text-ink">
-                    <.eip_field
+                  <dd id="employee-view-supervisor" class="mt-0.5 text-sm text-ink">
+                    <.choice_fact
                       field="supervisor"
                       label="Edit supervisor"
                       editing={@editing_field == "supervisor"}
                       can_manage?={@can_manage?}
+                      status={@field_status["supervisor"]}
                     >
                       <:display>
                         <span class={[
@@ -847,6 +882,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <select
                             id="employee-supervisor"
                             name="supervisor_id"
+                            aria-label="Supervisor"
                             phx-mounted={JS.focus()}
                             phx-blur="cancel_edit_field"
                             class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
@@ -861,7 +897,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           </select>
                         </form>
                       </:editor>
-                    </.eip_field>
+                    </.choice_fact>
                   </dd>
                 </div>
 
@@ -870,12 +906,13 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     Employee Type
                   </dt>
 
-                  <dd class="mt-0.5 text-sm text-ink">
-                    <.eip_field
+                  <dd id="employee-view-employee-type" class="mt-0.5 text-sm text-ink">
+                    <.choice_fact
                       field="employee_type"
                       label="Edit employee type"
                       editing={@editing_field == "employee_type"}
                       can_manage?={@can_manage?}
+                      status={@field_status["employee_type"]}
                     >
                       <:display>
                         <%!-- Neutral for every type, matching the index table
@@ -893,6 +930,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <select
                             id="employee-type"
                             name="employee_type"
+                            aria-label="Employee type"
                             phx-mounted={JS.focus()}
                             phx-blur="cancel_edit_field"
                             class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
@@ -921,7 +959,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           </select>
                         </form>
                       </:editor>
-                    </.eip_field>
+                    </.choice_fact>
                   </dd>
                 </div>
 
@@ -930,12 +968,13 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                     Status
                   </dt>
 
-                  <dd class="mt-0.5 text-sm text-ink">
-                    <.eip_field
+                  <dd id="employee-view-status" class="mt-0.5 text-sm text-ink">
+                    <.choice_fact
                       field="status"
                       label="Edit status"
                       editing={@editing_field == "status"}
                       can_manage?={@can_manage?}
+                      status={@field_status["status"]}
                     >
                       <:display>
                         <.badge kind={status_badge_kind(@employee.status)}>
@@ -947,33 +986,22 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                           <select
                             id="employee-status"
                             name="status"
+                            aria-label="Status"
                             phx-mounted={JS.focus()}
                             phx-blur="cancel_edit_field"
                             class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                           >
-                            <option value="pending" selected={@employee.status == "pending"}>
-                              Pending
-                            </option>
-
-                            <option value="probation" selected={@employee.status == "probation"}>
-                              Probation
-                            </option>
-
-                            <option value="active" selected={@employee.status == "active"}>
-                              Active
-                            </option>
-
-                            <option value="inactive" selected={@employee.status == "inactive"}>
-                              Inactive
-                            </option>
-
-                            <option value="terminated" selected={@employee.status == "terminated"}>
-                              Terminated
+                            <option
+                              :for={status <- statuses()}
+                              value={status}
+                              selected={@employee.status == status}
+                            >
+                              {String.capitalize(status)}
                             </option>
                           </select>
                         </form>
                       </:editor>
-                    </.eip_field>
+                    </.choice_fact>
                   </dd>
                 </div>
 
@@ -1243,6 +1271,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     </Layouts.app>
     """
   end
+
+  defp statuses, do: @statuses
 
   defp status_badge_kind("active"), do: :success
   defp status_badge_kind("probation"), do: :warning

@@ -49,8 +49,8 @@ defmodule Bilimbi.Base.UI.CommitStatus do
   5. Read `@field_status[name]` in the template as the `status` of
      `<.inline_edit>` or `<.commit_status>`.
 
-  `Bilimbi.Core.Address.Web.ShowLive` and `Bilimbi.Core.User.Web.ShowLive`
-  are the two adopters.
+  `Bilimbi.Core.Address.Web.ShowLive`, `Bilimbi.Core.User.Web.ShowLive` and
+  `Bilimbi.Core.Employee.Web.ShowLive` are the three adopters.
   """
 
   import Phoenix.Component, only: [assign: 3]

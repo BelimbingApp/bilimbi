@@ -847,7 +847,7 @@ defmodule Bilimbi.Core.User do
   """
   @spec replace_employee_account(Scope.t(), pos_integer(), pos_integer(), pos_integer() | nil) ::
           {:ok, Summary.t() | nil}
-          | {:error, lookup_error() | :employee_not_found | Changeset.t()}
+          | {:error, lookup_error() | :employee_not_found | :invariant_violation | Changeset.t()}
   def replace_employee_account(%Scope{} = scope, company_id, employee_id, user_id)
       when is_integer(company_id) and is_integer(employee_id) do
     Repo.transaction(fn ->
@@ -876,7 +876,7 @@ defmodule Bilimbi.Core.User do
   """
   @spec change_employee_type(Scope.t(), pos_integer(), pos_integer(), String.t()) ::
           {:ok, Bilimbi.Core.Employee.Summary.t()}
-          | {:error, lookup_error() | :employee_not_found | Changeset.t()}
+          | {:error, lookup_error() | :employee_not_found | :invariant_violation | Changeset.t()}
   def change_employee_type(%Scope{} = scope, company_id, employee_id, type)
       when is_integer(company_id) and is_integer(employee_id) and is_binary(type) do
     Repo.transaction(fn ->
@@ -1670,8 +1670,11 @@ defmodule Bilimbi.Core.User do
 
   defp maybe_lock_employee(scope, company_id, employee_id)
        when is_integer(employee_id) and employee_id > 0 do
+    # The protected platform orchestrator is refused as an invariant, not
+    # hidden as a missing record; every other failure collapses to not found.
     case Employee.lock_affiliation(scope, company_id, employee_id) do
       {:ok, proof} -> {:ok, proof}
+      {:error, :invariant_violation} = error -> error
       {:error, _reason} -> {:error, :employee_not_found}
     end
   end

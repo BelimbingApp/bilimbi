@@ -483,6 +483,29 @@ defmodule Bilimbi.Core.EmployeeTest do
     assert {:error, :employee_not_found} = Employee.get_employee(owner, 73, ordinary.id)
   end
 
+  # An in-place edit clears a nullable fact by writing NULL; the trimming of
+  # text changes must let that through and still refuse a blanked required one.
+  test "clears a nullable fact set to nil and refuses a blanked required one", %{owner: owner} do
+    assert {:ok, employee} =
+             Employee.create_employee(owner, 73, %{
+               employee_number: "EMP-050",
+               full_name: "Nil Clearer",
+               short_name: "  Nil  ",
+               email: "nil@example.test"
+             })
+
+    assert employee.short_name == "Nil"
+
+    assert {:ok, cleared} =
+             Employee.update_employee(owner, 73, employee.id, %{email: nil, short_name: nil})
+
+    assert cleared.email == nil
+    assert cleared.short_name == nil
+
+    assert {:error, blank} = Employee.update_employee(owner, 73, employee.id, %{full_name: nil})
+    assert errors_on(blank) == %{full_name: ["can't be blank"]}
+  end
+
   test "refuses a conflicting SYS-001 row instead of adopting it" do
     CompanyFixtures.assign_primary_company!(41, 73)
     insert_raw_employee!(73, "SYS-001", "full_time", "Conflicting Employee")

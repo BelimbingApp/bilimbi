@@ -658,6 +658,28 @@ defmodule Bilimbi.Core.UserTest do
 
       assert stored_employee_id(121) == nil
     end
+
+    # The employee page reports this refusal on the fact, so the coordinator
+    # must not hide the orchestrator's protected identity behind "not found".
+    test "employee type handler refuses the platform orchestrator as an invariant", %{
+      scope_a: scope_a
+    } do
+      :ok = Employee.ensure_system_types()
+      CompanyFixtures.assign_primary_company!(41, 73)
+      {:ok, orchestrator, :created} = Employee.ensure_platform_orchestrator()
+
+      assert {:error, :invariant_violation} =
+               EmployeeAccountPanel.dispatch(
+                 :change_employee_type,
+                 scope_a,
+                 73,
+                 orchestrator.id,
+                 "full_time"
+               )
+
+      assert {:ok, %{employee_type: "agent"}} =
+               Employee.get_employee(scope_a, 73, orchestrator.id)
+    end
   end
 
   describe "lifecycle" do

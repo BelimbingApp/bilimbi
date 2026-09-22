@@ -74,9 +74,14 @@ defmodule Bilimbi.Core.Employee.Schema do
     |> foreign_key_constraint(:supervisor_id, name: :employees_supervisor_id_foreign)
   end
 
+  # A change to NULL is a real change on a nullable column (an in-place edit
+  # clearing the email), so it passes through untrimmed instead of raising.
   defp trim_changes(changeset, fields) do
     Enum.reduce(fields, changeset, fn field, result ->
-      update_change(result, field, &String.trim/1)
+      update_change(result, field, fn
+        nil -> nil
+        value -> String.trim(value)
+      end)
     end)
   end
 

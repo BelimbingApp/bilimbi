@@ -68,6 +68,24 @@ behavior remain deferred behind their public Core contracts. Deleting the
 platform orchestrator is refused as `:invariant_violation`, and the show screen
 reports that honestly.
 
+**The detail page is read-first.** `/employees/:id` shows the employee as
+facts. An operator holding `admin.employee.update` edits the seven text facts
+in place through `<.inline_edit>` (the nullable columns pass `allow_empty`)
+and changes the department, supervisor, employee type and status through
+choices that read as a name or badge and become a select on click; every
+commit saves by itself and reports on its own fact through
+`Bilimbi.Base.UI.CommitStatus`, so there is no "Edit employee" button and a
+fact never reports through a flash. The company, employment start and end,
+linked account, subordinates and addresses stay read-only or keep their own
+workflows. `update_employee/4` accepts `nil` for a nullable text column, which
+is how an in-place clear lands; the platform orchestrator's identity is
+refused by the domain, and by Core User's `change_employee_type/4` as
+`:invariant_violation`, and the page reports both on the fact.
+`Bilimbi.Core.Employee.Web.ShowLive`'s moduledoc owns the per-fact rules and
+DESIGN.md's "Read-first detail pages" owns the pattern. The standalone
+`/employees/:id/edit` form still exists for the list's edit link, but nothing
+on the detail page reaches it.
+
 ## Employee Types administration
 
 `list_employee_types/2`, `create_employee_type/3`, `update_employee_type/4`, and
