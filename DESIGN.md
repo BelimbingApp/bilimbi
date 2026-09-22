@@ -229,9 +229,12 @@ kind on the page:
   default timezone are the shipped choice facts. A fact that is a setting
   rather than a column — the company's default timezone, read and written
   through Base Settings — is still a choice fact of its own section and
-  reads its explicit value, never the resolved platform default, so an unset
-  company says "Not configured (UTC)" as Belimbing's `explicitCompanyTimezone`
-  does; Belimbing keeps that one control always visible with a saved note
+  reads its explicit value to decide whether it is configured, as Belimbing's
+  `explicitCompanyTimezone` does, and names the resolved zone (company, then
+  tenant, then platform default) beside an unset one — "Not configured
+  (Asia/Kuala_Lumpur)" under a tenant-level zone, "Not configured (UTC)" only
+  when the resolution ends at UTC. Belimbing always says UTC there, which is
+  untrue under a tenant-level setting; Belimbing keeps that one control always visible with a saved note
   beside it, and Bilimbi's read-state trigger is the deliberate shape. One
   option of a choice may be irreversible — the
   user's company offers "None", after which the account leaves every user

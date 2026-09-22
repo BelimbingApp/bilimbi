@@ -16,7 +16,11 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     `allow_empty`;
   - a choice fact (status, legal entity type, jurisdiction, parent company,
     default timezone) reads as its badge or name and becomes a select on
-    click; the select commits on change, and Escape or leaving it cancels;
+    click; the select commits on change, and Escape or leaving it cancels.
+    The default timezone reads the company's own setting; without one it
+    reads "Not configured" beside the zone its dates resolve to through the
+    tenant and platform settings, so UTC is named only when that resolution
+    ends at UTC;
   - a business activity is added through the same in-place text control:
     its "Add activity" trigger opens an input that commits on Enter or on
     leaving it, as Belimbing's "+ Add" chip does, and an activity is removed
@@ -208,7 +212,6 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
         relationships = Company.list_relationships(scope, company_id) |> elem(1)
         external_accesses = Company.list_external_accesses(scope, company_id) |> elem(1)
         external_access_names = resolve_external_access_names(scope, external_accesses)
-        company_timezone = get_company_timezone(company)
 
         {:ok,
          socket
@@ -228,7 +231,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:external_access_names, external_access_names)
          |> assign(:page_sizes, @page_sizes)
          |> assign(:table_state, default_table_state())
-         |> assign(:company_timezone, company_timezone || "")
+         |> assign_timezone(company)
          |> assign(:status_options, @status_options)
          |> CommitStatus.init()
          |> assign(:editing_field, nil)
@@ -269,17 +272,18 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   end
 
   # The company's own explicit setting, as Belimbing's
-  # `explicitCompanyTimezone` reads it: `Settings.get/2` resolves through the
-  # scope chain to the platform default, which would present "UTC" as though
-  # someone had chosen it. An unset company reads "Not configured (UTC)".
-  defp get_company_timezone(company) do
+  # `explicitCompanyTimezone` reads it, decides whether the company has
+  # configured a timezone; the zone its dates display in is the resolved one,
+  # company then tenant then platform default. An unset company under a
+  # tenant-level zone reads "Not configured (<that zone>)", never UTC.
+  defp assign_timezone(socket, company) do
     scope = SettingsScope.company(company.id, company.tenant_id)
+    resolved = Settings.get("localization.timezone", scope)
+    explicit = if Settings.overridden?("localization.timezone", scope), do: resolved, else: ""
 
-    if Settings.overridden?("localization.timezone", scope),
-      do: Settings.get("localization.timezone", scope),
-      else: nil
-  rescue
-    _ -> nil
+    socket
+    |> assign(:company_timezone, explicit)
+    |> assign(:resolved_timezone, resolved)
   end
 
   # ============================================================================
@@ -533,7 +537,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
         {:noreply,
          socket
-         |> assign(:company_timezone, "")
+         |> assign_timezone(company)
          |> CommitStatus.put("timezone", :saved)}
 
       # The stdlib database is UTC-only; validity means the real IANA
@@ -554,7 +558,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           {:ok, _} ->
             {:noreply,
              socket
-             |> assign(:company_timezone, tz)
+             |> assign_timezone(company)
              |> CommitStatus.put("timezone", :saved)}
 
           {:error, _} ->
@@ -1252,7 +1256,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 name="timezone"
                 value={@company_timezone}
                 options={timezone_options(@company_timezone)}
-                prompt="Not configured (UTC)"
+                prompt={"Not configured (#{@resolved_timezone})"}
                 save_event="save_timezone"
                 editing?={@editing_field == "timezone"}
                 can_update?={@can_update?}
@@ -1260,7 +1264,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
               >
                 <span :if={@company_timezone != ""}>{@company_timezone}</span>
                 <span :if={@company_timezone == ""} class="text-ink-muted">
-                  Not configured (UTC)
+                  Not configured ({@resolved_timezone})
                 </span>
               </.choice_fact>
             </:item>
@@ -1268,7 +1272,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
           <div :if={@company_timezone == ""} class="mt-4">
             <.alert kind={:info}>
-              No timezone is configured for this company. Dates and times will display in UTC until a timezone is set.
+              No timezone is configured for this company. Dates and times will display in {@resolved_timezone} until a timezone is set.
             </.alert>
           </div>
         </.card>

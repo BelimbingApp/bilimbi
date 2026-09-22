@@ -1154,9 +1154,12 @@ Shipped:
   and keeps the editor open with what was typed, and an applied empty
   document clears the value. `{fm/companies-detail-read-first/claude-fable-5-1}`
 - [x] The default timezone is a choice fact of its own section, reading the
-  company's explicit setting through `Settings.overridden?/2` so an unset
-  company says "Not configured (UTC)" as Belimbing does, rather than the
-  resolved platform default the page previously presented as a chosen "UTC";
+  company's explicit setting through `Settings.overridden?/2` to decide
+  whether it is configured, rather than presenting the resolved value as a
+  chosen one; an unset company names the zone its dates resolve to through
+  the tenant and platform settings — "Not configured (Asia/Kuala_Lumpur)"
+  under a tenant-level zone, UTC only when the resolution ends there — where
+  Belimbing always says UTC, which is untrue under a tenant-level setting;
   a forged zone outside the IANA database is refused on the fact. The
   always-visible select is gone; the read-state trigger is the deliberate
   Bilimbi shape recorded in DESIGN.md. `{fm/companies-detail-read-first/claude-fable-5-1}`
