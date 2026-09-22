@@ -17,9 +17,12 @@ inference.
 
 Core Address contributes capability-gated routes from `priv/web_routes.exs`.
 The module-owned administration index uses the bounded tenant page API for
-search, sorting, pagination, and safe deletion. The create form writes only
-through the public Address facade and obtains country, Admin1, postcode, and
-locality choices from Core Geonames' public reference-data APIs.
+search, sorting, pagination, and safe deletion. It pages through the shared
+`<.pagination>` component and offers 25, 50, and 100 rows per page rather
+than the platform's fourth 300 option, because the page API refuses a page
+size above 100. The create form writes only through the public Address facade
+and obtains country, Admin1, postcode, and locality choices from Core
+Geonames' public reference-data APIs.
 
 Changing country clears all dependent location fields. Exact postcode matches
 may populate a valid Admin1 division and a single unambiguous locality; manual
