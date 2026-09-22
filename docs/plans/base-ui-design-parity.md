@@ -1004,7 +1004,8 @@ Not delivered by this slice, reported as follow-up:
   `<.commit_status>` in Base UI is its own task, so that `/addresses/:id` is
   not edited from this change.
 - **`/employees/:id`** still carries an "Edit employee" primary button and
-  reports in-place edits through a flash; **`/companies/:id`** still keeps its
+  reports in-place edits through a flash (delivered by the employee detail
+  slice below); **`/companies/:id`** still keeps its
   facts behind edit modes (CMP-03 stays partial).
 - **INT-02 stays without a shared primitive.** The user's company is the
   second page-local inline select on the same rule; extracting one shared
@@ -1015,3 +1016,85 @@ Not delivered by this slice, reported as follow-up:
   sits below it at the page's left edge). Each detail page still supplies its
   own `gap-3` actions row, and the six other header rows the previous slice
   listed as lacking the wrapper are still as they were.
+
+### Employee detail read-first slice — CMP-03, INT-02 and NAV-03, partial
+
+Goal: Bring `/employees/:id` to the read-first shape `/addresses/:id` and
+`/users/:id` settled, calling the shared `Bilimbi.Base.UI.CommitStatus`
+rather than copying it, under the captain's canonical instructions of
+2026-09-20: detail pages are read-first with working in-place edit and
+auto-save, an edit button is YAGNI once a page edits in place, secondary
+actions are links, and Belimbing is the parity reference.
+
+What Belimbing does, read from
+`resources/core/views/livewire/admin/employees/show.blade.php` and
+`app/Core/Employee/Livewire/Employees/Show.php` on 2026-09-23:
+
+- **No edit button.** The header is the record history and a "Back to List"
+  link. Full name, short name, employee number, designation, email and mobile
+  number are `x-ui.edit-in-place.text`; an agent's job description is
+  `x-ui.edit-in-place.textarea`.
+- **Department, supervisor, employee type, status and user are
+  `x-ui.edit-in-place.select`**, reading as a name or badge and saving on
+  change. Company, employment start and employment end are plain text.
+- **Outcomes are toasts.** `saveValidatedField` validates one field and
+  notifies "Could not save changes" on refusal; each select method notifies
+  its own success sentence.
+
+Shipped:
+
+- [x] `/employees/:id` is read-first: the "Edit employee" button is gone; the
+  seven text facts are `<.inline_edit>` with `status`, the five nullable
+  columns (short name, designation, email, mobile number, an agent's job
+  description) pass `allow_empty` and the required full name and employee
+  number do not; department, supervisor, employee type and status keep their
+  click-to-select read states and report through `<.commit_status>` with the
+  operator's choice named in a refusal; every outcome lands on its fact and
+  success does not flash. The page calls `CommitStatus.init/1`,
+  `inline_field/2`, `put/3`, `refusal_message/4`, `rejected_value/1`,
+  `failure_message/0` and `write_forbidden/2` and keeps only its write, its
+  nouns (`:employee_not_found`, `:company_not_found`, the orchestrator's
+  protected identity) and its forbidden-flash wording. The header is the
+  `flex flex-wrap items-center gap-3` row of History and "← Back" and no
+  button. `{fm/employees-detail-read-first/claude-fable-5-1}`
+- [x] Two domain refusals now tell the truth on the fact. Core Employee's
+  update changeset trimmed text changes with `String.trim/1`, so writing
+  `nil` to a nullable column raised instead of clearing it; the trim lets
+  `nil` through and a blanked required column is still refused. Core User's
+  `change_employee_type/4` collapsed the platform orchestrator's
+  `:invariant_violation` into `:employee_not_found`, so the old page's
+  orchestrator branch for that event was unreachable; the coordinator
+  preserves the invariant and the fact says the identity is protected.
+  `{fm/employees-detail-read-first/claude-fable-5-1}`
+- [x] Web tests cover the viewer without `admin.employee.update` seeing every
+  fact as plain text with no editor, trigger, select or header button; a saved
+  text commit with "Saved" on the latest commit only and a cleared nullable
+  fact; refused commits for format, a blanked required fact, a taken employee
+  number and the orchestrator's identity, each staying on its fact until it is
+  committed again; a choice committing on change, cancelling, and a forged
+  choice refused with its value named; and forged writes after grant
+  revocation clearing a stale "Saved".
+  `{fm/employees-detail-read-first/claude-fable-5-1}`
+
+Left read-only, deliberately:
+
+- **Company** is a relation Core Company owns, and Belimbing shows it as text.
+- **Employment start and end** are dates; `<.inline_edit>` is a text control
+  and would commit an unparsed string, and Belimbing shows them as text.
+- **The linked account** is the `employee.accounts` embed Core User owns, with
+  its own select and notice; **subordinates** and **addresses** are their own
+  workflows on this page.
+
+Not delivered by this slice, reported as follow-up:
+
+- **`/companies/:id`** is filed separately; the employee list and its edit
+  link, the addresses panel on this page and the native `data-confirm` on the
+  subordinate and delete actions are out of scope here.
+- **`/employees/:id/edit` still exists** as a route and form; nothing on the
+  detail page reaches it.
+- **INT-02 stays without a shared primitive.** The four employee choices are
+  a page-local `choice_fact` shell on the same rule as the address and user
+  pages; extracting one shared `<.inline_select>` waits for its control to be
+  accepted.
+- **The subordinates section** keeps its "Add" button, a hand-written table
+  and flashes, as Belimbing's does.

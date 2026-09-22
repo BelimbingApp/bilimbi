@@ -200,24 +200,25 @@ this anatomy as they are migrated.
 ## Read-first detail pages
 
 A detail page shows the record as facts and lets an authorized operator change
-each fact in place. `/addresses/:id` is the exemplar and `/users/:id` the
-second full adopter (its name, email and company); `/employees/:id` already
-edits facts in place but still reports the outcome in a flash and passes no
-`allow_empty`, and adopts the rest of this section as it is migrated.
-`/companies/:id` presents its facts on the shared list but still edits them
-through the "Edit Details" modal; moving those facts to in-place editing is
-the outstanding step for that page. There is no edit mode and no save button:
-a committed edit saves by itself, and an "Edit …" button that opens a separate
-edit form for the same facts is a defect. What "committed" means follows the
-control and is the same for every fact of that kind on the page:
+each fact in place. `/addresses/:id` is the exemplar, `/users/:id` the second
+full adopter (its name, email and company) and `/employees/:id` the third
+(seven text facts and the department, supervisor, employee type and status
+choices). `/companies/:id` presents its facts on the shared list but still
+edits them through the "Edit Details" modal; moving those facts to in-place
+editing is the outstanding step for that page. There is no edit mode and no
+save button: a committed edit saves by itself, and an "Edit …" button that
+opens a separate edit form for the same facts is a defect. What "committed"
+means follows the control and is the same for every fact of that kind on the
+page:
 
 - **Text facts** use `<.inline_edit>` and commit on Enter or on leaving the
   field. Every nullable column passes `allow_empty`.
 - **Choice facts** show the read state (a badge, a name) as the trigger; the
   select appears on click, commits on change, and Escape or leaving it
   cancels. A permanently visible `<select>` beside read-only facts is a
-  defect: the address verification status and the user's company are the
-  two shipped choice facts. One option of a choice may be irreversible — the
+  defect: the address verification status, the user's company and the
+  employee's department, supervisor, employee type and status are the shipped
+  choice facts. One option of a choice may be irreversible — the
   user's company offers "None", after which the account leaves every user
   screen and nothing can reopen it — and an irreversible option does not
   commit on change. Irreversibility is the test, not cost: every company
@@ -251,6 +252,12 @@ control and is the same for every fact of that kind on the page:
   write, its failure nouns and its forbidden-flash wording.
 - **Viewers without the update capability** see the value with no affordance,
   not a disabled control. Every write handler still re-asks Authz.
+- **Facts the page cannot save stay read-only.** A relation another module
+  owns (the employee's company), a date the text editor cannot commit
+  truthfully (employment start and end) and a record with its own workflow
+  (the linked account, subordinates, addresses) read as text or keep their
+  own section; an edit affordance for something the page cannot actually
+  save is a defect, not a step toward parity.
 - **Record history** is a demoted labelled action in the header: the
   registry's `history` glyph (Belimbing's clock) beside the word "History",
   in the same quiet `text-link` treatment as the back link, as Belimbing's
