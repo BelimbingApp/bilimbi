@@ -1,8 +1,33 @@
 defmodule Bilimbi.Core.User.Web.ShowLive do
   @moduledoc """
-  Shows one tenant-visible user and provides administrative management:
-  inline editing, roles and capability assignments, password updates,
-  employee linking/creation, and external accesses read model.
+  Read-first LiveView adapter for one tenant-visible user.
+
+  The page shows the account as facts. An operator holding `admin.user.update`
+  edits each fact in place and a committed edit saves by itself; there is no
+  edit mode and no "Edit user" button, as on `/addresses/:id`:
+
+  - the name and email commit on Enter or on leaving the field, through
+    `<.inline_edit>`; Escape cancels. Neither column is nullable, so an
+    emptied value commits nothing;
+  - the company is a choice fact: it reads as the company name (or "None")
+    and becomes a select on click; the select commits on change, and Escape
+    or leaving it cancels, as Belimbing's `admin/users/show` edit-in-place
+    select does.
+
+  Each fact reports its own outcome through the shared commit status:
+  "Saving…" while the round trip is in flight, "Saved" once stored, and an
+  alert on the fact naming the rejected value and the validation error when
+  the save was refused. The stored value stays on screen until the server
+  confirms a change, and success does not flash.
+
+  The header presents the same quiet labelled row Belimbing does — History,
+  Impersonate and "← Back", each with its glyph and its word — and no button.
+  Impersonate keeps its guards unchanged: `admin.user.impersonate`, never the
+  signed-in account, and never while already impersonating.
+
+  Roles and capability assignments, password updates, employee
+  linking/creation and the external accesses read model keep their own
+  sections and their own affordances.
   """
 
   use Bilimbi.Base.UI, :live_view
@@ -28,7 +53,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
          {:ok, user} <- User.get_tenant_user(scope, user_id) do
       socket =
         socket
-        |> assign(:page_title, user.name)
         |> assign(:active_nav, "admin.user")
         |> assign(:user_id, user_id)
         |> init_ui_state()
@@ -40,8 +64,17 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     end
   end
 
+  # The facts an inline text edit may write, keyed by the form name the hook
+  # pushes. A name outside this map is ignored; user input never becomes an
+  # atom. `company` is the choice fact and has its own event.
+  @inline_fields %{"name" => :name, "email" => :email}
+
+  @fact_labels %{"name" => "Name", "email" => "Email", "company" => "Company"}
+
   defp init_ui_state(socket) do
     socket
+    |> assign(:field_status, %{})
+    |> assign(:editing_field, nil)
     |> assign(:show_assign_roles, false)
     |> assign(:role_search, "")
     |> assign(:selected_role_ids, [])
@@ -209,6 +242,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
     socket
     |> assign(:user, user)
+    |> assign(:page_title, user.name)
     |> assign(:can_manage?, can_manage?)
     |> assign(:companies, companies)
     |> assign(:company_names, company_names)
@@ -255,45 +289,42 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   defp user_auditable_types,
     do: ["Bilimbi.Core.User.Schema", User.notifiable_identity()]
 
-  # --- Event Handlers: Inline Editing ---
+  # --- Event Handlers: In-place Facts ---
 
+  # One commit, one outcome on the fact that made it. Every write re-asks
+  # Authz; the `can_manage?` assign only decides what the page shows.
   @impl true
   def handle_event("save_field", params, socket) do
     if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      user = socket.assigns.user
+      case inline_field(params) do
+        {:ok, name, field, value} ->
+          {:noreply, save_fact(socket, name, %{field => value}, value)}
 
-      {field, value} =
-        cond do
-          Map.has_key?(params, "name") -> {:name, Map.get(params, "name")}
-          Map.has_key?(params, "email") -> {:email, Map.get(params, "email")}
-          Map.get(params, "field") == "name" -> {:name, Map.get(params, "value")}
-          Map.get(params, "field") == "email" -> {:email, Map.get(params, "value")}
-          true -> {nil, nil}
-        end
-
-      if field do
-        case User.update_user(scope, user.company_id, user.id, %{field => value}) do
-          {:ok, updated_user} ->
-            field_name = if field == :name, do: "Name", else: "Email"
-
-            {:noreply,
-             socket
-             |> put_flash(:info, "#{field_name} updated successfully.")
-             |> load_data(updated_user)}
-
-          {:error, _changeset} ->
-            field_name = if field == :name, do: "name", else: "email"
-            {:noreply, put_flash(socket, :error, "Failed to update #{field_name}.")}
-        end
-      else
-        {:noreply, socket}
+        :error ->
+          {:noreply, socket}
       end
     else
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit users.")}
+      {:noreply, write_forbidden(socket)}
     end
   end
 
+  def handle_event("edit_field", %{"field" => "company"}, socket) do
+    if can_manage?(socket) do
+      {:noreply, assign(socket, :editing_field, "company")}
+    else
+      {:noreply, write_forbidden(socket)}
+    end
+  end
+
+  def handle_event("edit_field", _params, socket), do: {:noreply, socket}
+
+  def handle_event("cancel_edit_field", _params, socket) do
+    {:noreply, assign(socket, :editing_field, nil)}
+  end
+
+  # The company choice commits on change. Belimbing's saveCompany routes the
+  # same three transitions — reassign, clear, and affiliate an unaffiliated
+  # account — and each stays its own audited Core User operation here.
   def handle_event("save_company", params, socket) do
     if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
@@ -334,30 +365,43 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             {:ok, user}
         end
 
+      socket = assign(socket, :editing_field, nil)
+
       case result do
         {:ok, updated_user} ->
-          msg =
-            cond do
-              is_nil(target_company_id) ->
-                "User is now unaffiliated with any company."
-
-              not is_nil(user.company_id) and user.company_id != target_company_id ->
-                "Company reassigned."
-
-              true ->
-                "Company assignment saved."
-            end
-
           {:noreply,
            socket
-           |> put_flash(:info, msg)
-           |> load_data(updated_user)}
+           |> load_data(updated_user)
+           |> put_field_status("company", :saved)}
 
-        {:error, _reason} ->
-          {:noreply, put_flash(socket, :error, "Failed to update company assignment.")}
+        {:error, %Ecto.Changeset{} = changeset} ->
+          {:noreply,
+           put_field_status(
+             socket,
+             "company",
+             {:error,
+              refusal_message(
+                "company",
+                company_choice_label(socket, target_company_id),
+                changeset
+              )}
+           )}
+
+        {:error, reason} ->
+          {:noreply,
+           put_field_status(
+             socket,
+             "company",
+             {:error,
+              company_failure_message(
+                reason,
+                company_choice_label(socket, target_company_id),
+                user
+              )}
+           )}
       end
     else
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit users.")}
+      {:noreply, write_forbidden(socket)}
     end
   end
 
@@ -904,97 +948,105 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             <% end %>
           </:subtitle>
           <:actions>
-            <.discovered_panel
-              key="record.history"
-              id="user-record-history"
-              current_scope={@current_scope}
-              opts={%{auditable_types: user_auditable_types(), auditable_id: @user.id}}
-            />
-
-            <.back_link id="user-back" navigate={~p"/users"} title="Back to users" />
-            <.link
-              :if={
-                allowed?(@current_scope, "admin.user.impersonate") and
-                  @user.id != @current_scope.user["user_id"] and
-                  is_nil(@current_scope.impersonator)
-              }
-              id="user-impersonate"
-              href={~p"/admin/impersonate/#{@user.id}"}
-              method="post"
-              class="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink shadow-xs transition hover:bg-surface-sunken"
-            >
-              <.icon name="bilimbi-impersonate" class="size-4" />
-              <span>Impersonate</span>
-            </.link>
-            <.button
-              :if={@can_manage?}
-              id="user-edit"
-              navigate={~p"/users/#{@user.id}/edit"}
-              variant="primary"
-            >
-              Edit user
-            </.button>
+            <%!-- Belimbing's admin/users/show header: History, Impersonate
+                 and Back as one quiet labelled row, each glyph beside its
+                 word, and no button. The row wraps at narrow widths instead
+                 of clipping. --%>
+            <div class="flex flex-wrap items-center gap-3">
+              <.discovered_panel
+                key="record.history"
+                id="user-record-history"
+                current_scope={@current_scope}
+                opts={%{auditable_types: user_auditable_types(), auditable_id: @user.id}}
+              />
+              <.action_link
+                :if={can_impersonate?(@current_scope, @user)}
+                id="user-impersonate"
+                icon="bilimbi-impersonate"
+                href={~p"/admin/impersonate/#{@user.id}"}
+                method="post"
+                title="Impersonate this user"
+              >
+                Impersonate
+              </.action_link>
+              <.back_link id="user-back" navigate={~p"/users"} title="Back to users" />
+            </div>
           </:actions>
         </.header>
 
         <div class="mt-6 space-y-6">
-          <!-- Card 1: User Details with In-place Editing -->
+          <!-- Card 1: User Details, read-first -->
           <.card id="user-details-card" inner_class="p-5 sm:p-6">
             <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-4">
               User Details
             </h3>
 
-            <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div id="user-detail-name">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                  Name
-                </dt>
-                <dd class="mt-0.5 text-sm text-ink">
-                  <%= if @can_manage? do %>
-                    <.inline_edit
-                      id="user-name"
-                      name="name"
-                      label="Name"
-                      value={@user.name}
-                      id_value={@user.id}
-                      save_event="save_field"
-                    />
-                  <% else %>
-                    <span>{@user.name}</span>
-                  <% end %>
-                </dd>
-              </div>
+            <%!-- Core User writes an account's facts through its company, so an
+                 unaffiliated account has no in-place editor for them; the page
+                 says so instead of offering a commit it would always refuse. --%>
+            <.alert
+              :if={@can_manage? and is_nil(@user.company_id)}
+              kind={:info}
+              id="user-unaffiliated-notice"
+              class="mb-4"
+            >
+              This account has no company. Its name and email can be edited once a company is
+              assigned, and affiliating an unaffiliated account needs the
+              admin.user.unaffiliated.manage capability.
+            </.alert>
 
-              <div id="user-detail-email">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                  Email
-                </dt>
-                <dd class="mt-0.5 text-sm text-ink">
-                  <%= if @can_manage? do %>
-                    <.inline_edit
-                      id="user-email"
-                      name="email"
-                      label="Email"
-                      value={@user.email}
-                      id_value={@user.id}
-                      save_event="save_field"
-                    />
-                  <% else %>
-                    <span>{@user.email}</span>
-                  <% end %>
-                </dd>
-              </div>
+            <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <.text_fact
+                name="name"
+                user={@user}
+                can_manage?={@can_manage?}
+                field_status={@field_status}
+              />
+              <.text_fact
+                name="email"
+                user={@user}
+                can_manage?={@can_manage?}
+                field_status={@field_status}
+              />
 
               <div id="user-detail-company">
                 <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
                   Company
                 </dt>
-                <dd class="mt-0.5 text-sm text-ink">
-                  <%= if @can_manage? do %>
-                    <form phx-change="save_company" id="user-company-form" class="inline-block">
+                <dd id="user-view-company" class="mt-0.5 text-sm text-ink">
+                  <button
+                    :if={@can_manage? and @editing_field != "company"}
+                    type="button"
+                    id="user-company-display"
+                    phx-click="edit_field"
+                    phx-value-field="company"
+                    aria-label="Edit company"
+                    aria-describedby={@field_status["company"] && "user-company-status"}
+                    class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
+                  >
+                    <span :if={@company_name} class="text-ink">{@company_name}</span>
+                    <span :if={is_nil(@company_name)} class="text-ink-muted">None</span>
+                    <.icon
+                      name="edit"
+                      class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                    />
+                  </button>
+
+                  <%!-- Window-scoped: the select may not hold focus (JS.focus is
+                       best-effort), and Escape must cancel regardless. Only one
+                       editor mounts at a time, so the listener is unambiguous. --%>
+                  <div
+                    :if={@can_manage? and @editing_field == "company"}
+                    phx-window-keydown="cancel_edit_field"
+                    phx-key="Escape"
+                  >
+                    <form id="user-company-form" phx-change="save_company" class="inline-block">
                       <select
                         id="user-company-select"
                         name="company_id"
+                        aria-label="Company"
+                        phx-mounted={JS.focus()}
+                        phx-blur="cancel_edit_field"
                         class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                       >
                         <option value="" selected={is_nil(@user.company_id)}>None</option>
@@ -1007,7 +1059,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                         </option>
                       </select>
                     </form>
-                  <% else %>
+                  </div>
+
+                  <%= if not @can_manage? do %>
                     <%= if @company_name do %>
                       <.link
                         navigate={~p"/companies/#{@user.company_id}"}
@@ -1016,9 +1070,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                         {@company_name}
                       </.link>
                     <% else %>
-                      <span class="text-ink-faint">None</span>
+                      <span class="text-ink-muted">None</span>
                     <% end %>
                   <% end %>
+
+                  <.commit_status id="user-company-status" status={@field_status["company"]} />
                 </dd>
               </div>
 
@@ -1072,7 +1128,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 </span>
               </h3>
             </div>
-            <p class="text-xs text-ink-muted mt-0.5 mb-4">
+            <p class="max-w-prose text-xs text-ink-muted mt-0.5 mb-4">
               Roles determine what this user can do. Each role grants a set of capabilities. Effective permissions show the combined result of all assigned roles.
             </p>
 
@@ -1498,7 +1554,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 </.button>
               </div>
             </div>
-            <p class="text-xs text-ink-muted mt-0.5">
+            <p class="max-w-prose text-xs text-ink-muted mt-0.5">
               Employment records linking this user to companies. A user can have multiple records across different companies (e.g. contractors). Not all employees require a user account.
             </p>
 
@@ -1637,7 +1693,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 </span>
               </h3>
             </div>
-            <p class="text-xs text-ink-muted mt-0.5">
+            <p class="max-w-prose text-xs text-ink-muted mt-0.5">
               Portal access granted to this user by other companies. Allows customers or suppliers to view orders, invoices, and other shared data.
             </p>
 
@@ -1841,7 +1897,183 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     """
   end
 
+  # --- Fact Components ---
+
+  # A read-first text fact. An operator who may update edits it in place;
+  # anyone else — a viewer, or any actor while the account has no company to
+  # write through — sees the stored value with no affordance. Name and email
+  # are required columns, so an emptied input is not a commit.
+  attr(:name, :string, required: true)
+  attr(:user, :map, required: true)
+  attr(:can_manage?, :boolean, required: true)
+  attr(:field_status, :map, required: true)
+
+  defp text_fact(assigns) do
+    assigns =
+      assigns
+      |> assign(:label, fact_label(assigns.name))
+      |> assign(:value, Map.fetch!(assigns.user, Map.fetch!(@inline_fields, assigns.name)))
+      |> assign(:editable?, assigns.can_manage? and not is_nil(assigns.user.company_id))
+
+    ~H"""
+    <div id={"user-detail-#{@name}"}>
+      <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">{@label}</dt>
+      <dd id={"user-view-#{@name}"} class="mt-0.5 text-sm text-ink">
+        <.inline_edit
+          :if={@editable?}
+          id={"user-#{@name}"}
+          name={@name}
+          label={@label}
+          value={@value}
+          id_value={@user.id}
+          save_event="save_field"
+          status={@field_status[@name]}
+        />
+        <span :if={not @editable?}>{@value}</span>
+      </dd>
+    </div>
+    """
+  end
+
   # --- Private Helpers ---
+
+  # The guard is unchanged from the header it replaced: the capability, never
+  # the signed-in account, and never while already impersonating.
+  defp can_impersonate?(current_scope, user) do
+    allowed?(current_scope, "admin.user.impersonate") and
+      user.id != current_scope.user["user_id"] and
+      is_nil(current_scope.impersonator)
+  end
+
+  # One commit, one outcome on the fact that made it. Success reloads the
+  # detail so every projection (title, subtitle, roles scope) is the
+  # server's; refusal keeps the stored value on screen and says what was
+  # rejected and why.
+  defp save_fact(socket, name, attrs, submitted) do
+    scope = socket.assigns.current_scope.scope
+    user = socket.assigns.user
+
+    case user.company_id && User.update_user(scope, user.company_id, user.id, attrs) do
+      nil ->
+        put_field_status(socket, name, {:error, unaffiliated_message()})
+
+      {:ok, updated_user} ->
+        socket
+        |> load_data(updated_user)
+        |> put_field_status(name, :saved)
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        put_field_status(socket, name, {:error, refusal_message(name, submitted, changeset)})
+
+      {:error, reason} ->
+        put_field_status(socket, name, {:error, failure_message(reason)})
+    end
+  end
+
+  # "Saved" belongs to the most recent commit only; a refusal stays on its
+  # fact until that fact is committed again, so an unsaved edit is never
+  # quietly forgotten.
+  defp put_field_status(socket, name, status) do
+    statuses =
+      socket.assigns.field_status
+      |> drop_saved()
+      |> Map.put(name, status)
+
+    assign(socket, :field_status, statuses)
+  end
+
+  defp drop_saved(statuses) do
+    statuses
+    |> Enum.reject(fn {_name, value} -> value == :saved end)
+    |> Map.new()
+  end
+
+  defp refusal_message(name, submitted, %Ecto.Changeset{} = changeset) do
+    field = Map.get(@inline_fields, name, :company_id)
+
+    reasons =
+      case translate_errors(changeset.errors, field) do
+        [] -> ["could not be saved"]
+        messages -> messages
+      end
+
+    "#{inspect(rejected_value(submitted))} was not saved: #{fact_label(name)} #{Enum.join(reasons, ", ")}."
+  end
+
+  # The alert names what was typed so the refusal is never anonymous, but a
+  # long rejected value would push the reason off screen; the first characters
+  # identify it and the reason carries the rule that refused it.
+  @rejected_value_limit 60
+  defp rejected_value(submitted) do
+    trimmed = String.trim(to_string(submitted))
+
+    if String.length(trimmed) > @rejected_value_limit do
+      String.slice(trimmed, 0, @rejected_value_limit) <> "…"
+    else
+      trimmed
+    end
+  end
+
+  defp failure_message(:user_not_found),
+    do: "This user no longer exists. Return to the list to find their replacement."
+
+  defp failure_message(:company_not_found),
+    do: "The change was not saved because this user's company could not be found."
+
+  defp failure_message(_reason),
+    do: "The change was not saved. Try again, and tell your administrator if it keeps failing."
+
+  # Affiliating an unaffiliated account is the operator-only transition
+  # (`admin.user.unaffiliated.manage`); the other two need `admin.user.update`
+  # on the companies involved. The refusal names the rule that applied.
+  defp company_failure_message(:unauthorized, choice, %{company_id: nil}),
+    do:
+      "#{inspect(choice)} was not saved: affiliating an unaffiliated account needs the " <>
+        "admin.user.unaffiliated.manage capability."
+
+  defp company_failure_message(:unauthorized, choice, _user),
+    do: "#{inspect(choice)} was not saved: you may not manage users of that company."
+
+  defp company_failure_message(:company_not_found, choice, _user),
+    do: "#{inspect(choice)} was not saved: that company is not in this workspace."
+
+  defp company_failure_message(:employee_not_found, choice, _user),
+    do: "#{inspect(choice)} was not saved: the linked employee record could not be found."
+
+  defp company_failure_message(reason, _choice, _user), do: failure_message(reason)
+
+  defp unaffiliated_message,
+    do: "The change was not saved: this account has no company to write it through."
+
+  # What the operator chose, as the alert names it: the company's display
+  # name when the option came from this workspace's list, "None" for the
+  # blank option, and the raw ID for anything else.
+  defp company_choice_label(_socket, nil), do: "None"
+
+  defp company_choice_label(socket, company_id) do
+    Map.get(socket.assigns.company_names, company_id, Integer.to_string(company_id))
+  end
+
+  # The refusal is the whole outcome: a "Saved" left over from an earlier
+  # commit would read as if this write had landed too.
+  defp write_forbidden(socket) do
+    socket
+    |> assign(:field_status, drop_saved(socket.assigns.field_status))
+    |> put_flash(:error, "You do not have permission to edit users.")
+  end
+
+  defp inline_field(params) when is_map(params) do
+    Enum.find_value(@inline_fields, :error, fn {name, field} ->
+      case Map.fetch(params, name) do
+        {:ok, value} when is_binary(value) -> {:ok, name, field, value}
+        _ -> nil
+      end
+    end)
+  end
+
+  defp inline_field(_params), do: :error
+
+  defp fact_label(name), do: Map.fetch!(@fact_labels, name)
 
   defp current_actor(socket, company_id) do
     current_scope = socket.assigns.current_scope

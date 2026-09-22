@@ -30,9 +30,12 @@ defmodule Bilimbi.Base.UI.ComponentsPageTest do
     assert render_page(%{}, :list) =~ "max-w-7xl"
   end
 
-  test "form and detail have their own widths" do
+  test "form has its own width and detail shares the list width" do
     assert render_page(%{}, :form) =~ "max-w-2xl"
-    assert render_page(%{}, :detail) =~ "max-w-4xl"
+    # Belimbing gives a detail page the same column as a list; the cards
+    # fill the main area beside the sidebar rather than a narrower band.
+    assert render_page(%{}, :detail) =~ "max-w-7xl"
+    refute render_page(%{}, :detail) =~ "max-w-4xl"
   end
 
   test "id, extra classes and global attributes pass through" do

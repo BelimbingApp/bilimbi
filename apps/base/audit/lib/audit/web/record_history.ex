@@ -2,10 +2,13 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
   @moduledoc """
   Header affordance for a single auditable record's recent mutation trail.
 
-  The trigger is a demoted icon action, not a button: history is a familiar
-  secondary action, so it takes the registry's `history` glyph (the clock
-  Belimbing uses for the same action) at the table/toolbar icon size, with
-  the word "History" kept for assistive technology and the tooltip.
+  The trigger is a demoted labelled action, not a button: history is a
+  familiar secondary action, so it is the registry's `history` glyph (the
+  clock Belimbing uses for the same action) beside the word "History", in the
+  one quiet treatment `Bilimbi.Base.UI.Components.demoted_action_class/0`
+  gives every demoted header action. Belimbing's `admin/*/show` pages present
+  it exactly so, as a labelled ghost control in the row with Impersonate and
+  Back, so the word is visible rather than kept for assistive technology.
   """
 
   use Bilimbi.Base.UI, :live_component
@@ -36,11 +39,12 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
         <summary
           id={"#{@id}-toggle"}
           title="History"
-          aria-label="History"
-          class="grid size-7 shrink-0 cursor-pointer list-none place-items-center rounded-md text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 [&::-webkit-details-marker]:hidden"
+          class={[
+            Bilimbi.Base.UI.Components.demoted_action_class(),
+            "cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+          ]}
         >
-          <.icon name="history" class="size-4" />
-          <span class="sr-only">History</span>
+          <.icon name="history" class="size-4" /> History
         </summary>
 
         <div

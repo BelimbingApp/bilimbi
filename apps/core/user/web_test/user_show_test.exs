@@ -65,6 +65,42 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(view, "#app-content", "unverified")
     refute has_element?(view, "#user-edit")
     refute has_element?(view, "#user-danger")
+
+    # A viewer sees the facts with no affordance: no in-place editors and no
+    # company trigger, and the header holds no button beyond the pin.
+    assert has_element?(view, "#user-view-name", "Grace Hopper")
+    assert has_element?(view, "#user-view-email", "grace@example.com")
+    refute has_element?(view, "#user-name[phx-hook='InlineEdit']")
+    refute has_element?(view, "#user-email[phx-hook='InlineEdit']")
+    refute has_element?(view, "#user-company-display")
+    refute has_element?(view, "#user-company-form")
+    refute has_element?(view, "main header button:not(#user-pin)")
+  end
+
+  test "hides History and Impersonate from an actor without their capabilities", %{conn: conn} do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    # Holding the update capability changes the facts, not the header:
+    # History needs admin.audit.log.list and Impersonate needs
+    # admin.user.impersonate, and neither is granted here.
+    grant_capabilities!(["admin.user.view", "admin.user.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+
+    assert has_element?(view, "#user-name[phx-hook='InlineEdit']")
+    refute has_element?(view, "#user-record-history-toggle")
+    refute has_element?(view, "#user-record-history")
+    refute has_element?(view, "#user-impersonate")
+    assert has_element?(view, "main header #user-back", "Back")
+    refute has_element?(view, "main header button:not(#user-pin)")
+    refute has_element?(view, "#user-edit")
   end
 
   test "shows record history for the user's compatible auditable identity", %{conn: conn} do
@@ -97,7 +133,14 @@ defmodule BilimbiWeb.UserShowTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
 
-    assert has_element?(view, "#user-record-history-toggle", "History")
+    # History is a demoted labelled action, as Belimbing's admin/users/show
+    # presents it: the clock beside its word, in the back link's quiet
+    # treatment, never a button.
+    assert has_element?(view, "summary#user-record-history-toggle[title='History']", "History")
+    assert has_element?(view, "summary#user-record-history-toggle.text-link")
+    assert has_element?(view, "#user-record-history-toggle .hero-clock")
+    refute has_element?(view, "button#user-record-history-toggle")
+    refute has_element?(view, "main header button:not(#user-pin)")
     assert has_element?(view, "#user-record-history-panel", "old@example.com")
     assert has_element?(view, "#user-record-history-panel", "grace@example.com")
   end
@@ -117,7 +160,8 @@ defmodule BilimbiWeb.UserShowTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
 
     refute has_element?(view, "#user-delete")
-    assert has_element?(view, "#user-edit")
+    # There is no edit mode to reach: the facts edit in place.
+    refute has_element?(view, "#user-edit")
   end
 
   test "redirects to the index for a user outside the tenant", %{conn: conn} do
@@ -233,14 +277,30 @@ defmodule BilimbiWeb.UserShowTest do
     grant_capabilities!(["admin.user.view", "admin.user.impersonate"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
-    assert has_element?(view, "#user-impersonate[href='/admin/impersonate/92']", "Impersonate")
 
-    # When viewing own profile, impersonate button is hidden
+    # Impersonate is the quiet labelled action Belimbing presents beside
+    # History and Back: its glyph and its word as a POST link in the demoted
+    # treatment, not a bordered or primary button.
+    assert has_element?(
+             view,
+             "a#user-impersonate[href='/admin/impersonate/92'][data-method='post'][title='Impersonate this user']",
+             "Impersonate"
+           )
+
+    assert has_element?(view, "a#user-impersonate.text-link svg")
+    refute has_element?(view, "a#user-impersonate.border")
+    refute has_element?(view, "a#user-impersonate.bg-action")
+    refute has_element?(view, "button#user-impersonate")
+    refute has_element?(view, "main header button:not(#user-pin)")
+
+    # When viewing own profile, impersonate action is hidden
     {:ok, own_view, _html} = conn |> log_in_as() |> live(~p"/users/91")
     refute has_element?(own_view, "#user-impersonate")
   end
 
-  test "updates user name and email via inline edit", %{conn: conn} do
+  test "saves each committed text fact in place and reports the outcome on that fact", %{
+    conn: conn
+  } do
     UserFixtures.insert_user!(%{id: 91, company_id: 73})
 
     UserFixtures.insert_user!(%{
@@ -253,18 +313,71 @@ defmodule BilimbiWeb.UserShowTest do
     grant_capabilities!(["admin.user.view", "admin.user.update"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
 
-    # Update name
-    render_hook(view, "save_field", %{"field" => "name", "value" => "Grace Brewster Hopper"})
+    assert has_element?(view, "#user-name[phx-hook='InlineEdit']")
+    refute has_element?(view, "#user-name[data-allow-empty]")
+    refute has_element?(view, "#user-name-status")
+
+    render_hook(view, "save_field", %{"id" => "92", "name" => "Grace Brewster Hopper"})
     assert has_element?(view, "h1", "Grace Brewster Hopper")
+    assert has_element?(view, "#user-view-name", "Grace Brewster Hopper")
+    assert has_element?(view, "#user-name-status[role='status']", "Saved")
+    refute has_element?(view, "#flash-group", "updated")
+    assert {:ok, %{name: "Grace Brewster Hopper"}} = User.get_user(scope, 73, 92)
 
-    # Update email
-    render_hook(view, "save_field", %{"field" => "email", "value" => "grace.hopper@example.com"})
-    assert has_element?(view, "#app-content", "grace.hopper@example.com")
+    # "Saved" belongs to the most recent commit only.
+    render_hook(view, "save_field", %{"id" => "92", "email" => "grace.hopper@example.com"})
+    assert has_element?(view, "#user-view-email", "grace.hopper@example.com")
+    assert has_element?(view, "#user-email-status[role='status']", "Saved")
+    refute has_element?(view, "#user-name-status")
+    assert {:ok, %{email: "grace.hopper@example.com"}} = User.get_user(scope, 73, 92)
+  end
 
-    # Invalid email format should show error flash
-    render_hook(view, "save_field", %{"field" => "email", "value" => "invalid-email"})
-    assert has_element?(view, "#flash-group", "Failed to update email")
+  test "a refused commit keeps the stored value on screen and reports the reason on the fact", %{
+    conn: conn
+  } do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    grant_capabilities!(["admin.user.view", "admin.user.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    render_hook(view, "save_field", %{"id" => "92", "email" => "invalid-email"})
+
+    assert has_element?(view, "#user-email-status[role='alert']", "was not saved")
+    assert has_element?(view, "#user-email-status", "\"invalid-email\"")
+    assert has_element?(view, "#user-email-status", "Email must be an email address")
+    assert has_element?(view, "#user-view-email", "grace@example.com")
+    assert has_element?(view, "#user-email input[aria-invalid='true']")
+    refute has_element?(view, "#user-email-status", "Saved")
+    refute has_element?(view, "#flash-group", "was not saved")
+    refute has_element?(view, "#flash-group", "Failed")
+    assert {:ok, %{email: "grace@example.com"}} = User.get_user(scope, 73, 92)
+
+    # The alert stays until that fact is committed again, and then gives way
+    # to the new outcome; a success elsewhere does not clear it.
+    render_hook(view, "save_field", %{"id" => "92", "name" => "Grace B. Hopper"})
+    assert has_element?(view, "#user-email-status[role='alert']")
+    assert has_element?(view, "#user-name-status", "Saved")
+
+    # A taken address is refused by the unique constraint, with its own reason.
+    render_hook(view, "save_field", %{"id" => "92", "email" => "ada@example.com"})
+    assert has_element?(view, "#user-email-status[role='alert']", "Email has already been taken")
+    refute has_element?(view, "#user-name-status")
+
+    render_hook(view, "save_field", %{"id" => "92", "email" => "grace.hopper@example.com"})
+    refute has_element?(view, "#user-email-status[role='alert']")
+    assert has_element?(view, "#user-email-status", "Saved")
+    assert has_element?(view, "#user-view-email", "grace.hopper@example.com")
   end
 
   test "reassigns company and unassigns to unaffiliated", %{conn: conn} do
@@ -288,21 +401,106 @@ defmodule BilimbiWeb.UserShowTest do
     grant_capabilities!(["admin.user.view", "admin.user.update"], company_id: 75)
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
 
-    # Reassign company to 75
+    # The company reads as its name and becomes a select on click, like
+    # Belimbing's edit-in-place select; nothing is a permanent control.
+    assert has_element?(view, "#user-company-display", "Bilimbi Industries")
+    refute has_element?(view, "#user-company-form")
+    refute has_element?(view, "select#user-company-select")
+
+    view |> element("#user-company-display") |> render_click()
+    assert has_element?(view, "#user-company-form select#user-company-select")
+    assert has_element?(view, "#user-company-select option[value='75']", "Beta Industries")
+
+    # Escape or leaving the select cancels without writing.
+    render_hook(view, "cancel_edit_field", %{})
+    refute has_element?(view, "#user-company-form")
+    assert {:ok, %{company_id: 73}} = User.get_user(scope, 73, 92)
+
+    # Reassign company to 75: commits on change and reports on the fact.
+    view |> element("#user-company-display") |> render_click()
+
     view
     |> form("#user-company-form")
     |> render_change(%{"company_id" => "75"})
 
-    assert has_element?(view, "#flash-group", "Company reassigned")
+    refute has_element?(view, "#user-company-form")
+    assert has_element?(view, "#user-company-display", "Beta Industries")
+    assert has_element?(view, "#user-company-status[role='status']", "Saved")
+    refute has_element?(view, "#flash-group", "reassigned")
+    assert has_element?(view, "main header", "Beta Industries")
+    assert {:ok, %{company_id: 75}} = User.get_user(scope, 75, 92)
 
     # Clear company to unaffiliated
+    view |> element("#user-company-display") |> render_click()
+
     view
     |> form("#user-company-form")
     |> render_change(%{"company_id" => ""})
 
-    assert has_element?(view, "#flash-group", "unaffiliated")
-    assert has_element?(view, "#app-content", "Unaffiliated")
+    assert has_element?(view, "#user-company-display", "None")
+    assert has_element?(view, "#user-company-status[role='status']", "Saved")
+    assert has_element?(view, "main header", "Unaffiliated")
+    refute has_element?(view, "#flash-group", "unaffiliated")
+
+    # An unaffiliated account has no company to write its facts through, so
+    # the name and email lose their editors and the page says why, while the
+    # company choice stays. Affiliating it again is the operator-only
+    # transition, which this actor may not perform.
+    assert has_element?(view, "#user-unaffiliated-notice", "admin.user.unaffiliated.manage")
+    refute has_element?(view, "#user-name[phx-hook='InlineEdit']")
+    refute has_element?(view, "#user-email[phx-hook='InlineEdit']")
+    assert has_element?(view, "#user-view-name", "Grace Hopper")
+
+    view |> element("#user-company-display") |> render_click()
+
+    view
+    |> form("#user-company-form")
+    |> render_change(%{"company_id" => "73"})
+
+    assert has_element?(view, "#user-company-status[role='alert']", "was not saved")
+    assert has_element?(view, "#user-company-status", "admin.user.unaffiliated.manage")
+    assert has_element?(view, "#user-company-display", "None")
+  end
+
+  test "a refused company choice keeps the stored company and reports the reason on the fact",
+       %{conn: conn} do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    grant_capabilities!(["admin.user.view", "admin.user.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    # Company 74 belongs to another tenant and is not an option; a forged
+    # change is refused by Core User and the refusal lands on the fact.
+    view |> element("#user-company-display") |> render_click()
+    refute has_element?(view, "#user-company-select option[value='74']")
+
+    view
+    |> form("#user-company-form")
+    |> render_change(%{"company_id" => "74"})
+
+    refute has_element?(view, "#user-company-form")
+    assert has_element?(view, "#user-company-status[role='alert']", "was not saved")
+    assert has_element?(view, "#user-company-status", "\"74\"")
+    assert has_element?(view, "#user-company-display", "Bilimbi Industries")
+    refute has_element?(view, "#user-company-status", "Saved")
+    refute has_element?(view, "#flash-group", "Failed")
+    assert {:ok, %{company_id: 73}} = User.get_user(scope, 73, 92)
+
+    # A later success elsewhere leaves the refusal standing on its fact.
+    render_hook(view, "save_field", %{"id" => "92", "name" => "Grace B. Hopper"})
+    assert has_element?(view, "#user-company-status[role='alert']")
+    assert has_element?(view, "#user-name-status", "Saved")
   end
 
   test "assigns and removes roles", %{conn: conn} do

@@ -103,6 +103,19 @@ limiting, session cookies, and Phoenix navigation.
 querying `employees`. A foreign key to another module's table does not grant
 read access to its schema.
 
+**The detail page is read-first.** `/users/:id` shows the account as facts.
+An operator holding `admin.user.update` edits the name and email in place
+through `<.inline_edit>` and changes the company through a choice that reads
+as the company name and becomes a select on click; every commit saves by
+itself and reports on its own fact, so there is no "Edit user" button and no
+edit mode to reach from the page. The header is Belimbing's quiet labelled
+row — History, Impersonate and "← Back" — with no button; the Impersonate
+guards (`admin.user.impersonate`, never the signed-in account, never while
+impersonating) are unchanged. `Bilimbi.Core.User.Web.ShowLive`'s moduledoc
+owns the per-fact rules and DESIGN.md's "Read-first detail pages" owns the
+pattern. The standalone `/users/:id/edit` form still exists for the create
+flow's sibling route but nothing on the detail page links to it.
+
 **`users.prefs` remains intentionally absent.** Belimbing dropped it in
 `0200_01_20_000007`. Core User contributes and validates `ui.theme`,
 `ui.landing_menu_id`, `ui.dashboard.layout`, and

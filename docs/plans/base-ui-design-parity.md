@@ -59,7 +59,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | LAY-02 [(contradicted)](#targets-the-evidence-contradicts) | Application shell and account footer | Exists | Remove persistent company and tenant repetition. Put the current timezone and light/dark theme selectors in the top bar. Keep the user circle at the bottom left as the account and scope entry point; show an always-visible warning only for unusual or safety-critical scope. Match the best collapse, drawer and navigation-continuity behavior. |
 | LAY-03 | Page width and page header | Shared primitives exist | Cover title, subtitle, action, pin, contextual help and narrow states. |
 | LAY-04 | Secondary side panel | Bespoke Design Library example | Establish one responsive page-local navigation pattern with desktop rail and mobile access. |
-| LAY-05 | Index, form and detail geometry | Shared `<.page>` enforces one width per list, form and detail archetype; each screen still composes its assembly locally | Define complete assemblies rather than leaving every screen to compose them differently. |
+| LAY-05 | Index, form and detail geometry | Shared `<.page>` enforces one width per archetype: list and detail share `max-w-7xl`, as Belimbing gives a detail the same column as a list, and form keeps `max-w-2xl`; each screen still composes its assembly locally | Define complete assemblies rather than leaving every screen to compose them differently. |
 | NAV-01 [(contradicted)](#targets-the-evidence-contradicts) | Main menu tree | Exists | Verify active ancestry, pinned items, reorder, collapse, mobile drawer and persistence. |
 | NAV-02 | Tabs | Shared `<.tabs>` used by Schedule and Settings | Provide shared semantics, keyboard navigation, active state and URL/history rules. |
 | NAV-03 | Link dictionary and related-link groups | Two shared entries: `<.back_link>`, the demoted "← Back" return link every list, form and detail page uses instead of a "Back to …" button, and `<.action_link>`, the demoted related-workflow link with its registry glyph that the Departments and Relationships sections of `/companies/1`, the Department Types and Legal Entity Types links on `/companies` and the Employee Types link on `/employees` use instead of buttons | Adopt internal, anchor, external, new-tab and download behavior; mutations remain buttons. |
@@ -78,7 +78,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | INP-08 | Country and currency lookup | Missing | Build only the generic visual/interaction seam; domain data stays with its owning module. |
 | INP-09 | Segmented control | Missing | Add for short peer choices when a real Bilimbi workflow needs it. |
 | INT-01 | Inline text editing | Shared `<.inline_edit>` commits on Enter or blur, cancels on Escape, shows `—` for a blank value, keeps the stored value on screen for the whole round trip, marks that trip `aria-busy` beside a "Saving…" line, and reports the commit outcome on the field itself through the shared `<.commit_status>`; an emptied input is a real edit only where the owner passes `allow_empty`. `/addresses/:id` adopts all of it; the other inline-edit screens still report through a flash. F2 entry and focus restore after a commit do not exist | Complete F2/typing entry, Enter/blur save, Escape cancel, focus restore and error recovery. |
-| INT-02 | Inline select, combobox and textarea editing | Missing | Add after their underlying controls are accepted. |
+| INT-02 | Inline select, combobox and textarea editing | Two page-local inline selects ship on the same rule — the address verification status and the user's company read as their value and become a select on click, commit on change, cancel on Escape or blur and report through `<.commit_status>` — but no shared inline-select primitive, combobox or textarea exists | Add after their underlying controls are accepted. |
 | INT-03 [(contradicted)](#targets-the-evidence-contradicts) | Grouped fact editing | Missing | Support Apply/Cancel where facts must change atomically. |
 | INT-04 [(contradicted)](#targets-the-evidence-contradicts) | Disclosure | No shared primitive | Define open/closed semantics, `aria-expanded`, keyboard behavior and reduced motion. |
 | INT-05 | Filter and period patterns | Repeated local compositions | Standardize the shared composition while keeping URL state and production meaning. |
@@ -99,7 +99,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | DAT-06 | Record history, timeline and comparisons | Local or missing | Keep specialist behavior with the owning workflow; share only the generic presentation seam. |
 | CMP-01 [(contradicted)](#targets-the-evidence-contradicts) | Operational index page | Partial specimen | Standardize header, filters, table, actions, empty/loading/error and pagination as one flow. |
 | CMP-02 | Form page | Complete production form ships (`/companies/create`: field rhythm, inline validation, save/cancel); no unsaved-navigation guard exists, and that criterion depends on INT-06, which is deferred until a real Bilimbi workflow proves the need; the shared composition is not extracted | Standardize field rhythm, validation, save/cancel, loading, success and unsaved navigation. |
-| CMP-03 | Detail and settings page | Two production details ship: `/addresses/1` is read-first (every fact edits in place and saves by itself, one grouped Apply for the interdependent location facts, the outcome on the fact rather than in a flash, a demoted back link and history icon), while `/companies/1` keeps facts behind explicit edit modes, though its header now matches Belimbing's history-and-back actions — the history icon and a back link, with Departments and Relationships reached through each section's demoted Manage link, and the status badge leading that row is Bilimbi's own #685 decision that Belimbing does not present; related navigation and permission states exist on both, and the shared assembly is not extracted | Standardize facts, inline/grouped editing, related navigation and permission states. |
+| CMP-03 | Detail and settings page | Three production details ship: `/addresses/1` and `/users/1` are read-first (every fact edits in place and saves by itself — the user's company is a choice that becomes a select on click — one grouped Apply for the interdependent location facts, the outcome on the fact rather than in a flash, a demoted back link and the labelled history action; `/users/1` also carries Impersonate as a demoted `POST` action and no button), while `/companies/1` keeps facts behind explicit edit modes, though its header now matches Belimbing's history-and-back actions — the labelled history action and a back link, with Departments and Relationships reached through each section's demoted Manage link, and the status badge leading that row is Bilimbi's own #685 decision that Belimbing does not present; every detail page now takes the list width, as Belimbing's `admin/*/show` pages fill the main column; related navigation and permission states exist on all three, and the shared assembly is not extracted | Standardize facts, inline/grouped editing, related navigation and permission states. |
 | CMP-04 | Destructive workflow | No complete specimen | Show entry, consequence, acknowledgement, in-flight, success, failure and recovery together. |
 | CMP-05 | Authentication and first arrival | Login, recovery and dashboard arrival ship and were audited live against Belimbing (Lanes A and D); the sign-in handoff is a busy submit with readonly fields | Treat login, recovery and dashboard arrival as first-impression acceptance surfaces. |
 | CMP-06 | Responsive and theme coverage | The `/companies` index and the shell were verified live at narrow width and in dark theme (Lane D); narrow detail, narrow form and a full keyboard pass remain | Review representative assemblies at desktop/narrow widths and in light/dark themes. |
@@ -880,3 +880,90 @@ and no strip.
 Not delivered by this slice: the operator-only surfaces themselves, such as
 the raw SQL console, do not warn that an action is unfiltered. That is a
 known gap.
+
+### User detail Belimbing parity slice — CMP-03, INT-02, LAY-05 and NAV-03, partial
+
+Goal: Bring `/users/:id` to the read-first, demoted-action shape `/addresses/:id`
+and `/companies/:id` settled, and settle the detail page width against what
+Belimbing actually does, under the captain's five canonical instructions of
+2026-09-20 applied globally.
+
+What Belimbing does, read from `resources/core/views/livewire/admin/users/show.blade.php`
+and its shared components on 2026-09-22:
+
+- **No width of its own.** The page is a `space-y-section-gap` stack inside a
+  `<main class="flex-1 … px-1 sm:px-4">`; no `admin/*/show` page and no layout
+  wrapper sets a `max-w-*`, so the cards fill the main column beside the
+  sidebar at every viewport. The facts inside a card are
+  `grid grid-cols-1 md:grid-cols-2 gap-4`.
+- **A quiet labelled header row.** `x-ui.record-history` renders a ghost
+  button (clock + "History"; none of the four `admin/*/show` pages passes
+  `icon-only`), Impersonate is a ghost button (glyph + "Impersonate", a `POST`
+  form, disabled for oneself and while impersonating) and Back is a plain
+  `x-ui.link`. There is no edit button: the facts edit in place.
+- **The company is `x-ui.edit-in-place.select`.** It reads as the company name
+  or "None" with a hover pencil, becomes a focused select on click, saves on
+  change, and closes on Escape (reverting) or blur.
+
+Shipped:
+
+- [x] `<.page variant={:detail}>` takes the list width `max-w-7xl` instead of
+  `max-w-4xl`. Belimbing gives a detail the same column as a list; a detail's
+  sections carry the same tables an index does; and the layout no longer jumps
+  between `/users` and `/users/1`. The cap only binds on a main column wider
+  than 80rem, where Bilimbi's lists already stop — on a 1920px display the
+  cards leave the sidebar's remaining ~190px on each side, on a 1440px or
+  1366px display they fill the column exactly as Belimbing's do, and at phone
+  width they fill it. The one alternative, no cap at all, would have made a
+  detail wider than its own index above 1536px and was not taken. Prose
+  descriptions inside the user page's sections carry `max-w-prose`; the cards
+  fill. `{fm/users-detail-belimbing-parity/claude-fable-5-1}`
+- [x] The `record.history` trigger is a labelled action: the clock beside the
+  word "History" in `demoted_action_class/0`, the treatment `<.back_link>` and
+  `<.action_link>` share and the one public class in Base UI, exposed because
+  the trigger is a `<summary>` and cannot be a link. The previous slice had
+  kept the word for assistive technology only; Belimbing shows it on every
+  detail page. Company, address, employee and user headers inherit it.
+  `{fm/users-detail-belimbing-parity/claude-fable-5-1}`
+- [x] `<.action_link>` accepts `href` and `method` in place of `navigate` for
+  a quiet action that submits a request; exactly one destination is allowed
+  and anything else raises. Impersonate on `/users/:id` is the first user,
+  with its guards unchanged. `{fm/users-detail-belimbing-parity/claude-fable-5-1}`
+- [x] `/users/:id` is read-first: the "Edit user" button is gone; name and
+  email are `<.inline_edit>` facts with `status` (no `allow_empty`: both are
+  required); the company reads as its name and becomes a select on click,
+  commits on change, cancels on Escape or blur, and reports through
+  `<.commit_status>` with the operator's choice named in a refusal; every
+  outcome lands on its fact and success does not flash. The header is the
+  `flex flex-wrap items-center gap-3` row of History, Impersonate and "← Back"
+  and no button. An unaffiliated account has no company for Core User to
+  write its facts through, so its name and email show no editor and an info
+  notice says why; the company choice stays, and a refused affiliation names
+  the operator-only `admin.user.unaffiliated.manage` rule. Web tests cover a
+  saved and a refused text commit (format and uniqueness), a saved, cancelled
+  and refused company choice, the unaffiliated state, the viewer without
+  `admin.user.update` seeing plain values, and History and Impersonate staying
+  hidden from an actor without `admin.audit.log.list` and
+  `admin.user.impersonate`. `{fm/users-detail-belimbing-parity/claude-fable-5-1}`
+
+Not delivered by this slice, reported as follow-up:
+
+- **The rest of `/users/:id`** — the roles and capability pickers, the
+  change-password disclosure, the employee records and external accesses
+  sections — keep their existing buttons, flashes and permanent controls.
+  Belimbing's page has the same sections; their own read-first migration is a
+  separate slice.
+- **`/users/:id/edit` still exists** as a route and form; nothing on the
+  detail page reaches it. Removing it is a product decision.
+- **`/employees/:id`** still carries an "Edit employee" primary button and
+  reports in-place edits through a flash; **`/companies/:id`** still keeps its
+  facts behind edit modes (CMP-03 stays partial).
+- **INT-02 stays without a shared primitive.** The user's company is the
+  second page-local inline select on the same rule; extracting one shared
+  `<.inline_select>` waits for its underlying control to be accepted.
+- **The `<.header>` change is the narrow-width stacking only** (title first,
+  actions below, under `sm`, as Belimbing's page header does; measured on
+  `/users/2` at 390px: the title row is one line again and the actions row
+  sits below it at the page's left edge). Each detail page still supplies its
+  own `gap-3` actions row, and the six other header rows the previous slice
+  listed as lacking the wrapper are still as they were.

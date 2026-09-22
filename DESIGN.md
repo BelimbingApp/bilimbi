@@ -101,7 +101,13 @@ forms, `:detail` for show screens and the dashboard. Never hand-write
 `mx-auto max-w-*` on a screen's root container. Every create and edit form
 renders at the `:form` width — related field pairs may share a row inside it
 (the company create screen is the exemplar), but the page never widens to
-fit more columns.
+fit more columns. A detail page shares the list width: Belimbing's
+`admin/*/show` pages set no width of their own, so their cards fill the main
+column beside the sidebar at every viewport, and a detail's sections carry
+the same tables an index does. Inside a section, only prose keeps a reading
+limit (`max-w-prose` on a description paragraph); the cards themselves fill.
+The fact grid inside a card is `grid-cols-1 md:grid-cols-2`, one column on a
+phone and two from tablet width, as Belimbing lays the same facts out.
 
 ### Input controls
 
@@ -152,17 +158,22 @@ surface they are read on — a table row or a detail page fact:
 ## Read-first detail pages
 
 A detail page shows the record as facts and lets an authorized operator change
-each fact in place. `/addresses/:id` is the exemplar and the only full adopter
-today; `/employees/:id` and `/users/:id` already edit facts in place but still
-report the outcome in a flash and pass no `allow_empty`, and adopt the rest of
-this section as they are migrated. There is no edit mode and no save button:
-a committed edit saves by itself. What "committed" means follows the control
+each fact in place. `/addresses/:id` is the exemplar and `/users/:id` the
+second full adopter (its name, email and company); `/employees/:id` already
+edits facts in place but still reports the outcome in a flash and passes no
+`allow_empty`, and adopts the rest of this section as it is migrated. There
+is no edit mode and no save button: a committed edit saves by itself, and an
+"Edit …" button that opens a separate edit form for the same facts is a
+defect. What "committed" means follows the control
 and is the same for every fact of that kind on the page:
 
 - **Text facts** use `<.inline_edit>` and commit on Enter or on leaving the
   field. Every nullable column passes `allow_empty`.
 - **Choice facts** show the read state (a badge, a name) as the trigger; the
-  select commits on change, and Escape or leaving it cancels.
+  select appears on click, commits on change, and Escape or leaving it
+  cancels. A permanently visible `<select>` beside read-only facts is a
+  defect: the address verification status and the user's company are the
+  two shipped choice facts.
 - **Interdependent facts** — the address location, where a country change
   invalidates the division, postcode and locality — commit together through
   one grouped editor with a primary Apply and a Cancel. The group is opened
@@ -178,10 +189,11 @@ and is the same for every fact of that kind on the page:
   so.
 - **Viewers without the update capability** see the value with no affordance,
   not a disabled control. Every write handler still re-asks Authz.
-- **Record history** is a demoted icon action in the header: the registry's
-  `history` glyph (Belimbing's clock) at the toolbar icon size, with the word
-  "History" for assistive technology and the tooltip. The
-  `record.history` panel renders it; a page never builds its own.
+- **Record history** is a demoted labelled action in the header: the
+  registry's `history` glyph (Belimbing's clock) beside the word "History",
+  in the same quiet `text-link` treatment as the back link, as Belimbing's
+  `admin/*/show` pages present it. The `record.history` panel renders it; a
+  page never builds its own.
 
 ## Demoted secondary actions
 
@@ -191,7 +203,11 @@ a button: `<.back_link navigate={...}>` renders "← Back" in `text-link`, and i
 `title` names the destination ("Back to company") when the page has more than
 one way back. This holds for every page — list, form and detail — so a
 "Back to …" `<.button>` anywhere is a defect. Record history is demoted the
-same way: it is an icon action in the header, never a button.
+same way: it is a labelled action in the header, never a button. A quiet
+action that submits a request rather than navigating — Impersonate on
+`/users/:id`, a `POST` — is an `<.action_link>` with `href` and `method`,
+so a detail header reads as one labelled row: History, Impersonate, "← Back",
+each glyph beside its word, and no button among them.
 
 Reaching a related workflow is demoted too. A section that lists records
 another page manages — a company's Departments and Relationships — carries
@@ -211,9 +227,12 @@ action followed by demoted links (`/companies`, `/employees`) or only demoted
 actions and record metadata (`/companies/:id`, `/addresses/:id`). Without it
 the controls sit one collapsed space apart and read as a single run of text.
 The page header never repeats a section's link as a button; on
-`/companies/:id` its actions row holds the status badge, the history icon
-action and the back link and no button, while the title row keeps the pin
-icon action. `<.action_link>` is the general form of `<.back_link>`: the same
+`/companies/:id` its actions row holds the status badge, the history action
+and the back link and no button, while the title row keeps the pin icon
+action. Below the `sm` breakpoint the shared `<.header>` stacks the actions
+row under the title, as Belimbing's page header does, so a labelled row never
+squeezes the title into one word per line or clips at the viewport edge; the
+call-site row is also `flex-wrap`, so a long row wraps rather than overflows. `<.action_link>` is the general form of `<.back_link>`: the same
 `text-link` treatment, free text, and a registry glyph. A related-workflow
 `<.button>` that is not the page's primary action is a defect.
 

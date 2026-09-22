@@ -28,7 +28,8 @@ The module-owned detail page is read-first: an operator holding
 `admin.address.update` changes each fact where they read it and the commit
 saves by itself, so the page has no edit mode and no save button. The
 interdependent location facts are the one grouped Apply, and the header
-carries record history as a demoted icon action beside plain "← Back" links.
+carries record history as a demoted labelled action beside plain "← Back"
+links.
 `Bilimbi.Core.Address.Web.ShowLive`'s moduledoc owns the per-fact rules, and
 DESIGN.md's "Read-first detail pages" owns the pattern.
 

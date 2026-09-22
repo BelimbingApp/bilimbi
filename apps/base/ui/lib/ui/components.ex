@@ -1833,7 +1833,15 @@ defmodule Bilimbi.Base.UI.Components do
       sparse table's trailing whitespace is benign, while a cramped dense
       table forces the navigation *Compact layout* asks us to avoid.
     * `:form` — single-column edit forms, at `max-w-2xl`.
-    * `:detail` — show screens and the dashboard, at `max-w-4xl`.
+    * `:detail` — show screens and the dashboard, at the list width
+      `max-w-7xl`. Belimbing gives a detail page the same column as a list:
+      its `admin/*/show` pages set no width of their own, so their cards
+      fill the main area beside the sidebar at every viewport. A detail's
+      sections carry the same tables an index does (a user's employee
+      records, a company's addresses), so it takes the same room, and the
+      layout no longer jumps between `/users` and `/users/1`. The cap only
+      binds on a column wider than 80rem, where Bilimbi's lists already
+      stop; prose inside a section keeps its own reading limit.
 
   ## Examples
 
@@ -1862,10 +1870,15 @@ defmodule Bilimbi.Base.UI.Components do
 
   defp page_width(:list), do: "max-w-7xl"
   defp page_width(:form), do: "max-w-2xl"
-  defp page_width(:detail), do: "max-w-4xl"
+  defp page_width(:detail), do: "max-w-7xl"
 
   @doc """
   Renders a header with title.
+
+  With `actions`, the title block and the actions row share one line from
+  the `sm` breakpoint and stack — title first, actions below — on a phone,
+  as Belimbing's `x-ui.page-header` does, so a labelled actions row never
+  squeezes the title into one word per line or clips at the viewport edge.
   """
   slot(:inner_block, required: true)
   slot(:subtitle)
@@ -1874,7 +1887,10 @@ defmodule Bilimbi.Base.UI.Components do
 
   def header(assigns) do
     ~H"""
-    <header class={[@actions != [] && "flex items-start justify-between gap-6", "pb-4"]}>
+    <header class={[
+      @actions != [] && "flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6",
+      "pb-4"
+    ]}>
       <div>
         <div :if={@title_actions != []} class="flex items-center gap-1.5">
           <h1 class="text-lg font-semibold leading-8 tracking-tight text-action">
@@ -1892,7 +1908,7 @@ defmodule Bilimbi.Base.UI.Components do
           {render_slot(@subtitle)}
         </p>
       </div>
-      <div :if={@actions != []} class="flex-none">{render_slot(@actions)}</div>
+      <div :if={@actions != []} class="sm:flex-none">{render_slot(@actions)}</div>
     </header>
     """
   end
@@ -2444,7 +2460,7 @@ defmodule Bilimbi.Base.UI.Components do
       navigate={@navigate}
       title={@title}
       aria-label={@title}
-      class={[secondary_link_class(), @class]}
+      class={[demoted_action_class(), @class]}
     >
       <span aria-hidden="true">←</span> Back
     </.link>
@@ -2464,10 +2480,16 @@ defmodule Bilimbi.Base.UI.Components do
   Belimbing uses for the same action. `<.back_link>` is the fixed-text member
   of the same family.
 
-  The surface is closed: `id`, `icon`, `navigate` and `title` are all
-  required and there is nothing else, so every demoted action is addressable,
-  reachable, glyphed and named, and none can style itself away from the one
-  treatment the family shares.
+  A quiet action that Belimbing presents the same way but that submits a
+  request rather than navigating — Impersonate on `/users/:id`, a `POST` —
+  passes `href` and `method` in place of `navigate`; the treatment is the
+  same, so the header reads as one labelled row (History, Impersonate,
+  Back) with no button among them.
+
+  The surface is closed: `id`, `icon` and `title` are required, exactly one
+  of `navigate` or `href` names the destination, and there is nothing else,
+  so every demoted action is addressable, reachable, glyphed and named, and
+  none can style itself away from the one treatment the family shares.
 
   ## Examples
 
@@ -2479,9 +2501,29 @@ defmodule Bilimbi.Base.UI.Components do
       >
         Manage
       </.action_link>
+
+      <.action_link
+        id="user-impersonate"
+        icon="bilimbi-impersonate"
+        href={~p"/admin/impersonate/1"}
+        method="post"
+        title="Impersonate this user"
+      >
+        Impersonate
+      </.action_link>
   """
   attr(:id, :string, required: true)
-  attr(:navigate, :string, required: true)
+  attr(:navigate, :string, default: nil)
+
+  attr(:href, :string,
+    default: nil,
+    doc: "the request destination of an action that submits rather than navigates"
+  )
+
+  attr(:method, :string,
+    default: nil,
+    doc: "the HTTP method sent to `href`; ignored with `navigate`"
+  )
 
   attr(:icon, :string,
     required: true,
@@ -2496,14 +2538,17 @@ defmodule Bilimbi.Base.UI.Components do
 
   slot(:inner_block, required: true)
 
-  def action_link(assigns) do
+  def action_link(%{navigate: navigate, href: href} = assigns)
+      when (is_binary(navigate) and is_nil(href)) or (is_nil(navigate) and is_binary(href)) do
     ~H"""
     <.link
       id={@id}
       navigate={@navigate}
+      href={@href}
+      method={@href && @method}
       title={@title}
       aria-label={@title}
-      class={secondary_link_class()}
+      class={demoted_action_class()}
     >
       <.icon name={@icon} class="size-4" />
       {render_slot(@inner_block)}
@@ -2511,9 +2556,26 @@ defmodule Bilimbi.Base.UI.Components do
     """
   end
 
-  # One treatment for every demoted secondary action rendered as a link, so
-  # "← Back" and "Manage" cannot drift apart.
-  defp secondary_link_class do
+  def action_link(assigns) do
+    raise ArgumentError,
+          "action_link #{inspect(assigns.id)} needs exactly one of navigate or href, got " <>
+            "navigate: #{inspect(assigns.navigate)}, href: #{inspect(assigns.href)}"
+  end
+
+  @doc """
+  The one treatment for a demoted secondary action: a quiet labelled control
+  in `text-link` that darkens on hover, never a button.
+
+  `<.back_link>` and `<.action_link>` are the link members of the family and
+  apply it themselves. It is public for the one member that is structurally
+  not a link: the `record.history` trigger is the `<summary>` of a
+  `<details>` and takes this class so History sits in the header row as the
+  same kind of thing as Impersonate and Back, as Belimbing's
+  `admin/*/show` pages present it. Do not use it to style a button as a
+  link; a control that changes data is a `<.button>`.
+  """
+  @spec demoted_action_class() :: String.t()
+  def demoted_action_class do
     "inline-flex items-center gap-1 whitespace-nowrap text-sm text-link transition-colors hover:text-ink focus-visible:outline-none focus-visible:rounded-sm focus-visible:ring-1 focus-visible:ring-brand-strong/40"
   end
 

@@ -228,8 +228,8 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
 
     assert has_element?(
              view,
-             "#component-page-stage #component-page-detail.max-w-4xl",
-             "medium for a record or dashboard"
+             "#component-page-stage #component-page-detail.max-w-7xl",
+             "the list width, for a record or dashboard"
            )
 
     assert has_element?(view, "#component-header-default", "Title, subtitle, and trailing action")

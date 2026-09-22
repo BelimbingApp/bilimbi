@@ -602,7 +602,10 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   Manage is an `<.action_link>` carrying its registry glyph, on the section
   it belongs to or beside the page's primary action, never a button; and
   render record history through the `record.history` panel, whose trigger is
-  the registry's `history` icon. Primary actions use
+  the registry's `history` clock beside the word "History" in the same quiet
+  treatment as those links; a quiet action that submits a request (Impersonate)
+  is an `<.action_link>` with `href` and `method`. Detail pages share the list
+  width and their fact grids collapse to one column below `md`. Primary actions use
   `<.button variant="primary">` with deep olive base (`bg-action`, `lime-950`
   light / `lime-600` dark), high-contrast text (`text-action-ink`, `lime-50`
   light / `lime-950` dark), and a brighter lime hover
