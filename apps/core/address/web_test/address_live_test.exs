@@ -188,12 +188,15 @@ defmodule BilimbiWeb.AddressLiveTest do
     assert address.locality == "Kuala Lumpur"
   end
 
-  test "an empty list shows no pager at all", %{conn: conn} do
+  test "an empty list keeps only the rows-per-page control", %{conn: conn} do
     grant_capabilities!("admin.address.list")
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses")
 
     assert render(view) =~ "No addresses found."
-    refute has_element?(view, "#addresses-pagination")
+    assert has_element?(view, "#addresses-pagination-page-size")
+    refute has_element?(view, "#addresses-pagination-summary")
+    refute has_element?(view, "#addresses-pagination-previous")
+    refute has_element?(view, "#addresses-pagination-next")
   end
 
   test "keeps the result count but omits navigation for a single page", %{
@@ -244,6 +247,24 @@ defmodule BilimbiWeb.AddressLiveTest do
              "#addresses-pagination-summary",
              "Showing 1 to 26 of 26 results"
            )
+  end
+
+  test "a rows-per-page value the list does not offer falls back to 25", %{
+    conn: conn,
+    scope: scope
+  } do
+    for index <- 1..26 do
+      label = "Site #{String.pad_leading("#{index}", 2, "0")}"
+      {:ok, _address} = Address.create_address(scope, %{label: label})
+    end
+
+    grant_capabilities!("admin.address.list")
+
+    for per_page <- ["30", "300", "nonsense"] do
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses?perPage=#{per_page}")
+
+      assert has_element?(view, "#addresses-pagination-summary", "Showing 1 to 25 of 26 results")
+    end
   end
 
   test "requires admin.address.view capability to view address show page", %{

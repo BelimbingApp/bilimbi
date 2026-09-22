@@ -123,7 +123,7 @@ during long operational sessions:
 - **Row padding:** `py-0.5` (`0.125rem` / `2px`), `px-2` (`0.5rem` / `8px`) horizontal cell padding.
 - **Header padding:** `py-1.5` (`0.375rem` / `6px`), `px-2` horizontal header padding.
 - **Header background:** `bg-surface-sunken`.
-- **Table geometry:** Table frames use flat angles, including their overflow wrapper; rounded corners belong to surrounding cards and other surfaces, not to tables.
+- **Table geometry:** Table frames use flat angles, including their overflow wrapper; rounded corners belong to surrounding cards and other surfaces, not to tables. `Bilimbi.Base.UI.Components.table/1` enforces this: neither framing mode carries a radius and the component takes no attribute that can add one, so a rounded table can only come from hand-written markup.
 - **Header typography:** Proper case `text-xs font-semibold text-ink-subtle`.
 - **Body typography:** `text-sm text-ink`, with `tabular-nums text-muted` (`text-ink-muted`) for codes, IDs, currencies, phones, populations, dates, and measurements.
 - **Search & filter toolbar:** Search and filters sit together in an open

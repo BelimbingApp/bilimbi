@@ -6,6 +6,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
   alias Bilimbi.Core.Address
 
   @page_sizes [25, 50, 100]
+  @default_page_size 25
   @sorts ~w(label country_iso verification_status)
 
   @impl true
@@ -183,7 +184,6 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
           </.table>
 
           <.pagination
-            :if={@addresses_page.total_pages > 0}
             id="addresses-pagination"
             page={@addresses_page}
             page_sizes={@page_sizes}
@@ -275,8 +275,10 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
   defp flip_direction(_direction), do: "asc"
 
   defp normalize_page_size(value) do
-    value = parse_page(value)
-    Enum.find(@page_sizes, List.last(@page_sizes), &(&1 >= value))
+    case parse_page(value) do
+      size when size in @page_sizes -> size
+      _size -> @default_page_size
+    end
   end
 
   defp parse_page(value) when is_integer(value) and value > 0, do: value
