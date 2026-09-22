@@ -1342,6 +1342,23 @@ defmodule BilimbiWeb.CompanyLiveTest do
       refute has_element?(view, "#company-timezone-card", "display in UTC")
     end
 
+    test "an unset company under an unconvertible tenant zone names UTC", %{conn: conn} do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, _} = Settings.put("localization.timezone", "Mars/Olympus", SettingsScope.tenant(41))
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      assert has_element?(view, "#company-timezone-display", "Not configured (UTC)")
+      refute has_element?(view, "#company-timezone-display", "Mars/Olympus")
+
+      assert has_element?(
+               view,
+               "#company-timezone-card",
+               "Dates and times will display in UTC until a timezone is set."
+             )
+    end
+
     test "opening a panel dialog dismisses an earlier page flash", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
       {:ok, scope} = Tenancy.scope(41)

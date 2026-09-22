@@ -273,17 +273,21 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
   # The company's own explicit setting, as Belimbing's
   # `explicitCompanyTimezone` reads it, decides whether the company has
-  # configured a timezone; the zone its dates display in is the resolved one,
-  # company then tenant then platform default. An unset company under a
+  # configured a timezone; the zone its dates display in is the one
+  # `Bilimbi.Base.DateTime` renders them in, company then tenant then platform
+  # default, UTC for an unconvertible value. An unset company under a
   # tenant-level zone reads "Not configured (<that zone>)", never UTC.
   defp assign_timezone(socket, company) do
     scope = SettingsScope.company(company.id, company.tenant_id)
-    resolved = Settings.get("localization.timezone", scope)
-    explicit = if Settings.overridden?("localization.timezone", scope), do: resolved, else: ""
+
+    explicit =
+      if Settings.overridden?("localization.timezone", scope),
+        do: Settings.get("localization.timezone", scope),
+        else: ""
 
     socket
     |> assign(:company_timezone, explicit)
-    |> assign(:resolved_timezone, resolved)
+    |> assign(:resolved_timezone, Bilimbi.Base.DateTime.company_timezone(scope))
   end
 
   # ============================================================================
