@@ -21,8 +21,9 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   value and the validation error when the save was refused. The stored value
   stays on screen until the server confirms a change.
 
-  The header carries the record history as a demoted icon action and plain
-  "← Back" links: to the owning Company when `?company=ID` names a linked
+  The header carries the record history as a demoted labelled action — the
+  registry's `history` clock beside the visible word "History", in the same
+  link treatment as the back links — and plain "← Back" links: to the owning Company when `?company=ID` names a linked
   Company, and to the address list.
   """
 

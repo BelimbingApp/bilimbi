@@ -661,16 +661,25 @@
               </.card>
               <.card id="component-action-link" title="Action link" inner_class="p-3">
                 <p class="mb-2 text-xs text-ink-muted">
-                  Reaching a related workflow is a secondary action, so it is a plain link on the section it belongs to or beside the page's primary action, never a button. The glyph is the registry's name for the action, so Manage keeps the cog Belimbing uses, and the title names the destination the short text alone does not.
+                  Reaching a related workflow is a secondary action, so it is a plain link on the section it belongs to or beside the page's primary action, never a button. The glyph is the registry's name for the action, so Manage keeps the cog Belimbing uses, and the title names the destination the short text alone does not. An action that submits a request rather than navigating — Impersonate on a user — takes <code>href</code> and <code>method</code> in place of <code>navigate</code> and reads the same; exactly one destination is allowed.
                 </p>
                 <div class="flex flex-wrap items-center gap-6">
                   <.action_link
                     id="design-library-action-link"
                     icon="manage"
-                    navigate={~p"/system/design-library"}
+                    navigate="/system/design-library"
                     title="Manage department types"
                   >
                     Department Types
+                  </.action_link>
+                  <.action_link
+                    id="design-library-action-link-request"
+                    icon="bilimbi-impersonate"
+                    href="/system/design-library"
+                    method="post"
+                    title="Impersonate this user"
+                  >
+                    Impersonate
                   </.action_link>
                 </div>
               </.card>
