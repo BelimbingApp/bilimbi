@@ -521,7 +521,7 @@
                 Application shell
               </h3>
               <p class="text-sm text-muted">
-                Your account stays at the bottom left. Open it for company, tenant and account actions. Unusual access stays visible while you work.
+                Your account stays at the bottom left. Open it for company, tenant, the platform-operator marker and account actions. Viewing as another user stays visible above the workspace until you stop.
               </p>
               <div class="rounded-xl border border-line bg-surface p-4">
                 <h4 class="text-sm font-semibold">Display controls</h4>
@@ -535,7 +535,7 @@
               <div class="rounded-xl border border-line bg-surface p-4">
                 <h4 class="text-sm font-semibold">Account disclosure</h4>
                 <p class="mt-1 text-xs text-muted">
-                  The accepted disclosure is the circle at the bottom left of this page. Open it for your name, identifier, company, tenant, Change password and Sign out. Every authenticated screen shows the same circle in the same place.
+                  The accepted disclosure is the circle at the bottom left of this page. Open it for your name, identifier, company, tenant, Change password and Sign out. When the tenant is the platform operator, a caution row labelled Platform-operator sits below Tenant: it names the company's status, not your own entitlement, so an account in that company may still be refused operator-only screens. Every authenticated screen shows the same circle in the same place.
                 </p>
               </div>
               <p class="text-xs text-muted">
@@ -1798,7 +1798,7 @@
               Application shell
             </h2>
             <p class="text-sm text-muted">
-              Account details belong behind the bottom-left circle. Platform-operator and impersonated access remain visible above the workspace. An account works in one company and tenant, so the menu shows the current scope and offers no switching.
+              Account details belong behind the bottom-left circle, including the Platform-operator caution row when the tenant is the platform operator; only impersonation, which has an exit, stays above the workspace. An account works in one company and tenant, so the menu shows the current scope and offers no switching.
             </p>
             <p class="text-sm text-muted">
               The clock selects Company, Local or UTC time. Sun, moon and desktop select Light, Dark or System theme. A saved choice confirms in place, updates the controls and follows your account; every timestamp already rendered through &lt;.datetime&gt; changes with it, without a reload and without losing your place, and every screen you open afterwards uses the new choice. A screen that formats instants directly rather than through that component is unaffected until it adopts it. While saving, controls prevent duplicate work; a failed save keeps the previous choice and explains how to retry. While you view as another user, the top bar reports the active time display and offers no controls, because those preferences belong to the account you are viewing.
