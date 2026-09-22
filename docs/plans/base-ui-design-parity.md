@@ -262,6 +262,8 @@ products were read and the plan forbids treating existence as acceptance.
   focus and Escape, with one deliberate departure from its "backdrop" wording: clicking
   the dimmed page does not close, so a stray click cannot discard a form.
 - **LAY-02, NAV-05** — the "Bilimbi now" cells describe pre-#711 state; both shipped.
+  LAY-02's always-visible-warning target was narrowed on 2026-09-22: see its
+  disposition row and the shell operator marker slice below.
 - **INT-04** — reduced motion was not adoptable when Lane A measured it: neither
   product had a contract. Bilimbi now has one platform-wide under FND-05, so a
   disclosure primitive inherits it instead of defining its own.
@@ -396,7 +398,7 @@ The first parity slice owns `LAY-02`, `NAV-05`, shell-related `FND-06`, timezone
 
 ### Account and tenancy context are disclosed when useful
 
-Keeping company and tenant in the top strip makes known context compete with the current task. Hiding scope everywhere is also unsafe for platform operators, impersonation and cross-company work. The recommended direction is progressive disclosure: the bottom-left user circle opens one account menu containing identity, company, tenant and account actions. A switcher appears only for users who can switch. Unusual or safety-critical scope remains visible outside the menu as a persistent warning.
+Keeping company and tenant in the top strip makes known context compete with the current task. Hiding scope everywhere is also unsafe for platform operators, impersonation and cross-company work. The recommended direction is progressive disclosure: the bottom-left user circle opens one account menu containing identity, company, tenant and account actions. A switcher appears only for users who can switch. Unusual or safety-critical scope remains visible outside the menu as a persistent warning. Revised 2026-09-22: only impersonation, which carries an exit, stays outside the menu; the standing platform-operator marker moved into it, as the shell operator marker slice below records and `DESIGN.md`'s application shell section states.
 
 ### Brand-strong text contrast (FND-01) is accepted
 
