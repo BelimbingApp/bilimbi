@@ -22,6 +22,7 @@ the detail header contract.
 | Function | Soft-deleted companies |
 |---|---|
 | `list_companies/1` | Excluded — matches `get_company/2` |
+| `dashboard_summary/2` | Excluded — counts all live companies and returns the preferred company, or the first live company by ID |
 | `list_tenant_company_ids/1` | Included — Belimbing-compatible user listing seam |
 
 Core User's tenant-wide list consumes `list_tenant_company_ids/1` so it never

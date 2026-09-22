@@ -49,19 +49,18 @@ defmodule BilimbiWeb.DashboardLive do
   def mount(_params, _session, socket) do
     scope = socket.assigns.current_scope.scope
 
-    {:ok, companies} = Company.list_companies(scope)
-    {:ok, users} = User.list_users(scope)
+    {:ok, companies} =
+      Company.dashboard_summary(scope, socket.assigns.current_scope.user["company_id"])
 
-    current_company =
-      Enum.find(companies, &(&1.id == socket.assigns.current_scope.user["company_id"])) ||
-        List.first(companies)
+    {:ok, people} = User.dashboard_summary(scope)
+    current_company = companies.company
 
     full_catalogue = Dashboard.widgets()
     authorized = authorized_catalogue(full_catalogue, socket.assigns.current_scope)
     layout = user_layout(socket.assigns.current_scope)
     visible = ordered_visible(authorized, layout)
     available = available_widgets(authorized, visible)
-    default_section_ids = default_section_ids(current_company, users)
+    default_section_ids = default_section_ids(current_company)
 
     visible_sections =
       ordered_visible_sections(default_section_ids, user_sections(socket.assigns.current_scope))
@@ -82,16 +81,15 @@ defmodule BilimbiWeb.DashboardLive do
      |> assign(:visible_sections, visible_sections)
      |> assign(:available_sections, available_sections)
      |> assign(:full_catalogue, full_catalogue)
-     |> assign(:company_count, length(companies))
-     |> assign(:active_company_count, active_company_count(companies))
-     |> assign(:user_count, length(users))
-     |> assign(:verified_user_count, verified_user_count(users))
-     |> assign(:unverified_user_count, unverified_user_count(users))
+     |> assign(:company_count, companies.total)
+     |> assign(:active_company_count, companies.active)
+     |> assign(:user_count, people.total)
+     |> assign(:verified_user_count, people.verified)
+     |> assign(:unverified_user_count, people.unverified)
      |> assign(:session_count, session_count)
      |> assign(:perf_diagnostics, perf_diagnostics)
      |> assign(:audit_entries, audit_entries)
-     |> assign(:companies, companies)
-     |> assign(:users, users)
+     |> assign(:users, people.users)
      |> assign(:current_company, current_company)
      |> assign(:layout_editing, false)
      |> assign(:refresh_timer, nil)
@@ -123,18 +121,6 @@ defmodule BilimbiWeb.DashboardLive do
       sort_by: :occurred_at,
       sort_dir: :desc
     ).entries
-  end
-
-  defp active_company_count(companies) do
-    Enum.count(companies, &(&1.status == "active"))
-  end
-
-  defp verified_user_count(users) do
-    Enum.count(users, &(!is_nil(&1.email_verified_at)))
-  end
-
-  defp unverified_user_count(users) do
-    Enum.count(users, &is_nil(&1.email_verified_at))
   end
 
   defp widget_module(widget_id) do
@@ -240,7 +226,7 @@ defmodule BilimbiWeb.DashboardLive do
     Enum.reject(default_ids, &(&1 in visible_ids))
   end
 
-  defp default_section_ids(current_company, _users) do
+  defp default_section_ids(current_company) do
     ids = ["recent-users"]
     if current_company, do: ["current-company" | ids], else: ids
   end
@@ -654,7 +640,7 @@ defmodule BilimbiWeb.DashboardLive do
                 </div>
                 <.table
                   id="dashboard-users"
-                  rows={Enum.take(@users, 5)}
+                  rows={@users}
                   row_id={&"dashboard-user-#{&1.id}"}
                   caption="People in this workspace"
                 >

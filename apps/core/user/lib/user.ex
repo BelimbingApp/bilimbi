@@ -125,6 +125,57 @@ defmodule Bilimbi.Core.User do
     {:ok, users}
   end
 
+  @doc """
+  Tenant-wide dashboard counts and the first five accounts ordered by ID.
+
+  Uses the same company visibility as `list_users/1`, including archived
+  companies. Counts and the bounded preview share one database snapshot;
+  credentials are not selected and only five account records leave the query.
+  """
+  @spec dashboard_summary(Scope.t()) ::
+          {:ok,
+           %{
+             total: non_neg_integer(),
+             verified: non_neg_integer(),
+             unverified: non_neg_integer(),
+             users: [Summary.t()]
+           }}
+  def dashboard_summary(%Scope{} = scope) do
+    {:ok, company_ids} = Company.list_tenant_company_ids(scope)
+
+    rows =
+      from(user in Schema,
+        where: user.company_id in ^company_ids,
+        windows: [all_users: []],
+        order_by: user.id,
+        limit: 5,
+        select: {
+          struct(user, [
+            :id,
+            :company_id,
+            :employee_id,
+            :name,
+            :email,
+            :email_verified_at,
+            :created_at,
+            :updated_at
+          ]),
+          over(count(user.id), :all_users),
+          over(filter(count(user.id), not is_nil(user.email_verified_at)), :all_users)
+        }
+      )
+      |> Repo.all()
+
+    case rows do
+      [] ->
+        {:ok, %{total: 0, verified: 0, unverified: 0, users: []}}
+
+      [{_, total, verified} | _] ->
+        users = Enum.map(rows, fn {user, _, _} -> Summary.from_schema(user) end)
+        {:ok, %{total: total, verified: verified, unverified: total - verified, users: users}}
+    end
+  end
+
   @spec get_user(Scope.t(), pos_integer(), pos_integer()) ::
           {:ok, Summary.t()} | {:error, lookup_error()}
   def get_user(%Scope{} = scope, company_id, user_id) do

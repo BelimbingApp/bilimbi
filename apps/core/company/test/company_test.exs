@@ -45,6 +45,31 @@ defmodule Bilimbi.Core.CompanyTest do
     assert PrimaryCompanyManager.primary?(PrimaryCompanyManager.platform_operator_company!())
   end
 
+  test "dashboard counts only live tenant companies and preserves current-company selection" do
+    insert_tenant!()
+    insert_tenant!(%{id: 42, is_platform_operator: false})
+    insert_company!()
+    insert_company!(%{id: 74, code: "suspended", status: "suspended"})
+    insert_company!(%{id: 75, code: "archived", deleted_at: ~N[2026-08-11 12:00:00]})
+    insert_company!(%{id: 76, tenant_id: 42, code: "other"})
+    {:ok, scope} = Tenancy.scope(41)
+
+    assert {:ok, %{total: 2, active: 1, company: %Summary{id: 74}}} =
+             Company.dashboard_summary(scope, 74)
+
+    assert {:ok, %{total: 2, active: 1, company: %Summary{id: 73}}} =
+             Company.dashboard_summary(scope, 75)
+
+    assert {:ok, %{total: 2, active: 1, company: %Summary{id: 73}}} =
+             Company.dashboard_summary(scope, 76)
+  end
+
+  test "dashboard returns zero counts for a tenant without live companies" do
+    insert_tenant!()
+    {:ok, scope} = Tenancy.scope(41)
+    assert {:ok, %{total: 0, active: 0, company: nil}} = Company.dashboard_summary(scope, 73)
+  end
+
   test "publishes the durable addressable identity it owns" do
     assert Company.addressable_identity() == "App\\Core\\Company\\Models\\Company"
   end

@@ -20,6 +20,7 @@ and reset-token hashes never leave the module; account reads return
 |---|---|
 | `list_company_users(scope, company_id)` | Users affiliated with one proven live company |
 | `list_users(scope)` | Tenant-wide list; includes users of soft-deleted companies |
+| `dashboard_summary(scope)` | Total/verified/unverified counts plus the first five accounts by ID; same tenant visibility as `list_users/1`, with credentials excluded from the query |
 | `get_user(scope, company_id, user_id)` | One user inside that company |
 | `register_user(scope, company_id, attributes)` | Create an unverified account from plaintext `:password` |
 | `create_user(scope, company_id, attributes)` | Compatibility name for `register_user/3` |

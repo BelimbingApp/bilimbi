@@ -96,6 +96,17 @@ defmodule BilimbiWeb.DashboardLiveTest do
     assert has_element?(view, "#dashboard-company-name", "Bilimbi Industries")
   end
 
+  test "counts all accounts but renders a bounded workspace preview", %{conn: conn} do
+    for id <- 92..98 do
+      UserFixtures.insert_user!(%{id: id, company_id: 73, email: "preview#{id}@example.com"})
+    end
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+    assert has_element?(view, "#stat-users", "8")
+    assert has_element?(view, "#dashboard-user-95")
+    refute has_element?(view, "#dashboard-user-96")
+  end
+
   test "lists users affiliated with the tenant's companies", %{conn: conn} do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 

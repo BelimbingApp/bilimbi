@@ -114,6 +114,59 @@ defmodule Bilimbi.Core.UserTest do
     end
   end
 
+  describe "dashboard_summary/1" do
+    test "counts all visible accounts while fetching only the ordered preview", %{scope_a: scope} do
+      CompanyFixtures.insert_company!(%{
+        id: 76,
+        tenant_id: 41,
+        code: "archived",
+        deleted_at: ~N[2026-08-11 12:00:00]
+      })
+
+      for id <- 91..98 do
+        insert_user!(%{
+          id: id,
+          company_id: if(id == 98, do: 76, else: 73),
+          email: "person#{id}@example.com",
+          email_verified_at: if(rem(id, 2) == 0, do: ~N[2026-08-11 12:00:00])
+        })
+      end
+
+      insert_user!(%{id: 99, company_id: 74, email: "other@example.com"})
+      insert_user!(%{id: 100, company_id: nil, email: "unaffiliated@example.com"})
+      owner = self()
+      handler = {__MODULE__, make_ref()}
+
+      :telemetry.attach(
+        handler,
+        [:bilimbi, :base, :repo, :query],
+        fn _, _, metadata, owner ->
+          if self() == owner and metadata.source == "users" do
+            {:ok, result} = metadata.result
+            send(owner, {:preview_query, result.num_rows, metadata.query})
+          end
+        end,
+        owner
+      )
+
+      on_exit(fn -> :telemetry.detach(handler) end)
+
+      assert {:ok, %{total: 8, verified: 4, unverified: 4, users: users}} =
+               User.dashboard_summary(scope)
+
+      assert Enum.map(users, & &1.id) == [91, 92, 93, 94, 95]
+      assert_receive {:preview_query, 5, query}
+      refute query =~ "password"
+      refute query =~ "remember_token"
+      refute_receive {:preview_query, _, _}
+    end
+
+    test "returns zero counts and an empty preview", %{scope_a: scope} do
+      assert {:ok, %{total: 0, verified: 0, unverified: 0, users: []}} =
+               User.dashboard_summary(scope)
+    end
+  end
+
   describe "get_tenant_user/2" do
     test "reads a user whose company is soft-deleted, matching list visibility", %{
       scope_a: scope_a

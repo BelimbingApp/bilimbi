@@ -119,6 +119,39 @@ defmodule Bilimbi.Core.Company do
   end
 
   @doc """
+  Dashboard counts and one live company, preferring the requested company ID.
+
+  The fallback is the first live company by ID, as in `list_companies/1`.
+  Counts cover all live companies in the tenant while only one company record
+  is returned. The counts and selected company share one database snapshot.
+  """
+  @spec dashboard_summary(Scope.t(), pos_integer()) ::
+          {:ok,
+           %{total: non_neg_integer(), active: non_neg_integer(), company: Summary.t() | nil}}
+  def dashboard_summary(%Scope{} = scope, preferred_company_id)
+      when is_integer(preferred_company_id) and preferred_company_id > 0 do
+    result =
+      from(company in Tenancy.scope_query(Schema, scope),
+        where: is_nil(company.deleted_at),
+        windows: [all_companies: []],
+        order_by: [desc: company.id == ^preferred_company_id, asc: company.id],
+        limit: 1,
+        select:
+          {company, over(count(company.id), :all_companies),
+           over(filter(count(company.id), company.status == "active"), :all_companies)}
+      )
+      |> Repo.one()
+
+    case result do
+      nil ->
+        {:ok, %{total: 0, active: 0, company: nil}}
+
+      {company, total, active} ->
+        {:ok, %{total: total, active: active, company: Summary.from_schema(company)}}
+    end
+  end
+
+  @doc """
   Lists one bounded page of live companies for the administration index.
 
   Options: `:page`, `:page_size` (1..300), `:search` (name, code, legal
