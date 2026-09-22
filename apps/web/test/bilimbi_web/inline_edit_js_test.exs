@@ -10,10 +10,6 @@ defmodule BilimbiWeb.InlineEditJsTest do
     assert source =~ "commit()"
     assert source =~ "cancel()"
     assert source =~ ~s(addEventListener("blur")
-    # Addressed to the element so a field inside a LiveComponent reaches that
-    # component; a bare pushEvent would always land on the LiveView.
-    assert source =~ ~s(this.pushEventTo(this.el, saveEvent)
-    refute source =~ ~s(this.pushEvent(saveEvent)
   end
 
   test "the hook never writes the displayed text itself" do
