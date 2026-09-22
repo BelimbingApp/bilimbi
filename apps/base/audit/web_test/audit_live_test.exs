@@ -256,7 +256,10 @@ defmodule BilimbiWeb.AuditLiveTest do
                "Showing 1 to #{reloaded_total} of #{reloaded_total} results"
              )
 
-      assert has_element?(reloaded, "#mutations-pagination-page-size option[value='50'][selected]")
+      assert has_element?(
+               reloaded,
+               "#mutations-pagination-page-size option[value='50'][selected]"
+             )
     end
 
     test "changing rows per page keeps the active filters", %{conn: conn, scope: scope} do

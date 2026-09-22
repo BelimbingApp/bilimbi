@@ -60,7 +60,11 @@ defmodule BilimbiWeb.SystemInfoLiveTest do
     end
 
     # A row is the shared list's label/value pair, reachable by its own id.
-    assert has_element?(view, "dl#system-info-runtime-facts #system-info-runtime-elixir dt", "Elixir")
+    assert has_element?(
+             view,
+             "dl#system-info-runtime-facts #system-info-runtime-elixir dt",
+             "Elixir"
+           )
 
     assert has_element?(
              view,
