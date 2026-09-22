@@ -61,6 +61,23 @@ defmodule BilimbiWeb.SystemLocalizationLiveTest do
     assert has_element?(view, "#nav-admin-system-localization[aria-current='page']")
   end
 
+  test "presents provenance through the shared record-facts list", %{conn: conn} do
+    {:ok, view, _html} = open(conn)
+
+    assert has_element?(view, "#localization-provenance dl#localization-provenance-facts")
+
+    for {row, label} <- [
+          {"localization-effective-locale", "Effective locale"},
+          {"localization-language", "Translation language"},
+          {"localization-source", "Source"},
+          {"localization-inferred-country", "Inferred country"},
+          {"localization-message-catalogues", "Shared UI message catalogues"}
+        ] do
+      assert has_element?(view, "dl#localization-provenance-facts ##{row} dt", label),
+             "#{label} is not a row of the shared list"
+    end
+  end
+
   test "stores a supported manual locale and clears stale inferred country", %{conn: conn} do
     assert %{source: "platform_operator_address"} =
              Locale.resolve(nil, %Bootstrap{country_iso: "DE"})

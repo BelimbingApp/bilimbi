@@ -24,33 +24,29 @@ defmodule Bilimbi.Base.System.Web.InfoLive do
      |> assign(:applications, System.applications())}
   end
 
-  attr(:id, :string, required: true)
-  attr(:facts, :list, required: true)
+  attr(:value, :any, required: true)
 
   @doc """
-  A card's rows.
+  One fact's value inside the shared `<.list>`.
 
   `:unavailable` renders as "Unavailable" in muted text rather than being
   hidden, so a probe that could not answer is visibly different from a fact
   that happens to be empty.
   """
-  def fact_list(assigns) do
+  def fact_value(%{value: :unavailable} = assigns) do
     ~H"""
-    <dl id={"system-info-#{@id}-facts"} class="divide-y divide-low-contrast-line text-sm">
-      <div
-        :for={fact <- @facts}
-        id={"system-info-#{@id}-#{slug(fact.label)}"}
-        class="flex items-baseline justify-between gap-3 px-2 py-1.5"
-      >
-        <dt class="text-ink-muted">{fact.label}</dt>
-        <dd :if={fact.value == :unavailable} class="text-right text-ink-faint">Unavailable</dd>
-        <dd :if={fact.value != :unavailable} class="text-right font-medium text-ink">
-          {fact.value}
-        </dd>
-      </div>
-    </dl>
+    <span class="text-ink-faint">Unavailable</span>
     """
   end
+
+  def fact_value(assigns) do
+    ~H"""
+    <span class="font-medium">{@value}</span>
+    """
+  end
+
+  @doc "The stable row id for a fact label, so a test or an anchor can reach one row."
+  def fact_id(card, label), do: "system-info-#{card}-#{slug(label)}"
 
   defp slug(label) do
     label

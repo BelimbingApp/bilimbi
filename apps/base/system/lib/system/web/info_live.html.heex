@@ -7,23 +7,43 @@
 
     <div class="mt-5 grid gap-4 md:grid-cols-2">
       <.card id="system-info-application" title="Application">
-        <.fact_list id="application" facts={@application_facts} />
+        <.list id="system-info-application-facts">
+          <:item :for={fact <- @application_facts} id={fact_id("application", fact.label)} title={fact.label}>
+            <.fact_value value={fact.value} />
+          </:item>
+        </.list>
       </.card>
 
       <.card id="system-info-runtime" title="Runtime">
-        <.fact_list id="runtime" facts={@runtime_facts} />
+        <.list id="system-info-runtime-facts">
+          <:item :for={fact <- @runtime_facts} id={fact_id("runtime", fact.label)} title={fact.label}>
+            <.fact_value value={fact.value} />
+          </:item>
+        </.list>
       </.card>
 
       <.card id="system-info-database" title="Database">
-        <.fact_list id="database" facts={@database_facts} />
+        <.list id="system-info-database-facts">
+          <:item :for={fact <- @database_facts} id={fact_id("database", fact.label)} title={fact.label}>
+            <.fact_value value={fact.value} />
+          </:item>
+        </.list>
       </.card>
 
       <.card id="system-info-server" title="Server">
-        <.fact_list id="server" facts={@server_facts} />
+        <.list id="system-info-server-facts">
+          <:item :for={fact <- @server_facts} id={fact_id("server", fact.label)} title={fact.label}>
+            <.fact_value value={fact.value} />
+          </:item>
+        </.list>
       </.card>
 
       <.card id="system-info-health" title="Health">
-        <.fact_list id="health" facts={@health_facts} />
+        <.list id="system-info-health-facts">
+          <:item :for={fact <- @health_facts} id={fact_id("health", fact.label)} title={fact.label}>
+            <.fact_value value={fact.value} />
+          </:item>
+        </.list>
       </.card>
 
       <.card id="system-info-applications" title="Applications">

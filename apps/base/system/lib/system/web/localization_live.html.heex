@@ -30,30 +30,23 @@
         </.form>
       </.card>
 
-      <.card id="localization-provenance" title="Current locale">
-        <dl class="divide-y divide-low-contrast-line px-4 text-sm">
-          <div id="localization-effective-locale" class="flex justify-between gap-4 py-2">
-            <dt class="text-ink-muted">Effective locale</dt>
-            <dd class="text-right font-medium text-ink">{@locale_label} ({@resolved.locale})</dd>
-          </div>
-          <div id="localization-language" class="flex justify-between gap-4 py-2">
-            <dt class="text-ink-muted">Translation language</dt>
-            <dd class="text-right font-medium text-ink">{@resolved.language}</dd>
-          </div>
-          <div id="localization-source" class="flex justify-between gap-4 py-2">
-            <dt class="text-ink-muted">Source</dt>
-            <dd class="text-right font-medium text-ink">{@source_label}</dd>
-          </div>
-          <div id="localization-inferred-country" class="flex justify-between gap-4 py-2">
-            <dt class="text-ink-muted">Inferred country</dt>
-            <dd class="text-right font-medium text-ink">{@inferred_country}</dd>
-          </div>
-          <div id="localization-message-catalogues" class="flex justify-between gap-4 py-2">
-            <dt class="text-ink-muted">Shared UI message catalogues</dt>
-            <dd class="text-right font-medium text-ink">{@shared_ui_catalogues}</dd>
-          </div>
-        </dl>
-        <p class="px-4 pb-4 pt-2 text-xs text-ink-subtle">
+      <.card id="localization-provenance" title="Current locale" inner_class="px-4">
+        <.list id="localization-provenance-facts">
+          <:item id="localization-effective-locale" title="Effective locale">
+            {@locale_label} ({@resolved.locale})
+          </:item>
+          <:item id="localization-language" title="Translation language">
+            {@resolved.language}
+          </:item>
+          <:item id="localization-source" title="Source">{@source_label}</:item>
+          <:item id="localization-inferred-country" title="Inferred country">
+            {@inferred_country}
+          </:item>
+          <:item id="localization-message-catalogues" title="Shared UI message catalogues">
+            {@shared_ui_catalogues}
+          </:item>
+        </.list>
+        <p class="pb-2 pt-2 text-xs text-ink-subtle">
           Regional support does not imply that translated product copy is installed.
         </p>
       </.card>

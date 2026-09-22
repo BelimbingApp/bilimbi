@@ -169,6 +169,136 @@ defmodule BilimbiWeb.AuditLiveTest do
              )
     end
 
+    test "keeps the result count but omits navigation for a single page", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.audit.log.list")
+      record_mutations!(scope, 1)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
+      total = captured_total(scope)
+      assert total in 1..25, "the log must fit one page for this proof"
+
+      assert has_element?(
+               view,
+               "#mutations-pagination-summary",
+               "Showing 1 to #{total} of #{total} results"
+             )
+
+      assert has_element?(view, "#mutations-pagination-page-size")
+      refute has_element?(view, "#mutations-pagination-previous")
+      refute has_element?(view, "#mutations-pagination-next")
+      refute has_element?(view, "#mutations-pagination-page-1")
+      refute render(view) =~ "Page 1 of 1"
+    end
+
+    test "paginates with numbered pages and keeps rows per page in URL state", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.audit.log.list")
+      record_mutations!(scope, 26)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
+      total = captured_total(scope)
+      assert total in 26..50, "one page of 50 must hold every row for this proof"
+
+      assert has_element?(
+               view,
+               "#mutations-pagination-summary",
+               "Showing 1 to 25 of #{total} results"
+             )
+
+      assert has_element?(view, "#mutations-pagination-previous[disabled]")
+      assert has_element?(view, "#mutations-pagination-page-1[aria-current='page']")
+      assert has_element?(view, "#mutations-pagination-page-2")
+      assert has_element?(view, "#mutations-pagination-next")
+      assert has_element?(view, "#mutations-table", "Widget 26")
+      refute has_element?(view, "#mutations-table", "Widget 01")
+
+      view |> element("#mutations-pagination-next") |> render_click()
+
+      assert %{"page" => "2", "page_size" => "25"} = patched_params(view)
+
+      assert has_element?(
+               view,
+               "#mutations-pagination-summary",
+               "Showing 26 to #{total} of #{total} results"
+             )
+
+      assert has_element?(view, "#mutations-pagination-page-2[aria-current='page']")
+      assert has_element?(view, "#mutations-pagination-next[disabled]")
+      assert has_element?(view, "#mutations-table", "Widget 01")
+
+      view
+      |> form("#mutations-pagination-page-size-form", %{"filters" => %{"perPage" => "50"}})
+      |> render_change()
+
+      assert %{"page" => "1", "page_size" => "50"} = patched_params(view)
+
+      assert has_element?(
+               view,
+               "#mutations-pagination-summary",
+               "Showing 1 to #{total} of #{total} results"
+             )
+
+      refute has_element?(view, "#mutations-pagination-next")
+
+      {:ok, reloaded, _html} = conn |> log_in_as() |> live(~p"/audit/mutations?page_size=50")
+      # A second sign-in is captured too, so the reloaded count is read afresh.
+      reloaded_total = captured_total(scope)
+      assert reloaded_total in 26..50
+
+      assert has_element?(
+               reloaded,
+               "#mutations-pagination-summary",
+               "Showing 1 to #{reloaded_total} of #{reloaded_total} results"
+             )
+
+      assert has_element?(
+               reloaded,
+               "#mutations-pagination-page-size option[value='50'][selected]"
+             )
+    end
+
+    test "changing rows per page keeps the active filters", %{conn: conn, scope: scope} do
+      grant_capabilities!("admin.audit.log.list")
+      record_mutations!(scope, 3)
+
+      {:ok, _deleted} =
+        Audit.record_mutation(scope, %{
+          company_id: 73,
+          actor_type: "user",
+          actor_id: 91,
+          auditable_type: "Bilimbi.Core.Address",
+          auditable_id: "10",
+          subject_name: "Headquarters",
+          event: "deleted",
+          occurred_at: ~N[2026-08-19 09:30:00]
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
+
+      view
+      |> form("#mutations-filters", %{"search" => "Headquarters", "event" => "deleted"})
+      |> render_change()
+
+      assert %{"search" => "Headquarters", "event" => "deleted"} = patched_params(view)
+      assert has_element?(view, "#mutations-pagination-summary", "Showing 1 to 1 of 1 results")
+
+      view
+      |> form("#mutations-pagination-page-size-form", %{"filters" => %{"perPage" => "100"}})
+      |> render_change()
+
+      assert %{"search" => "Headquarters", "event" => "deleted", "page_size" => "100"} =
+               patched_params(view)
+
+      assert has_element?(view, "#mutations-pagination-summary", "Showing 1 to 1 of 1 results")
+      assert has_element?(view, "#mutations-table", "Headquarters")
+      refute has_element?(view, "#mutations-table", "Widget 01")
+    end
+
     test "sorts mutations by column", %{conn: conn, scope: scope} do
       grant_capabilities!("admin.audit.log.list")
 
@@ -256,6 +386,11 @@ defmodule BilimbiWeb.AuditLiveTest do
       assert has_element?(view, "#actions-table", "200 · 43 ms")
       assert has_element?(view, "#actions-table", "trc999888")
 
+      # The retain toggle carries Belimbing's bookmark pair through the icon
+      # registry: outline while the row is not kept, solid once it is.
+      assert has_element?(view, "#action-retain-#{action.id} .hero-bookmark")
+      refute has_element?(view, "#action-retain-#{action.id} .hero-bookmark-solid")
+
       # Toggle retain
       view |> element("#action-retain-#{action.id}") |> render_click()
       assert has_element?(view, "#action-retain-#{action.id}[title='Remove retention']")
@@ -264,6 +399,8 @@ defmodule BilimbiWeb.AuditLiveTest do
       # Toggle back
       view |> element("#action-retain-#{action.id}") |> render_click()
       assert has_element?(view, "#action-retain-#{action.id}[title='Retain this entry']")
+      assert has_element?(view, "#action-retain-#{action.id} .hero-bookmark")
+      refute has_element?(view, "#action-retain-#{action.id} .hero-bookmark-solid")
     end
 
     test "shows impersonation attribution only on impersonated actions", %{
@@ -302,6 +439,107 @@ defmodule BilimbiWeb.AuditLiveTest do
              )
 
       refute has_element?(view, "#actions-#{ordinary.id}", "impersonated by")
+    end
+
+    test "keeps the result count but omits navigation for a single page", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.audit.log.list")
+      record_actions!(scope, 1)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/actions")
+
+      assert has_element?(view, "#actions-pagination-summary", "Showing 1 to 1 of 1 results")
+      assert has_element?(view, "#actions-pagination-page-size")
+      refute has_element?(view, "#actions-pagination-previous")
+      refute has_element?(view, "#actions-pagination-next")
+      refute has_element?(view, "#actions-pagination-page-1")
+      refute render(view) =~ "Page 1 of 1"
+    end
+
+    test "paginates with numbered pages and keeps rows per page in URL state", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.audit.log.list")
+      record_actions!(scope, 26)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/actions")
+
+      assert has_element?(view, "#actions-pagination-summary", "Showing 1 to 25 of 26 results")
+      assert has_element?(view, "#actions-pagination-previous[disabled]")
+      assert has_element?(view, "#actions-pagination-page-1[aria-current='page']")
+      assert has_element?(view, "#actions-pagination-page-2")
+      assert has_element?(view, "#actions-pagination-next")
+      assert has_element?(view, "#actions-table", "trace-26")
+      refute has_element?(view, "#actions-table", "trace-01")
+
+      view |> element("#actions-pagination-page-2") |> render_click()
+
+      assert %{"page" => "2", "page_size" => "25"} = patched_params(view)
+      assert has_element?(view, "#actions-pagination-summary", "Showing 26 to 26 of 26 results")
+      assert has_element?(view, "#actions-pagination-page-2[aria-current='page']")
+      assert has_element?(view, "#actions-pagination-next[disabled]")
+      assert has_element?(view, "#actions-table", "trace-01")
+
+      view
+      |> form("#actions-pagination-page-size-form", %{"filters" => %{"perPage" => "50"}})
+      |> render_change()
+
+      assert %{"page" => "1", "page_size" => "50"} = patched_params(view)
+      assert has_element?(view, "#actions-pagination-summary", "Showing 1 to 26 of 26 results")
+      refute has_element?(view, "#actions-pagination-next")
+
+      {:ok, reloaded, _html} = conn |> log_in_as() |> live(~p"/audit/actions?page_size=50")
+
+      assert has_element?(
+               reloaded,
+               "#actions-pagination-summary",
+               "Showing 1 to 26 of 26 results"
+             )
+
+      assert has_element?(reloaded, "#actions-pagination-page-size option[value='50'][selected]")
+    end
+
+    test "changing rows per page keeps the active filters and diagnostics", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.audit.log.list")
+      record_actions!(scope, 2)
+
+      {:ok, _livewire} =
+        Audit.record_action(scope, %{
+          company_id: 73,
+          actor_type: "user",
+          actor_id: 91,
+          event: "http.request",
+          url: "https://example.test/livewire/update",
+          payload: %{"method" => "POST", "status" => 200},
+          occurred_at: ~N[2026-08-19 09:00:00],
+          trace_id: "trc-livewire"
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/actions")
+
+      view
+      |> form("#actions-filters", %{"search" => "livewire", "diagnostics" => "show"})
+      |> render_change()
+
+      assert %{"search" => "livewire", "diagnostics" => "show"} = patched_params(view)
+      assert has_element?(view, "#actions-table", "trc-livewire")
+      assert has_element?(view, "#actions-pagination-summary", "Showing 1 to 1 of 1 results")
+
+      view
+      |> form("#actions-pagination-page-size-form", %{"filters" => %{"perPage" => "100"}})
+      |> render_change()
+
+      assert %{"search" => "livewire", "diagnostics" => "show", "page_size" => "100"} =
+               patched_params(view)
+
+      assert has_element?(view, "#actions-table", "trc-livewire")
+      assert has_element?(view, "#actions-pagination-summary", "Showing 1 to 1 of 1 results")
     end
 
     test "filters actions by family, actor_type, result, and diagnostics", %{
@@ -364,6 +602,55 @@ defmodule BilimbiWeb.AuditLiveTest do
       assert has_element?(view, "#actions-table", "bilimbi.migrate")
       refute has_element?(view, "#actions-table", "hacker@example.test")
     end
+  end
+
+  # Signing in and mounting the page are themselves captured mutations, so the
+  # log holds more than the rows a test recorded. The count the module reports
+  # after mount is what the summary must show.
+  defp captured_total(scope) do
+    Audit.list_mutations(scope, page_size: 300).total_entries
+  end
+
+  # `count` mutations, oldest first and older than anything write capture
+  # records, so the newest-first default lands the highest number on page one.
+  # Subjects pad to two digits so "Widget 1" cannot match "Widget 10" by prefix.
+  # Returns `count` so a caller can add it to the baseline.
+  defp record_mutations!(scope, count) do
+    for index <- 1..count do
+      number = String.pad_leading("#{index}", 2, "0")
+
+      {:ok, _mutation} =
+        Audit.record_mutation(scope, %{
+          company_id: 73,
+          actor_type: "user",
+          actor_id: 91,
+          auditable_type: "Bilimbi.Core.Company",
+          auditable_id: number,
+          subject_name: "Widget #{number}",
+          event: "updated",
+          occurred_at: NaiveDateTime.add(~N[2026-08-18 10:00:00], index, :minute)
+        })
+    end
+
+    count
+  end
+
+  defp record_actions!(scope, count) do
+    for index <- 1..count do
+      number = String.pad_leading("#{index}", 2, "0")
+
+      {:ok, _action} =
+        Audit.record_action(scope, %{
+          company_id: 73,
+          actor_type: "user",
+          actor_id: 91,
+          event: "employee.updated",
+          occurred_at: NaiveDateTime.add(~N[2026-08-18 10:00:00], index, :minute),
+          trace_id: "trace-#{number}"
+        })
+    end
+
+    count
   end
 
   defp patched_params(view) do
