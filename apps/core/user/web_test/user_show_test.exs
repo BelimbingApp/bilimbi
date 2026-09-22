@@ -461,6 +461,8 @@ defmodule BilimbiWeb.UserShowTest do
              ~s(#user-company-clear-confirm[data-confirm*="not reachable from any user screen"])
            )
 
+    assert has_element?(view, ~s(#user-company-clear-confirm[phx-disable-with="Removing…"]))
+
     # Cancel restores the read state and writes nothing.
     view |> element("#user-company-clear-cancel") |> render_click()
     refute has_element?(view, "#user-company-clear-confirm")
@@ -479,6 +481,20 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(view, "#user-company-status[role='status']", "Saved")
     assert has_element?(view, "main header", "Unaffiliated")
     refute has_element?(view, "#flash-group", "unaffiliated")
+
+    # A second confirmed click, queued before the first patch lands, finds
+    # nothing to remove: it writes nothing and must not report the removal
+    # that did land as refused.
+    {:ok, mutations} = Audit.list_mutations(scope)
+    assert Enum.count(mutations, &(&1.event == "cleared_company")) == 1
+
+    render_click(view, "remove_company", %{})
+
+    {:ok, mutations} = Audit.list_mutations(scope)
+    assert Enum.count(mutations, &(&1.event == "cleared_company")) == 1
+    assert has_element?(view, "#user-company-status[role='status']", "Saved")
+    refute has_element?(view, "#user-company-status[role='alert']")
+    assert has_element?(view, "#user-company-display", "None")
 
     # An unaffiliated account has no company to write its facts through, so
     # the name and email lose their editors and the page says why, while the

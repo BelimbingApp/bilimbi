@@ -963,7 +963,15 @@ Shipped:
   `data-confirm` names the account, the sessions ended and the loss of every
   screen, beside a Cancel that restores the read state; `phoenix_html`
   confirms a click and not a select's change (PR #733), and the confirmed
-  click re-asks Authz. The unreachable `:employee_not_found` refusal is gone
+  click re-asks Authz. That control is `phx-disable-with` for its round trip
+  and the handler is idempotent — an account that already has no company has
+  nothing to remove, so a confirmed click that arrives after the removal
+  landed leaves the stored outcome standing instead of reporting a completed
+  destructive write as refused. Its event is `remove_company` rather than
+  `clear_company` so that `write_handler_guard_test.exs` recognises the most
+  destructive event on the page as write-shaped; `clear` is in neither its
+  `@write_verbs` nor its `@exact_writes`, and widening those lists would drag
+  in unrelated `clear_notice` opt-outs. The unreachable `:employee_not_found` refusal is gone
   — the page passes no `employee_id` to any of the three transitions. Web
   tests cover the armed-but-unwritten blank choice, the `data-confirm` copy,
   Cancel, the confirmed clear, a refused clear naming the current company,

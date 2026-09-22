@@ -15,7 +15,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     select does. Choosing "None" is the one destructive choice — it ends
     every session the account holds and takes it off every user screen — so
     it arms a confirmation on the fact instead of writing, and the write
-    happens on the confirmed click.
+    happens on the confirmed click. That control is disabled for its round
+    trip, and a confirmed click that arrives after the removal has landed
+    finds nothing to remove and leaves the stored outcome standing.
 
   An account with no company has no company for Core User to write its facts
   through, so its name and email show no editor and an info notice says so.
@@ -391,21 +393,30 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     end
   end
 
-  # The confirmed clear. The confirmation decides only what the page shows;
-  # this write re-asks Authz like every other one.
-  def handle_event("clear_company", _params, socket) do
+  # The confirmed removal. The confirmation decides only what the page shows;
+  # this write re-asks Authz like every other one, and an account that already
+  # has no company has nothing to remove: the outcome on the fact is the one
+  # the write that landed put there.
+  def handle_event("remove_company", _params, socket) do
     if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
-      actor = current_actor(socket, user.company_id)
 
-      {:noreply,
-       commit_company(
-         socket,
-         :clear,
-         User.clear_user_company(actor, scope, user.company_id, user.id),
-         "None"
-       )}
+      case user.company_id do
+        nil ->
+          {:noreply, close_company_editor(socket)}
+
+        company_id ->
+          actor = current_actor(socket, company_id)
+
+          {:noreply,
+           commit_company(
+             socket,
+             :clear,
+             User.clear_user_company(actor, scope, company_id, user.id),
+             "None"
+           )}
+      end
     else
       {:noreply, write_forbidden(socket)}
     end
@@ -1089,7 +1100,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       <.button
                         id="user-company-clear-confirm"
                         variant="danger"
-                        phx-click="clear_company"
+                        phx-click="remove_company"
+                        phx-disable-with="Removing…"
                         data-confirm={company_clear_confirmation(@user.name, @company_name)}
                       >
                         Remove from company
