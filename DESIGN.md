@@ -236,8 +236,9 @@ control and is the same for every fact of that kind on the page:
   one grouped editor with a primary Apply and a Cancel. The group is opened
   by a demoted `<.icon_button icon="edit" context={:inline}>` beside its
   heading — the `title_actions` slot of `<.section_heading>` — not by an
-  "Edit …" button, and refused fields report on their own inputs. Use a group only where the facts genuinely change together; a
-  group is not a way to bring back the edit mode.
+  "Edit …" button, and refused fields report on their own inputs. Use a
+  group only where the facts genuinely change together; a group is not a way
+  to bring back the edit mode.
 - **Outcome per fact:** "Saving…" while in flight, "Saved" for the most recent
   commit only — any later write clears it, including one the server refuses,
   so no stale "Saved" stands beside a rejected form — and a refusal that stays

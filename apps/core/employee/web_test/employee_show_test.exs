@@ -165,7 +165,12 @@ defmodule BilimbiWeb.EmployeeShowTest do
     |> element("#address-priority-#{home.id}")
     |> render_hook("save_address_priority", %{"id" => to_string(home.id), "priority" => "4"})
 
-    assert has_element?(view, "#addresses-panel-notice[role='status']", "Address setting updated.")
+    assert has_element?(
+             view,
+             "#addresses-panel-notice[role='status']",
+             "Address setting updated."
+           )
+
     assert has_element?(view, "#address-priority-#{home.id} [data-role='text']", "4")
 
     {:ok, [attached]} = Address.list_employee_attached_addresses(scope, employee.id)

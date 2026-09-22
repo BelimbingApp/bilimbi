@@ -726,7 +726,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       # One heading treatment: every section is a named region whose title is
       # the shared level-two heading, and none writes its own h3.
-      for id <- ~w(company-details company-timezone company-subsidiaries company-departments company-relationships company-external-accesses) do
+      for id <-
+            ~w(company-details company-timezone company-subsidiaries company-departments company-relationships company-external-accesses) do
         assert has_element?(
                  view,
                  "##{id}-card[role='region'][aria-labelledby='#{id}-heading'] h2##{id}-heading"
@@ -750,7 +751,11 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      assert has_element?(view, "button#edit-metadata-btn[aria-label='Edit metadata'] .hero-pencil")
+      assert has_element?(
+               view,
+               "button#edit-metadata-btn[aria-label='Edit metadata'] .hero-pencil"
+             )
+
       refute has_element?(view, "#edit-metadata-btn", "Edit Metadata")
 
       view |> element("#edit-metadata-btn") |> render_click()
@@ -795,7 +800,12 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       # The panel is a section like the page's own: shared heading with its
       # count, and the shared table under it with no hand-written table.
-      assert has_element?(view, "#company-addresses-panel h2#company-addresses-heading", "Addresses")
+      assert has_element?(
+               view,
+               "#company-addresses-panel h2#company-addresses-heading",
+               "Addresses"
+             )
+
       assert has_element?(view, "#company-addresses-heading + span", "2")
       refute has_element?(view, "#company-addresses-panel h3")
       assert has_element?(view, "#company-addresses-panel caption", "Company addresses")
@@ -830,7 +840,11 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert depot_at < hq_at
 
       # Kinds are a choice fact: the read state is the trigger.
-      assert has_element?(view, "button#edit-kinds-#{depot.id}[aria-label='Edit kinds']", "Shipping")
+      assert has_element?(
+               view,
+               "button#edit-kinds-#{depot.id}[aria-label='Edit kinds']",
+               "Shipping"
+             )
 
       # The primary flag toggles on click and says which state it is in.
       view |> element("#toggle-primary-#{depot.id}[aria-pressed='false']") |> render_click()
