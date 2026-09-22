@@ -173,14 +173,21 @@ and is the same for every fact of that kind on the page:
   select appears on click, commits on change, and Escape or leaving it
   cancels. A permanently visible `<select>` beside read-only facts is a
   defect: the address verification status and the user's company are the
-  two shipped choice facts. One option of a choice may be destructive — the
-  user's company offers "None", which ends every session the account holds
-  and takes it off every user screen — and a destructive option does not
-  commit on change. `phoenix_html` confirms a click and never a select's
+  two shipped choice facts. One option of a choice may be irreversible — the
+  user's company offers "None", after which the account leaves every user
+  screen and nothing can reopen it — and an irreversible option does not
+  commit on change. Irreversibility is the test, not cost: every company
+  change ends the account's sessions, so that alone does not earn a
+  confirmation. `phoenix_html` confirms a click and never a select's
   change, so choosing it replaces the select on the fact with a
   `<.button variant="danger">` carrying the `data-confirm` that names the
   record and the consequences, beside a Cancel that restores the read state.
-  The write happens on the confirmed click and re-asks Authz there.
+  The write happens on the confirmed click and re-asks Authz there. This is
+  a deliberate deviation from Belimbing, whose edit-in-place select saves a
+  blank on change: Belimbing has a surface that manages an unaffiliated
+  account afterwards and Bilimbi has none, so copying the affordance without
+  that safety net would be parity in shape rather than in substance. The
+  captain may overrule it.
 - **Interdependent facts** — the address location, where a country change
   invalidates the division, postcode and locality — commit together through
   one grouped editor with a primary Apply and a Cancel. The group is opened

@@ -963,7 +963,11 @@ Shipped:
   `data-confirm` names the account, the sessions ended and the loss of every
   screen, beside a Cancel that restores the read state; `phoenix_html`
   confirms a click and not a select's change (PR #733), and the confirmed
-  click re-asks Authz. That control is `phx-disable-with` for its round trip
+  click re-asks Authz. This is the one place the page leaves Belimbing's
+  behaviour deliberately: Belimbing's select saves the blank on change
+  because it has a surface that manages an unaffiliated account afterwards,
+  and Bilimbi has none, so copying it would be parity in shape rather than
+  in substance. The captain may overrule it. That control is `phx-disable-with` for its round trip
   and the handler is idempotent — an account that already has no company has
   nothing to remove, so a confirmed click that arrives after the removal
   landed leaves the stored outcome standing instead of reporting a completed

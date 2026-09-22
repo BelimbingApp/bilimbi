@@ -12,12 +12,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   - the company is a choice fact: it reads as the company name (or "None")
     and becomes a select on click; the select commits on change, and Escape
     or leaving it cancels, as Belimbing's `admin/users/show` edit-in-place
-    select does. Choosing "None" is the one destructive choice — it ends
-    every session the account holds and takes it off every user screen — so
-    it arms a confirmation on the fact instead of writing, and the write
-    happens on the confirmed click. That control is disabled for its round
-    trip, and a confirmed click that arrives after the removal has landed
-    finds nothing to remove and leaves the stored outcome standing.
+    select does. Every company change ends every session the account holds:
+    `reassign_user_company/6` and `clear_user_company/5` both terminate them,
+    so that is not what sets one option apart. Choosing "None" is the one
+    irreversible choice — the account leaves every user screen and nothing
+    can reopen it — so it arms a confirmation on the fact instead of writing,
+    and the write happens on the confirmed click. That control is disabled
+    for its round trip, and a confirmed click that arrives after the removal
+    has landed finds nothing to remove and leaves the stored outcome
+    standing.
 
   An account with no company has no company for Core User to write its facts
   through, so its name and email show no editor and an info notice says so.

@@ -108,11 +108,15 @@ An operator holding `admin.user.update` edits the name and email in place
 through `<.inline_edit>` and changes the company through a choice that reads
 as the company name and becomes a select on click; every commit saves by
 itself and reports on its own fact, so there is no "Edit user" button and no
-edit mode to reach from the page. Choosing "None" is the one destructive
-option and does not commit on change: it replaces the select with a danger
-confirmation naming the account, the sessions the write ends and the fact
-that the account leaves every user screen, and the confirmed click performs
-`clear_user_company/5` with the same capability re-check.
+edit mode to reach from the page. Every company change ends the account's
+sessions — `reassign_user_company/6` and `clear_user_company/5` both call
+`Session.terminate_user_sessions/2` with a sentinel that spares none — so
+that is not what sets one option apart. Choosing "None" is the one
+irreversible option and the only one that does not commit on change: it
+replaces the select with a danger confirmation naming the account, the
+sessions the write ends and the fact that the account leaves every user
+screen, and the confirmed click performs `clear_user_company/5` with the
+same capability re-check.
 
 **An account with no company is a one-way state today.** Tenancy is derived
 from `company_id`, so `get_tenant_user/2` resolves no user without one and no
