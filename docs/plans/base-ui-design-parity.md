@@ -875,6 +875,6 @@ operator too); the marker present for an operator scope with the caution
 tokens and absent otherwise; the dashboard asserting the marker in the panel
 and no strip.
 
-Not delivered by this slice, filed separately as `operator-surface-warnings`:
-any warning on the operator-only surfaces themselves, such as the raw SQL
-console. The captain has not ruled on it.
+Not delivered by this slice: the operator-only surfaces themselves, such as
+the raw SQL console, do not warn that an action is unfiltered. That is a
+known gap.

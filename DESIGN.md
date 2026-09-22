@@ -330,9 +330,9 @@ registry's `warning` glyph, so it still reads as a caution rather than a
 neutral scope line. The row names the company's platform-operator status, not
 a personal entitlement: an account in that company may still be refused the
 operator-only surfaces, which is why it is not worded as ownership. Nothing
-about it changes what any capability or impersonation guard permits. A warning
-on the operator-only surfaces themselves, such as the raw SQL console, is a
-separate open question (`operator-surface-warnings`) and is not built here.
+about it changes what any capability or impersonation guard permits. The
+operator-only surfaces themselves, such as the raw SQL console, do not warn
+that an action is unfiltered; that is a known gap.
 
 The timezone and theme selectors are compact top-bar utilities, not settings
 navigation. A selection applies immediately and persists for the signed-in
