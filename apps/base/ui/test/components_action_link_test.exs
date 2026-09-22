@@ -73,6 +73,49 @@ defmodule Bilimbi.Base.UI.ComponentsActionLinkTest do
     assert class_of(action) == class_of(back)
   end
 
+  test "carries a request action as href and method in the same treatment" do
+    assigns = %{}
+
+    html =
+      rendered_to_string(~H"""
+      <.action_link
+        id="user-impersonate"
+        icon="bilimbi-impersonate"
+        href="/admin/impersonate/7"
+        method="post"
+        title="Impersonate this user"
+      >
+        Impersonate
+      </.action_link>
+      """)
+
+    assert html =~ ~s(href="/admin/impersonate/7")
+    assert html =~ ~s(data-method="post")
+    assert html =~ ~s(data-csrf=)
+    refute html =~ ~s(data-phx-link="redirect")
+    assert visible_text(html) == "Impersonate"
+    refute html =~ "<button"
+    assert html =~ "text-link"
+  end
+
+  test "needs exactly one destination" do
+    assigns = %{}
+
+    assert_raise ArgumentError, ~r/exactly one of navigate or href/, fn ->
+      rendered_to_string(~H"""
+      <.action_link id="none" icon="manage" title="Manage">Manage</.action_link>
+      """)
+    end
+
+    assert_raise ArgumentError, ~r/exactly one of navigate or href/, fn ->
+      rendered_to_string(~H"""
+      <.action_link id="both" icon="manage" navigate="/x" href="/y" title="Manage">
+        Manage
+      </.action_link>
+      """)
+    end
+  end
+
   defp class_of(html), do: attribute(html, "class")
 
   defp attribute(html, name) do

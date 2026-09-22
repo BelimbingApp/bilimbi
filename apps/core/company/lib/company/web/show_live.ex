@@ -5,8 +5,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   all accessed through declared public domain APIs.
 
   The header's actions row carries the record's status, record history as the
-  demoted `history` icon action and a plain "← Back" link, and no button; the
-  title row keeps the pin icon action. The Departments and Relationships
+  demoted labelled action — the registry's `history` clock beside the visible
+  word "History" — and a plain "← Back" link, and no button; the title row
+  keeps the pin icon action. The Departments and Relationships
   workflows are reached through the demoted "Manage" link on the section that
   lists them, carrying the registry's `manage` glyph, which is the cog
   Belimbing uses for the same action.

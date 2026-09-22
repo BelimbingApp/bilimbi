@@ -557,16 +557,17 @@ defmodule BilimbiWeb.CompanyLiveTest do
       grant_capabilities!("admin.audit.log.list")
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      # History is a demoted icon action carrying Belimbing's clock, not a
-      # button: the word stays for assistive technology and the tooltip only.
+      # History is a demoted labelled action carrying Belimbing's clock and
+      # its word, in the same quiet treatment as the back link, not a button.
       assert has_element?(
                view,
-               "summary#company-record-history-toggle[title='History'][aria-label='History']",
+               "summary#company-record-history-toggle[title='History']",
                "History"
              )
 
       assert has_element?(view, "#company-record-history-toggle .hero-clock")
-      assert has_element?(view, "#company-record-history-toggle .sr-only", "History")
+      assert has_element?(view, "summary#company-record-history-toggle.text-link")
+      refute has_element?(view, "#company-record-history-toggle .sr-only")
       refute has_element?(view, "button#company-record-history-toggle")
       refute has_element?(view, "#company-record-history-toggle.bg-action")
       assert has_element?(view, "#company-record-history-panel", "Old Name")

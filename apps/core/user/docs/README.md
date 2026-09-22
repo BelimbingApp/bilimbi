@@ -103,6 +103,41 @@ limiting, session cookies, and Phoenix navigation.
 querying `employees`. A foreign key to another module's table does not grant
 read access to its schema.
 
+**The detail page is read-first.** `/users/:id` shows the account as facts.
+An operator holding `admin.user.update` edits the name and email in place
+through `<.inline_edit>` and changes the company through a choice that reads
+as the company name and becomes a select on click; every commit saves by
+itself and reports on its own fact, so there is no "Edit user" button and no
+edit mode to reach from the page. Every company change ends the account's
+sessions — `reassign_user_company/6` and `clear_user_company/5` both call
+`Session.terminate_user_sessions/2` with a sentinel that spares none — so
+that is not what sets one option apart. Choosing "None" is the one
+irreversible option and the only one that does not commit on change: it
+replaces the select with a danger confirmation naming the account, the
+sessions the write ends and the fact that the account leaves every user
+screen, and the confirmed click performs `clear_user_company/5` with the
+same capability re-check.
+
+**An account with no company is a one-way state today.** Tenancy is derived
+from `company_id`, so `get_tenant_user/2` resolves no user without one and no
+route reaches `list_unaffiliated_users/2` or `get_unaffiliated_user/3`. The
+detail page is therefore the only surface an unaffiliated account is visible
+on, and only for as long as the LiveView that cleared it stays mounted. Its
+info notice says exactly that, and says what may still be done: inside the
+platform-operator tenant an operator holding `admin.user.unaffiliated.manage`
+can affiliate the account again from that page; in any other tenant
+`assign_unaffiliated_user/5` refuses on `tenants.is_platform_operator` before
+the capability is consulted, and the notice and the refusal both say so
+without offering a recovery that no screen provides. Reassign and clear
+authorize `admin.user.update` against the account's **current** company, so
+their refusals name that company and never the chosen one. The header is Belimbing's quiet labelled
+row — History, Impersonate and "← Back" — with no button; the Impersonate
+guards (`admin.user.impersonate`, never the signed-in account, never while
+impersonating) are unchanged. `Bilimbi.Core.User.Web.ShowLive`'s moduledoc
+owns the per-fact rules and DESIGN.md's "Read-first detail pages" owns the
+pattern. The standalone `/users/:id/edit` form still exists for the create
+flow's sibling route but nothing on the detail page links to it.
+
 **`users.prefs` remains intentionally absent.** Belimbing dropped it in
 `0200_01_20_000007`. Core User contributes and validates `ui.theme`,
 `ui.landing_menu_id`, `ui.dashboard.layout`, and
