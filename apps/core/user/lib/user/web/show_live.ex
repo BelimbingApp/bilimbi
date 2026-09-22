@@ -32,11 +32,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   screen can reopen an account with none, and neither the notice nor a
   refusal offers a recovery that does not exist.
 
-  Each fact reports its own outcome through the shared commit status:
-  "Saving…" while the round trip is in flight, "Saved" once stored, and an
-  alert on the fact naming the rejected value and the validation error when
-  the save was refused. The stored value stays on screen until the server
-  confirms a change, and success does not flash.
+  Each fact reports its own outcome through the shared commit status that
+  `Bilimbi.Base.UI.CommitStatus` keeps: "Saving…" while the round trip is in
+  flight, "Saved" once stored, and an alert on the fact naming the rejected
+  value and the validation error when the save was refused. The stored value
+  stays on screen until the server confirms a change, and success does not
+  flash.
 
   The header presents the same quiet labelled row Belimbing does — History,
   Impersonate and "← Back", each with its glyph and its word — and no button.
@@ -58,6 +59,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.UI.CommitStatus
 
   @manage_capability "admin.user.update"
   alias Bilimbi.Core.Company
@@ -92,7 +94,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   defp init_ui_state(socket) do
     socket
-    |> assign(:field_status, %{})
+    |> CommitStatus.init()
     |> assign(:editing_field, nil)
     |> assign(:confirm_clear_company?, false)
     |> assign(:show_assign_roles, false)
@@ -318,7 +320,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   @impl true
   def handle_event("save_field", params, socket) do
     if can_manage?(socket) do
-      case inline_field(params) do
+      case CommitStatus.inline_field(params, @inline_fields) do
         {:ok, name, field, value} ->
           {:noreply, save_fact(socket, name, %{field => value}, value)}
 
@@ -2009,63 +2011,26 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
     case user.company_id && User.update_user(scope, user.company_id, user.id, attrs) do
       nil ->
-        put_field_status(socket, name, {:error, unaffiliated_message()})
+        CommitStatus.put(socket, name, {:error, unaffiliated_message()})
 
       {:ok, updated_user} ->
         socket
         |> load_data(updated_user)
-        |> put_field_status(name, :saved)
+        |> CommitStatus.put(name, :saved)
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        put_field_status(socket, name, {:error, refusal_message(name, submitted, changeset)})
+        CommitStatus.put(socket, name, {:error, refusal_message(name, submitted, changeset)})
 
       {:error, reason} ->
-        put_field_status(socket, name, {:error, failure_message(reason)})
+        CommitStatus.put(socket, name, {:error, failure_message(reason)})
     end
   end
 
-  # "Saved" belongs to the most recent commit only; a refusal stays on its
-  # fact until that fact is committed again, so an unsaved edit is never
-  # quietly forgotten.
-  defp put_field_status(socket, name, status) do
-    statuses =
-      socket.assigns.field_status
-      |> drop_saved()
-      |> Map.put(name, status)
-
-    assign(socket, :field_status, statuses)
-  end
-
-  defp drop_saved(statuses) do
-    statuses
-    |> Enum.reject(fn {_name, value} -> value == :saved end)
-    |> Map.new()
-  end
-
+  # The choice fact reports on the schema field it writes; the shared wording
+  # names the rejected value and the label.
   defp refusal_message(name, submitted, %Ecto.Changeset{} = changeset) do
     field = Map.get(@inline_fields, name, :company_id)
-
-    reasons =
-      case translate_errors(changeset.errors, field) do
-        [] -> ["could not be saved"]
-        messages -> messages
-      end
-
-    "#{inspect(rejected_value(submitted))} was not saved: #{fact_label(name)} #{Enum.join(reasons, ", ")}."
-  end
-
-  # The alert names what was typed so the refusal is never anonymous, but a
-  # long rejected value would push the reason off screen; the first characters
-  # identify it and the reason carries the rule that refused it.
-  @rejected_value_limit 60
-  defp rejected_value(submitted) do
-    trimmed = String.trim(to_string(submitted))
-
-    if String.length(trimmed) > @rejected_value_limit do
-      String.slice(trimmed, 0, @rejected_value_limit) <> "…"
-    else
-      trimmed
-    end
+    CommitStatus.refusal_message(fact_label(name), field, submitted, changeset.errors)
   end
 
   defp failure_message(:user_not_found),
@@ -2074,8 +2039,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   defp failure_message(:company_not_found),
     do: "The change was not saved because this user's company could not be found."
 
-  defp failure_message(_reason),
-    do: "The change was not saved. Try again, and tell your administrator if it keeps failing."
+  defp failure_message(_reason), do: CommitStatus.failure_message()
 
   # Each refusal names the rule that applied to the transition that was asked
   # for, and the company that rule was evaluated against. Reassign and clear
@@ -2117,17 +2081,17 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       {:ok, updated_user} ->
         socket
         |> load_data(updated_user)
-        |> put_field_status("company", :saved)
+        |> CommitStatus.put("company", :saved)
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        put_field_status(
+        CommitStatus.put(
           socket,
           "company",
           {:error, refusal_message("company", choice, changeset)}
         )
 
       {:error, reason} ->
-        put_field_status(
+        CommitStatus.put(
           socket,
           "company",
           {:error, company_failure_message(reason, transition, choice, company_name)}
@@ -2168,24 +2132,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     Map.get(socket.assigns.company_names, company_id, Integer.to_string(company_id))
   end
 
-  # The refusal is the whole outcome: a "Saved" left over from an earlier
-  # commit would read as if this write had landed too.
-  defp write_forbidden(socket) do
-    socket
-    |> assign(:field_status, drop_saved(socket.assigns.field_status))
-    |> put_flash(:error, "You do not have permission to edit users.")
-  end
-
-  defp inline_field(params) when is_map(params) do
-    Enum.find_value(@inline_fields, :error, fn {name, field} ->
-      case Map.fetch(params, name) do
-        {:ok, value} when is_binary(value) -> {:ok, name, field, value}
-        _ -> nil
-      end
-    end)
-  end
-
-  defp inline_field(_params), do: :error
+  defp write_forbidden(socket),
+    do: CommitStatus.write_forbidden(socket, "You do not have permission to edit users.")
 
   defp fact_label(name), do: Map.fetch!(@fact_labels, name)
 

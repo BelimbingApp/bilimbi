@@ -16,7 +16,8 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
     together through one grouped editor with Apply and Cancel, as Belimbing's
     `admin/addresses/show` does.
 
-  Each fact reports its own outcome: "Saving…" while the round trip is in
+  Each fact reports its own outcome through the shared commit status that
+  `Bilimbi.Base.UI.CommitStatus` keeps: "Saving…" while the round trip is in
   flight, "Saved" once stored, and an alert on the fact naming the rejected
   value and the validation error when the save was refused. The stored value
   stays on screen until the server confirms a change.
@@ -30,6 +31,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.UI.CommitStatus
   alias Bilimbi.Base.UI.Layouts
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.Detail
@@ -84,7 +86,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
          |> assign(:countries, countries)
          |> assign(:linked_sort_by, :type)
          |> assign(:linked_sort_dir, :asc)
-         |> assign(:field_status, %{})
+         |> CommitStatus.init()
          |> assign(:editing_field, nil)
          |> assign(:editing_location?, false)
          |> assign_location_form(address)}
@@ -138,7 +140,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   @impl true
   def handle_event("save_field", params, socket) do
     if can_update?(socket) do
-      case inline_field(params) do
+      case CommitStatus.inline_field(params, @inline_fields) do
         {:ok, name, field, value} ->
           {:noreply, save_fact(socket, name, %{field => normalize_param(value)}, value)}
 
@@ -187,7 +189,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
       {:noreply,
        socket
        |> assign(:editing_field, nil)
-       |> put_field_status(
+       |> CommitStatus.put(
          "verification_status",
          {:error, "Verification status must be unverified, suggested, or verified."}
        )}
@@ -300,7 +302,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
            socket
            |> refresh_address()
            |> assign(:editing_location?, false)
-           |> put_field_status("location", :saved)
+           |> CommitStatus.put("location", :saved)
            |> then(&assign_location_form(&1, &1.assigns.address))}
 
         {:error, %Ecto.Changeset{} = changeset} ->
@@ -308,11 +310,11 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
           # the operator corrects it where they typed it.
           {:noreply,
            socket
-           |> put_field_status("location", nil)
+           |> CommitStatus.put("location", nil)
            |> assign(:location_form, to_form(changeset, as: :location))}
 
         {:error, reason} ->
-          {:noreply, put_field_status(socket, "location", {:error, failure_message(reason)})}
+          {:noreply, CommitStatus.put(socket, "location", {:error, failure_message(reason)})}
       end
     else
       {:noreply, write_forbidden(socket)}
@@ -365,13 +367,13 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
       {:ok, _summary} ->
         socket
         |> refresh_address()
-        |> put_field_status(name, :saved)
+        |> CommitStatus.put(name, :saved)
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        put_field_status(socket, name, {:error, refusal_message(name, submitted, changeset)})
+        CommitStatus.put(socket, name, {:error, refusal_message(name, submitted, changeset)})
 
       {:error, reason} ->
-        put_field_status(socket, name, {:error, failure_message(reason)})
+        CommitStatus.put(socket, name, {:error, failure_message(reason)})
     end
   end
 
@@ -387,80 +389,26 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
     |> assign(:page_title, page_title(refreshed))
   end
 
-  # "Saved" belongs to the most recent commit only; a refusal stays on its
-  # fact until that fact is committed again, so an unsaved edit is never
-  # quietly forgotten.
-  defp put_field_status(socket, name, status) do
-    statuses =
-      socket.assigns.field_status
-      |> drop_saved()
-      |> Map.put(name, status)
-
-    assign(socket, :field_status, statuses)
-  end
-
-  defp drop_saved(statuses) do
-    statuses
-    |> Enum.reject(fn {_name, value} -> value == :saved end)
-    |> Map.new()
-  end
-
+  # The choice fact reports on the schema field it writes; the shared wording
+  # names the rejected value and the label.
   defp refusal_message(name, submitted, %Ecto.Changeset{} = changeset) do
     field = Map.get(@inline_fields, name, :verification_status)
-
-    reasons =
-      case translate_errors(changeset.errors, field) do
-        [] -> ["could not be saved"]
-        messages -> messages
-      end
-
-    "#{inspect(rejected_value(submitted))} was not saved: #{fact_label(name)} #{Enum.join(reasons, ", ")}."
-  end
-
-  # The alert names what was typed so the refusal is never anonymous, but a
-  # long rejected value would push the reason off screen; the first characters
-  # identify it and the reason carries the rule that refused it.
-  @rejected_value_limit 60
-  defp rejected_value(submitted) do
-    trimmed = String.trim(to_string(submitted))
-
-    if String.length(trimmed) > @rejected_value_limit do
-      String.slice(trimmed, 0, @rejected_value_limit) <> "…"
-    else
-      trimmed
-    end
+    CommitStatus.refusal_message(fact_label(name), field, submitted, changeset.errors)
   end
 
   defp failure_message(:address_not_found),
     do: "This address no longer exists. Return to the list to find its replacement."
 
-  defp failure_message(_reason),
-    do: "The change was not saved. Try again, and tell your administrator if it keeps failing."
+  defp failure_message(_reason), do: CommitStatus.failure_message()
 
-  # The refusal is the whole outcome: a "Saved" left over from an earlier
-  # commit would read as if this write had landed too.
-  defp write_forbidden(socket) do
-    socket
-    |> assign(:field_status, drop_saved(socket.assigns.field_status))
-    |> put_flash(:error, "You do not have permission to update addresses.")
-  end
+  defp write_forbidden(socket),
+    do: CommitStatus.write_forbidden(socket, "You do not have permission to update addresses.")
 
   # Every write re-asks Authz: the `can_update?` assign decides what the page
   # shows, and a grant revoked while the page is open must still be refused.
   defp can_update?(socket) do
     Authz.can(socket.assigns.current_scope.actor, "admin.address.update").allowed
   end
-
-  defp inline_field(params) when is_map(params) do
-    Enum.find_value(@inline_fields, :error, fn {name, field} ->
-      case Map.fetch(params, name) do
-        {:ok, value} when is_binary(value) -> {:ok, name, field, value}
-        _ -> nil
-      end
-    end)
-  end
-
-  defp inline_field(_params), do: :error
 
   defp fact_label(name), do: Map.fetch!(@fact_labels, name)
 

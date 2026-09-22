@@ -2278,6 +2278,9 @@ defmodule Bilimbi.Base.UI.Components do
       why, naming the rejected value where that helps. It renders as an alert
       on this field, so validation reaches the operator where they typed.
 
+  `Bilimbi.Base.UI.CommitStatus` records these outcomes and owns the rules
+  around them; the owner passes what it recorded as `status`.
+
   ## Examples
 
       <.inline_edit
@@ -2383,6 +2386,9 @@ defmodule Bilimbi.Base.UI.Components do
     * `{:error, message}` — the last commit was refused, announced as a
       `role="alert"`, with `message` naming the rejected value and why.
 
+  `Bilimbi.Base.UI.CommitStatus` records these outcomes and owns the rules
+  around them; the owner passes what it recorded as `status`.
+
   ## Examples
 
       <.commit_status id="address-location-status" status={@field_status["location"]} />
@@ -2419,14 +2425,9 @@ defmodule Bilimbi.Base.UI.Components do
     """
   end
 
-  defp normalize_commit_status(nil), do: nil
-  defp normalize_commit_status(:saved), do: :saved
-  defp normalize_commit_status({:error, message}) when is_binary(message), do: {:error, message}
-
-  defp normalize_commit_status(other) do
-    raise ArgumentError,
-          "status must be nil, :saved, or {:error, message}, got: #{inspect(other)}"
-  end
+  # `Bilimbi.Base.UI.CommitStatus` owns the vocabulary and the bookkeeping
+  # behind it; the components only render what it recorded.
+  defp normalize_commit_status(status), do: Bilimbi.Base.UI.CommitStatus.normalize(status)
 
   @doc """
   Renders the demoted "← Back" navigation of a page header.
