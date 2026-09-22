@@ -73,8 +73,11 @@ defmodule BilimbiWeb.SystemLocalizationLiveTest do
           {"localization-inferred-country", "Inferred country"},
           {"localization-message-catalogues", "Shared UI message catalogues"}
         ] do
-      assert has_element?(view, "dl#localization-provenance-facts ##{row} dt", label),
+      assert has_element?(view, "dl#localization-provenance-facts dt", label),
              "#{label} is not a row of the shared list"
+
+      assert has_element?(view, "dl#localization-provenance-facts dd##{row}"),
+             "#{label} has no named value cell in the shared list"
     end
   end
 

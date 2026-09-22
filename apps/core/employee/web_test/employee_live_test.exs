@@ -740,24 +740,22 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       view |> element("#toggle-primary-#{address.id}") |> render_click()
       assert render(view) =~ "Address setting updated."
 
-      # Edit priority — driven through the clickable element so the event
-      # reaches the discovered panel component, as a user's click would.
+      # Priority commits in place through the shared editor — driven through
+      # the field itself so the hook event reaches the discovered panel
+      # component, as the browser hook's push would.
       view
-      |> element("div[phx-click='edit_address_priority'][phx-value-id='#{address.id}']")
-      |> render_click()
-
-      assert has_element?(view, "#priority-form-#{address.id}")
-
-      view
-      |> form("#priority-form-#{address.id}")
-      |> render_submit(%{"address_id" => to_string(address.id), "priority" => "10"})
+      |> element("#address-priority-#{address.id}[phx-hook='InlineEdit']")
+      |> render_hook("save_address_priority", %{
+        "id" => to_string(address.id),
+        "priority" => "10"
+      })
 
       assert render(view) =~ "Address setting updated."
       assert has_element?(view, "#address-row-#{address.id}", "10")
 
-      # Edit kinds — element-driven for the same component-target reason
+      # Edit kinds — the read state is the trigger, addressed to the component
       view
-      |> element("div[phx-click='edit_address_kinds'][phx-value-id='#{address.id}']")
+      |> element("button#edit-kinds-#{address.id}")
       |> render_click()
 
       view
@@ -770,10 +768,9 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
       assert render(view) =~ "Address kinds updated."
 
-      # Sort addresses by priority
-      view
-      |> element("button[phx-click='sort_addresses'][phx-value-sort_by='priority']")
-      |> render_click()
+      # Sort addresses by priority through the shared table's header button
+      view |> element("#addresses-table-sort-priority") |> render_click()
+      assert has_element?(view, "th[aria-sort='ascending'] #addresses-table-sort-priority")
 
       # Detach address
       view |> element("#unlink-address-#{address.id}") |> render_click()

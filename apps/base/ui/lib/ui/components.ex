@@ -2035,6 +2035,11 @@ defmodule Bilimbi.Base.UI.Components do
     doc: "the event name pushed when a column sort button is clicked"
   )
 
+  attr(:sort_target, :any,
+    default: nil,
+    doc: "`phx-target` for the sort event; a LiveComponent passes `@myself`, a LiveView nothing"
+  )
+
   attr(:framed, :boolean,
     default: true,
     doc: "when false, omit the flat outer frame so the table can sit in an existing panel"
@@ -2094,6 +2099,7 @@ defmodule Bilimbi.Base.UI.Components do
                 sort_by={@sort_by}
                 sort_dir={@sort_dir}
                 sort_event={@sort_event}
+                sort_target={@sort_target}
               />
               <span :if={!col[:sort]}>{col[:label]}</span>
             </th>
@@ -2261,8 +2267,10 @@ defmodule Bilimbi.Base.UI.Components do
 
   In display mode, shows the text with a pencil icon that appears on hover.
   Clicking immediately reveals an input box. Enter or leaving the field
-  commits the change and pushes `@save_event` to LiveView with
-  `%{id: @id_value, <@name>: new_value}`; Escape cancels and reverts to the
+  commits the change and pushes `@save_event` with
+  `%{id: @id_value, <@name>: new_value}` to the LiveComponent that rendered
+  the field, or to the LiveView when no component did (the hook addresses the
+  event to its own element); Escape cancels and reverts to the
   original value without pushing. An unchanged value pushes nothing, and an
   emptied value pushes nothing unless the owner passes `allow_empty`, so a
   field that may legitimately be blank has to say so.
@@ -2585,6 +2593,7 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:sort_by, :any, required: true)
   attr(:sort_dir, :any, required: true)
   attr(:sort_event, :string, default: "sort")
+  attr(:sort_target, :any, default: nil)
 
   defp table_sort_heading(assigns) do
     ~H"""
@@ -2592,6 +2601,7 @@ defmodule Bilimbi.Base.UI.Components do
       id={@col[:sort_id] || "#{@table_id}-sort-#{@col[:sort]}"}
       type="button"
       phx-click={@sort_event}
+      phx-target={@sort_target}
       phx-value-sort={@col[:sort]}
       class={[
         "inline-flex items-center gap-1 rounded transition hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/30",
@@ -2638,25 +2648,35 @@ defmodule Bilimbi.Base.UI.Components do
   defp table_empty_colspan(cols, _action), do: length(cols) + 1
 
   @doc """
-  Renders a data list: the facts of one record, label left and value right.
+  Renders the facts of one record as a definition list.
 
-  It is the shared presentation for read-only facts on a detail page, the
-  System Info cards and the Language & Region provenance card. Pass `id` so
-  the list can be found, and an `id` on a row a test or an anchor must reach;
-  a row without one renders without an `id` attribute.
+  This is the one shape a detail page's facts take. Each item is a row: the
+  label sits in a fixed left column and the value fills the rest, left-aligned,
+  so a value reads in the same place whether it is a word, a badge, a link or
+  an in-place editor. The value cell is a block the width of the row, which is
+  what lets `<.inline_edit>` open its input at full width and report its
+  commit status underneath; a right-aligned, shrink-wrapped value cannot host
+  one. Below the `sm` breakpoint the label stacks above its value.
+
+  Pass `id` on the list so it can be found. Pass `id` on an item to name its
+  value cell. Tests and `aria-describedby` references read the value, not the
+  row, so the id lands on the `<dd>`; an item without one renders no `id`.
 
   ## Examples
 
-      <.list id="post-facts">
-        <:item title="Title">{@post.title}</:item>
-        <:item id="post-facts-views" title="Views">{@post.views}</:item>
+      <.list id="address-facts">
+        <:item title="Company">{@company.name}</:item>
+        <:item title="Status"><.badge kind={:success}>Active</.badge></:item>
+        <:item title="Label" id="address-view-label">
+          <.inline_edit id="address-label" value={@address.label || ""} allow_empty ... />
+        </:item>
       </.list>
   """
   attr(:id, :string, default: nil)
 
   slot :item, required: true do
-    attr(:id, :string)
     attr(:title, :string, required: true)
+    attr(:id, :string, doc: "DOM id of the value cell (the `<dd>`)")
   end
 
   def list(assigns) do
@@ -2664,13 +2684,76 @@ defmodule Bilimbi.Base.UI.Components do
     <dl id={@id} class="divide-y divide-low-contrast-line text-sm">
       <div
         :for={item <- @item}
-        id={item[:id]}
-        class="flex items-baseline justify-between gap-6 py-2.5"
+        class="grid grid-cols-1 gap-x-6 gap-y-1 py-2.5 sm:grid-cols-[10rem_minmax(0,1fr)] sm:items-baseline"
       >
         <dt class="font-medium text-ink-subtle">{item.title}</dt>
-        <dd class="text-right text-ink">{render_slot(item)}</dd>
+        <dd id={item[:id]} class="min-w-0 text-ink">{render_slot(item)}</dd>
       </div>
     </dl>
+    """
+  end
+
+  @doc """
+  Renders the heading row of one section on a detail page.
+
+  A detail page is a stack of sections, each a `<.card>` whose body opens
+  with this row and then holds the section's facts (`<.list>`), its table or
+  its form. The row is the one heading treatment those sections share, so a
+  page never hand-writes a section title: the small-caps title Belimbing's
+  `admin/*/show` cards use, an optional count badge beside it, an optional
+  description line under it, and two action slots that mirror `<.header>`:
+  `title_actions` sits right beside the title (a demoted edit icon that opens
+  a grouped editor) and `actions` sits at the end of the row (a "Manage"
+  action link, the section's own buttons).
+
+  The title is an `<h2>`: a section is a direct child of the page, whose
+  title is the `<h1>`. Pass `id` to name the heading when the section's
+  landmark carries `aria-labelledby`.
+
+  ## Examples
+
+      <.section_heading title="Company Details">
+        <:actions><.button id="edit-company-details-btn">Edit Details</.button></:actions>
+      </.section_heading>
+
+      <.section_heading id="departments-heading" title="Departments" count={length(@departments)}>
+        <:actions>
+          <.action_link id="departments-manage" icon="manage" navigate={~p"/..."}>Manage</.action_link>
+        </:actions>
+      </.section_heading>
+
+      <.section_heading title="Geographic Location">
+        <:title_actions><.icon_button icon="edit" label="Edit location" context={:inline} /></:title_actions>
+        <:description>Country, division, postcode and locality are applied together.</:description>
+      </.section_heading>
+  """
+  attr(:id, :string, default: nil, doc: "DOM id of the `<h2>`")
+  attr(:title, :string, required: true)
+  attr(:count, :integer, default: nil, doc: "how many records the section lists, as a badge")
+  attr(:class, :any, default: nil)
+  slot(:title_actions, doc: "controls that sit right beside the title")
+  slot(:description, doc: "one line under the title saying what the section holds")
+  slot(:actions, doc: "controls at the end of the heading row")
+
+  def section_heading(assigns) do
+    ~H"""
+    <div class={["mb-4 flex items-start justify-between gap-3", @class]}>
+      <div class="min-w-0">
+        <div class="flex items-center gap-2">
+          <h2 id={@id} class="text-xs font-semibold uppercase tracking-wider text-ink-subtle">
+            {@title}
+          </h2>
+          <.badge :if={@count}>{@count}</.badge>
+          {render_slot(@title_actions)}
+        </div>
+        <div :if={@description != []} class="mt-0.5 text-xs text-ink-subtle">
+          {render_slot(@description)}
+        </div>
+      </div>
+      <div :if={@actions != []} class="flex shrink-0 items-center gap-2">
+        {render_slot(@actions)}
+      </div>
+    </div>
     """
   end
 

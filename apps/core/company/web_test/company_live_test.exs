@@ -9,6 +9,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.{Department, DepartmentType, LegalEntityType, Relationship}
@@ -705,6 +706,216 @@ defmodule BilimbiWeb.CompanyLiveTest do
       # ...and the headless one falls back to the em dash, never a bare id.
       assert table =~ "—"
       refute table =~ "head_id"
+    end
+
+    test "presents the company facts as the shared list under one section heading", %{
+      conn: conn
+    } do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # The facts are rows of one definition list; every value cell keeps its id.
+      assert has_element?(view, "#company-details-card dl dd#detail-name", "Bilimbi Industries")
+      assert has_element?(view, "#company-details-card dl dd#detail-code", "bilimbi_industries")
+      assert has_element?(view, "#company-details-card dl dd#detail-parent", "None")
+      assert has_element?(view, "#company-details-card dl dd#scope-activities-section")
+      assert has_element?(view, "#company-details-card dl dd#company-metadata")
+      assert has_element?(view, "#company-details-card dl dt", "Business Activities")
+      assert has_element?(view, "#company-details-card dl dt", "Metadata")
+
+      # One heading treatment: every section is a named region whose title is
+      # the shared level-two heading, and none writes its own h3.
+      for id <- ~w(company-details company-timezone company-subsidiaries company-departments company-relationships company-external-accesses) do
+        assert has_element?(
+                 view,
+                 "##{id}-card[role='region'][aria-labelledby='#{id}-heading'] h2##{id}-heading"
+               )
+
+        refute has_element?(view, "##{id}-card h3")
+      end
+
+      assert has_element?(view, "#company-departments-heading + span", "0")
+
+      # A viewer sees the facts with no edit affordance anywhere in the list.
+      refute has_element?(view, "#edit-company-details-btn")
+      refute has_element?(view, "#edit-metadata-btn")
+      refute has_element?(view, "#add-activity-form")
+    end
+
+    test "the metadata fact edits behind a demoted icon action, not a text button", %{
+      conn: conn
+    } do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      assert has_element?(view, "button#edit-metadata-btn[aria-label='Edit metadata'] .hero-pencil")
+      refute has_element?(view, "#edit-metadata-btn", "Edit Metadata")
+
+      view |> element("#edit-metadata-btn") |> render_click()
+      assert has_element?(view, "dd#company-metadata form#metadata-form")
+
+      view
+      |> form("#metadata-form", %{"metadata" => ~s({"founded_year": 2014})})
+      |> render_submit()
+
+      assert has_element?(view, "dd#company-metadata #company-metadata-display", "founded_year")
+      refute has_element?(view, "#metadata-form")
+    end
+
+    test "the addresses panel is the shared table, sorted by the panel and edited in place", %{
+      conn: conn
+    } do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+
+      {:ok, scope} = Tenancy.scope(41)
+
+      {:ok, hq} =
+        Address.create_address(scope, %{
+          label: "Head Office",
+          line1: "1 Market Street",
+          locality: "Kuala Lumpur",
+          country_iso: "MY"
+        })
+
+      {:ok, depot} = Address.create_address(scope, %{label: "Depot", line1: "9 Dock Road"})
+
+      {:ok, :attached} =
+        Address.attach_to_company(scope, hq.id, 73, %{
+          kind: ["headquarters"],
+          is_primary: true,
+          priority: 0
+        })
+
+      {:ok, :attached} =
+        Address.attach_to_company(scope, depot.id, 73, %{kind: ["shipping"], priority: 5})
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # The panel is a section like the page's own: shared heading with its
+      # count, and the shared table under it with no hand-written table.
+      assert has_element?(view, "#company-addresses-panel h2#company-addresses-heading", "Addresses")
+      assert has_element?(view, "#company-addresses-heading + span", "2")
+      refute has_element?(view, "#company-addresses-panel h3")
+      assert has_element?(view, "#company-addresses-panel caption", "Company addresses")
+
+      assert has_element?(
+               view,
+               "#company-addresses-panel th[aria-sort='ascending'] button#addresses-table-sort-label"
+             )
+
+      assert has_element?(view, "tbody#addresses-table tr#address-row-#{hq.id}")
+
+      # The label opens the address's own page, carrying the company for the way back.
+      assert has_element?(
+               view,
+               "#address-link-#{hq.id}[href='/addresses/#{hq.id}?company=73']",
+               "Head Office"
+             )
+
+      assert has_element?(view, "#address-row-#{hq.id}", "1 Market Street, Kuala Lumpur, MY")
+
+      # Sorting is the panel's own event, so it must reach the component.
+      view |> element("#addresses-table-sort-priority") |> render_click()
+      assert has_element?(view, "th[aria-sort='ascending'] #addresses-table-sort-priority")
+      refute has_element?(view, "th[aria-sort='ascending'] #addresses-table-sort-label")
+
+      view |> element("#addresses-table-sort-priority") |> render_click()
+      assert has_element?(view, "th[aria-sort='descending'] #addresses-table-sort-priority")
+
+      rows = view |> element("#addresses-table") |> render()
+      {depot_at, _} = :binary.match(rows, "address-row-#{depot.id}")
+      {hq_at, _} = :binary.match(rows, "address-row-#{hq.id}")
+      assert depot_at < hq_at
+
+      # Kinds are a choice fact: the read state is the trigger.
+      assert has_element?(view, "button#edit-kinds-#{depot.id}[aria-label='Edit kinds']", "Shipping")
+
+      # The primary flag toggles on click and says which state it is in.
+      view |> element("#toggle-primary-#{depot.id}[aria-pressed='false']") |> render_click()
+      assert has_element?(view, "#toggle-primary-#{depot.id}[aria-pressed='true']")
+
+      # Priority commits in place through the shared editor, addressed to the
+      # panel, and the outcome reports through the panel notice.
+      assert has_element?(
+               view,
+               "#address-priority-#{depot.id}[phx-hook='InlineEdit'][data-save-event='save_address_priority'][data-id='#{depot.id}']"
+             )
+
+      refute has_element?(view, "#priority-form-#{depot.id}")
+
+      view
+      |> element("#address-priority-#{depot.id}")
+      |> render_hook("save_address_priority", %{"id" => to_string(depot.id), "priority" => "2"})
+
+      assert has_element?(
+               view,
+               "#company-addresses-panel-notice[role='status']",
+               "Address setting updated."
+             )
+
+      assert has_element?(view, "#address-priority-#{depot.id} [data-role='text']", "2")
+
+      {:ok, attached} = Address.list_company_attached_addresses(scope, 73)
+      assert Enum.find(attached, &(&1.id == depot.id)).priority == 2
+
+      # A value that is not a whole number is refused and said so, never stored as 0.
+      view
+      |> element("#address-priority-#{depot.id}")
+      |> render_hook("save_address_priority", %{"id" => to_string(depot.id), "priority" => "high"})
+
+      assert has_element?(
+               view,
+               "#company-addresses-panel-notice[role='alert']",
+               "Priority was not saved"
+             )
+
+      {:ok, attached} = Address.list_company_attached_addresses(scope, 73)
+      assert Enum.find(attached, &(&1.id == depot.id)).priority == 2
+
+      # Unlinking is a demoted icon action carrying Belimbing's link-slash glyph.
+      assert has_element?(
+               view,
+               "button#unlink-address-#{depot.id}[aria-label='Unlink address'][title='Unlink'][data-confirm]"
+             )
+
+      assert has_element?(view, "#unlink-address-#{depot.id} .hero-link-slash")
+
+      view |> element("#unlink-address-#{depot.id}") |> render_click()
+
+      refute has_element?(view, "#address-row-#{depot.id}")
+      assert has_element?(view, "#company-addresses-heading + span", "1")
+    end
+
+    test "the addresses panel shows a viewer the facts and the shared empty state", %{
+      conn: conn
+    } do
+      grant_capabilities!(["admin.company.list", "admin.company.view"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      assert has_element?(view, "#addresses-table-empty", "No addresses linked.")
+
+      assert has_element?(
+               view,
+               "#addresses-table-empty",
+               "An operator who can edit companies can attach one."
+             )
+
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, hq} = Address.create_address(scope, %{label: "Head Office", line1: "1 Market Street"})
+      {:ok, :attached} = Address.attach_to_company(scope, hq.id, 73, %{priority: 3})
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      assert has_element?(view, "#address-row-#{hq.id}", "Head Office")
+      assert has_element?(view, "#address-row-#{hq.id}", "3")
+      refute has_element?(view, "#address-priority-#{hq.id}[phx-hook='InlineEdit']")
+      refute has_element?(view, "#edit-kinds-#{hq.id}")
+      refute has_element?(view, "#toggle-primary-#{hq.id}")
+      refute has_element?(view, "#unlink-address-#{hq.id}")
+      refute has_element?(view, "#company-addresses-panel th", "Actions")
     end
 
     test "edits company details via modal and validates fields", %{conn: conn} do

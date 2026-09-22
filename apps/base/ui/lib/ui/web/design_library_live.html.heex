@@ -598,6 +598,44 @@
                 </.header>
               </div>
             </.card>
+            <.card
+              id="component-section-heading"
+              title="Section heading"
+              inner_class="space-y-5 p-4"
+            >
+              <div>
+                <p class="mb-2 text-xs text-ink-muted">Title alone</p>
+                <.section_heading title="Company Details" class="mb-0" />
+              </div>
+              <div class="border-t border-line pt-4">
+                <p class="mb-2 text-xs text-ink-muted">
+                  Count, title action, description and trailing action
+                </p>
+                <.section_heading title="Geographic Location" count={4} class="mb-0">
+                  <:title_actions>
+                    <.icon_button icon="edit" label="Edit location" context={:inline} />
+                  </:title_actions>
+                  <:description>
+                    Country, division, postcode and locality depend on one another, so they are applied together.
+                  </:description>
+                  <:actions>
+                    <.action_link
+                      id="design-library-section-heading-manage"
+                      icon="manage"
+                      navigate={~p"/system/design-library"}
+                      title="Manage this section's records"
+                    >
+                      Manage
+                    </.action_link>
+                  </:actions>
+                </.section_heading>
+              </div>
+              <div class="border-t border-line pt-3">
+                <p class="text-xs text-ink-muted">
+                  The row every section of a detail page opens with, inside its card: the small-caps title, an optional count, and the same two action slots as the page header. It has no loading, empty or error state; the section body carries those.
+                </p>
+              </div>
+            </.card>
           </section>
 
           <section id="component-navigation-links" class="scroll-mt-4 space-y-4">

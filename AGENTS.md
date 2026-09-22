@@ -600,7 +600,12 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   in `DESIGN.md`. The per-fact outcome bookkeeping behind that `status` —
   which "Saved" stands, the refusal wording, the rejected-value truncation —
   is `Bilimbi.Base.UI.CommitStatus`; a page adopts it and never keeps a
-  copy. Returning is a secondary action: use `<.back_link>`
+  copy. A detail section is a `<.card>` opened by
+  `<.section_heading>` whose facts are `<.list>` and whose table is
+  `<.table framed={false}>`; a hand-written `<dl>`, `<h2>`, `<h3>` or
+  `<table>` in a section is a defect (DESIGN.md "Detail sections and
+  facts"). A `<.table>` inside a LiveComponent passes
+  `sort_target={@myself}`. Returning is a secondary action: use `<.back_link>`
   ("← Back"), never a "Back to …" button; a related workflow such as
   Manage is an `<.action_link>` carrying its registry glyph, on the section
   it belongs to or beside the page's primary action, never a button; and

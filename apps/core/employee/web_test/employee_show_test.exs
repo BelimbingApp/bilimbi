@@ -6,6 +6,8 @@ defmodule BilimbiWeb.EmployeeShowTest do
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Core.Address
+  alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.Employee
   alias Bilimbi.Core.User
@@ -114,6 +116,76 @@ defmodule BilimbiWeb.EmployeeShowTest do
              view,
              "#employee-record-history-entry-#{ordinary.id}",
              "impersonated by"
+           )
+  end
+
+  test "the addresses panel is the shared table with in-place priority and a demoted unlink", %{
+    conn: conn,
+    employee: employee
+  } do
+    AddressFixtures.create_geonames_tables!()
+    AddressFixtures.create_address_tables!()
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, home} =
+      Address.create_address(scope, %{label: "Home", line1: "12 Jalan Damai", locality: "Ipoh"})
+
+    {:ok, :attached} =
+      Address.attach_to_employee(scope, home.id, employee.id, %{kind: ["other"], priority: 1})
+
+    grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+    # Shared heading with its count over the shared table; no hand-written table.
+    assert has_element?(view, "#addresses-panel h2#employee-addresses-heading", "Addresses")
+    assert has_element?(view, "#employee-addresses-heading + span", "1")
+    assert has_element?(view, "#addresses-panel caption", "Employee addresses")
+
+    assert has_element?(
+             view,
+             "#addresses-panel th[aria-sort='ascending'] button#addresses-table-sort-label"
+           )
+
+    assert has_element?(view, "tbody#addresses-table tr#address-row-#{home.id}")
+    assert has_element?(view, "#address-link-#{home.id}[href='/addresses/#{home.id}']", "Home")
+    assert has_element?(view, "#address-row-#{home.id}", "12 Jalan Damai, Ipoh")
+
+    # Sorting reaches the panel, not the page.
+    view |> element("#addresses-table-sort-priority") |> render_click()
+    assert has_element?(view, "th[aria-sort='ascending'] #addresses-table-sort-priority")
+
+    # Priority commits in place through the shared editor addressed to the panel.
+    assert has_element?(
+             view,
+             "#address-priority-#{home.id}[phx-hook='InlineEdit'][data-save-event='save_address_priority']"
+           )
+
+    view
+    |> element("#address-priority-#{home.id}")
+    |> render_hook("save_address_priority", %{"id" => to_string(home.id), "priority" => "4"})
+
+    assert has_element?(view, "#addresses-panel-notice[role='status']", "Address setting updated.")
+    assert has_element?(view, "#address-priority-#{home.id} [data-role='text']", "4")
+
+    {:ok, [attached]} = Address.list_employee_attached_addresses(scope, employee.id)
+    assert attached.priority == 4
+
+    # Unlinking is a demoted icon action; the empty state then says what to do.
+    assert has_element?(
+             view,
+             "button#unlink-address-#{home.id}[aria-label='Unlink address'][data-confirm] .hero-link-slash"
+           )
+
+    view |> element("#unlink-address-#{home.id}") |> render_click()
+
+    refute has_element?(view, "#address-row-#{home.id}")
+    assert has_element?(view, "#addresses-table-empty", "No addresses linked.")
+
+    assert has_element?(
+             view,
+             "#addresses-table-empty",
+             "Attach one of the company's addresses to this employee."
            )
   end
 

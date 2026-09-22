@@ -448,6 +448,92 @@ defmodule BilimbiWeb.AddressLiveTest do
     assert has_element?(view, "#address-record-history-entry-#{mutation.id}", "Headquarters")
   end
 
+  test "presents the facts as the shared list without disturbing in-place editing", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, address} =
+      Address.create_address(scope, %{
+        label: "Head Office",
+        phone: "+60 1",
+        verification_status: "verified",
+        country_iso: "MY",
+        postcode: "50000",
+        locality: "Kuala Lumpur"
+      })
+
+    grant_capabilities!(["admin.address.view", "admin.address.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+
+    # Every section is a named region opened by the one shared heading; no
+    # section writes its own h3 or hand-rolled panel.
+    for id <- ~w(address-details address-location address-provenance address-linked-entities) do
+      assert has_element?(
+               view,
+               "##{id}-card[role='region'][aria-labelledby='#{id}-heading'] h2##{id}-heading"
+             )
+    end
+
+    refute has_element?(view, "#address-show-page h3")
+    refute has_element?(view, "#address-show-page section")
+
+    # The facts are rows of the shared list; the value cell hosts the editor
+    # and, after a commit, the status it reports.
+    assert has_element?(view, "#address-details-card dl dt", "Label")
+
+    assert has_element?(
+             view,
+             "#address-details-card dl dd#address-view-label #address-label[phx-hook='InlineEdit'][data-allow-empty]"
+           )
+
+    render_hook(view, "save_field", %{"id" => to_string(address.id), "label" => "Updated HQ"})
+
+    assert has_element?(view, "dd#address-view-label #address-label-status[role='status']", "Saved")
+    assert has_element?(view, "dd#address-view-label #address-label [data-role='text']", "Updated HQ")
+
+    # The choice fact keeps its trigger and status in its own row.
+    assert has_element?(
+             view,
+             "dd#address-view-verification-status button#address-verification-status-display",
+             "Verified"
+           )
+
+    view |> element("#address-verification-status-display") |> render_click()
+
+    view
+    |> form("#address-verification-status-form", %{"verification_status" => "suggested"})
+    |> render_change()
+
+    assert has_element?(
+             view,
+             "dd#address-view-verification-status #address-verification-status-status[role='status']",
+             "Saved"
+           )
+
+    # The grouped location editor opens from the demoted icon beside its
+    # heading and replaces the list while it is open.
+    assert has_element?(view, "h2#address-location-heading + button#address-edit-location-button")
+    assert has_element?(view, "#address-location-card dl dd#address-view-postcode", "50000")
+
+    view |> element("#address-edit-location-button") |> render_click()
+
+    assert has_element?(view, "#address-location-form")
+    refute has_element?(view, "#address-location-card dl")
+
+    view |> element("#address-cancel-location") |> render_click()
+
+    assert has_element?(view, "#address-location-card dl dd#address-view-locality", "Kuala Lumpur")
+
+    # Provenance facts are rows of the same list shape.
+    assert has_element?(
+             view,
+             "#address-provenance-card dl dd#address-view-source-ref #address-source-ref[phx-hook='InlineEdit']"
+           )
+
+    refute has_element?(view, "#address-provenance-card dd#address-view-raw-input")
+  end
+
   test "shows an in-place save in the record history panel", %{conn: conn, scope: scope} do
     {:ok, address} = Address.create_address(scope, %{label: "Head Office"})
 

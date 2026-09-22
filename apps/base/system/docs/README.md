@@ -32,7 +32,7 @@ Ports Belimbing's `app/Base/System/Livewire/Info/Index.php` and
 `resources/core/views/livewire/admin/system/info/index.blade.php`.
 
 Both screens present their facts through Base UI's `<.list>`, the record-facts
-list detail pages use, rather than their own `<dl>` markup. Each row keeps a
+list detail pages use, rather than their own `<dl>` markup. Each value cell keeps a
 stable id (`system-info-<card>-<label>`, `localization-<fact>`) so a test or an
 anchor can reach one fact. `InfoLive.fact_value/1` renders `:unavailable` as
 muted "Unavailable" inside that list, so a probe that could not answer stays

@@ -91,7 +91,12 @@ const InlineEdit = {
     // -- the row simply never changed (#302).
     if ((newValue !== "" || allowEmpty) && newValue !== this.originalValue) {
       this.markSaving()
-      this.pushEvent(saveEvent, {id: id, [field]: newValue}, () => this.settle())
+      // Addressed to the element rather than pushed bare: LiveView then
+      // routes the event to the LiveComponent that rendered this field, when
+      // one did (the address panels' table rows), and to the LiveView
+      // otherwise (a detail page's facts). A bare pushEvent always reaches
+      // the LiveView, which has no handler for a component's field.
+      this.pushEventTo(this.el, saveEvent, {id: id, [field]: newValue}, () => this.settle())
     } else {
       this.inputEl.value = this.originalValue
     }

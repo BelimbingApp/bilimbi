@@ -26,6 +26,11 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   registry's `history` clock beside the visible word "History", in the same
   link treatment as the back links — and plain "← Back" links: to the owning Company when `?company=ID` names a linked
   Company, and to the address list.
+
+  Each section is a `<.card>` opened by the shared `<.section_heading>`, and
+  its facts are rows of the shared `<.list>`: the value cell hosts the
+  in-place editor and the commit status it reports, so nothing about how a
+  fact edits or reports changed when the facts moved onto the shared list.
   """
 
   use Bilimbi.Base.UI, :live_view
@@ -420,7 +425,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
-      <.page id="address-show-page">
+      <.page id="address-show-page" variant={:detail}>
         <.header>
           Address Details
           <:subtitle>{@address.label || "Address ##{@address.id}"}</:subtitle>
@@ -448,148 +453,144 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
         </.header>
 
         <div class="space-y-6">
-          <section
+          <.card
             id="address-details-card"
-            class="rounded-2xl border border-line bg-surface p-6 shadow-xs"
+            inner_class="p-5 sm:p-6"
+            role="region"
             aria-labelledby="address-details-heading"
           >
-            <h2
-              id="address-details-heading"
-              class="mb-4 text-xs font-semibold uppercase tracking-wider text-ink-muted"
-            >
-              Address Details
-            </h2>
+            <.section_heading id="address-details-heading" title="Address Details" />
 
-            <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-              <.text_fact
-                name="label"
-                address={@address}
-                can_update?={@can_update?}
-                field_status={@field_status}
-                class="font-medium"
-              />
-              <.text_fact
-                name="phone"
-                address={@address}
-                can_update?={@can_update?}
-                field_status={@field_status}
-              />
-              <div>
-                <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                  Verification Status
-                </dt>
-                <dd id="address-view-verification-status" class="mt-1 text-sm">
-                  <button
-                    :if={@can_update? and @editing_field != "verification_status"}
-                    type="button"
-                    id="address-verification-status-display"
-                    phx-click="edit_field"
-                    phx-value-field="verification_status"
-                    aria-label="Edit verification status"
-                    aria-describedby={
-                      @field_status["verification_status"] && "address-verification-status-status"
-                    }
-                    class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
-                  >
-                    <.verification_badge status={@address.verification_status} />
-                    <.icon
-                      name="edit"
-                      class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-                    />
-                  </button>
+            <.list>
+              <:item title={fact_label("label")} id="address-view-label">
+                <.text_fact
+                  name="label"
+                  address={@address}
+                  can_update?={@can_update?}
+                  field_status={@field_status}
+                  class="font-medium"
+                />
+              </:item>
+              <:item title={fact_label("phone")} id="address-view-phone">
+                <.text_fact
+                  name="phone"
+                  address={@address}
+                  can_update?={@can_update?}
+                  field_status={@field_status}
+                />
+              </:item>
+              <:item title="Verification Status" id="address-view-verification-status">
+                <button
+                  :if={@can_update? and @editing_field != "verification_status"}
+                  type="button"
+                  id="address-verification-status-display"
+                  phx-click="edit_field"
+                  phx-value-field="verification_status"
+                  aria-label="Edit verification status"
+                  aria-describedby={
+                    @field_status["verification_status"] && "address-verification-status-status"
+                  }
+                  class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
+                >
+                  <.verification_badge status={@address.verification_status} />
+                  <.icon
+                    name="edit"
+                    class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                  />
+                </button>
 
-                  <%!-- Window-scoped: the select may not hold focus (JS.focus is
-                       best-effort), and Escape must cancel regardless. Only one
-                       editor mounts at a time, so the listener is unambiguous. --%>
-                  <div
-                    :if={@can_update? and @editing_field == "verification_status"}
-                    phx-window-keydown="cancel_edit_field"
-                    phx-key="Escape"
+                <%!-- Window-scoped: the select may not hold focus (JS.focus is
+                     best-effort), and Escape must cancel regardless. Only one
+                     editor mounts at a time, so the listener is unambiguous. --%>
+                <div
+                  :if={@can_update? and @editing_field == "verification_status"}
+                  phx-window-keydown="cancel_edit_field"
+                  phx-key="Escape"
+                >
+                  <form
+                    id="address-verification-status-form"
+                    phx-change="save_verification_status"
+                    class="inline-block"
                   >
-                    <form
-                      id="address-verification-status-form"
-                      phx-change="save_verification_status"
-                      class="inline-block"
+                    <select
+                      id="address-verification-status"
+                      name="verification_status"
+                      aria-label="Verification status"
+                      phx-mounted={JS.focus()}
+                      phx-blur="cancel_edit_field"
+                      class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                     >
-                      <select
-                        id="address-verification-status"
-                        name="verification_status"
-                        aria-label="Verification status"
-                        phx-mounted={JS.focus()}
-                        phx-blur="cancel_edit_field"
-                        class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                      <option
+                        :for={{label, value} <- verification_status_options()}
+                        value={value}
+                        selected={@address.verification_status == value}
                       >
-                        <option
-                          :for={{label, value} <- verification_status_options()}
-                          value={value}
-                          selected={@address.verification_status == value}
-                        >
-                          {label}
-                        </option>
-                      </select>
-                    </form>
-                  </div>
+                        {label}
+                      </option>
+                    </select>
+                  </form>
+                </div>
 
-                  <span :if={not @can_update?}>
-                    <.verification_badge status={@address.verification_status} />
-                  </span>
+                <span :if={not @can_update?}>
+                  <.verification_badge status={@address.verification_status} />
+                </span>
 
-                  <.commit_status id="address-verification-status-status" status={@field_status["verification_status"]} />
-                </dd>
-              </div>
+                <.commit_status
+                  id="address-verification-status-status"
+                  status={@field_status["verification_status"]}
+                />
+              </:item>
+              <:item title={fact_label("line1")} id="address-view-line1">
+                <.text_fact
+                  name="line1"
+                  address={@address}
+                  can_update?={@can_update?}
+                  field_status={@field_status}
+                />
+              </:item>
+              <:item title={fact_label("line2")} id="address-view-line2">
+                <.text_fact
+                  name="line2"
+                  address={@address}
+                  can_update?={@can_update?}
+                  field_status={@field_status}
+                />
+              </:item>
+              <:item title={fact_label("line3")} id="address-view-line3">
+                <.text_fact
+                  name="line3"
+                  address={@address}
+                  can_update?={@can_update?}
+                  field_status={@field_status}
+                />
+              </:item>
+            </.list>
+          </.card>
 
-              <.text_fact
-                name="line1"
-                address={@address}
-                can_update?={@can_update?}
-                field_status={@field_status}
-              />
-              <.text_fact
-                name="line2"
-                address={@address}
-                can_update?={@can_update?}
-                field_status={@field_status}
-              />
-              <.text_fact
-                name="line3"
-                address={@address}
-                can_update?={@can_update?}
-                field_status={@field_status}
-              />
-            </dl>
-          </section>
-
-          <section
+          <.card
             id="address-location-card"
-            class="rounded-2xl border border-line bg-surface p-6 shadow-xs"
+            inner_class="p-5 sm:p-6"
+            role="region"
             aria-labelledby="address-location-heading"
           >
-            <div class="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <div class="flex items-center gap-2">
-                  <h2
-                    id="address-location-heading"
-                    class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
-                  >
-                    Geographic Location
-                  </h2>
-                  <.icon_button
-                    :if={@can_update? and not @editing_location?}
-                    id="address-edit-location-button"
-                    icon="edit"
-                    label="Edit location"
-                    context={:inline}
-                    phx-click="edit_location"
-                  />
-                </div>
-                <p class="mt-0.5 text-xs text-ink-subtle">
-                  Linked to GeoNames reference database for standardization and lookup. Country, division, postcode and locality depend on one another, so they are applied together.
-                </p>
+            <.section_heading id="address-location-heading" title="Geographic Location">
+              <:title_actions>
+                <.icon_button
+                  :if={@can_update? and not @editing_location?}
+                  id="address-edit-location-button"
+                  icon="edit"
+                  label="Edit location"
+                  context={:inline}
+                  phx-click="edit_location"
+                />
+              </:title_actions>
+              <:description>
+                Linked to GeoNames reference database for standardization and lookup. Country, division, postcode and locality depend on one another, so they are applied together.
                 <.commit_status id="address-location-status" status={@field_status["location"]} />
-              </div>
-            </div>
+              </:description>
+            </.section_heading>
 
-            <div :if={@editing_location?} class="mt-4 border-t border-line pt-4">
+            <div :if={@editing_location?} class="border-t border-line pt-4">
               <.form
                 for={@location_form}
                 id="address-location-form"
@@ -682,111 +683,83 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
               </.form>
             </div>
 
-            <div :if={not @editing_location?} class="mt-4 border-t border-line pt-4">
-              <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-                <.fact label="Country">
-                  <dd id="address-view-country" class="mt-1 text-sm text-ink">
-                    {@address.country_name || @address.country_iso || "—"}
-                  </dd>
-                </.fact>
-                <.fact label="State / Province">
-                  <dd id="address-view-admin1" class="mt-1 text-sm text-ink">
-                    {@address.admin1_name || @address.admin1_code || "—"}
-                  </dd>
-                </.fact>
-                <.fact label="Postal Code">
-                  <dd id="address-view-postcode" class="mt-1 text-sm tabular-nums text-ink">
-                    {@address.postcode || "—"}
-                  </dd>
-                </.fact>
-                <.fact label="Locality">
-                  <dd id="address-view-locality" class="mt-1 text-sm text-ink">
-                    {@address.locality || "—"}
-                  </dd>
-                </.fact>
-              </dl>
-            </div>
-          </section>
+            <.list :if={not @editing_location?}>
+              <:item title="Country" id="address-view-country">
+                {@address.country_name || @address.country_iso || "—"}
+              </:item>
+              <:item title="State / Province" id="address-view-admin1">
+                {@address.admin1_name || @address.admin1_code || "—"}
+              </:item>
+              <:item title="Postal Code" id="address-view-postcode">
+                <span class="tabular-nums">{@address.postcode || "—"}</span>
+              </:item>
+              <:item title="Locality" id="address-view-locality">
+                {@address.locality || "—"}
+              </:item>
+            </.list>
+          </.card>
 
-          <section
+          <.card
             id="address-provenance-card"
-            class="rounded-2xl border border-line bg-surface p-6 shadow-xs"
+            inner_class="p-5 sm:p-6"
+            role="region"
             aria-labelledby="address-provenance-heading"
           >
-            <div class="mb-4">
-              <h2
-                id="address-provenance-heading"
-                class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
-              >
-                Provenance
-              </h2>
-              <p class="mt-0.5 text-xs text-ink-subtle">
+            <.section_heading id="address-provenance-heading" title="Provenance">
+              <:description>
                 Tracks where this address came from and how it was processed — useful for auditing data quality and imports.
-              </p>
-            </div>
+              </:description>
+            </.section_heading>
 
-            <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-              <.text_fact
-                name="source"
-                address={@address}
-                can_update?={@can_update?}
-                field_status={@field_status}
-              />
-              <.text_fact
-                name="source_ref"
-                address={@address}
-                can_update?={@can_update?}
-                field_status={@field_status}
-              />
-              <.fact label="Parser Version">
-                <dd id="address-view-parser-version" class="mt-1 text-sm text-ink">
-                  {@address.parser_version || "—"}
-                </dd>
-              </.fact>
-              <.fact label="Parse Confidence">
-                <dd id="address-view-parse-confidence" class="mt-1 text-sm tabular-nums text-ink">
-                  {@address.parse_confidence || "—"}
-                </dd>
-              </.fact>
-              <div :if={@address.raw_input} class="sm:col-span-2 md:col-span-4 mt-2 border-t border-line pt-4">
-                <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">
-                  Raw Input
-                </dt>
-                <dd class="mt-1">
-                  <pre
-                    id="address-view-raw-input"
-                    class="overflow-x-auto rounded-xl border border-line bg-surface-muted p-3 font-mono text-xs text-ink"
-                  >{@address.raw_input}</pre>
-                </dd>
-              </div>
-            </dl>
-          </section>
+            <.list>
+              <:item title={fact_label("source")} id="address-view-source">
+                <.text_fact
+                  name="source"
+                  address={@address}
+                  can_update?={@can_update?}
+                  field_status={@field_status}
+                />
+              </:item>
+              <:item title={fact_label("source_ref")} id="address-view-source-ref">
+                <.text_fact
+                  name="source_ref"
+                  address={@address}
+                  can_update?={@can_update?}
+                  field_status={@field_status}
+                />
+              </:item>
+              <:item title="Parser Version" id="address-view-parser-version">
+                {@address.parser_version || "—"}
+              </:item>
+              <:item title="Parse Confidence" id="address-view-parse-confidence">
+                <span class="tabular-nums">{@address.parse_confidence || "—"}</span>
+              </:item>
+              <:item :if={@address.raw_input} title="Raw Input" id="address-view-raw-input">
+                <pre class="overflow-x-auto rounded-xl border border-line bg-surface-muted p-3 font-mono text-xs text-ink">{@address.raw_input}</pre>
+              </:item>
+            </.list>
+          </.card>
 
-          <section
+          <.card
             id="address-linked-entities-card"
-            class="rounded-2xl border border-line bg-surface p-6 shadow-xs"
+            inner_class="p-5 sm:p-6"
+            role="region"
             aria-labelledby="address-linked-entities-heading"
           >
-            <div class="mb-4">
-              <h2
-                id="address-linked-entities-heading"
-                class="text-xs font-semibold uppercase tracking-wider text-ink-muted"
-              >
-                Linked Entities
-              </h2>
-              <p class="mt-0.5 text-xs text-ink-subtle">
+            <.section_heading id="address-linked-entities-heading" title="Linked Entities">
+              <:description>
                 Companies, employees, or other records that use this address. One address can be shared by multiple entities with different roles (e.g., billing, shipping).
-              </p>
-            </div>
+              </:description>
+            </.section_heading>
 
-            <div class="overflow-x-auto">
-              <.table
-                id="address-linked-entities-table"
-                rows={@address.linked_owners}
-                sort_by={@linked_sort_by}
-                sort_dir={@linked_sort_dir}
-                framed={false}
-              >
+            <.table
+              id="address-linked-entities-table"
+              rows={@address.linked_owners}
+              sort_by={@linked_sort_by}
+              sort_dir={@linked_sort_dir}
+              framed={false}
+              caption="Linked entities"
+            >
                 <:col :let={owner} label="Entity Type" sort="type" sort_id="sort-type">
                   <span class="whitespace-nowrap font-medium text-ink">
                     {format_owner_type(owner.owner_type)}
@@ -858,9 +831,8 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                 <:empty :if={@address.linked_owners == []}>
                   No linked entities.
                 </:empty>
-              </.table>
-            </div>
-          </section>
+            </.table>
+          </.card>
         </div>
       </.page>
     </Layouts.app>
@@ -871,9 +843,10 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
   # Fact Components
   # ============================================================================
 
-  # A read-first text fact. An operator who may update edits it in place; the
-  # emptied value is a real edit because every one of these columns is
-  # nullable. Anyone else sees the stored value with no affordance.
+  # A read-first text fact's value cell. An operator who may update edits it in
+  # place; the emptied value is a real edit because every one of these columns
+  # is nullable. Anyone else sees the stored value with no affordance. The row
+  # around it — label, value cell and its id — is the shared `<.list>` item.
   attr(:name, :string, required: true)
   attr(:address, Detail, required: true)
   attr(:can_update?, :boolean, required: true)
@@ -888,37 +861,21 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
       |> assign(:dom_id, "address-#{String.replace(assigns.name, "_", "-")}")
 
     ~H"""
-    <div>
-      <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">{@label}</dt>
-      <dd id={String.replace(@dom_id, "address-", "address-view-")} class={["mt-1 text-sm text-ink", @class]}>
-        <.inline_edit
-          :if={@can_update?}
-          id={@dom_id}
-          name={@name}
-          label={@label}
-          value={@value || ""}
-          id_value={@address.id}
-          save_event="save_field"
-          allow_empty
-          status={@field_status[@name]}
-        />
-        <span :if={not @can_update?} class={[is_nil(@value) && "text-ink-muted"]}>
-          {@value || "—"}
-        </span>
-      </dd>
-    </div>
-    """
-  end
-
-  attr(:label, :string, required: true)
-  slot(:inner_block, required: true)
-
-  defp fact(assigns) do
-    ~H"""
-    <div>
-      <dt class="text-xs font-medium uppercase tracking-wider text-ink-subtle">{@label}</dt>
-      {render_slot(@inner_block)}
-    </div>
+    <.inline_edit
+      :if={@can_update?}
+      id={@dom_id}
+      name={@name}
+      label={@label}
+      value={@value || ""}
+      id_value={@address.id}
+      save_event="save_field"
+      allow_empty
+      status={@field_status[@name]}
+      class={@class}
+    />
+    <span :if={not @can_update?} class={[@class, is_nil(@value) && "text-ink-muted"]}>
+      {@value || "—"}
+    </span>
     """
   end
 
