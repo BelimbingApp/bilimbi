@@ -53,6 +53,65 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
            ]
   end
 
+  test "literal descriptor reuse still notices same-size edits with an unchanged mtime", %{
+    root: root
+  } do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "aaa")
+    path = Path.join(module_root, "bilimbi.module.exs")
+    before = File.stat!(path)
+    assert [%{id: "base/aaa"}] = MixDiscovery.discover_workspace!(root)
+
+    File.write!(path, String.replace(File.read!(path), "base/aaa", "base/bbb"))
+    File.touch!(path, before.mtime)
+    assert [%{id: "base/bbb"}] = MixDiscovery.discover_workspace!(root)
+
+    File.write!(path, "[")
+
+    assert_raise ArgumentError, ~r/malformed Bilimbi module/, fn ->
+      MixDiscovery.discover_workspace!(root)
+    end
+  end
+
+  test "executable descriptors are reevaluated rather than cached", %{root: root} do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "aaa")
+    path = Path.join(module_root, "bilimbi.module.exs")
+
+    File.write!(
+      path,
+      "Process.put(:descriptor_evaluations, Process.get(:descriptor_evaluations, 0) + 1)\n" <>
+        File.read!(path)
+    )
+
+    MixDiscovery.discover_workspace!(root)
+    MixDiscovery.discover_workspace!(root)
+    assert Process.get(:descriptor_evaluations) == 2
+  end
+
+  test "cached literals do not conceal new directories or migration drift", %{root: root} do
+    put_container!(root, "base", :base)
+
+    module_root =
+      put_module!(root, "base", "aaa",
+        migrations: "priv/repo/migrations",
+        migration_dispositions: %{20_250_101_000_000 => :compatible_baseline}
+      )
+
+    migration_dir = Path.join(module_root, "priv/repo/migrations")
+    File.mkdir_p!(migration_dir)
+    File.write!(Path.join(migration_dir, "20250101000000_initial.exs"), "# initial\n")
+    assert [_] = MixDiscovery.discover_workspace!(root)
+    File.write!(Path.join(migration_dir, "20260101000000_added.exs"), "# new\n")
+    assert_raise ArgumentError, fn -> MixDiscovery.discover_workspace!(root) end
+    File.rm!(Path.join(migration_dir, "20260101000000_added.exs"))
+    File.mkdir_p!(Path.join(root, "apps/base/missing"))
+
+    assert_raise ArgumentError, ~r/missing bilimbi.module.exs/, fn ->
+      MixDiscovery.discover_workspace!(root)
+    end
+  end
+
   test "reloadable apps are the discovered module OTP apps plus the web host", %{root: root} do
     put_container!(root, "base", :base)
     put_container!(root, "people", :domain)

@@ -187,7 +187,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
       |> Enum.at(order)
       |> Map.drop([:path, :container_id, :container_layer, :container_path])
       |> Map.put(:order, order)
-      |> Map.put(:graph_fingerprint, workspace_fingerprint(workspace_root))
+      |> Map.put(:graph_fingerprint, workspace_fingerprint(workspace_root, modules))
 
     [bilimbi_module: descriptor]
   end
@@ -196,7 +196,10 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   @spec workspace_fingerprint(String.t()) :: String.t()
   def workspace_fingerprint(path) do
     workspace_root = workspace_root!(path)
+    workspace_fingerprint(workspace_root, discover_workspace!(workspace_root))
+  end
 
+  defp workspace_fingerprint(workspace_root, modules) do
     descriptor_files =
       [
         Path.join(workspace_root, "apps/*/#{@container_file}"),
@@ -209,8 +212,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
       |> Enum.sort()
 
     migration_files =
-      workspace_root
-      |> discover_workspace!()
+      modules
       |> Enum.flat_map(fn descriptor ->
         case descriptor.migrations do
           path when is_binary(path) ->
@@ -454,8 +456,12 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   end
 
   defp evaluate_descriptor!(path, label) do
-    case Code.eval_file(path) do
-      {value, _binding} -> value
+    source = File.read!(path)
+    key = {__MODULE__, :literal_descriptor, path}
+
+    case Process.get(key) do
+      {^source, value} -> value
+      _other -> evaluate_descriptor_source!(source, path, key)
     end
   rescue
     error ->
@@ -465,6 +471,33 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
                   "malformed Bilimbi #{label} descriptor #{path}: #{Exception.message(error)}"
               ],
               __STACKTRACE__
+  end
+
+  # Mix calls project/application repeatedly for every reloadable path package.
+  # Reuse only plain literal descriptors; executable descriptors still evaluate
+  # every time. Read the bytes on every call (not just mtime), and always run the
+  # graph, directory and migration validation outside this tiny parse cache.
+  defp evaluate_descriptor_source!(source, path, key) do
+    quoted =
+      source
+      |> Code.string_to_quoted!(file: path)
+      |> Macro.prewalk(fn
+        {:__aliases__, _, parts} = alias_ast ->
+          if Enum.all?(parts, &is_atom/1), do: Module.concat(parts), else: alias_ast
+
+        other ->
+          other
+      end)
+
+    if Macro.quoted_literal?(quoted) do
+      {value, _binding} = Code.eval_quoted(quoted, [], file: path)
+      Process.put(key, {source, value})
+      value
+    else
+      Process.delete(key)
+      {value, _binding} = Code.eval_string(source, [], file: path)
+      value
+    end
   end
 
   defp validate_keyword_keys!(value, expected_keys, path) do

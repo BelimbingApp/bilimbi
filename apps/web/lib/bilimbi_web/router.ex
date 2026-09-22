@@ -67,11 +67,6 @@ defmodule BilimbiWeb.Router do
 
     post "/admin/impersonate/leave", ImpersonationController, :delete
     post "/admin/impersonate/:id", ImpersonationController, :create
-
-    live_session :authenticated,
-      on_mount: [{BilimbiWeb.UserAuth, :require_authenticated}] do
-      live "/dashboard", DashboardLive
-    end
   end
 
   @manifest_path Path.expand(

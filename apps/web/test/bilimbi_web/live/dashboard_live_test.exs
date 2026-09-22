@@ -24,6 +24,60 @@ defmodule BilimbiWeb.DashboardLiveTest do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/dashboard")
   end
 
+  test "initial HTTP render resolves the durable session only once", %{conn: conn} do
+    conn = log_in_as(conn)
+    session_id = Plug.Conn.get_session(conn, "current_user")["session_id"]
+    owner = self()
+    handler = {__MODULE__, make_ref()}
+
+    :telemetry.attach(
+      handler,
+      Bilimbi.Base.Repo.config()[:telemetry_prefix] ++ [:query],
+      fn _event, _measurements, metadata, {owner, session_id} ->
+        if self() == owner and metadata.source == "sessions" and
+             session_id in (metadata.params || []) do
+          send(owner, :session_read)
+        end
+      end,
+      {owner, session_id}
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+    conn = get(conn, ~p"/dashboard")
+    assert html_response(conn, 200)
+    assert_receive :session_read
+    refute_receive :session_read
+
+    # Connecting must revalidate, even if the initial HTML was authenticated.
+    :ok = Session.delete_session(session_id)
+    assert {:error, {:redirect, %{to: "/"}}} = live(conn)
+  end
+
+  test "module pages and dashboard support navigation without an HTTP reload", %{conn: conn} do
+    grant_capabilities!(["admin.system.session.list"])
+    {:ok, sessions, _html} = conn |> log_in_as() |> live(~p"/system/sessions")
+    assert has_element?(sessions, "#app-shell")
+    assert {:ok, profile, _html} = live_redirect(sessions, to: "/settings/profile")
+    assert {:ok, dashboard, _html} = live_redirect(profile, to: "/dashboard")
+    assert has_element?(dashboard, "#dashboard-current-company")
+  end
+
+  test "live navigation denies a destination capability before mounting it", %{conn: conn} do
+    {:ok, dashboard, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+    assert {:error, {:redirect, %{to: "/dashboard"}}} =
+             live_redirect(dashboard, to: "/users/new")
+  end
+
+  test "live navigation rechecks a terminated durable session", %{conn: conn} do
+    conn = log_in_as(conn)
+    {:ok, dashboard, _html} = live(conn, ~p"/dashboard")
+    :ok = Session.delete_session(Plug.Conn.get_session(conn, "current_user")["session_id"])
+
+    assert {:error, {:redirect, %{to: "/"}}} =
+             live_redirect(dashboard, to: "/settings/profile")
+  end
+
   test "shows the workspace identity and real counts", %{conn: conn} do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 

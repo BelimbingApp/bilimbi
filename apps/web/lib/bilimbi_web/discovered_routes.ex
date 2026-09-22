@@ -7,79 +7,80 @@ defmodule BilimbiWeb.DiscoveredRoutes do
                  )
 
   def module_routes(routes) when is_list(routes) do
-    # Embed entries (no :path) belong to Bilimbi.Base.UI.DiscoveredPanels,
-    # not to the router.
     Enum.reject(routes, &(&1[:source] == "web" or not Map.has_key?(&1, :path)))
   end
 
   defmacro inject do
-    manifest_path = @manifest_path
-
     routes =
-      if File.regular?(manifest_path) do
-        {list, _} = Code.eval_file(manifest_path)
+      if File.regular?(@manifest_path) do
+        {list, _} = Code.eval_file(@manifest_path)
         module_routes(list)
       else
         []
       end
 
-    quotes =
-      for route <- routes, live_module?(route) do
-        path = route.path
-        live_mod = route.live
-        session = Map.get(route, :session, :auth)
-        capability = Map.get(route, :capability)
-        operator = Map.get(route, :operator, false) == true
-        session_name = :"discovered_#{:erlang.phash2({path, live_mod})}"
-        {pipeline, hooks} = pipes_and_hooks(session, capability)
+    routes = [%{path: "/dashboard", live: BilimbiWeb.DashboardLive, session: :auth} | routes]
 
-        # An operator-only route (e.g. the raw-SQL console, #650) gates on the
-        # platform-operator tenant AFTER auth + capability. Fail-closed at mount.
-        hooks =
-          if operator,
-            do: hooks ++ [{BilimbiWeb.UserAuth, :require_platform_operator}],
-            else: hooks
+    groups =
+      routes
+      |> Enum.filter(&(is_atom(&1[:live]) and not is_nil(&1[:live])))
+      |> Enum.group_by(&session_group/1)
+      |> Enum.sort_by(&elem(&1, 0))
+
+    blocks =
+      for {group, routes} <- groups do
+        {name, pipeline, hooks} = session_options(group)
+
+        # These atoms come exclusively from trusted, compiled route declarations.
+        # The action identifies the destination before its mount can read data.
+        policies = Map.new(routes, &{:"bilimbi:#{&1.path}", &1[:capability]})
+        hooks = hooks ++ [{BilimbiWeb.RouteAccess, policies}]
+
+        declarations =
+          for route <- routes do
+            action = :"bilimbi:#{route.path}"
+
+            quote do
+              live unquote(route.path), unquote(route.live), unquote(action)
+            end
+          end
 
         quote do
           scope "/" do
             pipe_through unquote(pipeline)
 
-            live_session unquote(session_name), on_mount: unquote(hooks) do
-              live unquote(path), unquote(live_mod)
+            live_session unquote(name), on_mount: unquote(Macro.escape(hooks)) do
+              (unquote_splicing(declarations))
             end
           end
         end
       end
 
     quote do
-      (unquote_splicing(quotes))
+      (unquote_splicing(blocks))
     end
   end
 
-  defp live_module?(route) do
-    case Map.get(route, :live) do
-      live when is_atom(live) and not is_nil(live) -> true
-      _other -> false
-    end
+  defp session_group(%{session: :auth, operator: true}), do: :operator
+  defp session_group(route), do: Map.get(route, :session, :auth)
+
+  defp session_options(:auth) do
+    {:authenticated, [:browser, :require_authenticated],
+     [{BilimbiWeb.UserAuth, :require_authenticated}]}
   end
 
-  defp pipes_and_hooks(:anonymous, _cap) do
-    {[:browser, :redirect_if_authenticated], [{BilimbiWeb.UserAuth, :redirect_if_authenticated}]}
-  end
-
-  defp pipes_and_hooks(:auth, nil) do
-    {[:browser, :require_authenticated], [{BilimbiWeb.UserAuth, :require_authenticated}]}
-  end
-
-  defp pipes_and_hooks(:auth, cap) when is_binary(cap) do
-    {[:browser, :require_authenticated],
+  defp session_options(:operator) do
+    {:operator, [:browser, :require_authenticated],
      [
        {BilimbiWeb.UserAuth, :require_authenticated},
-       {BilimbiWeb.UserAuth, {:require_capability, cap}}
+       {BilimbiWeb.UserAuth, :require_platform_operator}
      ]}
   end
 
-  defp pipes_and_hooks(:none, _cap) do
-    {[:browser], []}
+  defp session_options(:anonymous) do
+    {:discovered_anonymous, [:browser, :redirect_if_authenticated],
+     [{BilimbiWeb.UserAuth, :redirect_if_authenticated}]}
   end
+
+  defp session_options(:none), do: {:discovered_public, [:browser], []}
 end

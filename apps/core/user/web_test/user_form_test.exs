@@ -23,6 +23,23 @@ defmodule BilimbiWeb.UserFormTest do
   end
 
   describe "new" do
+    test "a same-view patch cannot borrow the create capability to edit", %{conn: conn} do
+      UserFixtures.insert_user!(%{id: 91, company_id: 73})
+      grant_capabilities!(["admin.user.create"])
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/new")
+
+      assert {:error, {:redirect, %{to: "/dashboard"}}} = render_patch(view, "/users/91/edit")
+    end
+
+    test "live navigation between routes sharing a view checks the destination capability", %{conn: conn} do
+      UserFixtures.insert_user!(%{id: 91, company_id: 73})
+      grant_capabilities!(["admin.user.create"])
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/new")
+
+      assert {:error, {:redirect, %{to: "/dashboard"}}} =
+               live_redirect(view, to: "/users/91/edit")
+    end
+
     test "requires authentication", %{conn: conn} do
       assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/users/new")
     end

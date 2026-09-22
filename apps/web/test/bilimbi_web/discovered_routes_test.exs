@@ -3,6 +3,32 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
 
   alias BilimbiWeb.DiscoveredRoutes
 
+  test "normal authenticated destinations share a session, with real security boundaries" do
+    session = fn path ->
+      %{phoenix_live_view: {_, _, _, session}} =
+        Phoenix.Router.route_info(BilimbiWeb.Router, "GET", path, "localhost")
+
+      session.name
+    end
+
+    assert session.("/dashboard") == :authenticated
+
+    for path <- [
+          "/companies",
+          "/companies/73",
+          "/users",
+          "/users/new",
+          "/users/91/edit",
+          "/settings/profile",
+          "/system/sessions"
+        ] do
+      assert session.(path) == :authenticated
+    end
+
+    refute session.("/") == :authenticated
+    refute session.("/admin/system/database-queries") == :authenticated
+  end
+
   @user_routes [
     {"/users", "/users", Bilimbi.Core.UserAdministration.Web.IndexLive},
     {"/users/new", "/users/new", Bilimbi.Core.User.Web.FormLive},

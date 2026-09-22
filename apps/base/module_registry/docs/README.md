@@ -14,6 +14,13 @@ its resolved order, and that fingerprint in OTP application metadata. The
 compiled runtime registry consumes that approved order without reimplementing
 the dependency graph or depending on source-checkout paths.
 
+Development reload checks reuse parsed literal descriptors in the calling Mix
+process, keyed by the full file contents. Executable descriptors are evaluated
+on every call. Directory discovery, migration checks, and graph validation still
+run each time; same-size edits, restored timestamps, and newly mounted modules
+cannot hide behind the parse cache. Application metadata fingerprints reuse the
+graph just validated for that metadata rather than discovering it a second time.
+
 An immediate child directory with a valid `bilimbi.module.exs` is an installed
 module. The Mix-time registry validates the complete installed graph before
 returning deterministically ordered local path dependencies. Runtime validates

@@ -632,16 +632,20 @@ defmodule BilimbiWeb.UserAuth do
   defp operator_scope?(_), do: false
 
   defp mount_current_scope(socket, session) do
-    current_scope = current_scope_from(session[@session_key], session[@impersonation_key])
+    # The HTTP plug already resolved this request's identity. Reuse it for
+    # the disconnected render; a connected mount or live navigation has no
+    # conn assigns and must resolve the durable session and permissions anew.
+    socket =
+      Phoenix.Component.assign_new(socket, :current_scope, fn ->
+        current_scope_from(session[@session_key], session[@impersonation_key])
+      end)
+
+    current_scope = socket.assigns.current_scope
 
     apply_locale(current_scope)
     put_audit_context(current_scope)
 
-    Phoenix.Component.assign(
-      socket,
-      :current_scope,
-      current_scope
-    )
+    socket
   end
 
   defp apply_locale(nil) do
