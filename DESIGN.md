@@ -123,7 +123,7 @@ during long operational sessions:
 - **Row padding:** `py-0.5` (`0.125rem` / `2px`), `px-2` (`0.5rem` / `8px`) horizontal cell padding.
 - **Header padding:** `py-1.5` (`0.375rem` / `6px`), `px-2` horizontal header padding.
 - **Header background:** `bg-surface-sunken`.
-- **Table geometry:** Table frames use flat angles, including their overflow wrapper. `Bilimbi.Base.UI.Components.table/1` enforces this: neither framing mode carries a radius and the component takes no attribute that can add one, so a rounded table can only come from hand-written markup. The card that full-bleeds a table is the same shape, so `card/1` enforces the other half: a card whose `inner_class` drops the padding is flush against its content and renders flat, while a padded card keeps its radius. Neither rule is a per-screen class.
+- **Table geometry:** Table frames use flat angles, including their overflow wrapper. `Bilimbi.Base.UI.Components.table/1` enforces this: neither framing mode carries a radius and the component takes no attribute that can add one, so a rounded table can only come from hand-written markup. The card that full-bleeds a table is the same shape, so `card/1` enforces the other half: a card whose `inner_class` asks for no inner padding renders flat, while a card that keeps its padding keeps its radius. Neither rule is a per-screen class, and neither changes any other geometry.
 - **Header typography:** Proper case `text-xs font-semibold text-ink-subtle`.
 - **Body typography:** `text-sm text-ink`, with `tabular-nums text-muted` (`text-ink-muted`) for codes, IDs, currencies, phones, populations, dates, and measurements.
 - **Search & filter toolbar:** Search and filters sit together in an open

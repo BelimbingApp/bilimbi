@@ -26,35 +26,45 @@ defmodule Bilimbi.Base.UI.ComponentsCardTest do
     """
   end
 
+  defp inner_classes(html) do
+    [_, rest] = String.split(html, ~s(<div class="), parts: 2)
+    [classes, _] = String.split(rest, ~s("), parts: 2)
+    String.split(classes)
+  end
+
   test "a padded card keeps its padding and its radius" do
     html = render_component(&preview/1, %{})
 
     assert html =~ "rounded-xl border border-line bg-surface shadow-xs"
-    assert html =~ ~s(<div class="p-2">)
+    assert inner_classes(html) == ["p-2"]
   end
 
-  test "dropping the inner padding drops the radius with it" do
+  test "asking for no inner padding drops the radius" do
     html = render_component(&preview/1, %{inner_class: "p-0"})
 
     refute html =~ "rounded"
     assert html =~ "border border-line bg-surface shadow-xs"
   end
 
-  test "a flush card drops its own padding instead of leaving two to fight" do
-    html = render_component(&preview/1, %{inner_class: "p-0"})
+  test "the corner is the only geometry the full-bleed signal changes" do
+    padded = render_component(&preview/1, %{})
+    full_bleed = render_component(&preview/1, %{inner_class: "p-0"})
 
-    assert html =~ ~s(<div class="p-0">)
-    refute html =~ "p-2"
+    assert inner_classes(padded) == ["p-2"]
+    assert inner_classes(full_bleed) == ["p-2", "p-0"]
+
+    assert String.replace(padded, "rounded-xl ", "") ==
+             String.replace(full_bleed, "p-2 p-0", "p-2 ")
   end
 
   test "a card that chooses different padding keeps its radius" do
     html = render_component(&preview/1, %{inner_class: "p-5 sm:p-6 space-y-4"})
 
     assert html =~ "rounded-xl"
-    assert html =~ "p-5 sm:p-6 space-y-4"
+    assert inner_classes(html) == ["p-2", "p-5", "sm:p-6", "space-y-4"]
   end
 
-  test "a titled card flushes as a whole, so the frame has one geometry" do
+  test "a titled card flattens as a whole, so the frame has one geometry" do
     titled = render_component(&preview/1, %{title: "Recent regressions", inner_class: "p-0"})
 
     assert titled =~ "Recent regressions"

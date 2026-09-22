@@ -1665,14 +1665,13 @@ defmodule Bilimbi.Base.UI.Components do
   @doc """
   Renders a card container with a subtle border (Belimbing's `x-ui.card` counterpart).
 
-  A caller that passes `p-0` as `inner_class` gets a flush card: the card
-  drops its own padding rather than leaving two padding utilities to fight
-  over the cascade, so the content really does reach the frame. A frame
-  wrapped tight around its content must not round corners that content
-  reaches, so a flush card drops the radius too. That is the list-page shape
-  — a card holding nothing but a table and its pager — and it is how a table
-  stays flat without every list screen saying so. A padded card keeps both
-  its padding and its radius.
+  A caller that asks for no inner padding (`inner_class` carrying `p-0`) is
+  framing one full-bleed block rather than laying out a panel. In practice
+  that is the list-page shape, a card holding nothing but a table and its
+  pager, so the frame renders flat: a table must not pick up a radius from
+  the card around it. This is the only place that decision is made, which is
+  why no list screen passes a corner class of its own. A card that keeps its
+  padding keeps its radius.
   """
   attr(:id, :string, default: nil)
   attr(:title, :string, default: nil)
@@ -1682,25 +1681,25 @@ defmodule Bilimbi.Base.UI.Components do
   slot(:inner_block, required: true)
 
   def card(assigns) do
-    assigns = assign(assigns, :flush, flush_card?(assigns.inner_class))
+    assigns = assign(assigns, :full_bleed, no_inner_padding?(assigns.inner_class))
 
     ~H"""
     <div
       id={@id}
-      class={[!@flush && "rounded-xl", "border border-line bg-surface shadow-xs", @class]}
+      class={[!@full_bleed && "rounded-xl", "border border-line bg-surface shadow-xs", @class]}
       {@rest}
     >
       <div :if={@title} class="border-b border-line px-4 py-3">
         <h3 class="text-base font-semibold text-ink">{@title}</h3>
       </div>
-      <div class={[!@flush && "p-2", @inner_class]}>
+      <div class={["p-2", @inner_class]}>
         {render_slot(@inner_block)}
       </div>
     </div>
     """
   end
 
-  defp flush_card?(inner_class) do
+  defp no_inner_padding?(inner_class) do
     inner_class
     |> List.wrap()
     |> Enum.flat_map(&String.split(to_string(&1)))
