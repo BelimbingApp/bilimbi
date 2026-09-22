@@ -94,9 +94,6 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       refute has_element?(view, "#duplicate-query-#{q1.id}")
       refute has_element?(view, "#delete-query-#{q2.id}")
 
-      assert html =~ "Showing 2 of 2 queries"
-      refute html =~ "Page 1 of 1"
-
       # Unauthorized event attempts fail server-side
       assert render_click(view, "delete", %{"id" => to_string(q2.id)}) =~
                "You are not authorized to modify queries."

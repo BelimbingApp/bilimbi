@@ -93,12 +93,12 @@
         </:empty>
       </.table>
 
-      <%= if @total_count > 0 do %>
+      <%= if @total_pages > 1 do %>
         <div class="mt-4 flex items-center justify-between text-sm text-ink-subtle">
           <span>
             Showing {@queries |> length()} of {@total_count} queries
           </span>
-          <div :if={@total_pages > 1} class="inline-flex items-center gap-2">
+          <div class="inline-flex items-center gap-2">
             <.button
               :if={@page > 1}
               phx-click="page"

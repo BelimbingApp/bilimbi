@@ -125,14 +125,14 @@
     </div>
 
     <div
-      :if={@page.total_pages > 0}
+      :if={@page.total_pages > 1}
       id="mutations-pagination"
       class="mt-3 flex items-center justify-between text-sm"
     >
-      <p id="mutations-pagination-summary" class="text-ink-subtle">
-        <span :if={@page.total_pages > 1}>Page {@page.page} of {@page.total_pages} · </span>{@page.total_entries} mutations
+      <p class="text-ink-subtle">
+        Page {@page.page} of {@page.total_pages} · {@page.total_entries} mutations
       </p>
-      <div :if={@page.total_pages > 1} class="flex gap-2">
+      <div class="flex gap-2">
         <.button :if={@page.page > 1} id="mutations-prev" phx-click="page" phx-value-page={@page.page - 1}>
           Previous
         </.button>
