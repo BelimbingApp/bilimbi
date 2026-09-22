@@ -221,6 +221,24 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     assert has_element?(view, "#schedule-history-pagination-summary", "2 runs")
   end
 
+  test "a history holding more than one page still names the page it is on", %{conn: conn} do
+    grant_capabilities!(@view)
+    insert_runs!(26)
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule?tab=history")
+
+    assert has_element?(view, "#schedule-history-pagination-summary", "Page 1 of 2")
+    assert has_element?(view, "#schedule-history-pagination-summary", "26 runs")
+    refute has_element?(view, "#schedule-history-prev")
+    assert has_element?(view, "#schedule-history-next")
+
+    view |> element("#schedule-history-next") |> render_click()
+
+    assert has_element?(view, "#schedule-history-pagination-summary", "Page 2 of 2")
+    assert has_element?(view, "#schedule-history-prev")
+    refute has_element?(view, "#schedule-history-next")
+  end
+
   test "an inverted history date range is rejected rather than ignored", %{conn: conn} do
     grant_capabilities!(@view)
     insert_boundary_runs!()
@@ -321,6 +339,19 @@ defmodule BilimbiWeb.ScheduleLiveTest do
       status: "succeeded",
       started_at: ~N[2026-08-21 00:30:00]
     })
+  end
+
+  # The history pages at 25 rows, so a second page needs one run more than that.
+  defp insert_runs!(count) do
+    Enum.each(1..count, fn index ->
+      Repo.insert!(%Run{
+        source: "scheduler",
+        key: "test.schedule",
+        name: "Run #{index}",
+        status: "succeeded",
+        started_at: NaiveDateTime.add(~N[2026-08-20 01:00:00], index, :minute)
+      })
+    end)
   end
 
   defp filter_runs(view, params) do

@@ -48,6 +48,23 @@ defmodule BilimbiWeb.SystemMenuInspectorLiveTest do
     refute render(view) =~ "Page 1 of 1"
   end
 
+  # The installed platform contributes more menu items than one 25-row page, so
+  # the unfiltered listing is the complement of the single-page guard above.
+  test "a listing holding more than one page still names the page it is on", %{conn: conn} do
+    grant_capabilities!("admin.system.menu-inspector.view")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/menu-inspector")
+
+    assert has_element?(view, "#menu-inspector-pagination-summary", "Page 1 of")
+    refute has_element?(view, "#menu-inspector-prev")
+    assert has_element?(view, "#menu-inspector-next")
+
+    view |> element("#menu-inspector-next") |> render_click()
+
+    assert has_element?(view, "#menu-inspector-pagination-summary", "Page 2 of")
+    assert has_element?(view, "#menu-inspector-prev")
+  end
+
   test "source filter narrows by contributing module", %{conn: conn} do
     grant_capabilities!("admin.system.menu-inspector.view")
 
