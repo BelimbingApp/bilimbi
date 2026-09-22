@@ -135,7 +135,8 @@ during long operational sessions:
 - **Search & filter toolbar:** Search and filters sit together in an open
   toolbar with `mb-2` above the table surface. Do not wrap the toolbar in a
   second card; the list is the common region.
-- **Pagination controls:** Rows per page selector uses compact geometry (`w-auto`, `h-7`, `pl-2 pr-6`) — sized to its content, because the options run to three digits and a fixed `w-14` clipped even `25` behind the dropdown arrow (#304) with accent focus styling (`focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30`). Render page navigation only when another page exists. Navigation buttons use `size-7` with accent focus rings (`focus-visible:ring-1 focus-visible:ring-brand-strong/40`) and active page highlight (`border-selection-line bg-brand-surface text-brand-ink`). Operational lists reach all of this through `Bilimbi.Base.UI.Components.pagination/1` rather than a hand-rolled pager; the address list uses it, rows-per-page selector included, by captain decision, so that is settled rather than open.
+- **Pagination controls:** Rows per page selector uses compact geometry (`w-auto`, `h-7`, `pl-2 pr-6`) — sized to its content, because the options run to three digits and a fixed `w-14` clipped even `25` behind the dropdown arrow (#304) with accent focus styling (`focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30`). Render page navigation only when another page exists. Navigation buttons use `size-7` with accent focus rings (`focus-visible:ring-1 focus-visible:ring-brand-strong/40`) and active page highlight (`border-selection-line bg-brand-surface text-brand-ink`). Operational lists reach all of this through `Bilimbi.Base.UI.Components.pagination/1` rather than a hand-rolled pager; the address list uses it, rows-per-page selector included, by captain decision, so that is settled rather than open. The audit action and mutation logs use it the same way: the rows-per-page selector lives in the component rather than the filter toolbar, the URL keeps each screen's own page-size key, and a single page shows the result count and the selector with no navigation, exactly as the address list does.
+- **Record facts:** the read-only facts of one record — a detail summary, the System Info cards, the Language & Region provenance card — render through `<.list>`: one `<dl>`, label left and value right, with an `id` on the list and on any row a test or an anchor must reach. A screen never hand-writes its own `<dl>` rows for that. A value the screen could not read says so in muted text (`text-ink-faint`) rather than disappearing.
 
 ## Inline editing
 
@@ -313,8 +314,10 @@ Use the shared `<.icon>` component for icons. Do not call Heroicons modules
 directly from templates. For an action that has a direct Belimbing equivalent,
 use the same established icon choice so replacement does not make familiar
 actions harder to recognize. Render it through Bilimbi's icon registry rather
-than copying assets or framework markup. Logout is the explicit exception and
-keeps Bilimbi's own treatment.
+than copying assets or framework markup; a two-state control names each state
+(`retain` is Belimbing's outline bookmark on an audit row that is not kept,
+`retained` the solid one on a row that is). Logout is the explicit exception
+and keeps Bilimbi's own treatment.
 
 Use `<.icon_button>` for familiar repeated secondary actions where words would
 create table or toolbar noise. Inline controls are `size-6` (24px targets); table and toolbar

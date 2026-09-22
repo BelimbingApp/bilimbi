@@ -2637,23 +2637,35 @@ defmodule Bilimbi.Base.UI.Components do
   defp table_empty_colspan(cols, _action), do: length(cols) + 1
 
   @doc """
-  Renders a data list.
+  Renders a data list: the facts of one record, label left and value right.
+
+  It is the shared presentation for read-only facts on a detail page, the
+  System Info cards and the Language & Region provenance card. Pass `id` so
+  the list can be found, and an `id` on a row a test or an anchor must reach;
+  a row without one renders without an `id` attribute.
 
   ## Examples
 
-      <.list>
+      <.list id="post-facts">
         <:item title="Title">{@post.title}</:item>
-        <:item title="Views">{@post.views}</:item>
+        <:item id="post-facts-views" title="Views">{@post.views}</:item>
       </.list>
   """
+  attr(:id, :string, default: nil)
+
   slot :item, required: true do
+    attr(:id, :string)
     attr(:title, :string, required: true)
   end
 
   def list(assigns) do
     ~H"""
-    <dl class="divide-y divide-low-contrast-line text-sm">
-      <div :for={item <- @item} class="flex items-baseline justify-between gap-6 py-2.5">
+    <dl id={@id} class="divide-y divide-low-contrast-line text-sm">
+      <div
+        :for={item <- @item}
+        id={item[:id]}
+        class="flex items-baseline justify-between gap-6 py-2.5"
+      >
         <dt class="font-medium text-ink-subtle">{item.title}</dt>
         <dd class="text-right text-ink">{render_slot(item)}</dd>
       </div>

@@ -64,6 +64,8 @@ defmodule Bilimbi.Base.UI.IconRegistryTest do
              "unlink" => "hero-link-slash",
              "archive" => "hero-archive-box",
              "unarchive" => "hero-archive-box-x-mark",
+             "retain" => "hero-bookmark",
+             "retained" => "hero-bookmark-solid",
              "copy" => "hero-clipboard",
              "attach" => "hero-paper-clip",
              "share" => "hero-share",

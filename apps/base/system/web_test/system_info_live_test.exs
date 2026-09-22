@@ -3,6 +3,7 @@ defmodule BilimbiWeb.SystemInfoLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.System.Web.InfoLive
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -47,6 +48,38 @@ defmodule BilimbiWeb.SystemInfoLiveTest do
     # The database row is a live probe, not config being present.
     assert has_element?(view, "#system-info-database-connection", "Connected")
   end
+
+  test "presents each card's facts through the shared record-facts list", %{conn: conn} do
+    grant_capabilities!("admin.system.info.view")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/info")
+
+    for card <- ~w(application runtime database server health) do
+      assert has_element?(view, "##{card_id(card)} dl#system-info-#{card}-facts"),
+             "the #{card} card does not render its facts as one shared list"
+    end
+
+    # A row is the shared list's label/value pair, reachable by its own id.
+    assert has_element?(view, "dl#system-info-runtime-facts #system-info-runtime-elixir dt", "Elixir")
+
+    assert has_element?(
+             view,
+             "dl#system-info-runtime-facts #system-info-runtime-elixir dd",
+             System.version()
+           )
+  end
+
+  test "an unavailable probe reads Unavailable in muted text rather than vanishing" do
+    unavailable = render_component(&InfoLive.fact_value/1, value: :unavailable)
+    assert unavailable =~ "Unavailable"
+    assert unavailable =~ "text-ink-faint"
+
+    available = render_component(&InfoLive.fact_value/1, value: "Connected")
+    assert available =~ "Connected"
+    refute available =~ "Unavailable"
+  end
+
+  defp card_id(card), do: "system-info-#{card}"
 
   test "reports the supervised queue's real empty-backlog status", %{conn: conn} do
     grant_capabilities!("admin.system.info.view")

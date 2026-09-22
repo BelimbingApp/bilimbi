@@ -33,20 +33,6 @@
           <option value="deleted" selected={@state.event == "deleted"}>Deleted</option>
         </select>
       </div>
-
-      <div>
-        <label for="mutations-page-size" class="sr-only">Per page</label>
-        <select
-          id="mutations-page-size"
-          name="page_size"
-          class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
-        >
-          <option value="25" selected={@state.page_size == 25}>25 / page</option>
-          <option value="50" selected={@state.page_size == 50}>50 / page</option>
-          <option value="100" selected={@state.page_size == 100}>100 / page</option>
-          <option value="300" selected={@state.page_size == 300}>300 / page</option>
-        </select>
-      </div>
     </form>
 
     <div class="mt-4">
@@ -122,29 +108,13 @@
             else: "No mutation logs match the current filters."}
         </:empty>
       </.table>
-    </div>
 
-    <div
-      :if={@page.total_pages > 1}
-      id="mutations-pagination"
-      class="mt-3 flex items-center justify-between text-sm"
-    >
-      <p class="text-ink-subtle">
-        Page {@page.page} of {@page.total_pages} · {@page.total_entries} mutations
-      </p>
-      <div class="flex gap-2">
-        <.button :if={@page.page > 1} id="mutations-prev" phx-click="page" phx-value-page={@page.page - 1}>
-          Previous
-        </.button>
-        <.button
-          :if={@page.page < @page.total_pages}
-          id="mutations-next"
-          phx-click="page"
-          phx-value-page={@page.page + 1}
-        >
-          Next
-        </.button>
-      </div>
+      <.pagination
+        id="mutations-pagination"
+        page={@page}
+        filters_form={@filters_form}
+        filters_event="filter"
+      />
     </div>
   </.page>
 </Layouts.app>

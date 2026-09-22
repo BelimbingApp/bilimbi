@@ -80,8 +80,10 @@ defmodule Bilimbi.Base.UI.IconRegistry do
   @spec shell_actions() :: %{atom() => String.t()}
   def shell_actions, do: @shell
 
-  # One chosen Heroicon per familiar action meaning. Theme and sort keep a
-  # name per state because those controls are the meaning, not one glyph.
+  # One chosen Heroicon per familiar action meaning. Theme, sort and retain
+  # keep a name per state because those controls are the meaning, not one
+  # glyph: `retain` is the outline bookmark Belimbing offers on a row that is
+  # not yet kept, `retained` the solid one on a row that is.
   @actions %{
     "create" => "hero-plus",
     "edit" => "hero-pencil",
@@ -120,6 +122,8 @@ defmodule Bilimbi.Base.UI.IconRegistry do
     "unlink" => "hero-link-slash",
     "archive" => "hero-archive-box",
     "unarchive" => "hero-archive-box-x-mark",
+    "retain" => "hero-bookmark",
+    "retained" => "hero-bookmark-solid",
     "copy" => "hero-clipboard",
     "attach" => "hero-paper-clip",
     "share" => "hero-share",

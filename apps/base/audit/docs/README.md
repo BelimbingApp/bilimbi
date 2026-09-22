@@ -40,3 +40,16 @@ This change registers `base/audit` on `core/compatibility` because CI check
 or schema-contract contributor. That descriptor edit is shared and must be
 called out on issue #43; this package still does not hard-code coordinator
 internals.
+
+## Audit log screens
+
+`/audit/actions` and `/audit/mutations` are the module's own LiveViews under
+`lib/audit/web/`. Both page through Base UI's `<.pagination>`: the summary,
+numbered pages with disabled ends, and the rows-per-page selector are the
+component's, so the single-page rule (count and selector shown, navigation
+absent) has one owner. The selector posts `filters[perPage]` into the same
+`filter` event as the toolbar, and a key the posting form did not carry keeps
+its current value; the URL keeps each screen's own `page_size` key so
+bookmarked links from before the swap still resolve. The retain toggle names
+its glyphs through the icon registry as `retain` and `retained`, Belimbing's
+outline and solid bookmark.

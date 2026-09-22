@@ -27,12 +27,19 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
   end
 
   @impl true
+  # The toolbar inputs post top-level names; `<.pagination>`'s rows-per-page
+  # select posts under `filters[perPage]`. Both funnel through this event, so a
+  # key the posting form did not carry keeps its current value rather than
+  # resetting to the default.
   def handle_event("filter", params, socket) do
+    current = socket.assigns.state
+    per_page = get_in(params, ["filters", "perPage"]) || Map.get(params, "perPage")
+
     state = %{
-      socket.assigns.state
-      | search: Map.get(params, "search", ""),
-        event: filter_event(Map.get(params, "event")),
-        page_size: to_page_size(Map.get(params, "page_size"), socket.assigns.state.page_size),
+      current
+      | search: Map.get(params, "search", current.search),
+        event: filter_event(Map.get(params, "event", current.event)),
+        page_size: to_page_size(per_page, current.page_size),
         page: 1
     }
 
@@ -85,12 +92,19 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
+      |> assign(:filters_form, page_size_form(state))
       |> stream(:mutations, page.entries, reset: true)
     end
   end
 
   defp beyond_last_page?(%Page{total_pages: total, page: page}) do
     total > 0 and page > total
+  end
+
+  # `<.pagination>` reads its rows-per-page value from `filters[:perPage]`; the
+  # URL keeps this screen's own `page_size` key.
+  defp page_size_form(state) do
+    to_form(%{"perPage" => Integer.to_string(state.page_size)}, as: :filters)
   end
 
   defp state_from_params(params) do

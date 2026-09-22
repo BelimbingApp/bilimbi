@@ -77,20 +77,6 @@
           <option value="queue" selected={@state.actor_type == "queue"}>Queue</option>
         </select>
       </div>
-
-      <div>
-        <label for="actions-page-size" class="sr-only">Per page</label>
-        <select
-          id="actions-page-size"
-          name="page_size"
-          class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
-        >
-          <option value="25" selected={@state.page_size == 25}>25 / page</option>
-          <option value="50" selected={@state.page_size == 50}>50 / page</option>
-          <option value="100" selected={@state.page_size == 100}>100 / page</option>
-          <option value="300" selected={@state.page_size == 300}>300 / page</option>
-        </select>
-      </div>
     </form>
 
     <p :if={@state.diagnostics == "hide"} class="mt-2 text-xs text-ink-muted">
@@ -167,14 +153,14 @@
             title={if action.is_retained, do: "Remove retention", else: "Retain this entry"}
             aria-label={if action.is_retained, do: "Remove retention for action #{action.id}", else: "Retain action #{action.id}"}
           >
-            <.icon name={if action.is_retained, do: "hero-bookmark-solid", else: "hero-bookmark"} class="size-4" />
+            <.icon name={if action.is_retained, do: "retained", else: "retain"} class="size-4" />
           </button>
           <span
             :if={!@can_manage}
             class="inline-block p-1 text-ink-muted/40 cursor-not-allowed"
             title="Retention management requires admin.audit.log.manage permission"
           >
-            <.icon name={if action.is_retained, do: "hero-bookmark-solid", else: "hero-bookmark"} class="size-4" />
+            <.icon name={if action.is_retained, do: "retained", else: "retain"} class="size-4" />
           </span>
         </:col>
 
@@ -184,29 +170,13 @@
             else: "No action logs match the current filters."}
         </:empty>
       </.table>
-    </div>
 
-    <div
-      :if={@page.total_pages > 1}
-      id="actions-pagination"
-      class="mt-3 flex items-center justify-between text-sm"
-    >
-      <p class="text-ink-subtle">
-        Page {@page.page} of {@page.total_pages} · {@page.total_entries} actions
-      </p>
-      <div class="flex gap-2">
-        <.button :if={@page.page > 1} id="actions-prev" phx-click="page" phx-value-page={@page.page - 1}>
-          Previous
-        </.button>
-        <.button
-          :if={@page.page < @page.total_pages}
-          id="actions-next"
-          phx-click="page"
-          phx-value-page={@page.page + 1}
-        >
-          Next
-        </.button>
-      </div>
+      <.pagination
+        id="actions-pagination"
+        page={@page}
+        filters_form={@filters_form}
+        filters_event="filter"
+      />
     </div>
   </.page>
 </Layouts.app>
