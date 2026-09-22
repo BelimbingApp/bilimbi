@@ -239,9 +239,8 @@ kind on the page:
   always visible with a saved note beside it, and Bilimbi's read-state
   trigger is the deliberate shape. One option of a choice may be
   irreversible — the user's company offers "None", after which the account
-  leaves every user
-  screen and nothing can reopen it — and an irreversible option does not
-  commit on change. Irreversibility is the test, not cost: every company
+  leaves every user screen and nothing can reopen it — and an irreversible
+  option does not commit on change. Irreversibility is the test, not cost: every company
   change ends the account's sessions, so that alone does not earn a
   confirmation. `phoenix_html` confirms a click and never a select's
   change, so choosing it replaces the select on the fact with a
