@@ -1663,7 +1663,20 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
-  Renders a card container with subtle border and rounded corners (Belimbing's `x-ui.card` counterpart).
+  Renders a card container with a subtle border (Belimbing's `x-ui.card` counterpart).
+
+  `inner_class` carrying `p-0` is the flat-corner signal and nothing more.
+  It is what every list-page card already passes — a card framing a table
+  and its pager — so the card reads it to drop the radius: a table must not
+  pick up a corner from the frame around it. This is the only place that
+  decision is made, which is why no list screen passes a corner class of its
+  own. Any other card keeps its radius.
+
+  The signal does not change padding. The card emits `p-2` either way, so a
+  card passing `p-0` renders `class="p-2 p-0"` and still shows 8px, because
+  the generated `.p-2` follows `.p-0` in the stylesheet. That cascade is
+  tracked as its own defect: do not resolve it by dropping the `p-2` here,
+  which would reflow every list screen at once.
   """
   attr(:id, :string, default: nil)
   attr(:title, :string, default: nil)
@@ -1673,10 +1686,12 @@ defmodule Bilimbi.Base.UI.Components do
   slot(:inner_block, required: true)
 
   def card(assigns) do
+    assigns = assign(assigns, :flat, flat_corner_signal?(assigns.inner_class))
+
     ~H"""
     <div
       id={@id}
-      class={["rounded-xl border border-line bg-surface shadow-xs", @class]}
+      class={[!@flat && "rounded-xl", "border border-line bg-surface shadow-xs", @class]}
       {@rest}
     >
       <div :if={@title} class="border-b border-line px-4 py-3">
@@ -1687,6 +1702,13 @@ defmodule Bilimbi.Base.UI.Components do
       </div>
     </div>
     """
+  end
+
+  defp flat_corner_signal?(inner_class) do
+    inner_class
+    |> List.wrap()
+    |> Enum.flat_map(&String.split(to_string(&1)))
+    |> Enum.member?("p-0")
   end
 
   @doc """
@@ -1960,7 +1982,7 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
-  Renders a table with compact Belimbing-parity styling.
+  Renders a table with compact Belimbing-parity styling and a flat outer frame.
 
   Pass `sort` on a column to render a header button that pushes `"sort"`
   with `phx-value-sort`. The active column gets `aria-sort`. Density is
@@ -1999,7 +2021,7 @@ defmodule Bilimbi.Base.UI.Components do
 
   attr(:framed, :boolean,
     default: true,
-    doc: "when false, omit the outer card chrome so the table can sit in an existing panel"
+    doc: "when false, omit the flat outer frame so the table can sit in an existing panel"
   )
 
   attr(:caption, :string,
@@ -2035,7 +2057,7 @@ defmodule Bilimbi.Base.UI.Components do
       end
 
     ~H"""
-    <div class={["overflow-x-auto", @framed && "rounded-xl border border-line bg-surface"]}>
+    <div class={["overflow-x-auto", @framed && "border border-line bg-surface"]}>
       <table class="w-full text-left text-sm">
         <caption :if={@caption} class="sr-only">{@caption}</caption>
         <thead class="border-b border-line bg-surface-sunken">

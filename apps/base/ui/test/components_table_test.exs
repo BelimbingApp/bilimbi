@@ -68,14 +68,32 @@ defmodule Bilimbi.Base.UI.ComponentsTableTest do
     assert html =~ ~s(id="people-empty")
   end
 
-  test "omits card chrome when nested in an existing panel" do
-    html =
+  test "uses a flat frame by default and omits it when nested in an existing panel" do
+    framed_html = render_component(&preview/1, %{rows: [%{name: "Ada", note: "ok", count: 3}]})
+
+    assert framed_html =~ "overflow-x-auto border border-line bg-surface"
+
+    unframed_html =
       render_component(&preview/1, %{
         rows: [%{name: "Ada", note: "ok", count: 3}],
         framed: false
       })
 
-    refute html =~ "rounded-xl border border-line bg-surface"
+    refute unframed_html =~ "border border-line bg-surface"
+  end
+
+  test "cannot render a rounded frame in either framing mode" do
+    for framed <- [true, false], rows <- [[%{name: "Ada", note: "ok", count: 3}], []] do
+      html = render_component(&preview/1, %{rows: rows, framed: framed})
+
+      [_, wrapper_tag] = String.split(html, "<div", parts: 2)
+      [wrapper_tag, _] = String.split(wrapper_tag, ">", parts: 2)
+      [_, table_tag] = String.split(html, "<table", parts: 2)
+      [table_tag, _] = String.split(table_tag, ">", parts: 2)
+
+      refute wrapper_tag =~ "rounded"
+      refute table_tag =~ "rounded"
+    end
   end
 
   test "names the table with an sr-only caption" do

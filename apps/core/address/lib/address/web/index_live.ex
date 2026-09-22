@@ -5,6 +5,8 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
 
   alias Bilimbi.Core.Address
 
+  @page_sizes [25, 50, 100]
+  @default_page_size 25
   @sorts ~w(label country_iso verification_status)
 
   @impl true
@@ -21,7 +23,8 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
   def handle_event("filters", %{"filters" => filters}, socket) do
     state =
       socket.assigns.index_state
-      |> Map.put(:search, Map.get(filters, "search", ""))
+      |> Map.put(:search, Map.get(filters, "search", socket.assigns.index_state.search))
+      |> Map.put(:per_page, Map.get(filters, "perPage", socket.assigns.index_state.per_page))
       |> Map.put(:page, 1)
 
     {:noreply, push_patch(socket, to: addresses_path(state))}
@@ -180,40 +183,12 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
             </:empty>
           </.table>
 
-          <nav
-            :if={@addresses_page.total_pages > 0}
+          <.pagination
             id="addresses-pagination"
-            aria-label="Address pagination"
-            class="flex items-center justify-between gap-3 border-t border-line px-4 py-3"
-          >
-            <p id="addresses-pagination-summary" class="text-xs text-ink-subtle">
-              {page_summary(@addresses_page)}
-            </p>
-            <div class="flex items-center gap-2">
-              <.button
-                id="addresses-page-previous"
-                phx-click="page"
-                phx-value-page={@addresses_page.page - 1}
-                disabled={@addresses_page.page <= 1}
-              >
-                Previous
-              </.button>
-              <span class="text-xs tabular-nums text-ink-muted">
-                {page_position(@addresses_page)}
-              </span>
-              <.button
-                id="addresses-page-next"
-                phx-click="page"
-                phx-value-page={@addresses_page.page + 1}
-                disabled={
-                  @addresses_page.total_pages == 0 or
-                    @addresses_page.page >= @addresses_page.total_pages
-                }
-              >
-                Next
-              </.button>
-            </div>
-          </nav>
+            page={@addresses_page}
+            page_sizes={@page_sizes}
+            filters_form={@filters_form}
+          />
         </.card>
       </.page>
     </Layouts.app>
@@ -229,7 +204,11 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
     |> assign(:page_title, "Addresses")
     |> assign(:active_nav, "admin.address")
     |> assign(:addresses_page, page)
-    |> assign(:filters_form, to_form(%{"search" => state.search}, as: :filters))
+    |> assign(:page_sizes, @page_sizes)
+    |> assign(
+      :filters_form,
+      to_form(%{"search" => state.search, "perPage" => state.per_page}, as: :filters)
+    )
     |> assign(:index_state, state)
     |> stream(:addresses, page.entries, reset: true)
   end
@@ -238,6 +217,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
     Address.list_addresses(socket.assigns.current_scope.scope,
       search: state.search,
       page: state.page,
+      page_size: state.per_page,
       sort_by: String.to_existing_atom(state.sort_by),
       sort_dir: String.to_existing_atom(state.sort_dir)
     )
@@ -264,6 +244,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
     %{
       search: Map.get(params, "search", ""),
       page: parse_page(Map.get(params, "page")),
+      per_page: normalize_page_size(Map.get(params, "perPage")),
       sort_by: normalize_sort(Map.get(params, "sortBy")),
       sort_dir: normalize_direction(Map.get(params, "sortDir"))
     }
@@ -281,7 +262,7 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
   end
 
   defp addresses_path(state) do
-    ~p"/addresses?#{%{search: state.search, page: state.page, sortBy: state.sort_by, sortDir: state.sort_dir}}"
+    ~p"/addresses?#{%{search: state.search, page: state.page, perPage: state.per_page, sortBy: state.sort_by, sortDir: state.sort_dir}}"
   end
 
   defp normalize_sort(value) when value in @sorts, do: value
@@ -292,6 +273,13 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
 
   defp flip_direction("asc"), do: "desc"
   defp flip_direction(_direction), do: "asc"
+
+  defp normalize_page_size(value) do
+    case parse_page(value) do
+      size when size in @page_sizes -> size
+      _size -> @default_page_size
+    end
+  end
 
   defp parse_page(value) when is_integer(value) and value > 0, do: value
 
@@ -320,17 +308,4 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
   defp status_kind("verified"), do: :success
   defp status_kind("suggested"), do: :warning
   defp status_kind(_status), do: :neutral
-
-  defp page_summary(%{total_entries: 0}), do: "No results"
-
-  defp page_summary(%{page: page, page_size: page_size, total_entries: total_entries}) do
-    first = (page - 1) * page_size + 1
-    last = min(page * page_size, total_entries)
-    "Showing #{first}–#{last} of #{total_entries}"
-  end
-
-  defp page_position(%{total_pages: 0}), do: "Page 0 of 0"
-
-  defp page_position(%{page: page, total_pages: total_pages}),
-    do: "Page #{page} of #{total_pages}"
 end

@@ -117,7 +117,7 @@
         class="flex items-center justify-between border-t border-line px-4 py-3 text-sm"
       >
         <p id="menu-inspector-pagination-summary" class="text-ink-subtle">
-          Page {@state.page} of {@total_pages} · {@total_entries} {item_noun(@total_entries)}
+          <span :if={@total_pages > 1}>Page {@state.page} of {@total_pages} · </span>{@total_entries} {item_noun(@total_entries)}
         </p>
         <div :if={@total_pages > 1} class="flex gap-2">
           <.button

@@ -461,6 +461,9 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   defp run_result(%{exit_code: exit_code}) when is_integer(exit_code), do: "Exit #{exit_code}"
   defp run_result(run), do: status_label(run.status)
 
+  defp run_noun(1), do: "run"
+  defp run_noun(_count), do: "runs"
+
   defp due_label(:none_due), do: "No work currently due"
   defp due_label(:due), do: "Work is due"
   defp due_label(:unknown), do: "Unknown"
