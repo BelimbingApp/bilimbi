@@ -249,6 +249,53 @@ defmodule BilimbiWeb.AddressLiveTest do
            )
   end
 
+  test "the search and the rows per page each survive a change to the other", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, hq} = Address.create_address(scope, %{label: "Head Office"})
+    {:ok, branch} = Address.create_address(scope, %{label: "Branch"})
+
+    grant_capabilities!("admin.address.list")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses")
+
+    view
+    |> element("#addresses-filters")
+    |> render_change(%{"filters" => %{"search" => "Head"}})
+
+    assert_patch(
+      view,
+      ~p"/addresses?#{%{search: "Head", page: 1, perPage: 25, sortBy: "label", sortDir: "asc"}}"
+    )
+
+    view
+    |> form("#addresses-pagination-page-size-form", %{"filters" => %{"perPage" => "50"}})
+    |> render_change()
+
+    assert_patch(
+      view,
+      ~p"/addresses?#{%{search: "Head", page: 1, perPage: 50, sortBy: "label", sortDir: "asc"}}"
+    )
+
+    assert has_element?(view, "#addresses-search[value='Head']")
+    assert has_element?(view, "#address-#{hq.id}")
+    refute has_element?(view, "#address-#{branch.id}")
+
+    view
+    |> element("#addresses-filters")
+    |> render_change(%{"filters" => %{"search" => "Branch"}})
+
+    assert_patch(
+      view,
+      ~p"/addresses?#{%{search: "Branch", page: 1, perPage: 50, sortBy: "label", sortDir: "asc"}}"
+    )
+
+    assert has_element?(view, "#addresses-pagination-page-size option[value='50'][selected]")
+    assert has_element?(view, "#address-#{branch.id}")
+    refute has_element?(view, "#address-#{hq.id}")
+  end
+
   test "a rows-per-page value the list does not offer falls back to 25", %{
     conn: conn,
     scope: scope
