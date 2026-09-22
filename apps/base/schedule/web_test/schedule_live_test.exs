@@ -205,14 +205,14 @@ defmodule BilimbiWeb.ScheduleLiveTest do
 
     refute has_element?(view, "#schedule-runs", "Late on the twentieth")
     assert has_element?(view, "#schedule-runs", "Early on the twenty-first")
-    assert has_element?(view, "#schedule-history-pagination-summary", "1 runs")
+    assert has_element?(view, "#schedule-history-pagination-summary", ~r/\b1 run\b/)
     refute render(view) =~ "Page 1 of 1"
 
     filter_runs(view, %{"start_date" => "", "end_date" => "2026-08-20"})
 
     assert has_element?(view, "#schedule-runs", "Late on the twentieth")
     refute has_element?(view, "#schedule-runs", "Early on the twenty-first")
-    assert has_element?(view, "#schedule-history-pagination-summary", "1 runs")
+    assert has_element?(view, "#schedule-history-pagination-summary", ~r/\b1 run\b/)
 
     filter_runs(view, %{"start_date" => "2026-08-20", "end_date" => "2026-08-21"})
 
@@ -250,7 +250,7 @@ defmodule BilimbiWeb.ScheduleLiveTest do
       "page_size" => "25"
     })
 
-    assert has_element?(view, "#schedule-history-pagination-summary", "1 runs")
+    assert has_element?(view, "#schedule-history-pagination-summary", ~r/\b1 run\b/)
 
     patched = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
     assert patched["tab"] == "history"
@@ -260,7 +260,7 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     {:ok, reloaded, _html} =
       conn |> log_in_as() |> live(~p"/system/schedule?tab=history&start_date=2026-08-21")
 
-    assert has_element?(reloaded, "#schedule-history-pagination-summary", "1 runs")
+    assert has_element?(reloaded, "#schedule-history-pagination-summary", ~r/\b1 run\b/)
     refute has_element?(reloaded, "#schedule-runs", "Late on the twentieth")
     assert has_element?(reloaded, "#schedule-runs", "Early on the twenty-first")
     assert has_element?(reloaded, "#schedule-run-start-date[value='2026-08-21']")
