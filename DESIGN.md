@@ -316,11 +316,23 @@ Two shells exist and each stays minimal:
   password, and sign out. Offer scope switching only when the user has more
   than one permitted scope. Below `lg`, the menu is an off-canvas drawer. The
   logo is the product mark on a transparent background — never a brand tile.
+  The bar is `h-7` with no vertical padding, so every control in it is the
+  `size-6` inline size the sidebar toggle uses; a `size-7` control fills the
+  bar and paints its pressed and hover surfaces onto the bar's border.
 
-Ordinary users do not need company and tenant repeated in the top strip. Show
-an always-visible scope warning outside the account menu when context is
-unusual or safety-critical, including platform-operator access, impersonation,
-or cross-company work where acting in the wrong scope could cause harm.
+Ordinary users do not need company and tenant repeated in the top strip. The
+strip above the workspace is for transient state with an exit: it renders only
+while impersonating, carrying "Viewing as … · Stop". A standing fact about the
+scope is not a strip. When the scope's tenant carries `is_platform_operator`,
+the account menu shows a "Platform-operator" row below Tenant, in the strip's
+own caution tokens (`warning-surface`, `warning-ink`, `warning-line`) with the
+registry's `warning` glyph, so it still reads as a caution rather than a
+neutral scope line. The row names the company's platform-operator status, not
+a personal entitlement: an account in that company may still be refused the
+operator-only surfaces, which is why it is not worded as ownership. Nothing
+about it changes what any capability or impersonation guard permits. The
+operator-only surfaces themselves, such as the raw SQL console, do not warn
+that an action is unfiltered; that is a known gap.
 
 The timezone and theme selectors are compact top-bar utilities, not settings
 navigation. A selection applies immediately and persists for the signed-in

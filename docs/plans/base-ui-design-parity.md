@@ -262,6 +262,8 @@ products were read and the plan forbids treating existence as acceptance.
   focus and Escape, with one deliberate departure from its "backdrop" wording: clicking
   the dimmed page does not close, so a stray click cannot discard a form.
 - **LAY-02, NAV-05** — the "Bilimbi now" cells describe pre-#711 state; both shipped.
+  LAY-02's always-visible-warning target was narrowed on 2026-09-22: see its
+  disposition row and the shell operator marker slice below.
 - **INT-04** — reduced motion was not adoptable when Lane A measured it: neither
   product had a contract. Bilimbi now has one platform-wide under FND-05, so a
   disclosure primitive inherits it instead of defining its own.
@@ -396,7 +398,7 @@ The first parity slice owns `LAY-02`, `NAV-05`, shell-related `FND-06`, timezone
 
 ### Account and tenancy context are disclosed when useful
 
-Keeping company and tenant in the top strip makes known context compete with the current task. Hiding scope everywhere is also unsafe for platform operators, impersonation and cross-company work. The recommended direction is progressive disclosure: the bottom-left user circle opens one account menu containing identity, company, tenant and account actions. A switcher appears only for users who can switch. Unusual or safety-critical scope remains visible outside the menu as a persistent warning.
+Keeping company and tenant in the top strip makes known context compete with the current task. Hiding scope everywhere is also unsafe for platform operators, impersonation and cross-company work. The recommended direction is progressive disclosure: the bottom-left user circle opens one account menu containing identity, company, tenant and account actions. A switcher appears only for users who can switch. Unusual or safety-critical scope remains visible outside the menu as a persistent warning. Revised 2026-09-22: only impersonation, which carries an exit, stays outside the menu; the standing platform-operator marker moved into it, as the shell operator marker slice below records and `DESIGN.md`'s application shell section states.
 
 ### Brand-strong text contrast (FND-01) is accepted
 
@@ -410,7 +412,7 @@ Lane D asked whether the notification unread count badge and per-item unread dot
 
 - Belimbing is reference evidence, not visual or implementation authority.
 - Bilimbi identity IDs `K01`–`K09` are fixed constraints for parity work; the design steward resolves routine design choices within them.
-- Ordinary company and tenant context is available through the bottom-left user account menu, not repeated in the top strip. Platform-operator, impersonated and other safety-critical scope remains visibly disclosed while active.
+- Ordinary company and tenant context is available through the bottom-left user account menu, not repeated in the top strip, and so is the standing platform-operator marker. Impersonation, which has an exit, remains visibly disclosed above the workspace while active.
 - The top bar exposes the current timezone and light/dark theme selectors. What a selection must do — apply immediately, persist for the signed-in user and render truthfully — is stated once in `DESIGN.md`'s application shell section.
 - Equivalent actions use Belimbing's established icon choices through Bilimbi's icon registry, with logout as the explicit exception.
 - Every parity issue names the catalog IDs it owns, its dependencies, affected routes, owned files and acceptance evidence.
@@ -627,7 +629,7 @@ Accepted dispositions (2026-09-14):
 |---|---|---|
 | LAY-02 desktop, rail and drawer | Adopt adapted | Retain Bilimbi geometry, mark, semantic surfaces, compact navigation and existing pin/tree state. Adopt useful top-bar utilities and account organization. Desktop collapse preserves the bottom-left circle; the narrow drawer contains focus, makes the workspace inert and restores focus on close. |
 | NAV-05 account and scope | Adopt adapted | Belimbing exposes identity/profile and logout in its sidebar footer. Bilimbi's shared disclosure fulfills the accepted name, identifier, company, tenant, password and sign-out contract. Current identity holds exactly one scope, so the menu presents no switching. Multi-company membership policy remains deferred as described above. |
-| LAY-02 safety context | Adopt adapted | Routine scope moves into the account menu. Platform-operator and impersonated access remain above the workspace, including when the narrow drawer covers content. Existing warning surface/line/ink roles preserve contrast in both themes. Ordinary scope has no warning; impersonation retains its stop action. |
+| LAY-02 safety context | Adopt adapted | Routine scope moves into the account menu. Platform-operator and impersonated access remain above the workspace, including when the narrow drawer covers content. Existing warning surface/line/ink roles preserve contrast in both themes. Ordinary scope has no warning; impersonation retains its stop action. Revised 2026-09-22: the platform-operator half moved into the account menu; see the shell operator marker slice below. |
 | Top-bar timezone | Adopt adapted | Belimbing's Company/Local/Stored choices and clock meaning are useful. Bilimbi uses the existing Base DateTime preference contract. A confirmed save patches the shell in place — the control, the per-process display context and the confirmation all update without navigation, so keyboard focus stays on the operated control — and every timestamp `<.datetime>` has already rendered follows it, including rows a LiveView stream handed to the DOM; that last part was deferred in this slice and delivered by the follow-up recorded below. The browser still invents no company or stored-UTC text: the element carries the string the server rendered for each mode and the browser only swaps between them, while `:local`, which the server cannot decide, is formatted in the browser as it always was. Explicit per-element display and calendar dates remain independent. |
 | Top-bar theme | Adopt adapted | Preserve Light/Dark/System as three explicit choices. Existing Core User preference storage remains authoritative. System follows browser appearance; failed writes retain the saved choice and provide recovery feedback. |
 | FND-06 shell icons | Equivalent | Clock, sun, moon, computer desktop, navigation bars and password key use familiar meanings through `IconRegistry.shell/1`. The existing Bilimbi navigation registry and impersonation icon remain in use. The wider searchable icon catalog is outside this slice. |
@@ -835,3 +837,46 @@ Not delivered by this slice:
   slice and are deferred together for a later change.
 - **CMP-03 stays open.** `/companies/:id` still keeps its facts behind explicit
   edit modes; only the header and the section affordances were settled here.
+
+### Shell operator marker slice — LAY-02 safety context, revised
+
+Goal: stop telling the platform operator who they are on every screen, while
+keeping the one strip that carries an exit.
+
+The captain's ruling (2026-09-22): remove the strip; mark the status in the
+account popup behind the bottom-left circle; label it "Platform-operator", in
+the strip's own colour and background. "Owner" was rejected because the flag
+sits on the tenant's company, and an account inside that company may still
+lack access on the operator-only surfaces, so ownership would tell that person
+something untrue about their standing.
+
+Shipped in `Bilimbi.Base.UI.ShellComponents`:
+
+- [x] `scope_warning/1` renders only while impersonating, with its "Viewing as
+  … · Stop" link unchanged. Without impersonation there is no strip and no
+  reserved space. `{fm/shell-operator-marker-and-topbar-spacing}`
+- [x] `account_menu/1` adds an `Access` row below Tenant, labelled
+  "Platform-operator", only when the scope's tenant carries
+  `is_platform_operator`. It uses the `warning-surface`, `warning-ink` and
+  `warning-line` tokens and the registry's `warning` glyph, so it reads as a
+  caution in both themes, and it names the company's status rather than a
+  personal entitlement. No capability or impersonation guard changed.
+- [x] Top-bar controls fit inside the bar. The bar is `h-7`; the theme
+  `<.icon_button>`s were `size-7` (the table default) and the timezone button
+  `h-7`, so their pressed and hover surfaces painted the bar's bottom border
+  and the window's top edge. The trailing horizontal padding was already the
+  same 12px as the leading side. Both controls are now the sidebar toggle's
+  `size-6` inline size, the timezone wrapper is a flex box so the two align,
+  and the controls container may shrink so the impersonation-locked notice
+  truncates at phone width instead of overflowing the brand.
+
+Checked live at desktop and phone widths, in light and dark themes, with and
+without impersonation. Coverage: the strip absent for an operator who is not
+impersonating and present with its stop link while impersonating (for an
+operator too); the marker present for an operator scope with the caution
+tokens and absent otherwise; the dashboard asserting the marker in the panel
+and no strip.
+
+Not delivered by this slice: the operator-only surfaces themselves, such as
+the raw SQL console, do not warn that an action is unfiltered. That is a
+known gap.

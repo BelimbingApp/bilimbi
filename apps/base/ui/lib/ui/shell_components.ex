@@ -53,6 +53,19 @@ defmodule Bilimbi.Base.UI.ShellComponents do
               <span class="tabular-nums text-muted">#{@current_scope.scope.tenant.id}</span>
             </dd>
           </div>
+          <%!-- The tenant's standing, not a personal entitlement: an account in
+               the operator company may still be refused operator-only surfaces.
+               It keeps the caution tokens the impersonation strip uses. --%>
+          <div
+            :if={@current_scope.scope.tenant.is_platform_operator}
+            id={@id <> "-platform-operator"}
+            class="rounded-md border border-warning-line bg-warning-surface px-2 py-1 text-warning-ink"
+          >
+            <dt class="sr-only">Access</dt>
+            <dd class="inline-flex items-center gap-1.5">
+              <.icon name={IconRegistry.shell(:warning)} class="size-4" /> Platform-operator
+            </dd>
+          </div>
         </dl>
         <div class="space-y-1">
           <.link
@@ -76,26 +89,26 @@ defmodule Bilimbi.Base.UI.ShellComponents do
     """
   end
 
+  @doc """
+  The transient access strip above the workspace.
+
+  It renders only while the session is impersonating, because that state has
+  an exit the operator must be able to reach from anywhere. The standing
+  platform-operator marker belongs in `account_menu/1`.
+  """
   attr :id, :string, required: true
   attr :current_scope, :map, required: true
 
   def scope_warning(assigns) do
     ~H"""
     <div
-      :if={@current_scope.scope.tenant.is_platform_operator || @current_scope[:impersonator]}
+      :if={@current_scope[:impersonator]}
       id={@id}
       role="note"
       aria-label="Access warning"
       class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-warning-line bg-warning-surface px-3 py-1 text-xs text-warning-ink"
     >
-      <span
-        :if={@current_scope.scope.tenant.is_platform_operator}
-        class="inline-flex items-center gap-1.5"
-      >
-        <.icon name={IconRegistry.shell(:warning)} class="size-4" /> Platform-operator access
-      </span>
       <.link
-        :if={@current_scope[:impersonator]}
         href={~p"/admin/impersonate/leave"}
         method="post"
         id="app-impersonation-stop"
@@ -108,13 +121,20 @@ defmodule Bilimbi.Base.UI.ShellComponents do
     """
   end
 
+  @doc """
+  The top bar's timezone and theme controls.
+
+  The bar is `h-7` with no vertical padding, so every control in it is the
+  `size-6` inline size the sidebar toggle uses; a `size-7` control would fill
+  the bar and paint its pressed and hover surfaces onto the bar's border.
+  """
   attr :id, :string, required: true
   attr :preferences, :map, required: true
   attr :impersonating, :boolean, required: true
 
   def display_controls(assigns) do
     ~H"""
-    <div id={@id} class="flex shrink-0 items-center gap-1" data-display-controls>
+    <div id={@id} class="flex min-w-0 items-center gap-1" data-display-controls>
       <p
         :if={@impersonating}
         id={@id <> "-locked"}
@@ -125,7 +145,7 @@ defmodule Bilimbi.Base.UI.ShellComponents do
           {mode_label(@preferences.mode)} time · display preferences are not editable while viewing as another user
         </span>
       </p>
-      <div :if={!@impersonating} class="relative" data-timezone-menu>
+      <div :if={!@impersonating} class="relative flex" data-timezone-menu>
         <button
           type="button"
           id={@id <> "-timezone"}
@@ -134,7 +154,7 @@ defmodule Bilimbi.Base.UI.ShellComponents do
           aria-controls={@id <> "-timezone-panel"}
           aria-label="Select timezone display mode"
           title={"Time display: " <> mode_label(@preferences.mode)}
-          class="inline-flex h-7 items-center gap-1 rounded-md px-1 text-xs text-link hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+          class="inline-flex h-6 items-center gap-1 rounded-sm px-1 text-xs text-link hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
         >
           <.icon name={IconRegistry.shell(:clock)} class="size-4" />
           <span class="max-w-28 truncate">{mode_label(@preferences.mode)}</span>
@@ -165,6 +185,7 @@ defmodule Bilimbi.Base.UI.ShellComponents do
         <.icon_button
           :for={{value, icon} <- [{"light", :light}, {"dark", :dark}, {"system", :system}]}
           id={@id <> "-" <> value}
+          context={:inline}
           data-preference-kind="theme"
           data-preference-value={value}
           label={String.capitalize(value)}

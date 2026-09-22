@@ -604,7 +604,10 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   light / `lime-600` dark), high-contrast text (`text-action-ink`, `lime-50`
   light / `lime-950` dark), and a brighter lime hover
   (`hover:bg-action-hover`, `lime-600` light / `lime-500` dark). Lime `brand`
-  is reserved for orientation and selection, never an action or status. Async actions
+  is reserved for orientation and selection, never an action or status. The
+  strip above the workspace renders only while impersonating; the
+  platform-operator marker is a `warning`-token row in the account menu
+  (`DESIGN.md` "Application shell"). Async actions
   must show in-flight state, reject duplicate work, and truthfully report the data
   outcome and recovery: `phx-disable-with` covers one socket round trip, which
   `app.js` mirrors onto `aria-busy`. It swaps the control's text, so it belongs
@@ -625,7 +628,9 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   notification surface.
 - **Compact actions:** Use `<.icon_button>` for familiar repeated secondary
   actions in tables and toolbars. Inline icon controls are `size-6` (24px targets); table and
-  toolbar icon controls are `size-7`. Every icon-only action has a truthful
+  toolbar icon controls are `size-7`; the `h-7` top bar takes only `size-6`
+  (`context={:inline}`) controls, or their pressed surface paints the bar's
+  border. Every icon-only action has a truthful
   accessible label and title. Keep primary and unfamiliar actions as text.
   Destructive actions use calm danger text with quiet hover feedback, not a
   solid danger fill.
