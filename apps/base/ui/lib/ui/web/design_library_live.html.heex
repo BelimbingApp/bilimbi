@@ -1155,7 +1155,7 @@
                   label="Edit company name"
                 />
               </div>
-              <div class="grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
+              <div class="grid gap-4 border-t border-line pt-4 sm:grid-cols-3">
                 <div>
                   <p class="mb-2 text-xs text-ink-muted">Saved</p><.inline_edit
                     id="design-library-inline-edit-saved"
@@ -1163,6 +1163,15 @@
                     save_event="preview-inline-edit"
                     label="Edit company name"
                     status={:saved}
+                  />
+                </div>
+                <div>
+                  <p class="mb-2 text-xs text-ink-muted">Adds rather than edits</p><.inline_edit
+                    id="design-library-inline-edit-add"
+                    value=""
+                    save_event="preview-inline-edit"
+                    label="Add business activity"
+                    placeholder="Add activity"
                   />
                 </div>
                 <div>

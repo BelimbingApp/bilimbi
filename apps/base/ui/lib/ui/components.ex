@@ -2275,6 +2275,12 @@ defmodule Bilimbi.Base.UI.Components do
   emptied value pushes nothing unless the owner passes `allow_empty`, so a
   field that may legitimately be blank has to say so.
 
+  An empty value reads as an em dash. A control that adds rather than edits —
+  the company page's "Add activity", whose value is always empty — passes
+  `placeholder`, which the trigger shows in place of the dash and the input
+  repeats as its own placeholder, so the affordance says what committing it
+  does.
+
   The displayed text is always the server's: the hook never paints the typed
   value, so a failed save leaves the stored value on screen. While the save is
   in flight the hook marks the field `aria-busy` and reveals the "Saving…"
@@ -2322,6 +2328,11 @@ defmodule Bilimbi.Base.UI.Components do
     doc: "an emptied input is a real edit and pushes the empty string"
   )
 
+  attr(:placeholder, :string,
+    default: nil,
+    doc: "what the trigger says while the value is empty, in place of the em dash"
+  )
+
   attr(:status, :any,
     default: nil,
     doc: "the outcome of the last commit: `nil`, `:saved`, or `{:error, message}`"
@@ -2353,7 +2364,9 @@ defmodule Bilimbi.Base.UI.Components do
         class="group flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 -mx-1.5 text-left hover:bg-surface-sunken transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
       >
         <span :if={@value != ""} data-role="text" class="text-ink">{@value}</span>
-        <span :if={@value == ""} data-role="text" class="text-ink-muted">—</span>
+        <span :if={@value == ""} data-role="text" class="text-ink-muted">
+          {@placeholder || "—"}
+        </span>
         <.icon
           name="edit"
           class="size-3.5 text-ink-muted opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity"
@@ -2365,6 +2378,7 @@ defmodule Bilimbi.Base.UI.Components do
         type="text"
         name={@name}
         value={@value}
+        placeholder={@placeholder}
         aria-label={@label}
         aria-invalid={match?({:error, _}, @status) && "true"}
         class={[
@@ -2712,9 +2726,7 @@ defmodule Bilimbi.Base.UI.Components do
 
   ## Examples
 
-      <.section_heading title="Company Details">
-        <:actions><.button id="edit-company-details-btn">Edit Details</.button></:actions>
-      </.section_heading>
+      <.section_heading id="company-details-heading" title="Company Details" />
 
       <.section_heading id="departments-heading" title="Departments" count={length(@departments)}>
         <:actions>

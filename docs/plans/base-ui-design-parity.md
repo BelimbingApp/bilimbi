@@ -3,7 +3,7 @@
 **Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families (#724). Merged to `main` through 2026-09-15: application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display. Since then the library has been stripped of catalog IDs (#728), and the shared layer has taken much of the accepted action and feedback contract — destructive confirmation (#733), reduced motion with 4.5:1 contrast (#738), stacked flash messages (#741), busy controls and a login screen that reports its progress (#743), the empty and permission region pattern (#740), real dialog semantics on modal overlays (#731), one shared filter toolbar (#745), field shell states (#744), secret reveal and multi-select corrections (#746) and a released shell observer (#747) — alongside icon-name validity (#727, #734), Schedule timestamps and UTC day labels through the datetime component (#735, #737), impersonation reader coverage (#729), corrected catalog rows (#730), drift-guard documentation folded into this plan (#726) and the Belimbing cutover value remap (#725); the drift guards stay excluded from the default run — the Design Library state-coverage slice of 2026-09-18 corrected all but two of the uncovered names and axes the coverage guard reports and records those two as accepted rather than pending, while the imitation guard's anchor and control-markup failures are still open
 **Last Updated:** 2026-09-20
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1); `fm/parity-plan-checklist-reconcile/muse-spark` (checklist reconciliation on 2026-09-18, not audit authorship); `fm/icon-registry-name-validity/opus-5`; `fm/designlib-state-coverage-gaps/opus-5` (Design Library state coverage on 2026-09-18); `fm/addresses-detail-read-first/opus-5` (read-first detail page, shared commit status and demoted back link on 2026-09-20); `fm/companies-detail-belimbing-parity/claude-fable-5-1` (company detail header settled against Belimbing on 2026-09-20: the history icon, demoted Manage links and no header buttons); `crewmate scout` (firstmate scout tasks that record no model — the FND-06 icon inventory and the four Phase 2 lane audits of 2026-09-16; separate sessions from the `crewmate/gpt-6` entry above, which is why these rows carry no model)
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1); `fm/parity-plan-checklist-reconcile/muse-spark` (checklist reconciliation on 2026-09-18, not audit authorship); `fm/icon-registry-name-validity/opus-5`; `fm/designlib-state-coverage-gaps/opus-5` (Design Library state coverage on 2026-09-18); `fm/addresses-detail-read-first/opus-5` (read-first detail page, shared commit status and demoted back link on 2026-09-20); `fm/companies-detail-belimbing-parity/claude-fable-5-1` (company detail header settled against Belimbing on 2026-09-20: the history icon, demoted Manage links and no header buttons); `fm/companies-detail-read-first/claude-fable-5-1` (company detail facts read-first on 2026-09-23); `crewmate scout` (firstmate scout tasks that record no model — the FND-06 icon inventory and the four Phase 2 lane audits of 2026-09-16; separate sessions from the `crewmate/gpt-6` entry above, which is why these rows carry no model)
 
 ## Problem Essence
 
@@ -99,7 +99,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | DAT-06 | Record history, timeline and comparisons | Local or missing | Keep specialist behavior with the owning workflow; share only the generic presentation seam. |
 | CMP-01 [(contradicted)](#targets-the-evidence-contradicts) | Operational index page | Partial specimen | Standardize header, filters, table, actions, empty/loading/error and pagination as one flow. |
 | CMP-02 | Form page | Complete production form ships (`/companies/create`: field rhythm, inline validation, save/cancel); no unsaved-navigation guard exists, and that criterion depends on INT-06, which is deferred until a real Bilimbi workflow proves the need; the shared composition is not extracted | Standardize field rhythm, validation, save/cancel, loading, success and unsaved navigation. |
-| CMP-03 | Detail and settings page | Three production details ship: `/addresses/1` and `/users/1` are read-first (every fact edits in place and saves by itself — the user's company is a choice that becomes a select on click — one grouped Apply for the interdependent location facts, the outcome on the fact rather than in a flash, a demoted back link and the labelled history action; `/users/1` also carries Impersonate as a demoted `POST` action and no button), while `/companies/1` keeps facts behind explicit edit modes, though its header now matches Belimbing's history-and-back actions — the labelled history action and a back link, with Departments and Relationships reached through each section's demoted Manage link, and the status badge leading that row is Bilimbi's own #685 decision that Belimbing does not present; every detail page now takes the list width, as Belimbing's `admin/*/show` pages fill the main column; related navigation and permission states exist on all three, and the shared assembly is not extracted | Standardize facts, inline/grouped editing, related navigation and permission states. |
+| CMP-03 | Detail and settings page | Three production details ship: `/addresses/1` and `/users/1` are read-first (every fact edits in place and saves by itself — the user's company is a choice that becomes a select on click — one grouped Apply for the interdependent location facts, the outcome on the fact rather than in a flash, a demoted back link and the labelled history action; `/users/1` also carries Impersonate as a demoted `POST` action and no button), and `/companies/1` is the third read-first adopter (every Company Details fact edits in place — seven text facts, four choice facts and the default-timezone setting as a fifth — business activities grow through the same in-place control and metadata keeps a single-fact Apply, each reporting on itself); its header matches Belimbing's history-and-back actions — the labelled history action and a back link, with Departments and Relationships reached through each section's demoted Manage link, and the status badge leading that row is Bilimbi's own #685 decision that Belimbing does not present; every detail page now takes the list width, as Belimbing's `admin/*/show` pages fill the main column; related navigation and permission states exist on all three, and the shared assembly is not extracted | Standardize facts, inline/grouped editing, related navigation and permission states. |
 | CMP-04 | Destructive workflow | No complete specimen | Show entry, consequence, acknowledgement, in-flight, success, failure and recovery together. |
 | CMP-05 | Authentication and first arrival | Login, recovery and dashboard arrival ship and were audited live against Belimbing (Lanes A and D); the sign-in handoff is a busy submit with readonly fields | Treat login, recovery and dashboard arrival as first-impression acceptance surfaces. |
 | CMP-06 | Responsive and theme coverage | The `/companies` index and the shell were verified live at narrow width and in dark theme (Lane D); narrow detail, narrow form and a full keyboard pass remain | Review representative assemblies at desktop/narrow widths and in light/dark themes. |
@@ -835,8 +835,10 @@ Not delivered by this slice:
   also still lack the `flex items-center gap-3` wrapper the rule above settles,
   so their controls sit one collapsed space apart. Both gaps pre-date this
   slice and are deferred together for a later change.
-- **CMP-03 stays open.** `/companies/:id` still keeps its facts behind explicit
-  edit modes; only the header and the section affordances were settled here.
+- **CMP-03 stayed open here.** `/companies/:id` still kept its facts behind
+  explicit edit modes after this slice; only the header and the section
+  affordances were settled. The company detail read-first slice below closed
+  that gap.
 
 ### Shell operator marker slice — LAY-02 safety context, revised
 
@@ -1098,3 +1100,97 @@ Not delivered by this slice, reported as follow-up:
   accepted.
 - **The subordinates section** keeps its "Add" button, a hand-written table
   and flashes, as Belimbing's does.
+
+### Company detail read-first slice — CMP-03 and INT-01, partial
+
+Goal: bring `/companies/:id` to the read-first shape `/addresses/:id` and
+`/users/:id` settled — facts that edit in place and save by themselves, each
+reporting its own outcome through the shared commit status, with the edit
+modes retired along with any button that only opened them — under the
+captain's canonical instructions of 2026-09-20 applied globally.
+
+What Belimbing does, read from
+`resources/core/views/livewire/admin/companies/partials/company-details.blade.php`,
+`partials/company-addresses.blade.php` and `app/Core/Company/Livewire/Companies/Show.php`
+on 2026-09-23:
+
+- **Every detail fact edits in place.** Name, code, legal name, registration
+  number, tax ID, email and website are `x-ui.edit-in-place.text` (Enter or
+  blur saves, Escape cancels); status, legal entity type, jurisdiction and
+  parent company are `x-ui.edit-in-place.select` whose read state (a badge,
+  a name, "None") is the trigger and whose select saves on change. There is
+  no edit button and no modal.
+- **Activities grow through a "+ Add" chip** that opens an input; Enter or
+  blur adds, Escape cancels; each chip carries a hover × that removes it
+  without asking.
+- **Metadata opens from a pencil** beside its label into a textarea with Save
+  and Cancel; Escape cancels; invalid JSON is refused with a notice.
+- **The timezone is an always-visible combobox** in its own card, reading the
+  company's *explicit* setting (`explicitCompanyTimezone`, or "Not
+  configured"), with a saved note beside it for three seconds.
+- **Every save notifies.** Belimbing reports each outcome in a toast; its
+  edit-in-place components carry no per-fact status line.
+
+Shipped:
+
+- [x] Company Details is read-first: the "Edit Details" button and its modal
+  are gone; the seven text facts are `<.inline_edit>` with `status`, name
+  and code without `allow_empty` (both required) and the other five with it;
+  status, legal entity type, jurisdiction and parent company are choice
+  facts whose read state is the trigger, committing on change through one
+  `save_choice` event and cancelling on Escape or blur; every outcome lands
+  on its fact through `Bilimbi.Base.UI.CommitStatus` and success does not
+  flash. The header keeps its status badge, History and "← Back" row and no
+  button. `{fm/companies-detail-read-first/claude-fable-5-1}`
+- [x] Business activities add through the same in-place control: a
+  `placeholder` attr on `<.inline_edit>` lets an always-empty control name
+  its addition ("Add activity") instead of reading as an em dash, so the
+  "+ Add" flow ships without a second hook or local markup; the fact reports
+  adding and removing on that control. Removal keeps its chip and its
+  existing confirmation. `{fm/companies-detail-read-first/claude-fable-5-1}`
+- [x] Metadata keeps Belimbing's single-fact Apply, the one place Enter cannot
+  commit: the demoted pencil opens the textarea, Apply and Cancel sit under
+  it, Escape cancels, a refusal ("must be a JSON object") reports on the fact
+  and keeps the editor open with what was typed, and an applied empty
+  document clears the value. `{fm/companies-detail-read-first/claude-fable-5-1}`
+- [x] The default timezone is a choice fact of its own section, reading the
+  company's explicit setting through `Settings.overridden?/2` so an unset
+  company says "Not configured (UTC)" as Belimbing does, rather than the
+  resolved platform default the page previously presented as a chosen "UTC";
+  a forged zone outside the IANA database is refused on the fact. The
+  always-visible select is gone; the read-state trigger is the deliberate
+  Bilimbi shape recorded in DESIGN.md. `{fm/companies-detail-read-first/claude-fable-5-1}`
+- [x] Every write re-asks Authz: the page's single `@write_events` gate now
+  calls `Authz.can/2` per event instead of reading the mount-time assign, so
+  a grant revoked while the page is open is refused, as on the other
+  adopters; the capability (`admin.company.update`) and the forbidden flash
+  wording are unchanged. Web tests cover a saved text commit and the header
+  following it, "Saved" belonging to the latest commit only, four saved
+  choices and a cancelled one, a refused email, a forged blank name, a
+  truncated long value, a forged out-of-vocabulary choice, the alert
+  outliving a success elsewhere, activities and metadata in place, the
+  timezone fact, the revoked grant, and a viewer without
+  `admin.company.update` seeing every fact with no editor.
+  `{fm/companies-detail-read-first/claude-fable-5-1}`
+
+Read-only on this page, and why:
+
+- **Subsidiaries** are the children's own parent facts; each child edits it
+  on its own page. **Departments** and **Relationships** have their Manage
+  workflows. **External accesses** are relationship-scoped grants with no
+  edit surface in Bilimbi. **The primary-company notice** is Core Company's
+  assignment, not a company column. None of these gained an affordance.
+- **Parent company** stays under `admin.company.update` as before; Belimbing
+  additionally restricts assigning a non-null parent to platform admins, and
+  no such guard exists in Bilimbi, so none was added.
+
+Not delivered by this slice, reported as follow-up:
+
+- **The departments, relationships and subsidiaries pages, and the company
+  list**, keep their own affordances.
+- **The chip removal's native `data-confirm`** stays as it was; whether that
+  confirmation belongs on a read-first page is a separate decision.
+- **A shared choice-fact component.** `/addresses/:id`, `/users/:id`,
+  `/employees/:id` and now `/companies/:id` each carry a private
+  read-state-trigger select in the same shape; that repetition is the case for
+  extracting it into Base UI, with a Design Library specimen, in its own slice.
