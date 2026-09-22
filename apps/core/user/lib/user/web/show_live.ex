@@ -39,6 +39,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                           toggle_effective_permissions toggle_link_employee)
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Tenancy.Scope
 
   @manage_capability "admin.user.update"
   alias Bilimbi.Core.Company
@@ -107,6 +108,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     scope = socket.assigns.current_scope.scope
     current_scope = socket.assigns.current_scope
     can_manage? = allowed?(current_scope, @manage_capability)
+    platform_operator? = Scope.platform_operator?(scope)
 
     {:ok, companies} = Company.list_companies(scope)
     company_names = Map.new(companies, &{&1.id, Company.Summary.display_name(&1)})
@@ -244,6 +246,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     |> assign(:user, user)
     |> assign(:page_title, user.name)
     |> assign(:can_manage?, can_manage?)
+    |> assign(:platform_operator?, platform_operator?)
     |> assign(:companies, companies)
     |> assign(:company_names, company_names)
     |> assign(:company_name, Map.get(company_names, user.company_id))
@@ -990,9 +993,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               id="user-unaffiliated-notice"
               class="mb-4"
             >
-              This account has no company. Its name and email can be edited once a company is
-              assigned, and affiliating an unaffiliated account needs the
-              admin.user.unaffiliated.manage capability.
+              <%= if @platform_operator? do %>
+                This account has no company. Its name and email can be edited once a company is
+                assigned, and affiliating an unaffiliated account needs the
+                admin.user.unaffiliated.manage capability.
+              <% else %>
+                This account has no company. Its name and email can be edited once a company is
+                assigned, and it can only be re-affiliated from
+                the platform-operator tenant.
+              <% end %>
             </.alert>
 
             <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2023,9 +2032,16 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   defp failure_message(_reason),
     do: "The change was not saved. Try again, and tell your administrator if it keeps failing."
 
-  # Affiliating an unaffiliated account is the operator-only transition
-  # (`admin.user.unaffiliated.manage`); the other two need `admin.user.update`
-  # on the companies involved. The refusal names the rule that applied.
+  # Affiliating an unaffiliated account is the operator-only transition: it is
+  # performed from the platform-operator tenant and needs
+  # `admin.user.unaffiliated.manage` there. The other two need
+  # `admin.user.update` on the companies involved. The refusal names the rule
+  # that applied, and never offers a retry that cannot clear it.
+  defp company_failure_message(:not_platform_operator, choice, _user),
+    do:
+      "#{inspect(choice)} was not saved: affiliating an unaffiliated account is done from " <>
+        "the platform-operator tenant, and this tenant is not it."
+
   defp company_failure_message(:unauthorized, choice, %{company_id: nil}),
     do:
       "#{inspect(choice)} was not saved: affiliating an unaffiliated account needs the " <>

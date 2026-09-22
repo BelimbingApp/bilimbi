@@ -464,6 +464,61 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(view, "#user-company-display", "None")
   end
 
+  test "an ordinary tenant is told the platform-operator rule, not to retry", %{conn: conn} do
+    UserFixtures.insert_user!(%{
+      id: 95,
+      company_id: 74,
+      name: "Elsewhere Admin",
+      email: "admin@elsewhere.example"
+    })
+
+    UserFixtures.insert_user!(%{
+      id: 96,
+      company_id: 74,
+      name: "Grace Hopper",
+      email: "grace@elsewhere.example"
+    })
+
+    grant_capabilities!(["admin.user.view", "admin.user.update"],
+      tenant_id: 42,
+      company_id: 74,
+      user_id: 95
+    )
+
+    conn = log_in_as(conn, session_user(%{"user_id" => 95, "company_id" => 74}))
+    {:ok, view, _html} = live(conn, ~p"/users/96")
+
+    # admin.user.update on the current company is enough to clear it, so an
+    # ordinary tenant can reach the unaffiliated state.
+    view |> element("#user-company-display") |> render_click()
+
+    view
+    |> form("#user-company-form")
+    |> render_change(%{"company_id" => ""})
+
+    assert has_element?(view, "#user-company-display", "None")
+    assert has_element?(view, "#user-company-status[role='status']", "Saved")
+    assert has_element?(view, "main header", "Unaffiliated")
+
+    # Outside the platform-operator tenant the blocker is the tenant, not the
+    # capability, and the notice says so.
+    assert has_element?(view, "#user-unaffiliated-notice", "platform-operator tenant")
+    refute has_element?(view, "#user-unaffiliated-notice", "admin.user.unaffiliated.manage")
+
+    # Re-affiliating is refused by tenants.is_platform_operator; retrying can
+    # never clear that, so the refusal must not invite one.
+    view |> element("#user-company-display") |> render_click()
+
+    view
+    |> form("#user-company-form")
+    |> render_change(%{"company_id" => "74"})
+
+    assert has_element?(view, "#user-company-status[role='alert']", "was not saved")
+    assert has_element?(view, "#user-company-status", "platform-operator tenant")
+    refute has_element?(view, "#user-company-status", "Try again")
+    assert has_element?(view, "#user-company-display", "None")
+  end
+
   test "a refused company choice keeps the stored company and reports the reason on the fact",
        %{conn: conn} do
     UserFixtures.insert_user!(%{id: 91, company_id: 73})
