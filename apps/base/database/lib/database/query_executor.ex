@@ -274,11 +274,16 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
       {:error, other} -> {:error, inspect(other)}
     end
   rescue
-    error in [DBConnection.ConnectionError, Postgrex.Error] ->
+    error in DBConnection.ConnectionError ->
       {:error,
        "The database console cannot connect through its select-only role: " <>
          "#{Exception.message(error)}. Check its connection (see " <>
          "docs/architecture/database.md, \"Operator SQL console\")."}
+
+    error in Postgrex.Error ->
+      {:error,
+       "The database console could not prepare its read-only transaction: " <>
+         Exception.message(error)}
   end
 
   # A console that could write would reinstate the hole the select-only role

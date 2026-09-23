@@ -289,6 +289,12 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
       assert msg =~ "cannot connect through its select-only role"
       assert msg =~ ~s(docs/architecture/database.md, "Operator SQL console")
     end
+
+    test "reports a failed transaction setup without blaming the connection" do
+      assert {:error, msg} = as_operator("SELECT 1", %{}, timeout: -1)
+      assert msg =~ "could not prepare its read-only transaction"
+      refute msg =~ "cannot connect"
+    end
   end
 
   describe "operator gate (#650)" do
