@@ -93,10 +93,19 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
       <.modal id="wide" title="Wide" width={:wide} on_cancel={JS.push("close")}>body</.modal>
       """)
 
+    compact =
+      rendered_to_string(~H"""
+      <.modal id="compact" title="Compact" width={:compact} on_cancel={JS.push("close")}>
+        body
+      </.modal>
+      """)
+
     assert narrow =~ "max-w-lg"
     refute narrow =~ "max-w-2xl"
     assert wide =~ "max-w-2xl"
     refute wide =~ "max-w-lg"
+    assert compact =~ "max-w-md"
+    refute compact =~ "max-w-lg"
   end
 
   test "renders the caller's flash inside the dialog, and nothing when none is passed" do

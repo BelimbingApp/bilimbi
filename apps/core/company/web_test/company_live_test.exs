@@ -912,18 +912,51 @@ defmodule BilimbiWeb.CompanyLiveTest do
       {:ok, attached} = Address.list_company_attached_addresses(scope, 73)
       assert Enum.find(attached, &(&1.id == depot.id)).priority == 2
 
-      # Unlinking is a demoted icon action carrying Belimbing's link-slash glyph.
+      # Unlinking is a demoted icon action carrying Belimbing's link-slash
+      # glyph, confirmed through the shared dialog rather than a native one.
       assert has_element?(
                view,
-               "button#unlink-address-#{depot.id}[aria-label='Unlink address'][title='Unlink'][data-confirm]"
+               "button#unlink-address-#{depot.id}[aria-label='Unlink address'][title='Unlink']"
              )
 
+      refute has_element?(view, "#unlink-address-#{depot.id}[data-confirm]")
       assert has_element?(view, "#unlink-address-#{depot.id} .hero-link-slash")
 
       view |> element("#unlink-address-#{depot.id}") |> render_click()
 
+      assert_modal_dialog(
+        view,
+        "unlink-address-confirm",
+        "“Depot” will be unlinked from this company."
+      )
+
+      assert has_element?(
+               view,
+               "#unlink-address-confirm-description",
+               "The address itself is kept and can be attached again."
+             )
+
+      # Cancelling keeps the link.
+      view |> element("#unlink-address-confirm-cancel", "Cancel") |> render_click()
+      refute has_element?(view, "#unlink-address-confirm")
+      assert has_element?(view, "#address-row-#{depot.id}")
+      assert has_element?(view, "#company-addresses-heading + span", "2")
+
+      # Confirming unlinks it; the address itself survives.
+      view |> element("#unlink-address-#{depot.id}") |> render_click()
+      view |> element("#unlink-address-confirm-confirm", "Unlink") |> render_click()
+
+      refute has_element?(view, "#unlink-address-confirm")
       refute has_element?(view, "#address-row-#{depot.id}")
       assert has_element?(view, "#company-addresses-heading + span", "1")
+
+      assert has_element?(
+               view,
+               "#company-addresses-panel-notice[role='status']",
+               "Address unlinked."
+             )
+
+      assert {:ok, _depot} = Address.get_address(scope, depot.id)
     end
 
     test "the addresses panel shows a viewer the facts and the shared empty state", %{
@@ -1846,9 +1879,77 @@ defmodule BilimbiWeb.CompanyLiveTest do
       view |> element("#toggle-type-#{type.id}") |> render_click()
       assert has_element?(view, "#legal-entity-types span", "active")
 
-      # Delete
+      # Delete confirms through the shared dialog, which leads with the
+      # consequence and says what cannot be undone; no native confirm remains.
+      refute has_element?(view, "#delete-type-#{type.id}[data-confirm]")
       view |> element("#delete-type-#{type.id}") |> render_click()
+
+      assert_modal_dialog(
+        view,
+        "delete-type-confirm",
+        "Legal entity type “Limited Liability Corp” will be deleted."
+      )
+
+      assert has_element?(view, "dialog#delete-type-confirm[role='alertdialog']")
+
+      assert has_element?(
+               view,
+               "#delete-type-confirm-description",
+               "It can no longer be chosen for a company. This cannot be undone."
+             )
+
+      # Cancelling keeps the type.
+      view |> element("#delete-type-confirm-cancel", "Cancel") |> render_click()
+      refute has_element?(view, "#delete-type-confirm")
+      assert has_element?(view, "#legal-entity-types td", "Limited Liability Corp")
+      assert Repo.get(LegalEntityType, type.id)
+
+      # Confirming deletes it and reports the completed write as a success.
+      view |> element("#delete-type-#{type.id}") |> render_click()
+
+      assert has_element?(
+               view,
+               "#delete-type-confirm-confirm[phx-disable-with='Deleting…']",
+               "Delete"
+             )
+
+      view |> element("#delete-type-confirm-confirm") |> render_click()
+      refute has_element?(view, "#delete-type-confirm")
+      assert has_element?(view, "#flash-success", "Legal entity type deleted.")
       assert has_element?(view, "#legal-entity-types-empty", "No legal entity types defined yet.")
+      refute Repo.get(LegalEntityType, type.id)
+    end
+
+    test "refuses to delete a legal entity type in use and says what to do", %{conn: conn} do
+      {:ok, type} =
+        Company.create_legal_entity_type(%{code: "LLC", name: "Limited Liability Company"})
+
+      CompanyFixtures.insert_company!(%{
+        id: 76,
+        tenant_id: 41,
+        name: "Uses LLC",
+        code: "uses_llc",
+        legal_entity_type_id: type.id
+      })
+
+      grant_capabilities!(["admin.company.list", "admin.company.delete"])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/legal-entity-types")
+
+      view |> element("#delete-type-#{type.id}") |> render_click()
+      view |> element("#delete-type-confirm-confirm") |> render_click()
+
+      refute has_element?(view, "#delete-type-confirm")
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "Limited Liability Company was not deleted: one or more companies still use it. " <>
+                 "Change those companies' legal entity type first."
+             )
+
+      assert has_element?(view, "#legal-entity-types td", "Limited Liability Company")
+      assert Repo.get(LegalEntityType, type.id)
     end
 
     test "hides write controls and rejects direct write events without write capabilities", %{
@@ -1974,10 +2075,34 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(view, "#department-types td", "Software Engineering")
 
-      # Delete HR
+      # Delete HR through the shared confirmation: cancel keeps it, confirm
+      # removes it and reports the completed write as a success.
       hr = Bilimbi.Base.Repo.get_by!(Bilimbi.Core.Company.DepartmentType, code: "HR")
+      refute has_element?(view, "#delete-dept-type-#{hr.id}[data-confirm]")
       view |> element("#delete-dept-type-#{hr.id}") |> render_click()
+
+      assert_modal_dialog(
+        view,
+        "delete-dept-type-confirm",
+        "Department type “Human Resources” will be deleted."
+      )
+
+      assert has_element?(
+               view,
+               "#delete-dept-type-confirm-description",
+               "It can no longer be chosen for a department. This cannot be undone."
+             )
+
+      view |> element("#delete-dept-type-confirm-cancel", "Cancel") |> render_click()
+      refute has_element?(view, "#delete-dept-type-confirm")
+      assert has_element?(view, "#department-types td", "Human Resources")
+
+      view |> element("#delete-dept-type-#{hr.id}") |> render_click()
+      view |> element("#delete-dept-type-confirm-confirm", "Delete") |> render_click()
+      refute has_element?(view, "#delete-dept-type-confirm")
+      assert has_element?(view, "#flash-success", "Department type deleted.")
       refute has_element?(view, "#department-types td", "Human Resources")
+      refute Repo.get(DepartmentType, hr.id)
     end
 
     test "hides write controls and rejects direct write events without write capabilities", %{

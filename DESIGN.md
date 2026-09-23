@@ -379,8 +379,50 @@ A short workflow that must finish or be abandoned before the screen continues
   message about finished work is neither announced as this dialog's own nor
   left stranded and unreadable behind the inert page; the Design Library
   specimen, which raises no flash of its own, deliberately dismisses none.
-- **Geometry:** A `rounded-xl` surface at `max-w-lg` for a single-column form
-  or `max-w-2xl` for two columns, over an `ink/40` dimmer.
+- **Geometry:** A `rounded-xl` surface at `max-w-lg` for a single-column form,
+  `max-w-2xl` for two columns or `max-w-md` for a confirmation, over an
+  `ink/40` dimmer.
+
+### Confirmation dialogs
+
+An action that cannot be undone — deleting a reference type, unlinking an
+address — confirms through `<.confirm_dialog>`, a `<.modal>` specialised for
+one answer, never through the browser's own `data-confirm` dialog, which
+cannot say what the consequence is, cannot be styled and reads as a browser
+alert rather than part of the product. Belimbing's confirmation shows the
+shape to keep — a short dialog, consequence copy, a cancel beside the
+destructive verb — and the gaps to close: it moved no
+focus, ignored Escape and painted its Delete solid red.
+
+- **Consequence first:** the dialog's title is one sentence saying what will
+  happen to the data ("Legal entity type “LLC” will be deleted."), so it is
+  the dialog's accessible name and the first thing announced; the detail
+  says what is kept and whether the change can be undone ("It can no longer
+  be chosen for a company. This cannot be undone."). Neither asks a question.
+  The dialog is an `alertdialog`, the role reserved for a message that needs
+  an answer before anything else continues.
+- **Two actions:** Cancel first, so it takes focus when the dialog opens and
+  Enter, Escape and Cancel all keep the data as it is; then the confirm as a
+  calm danger text control named by the verb alone ("Delete", "Unlink"). No
+  typed acknowledgement: nobody retypes a name to prove they read the
+  sentence above the button.
+- **Ownership:** the caller holds the requested record in an assign, renders
+  the dialog with `:if` while it is pending, acts on that held record from
+  `on_confirm` rather than on a client-supplied id, and stops rendering the
+  dialog whatever the outcome. The outcome then reports through the page's
+  flash — a completed delete as `:success`, so it times out — or the panel's
+  notice, and a refusal names what to do next ("one or more companies still
+  use it. Change those companies' legal entity type first."). The confirm
+  carries `phx-disable-with` for the round trip ("Deleting…").
+- **Specimen:** the Design Library's Overlays section shows the whole flow —
+  entry, consequence, in flight, success, failure and recovery — on example
+  records, not only the resting dialog.
+
+The reference-type deletes on `/companies/legal-entity-types` and
+`/companies/department-types` and the address unlinks on `/companies/:id`
+and `/employees/:id` confirm this way. The other destructive controls still
+carry a native `data-confirm`; they are pending conversion to this dialog,
+one owner at a time, and are not a second convention.
 
 ## Subtle depth and motion
 
@@ -568,8 +610,9 @@ the recovery (an operator must assign a role), not a blank rail.
 Flash messages stack at the top right, most severe first, so several stay
 readable at once. Info, warning and error stay until the person dismisses
 them, because a message someone must act on must not disappear on a timer.
-Only a success times out, after eight seconds, and nothing emits one yet: the
-timer waits on the confirmation callers that still use info.
+Only a success times out, after eight seconds. A delete confirmed through the
+shared confirmation dialog reports one; the other completed writes still
+report info and stay until dismissed, until their callers move to success.
 
 ## Reduce anxiety
 

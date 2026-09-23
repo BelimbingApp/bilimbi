@@ -566,7 +566,10 @@ defmodule BilimbiWeb.EmployeeLiveTest do
         view |> element("#subordinates-card thead") |> render() |> opening_tag_classes()
 
       cell_classes =
-        view |> element("#subordinates-card thead th:first-child") |> render() |> opening_tag_classes()
+        view
+        |> element("#subordinates-card thead th:first-child")
+        |> render()
+        |> opening_tag_classes()
 
       assert "bg-surface-sunken" in head_classes
       assert "text-ink-subtle" in cell_classes
@@ -721,7 +724,10 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       # Sort subordinates by status
       view |> element("#subordinates-table-sort-status") |> render_click()
 
-      assert has_element?(view, "#subordinates-card th[aria-sort='ascending'] #subordinates-table-sort-status")
+      assert has_element?(
+               view,
+               "#subordinates-card th[aria-sort='ascending'] #subordinates-table-sort-status"
+             )
 
       # Remove subordinate
       view
@@ -816,8 +822,10 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       view |> element("#addresses-table-sort-priority") |> render_click()
       assert has_element?(view, "th[aria-sort='ascending'] #addresses-table-sort-priority")
 
-      # Detach address
+      # Detach address, confirmed through the shared dialog
       view |> element("#unlink-address-#{address.id}") |> render_click()
+      assert_modal_dialog(view, "unlink-address-confirm", "will be unlinked from this employee.")
+      view |> element("#unlink-address-confirm-confirm", "Unlink") |> render_click()
       assert render(view) =~ "Address unlinked."
       refute has_element?(view, "#address-row-#{address.id}")
       assert has_element?(view, "#addresses-panel-notice", "Address unlinked.")

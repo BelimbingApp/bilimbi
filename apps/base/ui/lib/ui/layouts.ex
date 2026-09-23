@@ -539,10 +539,11 @@ defmodule Bilimbi.Base.UI.Layouts do
   are readable at once. Dismissal splits by severity: only `:success` carries
   the eight-second timer, while `:info`, `:warning` and `:error` stay until
   the person dismisses them, because a message someone must act on must not
-  disappear on a timer. The timer is dormant groundwork today: no caller emits
-  a `:success` flash, and `:info` stays sticky while callers use it for
-  actionable failure notices, so nothing times out until those call sites move
-  to `:success`. The reconnect notices are errors and keep that rule.
+  disappear on a timer. A delete confirmed through `<.confirm_dialog>` emits a
+  `:success` flash; the other completed writes still emit `:info`, which stays
+  sticky while callers also use it for actionable failure notices, so nothing
+  else times out until those call sites move to `:success`. The reconnect
+  notices are errors and keep that rule.
 
   The group is a permanent polite live region, so a message inserted into it
   is announced; every message is an alert, whatever its severity.
