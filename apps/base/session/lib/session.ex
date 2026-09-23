@@ -9,6 +9,7 @@ defmodule Bilimbi.Base.Session do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Database.WriteCapture
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Session.Entry
   alias Bilimbi.Base.Session.Page
@@ -151,8 +152,8 @@ defmodule Bilimbi.Base.Session do
   permanent login lockout: a session established after the statement outside
   that serialization can remain or appear later.
 
-  Session payloads are opaque and are neither read nor returned by this
-  lifecycle operation.
+  Session payloads are opaque: this lifecycle operation does not return them,
+  and the audit trail records only that a payload was there, redacted.
   """
   @spec terminate_user_sessions(pos_integer(), String.t()) :: {:ok, non_neg_integer()}
   def terminate_user_sessions(user_id, current_session_id)
@@ -171,10 +172,14 @@ defmodule Bilimbi.Base.Session do
   @spec prune_expired(non_neg_integer()) :: non_neg_integer()
   def prune_expired(before_last_activity)
       when is_integer(before_last_activity) and before_last_activity >= 0 do
+    # Housekeeping over sessions that already expired: nobody decided to
+    # end them, and the sweep would write one audit row per stale session.
     {count, _rows} =
-      Repo.delete_all(
-        from(session in Schema, where: session.last_activity < ^before_last_activity)
-      )
+      WriteCapture.without_capture(fn ->
+        Repo.delete_all(
+          from(session in Schema, where: session.last_activity < ^before_last_activity)
+        )
+      end)
 
     count
   end

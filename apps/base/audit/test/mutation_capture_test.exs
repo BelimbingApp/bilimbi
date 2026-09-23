@@ -204,6 +204,150 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
     assert Repo.get_by(Widget, name: "Still fine")
   end
 
+  describe "query-based bulk writes" do
+    test "insert_all writes one canonical row per inserted row, in one statement" do
+      Context.put(%Context{
+        actor_type: "user",
+        actor_id: 91,
+        actor_role: "Administrator",
+        company_id: 73,
+        tenant_id: 99,
+        ip_address: "198.51.100.9",
+        url: "/widgets",
+        trace_id: "abc123"
+      })
+
+      assert {2, nil} =
+               Repo.insert_all(Widget, [
+                 %{name: "Bulk one", tenant_id: 41},
+                 %{name: "Bulk two", tenant_id: 41}
+               ])
+
+      assert [first, second] = Enum.sort_by(mutations(), & &1.id)
+
+      for row <- [first, second] do
+        assert row.event == "created"
+        assert row.source == "listener"
+        assert row.actor_type == "user"
+        assert row.actor_id == 91
+        assert row.actor_role == "Administrator"
+        assert row.company_id == 73
+        # The row's own tenant is ground truth over the context's 99, the
+        # same order the struct path uses.
+        assert row.tenant_id == 41
+        assert row.trace_id == "abc123"
+        assert row.auditable_type == inspect(Widget)
+        assert row.auditable_id != nil
+        assert row.old_values == nil or row.old_values == %{}
+      end
+
+      assert first.new_values["name"] == "Bulk one"
+      assert second.new_values["name"] == "Bulk two"
+    end
+
+    test "the custom ip_address type is cast, not silently dropped" do
+      Context.put(%Context{actor_type: "user", actor_id: 91, ip_address: "198.51.100.9"})
+
+      Repo.insert_all(Widget, [%{name: "Addressed", tenant_id: 41}])
+
+      assert [row] = mutations()
+      assert row.ip_address == %Postgrex.INET{address: {198, 51, 100, 9}}
+    end
+
+    test "update_all records changed fields only, with their originals" do
+      Repo.insert_all(Widget, [%{name: "Before", notes: "keep", tenant_id: 41}])
+
+      assert {1, nil} = Repo.update_all(Widget, set: [name: "After"])
+
+      assert [_created, updated] = Enum.sort_by(mutations(), & &1.id)
+      assert updated.event == "updated"
+      assert updated.old_values == %{"name" => "Before"}
+      assert updated.new_values == %{"name" => "After"}
+      refute Map.has_key?(updated.new_values, "notes")
+    end
+
+    test "an update_all that changes nothing writes nothing" do
+      Repo.insert_all(Widget, [%{name: "Same", tenant_id: 41}])
+
+      assert {1, nil} = Repo.update_all(Widget, set: [name: "Same"])
+
+      assert [%{event: "created"}] = mutations()
+    end
+
+    test "delete_all records the old attributes it returned" do
+      Repo.insert_all(Widget, [%{name: "Doomed", tenant_id: 41}])
+
+      assert {1, nil} = Repo.delete_all(Widget)
+
+      assert [_created, deleted] = Enum.sort_by(mutations(), & &1.id)
+      assert deleted.event == "deleted"
+      assert deleted.old_values["name"] == "Doomed"
+      assert deleted.new_values == nil or deleted.new_values == %{}
+    end
+
+    test "redaction and truncation are the same policy the struct path uses" do
+      long = String.duplicate("x", 2100)
+
+      Repo.insert_all(Widget, [
+        %{name: "R", password: "hunter2", notes: long, tenant_id: 41}
+      ])
+
+      assert [created] = mutations()
+      assert created.new_values["password"] == "[redacted]"
+      assert created.new_values["notes"] =~ "[truncated 2100 chars]"
+      refute created.new_values["notes"] =~ String.duplicate("x", 2001)
+    end
+
+    test "a bulk write past the bind-parameter ceiling records every affected row" do
+      # 3,500 audit rows at 20 columns each would need 70,000 parameters in
+      # one statement, past PostgreSQL's 65,535.
+      rows = for n <- 1..3500, do: %{name: "Row #{n}", tenant_id: 41}
+
+      assert {3500, nil} = Repo.insert_all(Widget, rows)
+
+      assert Repo.aggregate(MutationSchema, :count) == 3500
+    end
+
+    test "a bulk write with no actor is recorded as guest, never refused" do
+      assert {1, nil} = Repo.insert_all(Widget, [%{name: "Anonymous", tenant_id: 41}])
+
+      assert [row] = mutations()
+      assert row.actor_type == "guest"
+      assert row.actor_id == 0
+      assert Repo.get_by(Widget, name: "Anonymous")
+    end
+
+    test "an excluded schema produces no row for a bulk write" do
+      previous = Application.get_env(:bilimbi_base_audit, :exclude_schemas)
+      Application.put_env(:bilimbi_base_audit, :exclude_schemas, [Widget])
+
+      on_exit(fn ->
+        Application.put_env(:bilimbi_base_audit, :exclude_schemas, previous || [])
+      end)
+
+      assert {1, nil} = Repo.insert_all(Widget, [%{name: "Excluded", tenant_id: 41}])
+      assert {1, nil} = Repo.update_all(Widget, set: [name: "Still excluded"])
+      assert {1, nil} = Repo.delete_all(Widget)
+
+      assert mutations() == []
+    end
+
+    test "without_auditing suppresses a bulk write" do
+      Audit.without_auditing(fn ->
+        Repo.insert_all(Widget, [%{name: "Quiet", tenant_id: 41}])
+      end)
+
+      assert mutations() == []
+      assert Repo.get_by(Widget, name: "Quiet")
+    end
+
+    @tag :without_audit_tables
+    test "a missing audit table leaves a bulk write alone" do
+      assert {1, nil} = Repo.insert_all(Widget, [%{name: "Early", tenant_id: 41}])
+      assert Repo.get_by(Widget, name: "Early")
+    end
+  end
+
   defp fake_scope(tenant_id) do
     {:ok,
      %Bilimbi.Base.Tenancy.Scope{

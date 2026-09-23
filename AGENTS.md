@@ -757,6 +757,19 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   the table — row locking, or a deliberate cross-tenant uniqueness proof — and
   each one should say so in a comment or function name.
 - Name constraints and indexes deliberately, especially on PostgreSQL.
+- **Every write through `Bilimbi.Base.Repo` is audited**, the eight struct
+  functions and `insert_all`/`update_all`/`delete_all` alike (ADR 0013).
+  Silence is an explicit opt-out with a written reason, never a default:
+  `:bilimbi_base_audit, :exclude_schemas` in `config/config.exs` when nothing
+  written to a schema is an actor's decision, or
+  `Bilimbi.Base.Database.WriteCapture.without_capture/1` (aliased as
+  `Audit.without_auditing/1`) at a machine-only call site on a table whose
+  other writes stay captured. There is no third mechanism. Raw SQL bypasses
+  the repo and so cannot carry an audited write. Raw-SQL DML outside the
+  lifecycle modules that need it (production-seed ledger, compatibility
+  cutover) is a review defect, a convention with no mechanical guard yet;
+  the one database-enforced control is the SQL console's select-only role
+  (#783), which covers the console only.
 - Generate migrations with `mix ecto.gen.migration`, but first confirm that
   the migration belongs to Bilimbi's compatibility plan and will not alter an
   existing Belimbing table unexpectedly.

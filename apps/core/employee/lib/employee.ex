@@ -16,6 +16,7 @@ defmodule Bilimbi.Core.Employee do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Database.WriteCapture
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.Company
@@ -349,11 +350,18 @@ defmodule Bilimbi.Core.Employee do
           })
         end)
 
-      repo.insert_all(EmployeeType, rows,
-        conflict_target:
-          {:unsafe_fragment, "(code) WHERE company_id IS NULL AND is_system = true"},
-        on_conflict: {:replace, [:label, :is_system, :company_id, :updated_at]}
-      )
+      # The system employee types are fixture data reconciled under the
+      # production seeds, not an actor's decision. The upsert's conflict
+      # target is an index predicate, which capture cannot read to tell an
+      # insert from a replacement, so saying so here is also what keeps it
+      # from reporting an unclassifiable upsert on every seed run.
+      WriteCapture.without_capture(fn ->
+        repo.insert_all(EmployeeType, rows,
+          conflict_target:
+            {:unsafe_fragment, "(code) WHERE company_id IS NULL AND is_system = true"},
+          on_conflict: {:replace, [:label, :is_system, :company_id, :updated_at]}
+        )
+      end)
 
       :ok
     end

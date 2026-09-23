@@ -4,7 +4,9 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
   (ADR 0013, #630) — the port of Belimbing's wildcard `MutationListener`.
 
   Base Database's `WriteCapture` seam calls `after_write/3` after every
-  successful struct write; this module owns the policy:
+  successful struct write and `after_bulk_write/2` after every successful
+  query-based bulk write; this module owns the policy for both, from one
+  set of functions:
 
     * actor columns come from the per-process `Audit.Context`, guest/0 when
       absent — the source's `PrincipalType::GUEST` default — and so does
@@ -15,8 +17,10 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
       record the new attributes; deletes record the old ones — empty diffs
       write nothing;
     * globally redacted fields (`password`, `password_hash`,
-      `remember_token`, `secret`, `api_key`, `token`) appear as
-      `[redacted]`; the change is recorded, the value never is. Long
+      `remember_token`, `secret`, `api_key`, `token`, `payload`) appear as
+      `[redacted]`; the change is recorded, the value never is. `payload`
+      is the durable session's opaque Laravel blob, which can carry a CSRF
+      token or a password hash that no field name reveals. Long
       strings truncate at #{2000} characters with an explicit marker;
     * `auditable_type` defaults to the Ecto schema module name; a schema
       that must match a Belimbing morph string defines
@@ -28,6 +32,12 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
   Rows are inserted synchronously in the caller's process, inside any open
   transaction: a rolled-back write rolls its audit row back with it. The
   seam guarantees a capture failure never fails the business write.
+
+  A bulk write produces one `insert_all` of audit rows per 1,000 affected
+  rows, never one insert per affected row: the per-row cost of capture is an
+  Elixir round trip, not database work, and a row-at-a-time capture measured
+  about 33x worse on a large batch (#785). The chunk keeps each statement
+  far below PostgreSQL's 65,535 bind-parameter ceiling.
   """
 
   @behaviour Bilimbi.Base.Database.WriteCapture
@@ -37,10 +47,14 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
   alias Bilimbi.Base.Audit.MutationSchema
   alias Bilimbi.Base.Repo
 
-  @redacted_fields ~w(password password_hash remember_token secret api_key token)a
+  @redacted_fields ~w(password password_hash remember_token secret api_key token payload)a
   @redacted_marker "[redacted]"
   @truncate_at 2000
+  @bulk_chunk_size 1000
   @excluded_schemas [ActionSchema, MutationSchema]
+
+  @impl true
+  def capture_schema?(schema) when is_atom(schema), do: captured_schema?(schema)
 
   @impl true
   def after_write(action, source, %schema{} = result) do
@@ -79,6 +93,105 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
   end
 
   def after_write(_action, _source, _result), do: :ok
+
+  @impl true
+  def after_bulk_write(schema, changes) do
+    if captured_schema?(schema) do
+      context = Context.get()
+
+      changes
+      |> Enum.map(&mutation_attributes(schema, &1, context))
+      |> Enum.reject(&is_nil/1)
+      |> insert_bulk_capture()
+    else
+      :ok
+    end
+  end
+
+  # The same canonical row as a struct write, reached through the same
+  # changeset: `insert_all` dumps but does not cast, so the changeset is
+  # applied first and its cast values — `ip_address` among them — become
+  # the batched entry.
+  defp mutation_attributes(schema, {action, old_row, new_row}, context) do
+    row = new_row || old_row
+
+    case bulk_values(action, old_row, new_row) do
+      nil ->
+        nil
+
+      {old_values, new_values} ->
+        %{
+          company_id: context.company_id,
+          actor_type: context.actor_type,
+          actor_id: context.actor_id,
+          actor_role: context.actor_role,
+          impersonator_id: context.impersonator_id,
+          ip_address: context.ip_address,
+          url: context.url,
+          user_agent: bounded(context.user_agent, 80),
+          auditable_type: auditable_type(schema),
+          auditable_id: auditable_id(row),
+          source: "listener",
+          event: event(action),
+          old_values: old_values,
+          new_values: new_values,
+          trace_id: bounded(context.trace_id, 12),
+          occurred_at: NaiveDateTime.truncate(NaiveDateTime.utc_now(), :second)
+        }
+        |> MutationSchema.changeset(tenant_id(row, context))
+        |> batched_entry()
+    end
+  end
+
+  defp bulk_values(:insert, _old_row, new_row), do: nonempty({%{}, sanitized_attributes(new_row)})
+  defp bulk_values(:delete, old_row, _new_row), do: nonempty({sanitized_attributes(old_row), %{}})
+
+  # A concurrent write can leave an updated row with no known original; it
+  # records the full new row rather than a diff against a guess, the same
+  # answer the struct path gives a non-changeset update.
+  defp bulk_values(:update, nil, new_row), do: nonempty({%{}, sanitized_attributes(new_row)})
+
+  defp bulk_values(:update, old_row, %schema{} = new_row) do
+    changed =
+      schema.__schema__(:fields)
+      |> Enum.filter(fn field ->
+        storable_value?(Map.get(new_row, field)) and
+          Map.get(old_row, field) != Map.get(new_row, field)
+      end)
+
+    if changed == [] do
+      nil
+    else
+      {sanitize(Map.new(changed, &{&1, Map.get(old_row, &1)})),
+       sanitize(Map.new(changed, &{&1, Map.get(new_row, &1)}))}
+    end
+  end
+
+  defp batched_entry(changeset) do
+    case Ecto.Changeset.apply_action(changeset, :insert) do
+      {:ok, mutation} -> mutation |> Map.from_struct() |> Map.drop([:__meta__, :id])
+      {:error, invalid} -> raise Ecto.InvalidChangesetError, action: :insert, changeset: invalid
+    end
+  end
+
+  defp insert_bulk_capture([]), do: :ok
+
+  defp insert_bulk_capture(entries) do
+    opts = if Repo.in_transaction?(), do: [mode: :savepoint], else: []
+
+    entries
+    |> Enum.chunk_every(@bulk_chunk_size)
+    |> Enum.each(&Repo.insert_all(MutationSchema, &1, opts))
+
+    :ok
+  rescue
+    error in Postgrex.Error ->
+      if match?(%{postgres: %{code: :undefined_table}}, error) do
+        :ok
+      else
+        reraise error, __STACKTRACE__
+      end
+  end
 
   # Inside a caller's transaction the row is written under a savepoint
   # (DBConnection's `mode: :savepoint`), so a failed capture rolls back to
