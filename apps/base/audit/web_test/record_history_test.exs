@@ -16,6 +16,7 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.UI.DateTimeDisplay
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
+  alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
   # 10:00 UTC is 18:00 the same day in Asia/Kuala_Lumpur. The entry's own
   # time reads to the minute; a value inside a diff reads to the second.
@@ -23,6 +24,7 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
   @diff_text "18/08/2026, 18:00:00 +08"
 
   setup do
+    UserFixtures.create_user_tables!()
     AuditFixtures.create_audit_tables!()
     CompanyFixtures.insert_tenant!(%{id: 41})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
