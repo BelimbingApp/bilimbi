@@ -135,7 +135,11 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
   # Literal segments doubled as route words (new, create, edit, …) can never
   # be a param: `/companies/new` is not a company show page. Without this,
   # the param wildcard would bless reserved words as already-clean paths.
-  @literal_segments @known_paths |> List.flatten() |> Enum.filter(&is_binary/1) |> MapSet.new()
+  @literal_segments @known_paths
+                    |> List.flatten()
+                    |> Enum.filter(&is_binary/1)
+                    |> MapSet.new()
+                    |> MapSet.put("edit")
 
   @icon_regex ~r/^heroicon-([osm])-(.+)$/
 
@@ -168,24 +172,43 @@ defmodule Bilimbi.Core.Compatibility.Cutover do
     if known_bilimbi_path?(path) do
       {:identity, normalized}
     else
-      case remap_path(path) do
-        {:ok, mapped_path} when query == "" ->
-          if known_bilimbi_path?(mapped_path),
-            do: {:mapped, mapped_path},
-            else: {:unmappable, normalized}
-
-        {:ok, mapped_path} ->
-          candidate = mapped_path <> "?" <> query
-
-          if known_bilimbi_path?(mapped_path),
-            do: {:mapped, candidate},
-            else: {:unmappable, normalized}
-
-        :error ->
-          {:unmappable, normalized}
+      with {:ok, mapped_path} <- remap_path(path),
+           {:ok, known_path} <- known_or_record_path(mapped_path) do
+        {:mapped, with_query(known_path, query)}
+      else
+        _ -> {:unmappable, normalized}
       end
     end
   end
+
+  # A Belimbing edit page whose Bilimbi record edits in place has no `/edit`
+  # route any more: `/admin/employee-types/5/edit` lands on `/employee-types/5`,
+  # the record's read-first page. The rename applies only where the `/edit`
+  # path is unknown and the record path is known.
+  defp known_or_record_path(mapped_path) do
+    cond do
+      known_bilimbi_path?(mapped_path) -> {:ok, mapped_path}
+      String.ends_with?(mapped_path, "/edit") -> known_record_path(mapped_path)
+      true -> :error
+    end
+  end
+
+  # The segment before `/edit` must be the record's id: a literal there
+  # (`/employee-types/edit`) names no record, so it stays unmappable.
+  defp known_record_path(edit_path) do
+    record_path = String.replace_suffix(edit_path, "/edit", "")
+
+    with [id | _] <- record_path |> String.split("/", trim: true) |> Enum.reverse(),
+         false <- MapSet.member?(@literal_segments, id),
+         true <- known_bilimbi_path?(record_path) do
+      {:ok, record_path}
+    else
+      _ -> :error
+    end
+  end
+
+  defp with_query(path, ""), do: path
+  defp with_query(path, query), do: path <> "?" <> query
 
   @doc """
   Maps a Belimbing icon name onto its Bilimbi `hero-` equivalent.

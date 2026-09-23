@@ -135,8 +135,8 @@ row — History, Impersonate and "← Back" — with no button; the Impersonate
 guards (`admin.user.impersonate`, never the signed-in account, never while
 impersonating) are unchanged. `Bilimbi.Core.User.Web.ShowLive`'s moduledoc
 owns the per-fact rules and DESIGN.md's "Read-first detail pages" owns the
-pattern. The standalone `/users/:id/edit` form still exists for the create
-flow's sibling route but nothing on the detail page links to it.
+pattern. There is no `/users/:id/edit` route; `FormLive` serves only
+`/users/new`.
 
 **`users.prefs` remains intentionally absent.** Belimbing dropped it in
 `0200_01_20_000007`. Core User contributes and validates `ui.theme`,

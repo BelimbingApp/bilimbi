@@ -1,9 +1,13 @@
 defmodule Bilimbi.Core.Employee.Web.FormLive do
   @moduledoc """
-  Employee create/edit form with full Belimbing parity. Domain rules stay in `Bilimbi.Core.Employee`.
+  Employee create form with full Belimbing parity. Domain rules stay in `Bilimbi.Core.Employee`.
 
-  Discovered routes do not set `live_action`, so new vs edit is taken from
-  the presence of `:id` in the params.
+  Only `/employees/new` routes here. Discovered routes do not set
+  `live_action`, so the module still keys new versus edit on the presence of
+  `:id` in the params, but no route carries one: the record's page,
+  `Bilimbi.Core.Employee.Web.ShowLive`, edits every fact in place, and the
+  `/employees/:id/edit` route was retired with the list's Edit link pointed
+  at that page. The edit branch remains as unrouted code until it is pruned.
   """
 
   use Bilimbi.Base.UI, :live_view

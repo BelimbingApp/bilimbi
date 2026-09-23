@@ -449,7 +449,13 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
             </:col>
 
             <:col :let={type} label="Label" sort="label" sort_id="employee-types-sort-label">
-              <span class="text-sm font-medium text-ink">{type.label}</span>
+              <.link
+                id={"employee-type-#{type.id}-link"}
+                navigate={~p"/employee-types/#{type.id}"}
+                class="font-medium text-ink-strong hover:underline"
+              >
+                {type.label}
+              </.link>
             </:col>
 
             <:col :let={type} label="Kind" sort="is_system" sort_id="employee-types-sort-kind">
@@ -474,7 +480,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
                   icon="edit"
                   label={"Edit #{type.label}"}
                   id={"employee-type-edit-#{type.id}"}
-                  navigate={~p"/employee-types/#{type.id}/edit"}
+                  navigate={~p"/employee-types/#{type.id}"}
                 />
                 <.icon_button
                   :if={allowed?(@current_scope, "admin.employee-type.delete")}

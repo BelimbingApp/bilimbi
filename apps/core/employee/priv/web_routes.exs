@@ -18,12 +18,6 @@
     capability: "admin.employee.view"
   },
   %{
-    path: "/employees/:id/edit",
-    live: Bilimbi.Core.Employee.Web.FormLive,
-    session: :auth,
-    capability: "admin.employee.update"
-  },
-  %{
     path: "/employee-types",
     live: Bilimbi.Core.Employee.Web.TypeIndexLive,
     session: :auth,
@@ -36,10 +30,10 @@
     capability: "admin.employee-type.create"
   },
   %{
-    path: "/employee-types/:id/edit",
-    live: Bilimbi.Core.Employee.Web.TypeFormLive,
+    path: "/employee-types/:id",
+    live: Bilimbi.Core.Employee.Web.TypeShowLive,
     session: :auth,
-    capability: "admin.employee-type.update"
+    capability: "admin.employee-type.list"
   },
   %{
     embed: "company.employees",

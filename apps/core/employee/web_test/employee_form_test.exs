@@ -295,57 +295,6 @@ defmodule BilimbiWeb.EmployeeFormTest do
     assert user.employee_id == created.id
   end
 
-  test "edits an employee with all fields and unlinks/relinks user account", %{conn: conn} do
-    {:ok, scope} = Tenancy.scope(41)
-
-    {:ok, employee} =
-      Employee.create_employee(scope, 73, %{
-        employee_number: "EMP-001",
-        full_name: "John Doe",
-        short_name: "John",
-        employee_type: "full_time",
-        status: "active"
-      })
-
-    # Link user 91 to this employee
-    {:ok, _} = User.update_user(scope, 73, 91, %{employee_id: employee.id})
-
-    grant_capabilities!(["admin.employee.update", "admin.employee.view"])
-
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}/edit")
-
-    # Form has pre-populated values
-    assert has_element?(view, "#employee-number[value='EMP-001']")
-    assert has_element?(view, "#employee-full-name[value='John Doe']")
-
-    view
-    |> form("#employee-form",
-      employee: %{
-        full_name: "John Richard Doe",
-        short_name: "Johnny",
-        designation: "Principal Engineer",
-        user_id: ""
-      }
-    )
-    |> render_submit()
-
-    {path, _flash} = assert_redirect(view)
-    assert path == "/employees/#{employee.id}"
-
-    {:ok, show, _html} = conn |> log_in_as() |> live(path)
-    assert has_element?(show, "h1", "Johnny")
-    assert has_element?(show, "#employee-details-card", "John Richard Doe")
-
-    {:ok, updated} = Employee.get_employee(scope, 73, employee.id)
-    assert updated.full_name == "John Richard Doe"
-    assert updated.short_name == "Johnny"
-    assert updated.designation == "Principal Engineer"
-
-    # Verify user was unlinked
-    assert {:ok, user} = User.get_user(scope, 73, 91)
-    assert is_nil(user.employee_id)
-  end
-
   test "validates date ordering (employment_end cannot be before employment_start)", %{conn: conn} do
     grant_capabilities!(["admin.employee.create", "admin.employee.view"])
 
@@ -518,38 +467,7 @@ defmodule BilimbiWeb.EmployeeFormTest do
     assert {:ok, []} = Employee.list_employees(other_scope, 75)
   end
 
-  test "editing a sibling employee requires tenant-wide company authority", %{conn: conn} do
-    CompanyFixtures.insert_company!(%{id: 74, tenant_id: 41, code: "sibling_corp"})
-    {:ok, scope} = Tenancy.scope(41)
-
-    {:ok, employee} =
-      Employee.create_employee(scope, 74, %{
-        employee_number: "SIBLING-EDIT",
-        full_name: "Sibling Employee",
-        employee_type: "full_time",
-        status: "active"
-      })
-
-    grant_capabilities!(["admin.employee.update", "admin.employee.view"])
-
-    assert {:error, {:live_redirect, %{to: "/employees"}}} =
-             conn |> log_in_as() |> live(~p"/employees/#{employee.id}/edit")
-
-    grant_capabilities!(["admin.company.tenant-wide.manage"])
-
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}/edit")
-    assert has_element?(view, "#employee-company-id option[value='74'][selected]")
-
-    view
-    |> form("#employee-form", employee: %{full_name: "Authorized Sibling Employee"})
-    |> render_submit()
-
-    assert {:ok, updated} = Employee.get_employee(scope, 74, employee.id)
-    assert updated.full_name == "Authorized Sibling Employee"
-  end
-
-  test "locks company on edit and retains original employee company", %{conn: conn} do
-    CompanyFixtures.insert_company!(%{id: 74, tenant_id: 41, code: "target_corp"})
+  test "the edit route is retired: an employee's facts change on its record page", %{conn: conn} do
     {:ok, scope} = Tenancy.scope(41)
 
     {:ok, employee} =
@@ -562,23 +480,13 @@ defmodule BilimbiWeb.EmployeeFormTest do
 
     grant_capabilities!(["admin.employee.update", "admin.employee.view"])
 
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}/edit")
+    # Nothing routes `/employees/:id/edit` any more; the read-first record
+    # page at `/employees/:id` is where every fact commits.
+    retired = "/employees/#{employee.id}/edit"
+    assert Phoenix.Router.route_info(BilimbiWeb.Router, "GET", retired, "localhost") == :error
+    assert conn |> log_in_as() |> get(retired) |> Map.fetch!(:status) == 404
 
-    assert has_element?(view, "#employee-company-id[disabled]")
-
-    view
-    |> form("#employee-form",
-      employee: %{
-        full_name: "John Richard Doe"
-      }
-    )
-    |> render_submit()
-
-    {path, _flash} = assert_redirect(view)
-    assert path == "/employees/#{employee.id}"
-
-    {:ok, updated} = Employee.get_employee(scope, 73, employee.id)
-    assert updated.company_id == 73
-    assert updated.full_name == "John Richard Doe"
+    {:ok, show, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+    assert has_element?(show, "#employee-full-name[phx-hook='InlineEdit']")
   end
 end
