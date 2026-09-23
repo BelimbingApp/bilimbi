@@ -26,9 +26,21 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   Every account this page mounts has a company — `get_tenant_user/2`
   returns no other — so every fact has a company for Core User to write it
-  through. When that company is archived, `Company.list_companies/1` does not
-  name it and the page reads it as an archived company rather than as no
-  company at all.
+  through. When that company is archived (soft-deleted, so
+  `Company.list_companies/1` does not name it), the page reads it as an
+  archived company rather than as no company at all, and the account is
+  read-only: no write on it can land, because every Core User and Base Authz
+  write resolves the account's company and refuses an archived one, and
+  nobody can sign in as or impersonate the account for the same reason. So
+  the page offers no editor, picker, password form, employee action, delete
+  or Impersonate for it, and one warning under the header says why. No
+  declared Company API returns an archived company's name, archiving is
+  final (no restore, and no moving an account to another company), and the
+  account's email stays unique platform-wide, so a replacement account
+  cannot reuse it; the notice therefore names neither the company nor a
+  next step, and states the finality as a rule. Hiding the controls is presentation: every write handler
+  still asks Authz and then Core Company, so a forged or stale commit is
+  refused on the fact or through the error flash.
 
   Each fact reports its own outcome through the shared commit status that
   `Bilimbi.Base.UI.CommitStatus` keeps: "Saving…" while the round trip is in
@@ -203,11 +215,25 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
     grouped_available_capabilities = group_by_domain(available_caps)
 
+    # `list_companies/1` names every live company of the workspace, so the
+    # account's company is missing from it only when archived.
+    company_name = Map.get(company_names, user.company_id)
+    company_archived? = is_nil(company_name)
+    can_edit? = can_manage? and not company_archived?
+
     roles_control =
-      roles_control(can_manage?, has_grant_all?, all_roles, unassigned_roles, available_roles)
+      roles_control(
+        company_archived?,
+        can_manage?,
+        has_grant_all?,
+        all_roles,
+        unassigned_roles,
+        available_roles
+      )
 
     capabilities_control =
       capabilities_control(
+        company_archived?,
         can_manage?,
         Enum.reject(all_registered_caps, &MapSet.member?(excluded_keys, &1)),
         available_caps
@@ -270,10 +296,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     socket
     |> assign(:user, user)
     |> assign(:page_title, user.name)
-    |> assign(:can_manage?, can_manage?)
+    |> assign(:company_archived?, company_archived?)
+    |> assign(:can_edit?, can_edit?)
     |> assign(:companies, companies)
     |> assign(:company_names, company_names)
-    |> assign(:company_name, Map.get(company_names, user.company_id))
+    |> assign(:company_name, company_name)
     |> assign(:department_names, department_names)
     |> assign(:assigned_roles, assigned_roles)
     |> assign(:assigned_role_ids, assigned_role_ids)
@@ -330,27 +357,28 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # --- Event Handlers: In-place Facts ---
 
   # One commit, one outcome on the fact that made it. Every write re-asks
-  # Authz; the `can_manage?` assign only decides what the page shows.
+  # Authz and then Core Company; the `can_edit?` and `company_archived?`
+  # assigns only decide what the page shows.
   @impl true
   def handle_event("save_field", params, socket) do
-    if can_manage?(socket) do
-      case CommitStatus.inline_field(params, @inline_fields) do
-        {:ok, name, field, value} ->
-          {:noreply, save_fact(socket, name, %{field => value}, value)}
-
-        :error ->
-          {:noreply, socket}
+    with true <- can_manage?(socket),
+         {:ok, name, field, value} <- CommitStatus.inline_field(params, @inline_fields) do
+      if archived_company?(socket) do
+        {:noreply, archived_refused(socket, name)}
+      else
+        {:noreply, save_fact(socket, name, %{field => value}, value)}
       end
     else
-      {:noreply, write_forbidden(socket)}
+      false -> {:noreply, write_forbidden(socket)}
+      :error -> {:noreply, socket}
     end
   end
 
   def handle_event("edit_field", %{"field" => "company"}, socket) do
-    if can_manage?(socket) do
-      {:noreply, assign(socket, :editing_field, "company")}
-    else
-      {:noreply, write_forbidden(socket)}
+    cond do
+      not can_manage?(socket) -> {:noreply, write_forbidden(socket)}
+      archived_company?(socket) -> {:noreply, archived_refused(socket, "company")}
+      true -> {:noreply, assign(socket, :editing_field, "company")}
     end
   end
 
@@ -366,39 +394,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # without a write. The reassignment ends the account's sessions; the open
   # editor warned about that before the choice was made.
   def handle_event("save_company", params, socket) do
-    if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      user = socket.assigns.user
-      current_company_id = user.company_id
-
-      case chosen_company_id(params) do
-        nil ->
-          {:noreply,
-           socket
-           |> close_company_editor()
-           |> CommitStatus.put("company", {:error, detach_refused_message()})}
-
-        ^current_company_id ->
-          {:noreply, commit_company(socket, {:ok, user}, socket.assigns.company_name)}
-
-        target_company_id ->
-          actor = current_actor(socket, user.company_id)
-
-          {:noreply,
-           commit_company(
-             socket,
-             User.reassign_user_company(
-               actor,
-               scope,
-               user.company_id,
-               user.id,
-               target_company_id
-             ),
-             company_choice_label(socket, target_company_id)
-           )}
-      end
-    else
-      {:noreply, write_forbidden(socket)}
+    cond do
+      not can_manage?(socket) -> {:noreply, write_forbidden(socket)}
+      archived_company?(socket) -> {:noreply, archived_refused(socket, "company")}
+      true -> save_company(socket, params)
     end
   end
 
@@ -421,57 +420,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("assign_selected_roles", params, socket) do
-    if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      user = socket.assigns.user
-      current_scope = socket.assigns.current_scope
-
-      role_ids =
-        case Map.get(params, "role_ids") do
-          ids when is_list(ids) and ids != [] -> ids
-          _ -> socket.assigns.selected_role_ids
-        end
-
-      parsed_role_ids =
-        for role_id_str <- role_ids,
-            {role_id, ""} <- [Integer.parse(to_string(role_id_str))] do
-          role_id
-        end
-
-      acting_grant_all? = acting_grant_all?(current_scope)
-      acting_allowed_caps = acting_allowed_capabilities(current_scope)
-      acting_allowed_set = MapSet.new(acting_allowed_caps)
-
-      unauthorized_roles =
-        Enum.reject(
-          parsed_role_ids,
-          &role_grantable?(scope, &1, acting_grant_all?, acting_allowed_set)
-        )
-
-      cond do
-        unauthorized_roles != [] ->
-          {:noreply, put_flash(socket, :error, "You cannot grant roles you do not hold.")}
-
-        parsed_role_ids != [] ->
-          for role_id <- parsed_role_ids do
-            Authz.assign_role(scope, user.company_id, :user, user.id, role_id)
-          end
-
-          count = length(parsed_role_ids)
-          msg = if count == 1, do: "Assigned 1 role.", else: "Assigned #{count} roles."
-
-          {:noreply,
-           socket
-           |> put_flash(:success, msg)
-           |> assign(:selected_role_ids, [])
-           |> assign(:show_assign_roles, false)
-           |> load_data(user)}
-
-        true ->
-          {:noreply, socket}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to manage roles.")}
+    cond do
+      not can_manage?(socket) -> {:noreply, roles_forbidden(socket)}
+      archived_company?(socket) -> {:noreply, archived_refused(socket)}
+      true -> assign_selected_roles(socket, params)
     end
   end
 
@@ -481,13 +433,18 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # on that held rule rather than on a client-supplied id, so what was
   # confirmed is what changes.
   def handle_event("request_remove_role", %{"assignment-id" => assignment_id_str}, socket) do
-    if can_manage?(socket) do
-      case find_assignment(socket, assignment_id_str) do
-        nil -> {:noreply, socket}
-        assignment -> hold_authz(socket, {:remove_role, assignment})
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to manage roles.")}
+    cond do
+      not can_manage?(socket) ->
+        {:noreply, roles_forbidden(socket)}
+
+      archived_company?(socket) ->
+        {:noreply, archived_refused(socket)}
+
+      assignment = find_assignment(socket, assignment_id_str) ->
+        hold_authz(socket, {:remove_role, assignment})
+
+      true ->
+        {:noreply, socket}
     end
   end
 
@@ -498,7 +455,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   def handle_event("remove_role", _params, socket) do
     cond do
       not can_manage?(socket) ->
-        {:noreply, put_flash(socket, :error, "You do not have permission to manage roles.")}
+        {:noreply, roles_forbidden(socket)}
 
       not match?({:remove_role, _}, socket.assigns.pending_authz) ->
         {:noreply, socket}
@@ -550,51 +507,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("add_selected_capabilities", params, socket) do
-    if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      user = socket.assigns.user
-      current_scope = socket.assigns.current_scope
-
-      cap_keys =
-        case Map.get(params, "capability_keys") do
-          keys when is_list(keys) and keys != [] -> keys
-          _ -> socket.assigns.selected_capability_keys
-        end
-
-      acting_grant_all? = acting_grant_all?(current_scope)
-      acting_allowed_caps = acting_allowed_capabilities(current_scope)
-      acting_allowed_set = MapSet.new(acting_allowed_caps)
-
-      unauthorized_caps =
-        if acting_grant_all? do
-          []
-        else
-          Enum.reject(cap_keys, &MapSet.member?(acting_allowed_set, &1))
-        end
-
-      cond do
-        unauthorized_caps != [] ->
-          {:noreply, put_flash(socket, :error, "You cannot grant capabilities you do not hold.")}
-
-        cap_keys != [] ->
-          for cap_key <- cap_keys do
-            Authz.put_principal_capability(scope, user.company_id, :user, user.id, cap_key, true)
-          end
-
-          count = length(cap_keys)
-          msg = if count == 1, do: "Granted 1 capability.", else: "Granted #{count} capabilities."
-
-          {:noreply,
-           socket
-           |> put_flash(:success, msg)
-           |> assign(:selected_capability_keys, [])
-           |> load_data(user)}
-
-        true ->
-          {:noreply, socket}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to manage capabilities.")}
+    cond do
+      not can_manage?(socket) -> capabilities_forbidden(socket)
+      archived_company?(socket) -> {:noreply, archived_refused(socket)}
+      true -> add_selected_capabilities(socket, params)
     end
   end
 
@@ -602,6 +518,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     cond do
       not can_manage?(socket) ->
         capabilities_forbidden(socket)
+
+      archived_company?(socket) ->
+        {:noreply, archived_refused(socket)}
 
       cap_key in socket.assigns.effective_keys ->
         hold_authz(socket, {:deny, cap_key})
@@ -654,13 +573,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # request resolves which one it is from the page's own maps before it opens
   # a dialog, and the copy says what removing that rule does.
   def handle_event("request_remove_capability", %{"grant-id" => grant_id_str}, socket) do
-    if can_manage?(socket) do
-      case find_capability_rule(socket, grant_id_str) do
-        nil -> {:noreply, socket}
-        rule -> hold_authz(socket, rule)
-      end
-    else
-      capabilities_forbidden(socket)
+    cond do
+      not can_manage?(socket) -> capabilities_forbidden(socket)
+      archived_company?(socket) -> {:noreply, archived_refused(socket)}
+      rule = find_capability_rule(socket, grant_id_str) -> hold_authz(socket, rule)
+      true -> {:noreply, socket}
     end
   end
 
@@ -706,49 +623,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("update_password", params, socket) do
-    if can_manage?(socket) do
-      p = params["user"] || params
-      password = p["password"] || ""
-      confirmation = p["password_confirmation"] || ""
-      errors = validate_password_params(password, confirmation)
+    cond do
+      not can_manage?(socket) ->
+        {:noreply, put_flash(socket, :error, "You do not have permission to change passwords.")}
 
-      if errors == %{} do
-        scope = socket.assigns.current_scope.scope
-        user = socket.assigns.user
-        actor = current_actor(socket, user.company_id)
+      archived_company?(socket) ->
+        {:noreply, archived_refused(socket)}
 
-        case User.admin_change_password(actor, scope, user.company_id, user.id, password) do
-          {:ok, updated_user} ->
-            {:noreply,
-             socket
-             |> put_flash(:success, "Password updated successfully.")
-             |> assign(
-               :password_form,
-               to_form(%{"password" => "", "password_confirmation" => ""})
-             )
-             |> assign(:password_errors, %{})
-             |> assign(:show_change_password, false)
-             |> load_data(updated_user)}
-
-          {:error, _reason} ->
-            {:noreply, put_flash(socket, :error, "Failed to update password.")}
-        end
-      else
-        {:noreply,
-         socket
-         |> assign(:password_errors, errors)
-         |> put_flash(
-           :error,
-           Map.get(errors, :password_confirmation) || Map.get(errors, :password) ||
-             "Invalid password."
-         )
-         |> assign(
-           :password_form,
-           to_form(%{"password" => password, "password_confirmation" => confirmation})
-         )}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to change passwords.")}
+      true ->
+        update_password(socket, params)
     end
   end
 
@@ -759,29 +642,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("link_employee", %{"employee_id" => employee_id_str}, socket) do
-    if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      user = socket.assigns.user
-
-      case Integer.parse(employee_id_str) do
-        {employee_id, ""} ->
-          case User.update_user(scope, user.company_id, user.id, %{employee_id: employee_id}) do
-            {:ok, updated_user} ->
-              {:noreply,
-               socket
-               |> put_flash(:success, "Employee linked.")
-               |> assign(:show_link_employee, false)
-               |> load_data(updated_user)}
-
-            {:error, _} ->
-              {:noreply, put_flash(socket, :error, "Failed to link employee.")}
-          end
-
-        _ ->
-          {:noreply, socket}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit users.")}
+    cond do
+      not can_manage?(socket) -> {:noreply, users_forbidden(socket)}
+      archived_company?(socket) -> {:noreply, archived_refused(socket)}
+      true -> link_employee(socket, employee_id_str)
     end
   end
 
@@ -791,7 +655,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   def handle_event("request_unlink_employee", %{"employee-id" => employee_id_str}, socket) do
     cond do
       not can_manage?(socket) ->
-        {:noreply, put_flash(socket, :error, "You do not have permission to edit users.")}
+        {:noreply, users_forbidden(socket)}
+
+      archived_company?(socket) ->
+        {:noreply, archived_refused(socket)}
 
       emp = find_linked_employee(socket, employee_id_str) ->
         {:noreply, socket |> clear_flash() |> assign(:pending_unlink, emp)}
@@ -808,7 +675,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   def handle_event("unlink_employee", _params, socket) do
     cond do
       not can_manage?(socket) ->
-        {:noreply, put_flash(socket, :error, "You do not have permission to edit users.")}
+        {:noreply, users_forbidden(socket)}
 
       is_nil(socket.assigns.pending_unlink) ->
         {:noreply, socket}
@@ -837,24 +704,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     end
   end
 
+  # Creating the record and linking it are two writes, and only the link is
+  # refused for an archived company, so the modal is refused before it opens
+  # rather than leaving an unlinked employee behind a refused link.
   def handle_event("open_add_employee_modal", _params, socket) do
-    user = socket.assigns.user
-
-    {:noreply,
-     socket
-     |> clear_flash()
-     |> assign(:show_add_employee_modal, true)
-     |> assign(
-       :new_employee_form,
-       to_form(%{
-         "company_id" => user.company_id,
-         "employee_number" => "",
-         "full_name" => "",
-         "designation" => "",
-         "employment_start" => ""
-       })
-     )
-     |> assign(:new_employee_errors, %{})}
+    cond do
+      not can_manage?(socket) -> {:noreply, users_forbidden(socket)}
+      archived_company?(socket) -> {:noreply, archived_refused(socket)}
+      true -> {:noreply, open_add_employee_modal(socket)}
+    end
   end
 
   def handle_event("close_add_employee_modal", _params, socket) do
@@ -862,63 +720,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("save_new_employee", params, socket) do
-    if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      user = socket.assigns.user
-      p = params["employee"] || params
-
-      company_id =
-        case Integer.parse(to_string(p["company_id"] || "")) do
-          {cid, ""} -> cid
-          _ -> user.company_id
-        end
-
-      emp_number = String.trim(to_string(p["employee_number"] || ""))
-      full_name = String.trim(to_string(p["full_name"] || ""))
-      designation = String.trim(to_string(p["designation"] || ""))
-      employment_start = p["employment_start"]
-
-      errors = %{}
-
-      errors =
-        if emp_number == "", do: Map.put(errors, :employee_number, "can't be blank"), else: errors
-
-      errors = if full_name == "", do: Map.put(errors, :full_name, "can't be blank"), else: errors
-
-      errors =
-        if is_nil(company_id), do: Map.put(errors, :company_id, "can't be blank"), else: errors
-
-      if errors == %{} do
-        attrs = %{
-          employee_number: emp_number,
-          full_name: full_name,
-          designation: if(designation == "", do: nil, else: designation),
-          employee_type: "full_time",
-          status: "active",
-          employment_start:
-            if(employment_start in ["", nil], do: nil, else: Date.from_iso8601!(employment_start))
-        }
-
-        with {:ok, employee} <- Employee.create_employee(scope, company_id, attrs),
-             {:ok, updated_user} <-
-               User.update_user(scope, user.company_id, user.id, %{employee_id: employee.id}) do
-          {:noreply,
-           socket
-           |> put_flash(:success, "Employee created and linked.")
-           |> assign(:show_add_employee_modal, false)
-           |> load_data(updated_user)}
-        else
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, "Failed to create employee record.")}
-        end
-      else
-        {:noreply,
-         socket
-         |> assign(:new_employee_errors, errors)
-         |> assign(:new_employee_form, to_form(params))}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit users.")}
+    cond do
+      not can_manage?(socket) -> {:noreply, users_forbidden(socket)}
+      archived_company?(socket) -> {:noreply, archived_refused(socket)}
+      true -> save_new_employee(socket, params)
     end
   end
 
@@ -992,6 +797,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       own_account?(socket) ->
         {:noreply, put_flash(socket, :error, "You cannot delete your own account.")}
 
+      archived_company?(socket) ->
+        {:noreply, archived_refused(socket)}
+
       true ->
         {:noreply, socket |> clear_flash() |> assign(:pending_delete?, true)}
     end
@@ -1027,12 +835,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
           {:error, :company_not_found} ->
             {:noreply,
-             put_flash(
-               socket,
-               :error,
-               "#{user.name} was not deleted: their company is archived. " <>
-                 "Restore the company first."
-             )}
+             put_flash(socket, :error, "#{user.name} was not deleted: their company is archived.")}
 
           {:error, _reason} ->
             {:noreply,
@@ -1042,6 +845,279 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                "#{user.name} was not deleted. Reload the page and try again."
              )}
         end
+    end
+  end
+
+  # --- Write bodies, entered only once the capability and company checks passed ---
+
+  defp save_company(socket, params) do
+    scope = socket.assigns.current_scope.scope
+    user = socket.assigns.user
+    current_company_id = user.company_id
+
+    case chosen_company_id(params) do
+      nil ->
+        {:noreply,
+         socket
+         |> close_company_editor()
+         |> CommitStatus.put("company", {:error, detach_refused_message()})}
+
+      ^current_company_id ->
+        {:noreply, commit_company(socket, {:ok, user}, socket.assigns.company_name)}
+
+      target_company_id ->
+        actor = current_actor(socket, user.company_id)
+
+        {:noreply,
+         commit_company(
+           socket,
+           User.reassign_user_company(
+             actor,
+             scope,
+             user.company_id,
+             user.id,
+             target_company_id
+           ),
+           company_choice_label(socket, target_company_id)
+         )}
+    end
+  end
+
+  defp assign_selected_roles(socket, params) do
+    scope = socket.assigns.current_scope.scope
+    user = socket.assigns.user
+    current_scope = socket.assigns.current_scope
+
+    role_ids =
+      case Map.get(params, "role_ids") do
+        ids when is_list(ids) and ids != [] -> ids
+        _ -> socket.assigns.selected_role_ids
+      end
+
+    parsed_role_ids =
+      for role_id_str <- role_ids,
+          {role_id, ""} <- [Integer.parse(to_string(role_id_str))] do
+        role_id
+      end
+
+    acting_grant_all? = acting_grant_all?(current_scope)
+    acting_allowed_caps = acting_allowed_capabilities(current_scope)
+    acting_allowed_set = MapSet.new(acting_allowed_caps)
+
+    unauthorized_roles =
+      Enum.reject(
+        parsed_role_ids,
+        &role_grantable?(scope, &1, acting_grant_all?, acting_allowed_set)
+      )
+
+    cond do
+      unauthorized_roles != [] ->
+        {:noreply, put_flash(socket, :error, "You cannot grant roles you do not hold.")}
+
+      parsed_role_ids != [] ->
+        for role_id <- parsed_role_ids do
+          Authz.assign_role(scope, user.company_id, :user, user.id, role_id)
+        end
+
+        count = length(parsed_role_ids)
+        msg = if count == 1, do: "Assigned 1 role.", else: "Assigned #{count} roles."
+
+        {:noreply,
+         socket
+         |> put_flash(:success, msg)
+         |> assign(:selected_role_ids, [])
+         |> assign(:show_assign_roles, false)
+         |> load_data(user)}
+
+      true ->
+        {:noreply, socket}
+    end
+  end
+
+  defp add_selected_capabilities(socket, params) do
+    scope = socket.assigns.current_scope.scope
+    user = socket.assigns.user
+    current_scope = socket.assigns.current_scope
+
+    cap_keys =
+      case Map.get(params, "capability_keys") do
+        keys when is_list(keys) and keys != [] -> keys
+        _ -> socket.assigns.selected_capability_keys
+      end
+
+    acting_grant_all? = acting_grant_all?(current_scope)
+    acting_allowed_caps = acting_allowed_capabilities(current_scope)
+    acting_allowed_set = MapSet.new(acting_allowed_caps)
+
+    unauthorized_caps =
+      if acting_grant_all? do
+        []
+      else
+        Enum.reject(cap_keys, &MapSet.member?(acting_allowed_set, &1))
+      end
+
+    cond do
+      unauthorized_caps != [] ->
+        {:noreply, put_flash(socket, :error, "You cannot grant capabilities you do not hold.")}
+
+      cap_keys != [] ->
+        for cap_key <- cap_keys do
+          Authz.put_principal_capability(scope, user.company_id, :user, user.id, cap_key, true)
+        end
+
+        count = length(cap_keys)
+        msg = if count == 1, do: "Granted 1 capability.", else: "Granted #{count} capabilities."
+
+        {:noreply,
+         socket
+         |> put_flash(:success, msg)
+         |> assign(:selected_capability_keys, [])
+         |> load_data(user)}
+
+      true ->
+        {:noreply, socket}
+    end
+  end
+
+  defp update_password(socket, params) do
+    p = params["user"] || params
+    password = p["password"] || ""
+    confirmation = p["password_confirmation"] || ""
+    errors = validate_password_params(password, confirmation)
+
+    if errors == %{} do
+      scope = socket.assigns.current_scope.scope
+      user = socket.assigns.user
+      actor = current_actor(socket, user.company_id)
+
+      case User.admin_change_password(actor, scope, user.company_id, user.id, password) do
+        {:ok, updated_user} ->
+          {:noreply,
+           socket
+           |> put_flash(:success, "Password updated successfully.")
+           |> assign(
+             :password_form,
+             to_form(%{"password" => "", "password_confirmation" => ""})
+           )
+           |> assign(:password_errors, %{})
+           |> assign(:show_change_password, false)
+           |> load_data(updated_user)}
+
+        {:error, _reason} ->
+          {:noreply, put_flash(socket, :error, "Failed to update password.")}
+      end
+    else
+      {:noreply,
+       socket
+       |> assign(:password_errors, errors)
+       |> put_flash(
+         :error,
+         Map.get(errors, :password_confirmation) || Map.get(errors, :password) ||
+           "Invalid password."
+       )
+       |> assign(
+         :password_form,
+         to_form(%{"password" => password, "password_confirmation" => confirmation})
+       )}
+    end
+  end
+
+  defp link_employee(socket, employee_id_str) do
+    scope = socket.assigns.current_scope.scope
+    user = socket.assigns.user
+
+    case Integer.parse(employee_id_str) do
+      {employee_id, ""} ->
+        case User.update_user(scope, user.company_id, user.id, %{employee_id: employee_id}) do
+          {:ok, updated_user} ->
+            {:noreply,
+             socket
+             |> put_flash(:success, "Employee linked.")
+             |> assign(:show_link_employee, false)
+             |> load_data(updated_user)}
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to link employee.")}
+        end
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  defp open_add_employee_modal(socket) do
+    user = socket.assigns.user
+
+    socket
+    |> clear_flash()
+    |> assign(:show_add_employee_modal, true)
+    |> assign(
+      :new_employee_form,
+      to_form(%{
+        "company_id" => user.company_id,
+        "employee_number" => "",
+        "full_name" => "",
+        "designation" => "",
+        "employment_start" => ""
+      })
+    )
+    |> assign(:new_employee_errors, %{})
+  end
+
+  defp save_new_employee(socket, params) do
+    scope = socket.assigns.current_scope.scope
+    user = socket.assigns.user
+    p = params["employee"] || params
+
+    company_id =
+      case Integer.parse(to_string(p["company_id"] || "")) do
+        {cid, ""} -> cid
+        _ -> user.company_id
+      end
+
+    emp_number = String.trim(to_string(p["employee_number"] || ""))
+    full_name = String.trim(to_string(p["full_name"] || ""))
+    designation = String.trim(to_string(p["designation"] || ""))
+    employment_start = p["employment_start"]
+
+    errors = %{}
+
+    errors =
+      if emp_number == "", do: Map.put(errors, :employee_number, "can't be blank"), else: errors
+
+    errors = if full_name == "", do: Map.put(errors, :full_name, "can't be blank"), else: errors
+
+    errors =
+      if is_nil(company_id), do: Map.put(errors, :company_id, "can't be blank"), else: errors
+
+    if errors == %{} do
+      attrs = %{
+        employee_number: emp_number,
+        full_name: full_name,
+        designation: if(designation == "", do: nil, else: designation),
+        employee_type: "full_time",
+        status: "active",
+        employment_start:
+          if(employment_start in ["", nil], do: nil, else: Date.from_iso8601!(employment_start))
+      }
+
+      with {:ok, employee} <- Employee.create_employee(scope, company_id, attrs),
+           {:ok, updated_user} <-
+             User.update_user(scope, user.company_id, user.id, %{employee_id: employee.id}) do
+        {:noreply,
+         socket
+         |> put_flash(:success, "Employee created and linked.")
+         |> assign(:show_add_employee_modal, false)
+         |> load_data(updated_user)}
+      else
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Failed to create employee record.")}
+      end
+    else
+      {:noreply,
+       socket
+       |> assign(:new_employee_errors, errors)
+       |> assign(:new_employee_form, to_form(params))}
     end
   end
 
@@ -1058,6 +1134,21 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   defp capabilities_forbidden(socket) do
     {:noreply, put_flash(socket, :error, "You do not have permission to manage capabilities.")}
   end
+
+  defp roles_forbidden(socket),
+    do: put_flash(socket, :error, "You do not have permission to manage roles.")
+
+  defp users_forbidden(socket),
+    do: put_flash(socket, :error, "You do not have permission to edit users.")
+
+  # A write on an archived-company account is refused where the page reports
+  # that write: on the fact that asked, or through the error flash. Either
+  # way a stale "Saved" is dropped, as for a forbidden write.
+  defp archived_refused(socket, name),
+    do: CommitStatus.put(socket, name, {:error, archived_company_message()})
+
+  defp archived_refused(socket),
+    do: CommitStatus.write_forbidden(socket, archived_account_message())
 
   defp find_assignment(socket, assignment_id_str) do
     case Integer.parse(assignment_id_str) do
@@ -1178,7 +1269,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 opts={%{auditable_types: user_auditable_types(), auditable_id: @user.id, record: @user}}
               />
               <.action_link
-                :if={can_impersonate?(@current_scope, @user)}
+                :if={can_impersonate?(@current_scope, @user, @company_archived?)}
                 id="user-impersonate"
                 icon="bilimbi-impersonate"
                 href={~p"/admin/impersonate/#{@user.id}"}
@@ -1191,6 +1282,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             </div>
           </:actions>
         </.header>
+
+        <%!-- The one place the page says why it is read-only, before the
+             reader reaches a fact. It names the condition and what it
+             prevents, and states that archiving is final. --%>
+        <.alert :if={@company_archived?} id="user-archived-company" kind={:warning}>
+          {archived_account_notice(@user)}
+        </.alert>
 
         <div class="mt-6 space-y-6">
           <%!-- Section 1: User Details. The facts are the shared `<.list>`
@@ -1210,7 +1308,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 <.text_fact
                   name="name"
                   user={@user}
-                  can_manage?={@can_manage?}
+                  editable?={@can_edit?}
                   field_status={@field_status}
                 />
               </:item>
@@ -1218,13 +1316,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 <.text_fact
                   name="email"
                   user={@user}
-                  can_manage?={@can_manage?}
+                  editable?={@can_edit?}
                   field_status={@field_status}
                 />
               </:item>
               <:item title="Company" id="user-view-company">
                 <button
-                  :if={@can_manage? and @editing_field != "company"}
+                  :if={@can_edit? and @editing_field != "company"}
                   type="button"
                   id="user-company-display"
                   phx-click="edit_field"
@@ -1233,8 +1331,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   aria-describedby={@field_status["company"] && "user-company-status"}
                   class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
                 >
-                  <span :if={@company_name} class="text-ink">{@company_name}</span>
-                  <span :if={is_nil(@company_name)} class="text-ink-muted">Archived company</span>
+                  <span class="text-ink">{@company_name}</span>
                   <.icon
                     name="edit"
                     class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
@@ -1245,7 +1342,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                      best-effort), and Escape must cancel regardless. Only one
                      editor mounts at a time, so the listener is unambiguous. --%>
                 <div
-                  :if={@can_manage? and @editing_field == "company"}
+                  :if={@can_edit? and @editing_field == "company"}
                   phx-window-keydown="cancel_edit_field"
                   phx-key="Escape"
                 >
@@ -1259,9 +1356,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       phx-blur="cancel_edit_field"
                       class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                     >
-                      <option :if={is_nil(@company_name)} value="" selected disabled>
-                        Archived company
-                      </option>
                       <option
                         :for={company <- @companies}
                         value={company.id}
@@ -1281,7 +1375,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   </p>
                 </div>
 
-                <%= if not @can_manage? do %>
+                <%!-- Read-only: a viewer's live company links to its page; an
+                     archived company has no page to reach and no name the
+                     Company API returns. --%>
+                <%= if not @can_edit? do %>
                   <%= if @company_name do %>
                     <.link
                       navigate={~p"/companies/#{@user.company_id}"}
@@ -1353,7 +1450,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       >
                         <span>{assignment.role_name}</span>
                         <.icon_button
-                          :if={@can_manage?}
+                          :if={@can_edit?}
                           icon="close"
                           label={"Remove the #{assignment.role_name} role"}
                           context={:inline}
@@ -1461,6 +1558,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             <% else %>
               <div id="assign-roles-unavailable" class="mb-6">
                 <%= case @roles_control do %>
+                  <% :archived -> %>
+                    <.empty_state
+                      title="Roles can't be changed"
+                      reason="This user's company is archived, so no role can be assigned or removed."
+                    />
                   <% :forbidden -> %>
                     <.empty_state forbidden={"assign roles to this user, which needs #{manage_capability()}"} />
                   <% :grant_all -> %>
@@ -1562,7 +1664,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                             ]}
                           >
                             <span>{cap}</span>
-                            <%= if @can_manage? do %>
+                            <%= if @can_edit? do %>
                               <%= if is_direct do %>
                                 <.icon_button
                                   icon="close"
@@ -1615,7 +1717,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                         >
                           <span>{cap}</span>
                           <.icon_button
-                            :if={@can_manage?}
+                            :if={@can_edit?}
                             icon="close"
                             label={"Remove the deny rule for #{cap}"}
                             context={:inline}
@@ -1709,6 +1811,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   class="mt-4 pt-4 border-t border-line"
                 >
                   <%= case @capabilities_control do %>
+                    <% :archived -> %>
+                      <.empty_state
+                        title="Capabilities can't be changed"
+                        reason="This user's company is archived, so no capability can be added, denied or removed."
+                      />
                     <% :forbidden -> %>
                       <.empty_state forbidden={"add capabilities to this user, which needs #{manage_capability()}"} />
                     <% :all_in_effect -> %>
@@ -1727,8 +1834,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             </div>
           </.card>
 
-          <!-- Card 3: Change Password -->
-          <.card id="user-password-card" inner_class="p-5 sm:p-6">
+          <%!-- Card 3: Change Password. The card holds nothing but the form,
+               so an archived-company account, whose password cannot be
+               changed, has no card; the notice under the header says so. --%>
+          <.card :if={not @company_archived?} id="user-password-card" inner_class="p-5 sm:p-6">
             <button
               type="button"
               id="toggle-change-password-btn"
@@ -1818,7 +1927,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               <:description>
                 Employment records linking this user to companies. A user can have multiple records across different companies (e.g. contractors). Not all employees require a user account.
               </:description>
-              <:actions :if={@can_manage?}>
+              <:actions :if={@can_edit?}>
                 <.button
                   type="button"
                   id="open-add-employee-modal-btn"
@@ -1883,7 +1992,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               </:col>
               <:action :let={emp}>
                 <.icon_button
-                  :if={@can_manage?}
+                  :if={@can_edit?}
                   icon="unlink"
                   label={"Unlink #{emp.full_name}"}
                   kind={:danger}
@@ -1899,7 +2008,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
             <!-- Link Existing Employee Form -->
             <div
-              :if={@can_manage? and @unlinkable_employees != []}
+              :if={@can_edit? and @unlinkable_employees != []}
               id="link-employee-section"
               class="mt-4 pt-4 border-t border-line"
             >
@@ -2035,9 +2144,10 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             </.table>
           </.card>
 
-          <!-- Card 6: Danger Zone (Delete Account) -->
+          <%!-- Card 6: Danger Zone (Delete Account). Deleting an archived-company
+               account is refused, so the zone is not offered for one. --%>
           <section
-            :if={allowed?(@current_scope, "admin.user.delete")}
+            :if={allowed?(@current_scope, "admin.user.delete") and not @company_archived?}
             id="user-danger"
             class="rounded-xl border border-danger-line bg-danger-surface px-5 py-4"
           >
@@ -2201,12 +2311,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # --- Fact Components ---
 
   # A read-first text fact. An operator who may update edits it in place;
-  # anyone else — a viewer, or any actor while the account has no company to
-  # write through — sees the stored value with no affordance. Name and email
-  # are required columns, so an emptied input is not a commit.
+  # anyone else — a viewer, or any actor while the account's company is
+  # archived — sees the stored value with no affordance. Name and email are
+  # required columns, so an emptied input is not a commit.
   attr(:name, :string, required: true)
   attr(:user, :map, required: true)
-  attr(:can_manage?, :boolean, required: true)
+  attr(:editable?, :boolean, required: true)
   attr(:field_status, :map, required: true)
 
   defp text_fact(assigns) do
@@ -2214,7 +2324,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       assigns
       |> assign(:label, fact_label(assigns.name))
       |> assign(:value, Map.fetch!(assigns.user, Map.fetch!(@inline_fields, assigns.name)))
-      |> assign(:editable?, assigns.can_manage?)
 
     ~H"""
     <.inline_edit
@@ -2227,18 +2336,24 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       save_event="save_field"
       status={@field_status[@name]}
     />
+    <%!-- The read-only fact keeps its outlet, so a forged or stale commit
+         on it is refused where the page reports facts. --%>
     <span :if={not @editable?}>{@value}</span>
+    <.commit_status :if={not @editable?} id={"user-#{@name}-status"} status={@field_status[@name]} />
     """
   end
 
   # --- Private Helpers ---
 
-  # The guard is unchanged from the header it replaced: the capability, never
-  # the signed-in account, and never while already impersonating.
-  defp can_impersonate?(current_scope, user) do
+  # The guard is the users list's: the capability, never the signed-in
+  # account, never while already impersonating, and never an archived-company
+  # account, whose session the host cannot open (`UserAuth.impersonate_user/3`
+  # resolves the tenant through the live company and refuses it).
+  defp can_impersonate?(current_scope, user, company_archived?) do
     allowed?(current_scope, "admin.user.impersonate") and
       user.id != current_scope.user["user_id"] and
-      is_nil(current_scope.impersonator)
+      is_nil(current_scope.impersonator) and
+      not company_archived?
   end
 
   # One commit, one outcome on the fact that made it. Success reloads the
@@ -2302,6 +2417,21 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # refusal names that company rather than the value the operator submitted.
   defp archived_company_message,
     do: "The change was not saved: this user's company is archived."
+
+  # The same refusal through the flash, for a write that reports there.
+  defp archived_account_message,
+    do: "This user's company is archived, so the account can't be changed."
+
+  # What the warning under the header says: the condition, that it is final,
+  # and what it prevents on this page and beyond it. No declared Company API
+  # names an archived company, archiving is never undone, and the account's
+  # email stays taken platform-wide, so the notice neither names the company
+  # nor offers a next step.
+  defp archived_account_notice(user) do
+    "#{user.name}'s company is archived, and archiving is final, so this account is " <>
+      "read-only: its details, roles, permissions, password and employee links can't " <>
+      "be changed, and nobody can sign in as or impersonate this user."
+  end
 
   # The select offers no choosable blank; a blank that still arrives is refused
   # in the words the product means, not as a missing company.
@@ -2553,15 +2683,24 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   # Why the Roles control is absent, as one reason in the order a reader can
-  # act on it: without permission nothing else matters; a grant-all role
-  # leaves nothing to add; and only then do the roles themselves decide (none
-  # exist, all held, or none this account may grant under the escalation
-  # guard). `:available` shows the control. A user without a company is not
-  # a case: a role is granted within a company, but `get_tenant_user/2`
-  # refuses such an account and mount redirects, so this page never renders
-  # one. Presentation only: every write asks Authz again.
-  defp roles_control(can_manage?, has_grant_all?, all_roles, unassigned_roles, available) do
+  # act on it: an archived company refuses every grant whatever the reader
+  # holds; without permission nothing else matters; a grant-all role leaves
+  # nothing to add; and only then do the roles themselves decide (none exist,
+  # all held, or none this account may grant under the escalation guard).
+  # `:available` shows the control. A user without a company is not a case:
+  # a role is granted within a company, but `get_tenant_user/2` refuses such
+  # an account and mount redirects, so this page never renders one.
+  # Presentation only: every write asks Authz and Core Company again.
+  defp roles_control(
+         archived?,
+         can_manage?,
+         has_grant_all?,
+         all_roles,
+         unassigned_roles,
+         available
+       ) do
     cond do
+      archived? -> :archived
       not can_manage? -> :forbidden
       has_grant_all? -> :grant_all
       all_roles == [] -> :no_roles
@@ -2574,8 +2713,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # The same decision for the Add Capabilities picker. `remaining` is every
   # installed capability not yet in effect or denied for the user; `available`
   # is the part of it the acting account holds and may therefore grant.
-  defp capabilities_control(can_manage?, remaining, available) do
+  defp capabilities_control(archived?, can_manage?, remaining, available) do
     cond do
+      archived? -> :archived
       not can_manage? -> :forbidden
       remaining == [] -> :all_in_effect
       available == [] -> :none_grantable
@@ -2623,5 +2763,16 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # pattern).
   defp can_manage?(socket) do
     Authz.can(socket.assigns.current_scope.actor, @manage_capability).allowed
+  end
+
+  # The same freshness for the account's company: the mount-time
+  # `company_archived?` assign hides the controls, and each write asks Core
+  # Company again, so a company archived after mount is refused and one
+  # restored after mount is written to. The domain refuses either way; this
+  # check only lets the page report the refusal in its own words before a
+  # dialog opens or a second write (creating an employee to link) lands.
+  defp archived_company?(socket) do
+    scope = socket.assigns.current_scope.scope
+    match?({:error, :not_found}, Company.get_company(scope, socket.assigns.user.company_id))
   end
 end

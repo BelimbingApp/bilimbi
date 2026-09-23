@@ -126,14 +126,23 @@ derived from `company_id`, so `get_tenant_user/2` resolves no user without
 one and no route reaches `list_unaffiliated_users/2` or
 `get_unaffiliated_user/3`; the detail page mounts no such account either, so
 every fact it shows has a company to be written through. An account whose
-company is archived reads as "Archived company" rather than as no company;
-its company select opens on that archived company as a selected, unchoosable
-option, and a refused write on the company, name or email fact names the
-archived company as the cause. Whether those editors open at all is a separate product decision.
-`clear_user_company/5` remains in the API with no surface offering it. The header is Belimbing's quiet labelled
-row — History, Impersonate and "← Back" — with no button; the Impersonate
-guards (`admin.user.impersonate`, never the signed-in account, never while
-impersonating) are unchanged. `Bilimbi.Core.User.Web.ShowLive`'s moduledoc
+company is archived (soft-deleted) reads as "Archived company" rather than
+as no company, and the page shows it read-only: no in-place editor, company
+select, role or capability picker, password form, employee action, delete
+zone or Impersonate is offered, because every write on the account resolves
+its company and an archived one is refused, and the host cannot open a
+session for it. One `<.alert kind={:warning}>` under the header says so and
+says what it prevents; archiving is final, so it states that as a rule and
+names neither the company (no declared Company API returns an archived
+company) nor a next step (there is no restore or move, and `users.email` is
+unique platform-wide, so a replacement account cannot reuse the email). Hiding the controls is
+presentation: each write handler asks Authz and then Core Company again, so
+a forged or stale commit is still refused on its fact or through the error
+flash. `clear_user_company/5` remains in the API with no surface offering
+it. The header is Belimbing's quiet labelled row — History, Impersonate and
+"← Back" — with no button; the Impersonate guards (`admin.user.impersonate`,
+never the signed-in account, never while impersonating, and now never an
+archived-company account, as on the users list) are otherwise unchanged. `Bilimbi.Core.User.Web.ShowLive`'s moduledoc
 owns the per-fact rules and DESIGN.md's "Read-first detail pages" owns the
 pattern. There is no `/users/:id/edit` route; `FormLive` serves only
 `/users/new`.

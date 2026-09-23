@@ -65,6 +65,7 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(view, "#app-content", "unverified")
     refute has_element?(view, "#user-edit")
     refute has_element?(view, "#user-danger")
+    refute has_element?(view, "#user-archived-company")
 
     # A viewer sees the facts with no affordance: no in-place editors and no
     # company trigger, and the header holds no button beyond the pin.
@@ -416,9 +417,26 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(view, "main header", "Archived company")
     refute has_element?(view, "#app-content", "None")
     refute has_element?(view, "#app-content", "Unaffiliated")
+
+    # The notice stands for a viewer too: it explains the account, not the
+    # reader's permission, it states archiving as final, and it says only what
+    # the page blocks.
+    assert has_element?(
+             view,
+             "#user-archived-company[role='alert']",
+             "Ada Archived's company is archived, and archiving is final, so this account is read-only"
+           )
+
+    assert has_element?(view, "#user-archived-company", "nobody can sign in as or impersonate")
+
+    assert has_element?(view, "#user-archived-company", "employee links can't be changed")
+    refute has_element?(view, "#user-archived-company", "employee records")
+    refute has_element?(view, "#user-archived-company", "yet")
+    refute has_element?(view, "#user-archived-company", "Restore")
+    refute has_element?(view, "#user-password-card")
   end
 
-  test "an archived current company is the selected value and the named cause of every refusal",
+  test "an archived-company account offers an operator no editor and says why at the top",
        %{conn: conn} do
     CompanyFixtures.insert_company!(%{
       id: 76,
@@ -436,37 +454,76 @@ defmodule BilimbiWeb.UserShowTest do
       email: "archived@example.com"
     })
 
-    grant_capabilities!(["admin.user.view", "admin.user.update"])
+    grant_capabilities!([
+      "admin.user.view",
+      "admin.user.update",
+      "admin.user.delete",
+      "admin.user.impersonate"
+    ])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/95")
+
+    # One warning under the header, before any fact, in the shared alert.
+    assert has_element?(
+             view,
+             "#user-archived-company[role='alert']",
+             "Ada Archived's company is archived, and archiving is final, so this account is read-only"
+           )
+
+    # The facts read as text: no in-place editors, no company trigger, no
+    # select, and the archived company is named as such with no link.
+    assert has_element?(view, "#user-view-name", "Ada Archived")
+    assert has_element?(view, "#user-view-email", "archived@example.com")
+    assert has_element?(view, "#user-view-company", "Archived company")
+    refute has_element?(view, "#user-name[phx-hook='InlineEdit']")
+    refute has_element?(view, "#user-email[phx-hook='InlineEdit']")
+    refute has_element?(view, "#user-company-display")
+    refute has_element?(view, "#user-company-form")
+    refute has_element?(view, "#user-view-company a")
+
+    # Nothing else that writes the account is offered: the pickers say why
+    # where they would stand, and the password card, employee actions,
+    # delete zone and Impersonate are absent.
+    refute has_element?(view, "#toggle-assign-roles-btn")
+    assert has_element?(view, "#assign-roles-unavailable", "Roles can't be changed")
+    view |> element("#toggle-permissions-btn") |> render_click()
+    refute has_element?(view, "#add-capabilities-section")
+    assert has_element?(view, "#add-capabilities-unavailable", "Capabilities can't be changed")
+    refute has_element?(view, "#user-password-card")
+    refute has_element?(view, "#open-add-employee-modal-btn")
+    refute has_element?(view, "#link-employee-section")
+    refute has_element?(view, "#user-danger")
+    refute has_element?(view, "#user-impersonate")
+
+    # The header still offers what reading needs.
+    assert has_element?(view, "#user-back[href='/users']")
+    assert has_element?(view, "#user-pin")
+  end
+
+  test "an archived-company account still refuses every forged commit", %{conn: conn} do
+    CompanyFixtures.insert_company!(%{
+      id: 76,
+      tenant_id: 41,
+      code: "archived",
+      deleted_at: ~N[2026-08-11 12:00:00]
+    })
+
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 95,
+      company_id: 76,
+      name: "Ada Archived",
+      email: "archived@example.com"
+    })
+
+    grant_capabilities!(["admin.user.view", "admin.user.update", "admin.user.delete"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/95")
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
 
-    # The select opens on the account's archived company, which cannot be
-    # chosen; the live companies stay the only choices.
-    view |> element("#user-company-display") |> render_click()
-
-    assert has_element?(
-             view,
-             "#user-company-select option[selected][disabled]",
-             "Archived company"
-           )
-
-    refute has_element?(view, "#user-company-select option[value='73'][selected]")
-    assert has_element?(view, "#user-company-select option[value='73']:not([disabled])")
-
-    view
-    |> form("#user-company-form")
-    |> render_change(%{"company_id" => "73"})
-
-    assert has_element?(
-             view,
-             "#user-company-status[role='alert']",
-             "\"Bilimbi Industries\" was not saved: this user's company is archived."
-           )
-
-    refute has_element?(view, "#user-company-status", "not in this workspace")
-    refute has_element?(view, "#user-company-status", "may not manage")
-
+    # A commit on a fact is refused on that fact, in the words the page used
+    # before the editors were withdrawn.
     render_hook(view, "save_field", %{"id" => "95", "name" => "Ada Lovelace"})
 
     assert has_element?(
@@ -482,6 +539,33 @@ defmodule BilimbiWeb.UserShowTest do
              "#user-email-status[role='alert']",
              "The change was not saved: this user's company is archived."
            )
+
+    # The company editor does not open, and a choice that arrives anyway is
+    # refused on the company fact.
+    render_hook(view, "edit_field", %{"field" => "company"})
+    refute has_element?(view, "#user-company-form")
+    assert has_element?(view, "#user-company-status[role='alert']", "company is archived")
+
+    render_hook(view, "save_company", %{"company_id" => "73"})
+    assert has_element?(view, "#user-company-status[role='alert']", "company is archived")
+    refute has_element?(view, "#user-company-status", "not in this workspace")
+
+    # Writes that report through the flash say the same thing and open no
+    # dialog or modal.
+    render_hook(view, "assign_selected_roles", %{"role_ids" => ["1"]})
+
+    assert has_element?(
+             view,
+             "#flash-error",
+             "This user's company is archived, so the account can't be changed."
+           )
+
+    render_hook(view, "open_add_employee_modal", %{})
+    refute has_element?(view, "#add-employee-modal")
+
+    render_hook(view, "request_delete", %{})
+    refute has_element?(view, "#delete-user-confirm")
+    render_hook(view, "delete", %{})
 
     refute has_element?(view, "#app-content", "could not be found")
 
@@ -511,19 +595,24 @@ defmodule BilimbiWeb.UserShowTest do
     grant_capabilities!(["admin.user.view", "admin.user.delete"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/95")
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
 
-    # The refusal is met after confirming: the dialog closes and the flash
-    # says what to do next.
-    view |> element("#user-delete") |> render_click()
-    view |> element("#delete-user-confirm-confirm") |> render_click()
+    # The zone is not offered, and a forged request is refused before any
+    # dialog opens.
+    refute has_element?(view, "#user-danger")
+
+    render_hook(view, "request_delete", %{})
 
     refute has_element?(view, "#delete-user-confirm")
 
     assert has_element?(
              view,
              "#flash-error",
-             "Ada Archived was not deleted: their company is archived. Restore the company first."
+             "This user's company is archived, so the account can't be changed."
            )
+
+    {:ok, users} = User.list_users(scope)
+    assert Enum.any?(users, &(&1.id == 95))
   end
 
   test "refuses to delete the signed-in account", %{conn: conn} do
