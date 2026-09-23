@@ -164,20 +164,15 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
     end
   end
 
-  def handle_event("enable", %{"key" => key}, socket) do
-    command(
-      socket,
-      @manage,
-      fn actor -> Schedule.review_definition(actor, key, true) end,
-      "Task enabled."
-    )
-  end
-
-  # Pausing and disabling cancel work already queued for the task before it
-  # starts, which resuming does not bring back, so both confirm through the
+  # Enabling approves the reviewed definition to run unattended, and pausing
+  # and disabling cancel work already queued for the task before it starts,
+  # which resuming does not bring back, so all three confirm through the
   # shared dialog: the request holds the task whose consequence the dialog
   # states, and the command acts on that held task rather than on a
-  # client-supplied key. Enabling and resuming lose nothing and run on click.
+  # client-supplied key. Resuming only lifts a pause and runs on click.
+  def handle_event("request_enable", %{"key" => key}, socket),
+    do: request_command(socket, :enable, key)
+
   def handle_event("request_pause", %{"key" => key}, socket),
     do: request_command(socket, :pause, key)
 
@@ -186,6 +181,18 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
 
   def handle_event("cancel_command", _params, socket),
     do: {:noreply, assign(socket, :pending_command, nil)}
+
+  def handle_event("enable", _params, socket) do
+    confirmed_command(socket, :enable, fn socket, key ->
+      command(
+        socket,
+        @manage,
+        fn actor -> Schedule.review_definition(actor, key, true) end,
+        "Task enabled.",
+        :success
+      )
+    end)
+  end
 
   def handle_event("disable", _params, socket) do
     confirmed_command(socket, :disable, fn socket, key ->
@@ -561,10 +568,18 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   defp error_message(:unreviewed), do: "Review and enable this definition before queuing it."
   defp error_message(_reason), do: "Schedule state is unavailable; no action was confirmed."
 
-  # The dialog states what the command does to the task's queued work, which
-  # is the part resuming or re-enabling does not bring back.
+  # The dialog states what the command sets running, or what it does to the
+  # task's queued work, which is the part resuming or re-enabling does not
+  # bring back.
+  defp command_consequence({:enable, task}), do: "Task “#{task.name}” will be enabled."
   defp command_consequence({:pause, task}), do: "Task “#{task.name}” will be paused."
   defp command_consequence({:disable, task}), do: "Task “#{task.name}” will be disabled."
+
+  defp command_detail({:enable, task}),
+    do:
+      "It begins running automatically on its schedule (#{task.expression}, #{task.timezone}) " <>
+        "at definition fingerprint #{String.slice(task.fingerprint, 0, 12)}, the one under review. " <>
+        "A later change to the definition stops it until that change is reviewed."
 
   defp command_detail({:pause, _task}),
     do:
@@ -576,10 +591,13 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
       "Work already queued for it is cancelled before it starts, and the scheduler " <>
         "stops queuing it until this definition is reviewed and enabled again."
 
+  defp command_verb({:enable, _task}), do: "Enable"
   defp command_verb({:pause, _task}), do: "Pause"
   defp command_verb({:disable, _task}), do: "Disable"
+  defp command_working({:enable, _task}), do: "Enabling…"
   defp command_working({:pause, _task}), do: "Pausing…"
   defp command_working({:disable, _task}), do: "Disabling…"
+  defp command_event({:enable, _task}), do: "enable"
   defp command_event({:pause, _task}), do: "pause"
   defp command_event({:disable, _task}), do: "disable"
 

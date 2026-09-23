@@ -115,9 +115,48 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     assert has_element?(manager, "#schedule-task-test-schedule-enable")
     refute has_element?(manager, "#schedule-task-test-schedule-run")
 
-    # Enabling loses nothing, so it runs on click without a confirmation.
+    # Enabling approves the reviewed definition to run unattended, so it
+    # confirms through the shared dialog, which names the task and states
+    # that it will run on its schedule at the fingerprint under review.
     refute has_element?(manager, "#schedule-task-test-schedule-enable[data-confirm]")
-    assert manager |> element("#schedule-task-test-schedule-enable") |> render_click() =~ "Task enabled."
+    manager |> element("#schedule-task-test-schedule-enable") |> render_click()
+
+    assert_modal_dialog(
+      manager,
+      "schedule-command-confirm",
+      "Task “#{definition.name}” will be enabled."
+    )
+
+    assert has_element?(
+             manager,
+             "#schedule-command-confirm-description",
+             "It begins running automatically on its schedule (30 1 * * *, America/New_York) " <>
+               "at definition fingerprint #{String.slice(Schedule.fingerprint(definition), 0, 12)}"
+           )
+
+    # Cancelling leaves the task not enabled.
+    manager |> element("#schedule-command-confirm-cancel", "Cancel") |> render_click()
+    refute has_element?(manager, "#schedule-command-confirm")
+    assert has_element?(manager, "#schedule-task-test-schedule-enable")
+    assert {:error, :unreviewed} = Schedule.run_now(definition.key)
+
+    # A confirm with nothing held is a stale click and does nothing.
+    render_click(manager, "enable", %{"key" => definition.key})
+    assert {:error, :unreviewed} = Schedule.run_now(definition.key)
+
+    # Confirming enables it and reports the completed write as a success.
+    manager |> element("#schedule-task-test-schedule-enable") |> render_click()
+
+    assert has_element?(
+             manager,
+             "#schedule-command-confirm-confirm[phx-disable-with='Enabling…']",
+             "Enable"
+           )
+
+    manager |> element("#schedule-command-confirm-confirm") |> render_click()
+    refute has_element?(manager, "#schedule-command-confirm")
+    assert has_element?(manager, "#flash-success", "Task enabled.")
+    refute has_element?(manager, "#schedule-task-test-schedule-enable")
     assert has_element?(manager, "#schedule-task-test-schedule-pause")
 
     # Pausing cancels queued work, so it confirms through the shared dialog,
@@ -164,7 +203,10 @@ defmodule BilimbiWeb.ScheduleLiveTest do
 
     # Resuming loses nothing, so it runs on click without a confirmation.
     refute has_element?(manager, "#schedule-task-test-schedule-resume[data-confirm]")
-    assert manager |> element("#schedule-task-test-schedule-resume") |> render_click() =~ "Task resumed."
+
+    assert manager |> element("#schedule-task-test-schedule-resume") |> render_click() =~
+             "Task resumed."
+
     refute Repo.exists?(Suppression)
 
     # Disabling confirms the same way and names its own consequence.

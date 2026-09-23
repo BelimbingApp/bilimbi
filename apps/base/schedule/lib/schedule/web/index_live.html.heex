@@ -168,7 +168,7 @@
               <.button
                 :if={@can_manage and task.review_state != :enabled}
                 id={"#{task_dom_id(task)}-enable"}
-                phx-click="enable"
+                phx-click="request_enable"
                 phx-value-key={task.key}
                 class="px-2 py-1 text-xs"
               >

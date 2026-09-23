@@ -424,10 +424,12 @@ the business activity chip, the employee and employee type deletes, the
 subordinate removal, the user deletes, the employee unlink, the role and
 capability rule changes on `/users/:id`, the saved database query deletes, the
 session terminate, the settings restore and the schedule pause and disable. No
-`data-confirm` attribute remains in the product. The schedule's enable and
-resume lose nothing and run on click, matching Belimbing, where a confirmation
-is reserved for a choice that cannot be undone; discarding an unsaved database
-query is the same case.
+`data-confirm` attribute remains in the product. The schedule's enable confirms
+the same way, because it approves the definition under review to run
+unattended: the dialog names the task and states that it begins running on its
+schedule at that definition's fingerprint. Resume only lifts a pause and runs
+on click, matching Belimbing, where a confirmation is reserved for a choice
+that cannot be undone; discarding an unsaved database query is the same case.
 
 ## Subtle depth and motion
 
