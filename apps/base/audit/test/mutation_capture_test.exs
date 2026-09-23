@@ -298,6 +298,16 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
       refute created.new_values["notes"] =~ String.duplicate("x", 2001)
     end
 
+    test "a bulk write past the bind-parameter ceiling records every affected row" do
+      # 3,500 audit rows at 20 columns each would need 70,000 parameters in
+      # one statement, past PostgreSQL's 65,535.
+      rows = for n <- 1..3500, do: %{name: "Row #{n}", tenant_id: 41}
+
+      assert {3500, nil} = Repo.insert_all(Widget, rows)
+
+      assert Repo.aggregate(MutationSchema, :count) == 3500
+    end
+
     test "a bulk write with no actor is recorded as guest, never refused" do
       assert {1, nil} = Repo.insert_all(Widget, [%{name: "Anonymous", tenant_id: 41}])
 

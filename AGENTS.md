@@ -765,8 +765,11 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   `Bilimbi.Base.Database.WriteCapture.without_capture/1` (aliased as
   `Audit.without_auditing/1`) at a machine-only call site on a table whose
   other writes stay captured. There is no third mechanism. Raw SQL bypasses
-  the repo and so cannot carry an audited write;
-  `apps/base/database/test/raw_sql_write_guard_test.exs` holds that line.
+  the repo and so cannot carry an audited write. Raw-SQL DML outside the
+  lifecycle modules that need it (production-seed ledger, compatibility
+  cutover) is a review defect, a convention with no mechanical guard yet;
+  the one database-enforced control is the SQL console's select-only role
+  (#783), which covers the console only.
 - Generate migrations with `mix ecto.gen.migration`, but first confirm that
   the migration belongs to Bilimbi's compatibility plan and will not alter an
   existing Belimbing table unexpectedly.

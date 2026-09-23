@@ -124,14 +124,7 @@ defmodule Bilimbi.Base.Session do
 
   @spec delete_session(String.t()) :: :ok
   def delete_session(id) when is_binary(id) do
-    # Signing out is the actor ending their own session, and the sign-out
-    # itself belongs in `base_audit_actions`, not in the mutation trail as
-    # a deleted row. Terminating *another* session is a different act and
-    # is captured -- see `terminate_session/2` below.
-    WriteCapture.without_capture(fn ->
-      Repo.delete_all(from(session in Schema, where: session.id == ^id))
-    end)
-
+    Repo.delete_all(from(session in Schema, where: session.id == ^id))
     :ok
   end
 
@@ -159,8 +152,8 @@ defmodule Bilimbi.Base.Session do
   permanent login lockout: a session established after the statement outside
   that serialization can remain or appear later.
 
-  Session payloads are opaque and are neither read nor returned by this
-  lifecycle operation.
+  Session payloads are opaque: this lifecycle operation does not return them,
+  and the audit trail records only that a payload was there, redacted.
   """
   @spec terminate_user_sessions(pos_integer(), String.t()) :: {:ok, non_neg_integer()}
   def terminate_user_sessions(user_id, current_session_id)

@@ -17,8 +17,10 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
       record the new attributes; deletes record the old ones — empty diffs
       write nothing;
     * globally redacted fields (`password`, `password_hash`,
-      `remember_token`, `secret`, `api_key`, `token`) appear as
-      `[redacted]`; the change is recorded, the value never is. Long
+      `remember_token`, `secret`, `api_key`, `token`, `payload`) appear as
+      `[redacted]`; the change is recorded, the value never is. `payload`
+      is the durable session's opaque Laravel blob, which can carry a CSRF
+      token or a password hash that no field name reveals. Long
       strings truncate at #{2000} characters with an explicit marker;
     * `auditable_type` defaults to the Ecto schema module name; a schema
       that must match a Belimbing morph string defines
@@ -31,10 +33,11 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
   transaction: a rolled-back write rolls its audit row back with it. The
   seam guarantees a capture failure never fails the business write.
 
-  A bulk write produces **one** `insert_all` of audit rows, never one
-  insert per affected row: the per-row cost of capture is an Elixir round
-  trip, not database work, and a row-at-a-time capture measured about 33x
-  worse on a large batch (#785).
+  A bulk write produces one `insert_all` of audit rows per 1,000 affected
+  rows, never one insert per affected row: the per-row cost of capture is an
+  Elixir round trip, not database work, and a row-at-a-time capture measured
+  about 33x worse on a large batch (#785). The chunk keeps each statement
+  far below PostgreSQL's 65,535 bind-parameter ceiling.
   """
 
   @behaviour Bilimbi.Base.Database.WriteCapture
@@ -44,9 +47,10 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
   alias Bilimbi.Base.Audit.MutationSchema
   alias Bilimbi.Base.Repo
 
-  @redacted_fields ~w(password password_hash remember_token secret api_key token)a
+  @redacted_fields ~w(password password_hash remember_token secret api_key token payload)a
   @redacted_marker "[redacted]"
   @truncate_at 2000
+  @bulk_chunk_size 1000
   @excluded_schemas [ActionSchema, MutationSchema]
 
   @impl true
@@ -174,7 +178,11 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
 
   defp insert_bulk_capture(entries) do
     opts = if Repo.in_transaction?(), do: [mode: :savepoint], else: []
-    Repo.insert_all(MutationSchema, entries, opts)
+
+    entries
+    |> Enum.chunk_every(@bulk_chunk_size)
+    |> Enum.each(&Repo.insert_all(MutationSchema, &1, opts))
+
     :ok
   rescue
     error in Postgrex.Error ->

@@ -15,8 +15,8 @@ defmodule Bilimbi.Base.Repo do
   # parity is not a reason to leave a hole in an audit trail.
   #
   # Raw SQL still bypasses this seam and is kept empty of auditable writes
-  # instead of covered — `Bilimbi.Base.Database.RawSqlWriteGuardTest`
-  # fails when new raw DML appears outside the lifecycle allowlist.
+  # instead of covered: raw DML belongs only to the lifecycle modules
+  # (seed ledger, compatibility cutover), a review convention (ADR 0013).
   defoverridable Ecto.Repo
 
   def insert(struct, opts) do

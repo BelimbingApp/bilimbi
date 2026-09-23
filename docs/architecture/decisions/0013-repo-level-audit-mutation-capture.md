@@ -97,13 +97,13 @@ and with a silent-falsehood failure mode.
   failure.
 - **Raw SQL remains uncaptured, and is kept empty of auditable writes
   rather than covered.** The operator SQL console is `SELECT`-only and its
-  transaction is genuinely read-only (#781); giving it its own
-  `SELECT`-only PostgreSQL role is separate work that makes the claim a
-  database-enforced fact rather than an application property.
-  `Bilimbi.Base.Database.RawSqlWriteGuardTest` reads the AST of every
-  module under `lib/` and fails when DML appears in an
-  `Ecto.Adapters.SQL.query/3` call outside the allowlisted lifecycle
-  modules.
+  transaction is genuinely read-only (#781); its own `SELECT`-only
+  PostgreSQL role (#783) makes that a database-enforced fact, and is the
+  only database-enforced control on raw SQL — it covers the console only.
+  Elsewhere, raw-SQL DML is confined to the lifecycle modules that need it
+  (the production-seed ledger and the compatibility cutover) by review
+  convention, not by a mechanical guard. A real mechanical control for the
+  rest of the codebase is follow-up work.
 - **Postgres triggers were built, measured and rejected** (#785). They
   work, and they are the only mechanism that sees a write the application
   did not make. They were rejected because they do not remove the
@@ -130,15 +130,16 @@ and with a silent-falsehood failure mode.
   schema callback for canonical morph strings, changed-fields-only diffs
   for updates with originals, full attributes for create/delete, global
   redaction (`password`, `password_hash`, `remember_token`, `secret`,
-  `api_key`, `token`) rendered as `[redacted]`, and string truncation at
+  `api_key`, `token`, and `payload` — the durable session's opaque Laravel
+  blob) rendered as `[redacted]`, and string truncation at
   2000 characters with an explicit truncation marker.
 - **Recursion and exclusion**: capture always skips Base Audit's own
   schemas; further schemas opt out via `:bilimbi_base_audit,
   :exclude_schemas` configuration — the port of `audit.exclude_models`,
   with the same justification discipline (a comment per entry). A schema
   belongs on that list only when *nothing* written to it is an actor's
-  business decision. Where one table holds both — sessions, employee
-  types, the operator tenant — the machine-only call site wraps itself in
+  business decision. Where one table holds both — sessions (the expiry
+  sweep), employee types — the machine-only call site wraps itself in
   `WriteCapture.without_capture/1` and says why there, so the actor's
   writes to the same table stay captured. These two controls are the whole
   flooding answer; there is no third concept.
@@ -177,7 +178,7 @@ and with a silent-falsehood failure mode.
 - Multi/`insert_or_update` flow through the overridden functions. The
   residual boundary is now the repo itself: anything bypassing
   `Bilimbi.Base.Repo` entirely bypasses capture, which is why raw-SQL DML
-  is allowlisted and guarded by a test. The write-session test in
+  is confined to the lifecycle modules by review convention. The write-session test in
   `apps/web` pins the guarantee for real domain writes (Employee, Company)
   and, since #785, for a real permission change driven through the User
   detail screen — the regression that would have caught the bulk-write gap

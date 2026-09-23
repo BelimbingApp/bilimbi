@@ -24,6 +24,7 @@ defmodule BilimbiWeb.AuditCaptureSessionTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Session
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
@@ -262,6 +263,56 @@ defmodule BilimbiWeb.AuditCaptureSessionTest do
 
       assert listener_rows("Bilimbi.Base.Authz.RoleCapability") == []
       assert Authz.get_role(scope, role.id) |> elem(0) == :ok
+    end
+  end
+
+  describe "sessions and platform provisioning" do
+    test "signing out records the actor's deleted session with its payload redacted", %{
+      conn: conn
+    } do
+      session_id = "audit-signout-session"
+      conn = log_in_as(conn, %{"user_id" => 91, "company_id" => 73, "session_id" => session_id})
+
+      {:ok, _entry} =
+        Session.put_session(session_id, "_token|s:40:\"csrf-secret\";password_hash_web|x", %{
+          user_id: 91,
+          last_activity: System.system_time(:second)
+        })
+
+      delete(conn, ~p"/session")
+
+      rows = listener_rows("Bilimbi.Base.Session.Schema")
+      deleted = Enum.find(rows, &(&1.event == "deleted"))
+
+      assert deleted, "signing out left no listener row"
+      assert deleted.auditable_id == session_id
+      assert deleted.actor_type == "user"
+      assert deleted.actor_id == 91
+      assert deleted.old_values["payload"] == "[redacted]"
+      refute Enum.any?(rows, &(inspect({&1.old_values, &1.new_values}) =~ "csrf-secret"))
+    end
+
+    test "provisioning the platform operator records every write as guest" do
+      Audit.without_auditing(fn ->
+        Repo.update_all(Bilimbi.Base.Tenancy.Tenant, set: [is_platform_operator: false])
+      end)
+
+      {:ok, %{tenant: tenant, company: company, tenant_status: :created}} =
+        Company.provision_platform_operator("Operator tenant", %{name: "Operator company"})
+
+      assert [tenant_row] = listener_rows("Bilimbi.Base.Tenancy.Tenant")
+      assert tenant_row.event == "created"
+      assert tenant_row.auditable_id == to_string(tenant.id)
+
+      company_row =
+        listener_rows("Bilimbi.Core.Company.Schema")
+        |> Enum.find(&(&1.auditable_id == to_string(company.id)))
+
+      assert company_row, "the operator company left no listener row"
+
+      rows = Repo.all(from(row in MutationSchema, where: row.source == "listener"))
+      assert length(rows) >= 3
+      assert Enum.all?(rows, &(&1.actor_type == "guest" and &1.actor_id == 0))
     end
   end
 end
