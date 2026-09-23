@@ -1428,16 +1428,15 @@
                   In flight, the confirm reads its working label for the round trip: LiveView disables it and swaps the verb until the server replies, and the shell mirrors that wait onto <code>aria-busy</code>.
                 </p>
               </div>
-              <div
+              <.table
                 id="design-library-confirm-rows"
-                class="divide-y divide-line rounded-lg border border-line bg-surface"
+                rows={@confirm_rows}
+                row_id={&"design-library-confirm-row-#{&1.id}"}
+                caption="Example legal entity types"
+                framed={false}
               >
-                <div
-                  :for={row <- @confirm_rows}
-                  id={"design-library-confirm-row-#{row.id}"}
-                  class="flex items-center justify-between gap-3 px-3 py-1 text-sm text-ink"
-                >
-                  <span>{row.name}</span>
+                <:col :let={row} label="Name">{row.name}</:col>
+                <:action :let={row}>
                   <.icon_button
                     id={"design-library-confirm-delete-#{row.id}"}
                     icon="delete"
@@ -1446,11 +1445,13 @@
                     phx-click="confirm-request"
                     phx-value-id={row.id}
                   />
-                </div>
-                <p :if={@confirm_rows == []} class="px-3 py-2 text-xs text-ink-muted">
-                  Every example has been deleted.
-                </p>
-              </div>
+                </:action>
+                <:empty
+                  :if={@confirm_rows == []}
+                  title="No example legal entity types"
+                  reason="Every example has been deleted. Restore the examples to walk the flow again."
+                />
+              </.table>
               <.alert
                 :if={match?({:success, _}, @confirm_outcome)}
                 id="design-library-confirm-outcome"
