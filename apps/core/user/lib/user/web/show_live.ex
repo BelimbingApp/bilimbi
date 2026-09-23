@@ -1058,18 +1058,20 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   defp find_capability_rule(socket, grant_id_str) do
-    with {grant_id, ""} <- Integer.parse(grant_id_str) do
-      grants = socket.assigns.direct_grant_ids
-      denials = socket.assigns.direct_deny_ids
+    case Integer.parse(grant_id_str) do
+      {grant_id, ""} ->
+        grants = socket.assigns.direct_grant_ids
+        denials = socket.assigns.direct_deny_ids
 
-      case {Enum.find(grants, &match?({_cap, ^grant_id}, &1)),
-            Enum.find(denials, &match?({_cap, ^grant_id}, &1))} do
-        {{cap, _id}, _} -> {:remove_grant, cap, grant_id}
-        {_, {cap, _id}} -> {:remove_denial, cap, grant_id}
-        _ -> nil
-      end
-    else
-      _ -> nil
+        case {Enum.find(grants, &match?({_cap, ^grant_id}, &1)),
+              Enum.find(denials, &match?({_cap, ^grant_id}, &1))} do
+          {{cap, _id}, _} -> {:remove_grant, cap, grant_id}
+          {_, {cap, _id}} -> {:remove_denial, cap, grant_id}
+          _ -> nil
+        end
+
+      _ ->
+        nil
     end
   end
 
