@@ -164,9 +164,10 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
   defp scope_kind(%{company_id: nil}), do: :warning
   defp scope_kind(_role), do: :success
 
-  # `Authz` widens this listing for the platform-operator scope to rows attached
-  # to no company (`Administration.company_visibility/2`). The caution names that
-  # widening where the list is read; it changes nothing about what is listed.
+  # The listed roles are the same for every scope, but `Authz` widens each row's
+  # Principals count for the platform-operator scope to assignments attached to
+  # no company (`Administration.company_visibility/2`). The caution names that
+  # widening where the counts are read; it changes nothing about what is counted.
   defp reach_caution?(socket) do
     Scope.platform_operator?(socket.assigns.current_scope.scope)
   end

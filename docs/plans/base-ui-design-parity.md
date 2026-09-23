@@ -897,8 +897,9 @@ checkbox and captions the table "(all tenants)" or "(current tenant)"
 (`AuditTenantScope::retentionCaption`), so a widened read is opt-in and named
 in a caption. Its roles list shows system roles to every tenant. Bilimbi's
 widening is different in kind: `Authz.Administration.company_visibility/2`
-adds company-less rows for the platform-operator scope on every listing, with
-no toggle, and the console reads without any tenant predicate at all.
+adds company-less rows for the platform-operator scope on the decision log and
+principal listings, and company-less assignments to the roles list's
+Principals counts, with no toggle, and the console reads without any tenant predicate at all.
 
 Shipped:
 
@@ -908,13 +909,16 @@ Shipped:
   SQL run here reads across every company and tenant in the database." It is
   the one prominent form, because a query there is unbounded; it is not a
   gate, and `Database.execute_readonly/3` is unchanged.
-- [x] The four widened listings — Roles, Decision Logs, Principal
-  Capabilities and Principal Roles — carry a one-line `text-warning-ink`
-  caption with the registry's `warning` glyph directly above the table,
-  "Beyond this tenant's companies: this list also includes … attached to no
-  company." A caption rather than a banner, following Belimbing's shape,
-  because the widening is a standing property of the rows. The listings'
-  queries are unchanged.
+- [x] The three widened listings — Decision Logs, Principal Capabilities and
+  Principal Roles — carry a one-line `text-warning-ink` caption with the
+  registry's `warning` glyph directly above the table, "Beyond this tenant's
+  companies: this list also includes … attached to no company." A caption
+  rather than a banner, following Belimbing's shape, because the widening is
+  a standing property of the rows. The listings' queries are unchanged.
+- [x] The Roles listing's rows are not widened — every scope sees the same
+  roles — but each row's Principals count is, so it carries the same caption
+  reading "Beyond this tenant's companies: the Principals counts also include
+  assignments attached to no company." Its query is unchanged.
 - [x] Both render only for a platform-operator scope. Coverage: each of the
   five surfaces asserts the caution, by id and warning token, for the
   operator scope, and each listing asserts its absence for a fully-capable

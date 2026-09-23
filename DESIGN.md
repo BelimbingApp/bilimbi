@@ -473,7 +473,9 @@ the query it runs, stating that SQL there reads across every company and
 tenant. The authorization listings, which the platform-operator scope widens to
 rows attached to no company, carry a one-line `text-warning-ink` caption with
 the registry's `warning` glyph directly above the table, because that widening
-is a standing property of the rows rather than an event. Neither is a gate:
+is a standing property of the rows rather than an event. The roles list is not
+widened, but its per-role Principals counts are, so it carries the same caption
+naming the counts rather than the rows. Neither is a gate:
 no confirmation, no extra click, and no change to what the surface returns. An
 ordinary scope never sees either caution, and a surface whose reach is
 filtered to one company carries none. Belimbing does not caution on these

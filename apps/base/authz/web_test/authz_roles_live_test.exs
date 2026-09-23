@@ -522,17 +522,17 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
   end
 
   describe "operator reach caution" do
-    # `Authz` widens this listing for the platform-operator scope to rows
-    # attached to no company. A caption above the table says so where the list
-    # is read, in the warning tokens, and only for that scope: an ordinary
-    # tenant never sees those rows, so it has nothing to be warned about.
-    test "warns the platform operator that the list reaches rows attached to no company", %{
+    # The roles listed are the same for every scope, but `Authz` widens each
+    # row's Principals count for the platform-operator scope to assignments
+    # attached to no company. A caption above the table says so, in the warning
+    # tokens, and only for that scope: an ordinary tenant's counts are filtered.
+    test "warns the platform operator that the principal counts reach assignments attached to no company", %{
       conn: conn
     } do
       grant_capabilities!("admin.authz.role.list")
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/roles")
 
-      assert has_element?(view, "#roles-reach-caution.text-warning-ink", "roles attached to no company")
+      assert has_element?(view, "#roles-reach-caution.text-warning-ink", "Principals counts also include assignments attached to no company")
     end
 
     test "says nothing to an ordinary tenant", %{conn: conn} do
