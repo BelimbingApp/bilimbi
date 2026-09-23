@@ -81,7 +81,7 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
         event: "updated",
         occurred_at: @occurred_at,
         old_values: %{"name" => "Acme Inc"},
-        new_values: %{"name" => "Acme Corp"},
+        new_values: %{"name" => "Acme Corp", "updated_at" => "2026-08-18T10:00:00"},
         trace_id: "trc123456"
       })
 
@@ -130,6 +130,19 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
 
     # And back again, from the same markup.
     assert client_text(unchanged.attributes, @utc_text, "company") == @company_text
+  end
+
+  test "a timestamp inside a diff follows the clock like the row's own time", %{
+    conn: conn,
+    mutation_id: mutation_id
+  } do
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
+
+    # The stored value is the UTC string capture wrote; the reader sees it in
+    # company time with the zone named, not the raw column.
+    assert has_element?(view, "time#mutation-#{mutation_id}-updated_at-new", @company_text)
+    refute has_element?(view, "#mutation-#{mutation_id}-updated_at-new", "2026-08-18T10:00:00")
+    assert has_element?(view, "span#mutation-#{mutation_id}-name-new", "Acme Corp")
   end
 
   test "an instant pinned to its own display context ignores the shell mode", %{

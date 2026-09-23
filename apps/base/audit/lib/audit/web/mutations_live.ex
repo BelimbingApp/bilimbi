@@ -11,6 +11,9 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Audit.Page
+  alias Bilimbi.Base.Audit.Web.MutationDiff
+
+  import MutationDiff, only: [diff_value: 1]
 
   @sortable ~w(occurred_at actor_type event auditable_type trace_id)
   @events ~w(created updated deleted)
@@ -219,64 +222,4 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
     |> String.split(["\\", "."])
     |> List.last()
   end
-
-  defp diffs(%{event: "created", new_values: new_vals}) when is_map(new_vals) do
-    Enum.map(new_vals, fn {k, v} ->
-      %{
-        field: to_string(k),
-        old: "—",
-        new: format_value(v),
-        sensitive: sensitive_key?(k)
-      }
-    end)
-  end
-
-  defp diffs(%{event: "deleted", old_values: old_vals}) when is_map(old_vals) do
-    Enum.map(old_vals, fn {k, v} ->
-      %{
-        field: to_string(k),
-        old: format_value(v),
-        new: "—",
-        sensitive: sensitive_key?(k)
-      }
-    end)
-  end
-
-  defp diffs(%{old_values: old_vals, new_values: new_vals}) do
-    old_map = old_vals || %{}
-    new_map = new_vals || %{}
-    all_keys = Enum.uniq(Map.keys(old_map) ++ Map.keys(new_map)) |> Enum.sort()
-
-    all_keys
-    |> Enum.filter(fn k -> Map.get(old_map, k) != Map.get(new_map, k) end)
-    |> Enum.map(fn k ->
-      %{
-        field: to_string(k),
-        old: format_value(Map.get(old_map, k)),
-        new: format_value(Map.get(new_map, k)),
-        sensitive: sensitive_key?(k)
-      }
-    end)
-  end
-
-  defp format_value(nil), do: "—"
-  defp format_value(val) when is_binary(val), do: val
-  defp format_value(val) when is_boolean(val), do: to_string(val)
-  defp format_value(val) when is_number(val), do: to_string(val)
-
-  defp format_value(val) when is_map(val) or is_list(val) do
-    case Jason.encode(val) do
-      {:ok, json} -> json
-      _ -> inspect(val)
-    end
-  end
-
-  defp format_value(val), do: inspect(val)
-
-  defp sensitive_key?(key) when is_binary(key) do
-    lower = String.downcase(key)
-    String.contains?(lower, ["password", "secret", "token", "key", "hash"])
-  end
-
-  defp sensitive_key?(key), do: sensitive_key?(to_string(key))
 end

@@ -1028,6 +1028,25 @@ defmodule BilimbiWeb.CompanyLiveTest do
       refute has_element?(view, "#company-addresses-panel th", "Actions")
     end
 
+    test "an in-place edit appears in the record history without a remount", %{conn: conn} do
+      grant_capabilities!([
+        "admin.company.list",
+        "admin.company.view",
+        "admin.company.update",
+        "admin.audit.log.list"
+      ])
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+      refute has_element?(view, "#company-record-history-panel", "Bilimbi Global")
+
+      render_hook(view, "save_field", %{"id" => "73", "name" => "Bilimbi Global"})
+      assert has_element?(view, "h1", "Bilimbi Global")
+
+      refute has_element?(view, "#company-record-history-empty")
+      assert has_element?(view, "#company-record-history-panel", "Updated")
+      assert has_element?(view, "#company-record-history-panel", "Bilimbi Global")
+    end
+
     test "edits the company facts in place and each reports its own outcome", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
       {:ok, scope} = Tenancy.scope(41)

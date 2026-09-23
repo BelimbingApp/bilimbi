@@ -625,8 +625,7 @@ defmodule BilimbiWeb.AddressLiveTest do
     render_hook(view, "save_field", %{"id" => to_string(address.id), "label" => "Headquarters"})
     assert has_element?(view, "#address-label-status[role='status']", "Saved")
 
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
-
+    # On the same view: the trail follows the edit without a remount.
     refute has_element?(view, "#address-record-history-empty")
     assert has_element?(view, "#address-record-history-panel", "Head Office")
     assert has_element?(view, "#address-record-history-panel", "Headquarters")

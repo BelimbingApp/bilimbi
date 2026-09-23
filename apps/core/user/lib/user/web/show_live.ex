@@ -1166,7 +1166,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 key="record.history"
                 id="user-record-history"
                 current_scope={@current_scope}
-                opts={%{auditable_types: user_auditable_types(), auditable_id: @user.id}}
+                opts={%{auditable_types: user_auditable_types(), auditable_id: @user.id, record: @user}}
               />
               <.action_link
                 :if={can_impersonate?(@current_scope, @user)}

@@ -438,6 +438,7 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                 opts={%{
                   auditable_types: address_auditable_types(),
                   auditable_id: @address.id,
+                  record: @address,
                   title: "History for address ##{@address.id}"
                 }}
               />

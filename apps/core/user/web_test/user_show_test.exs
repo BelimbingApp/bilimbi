@@ -227,6 +227,80 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(view, "#user-record-history-panel", "grace@example.com")
   end
 
+  test "an in-place name edit appears in the record history without a remount", %{conn: conn} do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    grant_capabilities!(["admin.user.view", "admin.user.update", "admin.audit.log.list"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+    assert has_element?(view, "#user-record-history-empty")
+
+    # The page's own Updated fact follows the write; the trail must too. A
+    # trail that stood still here was the loophole: the row was captured,
+    # and the panel never re-read it because the record's id had not changed.
+    render_hook(view, "save_field", %{"id" => "92", "name" => "Grace Brewster Hopper"})
+    assert has_element?(view, "h1", "Grace Brewster Hopper")
+
+    refute has_element?(view, "#user-record-history-empty")
+    assert has_element?(view, "#user-record-history-panel", "1 recent mutation")
+    assert has_element?(view, "#user-record-history-panel", "Updated")
+    assert has_element?(view, "#user-record-history-panel", "Grace Hopper")
+    assert has_element?(view, "#user-record-history-panel", "Grace Brewster Hopper")
+    assert has_element?(view, "#user-record-history-panel", "User #91")
+  end
+
+  test "opening the record history re-reads it and the open state is the server's", %{
+    conn: conn
+  } do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    grant_capabilities!(["admin.user.view", "admin.audit.log.list"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+    assert has_element?(view, "#user-record-history-empty")
+    refute has_element?(view, "#user-record-history details[open]")
+
+    # A write from elsewhere — another session, a job — lands after mount.
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    {:ok, mutation} =
+      Audit.record_mutation(scope, %{
+        company_id: 73,
+        actor_type: "user",
+        actor_id: 91,
+        auditable_type: User.notifiable_identity(),
+        auditable_id: "92",
+        subject_name: "Grace Hopper",
+        event: "updated",
+        occurred_at: ~N[2026-08-18 10:00:00],
+        old_values: %{"email" => "old@example.com"},
+        new_values: %{"email" => "grace@example.com"}
+      })
+
+    # Opening the panel shows the trail as of now, and the panel stays open
+    # across the patch that carries it.
+    view |> element("#user-record-history-toggle") |> render_click()
+    assert has_element?(view, "#user-record-history details[open]")
+    assert has_element?(view, "#user-record-history-entry-#{mutation.id}", "old@example.com")
+
+    view |> element("#user-record-history-toggle") |> render_click()
+    refute has_element?(view, "#user-record-history details[open]")
+  end
+
   test "hides the destructive action without admin.user.delete", %{conn: conn} do
     UserFixtures.insert_user!(%{id: 91, company_id: 73})
 
