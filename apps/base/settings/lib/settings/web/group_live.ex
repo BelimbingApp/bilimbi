@@ -62,11 +62,19 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
     submitted = Map.get(params, "settings", %{})
 
     case Form.save(submitted, socket.assigns.fields, scope(socket)) do
-      {:ok, outcome} ->
+      # The kind follows the outcome: a save that wrote or cleared nothing
+      # informs, one that changed storage confirms.
+      {:ok, %{written: [], cleared: []} = outcome} ->
         {:noreply,
          socket
          |> load_fields()
          |> put_flash(:info, saved_message(outcome))}
+
+      {:ok, outcome} ->
+        {:noreply,
+         socket
+         |> load_fields()
+         |> put_flash(:success, saved_message(outcome))}
 
       {:error, key, message} ->
         # Nothing was written -- Form.save/3 plans before it writes and rolls
