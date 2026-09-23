@@ -168,9 +168,8 @@
               <.button
                 :if={@can_manage and task.review_state != :enabled}
                 id={"#{task_dom_id(task)}-enable"}
-                phx-click="enable"
+                phx-click="request_enable"
                 phx-value-key={task.key}
-                data-confirm="Review this exact definition fingerprint and enable it?"
                 class="px-2 py-1 text-xs"
               >
                 Enable
@@ -178,9 +177,8 @@
               <.button
                 :if={@can_manage and task.review_state == :enabled and !task.suppressed?}
                 id={"#{task_dom_id(task)}-pause"}
-                phx-click="pause"
+                phx-click="request_pause"
                 phx-value-key={task.key}
-                data-confirm="Pause this task and cancel queued work before it starts?"
                 class="px-2 py-1 text-xs"
               >
                 Pause
@@ -190,7 +188,6 @@
                 id={"#{task_dom_id(task)}-resume"}
                 phx-click="resume"
                 phx-value-key={task.key}
-                data-confirm="Resume this task for future scheduler polls?"
                 class="px-2 py-1 text-xs"
               >
                 Resume
@@ -198,9 +195,8 @@
               <.button
                 :if={@can_manage and task.review_state == :enabled}
                 id={"#{task_dom_id(task)}-disable"}
-                phx-click="disable"
+                phx-click="request_disable"
                 phx-value-key={task.key}
-                data-confirm="Disable this exact definition fingerprint? Queued work will be cancelled before execution."
                 class="px-2 py-1 text-xs"
               >
                 Disable
@@ -370,5 +366,16 @@
         </p>
       </.card>
     </section>
+
+    <.confirm_dialog
+      :if={@pending_command}
+      id="schedule-command-confirm"
+      consequence={command_consequence(@pending_command)}
+      detail={command_detail(@pending_command)}
+      confirm={command_verb(@pending_command)}
+      working={command_working(@pending_command)}
+      on_confirm={JS.push(command_event(@pending_command))}
+      on_cancel={JS.push("cancel_command")}
+    />
   </.page>
 </Layouts.app>

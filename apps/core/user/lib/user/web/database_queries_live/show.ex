@@ -27,6 +27,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
      |> assign(:active_nav, "admin.system.database-query")
      |> assign(:reach_caution?, operator?(socket))
      |> assign(:is_new, false)
+     |> assign(:pending_delete?, false)
      |> assign(:query, nil)
      |> assign(:name, "Untitled Query")
      |> assign(:description, "")
@@ -252,32 +253,78 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   end
 
   @impl true
-  def handle_event("delete", _params, socket) do
-    if operator?(socket) and
-         allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
-      scope = socket.assigns.current_scope.scope
-      user_id = current_user_id(socket.assigns.current_scope)
+  # Deleting a saved query confirms through the shared dialog, which states
+  # what is lost; `delete` runs only once a request is held. Discarding an
+  # unsaved query loses nothing stored and needs no confirmation.
+  def handle_event("request_delete", _params, socket) do
+    cond do
+      not can_modify?(socket) ->
+        modify_forbidden(socket)
 
-      if socket.assigns.is_new || is_nil(socket.assigns.query) do
+      socket.assigns.is_new || is_nil(socket.assigns.query) ->
+        {:noreply, socket}
+
+      true ->
+        {:noreply, socket |> clear_flash() |> assign(:pending_delete?, true)}
+    end
+  end
+
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, :pending_delete?, false)}
+  end
+
+  def handle_event("delete", _params, socket) do
+    scope = socket.assigns.current_scope.scope
+    user_id = current_user_id(socket.assigns.current_scope)
+
+    cond do
+      not can_modify?(socket) ->
+        modify_forbidden(socket)
+
+      socket.assigns.is_new || is_nil(socket.assigns.query) ->
         {:noreply,
          socket
          |> put_flash(:info, "Query discarded.")
          |> push_navigate(to: ~p"/admin/system/database-queries")}
-      else
-        case User.delete_database_query(scope, user_id, socket.assigns.query.id) do
+
+      not socket.assigns.pending_delete? ->
+        {:noreply, socket}
+
+      true ->
+        query = socket.assigns.query
+        socket = assign(socket, :pending_delete?, false)
+
+        case User.delete_database_query(scope, user_id, query.id) do
           {:ok, _deleted} ->
             {:noreply,
              socket
-             |> put_flash(:info, "Query deleted.")
+             |> put_flash(:success, "Query “#{query.name}” was deleted.")
+             |> push_navigate(to: ~p"/admin/system/database-queries")}
+
+          {:error, :not_found} ->
+            {:noreply,
+             socket
+             |> put_flash(:error, "That query no longer exists.")
              |> push_navigate(to: ~p"/admin/system/database-queries")}
 
           {:error, _reason} ->
-            {:noreply, put_flash(socket, :error, "Could not delete query.")}
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "Query “#{query.name}” was not deleted. Reload the page and try again."
+             )}
         end
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You are not authorized to modify queries.")}
     end
+  end
+
+  defp can_modify?(socket) do
+    operator?(socket) and
+      allowed?(socket.assigns.current_scope, "admin.system.database-table.edit")
+  end
+
+  defp modify_forbidden(socket) do
+    {:noreply, put_flash(socket, :error, "You are not authorized to modify queries.")}
   end
 
   # #650: the whole console is operator-only. Mount gates it, and every write and

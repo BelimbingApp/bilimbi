@@ -237,6 +237,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> CommitStatus.init()
          |> assign(:editing_field, nil)
          |> assign(:editing_metadata?, false)
+         |> assign(:pending_activity, nil)
          |> assign(:metadata_input, format_metadata(company.metadata))
          |> refresh_show_table_pages()}
 
@@ -376,6 +377,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     edit_field
     save_choice
     add_activity
+    request_remove_activity
     remove_activity
     edit_metadata
     save_metadata
@@ -389,6 +391,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     else
       {:noreply, write_forbidden(socket)}
     end
+  end
+
+  def handle_event("cancel_remove_activity", _params, socket) do
+    {:noreply, assign(socket, :pending_activity, nil)}
   end
 
   def handle_event("cancel_edit_field", _params, socket) do
@@ -469,21 +475,31 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
 
   defp write_event("add_activity", _params, socket), do: {:noreply, socket}
 
-  defp write_event("remove_activity", %{"index" => index_param}, socket) do
+  # Removing an activity writes the company row at once, with no editor to
+  # cancel out of, so it confirms through the shared dialog: the request holds
+  # the activity the dialog names, and `remove_activity` drops that held value
+  # rather than a client-supplied index, so what was confirmed is what goes.
+  defp write_event("request_remove_activity", %{"index" => index_param}, socket) do
     current = socket.assigns.company.scope_activities || []
 
     case parse_index(index_param, length(current)) do
-      nil ->
-        {:noreply, socket}
-
-      index ->
-        {removed, remaining} = List.pop_at(current, index)
-        attrs = %{scope_activities: if(remaining == [], do: nil, else: remaining)}
-        {:noreply, save_fact(socket, "activities", attrs, removed)}
+      nil -> {:noreply, socket}
+      index -> {:noreply, assign(socket, :pending_activity, Enum.at(current, index))}
     end
   end
 
-  defp write_event("remove_activity", _params, socket), do: {:noreply, socket}
+  defp write_event("request_remove_activity", _params, socket), do: {:noreply, socket}
+
+  defp write_event("remove_activity", _params, %{assigns: %{pending_activity: nil}} = socket),
+    do: {:noreply, socket}
+
+  defp write_event("remove_activity", _params, socket) do
+    activity = socket.assigns.pending_activity
+    socket = assign(socket, :pending_activity, nil)
+    remaining = List.delete(socket.assigns.company.scope_activities || [], activity)
+    attrs = %{scope_activities: if(remaining == [], do: nil, else: remaining)}
+    {:noreply, save_fact(socket, "activities", attrs, activity)}
+  end
 
   # The metadata fact: a JSON document edited in a textarea with an explicit
   # Apply. A refusal keeps the editor open with what was typed, so the
@@ -1120,12 +1136,8 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                       context={:inline}
                       kind={:danger}
                       id={"remove-activity-#{idx}"}
-                      phx-click="remove_activity"
+                      phx-click="request_remove_activity"
                       phx-value-index={idx}
-                      data-confirm={
-                        "Remove the business activity #{activity}? " <>
-                          "The change is saved immediately."
-                      }
                     />
                   </span>
                 <% end %>
@@ -1541,6 +1553,17 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           opts={
             %{company_id: @company.id, table_state: @employees_table_state, page_sizes: @page_sizes}
           }
+        />
+
+        <.confirm_dialog
+          :if={@pending_activity}
+          id="remove-activity-confirm"
+          consequence={"Business activity “#{@pending_activity}” will be removed from this company."}
+          detail="The change is saved at once. The company's other activities are kept, and this one can be added again."
+          confirm="Remove"
+          working="Removing…"
+          on_confirm={JS.push("remove_activity")}
+          on_cancel={JS.push("cancel_remove_activity")}
         />
       </.page>
     </Layouts.app>

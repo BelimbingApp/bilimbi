@@ -638,7 +638,7 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
 - **Flash messages:** `put_flash` kinds are `:success`, `:info`, `:warning`,
   and `:error`. The layout's `flash_group` is the single stacked outlet:
   only success carries the eight-second timer, while info, warning and error
-  stay until dismissed. A delete confirmed through `<.confirm_dialog>` emits
+  stay until dismissed. An action confirmed through `<.confirm_dialog>` emits
   the success flash; the other completed writes still use info, which stays
   sticky because callers also use it for actionable failure notices, so
   nothing else times out until those call sites migrate.
@@ -658,8 +658,8 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   `<.confirm_dialog>`, never a native `data-confirm`: the caller holds the
   requested record in an assign, renders the dialog with `:if` while it is
   pending, acts on that held record from `on_confirm`, and stops rendering
-  it whatever the outcome (`DESIGN.md` "Confirmation dialogs"). The native
-  confirms that remain are pending conversion, not a second convention.
+  it whatever the outcome (`DESIGN.md` "Confirmation dialogs"). No
+  `data-confirm` remains in the product; a new one is a defect.
 - **Data tables & inline editing:** Tables use compact density (`py-0.5` row
   cells, `py-1.5` header cells, `px-2` cell horizontal padding,
   `bg-surface-sunken` header background, proper case

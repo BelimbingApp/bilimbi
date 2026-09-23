@@ -103,17 +103,23 @@
           Clearing a field removes this override, so the value returns to what it inherits.
         </p>
         <div class="flex gap-2">
-          <.button
-            id="settings-restore"
-            type="button"
-            phx-click="restore_defaults"
-            data-confirm="Remove every override shown on this page and fall back to inherited values?"
-          >
+          <.button id="settings-restore" type="button" phx-click="request_restore">
             Restore Defaults
           </.button>
           <.button id="settings-save" type="submit" variant="primary">Save</.button>
         </div>
       </div>
     </form>
+
+    <.confirm_dialog
+      :if={@pending_restore}
+      id="restore-defaults-confirm"
+      consequence={"#{count(@pending_restore, "override")} on this page will be removed."}
+      detail="Each of those settings returns to the value it inherits. This cannot be undone."
+      confirm="Restore"
+      working="Restoring…"
+      on_confirm={JS.push("restore_defaults")}
+      on_cancel={JS.push("cancel_restore")}
+    />
   </.page>
 </Layouts.app>

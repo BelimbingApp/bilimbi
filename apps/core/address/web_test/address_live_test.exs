@@ -103,15 +103,55 @@ defmodule BilimbiWeb.AddressLiveTest do
     assert has_element?(view, "th[aria-sort='ascending'] #addresses-sort-status")
     refute has_element?(view, "th[aria-sort='ascending'] #addresses-sort-label")
 
+    # Deleting confirms through the shared dialog, which names the address and
+    # says what cannot be undone; no native confirm remains. A linked address
+    # is refused after confirming: the dialog closes and the flash says where
+    # to unlink it.
+    refute has_element?(view, "#address-delete-#{hq.id}[data-confirm]")
     view |> element("#address-delete-#{hq.id}") |> render_click()
-    assert render(view) =~ "This address is linked. Unlink it before deleting it."
+
+    assert_modal_dialog(view, "delete-address-confirm", "“Head Office” will be deleted.")
+    assert has_element?(view, "dialog#delete-address-confirm[role='alertdialog']")
+
+    assert has_element?(
+             view,
+             "#delete-address-confirm-description",
+             "It can no longer be attached to a company or employee. This cannot be undone."
+           )
+
+    view |> element("#delete-address-confirm-confirm", "Delete") |> render_click()
+    refute has_element?(view, "#delete-address-confirm")
+
+    assert has_element?(
+             view,
+             "#flash-error",
+             "“Head Office” was not deleted: it is still attached to a company or employee. Unlink it there first."
+           )
+
     assert {:ok, _address} = Address.get_address(scope, hq.id)
 
     view
     |> element("#addresses-filters")
     |> render_change(%{"filters" => %{"search" => ""}})
 
+    # Cancelling keeps the address.
     view |> element("#address-delete-#{branch.id}") |> render_click()
+    view |> element("#delete-address-confirm-cancel", "Cancel") |> render_click()
+    refute has_element?(view, "#delete-address-confirm")
+    assert has_element?(view, "#address-#{branch.id}")
+
+    # Confirming deletes it and reports the completed write as a success.
+    view |> element("#address-delete-#{branch.id}") |> render_click()
+
+    assert has_element?(
+             view,
+             "#delete-address-confirm-confirm[phx-disable-with='Deleting…']",
+             "Delete"
+           )
+
+    view |> element("#delete-address-confirm-confirm") |> render_click()
+    refute has_element?(view, "#delete-address-confirm")
+    assert has_element?(view, "#flash-success", "Address deleted.")
     refute has_element?(view, "#address-#{branch.id}")
     assert {:error, :address_not_found} = Address.get_address(scope, branch.id)
   end

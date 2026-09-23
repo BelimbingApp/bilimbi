@@ -166,14 +166,47 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
     refute has_element?(view, "#employee-type-delete-#{type.id}[phx-disable-with]")
 
-    view
-    |> element("#employee-type-delete-#{type.id}")
-    |> render_click()
+    # Deleting confirms through the shared dialog, which leads with the
+    # consequence and says what cannot be undone; no native confirm remains.
+    refute has_element?(view, "#employee-type-delete-#{type.id}[data-confirm]")
+    view |> element("#employee-type-delete-#{type.id}") |> render_click()
+
+    assert_modal_dialog(
+      view,
+      "delete-employee-type-confirm",
+      "Employee type “Temporary” will be deleted."
+    )
+
+    assert has_element?(view, "dialog#delete-employee-type-confirm[role='alertdialog']")
+
+    assert has_element?(
+             view,
+             "#delete-employee-type-confirm-description",
+             "It can no longer be chosen for an employee. This cannot be undone."
+           )
+
+    # Cancelling keeps the type.
+    view |> element("#delete-employee-type-confirm-cancel", "Cancel") |> render_click()
+    refute has_element?(view, "#delete-employee-type-confirm")
+    assert has_element?(view, "#employee-types td", "Temporary")
+    assert {:ok, _} = Employee.get_employee_type(scope, 73, type.id)
+
+    # Confirming deletes it and reports the completed write as a success.
+    view |> element("#employee-type-delete-#{type.id}") |> render_click()
+
+    assert has_element?(
+             view,
+             "#delete-employee-type-confirm-confirm[phx-disable-with='Deleting…']",
+             "Delete"
+           )
+
+    view |> element("#delete-employee-type-confirm-confirm") |> render_click()
+    refute has_element?(view, "#delete-employee-type-confirm")
 
     render_async(view, 5_000)
 
     refute has_element?(view, "#employee-types td", "Temporary")
-    assert render(view) =~ "Employee type deleted."
+    assert has_element?(view, "#flash-success", "Employee type deleted.")
 
     assert {:error, :type_not_found} = Employee.get_employee_type(scope, 73, type.id)
   end
@@ -202,13 +235,17 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employee-types")
 
-    # The reply to the click is the in-flight render, read before the async
-    # delete can answer it: the clicked row's own control comes back busy
-    # rather than having its glyph replaced by text.
+    view |> element("#employee-type-delete-#{type.id}") |> render_click()
+
+    # The reply to the confirm is the in-flight render, read before the async
+    # delete can answer it: the dialog has closed and the row's own control
+    # comes back busy rather than having its glyph replaced by text.
     in_flight =
       view
-      |> element("#employee-type-delete-#{type.id}")
+      |> element("#delete-employee-type-confirm-confirm")
       |> render_click()
+
+    refute has_element?(view, "#delete-employee-type-confirm")
 
     busy =
       in_flight
@@ -240,20 +277,25 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
     # flight for the whole block. Neither click needs the database: the
     # capability check and the guard both read assigns.
     Bilimbi.Base.Repo.transaction(fn ->
-      view
-      |> element("#employee-type-delete-#{running.id}")
-      |> render_click()
+      view |> element("#employee-type-delete-#{running.id}") |> render_click()
+      view |> element("#delete-employee-type-confirm-confirm") |> render_click()
 
       # Only the deleting row's own control goes busy, so another row's
-      # confirmed delete still reaches the server. One delete runs at a time,
-      # and the operator is told this one was not served rather than left
-      # watching a row that never goes away.
+      # request still reaches the server. One delete runs at a time, and the
+      # operator is told this one was not served before any dialog opens,
+      # rather than confirming a delete that would be dropped.
       refused =
         view
         |> element("#employee-type-delete-#{other.id}")
         |> render_click()
 
       assert refused =~ "Another employee type is still being deleted."
+      refute has_element?(view, "#delete-employee-type-confirm")
+
+      # The deleting row's own control is busy and disabled; a forged repeat is
+      # the running request and needs nothing.
+      render_click(view, "request_delete", %{"id" => to_string(running.id)})
+      refute has_element?(view, "#delete-employee-type-confirm")
     end)
 
     render_async(view, 5_000)
@@ -263,9 +305,8 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     # The refusal was for that moment only: once nothing is in flight the same
     # row deletes.
-    view
-    |> element("#employee-type-delete-#{other.id}")
-    |> render_click()
+    view |> element("#employee-type-delete-#{other.id}") |> render_click()
+    view |> element("#delete-employee-type-confirm-confirm") |> render_click()
 
     render_async(view, 5_000)
 
@@ -316,9 +357,8 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     # Confirming the delete needs no database: the capability check and the
     # guard both read assigns.
-    view
-    |> element("#employee-type-delete-#{type.id}")
-    |> render_click()
+    view |> element("#employee-type-delete-#{type.id}") |> render_click()
+    view |> element("#delete-employee-type-confirm-confirm") |> render_click()
 
     # The patch a sort header pushes, driven while the delete is pinned.
     # `render_patch/2` parses no DOM, so the patch is two local message hops
@@ -527,6 +567,7 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
            )
 
     view |> element("#employee-type-delete-#{to_delete.id}") |> render_click()
+    view |> element("#delete-employee-type-confirm-confirm") |> render_click()
 
     render_async(view, 5_000)
 

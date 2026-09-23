@@ -62,6 +62,7 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
      |> assign(:index_state, %State{})
      |> assign(:sessions_page, empty_page())
      |> assign(:user_names, %{})
+     |> assign(:pending_terminate, nil)
      |> assign(:filters_form, to_form(filters_form_params(%State{}), as: :filters))}
   end
 
@@ -99,13 +100,55 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
     {:noreply, push_patch(socket, to: sessions_path(state))}
   end
 
+  # Terminating confirms through the shared dialog: the request holds the
+  # listed session whose consequence the dialog states, and `terminate` acts on
+  # that held session rather than on a client-supplied id, so what was
+  # confirmed is what ends. The caller's own session is refused before any
+  # dialog opens; its control is never rendered, so only a forged event gets
+  # here.
   @impl true
-  def handle_event("terminate", %{"id" => id}, socket) do
-    if can_manage?(socket) do
-      terminate_listed(socket, id)
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to terminate sessions.")}
+  def handle_event("request_terminate", %{"id" => id}, socket) do
+    cond do
+      not can_manage?(socket) ->
+        terminate_forbidden(socket)
+
+      id == socket.assigns.current_session_id ->
+        {:noreply, put_flash(socket, :error, "You cannot terminate your current session.")}
+
+      true ->
+        case Enum.find(socket.assigns.sessions_page.entries, &(&1.id == id)) do
+          nil ->
+            {:noreply, load_page(socket, socket.assigns.index_state)}
+
+          session ->
+            {:noreply, socket |> clear_flash() |> assign(:pending_terminate, session)}
+        end
     end
+  end
+
+  def handle_event("cancel_terminate", _params, socket) do
+    {:noreply, assign(socket, :pending_terminate, nil)}
+  end
+
+  def handle_event("terminate", _params, socket) do
+    cond do
+      not can_manage?(socket) ->
+        terminate_forbidden(socket)
+
+      is_nil(socket.assigns.pending_terminate) ->
+        {:noreply, socket}
+
+      true ->
+        session = socket.assigns.pending_terminate
+
+        socket
+        |> assign(:pending_terminate, nil)
+        |> terminate_listed(session.id)
+    end
+  end
+
+  defp terminate_forbidden(socket) do
+    {:noreply, put_flash(socket, :error, "You do not have permission to terminate sessions.")}
   end
 
   defp terminate_listed(socket, id) do
@@ -113,11 +156,14 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
       {:ok, :terminated} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Session terminated.")
+         |> put_flash(:success, "Session terminated.")
          |> load_page(socket.assigns.index_state)}
 
       {:ok, :not_found} ->
-        {:noreply, load_page(socket, socket.assigns.index_state)}
+        {:noreply,
+         socket
+         |> put_flash(:info, "That session had already ended.")
+         |> load_page(socket.assigns.index_state)}
 
       {:error, :current_session} ->
         {:noreply, put_flash(socket, :error, "You cannot terminate your current session.")}
@@ -306,6 +352,12 @@ defmodule Bilimbi.Base.Session.Web.IndexLive do
 
   defp maybe_put(params, _key, nil), do: params
   defp maybe_put(params, key, value), do: params ++ [{key, value}]
+
+  # The dialog names the session the way its row does, so the operator can
+  # match the two: who holds it and from where.
+  defp session_name(session, names) do
+    "The #{user_label(session, names)} session from #{session.ip_address || "an unknown address"}"
+  end
 
   defp user_label(%{user_id: nil}, _names), do: "Guest"
 

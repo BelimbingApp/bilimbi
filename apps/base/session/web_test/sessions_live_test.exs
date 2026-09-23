@@ -205,12 +205,49 @@ defmodule BilimbiWeb.SessionsLiveTest do
     assert has_element?(view, "#sessions-terminate-other-session")
     refute has_element?(view, "#sessions-terminate-#{current_id}")
 
-    render_click(view, "terminate", %{"id" => current_id})
+    # The caller's own session is refused before any dialog opens.
+    render_click(view, "request_terminate", %{"id" => current_id})
     assert has_element?(view, "#flash-error", "You cannot terminate your current session.")
+    refute has_element?(view, "#terminate-session-confirm")
 
+    # Terminating confirms through the shared dialog, which names the session
+    # the way its row does and says what happens to whoever holds it.
+    refute has_element?(view, "#sessions-terminate-other-session[data-confirm]")
     view |> element("#sessions-terminate-other-session") |> render_click()
 
-    assert has_element?(view, "#flash-info", "Session terminated.")
+    assert_modal_dialog(
+      view,
+      "terminate-session-confirm",
+      "session from 192.0.2.10 will be terminated."
+    )
+
+    assert has_element?(view, "dialog#terminate-session-confirm[role='alertdialog']")
+
+    assert has_element?(
+             view,
+             "#terminate-session-confirm-description",
+             "signed out on that device at once and must sign in again. This cannot be undone."
+           )
+
+    # Cancelling keeps the session.
+    view |> element("#terminate-session-confirm-cancel", "Cancel") |> render_click()
+    refute has_element?(view, "#terminate-session-confirm")
+    assert has_element?(view, "#sessions-terminate-other-session")
+    assert {:ok, _} = Session.fetch_session("other-session")
+
+    # Confirming ends it and reports the completed write as a success.
+    view |> element("#sessions-terminate-other-session") |> render_click()
+
+    assert has_element?(
+             view,
+             "#terminate-session-confirm-confirm[phx-disable-with='Terminating…']",
+             "Terminate"
+           )
+
+    view |> element("#terminate-session-confirm-confirm") |> render_click()
+    refute has_element?(view, "#terminate-session-confirm")
+
+    assert has_element?(view, "#flash-success", "Session terminated.")
     refute has_element?(view, "#sessions-terminate-other-session")
     assert {:error, :not_found} = Session.fetch_session("other-session")
     assert {:ok, _} = Session.fetch_session(current_id)

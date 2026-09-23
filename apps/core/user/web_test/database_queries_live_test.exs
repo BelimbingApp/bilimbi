@@ -144,10 +144,49 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       assert_redirect(view, ~p"/admin/system/database-queries/#{dup_slug}")
       assert {:ok, _dup} = User.get_database_query(scope, 91, dup_slug)
 
-      # Test delete
+      # Deleting confirms through the shared dialog, which names the query and
+      # says what is lost; no native confirm remains.
       {:ok, view2, _} = conn |> log_in_as() |> live(~p"/admin/system/database-queries")
+
+      # A confirm with nothing held is a stale click and deletes nothing.
       render_click(view2, "delete", %{"id" => to_string(q2.id)})
-      refute render(view2) =~ "Company Directory"
+      assert {:ok, _} = User.get_database_query(scope, 91, q2.slug)
+
+      refute has_element?(view2, "#delete-query-#{q2.id}[data-confirm]")
+      view2 |> element("#delete-query-#{q2.id}") |> render_click()
+
+      assert_modal_dialog(
+        view2,
+        "delete-query-confirm",
+        "Query “Company Directory” will be deleted."
+      )
+
+      assert has_element?(view2, "dialog#delete-query-confirm[role='alertdialog']")
+
+      assert has_element?(
+               view2,
+               "#delete-query-confirm-description",
+               "Its saved SQL and parameters are removed. This cannot be undone."
+             )
+
+      # Cancelling keeps the query.
+      view2 |> element("#delete-query-confirm-cancel", "Cancel") |> render_click()
+      refute has_element?(view2, "#delete-query-confirm")
+      assert render(view2) =~ "Company Directory"
+
+      # Confirming deletes it and reports the completed write as a success.
+      view2 |> element("#delete-query-#{q2.id}") |> render_click()
+
+      assert has_element?(
+               view2,
+               "#delete-query-confirm-confirm[phx-disable-with='Deleting…']",
+               "Delete"
+             )
+
+      view2 |> element("#delete-query-confirm-confirm") |> render_click()
+      refute has_element?(view2, "#delete-query-confirm")
+      assert has_element?(view2, "#flash-success", "Query “Company Directory” was deleted.")
+      refute has_element?(view2, "#database-queries-table", "Company Directory")
       assert {:error, :not_found} = User.get_database_query(scope, 91, q2.slug)
     end
   end
@@ -406,8 +445,34 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       {:ok, view, _html} =
         conn |> log_in_as() |> live(~p"/admin/system/database-queries/#{query.slug}")
 
+      # Deleting a saved query confirms through the shared dialog; cancelling
+      # keeps it on its page and confirming leaves for the list.
       assert has_element?(view, "#btn-delete-query")
+      refute has_element?(view, "#btn-delete-query[data-confirm]")
       view |> element("#btn-delete-query") |> render_click()
+
+      assert_modal_dialog(view, "delete-query-confirm", "Query “To Delete” will be deleted.")
+      assert has_element?(view, "dialog#delete-query-confirm[role='alertdialog']")
+
+      assert has_element?(
+               view,
+               "#delete-query-confirm-description",
+               "Its saved SQL and parameters are removed. This cannot be undone."
+             )
+
+      view |> element("#delete-query-confirm-cancel", "Cancel") |> render_click()
+      refute has_element?(view, "#delete-query-confirm")
+      assert {:ok, _} = User.get_database_query(scope, 91, query.slug)
+
+      view |> element("#btn-delete-query") |> render_click()
+
+      assert has_element?(
+               view,
+               "#delete-query-confirm-confirm[phx-disable-with='Deleting…']",
+               "Delete"
+             )
+
+      view |> element("#delete-query-confirm-confirm") |> render_click()
       assert_redirect(view, ~p"/admin/system/database-queries")
 
       assert {:error, :not_found} = User.get_database_query(scope, 91, query.slug)

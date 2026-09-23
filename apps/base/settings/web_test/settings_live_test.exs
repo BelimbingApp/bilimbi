@@ -233,21 +233,58 @@ defmodule BilimbiWeb.SettingsLiveTest do
     assert render(view) =~ "No changes to save."
   end
 
-  test "restore defaults clears overrides and reports what it did", %{conn: conn} do
+  test "restore defaults confirms the overrides it removes, then clears them", %{conn: conn} do
     assert {:ok, 45} = Settings.put(@retention, 45)
     {:ok, view, _html} = open(conn)
 
+    # Restoring confirms through the shared dialog, which counts the overrides
+    # it will remove and says what cannot be undone; no native confirm remains.
+    refute has_element?(view, "#settings-restore[data-confirm]")
     view |> element("#settings-restore") |> render_click()
 
+    assert_modal_dialog(
+      view,
+      "restore-defaults-confirm",
+      "1 override on this page will be removed."
+    )
+
+    assert has_element?(view, "dialog#restore-defaults-confirm[role='alertdialog']")
+
+    assert has_element?(
+             view,
+             "#restore-defaults-confirm-description",
+             "Each of those settings returns to the value it inherits. This cannot be undone."
+           )
+
+    # Cancelling keeps the override.
+    view |> element("#restore-defaults-confirm-cancel", "Cancel") |> render_click()
+    refute has_element?(view, "#restore-defaults-confirm")
+    assert Settings.overridden?(@retention)
+
+    # Confirming clears it and reports the completed write as a success.
+    view |> element("#settings-restore") |> render_click()
+
+    assert has_element?(
+             view,
+             "#restore-defaults-confirm-confirm[phx-disable-with='Restoring…']",
+             "Restore"
+           )
+
+    view |> element("#restore-defaults-confirm-confirm") |> render_click()
+    refute has_element?(view, "#restore-defaults-confirm")
+
     refute Settings.overridden?(@retention)
-    assert render(view) =~ "1 override cleared"
+    assert has_element?(view, "#flash-success", "1 override cleared")
   end
 
-  test "restore defaults with nothing overridden does not claim to have acted", %{conn: conn} do
+  test "restore defaults with nothing overridden does not ask or claim to have acted", %{
+    conn: conn
+  } do
     {:ok, view, _html} = open(conn)
 
     view |> element("#settings-restore") |> render_click()
 
+    refute has_element?(view, "#restore-defaults-confirm")
     assert render(view) =~ "already inherited"
   end
 

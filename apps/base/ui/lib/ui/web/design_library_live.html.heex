@@ -1203,7 +1203,7 @@
             </div>
             <div id="component-flash" class="space-y-3">
               <p class="text-sm text-ink-muted">
-                One message per severity. The layout's flash group is the single production outlet: it stacks messages in one column at the top right, most severe first, so several stay readable at once. Info, warning and error stay until dismissed, because a message someone must act on must not disappear on a timer. Only a success times out, after eight seconds: a confirmed delete reports one, while the other completed writes still report info and stay until dismissed. Success and info share one colour and differ by icon: most of the product's info messages still report a completed write, so the neutral colour cannot be applied until those callers move to success.
+                One message per severity. The layout's flash group is the single production outlet: it stacks messages in one column at the top right, most severe first, so several stay readable at once. Info, warning and error stay until dismissed, because a message someone must act on must not disappear on a timer. Only a success times out, after eight seconds: an action confirmed through the confirmation dialog reports one, while the other completed writes still report info and stay until dismissed. Success and info share one colour and differ by icon: most of the product's info messages still report a completed write, so the neutral colour cannot be applied until those callers move to success.
               </p>
               <div class="flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
                 <.flash

@@ -191,9 +191,8 @@
               title={gettext("Delete user")}
               kind={:danger}
               id={"user-#{user.id}-delete"}
-              phx-click="delete"
+              phx-click="request_delete"
               phx-value-id={user.id}
-              data-confirm="Are you sure you want to delete this user?"
             />
             <.icon_button
               :if={
@@ -225,5 +224,16 @@
         filters_form={@filters_form}
       />
     </.card>
+
+    <.confirm_dialog
+      :if={@pending_delete}
+      id="delete-user-confirm"
+      consequence={"#{@pending_delete.name}'s account will be deleted."}
+      detail="They can no longer sign in. This cannot be undone."
+      confirm="Delete"
+      working="Deleting…"
+      on_confirm={JS.push("delete")}
+      on_cancel={JS.push("cancel_delete")}
+    />
   </.page>
 </Layouts.app>

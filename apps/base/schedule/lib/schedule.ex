@@ -535,6 +535,7 @@ defmodule Bilimbi.Base.Schedule do
       owner_route: definition.owner_route,
       expression: definition.expression,
       timezone: definition.timezone,
+      fingerprint: fingerprint(definition),
       next_due_at: next_due_at(definition, now),
       review_state: review_state(definition, reviews),
       suppressed?: MapSet.member?(suppressions, definition.key),

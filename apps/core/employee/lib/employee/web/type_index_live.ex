@@ -50,6 +50,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
      |> assign(:active_nav, @active_nav)
      |> assign(:page_sizes, @page_sizes)
      |> assign(:deleting_type_id, nil)
+     |> assign(:pending_delete, nil)
      |> stream(:employee_types, [])}
   end
 
@@ -106,18 +107,55 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
   end
 
   @impl true
-  def handle_event("delete", %{"id" => id_str}, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.employee-type.delete") do
-      case Integer.parse(id_str) do
-        {type_id, ""} ->
-          request_delete(socket, type_id)
+  # Deleting confirms through the shared dialog: the request holds the listed
+  # type whose consequence the dialog states, and `delete` starts the async
+  # delete of that held type rather than of a client-supplied id, so what was
+  # confirmed is what runs. A request while another delete is still in flight
+  # is refused before any dialog opens, so nobody confirms a delete that would
+  # not be served.
+  def handle_event("request_delete", %{"id" => id_str}, socket) do
+    cond do
+      not allowed?(socket.assigns.current_scope, "admin.employee-type.delete") ->
+        delete_forbidden(socket)
 
-        _ ->
-          {:noreply, put_flash(socket, :error, "Could not delete employee type.")}
-      end
-    else
-      {:noreply,
-       put_flash(socket, :error, "You do not have permission to delete employee types.")}
+      type = find_listed(socket, id_str) ->
+        request_delete(socket, type)
+
+      true ->
+        {:noreply,
+         put_flash(socket, :error, "That employee type does not exist in this company.")}
+    end
+  end
+
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, :pending_delete, nil)}
+  end
+
+  def handle_event("delete", _params, socket) do
+    cond do
+      not allowed?(socket.assigns.current_scope, "admin.employee-type.delete") ->
+        delete_forbidden(socket)
+
+      is_nil(socket.assigns.pending_delete) ->
+        {:noreply, socket}
+
+      true ->
+        type = socket.assigns.pending_delete
+
+        socket
+        |> assign(:pending_delete, nil)
+        |> start_delete(type.id)
+    end
+  end
+
+  defp delete_forbidden(socket) do
+    {:noreply, put_flash(socket, :error, "You do not have permission to delete employee types.")}
+  end
+
+  defp find_listed(socket, id_str) do
+    case Integer.parse(id_str) do
+      {type_id, ""} -> Enum.find(socket.assigns.employee_types_page.entries, &(&1.id == type_id))
+      _ -> nil
     end
   end
 
@@ -126,7 +164,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
     socket =
       socket
       |> assign(:deleting_type_id, nil)
-      |> put_flash(:info, "Employee type deleted.")
+      |> put_flash(:success, "Employee type deleted.")
 
     load_page(socket, socket.assigns.index_state)
   end
@@ -156,14 +194,14 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
 
   # `start_async/3` is keyed by name, so one delete runs at a time. A repeat of
   # the row already deleting is the request that is already running and needs
-  # nothing; any other confirmed delete is refused out loud, because a
-  # destructive action the operator confirmed must never be dropped in silence.
-  defp request_delete(socket, type_id) do
+  # nothing; any other request is refused out loud rather than dropped in
+  # silence, and no dialog opens for a delete that would not be served.
+  defp request_delete(socket, type) do
     case socket.assigns.deleting_type_id do
       nil ->
-        start_delete(socket, type_id)
+        {:noreply, socket |> clear_flash() |> assign(:pending_delete, type)}
 
-      ^type_id ->
+      id when id == type.id ->
         {:noreply, socket}
 
       _another ->
@@ -488,10 +526,9 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
                   label={"Delete #{type.label}"}
                   kind={:danger}
                   id={"employee-type-delete-#{type.id}"}
-                  phx-click="delete"
+                  phx-click="request_delete"
                   phx-value-id={type.id}
                   busy={@deleting_type_id == type.id}
-                  data-confirm={"Are you sure you want to delete #{type.label}?"}
                 />
               </div>
               <%!-- The Kind column's System badge already says what this row
@@ -520,6 +557,17 @@ defmodule Bilimbi.Core.Employee.Web.TypeIndexLive do
             filters_form={@filters_form}
           />
         </.card>
+
+        <.confirm_dialog
+          :if={@pending_delete}
+          id="delete-employee-type-confirm"
+          consequence={"Employee type “#{@pending_delete.label}” will be deleted."}
+          detail="It can no longer be chosen for an employee. This cannot be undone."
+          confirm="Delete"
+          working="Deleting…"
+          on_confirm={JS.push("delete")}
+          on_cancel={JS.push("cancel_delete")}
+        />
       </.page>
     </Layouts.app>
     """

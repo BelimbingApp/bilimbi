@@ -158,13 +158,50 @@ defmodule BilimbiWeb.EmployeeShowTest do
     view |> element("#subordinates-table-sort-status") |> render_click()
     assert has_element?(view, "th[aria-sort='ascending'] #subordinates-table-sort-status")
 
-    # Removing is a demoted icon action that still asks first.
+    # Removing is a demoted icon action that confirms through the shared
+    # dialog, never natively.
     assert has_element?(
              view,
-             "button#remove-subordinate-#{report.id}[aria-label='Remove Sam Report as subordinate'][data-confirm] .hero-x-mark"
+             "button#remove-subordinate-#{report.id}[aria-label='Remove Sam Report as subordinate'] .hero-x-mark"
            )
 
+    refute has_element?(view, "#remove-subordinate-#{report.id}[data-confirm]")
     refute has_element?(view, "#remove-subordinate-#{report.id}", "Remove")
+
+    view |> element("#remove-subordinate-#{report.id}") |> render_click()
+
+    assert_modal_dialog(
+      view,
+      "remove-subordinate-confirm",
+      "Sam Report will no longer report to #{employee.full_name}."
+    )
+
+    assert has_element?(view, "dialog#remove-subordinate-confirm[role='alertdialog']")
+
+    assert has_element?(
+             view,
+             "#remove-subordinate-confirm-description",
+             "Both employee records are kept. The reporting line can be set again."
+           )
+
+    # Cancelling keeps the reporting line.
+    view |> element("#remove-subordinate-confirm-cancel", "Cancel") |> render_click()
+    refute has_element?(view, "#remove-subordinate-confirm")
+    assert has_element?(view, "#subordinate-link-#{report.id}")
+
+    # Confirming removes it and reports the completed write as a success.
+    view |> element("#remove-subordinate-#{report.id}") |> render_click()
+
+    assert has_element?(
+             view,
+             "#remove-subordinate-confirm-confirm[phx-disable-with='Removing…']",
+             "Remove"
+           )
+
+    view |> element("#remove-subordinate-confirm-confirm") |> render_click()
+    refute has_element?(view, "#remove-subordinate-confirm")
+    assert has_element?(view, "#flash-success", "Sam Report no longer reports to")
+    refute has_element?(view, "#subordinate-link-#{report.id}")
   end
 
   test "an agent has no linked-account row", %{conn: conn} do
@@ -624,7 +661,35 @@ defmodule BilimbiWeb.EmployeeShowTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
 
+    # Deleting confirms through the shared dialog, which names the employee
+    # and says what cannot be undone; no native confirm remains.
+    refute has_element?(view, "#employee-delete[data-confirm]")
     view |> element("#employee-delete") |> render_click()
+
+    assert_modal_dialog(view, "delete-employee-confirm", "John Doe will be deleted.")
+    assert has_element?(view, "dialog#delete-employee-confirm[role='alertdialog']")
+
+    assert has_element?(
+             view,
+             "#delete-employee-confirm-description",
+             "The employment record is removed and the person no longer appears in the directory. This cannot be undone."
+           )
+
+    # Cancelling keeps the employee on their page.
+    view |> element("#delete-employee-confirm-cancel", "Cancel") |> render_click()
+    refute has_element?(view, "#delete-employee-confirm")
+    assert has_element?(view, "#employee-delete")
+
+    # Confirming deletes and leaves for the directory.
+    view |> element("#employee-delete") |> render_click()
+
+    assert has_element?(
+             view,
+             "#delete-employee-confirm-confirm[phx-disable-with='Deleting…']",
+             "Delete"
+           )
+
+    view |> element("#delete-employee-confirm-confirm") |> render_click()
 
     {path, _flash} = assert_redirect(view)
     assert path == "/employees"
@@ -640,9 +705,13 @@ defmodule BilimbiWeb.EmployeeShowTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{orchestrator.id}")
 
+    # The refusal is met after confirming: the dialog closes and the flash
+    # says why nothing was deleted.
     view |> element("#employee-delete") |> render_click()
+    view |> element("#delete-employee-confirm-confirm") |> render_click()
 
-    assert has_element?(view, "#flash-group", "The platform orchestrator cannot be deleted.")
+    refute has_element?(view, "#delete-employee-confirm")
+    assert has_element?(view, "#flash-error", "the platform orchestrator cannot be deleted.")
     {:ok, scope} = Tenancy.scope(41)
     assert {:ok, _} = Employee.get_employee(scope, 73, orchestrator.id)
   end

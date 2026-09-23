@@ -130,9 +130,44 @@ defmodule BilimbiWeb.UserLiveTest do
     assert has_element?(view, "#user-93-delete[disabled]")
     assert has_element?(view, "#user-92-delete")
 
+    # The signed-in account is refused before any dialog opens, even from a
+    # forged event; its control is disabled.
+    render_click(view, "request_delete", %{"id" => "91"})
+    refute has_element?(view, "#delete-user-confirm")
+    assert has_element?(view, "#flash-error", "You cannot delete your own account.")
+
+    # Deleting confirms through the shared dialog, which names the account and
+    # says what cannot be undone; no native confirm remains.
+    refute has_element?(view, "#user-92-delete[data-confirm]")
     view |> element("#user-92-delete") |> render_click()
+
+    assert_modal_dialog(view, "delete-user-confirm", "Managed User's account will be deleted.")
+    assert has_element?(view, "dialog#delete-user-confirm[role='alertdialog']")
+
+    assert has_element?(
+             view,
+             "#delete-user-confirm-description",
+             "They can no longer sign in. This cannot be undone."
+           )
+
+    # Cancelling keeps the account.
+    view |> element("#delete-user-confirm-cancel", "Cancel") |> render_click()
+    refute has_element?(view, "#delete-user-confirm")
+    assert has_element?(view, "#user-92")
+
+    # Confirming deletes and reports the completed write as a success.
+    view |> element("#user-92-delete") |> render_click()
+
+    assert has_element?(
+             view,
+             "#delete-user-confirm-confirm[phx-disable-with='Deleting…']",
+             "Delete"
+           )
+
+    view |> element("#delete-user-confirm-confirm") |> render_click()
+    refute has_element?(view, "#delete-user-confirm")
     refute has_element?(view, "#user-92")
-    assert render(view) =~ "User deleted successfully."
+    assert has_element?(view, "#flash-success", "Managed User's account was deleted.")
   end
 
   test "preserves PostgreSQL LIKE contains, case, wildcard, and PHP-falsey search behavior", %{
