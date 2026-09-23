@@ -21,8 +21,8 @@ defmodule BilimbiWeb.AuditCaptureSessionTest do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Audit.MutationSchema
-  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Tenancy
