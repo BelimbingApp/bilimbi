@@ -93,13 +93,29 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
   # form resolves each field at the nearest scope its definition allows.
   defp scope(_socket), do: nil
 
+  # A field the actor may not see is withheld here, not by the form, so the
+  # page also knows what it withheld. A group left empty by that filter is
+  # otherwise indistinguishable from one no module contributes to, and the
+  # empty state would blame the modules for what is really a permission.
   defp load_fields(socket) do
-    fields =
+    {fields, withheld} =
       socket.assigns.page.groups
       |> Form.fields(scope(socket))
-      |> Enum.filter(&authorized_field?(socket.assigns.current_scope, &1))
+      |> Enum.split_with(&authorized_field?(socket.assigns.current_scope, &1))
 
-    assign(socket, :fields, fields)
+    socket
+    |> assign(:fields, fields)
+    |> assign(:withheld_capabilities, withheld_capabilities(withheld))
+  end
+
+  # Per group, the capabilities the withheld fields require, in the key form
+  # the Roles and Capabilities pages already use to name them.
+  defp withheld_capabilities(withheld) do
+    withheld
+    |> Enum.group_by(& &1.definition.editable, & &1.definition.capability)
+    |> Map.new(fn {group, capabilities} ->
+      {group, capabilities |> Enum.uniq() |> Enum.sort()}
+    end)
   end
 
   defp authorized_field?(_current_scope, %{definition: %{capability: nil}}), do: true
@@ -110,6 +126,20 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
 
   defp fields_in(fields, group) do
     Enum.filter(fields, &(&1.definition.editable == group))
+  end
+
+  defp withheld_in(withheld_capabilities, group), do: Map.get(withheld_capabilities, group, [])
+
+  # The action `<.empty_state forbidden>` completes into "You do not have
+  # permission to ...". Every setting in the group needs exactly one
+  # capability, so the sentence names each one the actor lacks.
+  defp withheld_wording([capability]),
+    do: "see the settings in this group, each of which needs #{capability}"
+
+  defp withheld_wording(capabilities) do
+    {rest, [last]} = Enum.split(capabilities, -1)
+
+    "see the settings in this group, each of which needs one of #{Enum.join(rest, ", ")} or #{last}"
   end
 
   defp label_for(socket, key) do
@@ -134,7 +164,9 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
     |> Kernel.<>(".")
   end
 
-  defp restored_message([]), do: "Nothing to restore; every setting is already inherited."
+  # "Shown", not "every setting": restore only reaches the fields this account
+  # may see, and a withheld field may still hold an override.
+  defp restored_message([]), do: "Nothing to restore; every setting shown is already inherited."
 
   defp restored_message(cleared),
     do: "#{count(cleared, "override")} cleared. Values now come from their defaults."
