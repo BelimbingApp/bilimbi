@@ -75,9 +75,11 @@ and with a silent-falsehood failure mode.
   values; only `update_all` needs anything extra, one `SELECT` of the
   originals before the statement. The caller's result is preserved exactly
   — the added `select` and `returning: true` never reach them. Capture
-  writes **one** `insert_all` per bulk statement, never one insert per row:
-  a row-at-a-time capture measured about 33x worse on a large batch,
-  because the cost is an Elixir round trip, not database work. `insert_all`
+  writes one `insert_all` per 1,000 affected rows, never one insert per
+  row: a row-at-a-time capture measured about 33x worse on a large batch,
+  because the cost is an Elixir round trip, not database work, and the
+  chunk keeps each statement below PostgreSQL's 65,535 bind-parameter
+  ceiling, so a large bulk write is never left unaudited. `insert_all`
   dumps but does not cast, so each row is shaped by the same
   `MutationSchema.changeset/2` the struct path uses and applied before
   batching, which is what casts `ip_address`.
