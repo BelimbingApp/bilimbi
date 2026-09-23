@@ -105,6 +105,22 @@ defmodule BilimbiWeb.SettingsLiveTest do
     refute has_element?(view, "#settings-group-operator-withheld", "one of")
   end
 
+  test "a group withheld by one capability names it alone", %{conn: conn} do
+    only_operator_settings_needing!("admin.system.perf.manage")
+    grant_capabilities!("base.settings.global.manage")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/settings")
+
+    assert has_element?(
+             view,
+             "#settings-group-operator-withheld",
+             "You do not have permission to see the settings in this group, each of which " <>
+               "needs admin.system.perf.manage."
+           )
+
+    refute has_element?(view, "#settings-group-operator-withheld", "its own permission")
+    refute has_element?(view, "#settings-group-operator-withheld", "one of")
+  end
+
   test "requires authentication", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/system/settings")
   end
@@ -243,6 +259,21 @@ defmodule BilimbiWeb.SettingsLiveTest do
     |> Enum.filter(&(&1.editable == "operator"))
     |> Enum.map(& &1.capability)
     |> Enum.uniq()
+  end
+
+  # The installed snapshot keeping only the operator settings gated by
+  # `capability`, restored on exit.
+  defp only_operator_settings_needing!(capability) do
+    installed = ContributionRegistry.snapshot!()
+    on_exit(fn -> ContributionRegistry.put_snapshot_for_test!(installed) end)
+
+    ContributionRegistry.put_snapshot_for_test!(
+      update_in(installed, [:consumers, :settings, :definitions], fn definitions ->
+        Map.reject(definitions, fn {_key, definition} ->
+          definition.editable == "operator" and definition.capability != capability
+        end)
+      end)
+    )
   end
 
   # The installed snapshot minus every setting editable in the operator group,

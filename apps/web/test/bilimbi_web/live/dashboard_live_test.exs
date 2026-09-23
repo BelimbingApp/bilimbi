@@ -271,6 +271,24 @@ defmodule BilimbiWeb.DashboardLiveTest do
       refute has_element?(view, "#dashboard-widgets-withheld", "one of")
     end
 
+    test "a grid withheld by one capability names it alone", %{conn: conn} do
+      with_dashboard_catalogue!(
+        Enum.filter(gated_catalogue(), &(&1.capability == "admin.audit.log.list"))
+      )
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(
+               view,
+               "#dashboard-widgets-withheld",
+               "You do not have permission to see the dashboard widgets, each of which " <>
+                 "needs admin.audit.log.list."
+             )
+
+      refute has_element?(view, "#dashboard-widgets-withheld", "its own permission")
+      refute has_element?(view, "#dashboard-widgets-withheld", "one of")
+    end
+
     test "a catalogue nothing contributes to says so, not that it is out of reach",
          %{conn: conn} do
       with_dashboard_catalogue!([])
