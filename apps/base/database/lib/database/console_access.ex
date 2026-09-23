@@ -222,10 +222,10 @@ defmodule Bilimbi.Base.Database.ConsoleAccess do
   # so a contract module may not be loaded yet; `function_exported?/3` alone
   # would then report no secrets and grant every column.
   defp declared_secrets(contracts) do
-    Enum.reduce(contracts, %{}, fn contract, secrets ->
-      if Code.ensure_loaded?(contract) and function_exported?(contract, :secret_columns, 0),
-        do: Map.merge(secrets, contract.secret_columns(), fn _table, a, b -> a ++ b end),
-        else: secrets
+    contracts
+    |> Enum.filter(&(Code.ensure_loaded?(&1) and function_exported?(&1, :secret_columns, 0)))
+    |> Enum.reduce(%{}, fn contract, secrets ->
+      Map.merge(secrets, contract.secret_columns(), fn _table, a, b -> a ++ b end)
     end)
   end
 

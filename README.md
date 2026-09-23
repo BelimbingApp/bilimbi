@@ -71,9 +71,10 @@ mix bilimbi.server
 Open [http://localhost:4000](http://localhost:4000).
 
 `mix setup` creates the database, runs the Base and Core compatibility
-migrations, grants the console role its reads, and builds the web assets. The baseline creates no tenant or
-company rows; platform-operator and primary-company provisioning are explicit
-setup steps and numeric IDs carry no runtime meaning.
+migrations, grants the console role its reads, and builds the web assets. The
+baseline creates no tenant or company rows; platform-operator and
+primary-company provisioning are explicit setup steps and numeric IDs carry no
+runtime meaning.
 
 To use an existing Belimbing database, configure its connection and adopt it
 instead of running fresh creation migrations:
