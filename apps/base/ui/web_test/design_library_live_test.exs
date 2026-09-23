@@ -278,7 +278,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
 
     assert has_element?(view, "#filter-toolbar-full label.sr-only", "Search example companies")
     assert has_element?(view, "#filter-toolbar-full label.sr-only", "Status filter")
-    assert has_element?(view, "#filter-toolbar-full label.sr-only", "Start date (UTC)")
+    assert has_element?(view, "#filter-toolbar-full label.sr-only", "Start date")
     assert has_element?(view, "#filter-toolbar-full .hero-magnifying-glass")
     assert has_element?(view, "#design-library-filter-full-start-date + p", "UTC")
 

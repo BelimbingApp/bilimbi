@@ -5,6 +5,19 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   Definitions remain immutable contributor facts. This adapter filters and
   paginates through the Schedule API, re-authorizes every command, and polls
   bounded operational evidence without treating absence as proof of health.
+
+  ## History days follow the Started column
+
+  The history date filters select calendar days in the zone the Started column
+  is displayed in, so a row that reads 21/08 is selected by a start date of
+  21/08. That zone is read from the same per-process display context
+  `<.datetime>` renders from: the company zone in company mode, UTC in UTC
+  mode, and in local mode the zone the browser reports through the
+  `BrowserTimeZone` hook — the server cannot know it otherwise, so until the
+  report arrives, or when the name is not in the server's time zone database,
+  the filters bound UTC, which is the text the server rendered itself. The
+  zone the current results were bounded in is named under the controls, and a
+  saved clock change reloads the results so the two never drift apart.
   """
 
   use Bilimbi.Base.UI, :live_view
@@ -14,10 +27,13 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   alias Bilimbi.Base.Schedule
   alias Bilimbi.Base.Schedule.RunPage
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.UI.DateTimeDisplay
 
   @execute "admin.system.schedule.execute"
   @manage "admin.system.schedule.manage"
   @poll_interval 5_000
+  @utc "UTC"
+  @tz_db TimeZoneInfo.TimeZoneDatabase
   @tabs ~w(tasks history settings)
   @task_statuses ~w(disabled failed never paused running skipped succeeded unreviewed)
   @run_statuses ~w(failed running skipped succeeded)
@@ -39,10 +55,26 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
       |> assign(:retention_days, retention_days())
       |> assign(:retention_form, retention_form(retention_days()))
       |> assign(:run_page, empty_run_page())
+      |> assign(:browser_timezone, nil)
       |> stream_configure(:tasks, dom_id: &task_dom_id/1)
       |> stream_configure(:runs, dom_id: &run_dom_id/1)
       |> stream(:tasks, [])
       |> stream(:runs, [])
+
+    socket = assign(socket, :run_zone, display_timezone(socket))
+
+    # A saved clock change is handled by the shell's own hook, which halts the
+    # event before it reaches this view, so the change is noticed here: once
+    # the results on screen were bounded in a zone other than the one the
+    # Started column now displays, they are reloaded in the displayed zone.
+    socket =
+      attach_hook(socket, :history_display_zone, :after_render, fn socket ->
+        if match?(%{tab: "history"}, socket.assigns[:state]) and
+             socket.assigns.run_zone != display_timezone(socket),
+           do: send(self(), :refresh)
+
+        socket
+      end)
 
     if connected?(socket), do: Process.send_after(self(), :poll, @poll_interval)
     {:ok, socket}
@@ -81,6 +113,22 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   end
 
   def handle_event("filter_runs", _params, socket), do: {:noreply, socket}
+
+  # The browser's own zone, which only it knows, is the one the Started column
+  # is displayed in under local mode. It is kept off the URL: a bookmark then
+  # means the same displayed days for whoever opens it, wherever they are.
+  def handle_event("browser_timezone", %{"timezone" => timezone}, socket) do
+    socket = assign(socket, :browser_timezone, known_timezone(timezone))
+
+    if match?(%{tab: "history"}, socket.assigns[:state]) and
+         socket.assigns.run_zone != display_timezone(socket) do
+      {:noreply, load(socket, socket.assigns.state)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("browser_timezone", _params, socket), do: {:noreply, socket}
 
   def handle_event("sort_tasks", %{"sort" => column}, socket) when column in @task_sortable do
     state = socket.assigns.state
@@ -256,11 +304,15 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   end
 
   defp load_runs(socket, state) do
+    run_zone = display_timezone(socket)
+    socket = assign(socket, :run_zone, run_zone)
+
     options = [
       search: state.run_search,
       status: nilify(state.run_status),
       start_date: state.start_date,
       end_date: state.end_date,
+      timezone: run_zone,
       sort_by: state.run_sort_by,
       sort_dir: state.run_sort_dir,
       page: state.page,
@@ -288,6 +340,27 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
         |> stream(:runs, [], reset: true)
     end
   end
+
+  # The zone the Started column displays in, read from the same context
+  # `<.datetime>` renders from so the two cannot disagree. Nothing stored is
+  # local, as it is for the component.
+  defp display_timezone(socket) do
+    case DateTimeDisplay.get() do
+      %{mode: :company, timezone: timezone} when is_binary(timezone) -> timezone
+      %{mode: :utc} -> @utc
+      _local -> socket.assigns.browser_timezone || @utc
+    end
+  end
+
+  # A reported zone bounds a query only once the real database knows it.
+  defp known_timezone(timezone) when is_binary(timezone) and byte_size(timezone) <= 64 do
+    case DateTime.now(timezone, @tz_db) do
+      {:ok, _now} -> timezone
+      {:error, _reason} -> nil
+    end
+  end
+
+  defp known_timezone(_timezone), do: nil
 
   defp retention_days do
     case Settings.get("schedule.history.keep_days") do
