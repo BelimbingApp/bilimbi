@@ -390,8 +390,8 @@ address — confirms through `<.confirm_dialog>`, a `<.modal>` specialised for
 one answer, never through the browser's own `data-confirm` dialog, which
 cannot say what the consequence is, cannot be styled and reads as a browser
 alert rather than part of the product. Belimbing's confirmation shows the
-shape to keep — a short dialog, consequence copy, a cancel that names keeping
-the record beside the destructive verb — and the gaps to close: it moved no
+shape to keep — a short dialog, consequence copy, a cancel beside the
+destructive verb — and the gaps to close: it moved no
 focus, ignored Escape and painted its Delete solid red.
 
 - **Consequence first:** the dialog's title is one sentence saying what will
