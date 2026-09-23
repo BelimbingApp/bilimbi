@@ -286,9 +286,10 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
     end
   end
 
-  # A command confirmed through the dialog reports its completed write as a
-  # success, so the flash timer runs; the one-click commands stay info.
-  defp command(socket, capability, operation, success_message, kind \\ :info) do
+  # Every command through here reports a completed write, so each one flashes
+  # success and the flash timer runs. The confirmed commands pass `:success`
+  # explicitly; the one-click commands take the default.
+  defp command(socket, capability, operation, success_message, kind \\ :success) do
     if authorized?(socket, capability) do
       case operation.(socket.assigns.current_scope.actor) do
         :ok ->

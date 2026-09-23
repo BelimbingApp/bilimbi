@@ -78,7 +78,7 @@ defmodule Bilimbi.Base.Tenancy.Web.TenantsLive do
          socket
          |> assign(:show_create, false)
          |> assign_form(create_changeset(%{}))
-         |> put_flash(:info, "Tenant created.")
+         |> put_flash(:success, "Tenant created.")
          |> refresh_tenants()}
 
       {:error, %Changeset{} = domain_changeset} ->

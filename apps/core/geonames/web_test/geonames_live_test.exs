@@ -417,14 +417,14 @@ defmodule BilimbiWeb.GeonamesLiveTest do
       "place_name" => "Kuala Lumpur City"
     })
 
-    assert has_element?(postcodes, "#flash-info", "Postcode 50000 updated.")
+    assert has_element?(postcodes, "#flash-success", "Postcode 50000 updated.")
 
     postcodes |> element("#postcodes-new") |> render_click()
     assert_modal_dialog(postcodes, "postcode-modal", "New Postcode")
 
     refute has_element?(postcodes, "dialog#postcode-modal #postcode-modal-flash-info")
     refute has_element?(postcodes, "dialog#postcode-modal #postcode-modal-flash-error")
-    refute has_element?(postcodes, "#flash-info")
+    refute has_element?(postcodes, "#flash-success")
   end
 
   test "forged postcode writes fail closed without the update capability", %{conn: conn} do
@@ -562,13 +562,13 @@ defmodule BilimbiWeb.GeonamesLiveTest do
                  update_socket()
                )
 
-      socket.assigns.flash["info"]
+      socket.assigns.flash
     end
 
     test "a fallback says the update did not happen and dates the data" do
       cached_at = DateTime.new!(~D[2026-03-04], ~T[09:00:00], "Etc/UTC")
 
-      message =
+      flash =
         flash_for(%{
           cached: true,
           download_status: {:fallback, :unreachable},
@@ -578,14 +578,18 @@ defmodule BilimbiWeb.GeonamesLiveTest do
         })
 
       # The whole point: an operator whose network died must not be told their
-      # country data is current (#273).
+      # country data is current (#273). A fallback warns; it never reads as
+      # confirmation.
+      message = flash["warning"]
       assert message =~ "were not updated"
       assert message =~ "04 Mar 2026"
       refute message =~ "Countries updated"
+      refute flash["success"]
+      refute flash["info"]
     end
 
     test "a server error names the server, not the network" do
-      message =
+      flash =
         flash_for(%{
           cached: true,
           download_status: {:fallback, {:http_status, 503}},
@@ -596,27 +600,28 @@ defmodule BilimbiWeb.GeonamesLiveTest do
 
       # Telling someone to check their firewall when GeoNames is simply down
       # costs them an afternoon.
+      message = flash["warning"]
       assert message =~ "GeoNames returned an error (HTTP 503)"
       refute message =~ "could not be reached"
       refute message =~ "Countries updated"
     end
 
     test "a 304 still reads as an update, because it is one" do
-      message =
+      flash =
         flash_for(%{cached: true, download_status: 304, imported: 252, skipped: 50})
 
-      assert message =~ "Countries updated from the current local GeoNames download"
+      assert flash["success"] =~ "Countries updated from the current local GeoNames download"
     end
 
     test "a fresh download reads as an update" do
-      message =
+      flash =
         flash_for(%{cached: false, download_status: 200, imported: 252, skipped: 50})
 
-      assert message =~ "Countries updated from a fresh GeoNames download"
+      assert flash["success"] =~ "Countries updated from a fresh GeoNames download"
     end
 
     test "a fallback with no readable timestamp still refuses to claim an update" do
-      message =
+      flash =
         flash_for(%{
           cached: true,
           download_status: {:fallback, :unreachable},
@@ -625,6 +630,7 @@ defmodule BilimbiWeb.GeonamesLiveTest do
           skipped: 0
         })
 
+      message = flash["warning"]
       assert message =~ "were not updated"
       refute message =~ "Countries updated"
     end

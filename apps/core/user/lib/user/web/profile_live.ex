@@ -140,7 +140,7 @@ defmodule Bilimbi.Core.User.Web.ProfileLive do
     case Settings.Form.save(submitted, fields, scope) do
       {:ok, _outcome} ->
         socket
-        |> put_flash(:info, saved_message(attributes))
+        |> put_flash(:success, saved_message(attributes))
         |> load_form()
 
       {:error, _key, message} ->

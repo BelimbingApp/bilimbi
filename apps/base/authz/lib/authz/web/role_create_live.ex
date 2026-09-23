@@ -115,7 +115,7 @@ defmodule Bilimbi.Base.Authz.Web.RoleCreateLive do
   # created either way, so no business meaning changes.
   defp after_create(socket, role) do
     scope = socket.assigns.current_scope
-    socket = put_flash(socket, :info, "Role created.")
+    socket = put_flash(socket, :success, "Role created.")
 
     cond do
       allowed?(scope, "admin.authz.role.view") ->

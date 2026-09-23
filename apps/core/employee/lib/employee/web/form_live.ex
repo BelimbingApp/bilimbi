@@ -257,7 +257,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
 
         {:noreply,
          socket
-         |> put_flash(:info, "#{employee.full_name} was created.")
+         |> put_flash(:success, "#{employee.full_name} was created.")
          |> flash_rejected_link(link_result)
          |> push_navigate(to: ~p"/employees/#{employee.id}")}
 
@@ -276,7 +276,7 @@ defmodule Bilimbi.Core.Employee.Web.FormLive do
 
         {:noreply,
          socket
-         |> put_flash(:info, "#{updated.full_name} was updated.")
+         |> put_flash(:success, "#{updated.full_name} was updated.")
          |> flash_rejected_link(link_result)
          |> push_navigate(to: ~p"/employees/#{updated.id}")}
 

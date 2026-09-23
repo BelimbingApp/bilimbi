@@ -460,7 +460,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
         {:noreply,
          socket
          |> close_postcode_modal()
-         |> put_flash(:info, message)
+         |> put_flash(:success, message)
          |> load_page(socket.assigns.index_state)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
@@ -492,7 +492,7 @@ defmodule Bilimbi.Core.Geonames.Web.PostcodesLive do
        socket
        |> assign(:postcode_rows, Map.put(socket.assigns.postcode_rows, postcode.id, postcode))
        |> stream_insert(:postcodes, postcode)
-       |> put_flash(:info, "Postcode #{postcode.postcode} updated.")}
+       |> put_flash(:success, "Postcode #{postcode.postcode} updated.")}
     else
       {:error, %Ecto.Changeset{}} ->
         write_failed(socket)

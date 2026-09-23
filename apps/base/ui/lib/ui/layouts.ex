@@ -540,9 +540,8 @@ defmodule Bilimbi.Base.UI.Layouts do
   the eight-second timer, while `:info`, `:warning` and `:error` stay until
   the person dismisses them, because a message someone must act on must not
   disappear on a timer. An action confirmed through `<.confirm_dialog>` emits a
-  `:success` flash; the other completed writes still emit `:info`, which stays
-  sticky while callers also use it for actionable failure notices, so nothing
-  else times out until those call sites move to `:success`. The reconnect
+  `:success` flash; completed writes emit `:success`, while `:info` stays
+  sticky for notices that inform without confirming a write. The reconnect
   notices are errors and keep that rule.
 
   The group is a permanent polite live region, so a message inserted into it

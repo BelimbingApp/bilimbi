@@ -71,7 +71,7 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
          {:ok, _} <- Company.assign_primary_company(scope, company.id) do
       {:noreply,
        socket
-       |> put_flash(:info, "Platform-operator primary company designated successfully.")
+       |> put_flash(:success, "Platform-operator primary company designated successfully.")
        |> push_navigate(to: ~p"/companies/#{company.id}")}
     else
       :error ->
@@ -95,7 +95,7 @@ defmodule Bilimbi.Core.Company.Web.PlatformOperatorSetupLive do
         {:ok, company} ->
           {:noreply,
            socket
-           |> put_flash(:info, "Platform-operator primary company created successfully.")
+           |> put_flash(:success, "Platform-operator primary company created successfully.")
            |> push_navigate(to: ~p"/companies/#{company.id}")}
 
         {:error, %Changeset{} = domain_changeset} ->

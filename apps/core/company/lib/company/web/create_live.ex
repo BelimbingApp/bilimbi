@@ -81,7 +81,7 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
         {:ok, _company} ->
           {:noreply,
            socket
-           |> put_flash(:info, "Company created successfully.")
+           |> put_flash(:success, "Company created successfully.")
            |> push_navigate(to: ~p"/companies")}
 
         {:error, %Changeset{} = domain_changeset} ->

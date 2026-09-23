@@ -143,7 +143,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
 
             {:noreply,
              socket
-             |> put_flash(:info, "Department type created successfully.")
+             |> put_flash(:success, "Department type created successfully.")
              |> assign(:modal_action, nil)
              |> assign(:editing_type, nil)
              |> assign(:types_count, length(types))
@@ -161,7 +161,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
           {:ok, updated_type} ->
             {:noreply,
              socket
-             |> put_flash(:info, "Department type updated successfully.")
+             |> put_flash(:success, "Department type updated successfully.")
              |> assign(:modal_action, nil)
              |> assign(:editing_type, nil)
              |> assign_form(nil)
@@ -192,7 +192,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
           {:ok, updated_type} ->
             {:noreply,
              socket
-             |> put_flash(:info, "Status updated successfully.")
+             |> put_flash(:success, "Status updated successfully.")
              |> stream_insert(:types, updated_type)}
 
           {:error, _reason} ->

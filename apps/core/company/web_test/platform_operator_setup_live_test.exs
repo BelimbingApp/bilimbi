@@ -94,7 +94,7 @@ defmodule BilimbiWeb.PlatformOperatorSetupLiveTest do
 
     {path, flash} = assert_redirect(view)
     assert path == "/companies/73"
-    assert flash["info"] =~ "designated successfully"
+    assert flash["success"] =~ "designated successfully"
 
     {:ok, scope} = Tenancy.scope(41)
     assert {:ok, :unchanged} = Company.assign_primary_company(scope, 73)
@@ -124,7 +124,7 @@ defmodule BilimbiWeb.PlatformOperatorSetupLiveTest do
 
     {path, flash} = assert_redirect(view)
     assert path =~ ~r"^/companies/\d+$"
-    assert flash["info"] =~ "created successfully"
+    assert flash["success"] =~ "created successfully"
 
     assert {:ok, %Company.Summary{name: "Operator Co", code: "operator_co"}} =
              Company.platform_operator_company()

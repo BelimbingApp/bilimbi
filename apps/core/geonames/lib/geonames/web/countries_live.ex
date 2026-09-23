@@ -41,7 +41,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
         {:noreply,
          socket
          |> stream_insert(:countries, updated_country)
-         |> put_flash(:info, "Country #{updated_country.iso} name updated.")}
+         |> put_flash(:success, "Country #{updated_country.iso} name updated.")}
 
       {:error, _reason} ->
         {:noreply,
@@ -95,10 +95,12 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
 
   @impl true
   def handle_async(:update_countries, {:ok, {:ok, result}}, socket) do
+    {kind, message} = update_message(result)
+
     socket =
       socket
       |> assign(:updating_countries?, false)
-      |> put_flash(:info, update_success_message(result))
+      |> put_flash(kind, message)
 
     {:noreply, load_page(socket, socket.assigns.index_state)}
   end
@@ -335,24 +337,25 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
   # because both carry `cached: true` and only `:status` told them apart (#273).
   # Saying "updated" there tells an operator with a week-dead proxy that their
   # country data is current.
-  defp update_success_message(%{
+  defp update_message(%{
          countries:
            %{download_status: {:fallback, cause}, imported: imported, skipped: skipped} = result
        }) do
-    "Countries were not updated: #{fallback_cause(cause)}#{as_of(result[:cached_at])}. " <>
-      "Kept the existing local data (#{imported} imported, #{skipped} skipped). Try Update again later."
+    {:warning,
+     "Countries were not updated: #{fallback_cause(cause)}#{as_of(result[:cached_at])}. " <>
+       "Kept the existing local data (#{imported} imported, #{skipped} skipped). Try Update again later."}
   end
 
-  defp update_success_message(%{
+  defp update_message(%{
          countries: %{cached: cached, imported: imported, skipped: skipped}
        }) do
     source =
       if cached, do: "the current local GeoNames download", else: "a fresh GeoNames download"
 
-    "Countries updated from #{source}: #{imported} imported, #{skipped} skipped."
+    {:success, "Countries updated from #{source}: #{imported} imported, #{skipped} skipped."}
   end
 
-  defp update_success_message(_result), do: "Countries updated from GeoNames."
+  defp update_message(_result), do: {:success, "Countries updated from GeoNames."}
 
   # A 503 is not the same as an unplugged cable, and telling an operator to
   # check their firewall when GeoNames is simply down wastes their afternoon.

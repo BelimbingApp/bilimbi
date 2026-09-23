@@ -1619,7 +1619,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {path, flash} = assert_redirect(view)
       assert path == "/companies"
-      assert flash["info"] == "Company created successfully."
+      assert flash["success"] == "Company created successfully."
 
       {:ok, index, _html} = conn |> log_in_as() |> live(path)
       assert has_element?(index, "#companies td", "North Branch")

@@ -130,7 +130,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
 
         {:noreply,
          socket
-         |> put_flash(:info, "Department added successfully.")
+         |> put_flash(:success, "Department added successfully.")
          |> assign(:modal_action, nil)
          |> assign(:departments_count, length(departments))
          |> assign_form(nil)
@@ -157,7 +157,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
           {:ok, updated_dept} ->
             {:noreply,
              socket
-             |> put_flash(:info, "Department status updated to #{status}.")
+             |> put_flash(:success, "Department status updated to #{status}.")
              |> stream_insert(:departments, updated_dept)}
 
           {:error, _reason} ->
@@ -310,7 +310,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
         {:noreply,
          socket
          |> put_flash(
-           :info,
+           :success,
            if(is_nil(head), do: "Department head cleared.", else: "Department head updated.")
          )
          |> assign(:department_head_names, head_names)

@@ -51,7 +51,7 @@ defmodule Bilimbi.Base.System.Web.LocalizationLive do
           {:noreply,
            socket
            |> load_locale()
-           |> put_flash(:info, "Installation locale saved.")}
+           |> put_flash(:success, "Installation locale saved.")}
 
         {:error, _reason} ->
           {:noreply, put_flash(socket, :error, "Could not save the installation locale.")}

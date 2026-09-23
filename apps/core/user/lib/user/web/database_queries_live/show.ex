@@ -157,7 +157,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
           {:ok, query} ->
             {:noreply,
              socket
-             |> put_flash(:info, "Query saved.")
+             |> put_flash(:success, "Query saved.")
              |> push_navigate(to: ~p"/admin/system/database-queries/#{query.slug}")}
 
           {:error, changeset} ->
@@ -172,7 +172,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
              |> assign(:query, updated_query)
              |> assign(:page_title, updated_query.name)
              |> assign(:is_dirty, false)
-             |> put_flash(:info, "Query saved.")}
+             |> put_flash(:success, "Query saved.")}
 
           {:error, changeset} ->
             error_msg = format_changeset_errors(changeset)
@@ -238,7 +238,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
           {:ok, duplicate} ->
             {:noreply,
              socket
-             |> put_flash(:info, "Query duplicated.")
+             |> put_flash(:success, "Query duplicated.")
              |> push_navigate(to: ~p"/admin/system/database-queries/#{duplicate.slug}")}
 
           {:error, _reason} ->

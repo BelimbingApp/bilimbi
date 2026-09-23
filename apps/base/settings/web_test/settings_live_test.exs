@@ -158,7 +158,8 @@ defmodule BilimbiWeb.SettingsLiveTest do
 
     assert Settings.get(@retention) == 45
     assert has_element?(view, "#setting-authz-decision_log_retention_days", "Set here")
-    assert render(view) =~ "1 setting updated"
+    assert has_element?(view, "#flash-success", "1 setting updated")
+    refute has_element?(view, "#flash-info")
   end
 
   test "clearing a field says so, and the value returns to its default", %{conn: conn} do
@@ -171,7 +172,8 @@ defmodule BilimbiWeb.SettingsLiveTest do
     # an override was cleared, rather than reporting a save that looks empty.
     assert Settings.get(@retention) == 90
     refute Settings.overridden?(@retention)
-    assert render(view) =~ "1 override cleared"
+    assert has_element?(view, "#flash-success", "1 override cleared")
+    refute has_element?(view, "#flash-info")
   end
 
   test "reports a rejected value against the field, and writes nothing", %{conn: conn} do
@@ -230,7 +232,9 @@ defmodule BilimbiWeb.SettingsLiveTest do
     # No settings key at all: the form submitted nothing this page owns.
     view |> render_submit("save", %{})
 
-    assert render(view) =~ "No changes to save."
+    # Nothing was written, so the page informs rather than confirms.
+    assert has_element?(view, "#flash-info", "No changes to save.")
+    refute has_element?(view, "#flash-success")
   end
 
   test "restore defaults confirms the overrides it removes, then clears them", %{conn: conn} do

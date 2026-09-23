@@ -87,7 +87,7 @@ defmodule BilimbiWeb.UserPasswordLiveTest do
     })
     |> render_submit()
 
-    assert has_element?(view, "#flash-info", "Password updated successfully.")
+    assert has_element?(view, "#flash-success", "Password updated successfully.")
 
     # Verify password hash was updated in database
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)

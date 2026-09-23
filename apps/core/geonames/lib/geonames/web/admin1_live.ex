@@ -60,7 +60,7 @@ defmodule Bilimbi.Core.Geonames.Web.Admin1Live do
         {:noreply,
          socket
          |> stream_insert(:admin1, updated_admin1)
-         |> put_flash(:info, "Admin1 division #{updated_admin1.code} updated.")}
+         |> put_flash(:success, "Admin1 division #{updated_admin1.code} updated.")}
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to save division name.")}
