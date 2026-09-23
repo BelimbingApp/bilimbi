@@ -206,7 +206,7 @@ defmodule BilimbiWeb.DashboardLive do
       capabilities ->
         {rest, [last]} = Enum.split(capabilities, -1)
 
-        "see the dashboard widgets, each of which needs one of #{Enum.join(rest, ", ")} or #{last}"
+        "see the dashboard widgets; each widget needs its own permission, and these widgets use #{Enum.join(rest, ", ")} and #{last}"
     end
   end
 

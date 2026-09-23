@@ -253,6 +253,22 @@ defmodule BilimbiWeb.DashboardLiveTest do
       for capability <- ["admin.audit.log.list", "admin.system.session.list"] do
         assert has_element?(view, "#dashboard-widgets-withheld", capability)
       end
+
+      {rest, [last]} =
+        gated_catalogue()
+        |> Enum.map(& &1.capability)
+        |> Enum.uniq()
+        |> Enum.sort()
+        |> Enum.split(-1)
+
+      assert has_element?(
+               view,
+               "#dashboard-widgets-withheld",
+               "You do not have permission to see the dashboard widgets; each widget needs its " <>
+                 "own permission, and these widgets use #{Enum.join(rest, ", ")} and #{last}."
+             )
+
+      refute has_element?(view, "#dashboard-widgets-withheld", "one of")
     end
 
     test "a catalogue nothing contributes to says so, not that it is out of reach",

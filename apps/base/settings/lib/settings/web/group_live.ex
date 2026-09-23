@@ -139,7 +139,7 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
   defp withheld_wording(capabilities) do
     {rest, [last]} = Enum.split(capabilities, -1)
 
-    "see the settings in this group, each of which needs one of #{Enum.join(rest, ", ")} or #{last}"
+    "see the settings in this group; each setting needs its own permission, and this group uses #{Enum.join(rest, ", ")} and #{last}"
   end
 
   defp label_for(socket, key) do

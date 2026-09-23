@@ -65,8 +65,8 @@ defmodule BilimbiWeb.SettingsLiveTest do
   end
 
   test "a group whose settings the account may not see names the capabilities", %{conn: conn} do
-    # Only the page capability: every operator setting also needs one of its
-    # own, so the group is empty for this account while modules do contribute.
+    # Only the page capability: every operator setting also needs a capability of
+    # its own, so the group is empty for this account while modules do contribute.
     grant_capabilities!("base.settings.global.manage")
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/settings")
 
@@ -90,6 +90,19 @@ defmodule BilimbiWeb.SettingsLiveTest do
     for capability <- required do
       assert has_element?(view, "#settings-group-operator-withheld", capability)
     end
+
+    # Each setting needs its own capability, so no single grant is offered as
+    # the key to the whole group.
+    {rest, [last]} = required |> Enum.sort() |> Enum.split(-1)
+
+    assert has_element?(
+             view,
+             "#settings-group-operator-withheld",
+             "You do not have permission to see the settings in this group; each setting " <>
+               "needs its own permission, and this group uses #{Enum.join(rest, ", ")} and #{last}."
+           )
+
+    refute has_element?(view, "#settings-group-operator-withheld", "one of")
   end
 
   test "requires authentication", %{conn: conn} do
