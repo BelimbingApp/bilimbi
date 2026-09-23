@@ -501,9 +501,9 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
   the modal specimen rather than through an anchor of its own. A second live
   instance on that page would announce a dropped connection twice — the component
   has no presentational mode, and giving it one to satisfy a guard would be the
-  guard shaping the product. Superseded 2026-09-23 by the `yields` seam recorded
-  under the coverage entry below: the library presents a real pair, and the
-  layout's stands down for it as it does for a dialog's.
+  guard shaping the product. Superseded 2026-09-23 by the `revealed` state
+  recorded under the coverage entry below: the library presents the banners
+  static, so the layout's pair stays the page's only live outlet.
 - [ ] Correct the `:design_library_drift` failures those two slices left, then move the guards into the default test run and `mix precommit`.
 
   Reconciled by the Design Library state-coverage slice of 2026-09-18, measured
@@ -525,10 +525,11 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     "Connection interrupted" twice on a real disconnect. Presenting it honestly
     needs a suppression seam in the shared component and in `app.css`, which is
     its own slice. **Closed 2026-09-23:** `<.connection_banners>` gained
-    `yields`, the layout's pair declares it, and `app.css` hides a yielding
-    pair while any other pair is in the document; the library presents the
-    reporting and yielding pairs under Feedback and states, so a disconnect on
-    that page shows the banner once, in the specimen.
+    `revealed` (`:client` or `:server`), which renders that one banner shown
+    and bound to no connection event. The library presents both under
+    Feedback and states without adding a live outlet, so a disconnect on that
+    page is reported once, by the layout's pair or an open dialog's, and no
+    suppression seam is needed.
   - **Coverage, declared states — all but one closed.** Twenty-one axes across
     `filter_toolbar`, `icon`, `input`, `list`, `multi_select`, `radio_group`,
     `table` and `tabs` were presented in a single state; every one is varied now

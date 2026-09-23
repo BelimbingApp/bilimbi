@@ -370,14 +370,6 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
     )
   end
 
-  # Reveals one kind of connection banner in every pair the specimen carries,
-  # the way the client does on a drop: unhide, then show. The yielding pair is
-  # told too, so a reviewer sees it stand down rather than take it on trust.
-  defp reveal_connection_banners(kind) when kind in ["client", "server"] do
-    selector = "#component-connection-banners [id$='-#{kind}-error']"
-    JS.remove_attribute("hidden", to: selector) |> show(selector)
-  end
-
   defp sort_state(sort_by), do: %{sort_by: sort_by, sort_dir: default_direction(sort_by)}
 
   defp next_sort(state, requested_sort) when is_map_key(@sample_sorts, requested_sort) do

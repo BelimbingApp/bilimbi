@@ -112,70 +112,66 @@ defmodule Bilimbi.Base.UI.Components do
   defp status_icon(:error), do: "error"
 
   @doc """
-  Renders the two connection banners for one outlet.
+  Renders the two connection banners for one container.
 
   They report a dropped or unreachable websocket, and LiveView reveals them
   from the client — the server is by definition not reachable to re-render
-  when they matter. Both ids derive from `id`, so an outlet can carry its
+  when they matter. Both ids derive from `id`, so a container can carry its
   own pair without colliding with another's.
 
-  A page reports a dropped connection once. Every pair is marked
-  `data-connection-banners`, and a pair that `yields` stands down — is kept
-  invisible by `app.css` — while any other pair is in the document. The
-  layout's pair yields; every other pair is an outlet that outranks it
-  because the layout's cannot serve there: an open modal dialog is promoted
-  to the browser's top layer and makes the rest of the page inert, so
-  `modal/1` renders its own pair where it can be painted above the dimmer,
-  announced and dismissed, and the Design Library presents a pair of its own
-  so the component can be reviewed. Nothing else decides which outlet
-  reports: two outranking pairs on one page both report, so a dialog opened
-  over the Design Library specimen leaves that specimen's banner dimmed
-  behind the dialog, as it leaves the page's flash.
+  An open modal dialog is promoted to the browser's top layer and makes the
+  rest of the page inert, so the layout's pair can be neither painted above
+  the dimmer, announced nor dismissed while one is open. `modal/1` renders a
+  second pair inside the dialog for that reason, and the layout's is hidden
+  while a dialog is open so the same banner never appears twice.
+
+  `revealed` renders only that banner, already shown and bound to no
+  connection event, so the Design Library can present what a drop looks like
+  without becoming a second live outlet that would report it again.
   """
   attr(:id, :string, required: true)
 
-  attr(:yields, :boolean,
-    default: false,
-    doc:
-      "whether this pair stands down while any other pair is in the document; " <>
-        "only the layout's pair yields"
+  attr(:revealed, :atom,
+    values: [:client, :server],
+    doc: "renders only this banner, shown and unbound, for presentation"
   )
 
   def connection_banners(assigns) do
     assigns =
       assigns
+      |> assign_new(:revealed, fn -> nil end)
       |> assign(:client_id, "#{assigns.id}-client-error")
       |> assign(:server_id, "#{assigns.id}-server-error")
 
     ~H"""
     <.flash
+      :if={@revealed != :server}
       id={@client_id}
       kind={:error}
       title={gettext("Connection interrupted")}
       phx-disconnected={
-        show(".phx-client-error ##{@client_id}")
-        |> JS.remove_attribute("hidden", to: ".phx-client-error ##{@client_id}")
+        !@revealed &&
+          show(".phx-client-error ##{@client_id}")
+          |> JS.remove_attribute("hidden", to: ".phx-client-error ##{@client_id}")
       }
-      phx-connected={hide("##{@client_id}") |> JS.set_attribute({"hidden", ""})}
-      data-connection-banners
-      data-yields={@yields}
-      hidden
+      phx-connected={!@revealed && hide("##{@client_id}") |> JS.set_attribute({"hidden", ""})}
+      hidden={!@revealed}
     >
       {gettext("Reconnecting…")}
     </.flash>
 
     <.flash
+      :if={@revealed != :client}
       id={@server_id}
       kind={:error}
       title={gettext("Server unavailable")}
       phx-disconnected={
-        show(".phx-server-error ##{@server_id}")
-        |> JS.remove_attribute("hidden", to: ".phx-server-error ##{@server_id}")
+        !@revealed &&
+          show(".phx-server-error ##{@server_id}")
+          |> JS.remove_attribute("hidden", to: ".phx-server-error ##{@server_id}")
       }
-      phx-connected={hide("##{@server_id}") |> JS.set_attribute({"hidden", ""})}
-      data-connection-banners
-      data-yields={@yields}
-      hidden
+      phx-connected={!@revealed && hide("##{@server_id}") |> JS.set_attribute({"hidden", ""})}
+      hidden={!@revealed}
     >
       {gettext("Attempting to reconnect")}
       <.icon name="hero-arrow-path" class="ml-1 size-3 animate-spin" />
@@ -1773,8 +1769,7 @@ defmodule Bilimbi.Base.UI.Components do
 
   The dialog also carries its own `connection_banners/1`, because the page
   behind it is inert and painted under the dimmer: a dropped websocket must
-  still be announced and dismissable while a dialog is open. The layout's
-  pair yields to it, so the banner still appears once.
+  still be announced and dismissable while a dialog is open.
 
   Every production caller dismisses the layout flash as it opens a dialog, so
   a message about finished work is neither adopted as the new dialog's own

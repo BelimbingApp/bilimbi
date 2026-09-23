@@ -543,9 +543,7 @@ defmodule Bilimbi.Base.UI.Layouts do
   `:success` flash; the other completed writes still emit `:info`, which stays
   sticky while callers also use it for actionable failure notices, so nothing
   else times out until those call sites move to `:success`. The reconnect
-  notices are errors and keep that rule; theirs is the pair that yields, so
-  a dialog's pair or a Design Library specimen reports the drop instead of
-  it and the banner appears once.
+  notices are errors and keep that rule.
 
   The group is a permanent polite live region, so a message inserted into it
   is announced; every message is an alert, whatever its severity.
@@ -575,7 +573,7 @@ defmodule Bilimbi.Base.UI.Layouts do
       />
       <.flash kind={:info} flash={@flash} />
 
-      <.connection_banners id="connection" yields />
+      <.connection_banners id="connection" />
     </div>
     """
   end

@@ -85,15 +85,6 @@ defmodule Bilimbi.Base.UI.LayoutsFlashGroupTest do
     end
   end
 
-  test "the layout's connection pair yields, so a dialog's or a specimen's reports instead" do
-    html = render_group(%{})
-
-    for id <- ["connection-client-error", "connection-server-error"] do
-      assert tag(html, id) =~ ~r/\sdata-connection-banners[\s>]/
-      assert tag(html, id) =~ ~r/\sdata-yields[\s>]/
-    end
-  end
-
   test "the group is a live region so an inserted message is announced" do
     html = render_group(%{"info" => "Saved."})
 

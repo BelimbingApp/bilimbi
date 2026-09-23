@@ -1,14 +1,8 @@
 defmodule Bilimbi.Base.UI.ComponentsConnectionBannersTest do
   @moduledoc """
   `connection_banners/1` renders the pair the client reveals when the
-  websocket drops, and the seam through which one outlet stands down for
-  another: every banner is marked `data-connection-banners`, and a pair that
-  `yields` also carries `data-yields`, which `app.css` keeps invisible while
-  any other pair is in the document.
-
-  What is asserted here is the markup contract the stylesheet keys on. That
-  the yielding pair then stays out of sight is browser-only and is proven in
-  `BilimbiWeb.ConnectionBannersCssTest` on the stylesheet side.
+  websocket drops. `revealed` renders one banner already shown and bound to
+  no connection event, so presenting it never adds a second live outlet.
   """
 
   use ExUnit.Case, async: true
@@ -20,40 +14,41 @@ defmodule Bilimbi.Base.UI.ComponentsConnectionBannersTest do
     render_component(
       fn assigns ->
         ~H"""
-        <Bilimbi.Base.UI.Components.connection_banners id={@id} yields={@yields} />
+        <Bilimbi.Base.UI.Components.connection_banners id={@id} {@extra} />
         """
       end,
-      Map.merge(%{id: "pair", yields: false}, assigns)
+      Map.merge(%{id: "pair", extra: %{}}, assigns)
     )
   end
 
-  defp tag(html, id) do
-    assert [tag] = Regex.run(~r/<div[^>]*\sid="#{id}"[^>]*>/, html),
-           "no element with id #{id} rendered"
-
-    tag
+  defp tags(html) do
+    Regex.scan(~r/<div[^>]*\sid="([^"]+-error)"[^>]*>/, html)
+    |> Map.new(fn [tag, id] -> {id, tag} end)
   end
 
-  test "both banners derive their ids from the outlet and start hidden" do
-    html = render_pair(%{id: "attach-modal"})
+  test "a live pair derives its ids from the container, starts hidden and follows the connection" do
+    tags = tags(render_pair(%{id: "attach-modal"}))
 
-    for id <- ["attach-modal-client-error", "attach-modal-server-error"] do
-      tag = tag(html, id)
+    assert Map.keys(tags) == ["attach-modal-client-error", "attach-modal-server-error"]
+
+    for {_id, tag} <- tags do
       assert tag =~ ~s(role="alert")
       assert tag =~ ~r/\shidden[\s>]/
+      assert tag =~ "phx-disconnected="
+      assert tag =~ "phx-connected="
     end
   end
 
-  test "every banner is marked as a connection outlet, and only a yielding pair yields" do
-    reporting = render_pair(%{id: "reporting"})
-    yielding = render_pair(%{id: "yielding", yields: true})
+  for kind <- [:client, :server] do
+    test "revealed #{kind} renders only that banner, shown and bound to no connection event" do
+      tags = tags(render_pair(%{id: "specimen", extra: %{revealed: unquote(kind)}}))
 
-    for kind <- ~w(client server) do
-      assert tag(reporting, "reporting-#{kind}-error") =~ ~r/\sdata-connection-banners[\s>]/
-      refute tag(reporting, "reporting-#{kind}-error") =~ "data-yields"
-
-      assert tag(yielding, "yielding-#{kind}-error") =~ ~r/\sdata-connection-banners[\s>]/
-      assert tag(yielding, "yielding-#{kind}-error") =~ ~r/\sdata-yields[\s>]/
+      id = "specimen-#{unquote(kind)}-error"
+      assert [{^id, tag}] = Map.to_list(tags)
+      assert tag =~ ~s(role="alert")
+      refute tag =~ ~r/\shidden[\s>=]/
+      refute tag =~ "phx-disconnected"
+      refute tag =~ "phx-connected"
     end
   end
 end

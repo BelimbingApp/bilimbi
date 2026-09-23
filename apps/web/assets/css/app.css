@@ -221,25 +221,17 @@ body {
 
 /* An open modal dialog is promoted to the top layer and makes the rest of the
  * page inert, so anything left in the layout's flash group paints under the
- * dimmer and can be neither announced nor dismissed while one is open. A
- * dialog given `flash` renders its own `:info` and `:error` copy and marks
- * itself `data-owns-flash`; hide the layout copy of what the open dialog
- * carries, so the same message never appears twice. A dialog without that
- * marker — the Design Library specimen's, say — leaves the layout flash in the
- * DOM, dimmed behind the backdrop until the dialog closes. */
+ * dimmer and can be neither announced nor dismissed while one is open. Every
+ * dialog renders its own connection banners, and a dialog given `flash` also
+ * renders its own `:info` and `:error` copy and marks itself
+ * `data-owns-flash`. Hide the layout copy of whatever the open dialog carries,
+ * so the same message never appears twice. A dialog without that marker — the
+ * Design Library specimen's, say — leaves the layout flash in the DOM, dimmed
+ * behind the backdrop until the dialog closes. */
 body:has(dialog:modal[data-owns-flash]) #flash-group > #flash-info,
-body:has(dialog:modal[data-owns-flash]) #flash-group > #flash-error {
-  visibility: hidden;
-}
-
-/* A page reports a dropped connection once. `connection_banners/1` marks every
- * pair it renders `data-connection-banners`, and the layout's pair `yields`:
- * it stands down while any other pair is in the document. That other pair is
- * an outlet the layout's cannot serve — a dialog's, painted in the top layer
- * above the dimmer the layout's is stuck under, or the Design Library's
- * specimen. The rule keys on the component's markers, not on which page or
- * element carries the other pair. */
-body:has([data-connection-banners]:not([data-yields])) [data-connection-banners][data-yields] {
+body:has(dialog:modal[data-owns-flash]) #flash-group > #flash-error,
+body:has(dialog:modal) #flash-group > #connection-client-error,
+body:has(dialog:modal) #flash-group > #connection-server-error {
   visibility: hidden;
 }
 

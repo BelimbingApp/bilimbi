@@ -1291,45 +1291,13 @@
               <p class="text-xs text-ink-muted">
                 The two banners the client reveals by itself when the websocket drops: "Connection
                 interrupted" while the browser cannot reach the server, "Server unavailable" when
-                the server refused or lost the view. The server cannot render them when they
-                matter, so both sit in the page from the start, hidden until the client shows one
-                and hidden again on reconnect. A page reports a drop once: the layout's own pair,
-                at the top right, yields, standing down while any other pair is on the page, so a
-                dialog's pair or this specimen is the one that reports. Disconnect here and the
-                banner appears in the first card only; with a dialog open it appears in the
-                dialog, and this card's copy stays dimmed behind it, as the page's flash does.
+                the server refused or lost the view. Shown here already revealed and bound to no
+                connection event, so a real drop is still reported once, by the layout's own pair
+                at the top right, or by an open dialog's.
               </p>
               <div class="grid gap-3 lg:grid-cols-2">
-                <.card title="Reports" inner_class="space-y-3 p-4">
-                  <div class="flex flex-wrap gap-2">
-                    <.button
-                      id="design-library-connection-show-client"
-                      type="button"
-                      phx-click={reveal_connection_banners("client")}
-                    >
-                      Show “Connection interrupted”
-                    </.button>
-                    <.button
-                      id="design-library-connection-show-server"
-                      type="button"
-                      phx-click={reveal_connection_banners("server")}
-                    >
-                      Show “Server unavailable”
-                    </.button>
-                  </div>
-                  <div class="flex flex-col gap-2">
-                    <.connection_banners id="design-library-connection" />
-                  </div>
-                </.card>
-                <.card title="Yields" inner_class="space-y-3 p-4">
-                  <p class="text-xs text-ink-muted">
-                    The same pair, declared to yield, as the layout's is. The buttons reveal it
-                    too, and it stays out of sight while the reporting pair is on this page.
-                  </p>
-                  <div class="flex flex-col gap-2">
-                    <.connection_banners id="design-library-connection-yielding" yields />
-                  </div>
-                </.card>
+                <.connection_banners id="design-library-connection" revealed={:client} />
+                <.connection_banners id="design-library-connection" revealed={:server} />
               </div>
             </div>
           </section>
@@ -1348,7 +1316,7 @@
                 A short workflow over the current screen. Focus enters the dialog, the page
                 behind is inert, and Escape or Cancel returns focus to the control that opened it.
                 The open dialog carries its own connection banners, revealed above it rather than
-                dimmed behind it if the connection drops; the layout's pair yields to it.
+                dimmed behind it if the connection drops.
               </p>
               <div class="flex flex-wrap gap-2">
                 <.button id="design-library-open-modal" type="button" phx-click="open-modal">
