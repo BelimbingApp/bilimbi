@@ -1,3 +1,7 @@
+/* Keep `source(none)` and every `@source` below. `source(none)` turns off
+ * Tailwind v4's automatic detection, so these lines are the whole list of
+ * places a class name is read from. A class used only in an unlisted path is
+ * never generated and the markup renders unstyled, without an error. */
 @import "tailwindcss" source(none);
 @import "phoenix-colocated/web/colocated.css";
 @source "../css";

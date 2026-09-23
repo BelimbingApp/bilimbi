@@ -33,7 +33,10 @@ defmodule Bilimbi.Umbrella.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
-      {:sobelow, "~> 0.15.0", only: [:dev, :test], runtime: false}
+      {:sobelow, "~> 0.15.0", only: [:dev, :test], runtime: false},
+      # Docs for the locked dependency versions. No `usage_rules:` key, and
+      # never sync those files into a guide.
+      {:usage_rules, "~> 1.2", only: [:dev, :test], runtime: false}
     ]
   end
 

@@ -132,7 +132,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
 
     # The menu is the parity capability catalog's eleven families, in catalog
     # order. The A-K prefixes make that sequence identical to the alphabetical
-    # ascending order root AGENTS.md section 12 requires, so both are asserted.
+    # ascending order DESIGN.md "Ordering" requires, so both are asserted.
     labels = family_menu_labels(view)
     assert labels == @family_menu_labels
     assert labels == Enum.sort(labels)
