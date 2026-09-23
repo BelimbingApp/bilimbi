@@ -172,10 +172,11 @@ defmodule BilimbiWeb.UserShowPermissionsTest do
              )
     end
 
-    # The fourth condition, a user without a company, has no sentence to
-    # show because the page never mounts such an account: `get_tenant_user/2`
-    # resolves a user through its company, so the page redirects instead.
-    # This pins that fact so the branch's absence from the cases above is
+    # A user without a company has no sentence because the page never mounts
+    # such an account: Belimbing's `users.company_id` is nullable, but
+    # `User.get_tenant_user/2` matches only an integer company and answers
+    # `:user_not_found` otherwise, so mount redirects. This pins that fact so
+    # the page carries no nil-company branch and the case's absence above is
     # deliberate rather than an oversight.
     test "a user without a company cannot be opened here at all", %{conn: conn, scope: scope} do
       create_role!(scope, "Auditor", "auditor", ["admin.user.view"])

@@ -175,16 +175,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       |> Enum.reject(& &1.allowed)
       |> Map.new(&{&1.capability, &1.id})
 
-    # Effective permissions
-    {effective_keys, grouped_effective_permissions} =
-      if is_nil(user.company_id) do
-        {[], %{}}
-      else
-        actor = Authz.actor(:user, user.id, scope, user.company_id)
-        effective = Authz.effective_capabilities(actor)
-        allowed_caps = Enum.sort(effective.allowed)
-        {allowed_caps, group_by_domain(allowed_caps)}
-      end
+    # Effective permissions. `get_tenant_user/2` mounts no account without a
+    # company, so the actor always has one to evaluate in.
+    actor = Authz.actor(:user, user.id, scope, user.company_id)
+    effective_keys = Enum.sort(Authz.effective_capabilities(actor).allowed)
+    grouped_effective_permissions = group_by_domain(effective_keys)
 
     # Grouped denied permissions
     denied_keys = Map.keys(direct_deny_ids) |> Enum.sort()
@@ -209,19 +204,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     grouped_available_capabilities = group_by_domain(available_caps)
 
     roles_control =
-      roles_control(
-        can_manage?,
-        user,
-        has_grant_all?,
-        all_roles,
-        unassigned_roles,
-        available_roles
-      )
+      roles_control(can_manage?, has_grant_all?, all_roles, unassigned_roles, available_roles)
 
     capabilities_control =
       capabilities_control(
         can_manage?,
-        user,
         Enum.reject(all_registered_caps, &MapSet.member?(excluded_keys, &1)),
         available_caps
       )
@@ -248,15 +235,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         end
       end)
 
+    # Company employees not already linked to this user
     unlinkable_employees =
-      if is_nil(user.company_id) do
-        []
-      else
-        # filter to company employees not already linked to this user
-        tenant_employees
-        |> Enum.filter(&(&1.company_id == user.company_id and &1.id != user.employee_id))
-        |> Enum.sort_by(& &1.full_name)
-      end
+      tenant_employees
+      |> Enum.filter(&(&1.company_id == user.company_id and &1.id != user.employee_id))
+      |> Enum.sort_by(& &1.full_name)
 
     # External accesses
     {:ok, external_accesses} = Company.list_external_accesses_for_user(scope, user.id)
@@ -466,9 +449,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         )
 
       cond do
-        user.company_id == nil ->
-          {:noreply, socket}
-
         unauthorized_roles != [] ->
           {:noreply, put_flash(socket, :error, "You cannot grant roles you do not hold.")}
 
@@ -593,9 +573,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         end
 
       cond do
-        user.company_id == nil ->
-          {:noreply, socket}
-
         unauthorized_caps != [] ->
           {:noreply, put_flash(socket, :error, "You cannot grant capabilities you do not hold.")}
 
@@ -625,9 +602,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     cond do
       not can_manage?(socket) ->
         capabilities_forbidden(socket)
-
-      is_nil(socket.assigns.user.company_id) ->
-        {:noreply, socket}
 
       cap_key in socket.assigns.effective_keys ->
         hold_authz(socket, {:deny, cap_key})
@@ -1365,12 +1339,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               </:description>
             </.section_heading>
 
-            <%= if is_nil(@user.company_id) do %>
-              <.alert kind={:info} id="roles-unaffiliated-alert" class="mb-4">
-                Assign a company in User Details before roles or capabilities can be managed. Permissions are evaluated in a company scope.
-              </.alert>
-            <% end %>
-
             <div class="mb-4">
               <.list id="assigned-roles-container">
                 <:item title="Roles" id="assigned-roles">
@@ -1405,11 +1373,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             <%!-- The Roles control, or the one sentence that says why it is absent.
                  The sentence stands where the control would be, so a reader who
                  finds no button is not left wondering; it names the most
-                 actionable condition (permission first, then company, then
-                 whether a role could add anything, then the roles themselves).
-                 The company condition is the section alert above, so it is not
-                 repeated here; `get_tenant_user/2` mounts no account without
-                 one, so neither renders today. --%>
+                 actionable condition (permission first, then whether a role
+                 could add anything, then the roles themselves). --%>
             <%= if @roles_control == :available do %>
               <div class="mb-6">
                 <div :if={not @show_assign_roles}>
@@ -1494,7 +1459,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 </div>
               </div>
             <% else %>
-              <div :if={@roles_control != :no_company} id="assign-roles-unavailable" class="mb-6">
+              <div id="assign-roles-unavailable" class="mb-6">
                 <%= case @roles_control do %>
                   <% :forbidden -> %>
                     <.empty_state forbidden={"assign roles to this user, which needs #{manage_capability()}"} />
@@ -1609,17 +1574,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                                   phx-value-grant-id={@direct_grant_ids[cap]}
                                 />
                               <% else %>
-                                <%= if not is_nil(@user.company_id) do %>
-                                  <.icon_button
-                                    icon="close"
-                                    label={"Deny #{cap}"}
-                                    context={:inline}
-                                    kind={:danger}
-                                    id={"deny-cap-#{String.replace(cap, ".", "-")}"}
-                                    phx-click="request_deny_capability"
-                                    phx-value-capability-key={cap}
-                                  />
-                                <% end %>
+                                <.icon_button
+                                  icon="close"
+                                  label={"Deny #{cap}"}
+                                  context={:inline}
+                                  kind={:danger}
+                                  id={"deny-cap-#{String.replace(cap, ".", "-")}"}
+                                  phx-click="request_deny_capability"
+                                  phx-value-capability-key={cap}
+                                />
                               <% end %>
                             <% end %>
                           </span>
@@ -1736,7 +1699,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 <%!-- The same rule as the Roles control: a hidden picker states
                      its own reason where the picker would be. --%>
                 <div
-                  :if={@capabilities_control not in [:available, :no_company]}
+                  :if={@capabilities_control != :available}
                   id="add-capabilities-unavailable"
                   class="mt-4 pt-4 border-t border-line"
                 >
@@ -1850,7 +1813,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               <:description>
                 Employment records linking this user to companies. A user can have multiple records across different companies (e.g. contractors). Not all employees require a user account.
               </:description>
-              <:actions :if={@can_manage? and not is_nil(@user.company_id)}>
+              <:actions :if={@can_manage?}>
                 <.button
                   type="button"
                   id="open-add-employee-modal-btn"
@@ -2585,15 +2548,16 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   # Why the Roles control is absent, as one reason in the order a reader can
-  # act on it: without permission nothing else matters; without a company no
-  # role can be granted; a grant-all role leaves nothing to add; and only then
-  # do the roles themselves decide (none exist, all held, or none this
-  # account may grant under the escalation guard). `:available` shows the
-  # control. Presentation only: every write asks Authz again.
-  defp roles_control(can_manage?, user, has_grant_all?, all_roles, unassigned_roles, available) do
+  # act on it: without permission nothing else matters; a grant-all role
+  # leaves nothing to add; and only then do the roles themselves decide (none
+  # exist, all held, or none this account may grant under the escalation
+  # guard). `:available` shows the control. A user without a company is not
+  # a case: a role is granted within a company, but `get_tenant_user/2`
+  # refuses such an account and mount redirects, so this page never renders
+  # one. Presentation only: every write asks Authz again.
+  defp roles_control(can_manage?, has_grant_all?, all_roles, unassigned_roles, available) do
     cond do
       not can_manage? -> :forbidden
-      is_nil(user.company_id) -> :no_company
       has_grant_all? -> :grant_all
       all_roles == [] -> :no_roles
       unassigned_roles == [] -> :all_assigned
@@ -2605,10 +2569,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # The same decision for the Add Capabilities picker. `remaining` is every
   # installed capability not yet in effect or denied for the user; `available`
   # is the part of it the acting account holds and may therefore grant.
-  defp capabilities_control(can_manage?, user, remaining, available) do
+  defp capabilities_control(can_manage?, remaining, available) do
     cond do
       not can_manage? -> :forbidden
-      is_nil(user.company_id) -> :no_company
       remaining == [] -> :all_in_effect
       available == [] -> :none_grantable
       true -> :available
