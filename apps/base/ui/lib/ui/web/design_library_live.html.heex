@@ -1182,7 +1182,7 @@
             </div>
             <div id="component-flash" class="space-y-3">
               <p class="text-sm text-ink-muted">
-                One message per severity. The layout's flash group is the single production outlet: it stacks messages in one column at the top right, most severe first, so several stay readable at once. Info, warning and error stay until dismissed, because a message someone must act on must not disappear on a timer. Only a success times out, after eight seconds: an action confirmed through the confirmation dialog reports one, while the other completed writes still report info and stay until dismissed. Success and info share one colour and differ by icon: most of the product's info messages still report a completed write, so the neutral colour cannot be applied until those callers move to success.
+                One message per severity. The layout's flash group is the single production outlet: it stacks messages in one column at the top right, most severe first, so several stay readable at once. Info, warning and error stay until dismissed, because a message someone must act on must not disappear on a timer. Only a success times out, after eight seconds: every completed write reports one, and info is for a message that informs without confirming a write. Success and info still share one colour and differ by icon; giving info a colour of its own is follow-up work now that the callers have moved.
               </p>
               <div class="flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
                 <.flash
@@ -1241,6 +1241,39 @@
               </.alert><.alert kind={:warning}>
                 Review the missing address before continuing.
               </.alert><.alert kind={:error}>The record could not be saved.</.alert>
+            </div>
+            <div id="component-panel-notice" class="space-y-2">
+              <p class="text-xs text-ink-muted">
+                What the last action on a panel did, reported above the panel's table or inside
+                its open dialog: a LiveComponent cannot reach the page's flash, and a message
+                raised behind an open dialog could be neither read nor dismissed. The kinds follow
+                the flash's rule for what a message does, not how it is worded: a completed write
+                says success and reads as the success flash at inline strength, a plain statement
+                is info, and a refusal is an error that interrupts. Dismiss clears it.
+              </p>
+              <div class="grid gap-2 lg:grid-cols-2">
+                <.panel_notice
+                  id="design-library-panel-notice-success"
+                  kind={:success}
+                  on_dismiss={JS.hide(to: "#design-library-panel-notice-success")}
+                >
+                  Address attached.
+                </.panel_notice>
+                <.panel_notice
+                  id="design-library-panel-notice-info"
+                  kind={:info}
+                  on_dismiss={JS.hide(to: "#design-library-panel-notice-info")}
+                >
+                  Nothing changed: the address already had those kinds.
+                </.panel_notice>
+                <.panel_notice
+                  id="design-library-panel-notice-error"
+                  kind={:error}
+                  on_dismiss={JS.hide(to: "#design-library-panel-notice-error")}
+                >
+                  The address was not unlinked. Try again.
+                </.panel_notice>
+              </div>
             </div>
             <div id="component-empty-state" class="space-y-2">
               <p class="text-xs text-ink-muted">

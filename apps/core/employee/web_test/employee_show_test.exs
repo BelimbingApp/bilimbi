@@ -587,7 +587,7 @@ defmodule BilimbiWeb.EmployeeShowTest do
 
     assert has_element?(
              view,
-             "#addresses-panel-notice[role='status']",
+             "#addresses-panel-notice[role='status'][data-kind='success']",
              "Address setting updated."
            )
 
@@ -628,7 +628,13 @@ defmodule BilimbiWeb.EmployeeShowTest do
 
     refute has_element?(view, "#unlink-address-confirm")
     refute has_element?(view, "#address-row-#{home.id}")
-    assert has_element?(view, "#addresses-panel-notice[role='status']", "Address unlinked.")
+
+    assert has_element?(
+             view,
+             "#addresses-panel-notice[role='status'][data-kind='success']",
+             "Address unlinked."
+           )
+
     assert {:ok, _home} = Address.get_address(scope, home.id)
     assert has_element?(view, "#addresses-table-empty", "No addresses linked.")
 
@@ -636,6 +642,49 @@ defmodule BilimbiWeb.EmployeeShowTest do
              view,
              "#addresses-table-empty",
              "Attach one of the company's addresses to this employee."
+           )
+  end
+
+  test "unlinking an address whose link is already gone informs rather than refuses", %{
+    conn: conn,
+    employee: employee
+  } do
+    AddressFixtures.create_geonames_tables!()
+    AddressFixtures.create_address_tables!()
+    {:ok, scope} = Tenancy.scope(41)
+    {:ok, home} = Address.create_address(scope, %{label: "Home", line1: "12 Jalan Damai"})
+    {:ok, flat} = Address.create_address(scope, %{label: "Flat", line1: "4 Jalan Seri"})
+    {:ok, :attached} = Address.attach_to_employee(scope, home.id, employee.id)
+    {:ok, :attached} = Address.attach_to_employee(scope, flat.id, employee.id)
+
+    grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+    # Another operator unlinks the address while this list still shows it:
+    # the confirmation runs against a link that is already gone.
+    :ok = Address.detach_from_employee(scope, home.id, employee.id)
+    view |> element("#unlink-address-#{home.id}") |> render_click()
+    view |> element("#unlink-address-confirm-confirm", "Unlink") |> render_click()
+
+    refute has_element?(view, "#unlink-address-confirm")
+    refute has_element?(view, "#address-row-#{home.id}")
+
+    assert has_element?(
+             view,
+             "#addresses-panel-notice[role='status'][data-kind='info']",
+             "That address is no longer linked."
+           )
+
+    # A request naming an address the refreshed list no longer holds.
+    view |> element("#unlink-address-#{flat.id}") |> render_click(%{"id" => "#{home.id}"})
+
+    refute has_element?(view, "#unlink-address-confirm")
+
+    assert has_element?(
+             view,
+             "#addresses-panel-notice[role='status'][data-kind='info']",
+             "That address is no longer linked."
            )
   end
 
@@ -734,7 +783,15 @@ defmodule BilimbiWeb.EmployeeShowTest do
     |> element("#employee-user-form")
     |> render_change(%{"user_id" => "91"})
 
-    assert has_element?(view, "#account-panel-notice", "User link updated.")
+    assert has_element?(
+             view,
+             "#account-panel-notice[role='status'][data-kind='success']",
+             "User link updated."
+           )
+
+    # The notice is dismissed in place, like every panel notice.
+    view |> element("#account-panel-notice-dismiss") |> render_click()
+    refute has_element?(view, "#account-panel-notice")
 
     {:ok, scope} = Tenancy.scope(41)
     assert {:ok, %{employee_id: linked}} = User.get_user(scope, 73, 91)
@@ -797,7 +854,11 @@ defmodule BilimbiWeb.EmployeeShowTest do
     |> element("#employee-user-form")
     |> render_change(%{"user_id" => "92"})
 
-    assert has_element?(view, "#account-panel-notice", "Failed to update linked user account.")
+    assert has_element?(
+             view,
+             "#account-panel-notice[role='alert'][data-kind='error']",
+             "Failed to update linked user account."
+           )
 
     {:ok, scope} = Tenancy.scope(41)
     assert {:ok, %{employee_id: nil}} = User.get_user(scope, 74, 92)

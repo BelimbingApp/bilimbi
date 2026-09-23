@@ -200,16 +200,88 @@ defmodule Bilimbi.Base.UI.Components do
       role="alert"
       class={[
         "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm",
-        @kind == :info && "border-line bg-surface-sunken text-ink",
-        @kind == :success && "border-success-line bg-success-surface text-success-ink",
-        @kind == :warning && "border-warning-line bg-warning-surface text-warning-ink",
-        @kind == :error && "border-danger-line bg-danger-surface text-danger-ink",
+        status_surface(@kind),
         @class
       ]}
       {@rest}
     >
       <.icon name={status_icon(@kind)} class="mt-0.5 size-4 shrink-0" />
       <div class="min-w-0">{render_slot(@inner_block)}</div>
+    </div>
+    """
+  end
+
+  # The one inline colouring per status role, shared by `alert/1` and
+  # `panel_notice/1` so a success reads as the same idea wherever it lands.
+  # The page-level `flash/1` uses the same roles at banner strength.
+  defp status_surface(:info), do: "border-line bg-surface-sunken text-ink"
+  defp status_surface(:success), do: "border-success-line bg-success-surface text-success-ink"
+  defp status_surface(:warning), do: "border-warning-line bg-warning-surface text-warning-ink"
+  defp status_surface(:error), do: "border-danger-line bg-danger-surface text-danger-ink"
+
+  @doc """
+  Renders a panel's outcome notice: what the last action on a panel did.
+
+  A LiveComponent panel cannot reach the page's flash without a parent
+  contract, and a notice raised while one of its modal dialogs is open has
+  to render inside that dialog, where the page behind is inert. The panel
+  therefore holds one `{kind, message}` outcome and renders it through this
+  component above its table, or inside its open dialog, and dismisses it
+  through `on_dismiss`. The gap to what follows is the caller's, through
+  `class`.
+
+  `kind` is what the message does, not how it is worded: a write that
+  finished says `:success`, a notice that merely informs stays `:info`, and
+  a refusal or failure is `:error`. A completed write and an error look like
+  their page-level flash counterparts at inline strength. Success and info
+  are announced politely as a `status`; an error interrupts as an `alert`.
+
+  ## Examples
+
+      <.panel_notice
+        :if={@notice}
+        id={"\#{@id}-notice"}
+        kind={elem(@notice, 0)}
+        on_dismiss={JS.push("clear_notice", target: @myself)}
+        class="mb-3"
+      >
+        {elem(@notice, 1)}
+      </.panel_notice>
+  """
+  attr(:id, :string, required: true)
+
+  attr(:kind, :atom,
+    values: [:info, :success, :error],
+    required: true,
+    doc: "what the message does: a completed write, a plain statement, or a failure"
+  )
+
+  attr(:on_dismiss, JS, required: true, doc: "the command the Dismiss control runs")
+  attr(:class, :any, default: nil)
+  slot(:inner_block, required: true)
+
+  def panel_notice(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      role={if @kind == :error, do: "alert", else: "status"}
+      data-kind={@kind}
+      class={[
+        "flex items-start gap-2 rounded-lg border px-3 py-2 text-sm",
+        status_surface(@kind),
+        @class
+      ]}
+    >
+      <.icon name={status_icon(@kind)} class="mt-0.5 size-4 shrink-0" />
+      <span class="min-w-0 flex-1">{render_slot(@inner_block)}</span>
+      <.icon_button
+        id={"#{@id}-dismiss"}
+        icon="close"
+        label="Dismiss notice"
+        context={:inline}
+        class="-my-0.5"
+        phx-click={@on_dismiss}
+      />
     </div>
     """
   end
