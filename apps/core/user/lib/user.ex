@@ -1189,6 +1189,13 @@ defmodule Bilimbi.Core.User do
 
   Locks the current company and user row, clears `company_id` and `employee_id`,
   terminates existing sessions, and records an atomic audit mutation.
+
+  No surface offers this write today. `/users/:id` used to offer it as the
+  "None" company choice and no longer does: a user always belongs to a
+  company, and `get_tenant_user/2` resolves no account without one, so a
+  cleared account is reachable from no screen. The function stays for its
+  own tests and for a future operator surface; removing a write path is a
+  separate decision from removing the control that offered it.
   """
   @spec clear_user_company(
           AuthzActor.t(),

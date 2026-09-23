@@ -31,7 +31,7 @@ and reset-token hashes never leave the module; account reads return
 | `create_unaffiliated_user(actor, scope, attributes)` | Operator-only creation of an unaffiliated user account |
 | `assign_unaffiliated_user(actor, scope, user_id, target_company_id, opts)` | Assign an unaffiliated user to a live company and optional employee |
 | `reassign_user_company(actor, scope, current_company_id, user_id, target_company_id, opts)` | Reassign a user to a target live company with ascending lock ordering |
-| `clear_user_company(actor, scope, current_company_id, user_id, opts)` | Move an affiliated user back to unaffiliated state |
+| `clear_user_company(actor, scope, current_company_id, user_id, opts)` | Move an affiliated user back to unaffiliated state; no surface offers it today |
 | `admin_change_password(actor, scope, company_id, user_id, new_password, opts)` | Admin password reset with token rotation and session invalidation |
 | `authenticate(email, password)` | Verify a login and upgrade legacy bcrypt |
 | `confirm_password(...)` / `change_password(...)` | Current-password confirmation and replacement |
@@ -108,29 +108,26 @@ An operator holding `admin.user.update` edits the name and email in place
 through `<.inline_edit>` and changes the company through a choice that reads
 as the company name and becomes a select on click; every commit saves by
 itself and reports on its own fact, so there is no "Edit user" button and no
-edit mode to reach from the page. Every company change ends the account's
-sessions — `reassign_user_company/6` and `clear_user_company/5` both call
-`Session.terminate_user_sessions/2` with a sentinel that spares none — so
-that is not what sets one option apart. Choosing "None" is the one
-irreversible option and the only one that does not commit on change: it
-replaces the select with a danger confirmation naming the account, the
-sessions the write ends and the fact that the account leaves every user
-screen, and the confirmed click performs `clear_user_company/5` with the
-same capability re-check.
+edit mode to reach from the page. The select offers the workspace's live
+companies and nothing else. A user always belongs to a company and is the
+same person operating under a different one, so the page never detaches an
+account: Belimbing's select offers "None" and Bilimbi's does not, and a
+blank value that still arrives is refused on the fact without a write. The
+reassignment ends the account's sessions — `reassign_user_company/6` calls
+`Session.terminate_user_sessions/2` with a sentinel that spares none — so the
+open editor carries a warning saying so beside the select, before the
+operator chooses; it is a note, not a confirmation, because choosing the
+previous company again reverses the change. A reassignment authorizes
+`admin.user.update` against the account's **current** company, so its
+refusal names that company and never the chosen one.
 
-**An account with no company is a one-way state today.** Tenancy is derived
-from `company_id`, so `get_tenant_user/2` resolves no user without one and no
-route reaches `list_unaffiliated_users/2` or `get_unaffiliated_user/3`. The
-detail page is therefore the only surface an unaffiliated account is visible
-on, and only for as long as the LiveView that cleared it stays mounted. Its
-info notice says exactly that, and says what may still be done: inside the
-platform-operator tenant an operator holding `admin.user.unaffiliated.manage`
-can affiliate the account again from that page; in any other tenant
-`assign_unaffiliated_user/5` refuses on `tenants.is_platform_operator` before
-the capability is consulted, and the notice and the refusal both say so
-without offering a recovery that no screen provides. Reassign and clear
-authorize `admin.user.update` against the account's **current** company, so
-their refusals name that company and never the chosen one. The header is Belimbing's quiet labelled
+**An account with no company is reachable from no screen.** Tenancy is
+derived from `company_id`, so `get_tenant_user/2` resolves no user without
+one and no route reaches `list_unaffiliated_users/2` or
+`get_unaffiliated_user/3`; the detail page mounts no such account either, so
+every fact it shows has a company to be written through. An account whose
+company is archived reads as "Archived company" rather than as no company.
+`clear_user_company/5` remains in the API with no surface offering it. The header is Belimbing's quiet labelled
 row — History, Impersonate and "← Back" — with no button; the Impersonate
 guards (`admin.user.impersonate`, never the signed-in account, never while
 impersonating) are unchanged. `Bilimbi.Core.User.Web.ShowLive`'s moduledoc

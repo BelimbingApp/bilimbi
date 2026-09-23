@@ -984,8 +984,31 @@ Shipped:
   and the notice in both a platform-operator and an ordinary tenant.
   `{fm/users-detail-belimbing-parity/claude-fable-5-1}`
 
+- [x] The company choice offers companies only. The captain overruled the
+  guarded "None": a user always belongs to a company and is the same person
+  operating under a different one, so the page no longer detaches an
+  account at all. The blank option, the `remove_company` event, the
+  `confirm_clear_company?` assign, the danger confirmation and the
+  unaffiliated notice are gone; the choice commits on change like every
+  other choice fact and like Belimbing's select, and a blank value that
+  still arrives is refused on the fact ("a user always belongs to a
+  company") without a write. The one cost the operator could not see —
+  `reassign_user_company/6` ends every session the account holds — is now a
+  `text-warning-ink` note beside the open select, named by its
+  `aria-describedby`, before the choice is made; it is a warning, not a
+  second click. A user whose company is archived reads as "Archived
+  company" in the fact and the subtitle instead of "None" and
+  "Unaffiliated". `clear_user_company/5` stays in the API with a note that
+  nothing offers it. Web tests cover the select without a blank option, the
+  warning in the open editor and not in the read state, a refused blank, a
+  refused reassignment naming the current company, and the viewer without
+  `admin.user.update` seeing no select, no warning and no editors.
+  `{fm/user-company-no-detach/claude-fable-5-1}`
+
 Not delivered by this slice, reported as follow-up:
 
+- **`clear_user_company/5` has no caller outside its tests.** Removing the
+  write path, or giving it an operator surface, is a separate decision.
 - **The rest of `/users/:id`** — the roles and capability pickers, the
   change-password disclosure, the employee records and external accesses
   sections — keep their existing buttons, flashes and permanent controls.
@@ -994,12 +1017,10 @@ Not delivered by this slice, reported as follow-up:
 - **`/users/:id/edit` still exists** as a route and form; nothing on the
   detail page reaches it. Removing it is a product decision.
 - **No unaffiliated-users surface.** Nothing routes to
-  `list_unaffiliated_users/2` or `get_unaffiliated_user/3`, so an account
-  cleared of its company can only be affiliated again from the page that
-  cleared it. Shipping that surface, and deciding whether "None" should be
-  offered at all outside the platform-operator tenant, are captain decisions
-  and are not taken here; the page's copy states the limit instead of
-  implying a recovery.
+  `list_unaffiliated_users/2` or `get_unaffiliated_user/3`. The detail page
+  no longer creates such accounts, but accounts already detached in
+  existing data stay unreachable; shipping a surface for them is a captain
+  decision and is not taken here.
 - **The commit-status plumbing stays duplicated.** `put_field_status/3`,
   `drop_saved/1`, `refusal_message/3`, `rejected_value/1` and `fact_label/1`
   exist on both `/addresses/:id` and `/users/:id`. Extracting them beside
