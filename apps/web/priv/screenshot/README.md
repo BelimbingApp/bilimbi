@@ -4,7 +4,7 @@ Reviewer tooling for the [#614](https://github.com/BelimbingApp/bilimbi/issues/6
 visual review lane. It renders an installed screen exactly as a signed-in
 operator sees it and writes a PNG, so a reviewer can compare against the
 dashboard / `<.table>` exemplars, the Belimbing screen at the pin, and
-AGENTS.md §12.
+`DESIGN.md`.
 
 **It is reviewer tooling, not a CI gate.** Nothing here runs in CI.
 
