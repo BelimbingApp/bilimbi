@@ -39,7 +39,7 @@ const observeShell = () => {
 // `local` renders the instant the way the reader's own device would: their
 // locale orders the fields and chooses the hour cycle. The zone is named on
 // `datetime` only, where the label qualifies a full date and time.
-export const formatLocal = (value, timeZone, format) => {
+export const formatLocal = (value, timeZone, format, precision) => {
   const options = {timeZone}
 
   if (format !== "time") {
@@ -48,6 +48,7 @@ export const formatLocal = (value, timeZone, format) => {
 
   if (format !== "date") {
     Object.assign(options, {hour: "2-digit", minute: "2-digit"})
+    if (precision === "second") options.second = "2-digit"
   }
 
   if (format === "datetime") options.timeZoneName = "short"
@@ -106,7 +107,7 @@ const DateTime = {
     let text
 
     try {
-      text = formatLocal(value, timeZone, this.el.dataset.format)
+      text = formatLocal(value, timeZone, this.el.dataset.format, this.el.dataset.precision)
     } catch {
       // A browser that cannot format this zone falls back to the server's
       // stored-UTC text. Keeping whatever is there would leave the previous

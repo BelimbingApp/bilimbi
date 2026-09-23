@@ -1653,10 +1653,14 @@ defmodule Bilimbi.Base.UI.Components do
 
   With no context stored, `:local` — the pre-policy behavior, and the
   truthful no-JavaScript fallback in every mode is the server text itself.
+
+  A time of day shows minutes. `precision={:second}` adds seconds, for a
+  reader who compares two instants that can fall inside one minute.
   """
   attr(:id, :string, required: true)
   attr(:value, :any, default: nil)
   attr(:format, :atom, values: [:date, :time, :datetime], default: :datetime)
+  attr(:precision, :atom, values: [:minute, :second], default: :minute)
   attr(:class, :any, default: nil)
 
   attr(:display, :any,
@@ -1668,7 +1672,7 @@ defmodule Bilimbi.Base.UI.Components do
     display = assigns.display || Bilimbi.Base.UI.DateTimeDisplay.get()
     date_time = datetime_value(assigns.value)
     mode = display_mode(display)
-    format = assigns.format
+    format = {assigns.format, assigns.precision}
 
     # Both server-decidable modes are rendered up front, whatever the current
     # mode is, so the browser can follow a mode change by copying a server
@@ -1706,6 +1710,7 @@ defmodule Bilimbi.Base.UI.Components do
       id={@id}
       datetime={DateTime.to_iso8601(@date_time)}
       data-format={@format}
+      data-precision={@precision}
       data-mode={@mode}
       data-text-company={@text_company}
       data-text-utc={@text_utc}
@@ -1741,15 +1746,17 @@ defmodule Bilimbi.Base.UI.Components do
     end
   end
 
-  defp server_datetime(value, :date), do: Calendar.strftime(value, "%d/%m/%Y UTC")
-  defp server_datetime(value, :time), do: Calendar.strftime(value, "%H:%M UTC")
-  defp server_datetime(value, :datetime), do: Calendar.strftime(value, "%d/%m/%Y, %H:%M UTC")
+  defp server_datetime(value, format), do: Calendar.strftime(value, strftime(format)) <> " UTC"
 
-  defp zoned_datetime(value, :date), do: Calendar.strftime(value, "%d/%m/%Y ") <> value.zone_abbr
-  defp zoned_datetime(value, :time), do: Calendar.strftime(value, "%H:%M ") <> value.zone_abbr
+  defp zoned_datetime(value, format),
+    do: Calendar.strftime(value, strftime(format)) <> " " <> value.zone_abbr
 
-  defp zoned_datetime(value, :datetime),
-    do: Calendar.strftime(value, "%d/%m/%Y, %H:%M ") <> value.zone_abbr
+  defp strftime({:date, _precision}), do: "%d/%m/%Y"
+  defp strftime({:time, precision}), do: clock(precision)
+  defp strftime({:datetime, precision}), do: "%d/%m/%Y, " <> clock(precision)
+
+  defp clock(:minute), do: "%H:%M"
+  defp clock(:second), do: "%H:%M:%S"
 
   # Helper used by inputs to generate form errors
   attr(:id, :string, default: nil)

@@ -17,8 +17,10 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
   alias Bilimbi.Base.UI.DateTimeDisplay
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
 
-  # 10:00 UTC is 18:00 the same day in Asia/Kuala_Lumpur.
+  # 10:00 UTC is 18:00 the same day in Asia/Kuala_Lumpur. The entry's own
+  # time reads to the minute; a value inside a diff reads to the second.
   @company_text "18/08/2026, 18:00 +08"
+  @diff_text "18/08/2026, 18:00:00 +08"
 
   setup do
     AuditFixtures.create_audit_tables!()
@@ -65,9 +67,9 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
     # The entry's own time and the timestamps inside its diff agree: same
     # instant, same clock, and the zone is named on each.
     assert text(html, "time#history-entry-#{mutation.id}-occurred") == @company_text
-    assert text(html, "time#history-entry-#{mutation.id}-created_at-new") == @company_text
-    assert text(html, "time#history-entry-#{mutation.id}-archived_at-new") == @company_text
-    assert text(html, "time#history-entry-#{mutation.id}-synced_at-new") == @company_text
+    assert text(html, "time#history-entry-#{mutation.id}-created_at-new") == @diff_text
+    assert text(html, "time#history-entry-#{mutation.id}-archived_at-new") == @diff_text
+    assert text(html, "time#history-entry-#{mutation.id}-synced_at-new") == @diff_text
     refute text(html, "#history-panel") =~ "2026-08-18T10:00:00"
 
     # A calendar date and a bare time denote no instant and stay as stored.
@@ -92,10 +94,36 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
 
     html = render_panel(scope, mutation)
 
-    assert text(html, "time#history-entry-#{mutation.id}-expires_at-old") == @company_text
+    assert text(html, "time#history-entry-#{mutation.id}-expires_at-old") == @diff_text
 
     assert text(html, "time#history-entry-#{mutation.id}-expires_at-new") ==
-             "19/08/2026, 18:00 +08"
+             "19/08/2026, 18:00:00 +08"
+  end
+
+  test "two changes to one field inside one minute read as two different values", %{
+    scope: scope
+  } do
+    {:ok, mutation} =
+      Audit.record_mutation(scope, %{
+        company_id: 73,
+        actor_type: "user",
+        actor_id: 91,
+        auditable_type: "Bilimbi.Core.Widget.Schema",
+        auditable_id: "7",
+        event: "updated",
+        occurred_at: ~N[2026-08-18 10:00:41],
+        old_values: %{"updated_at" => "2026-08-18T10:00:05"},
+        new_values: %{"updated_at" => "2026-08-18T10:00:41"}
+      })
+
+    html = render_panel(scope, mutation)
+
+    old = text(html, "time#history-entry-#{mutation.id}-updated_at-old")
+    new = text(html, "time#history-entry-#{mutation.id}-updated_at-new")
+
+    assert old == "18/08/2026, 18:00:05 +08"
+    assert new == "18/08/2026, 18:00:41 +08"
+    assert old != new
   end
 
   defp render_panel(scope, mutation) do

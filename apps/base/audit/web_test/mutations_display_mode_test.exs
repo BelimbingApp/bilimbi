@@ -140,7 +140,12 @@ defmodule Bilimbi.Base.Audit.Web.MutationsDisplayModeTest do
 
     # The stored value is the UTC string capture wrote; the reader sees it in
     # company time with the zone named, not the raw column.
-    assert has_element?(view, "time#mutation-#{mutation_id}-updated_at-new", @company_text)
+    assert has_element?(
+             view,
+             "time#mutation-#{mutation_id}-updated_at-new",
+             "18/08/2026, 18:00:00 +08"
+           )
+
     refute has_element?(view, "#mutation-#{mutation_id}-updated_at-new", "2026-08-18T10:00:00")
     assert has_element?(view, "span#mutation-#{mutation_id}-name-new", "Acme Corp")
   end

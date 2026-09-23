@@ -313,7 +313,8 @@ page:
   beside the `auditable_id`: the id never changes, so it alone would never
   re-render the panel, and a trail that stands still after an in-page edit
   states something untrue. A timestamp inside a diff follows the page's
-  clock like the entry's own time.
+  clock like the entry's own time, and reads to the second so two changes
+  inside one minute do not read as the same value.
 
 ## Demoted secondary actions
 

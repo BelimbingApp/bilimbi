@@ -12,7 +12,8 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
   are the usual ones, but any timestamp column lands in a diff the same way,
   so the rule is "this string parses as a date-time", and such a value
   renders through `<.datetime>`, where the page's clock choice covers it
-  like every other time on the page. A calendar date or a bare time stays
+  like every other time on the page. It shows seconds, so two changes inside
+  one minute read as two different values. A calendar date or a bare time stays
   text: neither denotes an instant, so neither has a zone to shift.
 
   Keys are classified as sensitive by the same substring rule both surfaces
@@ -101,7 +102,7 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
     ~H"""
     <%= case @value do %>
       <% {:instant, instant} -> %>
-        <.datetime id={@id} value={instant} class={@class} />
+        <.datetime id={@id} value={instant} precision={:second} class={@class} />
       <% {:text, text} -> %>
         <span id={@id} class={@class}>{text}</span>
       <% :absent -> %>

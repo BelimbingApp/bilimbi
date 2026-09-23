@@ -25,11 +25,17 @@ defmodule BilimbiWeb.DateTimeJsTest do
   @instants [~U[2026-01-01 16:30:00Z], ~U[2026-07-24 07:00:00Z]]
   @formats [:datetime, :date, :time]
   @zones ["UTC", "Asia/Kuala_Lumpur", "America/New_York"]
+  @precisions [:minute, :second]
 
   defp client_rendering(env) do
     cases =
-      for zone <- @zones, instant <- @instants, format <- @formats do
-        %{zone: zone, instant: DateTime.to_iso8601(instant), format: to_string(format)}
+      for zone <- @zones, instant <- @instants, format <- @formats, precision <- @precisions do
+        %{
+          zone: zone,
+          instant: DateTime.to_iso8601(instant),
+          format: to_string(format),
+          precision: to_string(precision)
+        }
       end
 
     encoded_source = @hook |> File.read!() |> Base.encode64()
@@ -41,14 +47,18 @@ defmodule BilimbiWeb.DateTimeJsTest do
 
     console.log(JSON.stringify(cases.map(entry => ({
       ...entry,
-      text: formatLocal(new Date(entry.instant), entry.zone, entry.format),
+      text: formatLocal(new Date(entry.instant), entry.zone, entry.format, entry.precision),
     }))))
     """
 
     {output, 0} = System.cmd("node", ["--input-type=module", "--eval", script], env: env)
 
-    Map.new(Jason.decode!(output), fn %{"zone" => zone, "instant" => instant} = entry ->
-      {{zone, instant, entry["format"]}, entry["text"]}
+    Map.new(Jason.decode!(output), fn
+      %{"zone" => zone, "instant" => instant, "precision" => "minute"} = entry ->
+        {{zone, instant, entry["format"]}, entry["text"]}
+
+      %{"zone" => zone, "instant" => instant, "precision" => precision} = entry ->
+        {{zone, instant, entry["format"], precision}, entry["text"]}
     end)
   end
 
@@ -103,6 +113,15 @@ defmodule BilimbiWeb.DateTimeJsTest do
         refute String.contains?(date, label)
         refute String.contains?(time, label)
       end
+    end
+
+    test "adds seconds only when the instant asks for them", %{gb: gb} do
+      key = {"Asia/Kuala_Lumpur", "2026-07-24T07:00:00Z", "datetime"}
+
+      assert gb[key] == "24/07/2026, 15:00 GMT+8"
+      assert gb[Tuple.insert_at(key, 3, "second")] == "24/07/2026, 15:00:00 GMT+8"
+      assert gb[{"UTC", "2026-01-01T16:30:00Z", "time", "second"}] == "16:30:00"
+      assert gb[{"UTC", "2026-01-01T16:30:00Z", "date", "second"}] == "01/01/2026"
     end
 
     test "follows a zone through its own daylight change", %{gb: gb} do
