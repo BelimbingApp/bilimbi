@@ -2,8 +2,11 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
   @moduledoc """
   Safe, read-only SQL query execution engine.
 
-  Enforces read-only transactions, query timeouts, row limits, keyword checks,
-  and parameter extraction for user-defined SQL queries.
+  Runs user-defined SQL inside a PostgreSQL `READ ONLY` transaction with a
+  statement timeout and a row limit, after text checks that reject anything
+  but a `SELECT`/`WITH` statement and known write/DDL keywords. The text checks
+  give early, readable refusals; the read-only transaction is the boundary
+  PostgreSQL enforces regardless of what the text checks miss.
   """
 
   alias Bilimbi.Base.Repo
@@ -171,8 +174,14 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
          timeout_ms
        ) do
     Repo.transaction(fn ->
-      # Set PostgreSQL session variables for this transaction
-      SQL.query!(Repo, "SET LOCAL default_transaction_read_only = on", [])
+      # The text guards in validate_sql/1 are not the boundary; this is.
+      # `SET TRANSACTION READ ONLY` applies to the transaction already open
+      # here, so PostgreSQL itself refuses any write that reaches it. (The
+      # similar-looking `SET LOCAL default_transaction_read_only = on` only
+      # sets the default for *later* transactions and leaves this one
+      # read-write.) The mode ends with the transaction, and in the SQL
+      # sandbox it ends with the executor's savepoint.
+      SQL.query!(Repo, "SET TRANSACTION READ ONLY", [])
 
       # `timeout_ms` is an internal clamped integer from options/defaults, never reachable from client parameters.
       SQL.query!(Repo, "SET LOCAL statement_timeout = #{timeout_ms}", [])
