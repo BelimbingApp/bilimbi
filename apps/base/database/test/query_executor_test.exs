@@ -3,6 +3,7 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
 
   alias Bilimbi.Base.Database
   alias Bilimbi.Base.Database.QueryExecutor
+  alias Bilimbi.Base.Repo
 
   describe "extract_named_parameters/1" do
     test "extracts named parameters" do
@@ -132,6 +133,45 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
     test "handles syntax errors gracefully" do
       assert {:error, msg} = as_operator("SELECT * FROM non_existent_table_xyz")
       assert msg =~ "does not exist" or msg =~ "SQL error"
+    end
+  end
+
+  # The string guards (SELECT/WITH first word, forbidden keywords) are text
+  # checks over user-authored SQL and are not the boundary. The boundary is
+  # PostgreSQL's own read-only transaction mode, so these tests prove it by
+  # observing the database: a write that both text guards let through must be
+  # refused by PostgreSQL, and must leave no data behind.
+  describe "read-only transaction boundary" do
+    test "the executor's transaction is read-only as PostgreSQL sees it" do
+      assert {:ok, result} =
+               as_operator("SELECT current_setting('transaction_read_only') AS mode")
+
+      assert result.rows == [%{"mode" => "on"}]
+    end
+
+    test "PostgreSQL refuses a write that passes both text guards" do
+      # `SELECT setval(...)` starts with SELECT and contains no forbidden
+      # keyword, so it reaches PostgreSQL. setval/2 is also non-transactional:
+      # had it run, the new value would survive the rollback, so an unchanged
+      # sequence afterwards proves the write never executed rather than being
+      # undone.
+      Repo.query!("CREATE SEQUENCE __blb_readonly_probe START 1")
+
+      assert {:error, msg} = as_operator("SELECT setval('__blb_readonly_probe', 42)")
+      assert msg =~ "read-only transaction"
+
+      assert %{rows: [[1, false]]} =
+               Repo.query!("SELECT last_value, is_called FROM __blb_readonly_probe")
+    end
+
+    test "the read-only mode does not outlive the executor's transaction" do
+      # In production the mode ends with the transaction's COMMIT/ROLLBACK; in
+      # the SQL sandbox the executor runs inside a savepoint, and the caller's
+      # enclosing transaction must be able to write again afterwards.
+      assert {:ok, _} = as_operator("SELECT 1")
+
+      assert %{rows: [["off"]]} =
+               Repo.query!("SELECT current_setting('transaction_read_only')")
     end
   end
 
