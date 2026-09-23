@@ -9,6 +9,18 @@ Read this file and `DESIGN.md` before making changes. The source Belimbing
 project is the reference for business meaning and schema compatibility, not a
 template for copying Laravel implementation details.
 
+Frequent mistakes are written in the folder the next edit touches. Read that
+guide before changing the code it names. It points at the component comment
+that enforces the rule. Open the file: a harness that stops at 32KiB of
+project instructions will not append it, because this root file already
+fills that budget.
+
+- `apps/AGENTS.md` — LiveView bindings, messages, withheld controls, clocks, read-first pages, tests
+- `apps/base/ui/AGENTS.md` — shared components, the Design Library, assets
+- `apps/base/audit/AGENTS.md` — what an audit row records
+- `apps/base/database/AGENTS.md` — silencing capture, and a boundary the database enforces
+- `apps/core/AGENTS.md` — an archived company freezes its accounts for good
+
 `docs/architecture/database.md` is the normative source of truth for database
 ownership, dependency categories, migrations, schema contracts, verification,
 adoption, and seeding. Read it before changing persistent behavior; do not
@@ -467,6 +479,41 @@ is necessary.
 Keep dependency versions current and compatible, update `mix.lock`, compile,
 format, and test after updates.
 
+Phoenix 1.8, LiveView 1.2, and Ecto 3.14 are newer than much of what a model
+learned. Before calling a library function or copying a pattern, check the
+installed version, then use the newer way when this version has one.
+
+```bash
+mix usage_rules.docs Module.function/arity
+mix usage_rules.search_docs "phrase" -p package
+```
+
+Those tasks read this project's locked versions. In `iex -S mix`,
+`h Module.function` shows the same installed docs. The source is
+`deps/<package>` (`ls`, `rg`, its `README` or `CHANGELOG`). When a
+dependency is upgraded, record the new pattern and the retired one in the
+component comment and the folder guide as part of the same change.
+
+Files a library ships, such as `deps/phoenix/usage-rules/*.md` and
+`deps/sobelow/usage-rules.md`, are that library's notes. This guide and the
+folder guides win where they disagree. Do not copy those files into a guide.
+
+- `deps/phoenix/usage-rules/liveview.md` says a stream prepend uses `at: -1`.
+  LiveView 1.2.9 appends at `-1` and prepends at `0`
+  (`deps/phoenix_live_view/lib/phoenix_live_view.ex`, around the `:at` option
+  of `stream/4`). Re-check this sentence when Phoenix or LiveView is
+  upgraded, and delete it once Phoenix corrects the file.
+- `deps/phoenix/usage-rules/ecto.md` generates migrations with
+  `mix ecto.gen.migration`. A Bilimbi migration belongs to the owning module
+  and runs through `mix bilimbi.migrate`.
+- `deps/phoenix/usage-rules/html.md` puts app-wide imports in `my_app_web.ex`.
+  A module LiveView uses `Bilimbi.Base.UI, :live_view`.
+- Those LiveView notes name a view `AppWeb.WeatherLive` under the router's
+  alias. A Bilimbi LiveView lives on the owning module, such as
+  `Bilimbi.Core.Company.Web.IndexLive`.
+- The same file shows an empty stream with a Tailwind `only:` class. An
+  empty region uses `<.empty_state>`.
+
 ## 9. Phoenix application conventions
 
 - Use verified routes and the `~p` sigil for internal paths.
@@ -517,28 +564,9 @@ not call or recreate it elsewhere.
 - Do not use `Enum.each/2` to generate template content; use a HEEx `for`.
 - Prefer function components for reusable markup. Avoid LiveComponents unless
   they need their own state and event lifecycle.
-- The Design Library (`/system/design-library`) presents only shared
-  components, and varies on the states they declare: an axis that declares two
-  or more states shows at least two of them, and an axis that declares a single
-  state shows that one. Showing every declared value is not required, so a
-  value that cannot be seen is never built. A component is presented by an
-  `id="component-<name>"` block of its own that calls `<.name>`; framing
-  another specimen is not presenting it. The exempt anchors are the sidebar
-  menu, the grouping sections it links to and the wrapper around them, so a
-  new grouping section is linked from the menu or drops the prefix. A nested
-  `component-` id is an entry of its own and splits the block above it, so
-  the library's stage wrappers, captions and boundary notes take the
-  `design-library-` prefix instead. A `<.card>` in the components area with
-  no `component-` anchor names nothing, so it is anchored, nested inside an
-  anchored block, or listed in the `@declared_specimens` of
-  `Bilimbi.Base.UI.DesignLibrarySource`, which owns the rules that read the
-  template. Hand-written control markup and single-state specimens fail the
-  guards in `apps/base/ui/test/design_library_*_test.exs`, which read it and
-  `Components.__components__/0`. Those guards are tagged
-  `:design_library_drift` and excluded from the default run until the current
-  specimens are corrected; run them with
-  `mix test --include design_library_drift`. The rules are covered on fixtures
-  by `design_library_rules_test.exs`, which runs by default.
+- A Design Library specimen calls the real component. Anchor, state, and
+  catalog-id rules live with `Bilimbi.Base.UI.DesignLibrarySource` and
+  `apps/base/ui/AGENTS.md`. Do not copy them here.
 
 Templates may be colocated with their owning LiveView through `embed_templates`
 or a nearby `.html.heex` file. Colocation does not move the view into the
@@ -574,156 +602,11 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
 
 ## 12. JavaScript and CSS
 
-- Use Tailwind CSS and focused custom CSS for the design in `DESIGN.md`.
-- **UI consistency:** Reuse Base UI before local markup. Field, search, and
-  filter controls are compact (`rounded-md`, `py-1.5`) and use `brand-strong`
-  focus borders and rings; compact pagination and icon controls are
-  `rounded-md`; surfaces are `rounded-xl`, except a table, which is always
-  flat, and a full-bleed (`p-0`) card whose edge is the table's frame; a
-  padded section card around an inset table keeps its radius. `table/1` and
-  `card/1` own this — read DESIGN.md's Table geometry bullet before writing a
-  radius near a table.
-  Operational lists default to 25 rows and only offer 25, 50, 100, or 300;
-  their sortable headers expose `aria-sort`, and page, search, filters, sort,
-  and page size stay in URL state. Use `<.datetime>` for timestamps and
-  `<.icon>` for all icons.
-  Name user-facing actions through `Bilimbi.Base.UI.IconRegistry` rather than
-  raw `hero-*` strings; put product-only SVGs in the same registry. Logout
-  keeps `hero-arrow-right-on-rectangle`. An empty region says what is
-  missing, why, and how to recover through `<.empty_state>` or the same
-  `title`/`reason`/`forbidden` attrs on `<.table>`'s `<:empty>` slot;
-  nothing-yet and nothing-matched are different sentences with different
-  recoveries, and a region the actor may not see uses the component's
-  `forbidden` wording rather than looking empty. `<.datetime>` already
-  follows a saved clock change on instants that are already on screen,
-  streamed rows included; do not thread a `display` assign to achieve
-  that. Pass `display` only to pin one instant to a context of your own.
-  A record's page is read-first whether or not it is called a detail page
-  (a record whose only page was an edit form gets a `/:id` page instead):
-  facts edit in place and commit by themselves
-  through `<.inline_edit>` (`allow_empty` on nullable columns, the outcome
-  passed back as `status`), a choice commits on change, and only genuinely
-  interdependent facts share a grouped Apply; see "Read-first detail pages"
-  in `DESIGN.md`. The per-fact outcome bookkeeping behind that `status` —
-  which "Saved" stands, the refusal wording, the rejected-value truncation —
-  is `Bilimbi.Base.UI.CommitStatus`; a page adopts it and never keeps a
-  copy. A detail section is a `<.card>` opened by
-  `<.section_heading>` whose facts are `<.list>` and whose table is
-  `<.table framed={false}>`; a hand-written `<dl>`, `<h2>`, `<h3>` or
-  `<table>` in a section is a defect (DESIGN.md "Detail sections and
-  facts"). A `<.table>` inside a LiveComponent passes
-  `sort_target={@myself}`. Returning is a secondary action: use `<.back_link>`
-  ("← Back"), never a "Back to …" button; a related workflow such as
-  Manage is an `<.action_link>` carrying its registry glyph, on the section
-  it belongs to or beside the page's primary action, never a button; and
-  render record history through the `record.history` panel, whose trigger is
-  the registry's `history` clock beside the word "History" in the same quiet
-  treatment as those links; a quiet action that submits a request (Impersonate)
-  is an `<.action_link>` with `href` and `method`. Detail pages share the list
-  width and their fact grids collapse to one column below `md`. Primary actions use
-  `<.button variant="primary">` with deep olive base (`bg-action`, `lime-950`
-  light / `lime-600` dark), high-contrast text (`text-action-ink`, `lime-50`
-  light / `lime-950` dark), and a brighter lime hover
-  (`hover:bg-action-hover`, `lime-600` light / `lime-500` dark). Lime `brand`
-  is reserved for orientation and selection, never an action or status. The
-  strip above the workspace renders only while impersonating; the
-  platform-operator marker is a `warning`-token row in the account menu, and
-  an operator-only surface whose reach is not filtered to one company carries
-  its own `warning`-token caution naming what is unfiltered, never a gate
-  (`DESIGN.md` "Application shell"). Async actions
-  must show in-flight state, reject duplicate work, and truthfully report the data
-  outcome and recovery: `phx-disable-with` covers one socket round trip, which
-  `app.js` mirrors onto `aria-busy`. It swaps the control's text, so it belongs
-  on text controls only and never on `<.icon_button>`, whose glyph it would
-  delete. A wait the server knows about (the sign-in handoff, an async delete)
-  is `<.button busy>` or `<.icon_button busy>`, which disables the control,
-  marks it and announces `aria-busy`.
-- **Flash messages:** `put_flash` kinds are `:success`, `:info`, `:warning`,
-  and `:error`. The layout's `flash_group` is the single stacked outlet:
-  only success carries the eight-second timer, while info, warning and error
-  stay until dismissed. A completed write flashes `:success`; `:info` is for
-  a notice that informs without confirming a write. Pick the kind from what
-  the message does and, where one handler reports different outcomes, from
-  the branch. `:info` paints on the blue `info` role and `:success` on
-  `success`, so they never look alike; success and info are announced as a
-  polite `status`, warning and error as an assertive `alert`.
-  A LiveComponent panel that cannot reach the page's flash reports through
-  `<.panel_notice>` under the same kind rule (`:success`, `:info`, `:error`),
-  above its table or inside its open dialog; do not hand-write a notice. The
-  shell's preference status line is deliberately not a flash. Do not build a
-  second notification surface.
-- **Compact actions:** Use `<.icon_button>` for familiar repeated secondary
-  actions in tables and toolbars. Inline icon controls are `size-6` (24px targets); table and
-  toolbar icon controls are `size-7`; the `h-7` top bar takes only `size-6`
-  (`context={:inline}`) controls, or their pressed surface paints the bar's
-  border. Every icon-only action has a truthful
-  accessible label and title. Keep primary and unfamiliar actions as text.
-  Destructive actions use calm danger text with quiet hover feedback, not a
-  solid danger fill. An action that cannot be undone confirms through
-  `<.confirm_dialog>`, never a native `data-confirm`: the caller holds the
-  requested record in an assign, renders the dialog with `:if` while it is
-  pending, acts on that held record from `on_confirm`, and stops rendering
-  it whatever the outcome (`DESIGN.md` "Confirmation dialogs"). No
-  `data-confirm` remains in the product; a new one is a defect.
-- **Data tables & inline editing:** Tables use compact density (`py-0.5` row
-  cells, `py-1.5` header cells, `px-2` cell horizontal padding,
-  `bg-surface-sunken` header background, proper case
-  `text-xs font-semibold text-ink-subtle` headers,
-  tabular numbers for numeric/code/date columns). Search filters use an open
-  toolbar with an `mb-2` gap above the table card; do not wrap the toolbar in
-  another card. Inline editing uses `<.inline_edit>` with
-  subtle hover pencil icon, click/focus activation, Enter/blur save, Escape cancel, and
-  LiveView stream patching (`stream_insert/3`). Pagination uses compact rows-per-page select
-  (`w-auto`, `h-7`, `pl-2 pr-6`) so three-digit options clear the dropdown
-  arrow, and accent focus rings (`focus:border-brand-strong focus:ring-brand-strong/30`).
-- Maintain the Tailwind v4 `source(none)` and `@source` imports in
-  `assets/css/app.css`.
-- The platform uses `Instrument Sans` globally via `--font-sans` in `@theme`.
-- **Navigation & menu design:** Navigation items use `Instrument Sans` with compact
-  styling (`font-weight: 350`, `0.8125rem`/13px, `line-height: 1.25rem`). Default
-  link text is `text-link` (`stone-700` light / `stone-300` dark), hover is
-  `text-ink`, and pinned headers and grips are `text-muted` (`stone-600` light /
-  `stone-400` dark). Active navigation uses `bg-surface text-brand-strong`
-  without bolding or spine borders. Parent branches of active items ascend with
-  `text-brand-strong`. Chevrons use triangle characters `&#x2BC8;` (`⯈`) and `&#x2BC6;`
-  (`⯆`) with figure space indentation for leaf items. Menu items and submenus are sorted
-  alphabetically ascending (`ASC`). Pinned items sit in `bg-brand-surface`.
-- Do not use `@apply` in raw CSS.
-- Build the design system with hand-written Tailwind-based components. Do not
-  make daisyUI or another component library the product design system.
-- The `@theme` block in `apps/web/assets/css/app.css` is the only place a color
-  is chosen. Components and templates use the semantic roles it declares —
-  `canvas`, `surface`, `surface-sunken`, `surface-muted`, `surface-sidebar`,
-  `brand-surface`, `line`, `ink`, `link`, `muted`, `action`, `brand`, `brand-strong`,
-  `success`, `info`, `warning`, `danger` — as ordinary Tailwind utilities such as
-  `bg-surface`, `text-ink-muted`, `text-link`, `border-line`, `text-danger`.
-- A raw palette class such as `stone-200` or `emerald-600` outside that
-  `@theme` block is a defect. It is greppable, so treat it as one:
-
-  ```bash
-  grep -rnE '\b(bg|text|border|ring|shadow|divide|accent)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]+' apps/*/lib
-  ```
-
-- Add a semantic role when a workflow genuinely needs one, not when a single
-  screen wants a shade. Roles carry meaning; `brand` is identity and never
-  reports status.
-- `phx.gen.live`, `phx.gen.html`, and `phx.gen.schema` output must use the
-  shared `Bilimbi.Base.UI.Components`; do not introduce a parallel
-  `BilimbiWeb.CoreComponents` layer.
-  `phx.gen.auth` is the exception: its templates hardcode daisyUI classes
-  (`btn btn-primary`, `btn-soft`, `alert alert-outline`, `alert alert-info`).
-  Convert those to semantic roles in the same change that runs the generator.
-- Do not add external script or stylesheet URLs to layouts. Import vendor code
-  through the supported asset bundles.
-- Do not write raw inline `<script>` tags in HEEx.
-- Use colocated hooks with `:type={Phoenix.LiveView.ColocatedHook}` for small
-  template-local behaviour; hook names start with `.`.
-- External hooks live in `assets/js/`, are registered with `LiveSocket`, and
-  have a unique DOM ID plus `phx-update="ignore"` when they manage their own
-  DOM.
-- Use `push_event/3` for server-to-hook events and rebind the returned socket.
-- Keep client-side behaviour small. Business rules and authorization remain on
-  the server.
+Interface rules live in `DESIGN.md`. The mistakes that keep recurring, and
+the asset and generator rules, live in `apps/base/ui/AGENTS.md`. Read both
+before editing HEEx, a shared component, or `apps/web/assets`. Where a
+component comment states the rule, follow that comment instead of restating
+it at the call site.
 
 ## 13. Ecto conventions
 
@@ -757,17 +640,12 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   the table — row locking, or a deliberate cross-tenant uniqueness proof — and
   each one should say so in a comment or function name.
 - Name constraints and indexes deliberately, especially on PostgreSQL.
-- **Every write through `Bilimbi.Base.Repo` is audited**, the eight struct
-  functions and `insert_all`/`update_all`/`delete_all` alike (ADR 0013).
-  Silence is an explicit opt-out with a written reason, never a default:
-  `:bilimbi_base_audit, :exclude_schemas` in `config/config.exs` when nothing
-  written to a schema is an actor's decision, or
-  `Bilimbi.Base.Database.WriteCapture.without_capture/1` (aliased as
-  `Audit.without_auditing/1`) at a machine-only call site on a table whose
-  other writes stay captured. There is no third mechanism. Raw SQL bypasses
-  the repo and so cannot carry an audited write. Raw-SQL DML outside the
-  lifecycle modules that need it (production-seed ledger, compatibility
-  cutover) is a review defect, a convention with no mechanical guard yet.
+- **Every write through `Bilimbi.Base.Repo` is audited**, struct writes and
+  `insert_all`/`update_all`/`delete_all` alike (ADR 0013). What a row
+  records, and how silence is allowed, lives in `apps/base/audit/AGENTS.md`
+  and `apps/base/database/AGENTS.md`. Raw SQL bypasses the repo, so raw-SQL
+  DML outside the lifecycle modules that need it (production-seed ledger,
+  compatibility cutover) is a review defect.
   The database console is a developer tool on the application's own
   connection, with no login of its own: its read-only transaction makes a
   console write refused by PostgreSQL itself, and every console command,
@@ -795,6 +673,9 @@ Test outcomes and public contracts rather than implementation details.
   persistence as observable outcomes.
 - Split large behaviours into focused test files and begin with simple
   presence/contract tests before interaction-heavy tests.
+- Prove behaviour. Do not add a test that reads or pattern-matches source
+  to show a bug is absent. A security or database boundary makes the
+  database refuse. See `apps/AGENTS.md`.
 
 ## 15. Documentation and AI workflow
 

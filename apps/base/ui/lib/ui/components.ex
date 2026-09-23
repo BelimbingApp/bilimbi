@@ -246,7 +246,9 @@ defmodule Bilimbi.Base.UI.Components do
 
   `kind` is what the message does, not how it is worded: a write that
   finished says `:success`, a notice that merely informs stays `:info`, and
-  a refusal or failure is `:error`. A completed write and an error look like
+  a refusal or failure is `:error`. When one handler can confirm a write or
+  report that nothing changed, the kind comes from that branch. A refusal
+  names its real cause. A completed write and an error look like
   their page-level flash counterparts at inline strength, and so does an
   informational notice on the `info` role. Success and info are announced
   politely as a `status`; an error interrupts as an `alert`.
@@ -1668,6 +1670,11 @@ defmodule Bilimbi.Base.UI.Components do
     doc: "explicit display context that pins the instant to it; defaults to the process context"
   )
 
+  # Every timestamp a person reads goes through here, so a saved clock
+  # change reaches instants already on screen. Pass `precision={:second}`
+  # when two events in one minute must stay distinct (an audit diff).
+  # Do not format the instant in the template. `display` pins one instant;
+  # omit it to follow the reader's clock.
   def datetime(assigns) do
     display = assigns.display || Bilimbi.Base.UI.DateTimeDisplay.get()
     date_time = datetime_value(assigns.value)
@@ -1831,9 +1838,12 @@ defmodule Bilimbi.Base.UI.Components do
     |> Enum.flat_map(&String.split(to_string(&1)))
   end
 
-  # The default gives way only to a base-variant padding shorthand. A
-  # responsive one (`sm:p-6`) sets nothing below its breakpoint, and an
-  # axis-only one (`px-4`) sets nothing on the other axis, so both keep it.
+  # The caller's padding shorthand wins over the `p-2` default. Resolve
+  # that here: two utilities of equal specificity follow stylesheet order,
+  # and `.p-0` is emitted before `.p-2`, so appending the caller's class
+  # would still render 8px. A responsive shorthand (`sm:p-6`) sets nothing
+  # below its breakpoint, and an axis-only one (`px-4`) sets nothing on
+  # the other axis, so both keep the default where they say nothing.
   defp inner_padding(tokens) do
     if Enum.any?(tokens, &match?("p-" <> _, &1)), do: nil, else: "p-2"
   end
@@ -2022,6 +2032,8 @@ defmodule Bilimbi.Base.UI.Components do
 
   attr(:rest, :global)
 
+  # Never `data-confirm`. The caller holds the record, renders this while
+  # that record is pending, and stops rendering it whatever the outcome.
   def confirm_dialog(assigns) do
     ~H"""
     <.modal
@@ -2301,6 +2313,8 @@ defmodule Bilimbi.Base.UI.Components do
     attr(:forbidden, :string, doc: "the action the actor lacks permission for")
   end
 
+  # Flat on purpose. This component takes no radius, so a rounded table is
+  # hand-written markup. DESIGN.md "Table geometry".
   def table(assigns) do
     assigns =
       with %{rows: %Phoenix.LiveView.LiveStream{}} <- assigns do
@@ -2453,6 +2467,9 @@ defmodule Bilimbi.Base.UI.Components do
     doc: "an optional recovery, such as clearing the search or creating the first record"
   )
 
+  # Say why a region is empty and what to do next. `forbidden` names a
+  # permission the actor lacks; it is a different sentence from an empty
+  # list. Hiding the control and saying nothing is the mistake.
   def empty_state(%{title: nil, forbidden: nil}) do
     raise ArgumentError,
           "<.empty_state> needs a title (what is missing) or forbidden (the action the actor lacks)"
@@ -2572,6 +2589,9 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:input_class, :any, default: nil)
   attr(:rest, :global)
 
+  # A record page edits the fact here. There is no separate Edit button,
+  # and no `/:id/edit` route for a record whose only page was a form.
+  # The outcome text is `Bilimbi.Base.UI.CommitStatus`, passed as `status`.
   def inline_edit(assigns) do
     assigns = assign(assigns, :status, normalize_commit_status(assigns.status))
 

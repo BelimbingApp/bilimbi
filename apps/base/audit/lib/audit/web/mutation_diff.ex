@@ -97,6 +97,9 @@ defmodule Bilimbi.Base.Audit.Web.MutationDiff do
   @doc """
   Renders one side of a change: an instant through `<.datetime>`, so it
   follows the page's clock, and anything else as its text.
+
+  The instant includes seconds. Two edits in one minute must stay
+  distinguishable; minute precision hides the later one.
   """
   def diff_value(assigns) do
     ~H"""

@@ -541,7 +541,9 @@ defmodule Bilimbi.Base.UI.Layouts do
   the person dismisses them, because a message someone must act on must not
   disappear on a timer. An action confirmed through `<.confirm_dialog>` emits a
   `:success` flash; completed writes emit `:success`, while `:info` stays
-  sticky for notices that inform without confirming a write. The reconnect
+  sticky for notices that inform without confirming a write. Pick the kind
+  from the outcome of this call. A failure is never `:success`, and a
+  refusal names its real cause. The reconnect
   notices are errors and keep that rule.
 
   The group is a permanent polite live region, so a message inserted into it

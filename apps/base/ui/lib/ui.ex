@@ -42,6 +42,9 @@ defmodule Bilimbi.Base.UI do
             "scope propagation rather than defaulting the id. Got: #{inspect(current_scope)}"
   end
 
+  # `phx-input` is not a LiveView binding and silently does nothing.
+  # Filter with `phx-change` on the form and `phx-submit` to the same
+  # handler, or `phx-keyup` when there is no form. See `apps/AGENTS.md`.
   def live_view do
     quote do
       use Phoenix.LiveView

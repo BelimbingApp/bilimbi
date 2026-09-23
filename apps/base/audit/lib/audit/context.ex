@@ -6,7 +6,8 @@ defmodule Bilimbi.Base.Audit.Context do
   per HTTP request or LiveView process — the same lifecycle as the locale —
   and capture reads it when shaping rows. Absent context degrades to the
   source's guest default (`actor_type "guest"`, `actor_id 0`) rather than
-  failing the write; background work that wants attribution sets its own.
+  failing the write or skipping it. Do not silence capture to avoid a guest
+  row; background work that wants attribution sets its own.
 
   `impersonator_id` names the operator behind an impersonated session. The
   actor pair keeps naming the account acted as; the impersonator is the

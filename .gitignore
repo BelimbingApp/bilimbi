@@ -63,6 +63,10 @@ npm-debug.log
 !/apps/base/
 !/apps/core/
 !/apps/web/
+# Folder guides sit beside those containers. `/apps/*` would hide them, and a
+# guide git ignores is a guide the harnesses skip.
+!/apps/AGENTS.md
+!/apps/CLAUDE.md
 
 # Python bytecode from .github/scripts tests
 __pycache__

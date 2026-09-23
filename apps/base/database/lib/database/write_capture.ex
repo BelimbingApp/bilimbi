@@ -65,7 +65,14 @@ defmodule Bilimbi.Base.Database.WriteCapture do
   """
   @callback capture_schema?(module()) :: boolean()
 
-  @doc "Runs `fun` with write capture disabled in this process."
+  @doc """
+  Runs `fun` with write capture disabled in this process.
+
+  Call this only with a written reason for that table, at a machine-only
+  site whose other writes stay captured. A missing actor is not a reason:
+  the audit policy records that write as guest. Schema-wide silence is
+  `:bilimbi_base_audit, :exclude_schemas`, not this function.
+  """
   @spec without_capture((-> result)) :: result when result: var
   def without_capture(fun) when is_function(fun, 0) do
     previous = Process.put(@capture_disabled_key, true)

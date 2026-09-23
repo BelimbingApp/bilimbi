@@ -48,6 +48,9 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
   alias Bilimbi.Base.Audit.PayloadText
   alias Bilimbi.Base.Repo
 
+  # Redact here, in the shared policy. A call site does not invent its own
+  # masking. `payload` is the opaque session blob, which can carry a secret
+  # no field name reveals.
   @redacted_fields ~w(password password_hash remember_token secret api_key token payload)a
   @redacted_marker "[redacted]"
   @bulk_chunk_size 1000
