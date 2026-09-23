@@ -594,7 +594,7 @@ defmodule BilimbiWeb.UserShowTest do
     assert {:ok, %{company_id: 75}} = User.get_user(scope, 75, 92)
 
     {:ok, mutations} = Audit.list_mutations(scope)
-    assert Enum.count(mutations, &(&1.event == "cleared_company")) == 0
+    refute Enum.any?(mutations, &(&1.event == "cleared_company"))
     refute has_element?(view, "#user-unaffiliated-notice")
   end
 
