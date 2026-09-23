@@ -117,7 +117,7 @@ Every catalog item receives one disposition after visual and interaction review:
 - **Steward review** — the design steward compares live alternatives, chooses the best supported treatment within K01–K09 and records the reason; this is temporary audit work, not a user approval queue.
 - **Not applicable** — the capability has no honest Bilimbi use; record why and do not build it.
 
-The ledger is campaign tracking, not a permanent second design source. Accepted outcomes move to the live Design Library, Design Spec and shared implementation under the same catalog ID.
+The ledger is campaign tracking, not a permanent second design source. Accepted outcomes move to the live Design Library, Design Spec and shared implementation under the same catalog ID; the ID lives in this plan, HTML comments, test names and element ids — never in rendered text.
 
 #### Recorded dispositions (Phase 0, 2026-09-16)
 
@@ -361,7 +361,7 @@ dispatched events, and dark theme on the Lane B rows.
 
 The Design Library uses one shared secondary catalog and one review surface per family. It renders the real Bilimbi implementation in meaningful states. Comparison notes describe user-visible Belimbing behavior and recognizable product use cases; normal UI does not expose agent instructions, repository ownership or Laravel component names.
 
-To make parallel work mergeable, family specimens may be separated into family-owned view files behind the existing Design Library shell. Do not split the production component API merely to create artificial agent concurrency.
+Family specimens stay in the shared template behind the existing Design Library shell; the family-owned view split is dropped (see the dropped Phase 1 item below) — the few remaining Design Library slices rebase on the one template instead. Do not split the production component API merely to create artificial agent concurrency.
 
 ### Shared Base UI and Production Adoption
 
@@ -486,7 +486,7 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     ID. Letters also need no zero-padding, so a twelfth family cannot silently
     break the sort the way unpadded numbers would.
 
-- [x] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source. `{codex-sol-specimens-1/gpt-5.6-sol}`
+- [x] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source. **Dropped 2026-09-23:** the problem it was written for — fake specimens drifting away from the real components — was already solved by #723 (which replaced hand-written navigation, tabs and radio specimens with the real components) plus the route guards. Splitting the 1,369-line template would touch every anchor and all 14 web tests, and only a few Design Library slices remain, so rebasing those is cheaper than the split. `{codex-sol-specimens-1/gpt-5.6-sol}`
 - [x] Show the current Bilimbi component in every meaningful state for the active family. `{codex-luna-states-1/gpt-5.6-luna}`
 
   Both landed on 2026-09-15 and neither finished the job: the `:design_library_drift`
@@ -534,12 +534,12 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
 
   Both guards therefore still fail, stay tagged `:design_library_drift`, and stay
   out of the default run and `mix precommit`.
-- [ ] Present alternatives under steward review together with recognizable use cases and stable catalog IDs; record the design steward's accepted disposition and rationale.
+- [ ] Record dispositions in the ledger as steward review closes; the accepted choices already live in the Design Spec cards and this plan's ledger. **Rewritten 2026-09-23:** the in-library alternatives surface with catalog IDs is dropped — only one row (INP-09) is still at steward review, catalog IDs are ruled out of the rendered library, and building a surface for a one-row queue is speculative.
 - [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
 
 Affected pages: `/system/design-library`, `/system/design-library/components`, `/system/design-library/graphic`, `/system/design-library/design-spec`
 
-Validation: The reviewer can reach any catalog family quickly, interact with the real component and record a decision by stable ID.
+Validation: The reviewer can reach any catalog family quickly, interact with the real component and record a decision by stable ID in the plan ledger.
 
 ### Phase 2 — Parallel family audits
 
@@ -605,7 +605,7 @@ Goal: Close the campaign with evidence that remains useful as Bilimbi evolves.
 - [x] Build the Design Library drift guards at the start of the campaign instead of at closeout, so later slices land against them rather than accumulating drift: `apps/base/ui/test/design_library_imitation_test.exs` rejects anchors that name no shared component, hand-written control markup and undeclared specimen cards; `design_library_coverage_test.exs` requires a `component-<name>` block per component and variation on the states it declares, showing at least two of an axis's declared states where it declares two or more and the single one where it declares one. Both read the template through `Bilimbi.Base.UI.DesignLibrarySource`, which owns the rules and is covered on fixtures by `design_library_rules_test.exs`. Both are tagged `:design_library_drift` and stay out of the default run and `mix precommit` until the specimens they report are corrected; run them with `mix test --include design_library_drift`. `{claude-fable-guards-1/claude-fable-5-1}`
 - [ ] Add guards for raw palette use, local component forks, missing Design Library states and unregistered icons where deterministic checks are useful.
 - [ ] Run component, LiveView, module workflow, asset and full precommit validation.
-- [ ] Record the accepted catalog IDs in Design Spec and close the execution issues with browser evidence.
+- [ ] Record the accepted dispositions in this plan and in HTML comments — catalog IDs stay in the plan, comments, test names and element ids, never in rendered text — and close the execution issues with browser evidence.
 
 Validation: Bilimbi matches or exceeds the useful design capability of Belimbing, preserves its own identity, and makes later drift visible before it reaches users.
 
