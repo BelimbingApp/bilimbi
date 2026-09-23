@@ -3,6 +3,11 @@ defmodule Bilimbi.Core.User.Web.NotificationBellComponent do
   Top-bar notification bell LiveComponent.
   Displays an unread badge and dropdown list of recent notifications
   for the signed-in user within tenant scope.
+
+  The panel follows the contract the shell's own disclosures (account,
+  timezone) keep: opening moves focus to its first control, Escape closes it
+  and returns focus to the bell, and a click outside closes it. The Escape
+  listener is the panel's own, so a closed bell never claims the key.
   """
 
   use Bilimbi.Base.UI, :live_component

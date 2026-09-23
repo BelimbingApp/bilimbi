@@ -44,7 +44,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   Roles and capability assignments, password updates, employee
   linking/creation and the external accesses read model keep their own
-  sections and their own affordances.
+  sections and their own affordances. Every section has the anatomy
+  DESIGN.md's "Detail sections and facts" sets out: a `<.card>` region opened
+  by `<.section_heading>`, whose facts — the User Details, the assigned roles
+  and each domain of effective and denied permissions — are the shared
+  `<.list>`. The two disclosures (Effective Permissions, Change Password)
+  keep their hand-written trigger until the shared disclosure lands.
   """
 
   use Bilimbi.Base.UI, :live_view
@@ -952,159 +957,151 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         </.header>
 
         <div class="mt-6 space-y-6">
-          <!-- Card 1: User Details, read-first -->
-          <.card id="user-details-card" inner_class="p-5 sm:p-6">
-            <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-4">
-              User Details
-            </h3>
+          <%!-- Section 1: User Details. The facts are the shared `<.list>`
+               under the shared `<.section_heading>`, as on `/companies/:id`,
+               `/addresses/:id` and `/employees/:id`; each fact edits in place
+               and reports on itself, so the heading carries no button. --%>
+          <.card
+            id="user-details-card"
+            inner_class="p-5 sm:p-6"
+            role="region"
+            aria-labelledby="user-details-heading"
+          >
+            <.section_heading id="user-details-heading" title="User Details" />
 
-            <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <.text_fact
-                name="name"
-                user={@user}
-                can_manage?={@can_manage?}
-                field_status={@field_status}
-              />
-              <.text_fact
-                name="email"
-                user={@user}
-                can_manage?={@can_manage?}
-                field_status={@field_status}
-              />
+            <.list id="user-details">
+              <:item title={fact_label("name")} id="user-view-name">
+                <.text_fact
+                  name="name"
+                  user={@user}
+                  can_manage?={@can_manage?}
+                  field_status={@field_status}
+                />
+              </:item>
+              <:item title={fact_label("email")} id="user-view-email">
+                <.text_fact
+                  name="email"
+                  user={@user}
+                  can_manage?={@can_manage?}
+                  field_status={@field_status}
+                />
+              </:item>
+              <:item title="Company" id="user-view-company">
+                <button
+                  :if={@can_manage? and @editing_field != "company"}
+                  type="button"
+                  id="user-company-display"
+                  phx-click="edit_field"
+                  phx-value-field="company"
+                  aria-label="Edit company"
+                  aria-describedby={@field_status["company"] && "user-company-status"}
+                  class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
+                >
+                  <span :if={@company_name} class="text-ink">{@company_name}</span>
+                  <span :if={is_nil(@company_name)} class="text-ink-muted">Archived company</span>
+                  <.icon
+                    name="edit"
+                    class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                  />
+                </button>
 
-              <div id="user-detail-company">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                  Company
-                </dt>
-                <dd id="user-view-company" class="mt-0.5 text-sm text-ink">
-                  <button
-                    :if={@can_manage? and @editing_field != "company"}
-                    type="button"
-                    id="user-company-display"
-                    phx-click="edit_field"
-                    phx-value-field="company"
-                    aria-label="Edit company"
-                    aria-describedby={@field_status["company"] && "user-company-status"}
-                    class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
-                  >
-                    <span :if={@company_name} class="text-ink">{@company_name}</span>
-                    <span :if={is_nil(@company_name)} class="text-ink-muted">Archived company</span>
-                    <.icon
-                      name="edit"
-                      class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-                    />
-                  </button>
-
-                  <%!-- Window-scoped: the select may not hold focus (JS.focus is
-                       best-effort), and Escape must cancel regardless. Only one
-                       editor mounts at a time, so the listener is unambiguous. --%>
-                  <div
-                    :if={@can_manage? and @editing_field == "company"}
-                    phx-window-keydown="cancel_edit_field"
-                    phx-key="Escape"
-                  >
-                    <form id="user-company-form" phx-change="save_company" class="inline-block">
-                      <select
-                        id="user-company-select"
-                        name="company_id"
-                        aria-label="Company"
-                        aria-describedby="user-company-warning"
-                        phx-mounted={JS.focus()}
-                        phx-blur="cancel_edit_field"
-                        class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                <%!-- Window-scoped: the select may not hold focus (JS.focus is
+                     best-effort), and Escape must cancel regardless. Only one
+                     editor mounts at a time, so the listener is unambiguous. --%>
+                <div
+                  :if={@can_manage? and @editing_field == "company"}
+                  phx-window-keydown="cancel_edit_field"
+                  phx-key="Escape"
+                >
+                  <form id="user-company-form" phx-change="save_company" class="inline-block">
+                    <select
+                      id="user-company-select"
+                      name="company_id"
+                      aria-label="Company"
+                      aria-describedby="user-company-warning"
+                      phx-mounted={JS.focus()}
+                      phx-blur="cancel_edit_field"
+                      class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                    >
+                      <option :if={is_nil(@company_name)} value="" selected disabled>
+                        Archived company
+                      </option>
+                      <option
+                        :for={company <- @companies}
+                        value={company.id}
+                        selected={@user.company_id == company.id}
                       >
-                        <option :if={is_nil(@company_name)} value="" selected disabled>
-                          Archived company
-                        </option>
-                        <option
-                          :for={company <- @companies}
-                          value={company.id}
-                          selected={@user.company_id == company.id}
-                        >
-                          {Company.Summary.display_name(company)}
-                        </option>
-                      </select>
-                    </form>
+                        {Company.Summary.display_name(company)}
+                      </option>
+                    </select>
+                  </form>
 
-                    <%!-- The choice commits on change and the write ends the
-                         account's sessions, so the warning stands before the
-                         choice, beside the select, where the operator reads it
-                         first; it is a note, not a second click. --%>
-                    <p id="user-company-warning" class="mt-1 text-xs text-warning-ink">
-                      Changing the company signs {@user.name} out of every session.
-                    </p>
-                  </div>
+                  <%!-- The choice commits on change and the write ends the
+                       account's sessions, so the warning stands before the
+                       choice, beside the select, where the operator reads it
+                       first; it is a note, not a second click. --%>
+                  <p id="user-company-warning" class="mt-1 text-xs text-warning-ink">
+                    Changing the company signs {@user.name} out of every session.
+                  </p>
+                </div>
 
-                  <%= if not @can_manage? do %>
-                    <%= if @company_name do %>
-                      <.link
-                        navigate={~p"/companies/#{@user.company_id}"}
-                        class="text-action hover:underline"
-                      >
-                        {@company_name}
-                      </.link>
-                    <% else %>
-                      <span class="text-ink-muted">Archived company</span>
-                    <% end %>
+                <%= if not @can_manage? do %>
+                  <%= if @company_name do %>
+                    <.link
+                      navigate={~p"/companies/#{@user.company_id}"}
+                      class="text-action hover:underline"
+                    >
+                      {@company_name}
+                    </.link>
+                  <% else %>
+                    <span class="text-ink-muted">Archived company</span>
                   <% end %>
+                <% end %>
 
-                  <.commit_status id="user-company-status" status={@field_status["company"]} />
-                </dd>
-              </div>
-
-              <div id="user-detail-email-verified">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                  Email Verified
-                </dt>
-                <dd class="mt-0.5 text-sm text-ink">
-                  <.badge kind={if @user.email_verified_at, do: :success, else: :warning}>
-                    <%= if @user.email_verified_at do %>
-                      <.datetime id="user-email-verified-at" value={@user.email_verified_at} />
-                    <% else %>
-                      unverified
-                    <% end %>
-                  </.badge>
-                </dd>
-              </div>
-
-              <div id="user-detail-created">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                  Created
-                </dt>
-                <dd class="mt-0.5 text-sm text-ink-muted tabular-nums">
+                <.commit_status id="user-company-status" status={@field_status["company"]} />
+              </:item>
+              <:item title="Email Verified" id="user-view-email-verified">
+                <.badge kind={if @user.email_verified_at, do: :success, else: :warning}>
+                  <%= if @user.email_verified_at do %>
+                    <.datetime id="user-email-verified-at" value={@user.email_verified_at} />
+                  <% else %>
+                    unverified
+                  <% end %>
+                </.badge>
+              </:item>
+              <:item title="Created" id="user-view-created">
+                <span class="text-ink-muted tabular-nums">
                   <.datetime :if={@user.created_at} id="user-created-at" value={@user.created_at} />
                   <span :if={is_nil(@user.created_at)} class="text-ink-faint">—</span>
-                </dd>
-              </div>
-
-              <div id="user-detail-updated">
-                <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                  Updated
-                </dt>
-                <dd class="mt-0.5 text-sm text-ink-muted tabular-nums">
+                </span>
+              </:item>
+              <:item title="Updated" id="user-view-updated">
+                <span class="text-ink-muted tabular-nums">
                   <.datetime :if={@user.updated_at} id="user-updated-at" value={@user.updated_at} />
                   <span :if={is_nil(@user.updated_at)} class="text-ink-faint">—</span>
-                </dd>
-              </div>
-            </dl>
+                </span>
+              </:item>
+            </.list>
           </.card>
 
-          <!-- Card 2: Roles & Permissions -->
-          <.card id="user-roles-card" inner_class="p-5 sm:p-6 space-y-4">
-            <div class="flex items-center justify-between mb-1">
-              <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                Roles & Permissions
-                <span
-                  id="assigned-roles-count"
-                  class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
-                >
-                  {length(@assigned_roles)}
-                </span>
-              </h3>
-            </div>
-            <p class="max-w-prose text-xs text-ink-muted mt-0.5 mb-4">
-              Roles determine what this user can do. Each role grants a set of capabilities. Effective permissions show the combined result of all assigned roles.
-            </p>
+          <%!-- Section 2: Roles & Permissions. Roles are a fact of the shared
+               list; the pickers and the effective-permission disclosure keep
+               their own controls below it. --%>
+          <.card
+            id="user-roles-card"
+            inner_class="p-5 sm:p-6"
+            role="region"
+            aria-labelledby="user-roles-heading"
+          >
+            <.section_heading
+              id="user-roles-heading"
+              title="Roles & Permissions"
+              count={length(@assigned_roles)}
+            >
+              <:description>
+                Roles determine what this user can do. Each role grants a set of capabilities. Effective permissions show the combined result of all assigned roles.
+              </:description>
+            </.section_heading>
 
             <%= if is_nil(@user.company_id) do %>
               <.alert kind={:info} id="roles-unaffiliated-alert" class="mb-4">
@@ -1112,12 +1109,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               </.alert>
             <% end %>
 
-            <!-- Assigned Roles -->
-            <dl class="mb-4" id="assigned-roles-container">
-              <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">
-                Roles
-              </dt>
-              <dd>
+            <div class="mb-4">
+              <.list id="assigned-roles-container">
+                <:item title="Roles" id="assigned-roles">
                 <%= if @assigned_roles == [] do %>
                   <span class="text-sm text-ink-muted" id="no-roles-msg">No roles assigned.</span>
                 <% else %>
@@ -1148,8 +1142,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     </span>
                   </div>
                 <% end %>
-              </dd>
-            </dl>
+                </:item>
+              </.list>
+            </div>
 
             <!-- Assign Roles Form (Expandable) -->
             <%= if @can_manage? and not is_nil(@user.company_id) and @available_roles != [] and not @has_grant_all? do %>
@@ -1261,15 +1256,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 <%= if @grouped_effective_permissions == %{} do %>
                   <p class="text-sm text-ink-muted">No permissions.</p>
                 <% else %>
-                  <dl
-                    :for={{domain, caps} <- @grouped_effective_permissions}
-                    id={"permissions-domain-#{domain}"}
-                    class="mb-3"
-                  >
-                    <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-1">
-                      {domain}
-                    </dt>
-                    <dd class="flex flex-wrap gap-1">
+                  <.list id="effective-permissions-list">
+                    <:item
+                      :for={{domain, caps} <- @grouped_effective_permissions}
+                      title={domain}
+                      id={"permissions-domain-#{domain}"}
+                    >
+                      <div class="flex flex-wrap gap-1">
                       <%= for cap <- caps do %>
                         <% is_direct = Map.has_key?(@direct_grant_ids, cap) %>
                         <span
@@ -1319,8 +1312,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                           <% end %>
                         </span>
                       <% end %>
-                    </dd>
-                  </dl>
+                      </div>
+                    </:item>
+                  </.list>
                 <% end %>
 
                 <!-- Denied Capabilities Grouped by Domain (Red) -->
@@ -1332,15 +1326,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">
                     Denied
                   </div>
-                  <div
-                    :for={{domain, caps} <- @grouped_denied_permissions}
-                    id={"denied-domain-#{domain}"}
-                    class="mb-3"
-                  >
-                    <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-1">
-                      {domain}
-                    </div>
-                    <div class="flex flex-wrap gap-1">
+                  <.list id="denied-permissions-list">
+                    <:item
+                      :for={{domain, caps} <- @grouped_denied_permissions}
+                      title={domain}
+                      id={"denied-domain-#{domain}"}
+                    >
+                      <div class="flex flex-wrap gap-1">
                       <span
                         :for={cap <- caps}
                         id={"denied-cap-badge-#{String.replace(cap, ".", "-")}"}
@@ -1362,8 +1354,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                           }
                         />
                       </span>
-                    </div>
-                  </div>
+                      </div>
+                    </:item>
+                  </.list>
                 </div>
 
                 <!-- Add Capabilities Picker -->
@@ -1503,19 +1496,22 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             </div>
           </.card>
 
-          <!-- Card 4: Employee Records -->
-          <.card id="user-employees-card" inner_class="p-5 sm:p-6 space-y-4">
-            <div class="flex items-center justify-between">
-              <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                Employee Records
-                <span
-                  id="employees-count"
-                  class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
-                >
-                  {length(@employees)}
-                </span>
-              </h3>
-              <div :if={@can_manage? and not is_nil(@user.company_id)}>
+          <%!-- Section 4: Employee Records --%>
+          <.card
+            id="user-employees-card"
+            inner_class="p-5 sm:p-6"
+            role="region"
+            aria-labelledby="user-employees-heading"
+          >
+            <.section_heading
+              id="user-employees-heading"
+              title="Employee Records"
+              count={length(@employees)}
+            >
+              <:description>
+                Employment records linking this user to companies. A user can have multiple records across different companies (e.g. contractors). Not all employees require a user account.
+              </:description>
+              <:actions :if={@can_manage? and not is_nil(@user.company_id)}>
                 <.button
                   type="button"
                   id="open-add-employee-modal-btn"
@@ -1526,11 +1522,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <.icon name="create" class="size-3.5" />
                   <span>Add Employee</span>
                 </.button>
-              </div>
-            </div>
-            <p class="max-w-prose text-xs text-ink-muted mt-0.5">
-              Employment records linking this user to companies. A user can have multiple records across different companies (e.g. contractors). Not all employees require a user account.
-            </p>
+              </:actions>
+            </.section_heading>
 
             <.table
               id="user-employees-table"
@@ -1654,22 +1647,22 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             </div>
           </.card>
 
-          <!-- Card 5: External Accesses -->
-          <.card id="user-external-accesses-card" inner_class="p-5 sm:p-6 space-y-4">
-            <div class="flex items-center justify-between">
-              <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                External Accesses
-                <span
-                  id="external-accesses-count"
-                  class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
-                >
-                  {length(@external_accesses)}
-                </span>
-              </h3>
-            </div>
-            <p class="max-w-prose text-xs text-ink-muted mt-0.5">
-              Portal access granted to this user by other companies. Allows customers or suppliers to view orders, invoices, and other shared data.
-            </p>
+          <%!-- Section 5: External Accesses --%>
+          <.card
+            id="user-external-accesses-card"
+            inner_class="p-5 sm:p-6"
+            role="region"
+            aria-labelledby="user-external-accesses-heading"
+          >
+            <.section_heading
+              id="user-external-accesses-heading"
+              title="External Accesses"
+              count={length(@external_accesses)}
+            >
+              <:description>
+                Portal access granted to this user by other companies. Allows customers or suppliers to view orders, invoices, and other shared data.
+              </:description>
+            </.section_heading>
 
             <.table
               id="user-external-accesses-table"
@@ -1890,22 +1883,17 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       |> assign(:editable?, assigns.can_manage?)
 
     ~H"""
-    <div id={"user-detail-#{@name}"}>
-      <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">{@label}</dt>
-      <dd id={"user-view-#{@name}"} class="mt-0.5 text-sm text-ink">
-        <.inline_edit
-          :if={@editable?}
-          id={"user-#{@name}"}
-          name={@name}
-          label={@label}
-          value={@value}
-          id_value={@user.id}
-          save_event="save_field"
-          status={@field_status[@name]}
-        />
-        <span :if={not @editable?}>{@value}</span>
-      </dd>
-    </div>
+    <.inline_edit
+      :if={@editable?}
+      id={"user-#{@name}"}
+      name={@name}
+      label={@label}
+      value={@value}
+      id_value={@user.id}
+      save_event="save_field"
+      status={@field_status[@name]}
+    />
+    <span :if={not @editable?}>{@value}</span>
     """
   end
 

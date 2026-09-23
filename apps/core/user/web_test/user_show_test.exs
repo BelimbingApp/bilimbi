@@ -109,6 +109,56 @@ defmodule BilimbiWeb.UserShowTest do
     assert {:ok, %{company_id: 73}} = User.get_user(scope, 73, 92)
   end
 
+  test "presents the user facts as the shared list under one section heading", %{conn: conn} do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.com"
+    })
+
+    grant_capabilities!(["admin.user.view", "admin.user.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+
+    # One heading treatment: every section is a named region whose title is
+    # the shared level-two heading, and the fact sections write no h3.
+    for id <- ~w(user-details user-roles user-employees user-external-accesses) do
+      assert has_element?(
+               view,
+               "##{id}-card[role='region'][aria-labelledby='#{id}-heading'] h2##{id}-heading"
+             )
+    end
+
+    refute has_element?(view, "#user-details-card h3")
+    refute has_element?(view, "#user-employees-card h3")
+    refute has_element?(view, "#user-external-accesses-card h3")
+    refute has_element?(view, "#user-details-card dl.grid")
+
+    # The facts are rows of one definition list; every value cell keeps its
+    # id and the in-place editor opens inside it.
+    assert has_element?(view, "#user-details-card dl dd#user-view-name", "Grace Hopper")
+    assert has_element?(view, "dd#user-view-name #user-name[phx-hook='InlineEdit']")
+    assert has_element?(view, "#user-details-card dl dd#user-view-email", "grace@example.com")
+    assert has_element?(view, "#user-details-card dl dt", "Company")
+    assert has_element?(view, "dd#user-view-company #user-company-display", "Bilimbi Industries")
+    assert has_element?(view, "dd#user-view-email-verified", "unverified")
+    assert has_element?(view, "#user-details-card dl dt", "Created")
+    assert has_element?(view, "dd#user-view-created")
+    assert has_element?(view, "dd#user-view-updated")
+
+    # Roles are a fact of the same shape, with the count in the heading row.
+    assert has_element?(view, "#user-roles-heading + span", "0")
+    assert has_element?(view, "#assigned-roles-container dt", "Roles")
+    assert has_element?(view, "dd#assigned-roles #no-roles-msg", "No roles assigned.")
+
+    # The section's own action sits in its heading row.
+    assert has_element?(view, "#user-employees-heading + span", "0")
+    assert has_element?(view, "#user-employees-card #open-add-employee-modal-btn", "Add Employee")
+  end
+
   test "hides History and Impersonate from an actor without their capabilities", %{conn: conn} do
     UserFixtures.insert_user!(%{id: 91, company_id: 73})
 
@@ -720,7 +770,7 @@ defmodule BilimbiWeb.UserShowTest do
     |> form("#assign-roles-form")
     |> render_submit(%{"role_ids" => ["#{role.id}"]})
 
-    assert has_element?(view, "#assigned-roles-count", "1")
+    assert has_element?(view, "#user-roles-heading + span", "1")
     assert has_element?(view, "#assigned-roles-list", "Editor")
 
     # Remove role
@@ -728,7 +778,7 @@ defmodule BilimbiWeb.UserShowTest do
     [assignment] = assignments.entries
 
     view |> element("#remove-role-#{assignment.id}") |> render_click()
-    assert has_element?(view, "#assigned-roles-count", "0")
+    assert has_element?(view, "#user-roles-heading + span", "0")
   end
 
   test "grants direct capability, denies role-derived capability, and removes grant", %{
@@ -755,13 +805,24 @@ defmodule BilimbiWeb.UserShowTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
 
-    # Toggle effective permissions disclosure
+    # Toggle effective permissions disclosure: each domain is a row of the
+    # shared list, its capabilities the value.
     view |> element("#toggle-permissions-btn") |> render_click()
+
+    assert has_element?(
+             view,
+             "#effective-permissions-list dd#permissions-domain-admin #cap-badge-admin-company-view"
+           )
 
     # Deny role-derived capability
     view |> element("#deny-cap-admin-company-view") |> render_click()
     assert has_element?(view, "#flash-group", "denied")
-    assert has_element?(view, "#denied-cap-badge-admin-company-view", "admin.company.view")
+
+    assert has_element?(
+             view,
+             "#denied-permissions-list dd#denied-domain-admin #denied-cap-badge-admin-company-view",
+             "admin.company.view"
+           )
 
     # Remove denial
     view |> element("#remove-denial-admin-company-view") |> render_click()
@@ -1050,7 +1111,7 @@ defmodule BilimbiWeb.UserShowTest do
     |> render_submit(%{"employee_id" => "#{emp.id}"})
 
     assert has_element?(view, "#flash-group", "Employee linked.")
-    assert has_element?(view, "#employees-count", "1")
+    assert has_element?(view, "#user-employees-heading + span", "1")
     assert has_element?(view, "#user-employees-table", "EMP-001")
     assert has_element?(view, "#user-employees-table", "Engineering")
     assert has_element?(view, "#user-employees-table", "Rear Admiral")
@@ -1062,7 +1123,7 @@ defmodule BilimbiWeb.UserShowTest do
     # Unlink employee
     view |> element("#unlink-employee-#{emp.id}") |> render_click()
     assert has_element?(view, "#flash-group", "Employee unlinked.")
-    assert has_element?(view, "#employees-count", "0")
+    assert has_element?(view, "#user-employees-heading + span", "0")
 
     # Open add employee modal and create new employee
     view |> element("#open-add-employee-modal-btn") |> render_click()
@@ -1080,7 +1141,7 @@ defmodule BilimbiWeb.UserShowTest do
     })
 
     assert has_element?(view, "#flash-group", "created and linked")
-    assert has_element?(view, "#employees-count", "1")
+    assert has_element?(view, "#user-employees-heading + span", "1")
     assert has_element?(view, "#user-employees-table", "EMP-002")
   end
 
@@ -1126,7 +1187,7 @@ defmodule BilimbiWeb.UserShowTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
 
-    assert has_element?(view, "#external-accesses-count", "1")
+    assert has_element?(view, "#user-external-accesses-heading + span", "1")
     assert has_element?(view, "#user-external-accesses-table", "portal.view")
     assert has_element?(view, "#user-external-accesses-table", "portal.orders")
     assert has_element?(view, "#user-external-accesses-table", "Valid")

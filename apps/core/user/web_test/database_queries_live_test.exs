@@ -135,7 +135,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/admin/system/database-queries")
 
       assert has_element?(view, "#btn-create-query")
-      assert has_element?(view, "#duplicate-query-#{q1.id}")
+      assert has_element?(view, "#duplicate-query-#{q1.id} .hero-document-duplicate")
       assert has_element?(view, "#delete-query-#{q2.id}")
 
       # Test duplicate
@@ -301,7 +301,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
              end)
     end
 
-    test "the query result head renders the role pair the contrast gate measures", %{
+    test "renders the result set through the shared table, one sort button per column", %{
       conn: conn,
       scope: scope
     } do
@@ -316,15 +316,63 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       {:ok, view, _html} =
         conn |> log_in_as() |> live(~p"/admin/system/database-queries/#{query.slug}")
 
-      # `theme_contrast_test.exs` gates `ink-subtle` against `surface-muted`
-      # because that is the pair this head renders (parity finding C2). If the
-      # head moves to another surface or another text role, the measured pair
-      # is no longer the rendered one.
-      classes =
-        view |> element("#query-results-table thead") |> render() |> opening_tag_classes()
+      # Every section is a named region under the shared heading; the raw
+      # section glyphs are gone with the hand-written headings.
+      for id <- ~w(prompt sql-editor query-results) do
+        assert has_element?(
+                 view,
+                 "##{id}-card[role='region'][aria-labelledby='#{id}-heading'] h2##{id}-heading"
+               )
+      end
 
-      assert "bg-surface-muted" in classes
-      assert "text-ink-subtle" in classes
+      assert has_element?(view, "#sql-editor-card #btn-run-query", "Run Query")
+      assert has_element?(view, "#query-results-summary", "2 columns")
+      assert has_element?(view, "#query-results-card caption", "Query results")
+
+      # `theme_contrast_test.exs` gates `ink-subtle` against `surface-sunken`
+      # because that is the pair the shared `<.table>` head renders, and this
+      # console renders that head rather than a hand-written one (parity
+      # finding C2).
+      head_classes =
+        view |> element("#query-results-card thead") |> render() |> opening_tag_classes()
+
+      cell_classes =
+        view
+        |> element("#query-results-card thead th:first-child")
+        |> render()
+        |> opening_tag_classes()
+
+      assert "bg-surface-sunken" in head_classes
+      assert "text-ink-subtle" in cell_classes
+
+      # The columns come from the result set, each a sort button that reports
+      # its state; sorting reruns the query through the page.
+      assert has_element?(view, "th[aria-sort='none'] button#query-results-table-sort-name", "name")
+      assert has_element?(view, "tbody#query-results-table tr#result-row-0", "Ada Lovelace")
+
+      view |> element("#query-results-table-sort-name") |> render_click()
+      assert has_element?(view, "th[aria-sort='ascending'] #query-results-table-sort-name")
+
+      view |> element("#query-results-table-sort-name") |> render_click()
+      assert has_element?(view, "th[aria-sort='descending'] #query-results-table-sort-name")
+
+      refute has_element?(view, "#query-results-card table.font-mono")
+    end
+
+    test "says when a query matched nothing", %{conn: conn, scope: scope} do
+      grant_capabilities!("admin.system.database-table.list")
+
+      {:ok, query} =
+        User.create_database_query(scope, 91, %{
+          name: "Nobody",
+          sql_query: "SELECT id FROM users WHERE id = -1;"
+        })
+
+      {:ok, view, _html} =
+        conn |> log_in_as() |> live(~p"/admin/system/database-queries/#{query.slug}")
+
+      assert has_element?(view, "#query-results-table-empty", "No rows returned")
+      assert has_element?(view, "#query-results-table-empty", "matched nothing")
     end
 
     test "handles execution errors gracefully", %{conn: conn, scope: scope} do

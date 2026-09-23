@@ -558,16 +558,18 @@ defmodule BilimbiWeb.EmployeeLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
 
-      # `theme_contrast_test.exs` gates `ink-subtle` against `surface` because
-      # that is the pair this hand-written head renders: the card supplies the
-      # background the head inherits (parity finding C2).
-      card_classes = view |> element("#subordinates-card") |> render() |> opening_tag_classes()
-
+      # `theme_contrast_test.exs` gates `ink-subtle` against `surface-sunken`
+      # because that is the pair the shared `<.table>` head renders, and this
+      # section renders that head rather than a hand-written one (parity
+      # finding C2).
       head_classes =
-        view |> element("#subordinates-table thead tr") |> render() |> opening_tag_classes()
+        view |> element("#subordinates-card thead") |> render() |> opening_tag_classes()
 
-      assert "bg-surface" in card_classes
-      assert "text-ink-subtle" in head_classes
+      cell_classes =
+        view |> element("#subordinates-card thead th:first-child") |> render() |> opening_tag_classes()
+
+      assert "bg-surface-sunken" in head_classes
+      assert "text-ink-subtle" in cell_classes
     end
 
     test "supports inline editing of employee text fields", %{
@@ -717,11 +719,9 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       assert length(subs) == 1
 
       # Sort subordinates by status
-      view
-      |> element("button[phx-click='sort_subordinates'][phx-value-sort_by='status']")
-      |> render_click()
+      view |> element("#subordinates-table-sort-status") |> render_click()
 
-      assert has_element?(view, "#subordinates-table")
+      assert has_element?(view, "#subordinates-card th[aria-sort='ascending'] #subordinates-table-sort-status")
 
       # Remove subordinate
       view

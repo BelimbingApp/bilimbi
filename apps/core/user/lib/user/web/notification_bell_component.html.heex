@@ -1,10 +1,4 @@
-<div
-  id={@id}
-  class="relative"
-  phx-click-away={JS.push("close_dropdown", target: @myself)}
-  phx-window-keydown={JS.push("close_dropdown", target: @myself)}
-  phx-key="escape"
->
+<div id={@id} class="relative" phx-click-away={JS.push("close_dropdown", target: @myself)}>
   <button
     type="button"
     id="app-notifications-bell"
@@ -26,9 +20,18 @@
     </span>
   </button>
 
+  <%!-- The panel follows the shell's own disclosures (account, timezone):
+       opening moves focus to its first control, Escape closes it and returns
+       focus to the bell. The Escape listener lives on the panel, which only
+       exists while open, so a closed bell never claims the key. --%>
   <div
     :if={@open}
     id="app-notifications-dropdown"
+    phx-mounted={JS.focus_first()}
+    phx-window-keydown={
+      JS.push("close_dropdown", target: @myself) |> JS.focus(to: "#app-notifications-bell")
+    }
+    phx-key="escape"
     class="absolute right-0 top-full mt-1 w-80 rounded-lg border border-line bg-surface shadow-lg z-50 overflow-hidden"
   >
     <div class="flex items-center justify-between border-b border-line px-3 py-2 bg-surface-muted/50">

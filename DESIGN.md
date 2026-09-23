@@ -107,8 +107,7 @@ column beside the sidebar at every viewport, and a detail's sections carry
 the same tables an index does. Inside a section, only prose keeps a reading
 limit (`max-w-prose` on a description paragraph); the cards themselves fill.
 The facts inside a section are the shared `<.list>` (see "Detail sections and
-facts"); `/users/:id` still lays its facts out in a hand-written
-`grid-cols-1 md:grid-cols-2` grid and adopts the list as it is migrated.
+facts").
 
 ### Input controls
 
@@ -193,9 +192,19 @@ priority cell commits in place through `<.inline_edit>` (the hook addresses
 its event to its own element, so it reaches the LiveComponent that rendered
 the field, or the LiveView when none did), the kinds are a choice fact whose
 read state is the trigger, and unlinking is a demoted `<.icon_button>` with
-Belimbing's link-slash glyph. `/employees/:id`, `/users/:id`, the
-departments and relationships pages still hand-write their sections and adopt
-this anatomy as they are migrated.
+Belimbing's link-slash glyph. `/employees/:id` and `/users/:id` follow the
+same anatomy: the employee's linked account is a row of its Employment
+Information list whose value is the `employee.accounts` embed, its
+subordinates are the shared table with assigning in the heading row and a
+demoted remove action on the row; the user's roles and each domain of its
+effective and denied permissions are rows of the same list, and its Employee
+Records and External Accesses sections open with the shared heading. The
+database-query console renders its result set through the same table, one
+sort button per returned column. The departments and relationships pages
+still hand-write their sections and adopt this anatomy as they are migrated,
+and the two disclosure triggers on `/users/:id` (Effective Permissions,
+Change Password) keep their hand-written heading until the shared disclosure
+lands.
 
 ## Read-first detail pages
 
