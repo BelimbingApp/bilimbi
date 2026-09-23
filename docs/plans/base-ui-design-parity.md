@@ -535,6 +535,21 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
 
   Both guards therefore still fail, stay tagged `:design_library_drift`, and stay
   out of the default run and `mix precommit`.
+
+  - **Coverage reads verified routes.** `DesignLibrarySource` used to classify
+    every `~p` sigil as a runtime value, so a specimen could register a
+    presence axis for `navigate`, `href` or `patch` only by passing a bare
+    string, which is what root `AGENTS.md` section 9 forbids for internal
+    paths; the read-first `/users/:id` slice made that trade and reversed it
+    (#754). A `~p` whose path is wholly literal now normalises to the string
+    it wraps, and a `~p` that interpolates, carries modifiers or sits inside a
+    larger expression stays dynamic, both covered on fixtures in
+    `design_library_rules_test.exs`. No specimen still carries a bare string
+    for that reason. The `<.action_link>` `navigate` axis therefore shows
+    `:present` and needs `:absent`, which only an `href` specimen can give;
+    the `href` and `method` axes are unchanged. A request-form specimen
+    needs a POST destination the library does not have, so those three axes
+    stay open beside `<.connection_banners>` and the `<:control>` slot.
 - [ ] Record dispositions in the ledger as steward review closes; the accepted choices already live in the Design Spec cards and this plan's ledger. **Rewritten 2026-09-23:** the in-library alternatives surface with catalog IDs is dropped — only one row (INP-09) is still at steward review, catalog IDs are ruled out of the rendered library, and building a surface for a one-row queue is speculative.
 - [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
 

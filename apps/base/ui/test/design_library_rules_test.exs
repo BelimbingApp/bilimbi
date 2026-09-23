@@ -204,6 +204,57 @@ defmodule Bilimbi.Base.UI.DesignLibraryRulesTest do
 
       assert Enum.any?(Source.presented(nodes), &(&1.name == "badge"))
     end
+
+    test "reads a verified route with a literal path as the path it wraps" do
+      call = presented_action_link(~S|navigate={~p"/system/design-library"}|)
+
+      assert Source.attr(call, "navigate") == {:literal, "/system/design-library"}
+    end
+
+    test "keeps a verified route that interpolates dynamic" do
+      call = presented_action_link(~S|navigate={~p"/users/#{@user.id}"}|)
+
+      assert Source.attr(call, "navigate") == {:dynamic, ~S|~p"/users/#{@user.id}"|}
+    end
+
+    test "keeps a verified route inside a larger expression dynamic" do
+      call = presented_action_link(~S|navigate={~p"/users" <> @suffix}|)
+
+      assert Source.attr(call, "navigate") == {:dynamic, ~S|~p"/users" <> @suffix|}
+    end
+
+    test "keeps a verified route carrying sigil modifiers dynamic" do
+      call = presented_action_link(~S|navigate={~p"/users"x}|)
+
+      assert Source.attr(call, "navigate") == {:dynamic, ~S|~p"/users"x|}
+    end
+
+    test "keeps a variable dynamic" do
+      call = presented_action_link("navigate={@destination}")
+
+      assert Source.attr(call, "navigate") == {:dynamic, "@destination"}
+    end
+
+    test "keeps a function call dynamic" do
+      call = presented_action_link("navigate={destination(@user)}")
+
+      assert Source.attr(call, "navigate") == {:dynamic, "destination(@user)"}
+    end
+  end
+
+  # One `<.action_link>` specimen inside the components area, carrying the
+  # given destination attribute, as the element the rules read.
+  defp presented_action_link(destination) do
+    [call] =
+      area("""
+      <.card id="component-action-link" title="Action link">
+        <.action_link id="link" icon="manage" #{destination} title="Manage">Manage</.action_link>
+      </.card>
+      """)
+      |> Source.presented()
+      |> Enum.filter(&(&1.kind == :component and &1.name == "action_link"))
+
+    call
   end
 
   # A minimal components area: the sidebar menu the grouping-section exemption

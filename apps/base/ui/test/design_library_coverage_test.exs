@@ -96,8 +96,9 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
            axis that declares one has to show it. Which ones is the library's
            call, so a value that cannot be seen never has to be built. A state
            counts only when the template spells it out (a literal attr value, a
-           slot that is present or absent). Values computed at render time, like
-           `kind={row.kind}`, prove nothing about what is shown.
+           `~p` route with no interpolation, a slot that is present or absent).
+           Values computed at render time, like `kind={row.kind}`, prove nothing
+           about what is shown.
            """
   end
 
