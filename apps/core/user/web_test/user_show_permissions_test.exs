@@ -97,6 +97,21 @@ defmodule BilimbiWeb.UserShowPermissionsTest do
       assert has_element?(view, "#available-cap-label-admin-user-update")
       refute has_element?(view, "#available-capabilities-empty")
     end
+
+    test "pressing Enter keeps the search narrowed and the picker open", %{conn: conn} do
+      insert_target!()
+      grant_capabilities!(["admin.user.view", @manage])
+
+      view = conn |> open_page() |> open_effective_permissions()
+
+      view
+      |> form("#capability-search-form", %{"value" => "update"})
+      |> render_submit()
+
+      assert has_element?(view, "#capability-search-form")
+      assert has_element?(view, "#available-cap-label-admin-user-update")
+      refute has_element?(view, "#available-cap-label-admin-user-view")
+    end
   end
 
   describe "role search" do
@@ -134,6 +149,27 @@ defmodule BilimbiWeb.UserShowPermissionsTest do
       refute has_element?(view, "#available-roles-list label")
       assert has_element?(view, "#available-roles-empty", "No roles match “zzz”")
       assert has_element?(view, "#available-roles-empty", "Clear the search")
+    end
+
+    test "pressing Enter keeps the search narrowed and the picker open", %{
+      conn: conn,
+      scope: scope
+    } do
+      auditor = create_role!(scope, "Auditor", "auditor", ["admin.user.view"])
+      editor = create_role!(scope, "Editor", "editor", [@manage])
+      insert_target!()
+      grant_capabilities!(["admin.user.view", @manage])
+
+      view = open_page(conn)
+      view |> element("#toggle-assign-roles-btn") |> render_click()
+
+      view
+      |> form("#role-search-form", %{"value" => "aud"})
+      |> render_submit()
+
+      assert has_element?(view, "#assign-roles-picker")
+      assert has_element?(view, "#available-role-label-#{auditor.id}", "Auditor")
+      refute has_element?(view, "#available-role-label-#{editor.id}")
     end
   end
 

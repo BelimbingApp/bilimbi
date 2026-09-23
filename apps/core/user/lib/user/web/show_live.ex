@@ -1393,7 +1393,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   id="assign-roles-picker"
                   class="rounded-xl border border-line bg-surface p-3 space-y-3 shadow-xs"
                 >
-                  <form phx-change="search_roles" id="role-search-form">
+                  <form phx-change="search_roles" phx-submit="search_roles" id="role-search-form">
                     <label for="role-search-input" class="sr-only">Search roles</label>
                     <input
                       type="search"
@@ -1639,7 +1639,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">
                     Add Capabilities
                   </div>
-                  <form phx-change="search_capabilities" id="capability-search-form" class="mb-2">
+                  <form
+                    phx-change="search_capabilities"
+                    phx-submit="search_capabilities"
+                    id="capability-search-form"
+                    class="mb-2"
+                  >
                     <label for="capability-search-input" class="sr-only">Search capabilities</label>
                     <input
                       type="search"
