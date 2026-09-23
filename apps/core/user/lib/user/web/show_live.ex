@@ -175,16 +175,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       |> Enum.reject(& &1.allowed)
       |> Map.new(&{&1.capability, &1.id})
 
-    # Effective permissions
-    {effective_keys, grouped_effective_permissions} =
-      if is_nil(user.company_id) do
-        {[], %{}}
-      else
-        actor = Authz.actor(:user, user.id, scope, user.company_id)
-        effective = Authz.effective_capabilities(actor)
-        allowed_caps = Enum.sort(effective.allowed)
-        {allowed_caps, group_by_domain(allowed_caps)}
-      end
+    # Effective permissions. `get_tenant_user/2` mounts no account without a
+    # company, so the actor always has one to evaluate in.
+    actor = Authz.actor(:user, user.id, scope, user.company_id)
+    effective_keys = Enum.sort(Authz.effective_capabilities(actor).allowed)
+    grouped_effective_permissions = group_by_domain(effective_keys)
 
     # Grouped denied permissions
     denied_keys = Map.keys(direct_deny_ids) |> Enum.sort()
@@ -208,6 +203,16 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
     grouped_available_capabilities = group_by_domain(available_caps)
 
+    roles_control =
+      roles_control(can_manage?, has_grant_all?, all_roles, unassigned_roles, available_roles)
+
+    capabilities_control =
+      capabilities_control(
+        can_manage?,
+        Enum.reject(all_registered_caps, &MapSet.member?(excluded_keys, &1)),
+        available_caps
+      )
+
     # Employees
     linked_employees =
       case user.employee_id do
@@ -230,15 +235,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         end
       end)
 
+    # Company employees not already linked to this user
     unlinkable_employees =
-      if is_nil(user.company_id) do
-        []
-      else
-        # filter to company employees not already linked to this user
-        tenant_employees
-        |> Enum.filter(&(&1.company_id == user.company_id and &1.id != user.employee_id))
-        |> Enum.sort_by(& &1.full_name)
-      end
+      tenant_employees
+      |> Enum.filter(&(&1.company_id == user.company_id and &1.id != user.employee_id))
+      |> Enum.sort_by(& &1.full_name)
 
     # External accesses
     {:ok, external_accesses} = Company.list_external_accesses_for_user(scope, user.id)
@@ -282,12 +283,23 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       :filtered_available_roles,
       filter_roles(available_roles, socket.assigns[:role_search] || "")
     )
+    |> assign(:roles_control, roles_control)
+    |> assign(:can_create_roles?, allowed?(current_scope, "admin.authz.role.create"))
+    |> assign(:can_list_roles?, allowed?(current_scope, "admin.authz.role.list"))
     |> assign(:direct_grant_ids, direct_grant_ids)
     |> assign(:direct_deny_ids, direct_deny_ids)
     |> assign(:effective_keys, effective_keys)
     |> assign(:grouped_effective_permissions, grouped_effective_permissions)
     |> assign(:grouped_denied_permissions, grouped_denied_permissions)
     |> assign(:grouped_available_capabilities, grouped_available_capabilities)
+    |> assign(
+      :filtered_available_capabilities,
+      filter_capabilities(
+        grouped_available_capabilities,
+        socket.assigns[:capability_search] || ""
+      )
+    )
+    |> assign(:capabilities_control, capabilities_control)
     |> assign(:employees, linked_employees)
     |> assign(
       :sorted_employees,
@@ -437,9 +449,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         )
 
       cond do
-        user.company_id == nil ->
-          {:noreply, socket}
-
         unauthorized_roles != [] ->
           {:noreply, put_flash(socket, :error, "You cannot grant roles you do not hold.")}
 
@@ -526,7 +535,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   def handle_event("search_capabilities", %{"value" => query}, socket) do
-    {:noreply, assign(socket, :capability_search, query)}
+    {:noreply,
+     socket
+     |> assign(:capability_search, query)
+     |> assign(
+       :filtered_available_capabilities,
+       filter_capabilities(socket.assigns.grouped_available_capabilities, query)
+     )}
   end
 
   def handle_event("select_capabilities", params, socket) do
@@ -558,9 +573,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         end
 
       cond do
-        user.company_id == nil ->
-          {:noreply, socket}
-
         unauthorized_caps != [] ->
           {:noreply, put_flash(socket, :error, "You cannot grant capabilities you do not hold.")}
 
@@ -590,9 +602,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     cond do
       not can_manage?(socket) ->
         capabilities_forbidden(socket)
-
-      is_nil(socket.assigns.user.company_id) ->
-        {:noreply, socket}
 
       cap_key in socket.assigns.effective_keys ->
         hold_authz(socket, {:deny, cap_key})
@@ -1147,7 +1156,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               data-nav-pin-label={"Administration / Users / #{@user.name}"}
               data-nav-pin-url={~p"/users/#{@user.id}"}
               aria-pressed="false"
-              />
+            />
           </:title_actions>
           <:subtitle>
             <%= if @company_name do %>
@@ -1330,45 +1339,43 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               </:description>
             </.section_heading>
 
-            <%= if is_nil(@user.company_id) do %>
-              <.alert kind={:info} id="roles-unaffiliated-alert" class="mb-4">
-                Assign a company in User Details before roles or capabilities can be managed. Permissions are evaluated in a company scope.
-              </.alert>
-            <% end %>
-
             <div class="mb-4">
               <.list id="assigned-roles-container">
                 <:item title="Roles" id="assigned-roles">
-                <%= if @assigned_roles == [] do %>
-                  <span class="text-sm text-ink-muted" id="no-roles-msg">No roles assigned.</span>
-                <% else %>
-                  <div class="flex flex-wrap gap-2" id="assigned-roles-list">
-                    <span
-                      :for={assignment <- @assigned_roles}
-                      id={"assigned-role-#{assignment.id}"}
-                      class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
-                    >
-                      <span>{assignment.role_name}</span>
-                      <.icon_button
-                        :if={@can_manage?}
-                        icon="close"
-                        label={"Remove the #{assignment.role_name} role"}
-                        context={:inline}
-                        kind={:danger}
-                        id={"remove-role-#{assignment.id}"}
-                        phx-click="request_remove_role"
-                        phx-value-assignment-id={assignment.id}
-                        class="-mr-1"
-                      />
-                    </span>
-                  </div>
-                <% end %>
+                  <%= if @assigned_roles == [] do %>
+                    <span class="text-sm text-ink-muted" id="no-roles-msg">No roles assigned.</span>
+                  <% else %>
+                    <div class="flex flex-wrap gap-2" id="assigned-roles-list">
+                      <span
+                        :for={assignment <- @assigned_roles}
+                        id={"assigned-role-#{assignment.id}"}
+                        class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink"
+                      >
+                        <span>{assignment.role_name}</span>
+                        <.icon_button
+                          :if={@can_manage?}
+                          icon="close"
+                          label={"Remove the #{assignment.role_name} role"}
+                          context={:inline}
+                          kind={:danger}
+                          id={"remove-role-#{assignment.id}"}
+                          phx-click="request_remove_role"
+                          phx-value-assignment-id={assignment.id}
+                          class="-mr-1"
+                        />
+                      </span>
+                    </div>
+                  <% end %>
                 </:item>
               </.list>
             </div>
 
-            <!-- Assign Roles Form (Expandable) -->
-            <%= if @can_manage? and not is_nil(@user.company_id) and @available_roles != [] and not @has_grant_all? do %>
+            <%!-- The Roles control, or the one sentence that says why it is absent.
+                 The sentence stands where the control would be, so a reader who
+                 finds no button is not left wondering; it names the most
+                 actionable condition (permission first, then whether a role
+                 could add anything, then the roles themselves). --%>
+            <%= if @roles_control == :available do %>
               <div class="mb-6">
                 <div :if={not @show_assign_roles}>
                   <.button
@@ -1386,16 +1393,19 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   id="assign-roles-picker"
                   class="rounded-xl border border-line bg-surface p-3 space-y-3 shadow-xs"
                 >
-                  <div>
+                  <form phx-change="search_roles" phx-submit="search_roles" id="role-search-form">
+                    <label for="role-search-input" class="sr-only">Search roles</label>
                     <input
-                      type="text"
+                      type="search"
                       id="role-search-input"
-                      phx-input="search_roles"
+                      name="value"
+                      phx-debounce="300"
+                      autocomplete="off"
                       placeholder="Search roles..."
                       value={@role_search}
                       class="w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none"
                     />
-                  </div>
+                  </form>
                   <form
                     phx-change="select_roles"
                     phx-submit="assign_selected_roles"
@@ -1420,6 +1430,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                         <span class="truncate" title={role.name}>{role.name}</span>
                       </label>
                     </div>
+                    <.empty_state
+                      :if={@filtered_available_roles == []}
+                      id="available-roles-empty"
+                      class="py-2"
+                      title={"No roles match “#{String.trim(@role_search)}”"}
+                      reason="Roles are matched by name. Clear the search to see every role you can assign."
+                    />
                     <div class="flex items-center gap-2 mt-2">
                       <.button
                         :if={@selected_role_ids != []}
@@ -1440,6 +1457,54 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     </div>
                   </form>
                 </div>
+              </div>
+            <% else %>
+              <div id="assign-roles-unavailable" class="mb-6">
+                <%= case @roles_control do %>
+                  <% :forbidden -> %>
+                    <.empty_state forbidden={"assign roles to this user, which needs #{manage_capability()}"} />
+                  <% :grant_all -> %>
+                    <.empty_state
+                      title="A role would add nothing"
+                      reason={"#{grant_all_role_names(@assigned_roles)} already grants every capability, so this user holds everything a role could add."}
+                    />
+                  <% :no_roles -> %>
+                    <.empty_state
+                      title="No roles exist yet"
+                      reason={no_roles_reason(@can_create_roles?)}
+                    >
+                      <:action :if={@can_create_roles?}>
+                        <.action_link
+                          id="assign-roles-create-link"
+                          icon="create"
+                          navigate={~p"/authz/roles/create"}
+                          title="Create a role"
+                        >
+                          Create a role
+                        </.action_link>
+                      </:action>
+                      <:action :if={not @can_create_roles? and @can_list_roles?}>
+                        <.action_link
+                          id="assign-roles-index-link"
+                          icon="manage"
+                          navigate={~p"/authz/roles"}
+                          title="Open the Roles page"
+                        >
+                          Roles
+                        </.action_link>
+                      </:action>
+                    </.empty_state>
+                  <% :all_assigned -> %>
+                    <.empty_state
+                      title="No roles left to assign"
+                      reason="This user already holds every role that exists in this workspace."
+                    />
+                  <% :none_grantable -> %>
+                    <.empty_state
+                      title="No roles your account can assign"
+                      reason="Assigning a role needs every capability it grants, and each remaining role grants one your account does not hold. Ask an operator to review your role."
+                    />
+                <% end %>
               </div>
             <% end %>
 
@@ -1484,32 +1549,31 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       id={"permissions-domain-#{domain}"}
                     >
                       <div class="flex flex-wrap gap-1">
-                      <%= for cap <- caps do %>
-                        <% is_direct = Map.has_key?(@direct_grant_ids, cap) %>
-                        <span
-                          id={"cap-badge-#{String.replace(cap, ".", "-")}"}
-                          class={[
-                            "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border",
-                            if(is_direct,
-                              do: "bg-info-surface text-info-ink border-info-line",
-                              else: "bg-success-surface text-success-ink border-success-line"
-                            )
-                          ]}
-                        >
-                          <span>{cap}</span>
-                          <%= if @can_manage? do %>
-                            <%= if is_direct do %>
-                              <.icon_button
-                                icon="close"
-                                label={"Remove the direct grant of #{cap}"}
-                                context={:inline}
-                                kind={:danger}
-                                id={"remove-direct-cap-#{String.replace(cap, ".", "-")}"}
-                                phx-click="request_remove_capability"
-                                phx-value-grant-id={@direct_grant_ids[cap]}
-                              />
-                            <% else %>
-                              <%= if not is_nil(@user.company_id) do %>
+                        <%= for cap <- caps do %>
+                          <% is_direct = Map.has_key?(@direct_grant_ids, cap) %>
+                          <span
+                            id={"cap-badge-#{String.replace(cap, ".", "-")}"}
+                            class={[
+                              "inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border",
+                              if(is_direct,
+                                do: "bg-info-surface text-info-ink border-info-line",
+                                else: "bg-success-surface text-success-ink border-success-line"
+                              )
+                            ]}
+                          >
+                            <span>{cap}</span>
+                            <%= if @can_manage? do %>
+                              <%= if is_direct do %>
+                                <.icon_button
+                                  icon="close"
+                                  label={"Remove the direct grant of #{cap}"}
+                                  context={:inline}
+                                  kind={:danger}
+                                  id={"remove-direct-cap-#{String.replace(cap, ".", "-")}"}
+                                  phx-click="request_remove_capability"
+                                  phx-value-grant-id={@direct_grant_ids[cap]}
+                                />
+                              <% else %>
                                 <.icon_button
                                   icon="close"
                                   label={"Deny #{cap}"}
@@ -1521,9 +1585,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                                 />
                               <% end %>
                             <% end %>
-                          <% end %>
-                        </span>
-                      <% end %>
+                          </span>
+                        <% end %>
                       </div>
                     </:item>
                   </.list>
@@ -1545,23 +1608,23 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       id={"denied-domain-#{domain}"}
                     >
                       <div class="flex flex-wrap gap-1">
-                      <span
-                        :for={cap <- caps}
-                        id={"denied-cap-badge-#{String.replace(cap, ".", "-")}"}
-                        class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border border-danger-line bg-danger-surface text-danger-ink"
-                      >
-                        <span>{cap}</span>
-                        <.icon_button
-                          :if={@can_manage?}
-                          icon="close"
-                          label={"Remove the deny rule for #{cap}"}
-                          context={:inline}
-                          kind={:danger}
-                          id={"remove-denial-#{String.replace(cap, ".", "-")}"}
-                          phx-click="request_remove_capability"
-                          phx-value-grant-id={@direct_deny_ids[cap]}
-                        />
-                      </span>
+                        <span
+                          :for={cap <- caps}
+                          id={"denied-cap-badge-#{String.replace(cap, ".", "-")}"}
+                          class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border border-danger-line bg-danger-surface text-danger-ink"
+                        >
+                          <span>{cap}</span>
+                          <.icon_button
+                            :if={@can_manage?}
+                            icon="close"
+                            label={"Remove the deny rule for #{cap}"}
+                            context={:inline}
+                            kind={:danger}
+                            id={"remove-denial-#{String.replace(cap, ".", "-")}"}
+                            phx-click="request_remove_capability"
+                            phx-value-grant-id={@direct_deny_ids[cap]}
+                          />
+                        </span>
                       </div>
                     </:item>
                   </.list>
@@ -1569,24 +1632,31 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
                 <!-- Add Capabilities Picker -->
                 <div
-                  :if={
-                    @can_manage? and not is_nil(@user.company_id) and
-                      @grouped_available_capabilities != %{}
-                  }
+                  :if={@capabilities_control == :available}
                   id="add-capabilities-section"
                   class="mt-4 pt-4 border-t border-line"
                 >
                   <div class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle mb-2">
                     Add Capabilities
                   </div>
-                  <input
-                    type="text"
-                    id="capability-search-input"
-                    phx-input="search_capabilities"
-                    placeholder="Search capabilities..."
-                    value={@capability_search}
-                    class="w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none mb-2"
-                  />
+                  <form
+                    phx-change="search_capabilities"
+                    phx-submit="search_capabilities"
+                    id="capability-search-form"
+                    class="mb-2"
+                  >
+                    <label for="capability-search-input" class="sr-only">Search capabilities</label>
+                    <input
+                      type="search"
+                      id="capability-search-input"
+                      name="value"
+                      phx-debounce="300"
+                      autocomplete="off"
+                      placeholder="Search capabilities..."
+                      value={@capability_search}
+                      class="w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-brand-strong focus:outline-none"
+                    />
+                  </form>
                   <form
                     phx-change="select_capabilities"
                     phx-submit="add_selected_capabilities"
@@ -1596,7 +1666,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1 max-h-48 overflow-y-auto"
                       id="available-capabilities-list"
                     >
-                      <%= for {_domain, caps} <- @grouped_available_capabilities, cap <- caps, String.contains?(String.downcase(cap), String.downcase(@capability_search)) do %>
+                      <%= for {_domain, caps} <- @filtered_available_capabilities, cap <- caps do %>
                         <label
                           id={"available-cap-label-#{String.replace(cap, ".", "-")}"}
                           class="flex items-center gap-2 px-2 py-1 rounded text-sm hover:bg-surface-sunken cursor-pointer text-ink"
@@ -1612,6 +1682,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                         </label>
                       <% end %>
                     </div>
+                    <.empty_state
+                      :if={@filtered_available_capabilities == %{}}
+                      id="available-capabilities-empty"
+                      class="py-2"
+                      title={"No capabilities match “#{String.trim(@capability_search)}”"}
+                      reason="Capabilities are matched by key, which starts with the domain (such as admin.). Clear the search to see every capability you can add."
+                    />
                     <div :if={@selected_capability_keys != []} class="mt-2">
                       <.button
                         type="submit"
@@ -1623,6 +1700,28 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       </.button>
                     </div>
                   </form>
+                </div>
+                <%!-- The same rule as the Roles control: a hidden picker states
+                     its own reason where the picker would be. --%>
+                <div
+                  :if={@capabilities_control != :available}
+                  id="add-capabilities-unavailable"
+                  class="mt-4 pt-4 border-t border-line"
+                >
+                  <%= case @capabilities_control do %>
+                    <% :forbidden -> %>
+                      <.empty_state forbidden={"add capabilities to this user, which needs #{manage_capability()}"} />
+                    <% :all_in_effect -> %>
+                      <.empty_state
+                        title="No capabilities left to add"
+                        reason="Every installed capability is already in effect or denied for this user."
+                      />
+                    <% :none_grantable -> %>
+                      <.empty_state
+                        title="No capabilities your account can add"
+                        reason="You can only add capabilities you hold, and every remaining capability is one your account does not. Ask an operator to review your role."
+                      />
+                  <% end %>
                 </div>
               </div>
             </div>
@@ -1719,7 +1818,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               <:description>
                 Employment records linking this user to companies. A user can have multiple records across different companies (e.g. contractors). Not all employees require a user account.
               </:description>
-              <:actions :if={@can_manage? and not is_nil(@user.company_id)}>
+              <:actions :if={@can_manage?}>
                 <.button
                   type="button"
                   id="open-add-employee-modal-btn"
@@ -1997,102 +2096,102 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           on_cancel={JS.push("close_add_employee_modal")}
         >
           <:description>Create a new employee record and link it to this user.</:description>
-            <.form
-              for={@new_employee_form}
-              id="modal-create-employee-form"
-              phx-submit="save_new_employee"
-              class="mt-4 space-y-4"
-            >
-              <div>
-                <label for="new-emp-company" class="block text-xs font-medium text-ink">Company</label>
-                <select
-                  name="company_id"
-                  id="new-emp-company"
-                  required
-                  class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+          <.form
+            for={@new_employee_form}
+            id="modal-create-employee-form"
+            phx-submit="save_new_employee"
+            class="mt-4 space-y-4"
+          >
+            <div>
+              <label for="new-emp-company" class="block text-xs font-medium text-ink">Company</label>
+              <select
+                name="company_id"
+                id="new-emp-company"
+                required
+                class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+              >
+                <option
+                  :for={company <- @companies}
+                  value={company.id}
+                  selected={@new_employee_form[:company_id].value == company.id}
                 >
-                  <option
-                    :for={company <- @companies}
-                    value={company.id}
-                    selected={@new_employee_form[:company_id].value == company.id}
-                  >
-                    {Company.Summary.display_name(company)}
-                  </option>
-                </select>
-                <p :if={@new_employee_errors[:company_id]} class="mt-1 text-xs text-danger-ink">
-                  {@new_employee_errors[:company_id]}
+                  {Company.Summary.display_name(company)}
+                </option>
+              </select>
+              <p :if={@new_employee_errors[:company_id]} class="mt-1 text-xs text-danger-ink">
+                {@new_employee_errors[:company_id]}
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="new-emp-number" class="block text-xs font-medium text-ink">Employee Number</label>
+                <input
+                  type="text"
+                  name="employee_number"
+                  id="new-emp-number"
+                  required
+                  value={@new_employee_form[:employee_number].value}
+                  class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                />
+                <p :if={@new_employee_errors[:employee_number]} class="mt-1 text-xs text-danger-ink">
+                  {@new_employee_errors[:employee_number]}
                 </p>
               </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label for="new-emp-number" class="block text-xs font-medium text-ink">Employee Number</label>
-                  <input
-                    type="text"
-                    name="employee_number"
-                    id="new-emp-number"
-                    required
-                    value={@new_employee_form[:employee_number].value}
-                    class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
-                  />
-                  <p :if={@new_employee_errors[:employee_number]} class="mt-1 text-xs text-danger-ink">
-                    {@new_employee_errors[:employee_number]}
-                  </p>
-                </div>
-                <div>
-                  <label for="new-emp-name" class="block text-xs font-medium text-ink">Full Name</label>
-                  <input
-                    type="text"
-                    name="full_name"
-                    id="new-emp-name"
-                    required
-                    value={@new_employee_form[:full_name].value}
-                    class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
-                  />
-                  <p :if={@new_employee_errors[:full_name]} class="mt-1 text-xs text-danger-ink">
-                    {@new_employee_errors[:full_name]}
-                  </p>
-                </div>
+              <div>
+                <label for="new-emp-name" class="block text-xs font-medium text-ink">Full Name</label>
+                <input
+                  type="text"
+                  name="full_name"
+                  id="new-emp-name"
+                  required
+                  value={@new_employee_form[:full_name].value}
+                  class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                />
+                <p :if={@new_employee_errors[:full_name]} class="mt-1 text-xs text-danger-ink">
+                  {@new_employee_errors[:full_name]}
+                </p>
               </div>
+            </div>
 
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label for="new-emp-designation" class="block text-xs font-medium text-ink">Designation</label>
-                  <input
-                    type="text"
-                    name="designation"
-                    id="new-emp-designation"
-                    placeholder="Job title"
-                    value={@new_employee_form[:designation].value}
-                    class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label for="new-emp-start" class="block text-xs font-medium text-ink">Employment Start</label>
-                  <input
-                    type="date"
-                    name="employment_start"
-                    id="new-emp-start"
-                    value={@new_employee_form[:employment_start].value}
-                    class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
-                  />
-                </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="new-emp-designation" class="block text-xs font-medium text-ink">Designation</label>
+                <input
+                  type="text"
+                  name="designation"
+                  id="new-emp-designation"
+                  placeholder="Job title"
+                  value={@new_employee_form[:designation].value}
+                  class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                />
               </div>
+              <div>
+                <label for="new-emp-start" class="block text-xs font-medium text-ink">Employment Start</label>
+                <input
+                  type="date"
+                  name="employment_start"
+                  id="new-emp-start"
+                  value={@new_employee_form[:employment_start].value}
+                  class="mt-1 block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none"
+                />
+              </div>
+            </div>
 
-              <div class="mt-6 flex justify-end gap-2">
-                <.button
-                  type="button"
-                  phx-click="close_add_employee_modal"
-                  id="cancel-add-employee-btn"
-                  class="text-xs"
-                >
-                  Cancel
-                </.button>
-                <.button type="submit" variant="primary" id="confirm-add-employee-btn" class="text-xs">
-                  Create & Link
-                </.button>
-              </div>
-            </.form>
+            <div class="mt-6 flex justify-end gap-2">
+              <.button
+                type="button"
+                phx-click="close_add_employee_modal"
+                id="cancel-add-employee-btn"
+                class="text-xs"
+              >
+                Cancel
+              </.button>
+              <.button type="submit" variant="primary" id="confirm-add-employee-btn" class="text-xs">
+                Create & Link
+              </.button>
+            </div>
+          </.form>
         </.modal>
       </.page>
     </Layouts.app>
@@ -2450,6 +2549,71 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
       _ ->
         false
+    end
+  end
+
+  # Why the Roles control is absent, as one reason in the order a reader can
+  # act on it: without permission nothing else matters; a grant-all role
+  # leaves nothing to add; and only then do the roles themselves decide (none
+  # exist, all held, or none this account may grant under the escalation
+  # guard). `:available` shows the control. A user without a company is not
+  # a case: a role is granted within a company, but `get_tenant_user/2`
+  # refuses such an account and mount redirects, so this page never renders
+  # one. Presentation only: every write asks Authz again.
+  defp roles_control(can_manage?, has_grant_all?, all_roles, unassigned_roles, available) do
+    cond do
+      not can_manage? -> :forbidden
+      has_grant_all? -> :grant_all
+      all_roles == [] -> :no_roles
+      unassigned_roles == [] -> :all_assigned
+      available == [] -> :none_grantable
+      true -> :available
+    end
+  end
+
+  # The same decision for the Add Capabilities picker. `remaining` is every
+  # installed capability not yet in effect or denied for the user; `available`
+  # is the part of it the acting account holds and may therefore grant.
+  defp capabilities_control(can_manage?, remaining, available) do
+    cond do
+      not can_manage? -> :forbidden
+      remaining == [] -> :all_in_effect
+      available == [] -> :none_grantable
+      true -> :available
+    end
+  end
+
+  defp grant_all_role_names(assigned_roles) do
+    assigned_roles
+    |> Enum.filter(& &1.role_grant_all)
+    |> Enum.map_join(" and ", & &1.role_name)
+  end
+
+  defp no_roles_reason(true),
+    do: "Create one on the Roles page, then assign it here."
+
+  defp no_roles_reason(false),
+    do:
+      "Roles are created on the Roles page, which needs admin.authz.role.create; your account does not hold it."
+
+  defp manage_capability, do: @manage_capability
+
+  # Keeps the domain grouping and drops a domain whose capabilities all fall
+  # out, so the picker's empty state is decided by one comparison with `%{}`.
+  defp filter_capabilities(grouped, query) do
+    q = String.downcase(String.trim(query))
+
+    if q == "" do
+      grouped
+    else
+      grouped
+      |> Enum.flat_map(fn {domain, caps} ->
+        case Enum.filter(caps, &String.contains?(String.downcase(&1), q)) do
+          [] -> []
+          matched -> [{domain, matched}]
+        end
+      end)
+      |> Map.new()
     end
   end
 
