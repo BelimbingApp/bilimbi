@@ -72,6 +72,13 @@ read-only login it is true because the database will not allow otherwise."
   developer creates it once per cluster, and an upgrading deployment must
   create it, set `CONSOLE_DATABASE_URL`, and run `mix bilimbi.migrate`. Each
   missing step fails loudly.
+- Column secrecy is opt-in and nothing enforces the opt-in. A declared
+  secret column the table lacks fails reconciliation and a declared table
+  the prefix lacks is reported, but an undeclared credential column is
+  granted like any other and is readable from the console without any
+  warning. Whoever adds a token, hash, or secret column must declare it in
+  the owning contract's `secret_columns/0` in the same change; the database
+  architecture's change checklist carries that step.
 - The console sees only committed state. Its test connection is not
   sandboxed, so console tests create what they read outside the sandbox.
 
@@ -83,5 +90,11 @@ read-only login it is true because the database will not allow otherwise."
   serialized PHP and could be declared secret by the module that owns that
   knowledge (ADR 0005 places it with Base Queue), through a contract whose
   `tables/0` is empty; nothing does so yet.
+- The undeclared-secret gap could be narrowed cheaply by having
+  reconciliation report, without refusing, readable columns in the prefix
+  whose names suggest a credential (`password`, `token`, `secret`, `_hash`,
+  `api_key`) and that no contract declares, read from the live catalog
+  rather than from source. It is a reminder, not a guarantee, and is not
+  built yet.
 - The role keeps PostgreSQL's default `TEMP` privilege; temporary objects are
   session-local and the `READ ONLY` transaction refuses writing them.

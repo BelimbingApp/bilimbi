@@ -18,7 +18,9 @@ defmodule Bilimbi.Base.Database.SchemaContract do
 
   The operator SQL console's role is granted every other column of such a
   table and never these, so `SELECT *` on it is refused and the console names
-  the columns it may read. A table absent here is readable in full. Keys are
+  the columns it may read. A table absent here is readable in full, and
+  nothing detects an undeclared credential column, so declaring one belongs
+  to the change that adds it. Keys are
   tables the module owns in the database, whether or not `tables/0` pins them
   as compatible baseline; a named column the table does not have fails
   reconciliation.

@@ -328,6 +328,13 @@ before any grant changes; a secret declared on a table the prefix does not
 hold is reported, not refused, because a contract may know a table the
 database has not migrated yet.
 
+The protection runs one way only. A declared secret that is wrong is
+reported, but a credential column nobody declared is silently readable
+through the console: a new token, hash, or secret column is granted like
+any other column, and nothing reminds its author. Declaring it in the
+owner's `secret_columns/0` in the same change that adds the column is the
+author's obligation (see the change checklist below).
+
 **How a misconfigured console fails.** Before every run the executor asks
 PostgreSQL, as the connected role, whether the connection could write
 anything: superuser, role- or database-creation flags, `CREATE` on the
