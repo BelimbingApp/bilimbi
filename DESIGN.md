@@ -65,9 +65,10 @@ module may add a semantic role only when its workflow genuinely needs one.
   distinct from its brighter hover in both themes.
 - **`success` / `warning` / `danger`** (each with `-surface`, `-line`,
   `-ink`): Honest status roles for real feedback. A neutral statement has no
-  status role of its own yet: an `:info` flash is painted with `success` and
-  an `:info` alert stays on the neutral surface, because most of the
-  product's `:info` messages report a completed write.
+  status role of its own yet: an `:info` flash is still painted with
+  `success`, while an `:info` alert or panel notice stays on the neutral
+  surface. Completed writes report `:success`, so giving `:info` a treatment
+  of its own is follow-up work that touches no caller.
 
 ## Compact typography
 
@@ -617,9 +618,14 @@ the recovery (an operator must assign a role), not a blank rail.
 Flash messages stack at the top right, most severe first, so several stay
 readable at once. Info, warning and error stay until the person dismisses
 them, because a message someone must act on must not disappear on a timer.
-Only a success times out, after eight seconds. An action confirmed through
-the shared confirmation dialog reports one; the other completed writes still
-report info and stay until dismissed, until their callers move to success.
+Only a success times out, after eight seconds. Every completed write reports
+one, whether or not it was confirmed through the shared confirmation dialog;
+an info flash informs without confirming a write. A panel that cannot reach
+the page's flash reports through `<.panel_notice>` under the same rule: a
+completed write says success and reads as the success flash at inline
+strength, a plain statement stays info, and a refusal is an error announced
+as an alert. The notice renders above the panel's table, or inside the
+panel's open dialog, and is dismissed in place.
 
 ## Reduce anxiety
 

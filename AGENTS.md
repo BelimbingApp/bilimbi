@@ -641,15 +641,16 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
 - **Flash messages:** `put_flash` kinds are `:success`, `:info`, `:warning`,
   and `:error`. The layout's `flash_group` is the single stacked outlet:
   only success carries the eight-second timer, while info, warning and error
-  stay until dismissed. An action confirmed through `<.confirm_dialog>` emits
-  the success flash; the other completed writes still use info, which stays
-  sticky because callers also use it for actionable failure notices, so
-  nothing else times out until those call sites migrate.
-  `:success` and `:info` still share the success colouring because
-  most `put_flash(:info, ...)` call sites report a completed write; correcting
-  that means migrating those callers, not repainting `:info`. The shell's
-  preference status line is deliberately not a flash. Do not build a second
-  notification surface.
+  stay until dismissed. A completed write flashes `:success`; `:info` is for
+  a notice that informs without confirming a write. Pick the kind from what
+  the message does and, where one handler reports different outcomes, from
+  the branch. `:success` and `:info` still share the success colouring;
+  giving `:info` its own treatment is follow-up work that touches no caller.
+  A LiveComponent panel that cannot reach the page's flash reports through
+  `<.panel_notice>` under the same kind rule (`:success`, `:info`, `:error`),
+  above its table or inside its open dialog; do not hand-write a notice. The
+  shell's preference status line is deliberately not a flash. Do not build a
+  second notification surface.
 - **Compact actions:** Use `<.icon_button>` for familiar repeated secondary
   actions in tables and toolbars. Inline icon controls are `size-6` (24px targets); table and
   toolbar icon controls are `size-7`; the `h-7` top bar takes only `size-6`

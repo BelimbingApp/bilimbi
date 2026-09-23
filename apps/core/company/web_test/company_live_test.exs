@@ -889,7 +889,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(
                view,
-               "#company-addresses-panel-notice[role='status']",
+               "#company-addresses-panel-notice[role='status'][data-kind='success']",
                "Address setting updated."
              )
 
@@ -905,7 +905,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(
                view,
-               "#company-addresses-panel-notice[role='alert']",
+               "#company-addresses-panel-notice[role='alert'][data-kind='error']",
                "Priority was not saved"
              )
 
@@ -952,7 +952,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(
                view,
-               "#company-addresses-panel-notice[role='status']",
+               "#company-addresses-panel-notice[role='status'][data-kind='success']",
                "Address unlinked."
              )
 
@@ -1500,8 +1500,12 @@ defmodule BilimbiWeb.CompanyLiveTest do
                "Address created and attached."
              )
 
-      # A success notice is announced politely, and the user can dismiss it.
-      assert has_element?(view, ~s(#company-addresses-panel-notice[role="status"]))
+      # A completed write is a success notice, announced politely, and the user
+      # can dismiss it.
+      assert has_element?(
+               view,
+               ~s(#company-addresses-panel-notice[role="status"][data-kind="success"])
+             )
 
       view |> element("#company-addresses-panel-notice-dismiss") |> render_click()
       refute has_element?(view, "#company-addresses-panel-notice")
@@ -1547,7 +1551,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       # because the page behind a modal dialog is inert.
       assert has_element?(
                view,
-               ~s(dialog#company-create-address-modal #company-addresses-panel-notice[role="alert"]),
+               ~s(dialog#company-create-address-modal #company-addresses-panel-notice[role="alert"][data-kind="error"]),
                "You do not have permission to edit companies."
              )
 

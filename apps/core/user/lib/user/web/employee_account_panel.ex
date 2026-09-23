@@ -18,8 +18,10 @@ defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
 
   Every write re-evaluates the actor's current grants through `Authz.can/2`
   (the #482/#541 pattern); mount-time capability state is presentation, not
-  an authorization decision. Outcomes render as a panel-local notice because
-  a LiveComponent cannot reach the page's flash without a parent contract.
+  an authorization decision. Outcomes render through the shared
+  `<.panel_notice>` because a LiveComponent cannot reach the page's flash
+  without a parent contract; a completed write says `:success` there, as it
+  would in the page's flash, and a refusal or failure `:error`.
   """
 
   use Bilimbi.Base.UI, :live_component
@@ -61,7 +63,7 @@ defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
              target_user_id
            ) do
         {:ok, _} ->
-          {:noreply, socket |> notice(:info, "User link updated.") |> reload()}
+          {:noreply, socket |> notice(:success, "User link updated.") |> reload()}
 
         {:error, _} ->
           {:noreply,
@@ -72,6 +74,10 @@ defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
     else
       {:noreply, write_forbidden(socket)}
     end
+  end
+
+  def handle_event("clear_notice", _params, socket) do
+    {:noreply, assign(socket, :notice, nil)}
   end
 
   # --- Data & helpers ---
@@ -143,18 +149,15 @@ defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
   def render(assigns) do
     ~H"""
     <div id={@id}>
-      <div
+      <.panel_notice
         :if={@notice}
         id={"#{@id}-notice"}
-        role={if elem(@notice, 0) == :error, do: "alert", else: "status"}
-        class={[
-          "mb-1.5 rounded-lg border px-2.5 py-1.5 text-xs",
-          elem(@notice, 0) == :info && "border-line bg-brand-surface text-ink",
-          elem(@notice, 0) == :error && "border-danger/40 bg-surface text-danger"
-        ]}
+        kind={elem(@notice, 0)}
+        on_dismiss={JS.push("clear_notice", target: @myself)}
+        class="mb-1.5"
       >
         {elem(@notice, 1)}
-      </div>
+      </.panel_notice>
 
       <%= if @can_manage? do %>
         <form

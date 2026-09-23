@@ -11,8 +11,10 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
   Visibility of the edit affordances uses the assign computed on update;
   every write re-evaluates the actor's current grants through `Authz.can/2`
   (the #482/#541 pattern) — mount-time capability state is presentation, not
-  an authorization decision. Outcomes render as a panel-local notice because a
-  LiveComponent cannot reach the page's flash without a parent contract. While
+  an authorization decision. Outcomes render through the shared
+  `<.panel_notice>` because a LiveComponent cannot reach the page's flash
+  without a parent contract; a completed write says `:success` there, as it
+  would in the page's flash, and a refusal or failure `:error`. While
   the attach dialog is open the notice renders inside it instead of above the
   cards: the page behind a modal dialog is inert, so a notice left outside
   could be neither read nor dismissed. An unexpected failure recovered by
@@ -120,7 +122,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
             {:ok, :attached} ->
               {:noreply,
                socket
-               |> notice(:info, "Address attached.")
+               |> notice(:success, "Address attached.")
                |> assign(:show_attach_modal, false)
                |> reload()}
 
@@ -173,7 +175,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
           case Address.detach_from_employee(scope, address_id, socket.assigns.employee_id) do
             :ok ->
-              {:noreply, socket |> notice(:info, "Address unlinked.") |> reload()}
+              {:noreply, socket |> notice(:success, "Address unlinked.") |> reload()}
 
             {:error, _} ->
               {:noreply,
@@ -206,7 +208,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
                  }
                ) do
             {:ok, :updated} ->
-              {:noreply, socket |> notice(:info, "Address setting updated.") |> reload()}
+              {:noreply, socket |> notice(:success, "Address setting updated.") |> reload()}
 
             {:error, _} ->
               {:noreply, notice(socket, :error, "Failed to update address setting.")}
@@ -242,7 +244,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
             {:ok, :updated} ->
               {:noreply,
                socket
-               |> notice(:info, "Address setting updated.")
+               |> notice(:success, "Address setting updated.")
                |> reload()}
 
             {:error, _} ->
@@ -317,7 +319,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
             {:ok, :updated} ->
               {:noreply,
                socket
-               |> notice(:info, "Address kinds updated.")
+               |> notice(:success, "Address kinds updated.")
                |> assign(:editing_kinds_address_id, nil)
                |> reload()}
 
@@ -398,45 +400,19 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
   def report_action_failure(socket, message), do: notice(socket, :error, message)
 
-  attr(:id, :string, required: true)
-  attr(:notice, :any, required: true)
-  attr(:target, :any, required: true)
-
-  defp panel_notice(assigns) do
-    ~H"""
-    <div
-      :if={@notice}
-      id={@id}
-      role={if elem(@notice, 0) == :error, do: "alert", else: "status"}
-      class={[
-        "mb-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-sm",
-        elem(@notice, 0) == :info && "border-line bg-brand-surface text-ink",
-        elem(@notice, 0) == :error && "border-danger/40 bg-surface text-danger"
-      ]}
-    >
-      <span class="flex-1">{elem(@notice, 1)}</span>
-      <.icon_button
-        id={"#{@id}-dismiss"}
-        icon="close"
-        label="Dismiss notice"
-        context={:inline}
-        phx-click="clear_notice"
-        phx-target={@target}
-      />
-    </div>
-    """
-  end
-
   @impl true
   def render(assigns) do
     ~H"""
     <div id={@id} class="contents">
       <.panel_notice
-        :if={not @show_attach_modal}
+        :if={@notice && not @show_attach_modal}
         id={"#{@id}-notice"}
-        notice={@notice}
-        target={@myself}
-      />
+        kind={elem(@notice, 0)}
+        on_dismiss={JS.push("clear_notice", target: @myself)}
+        class="mb-3"
+      >
+        {elem(@notice, 1)}
+      </.panel_notice>
       <.card
         id="addresses-card"
         inner_class="p-5 sm:p-6"
@@ -637,7 +613,15 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
         on_cancel={JS.push("close_attach_modal", target: @myself)}
       >
         <:description>Select an address from the company to attach to this employee.</:description>
-        <.panel_notice id={"#{@id}-notice"} notice={@notice} target={@myself} />
+        <.panel_notice
+          :if={@notice}
+          id={"#{@id}-notice"}
+          kind={elem(@notice, 0)}
+          on_dismiss={JS.push("clear_notice", target: @myself)}
+          class="mb-3"
+        >
+          {elem(@notice, 1)}
+        </.panel_notice>
             <.form
               for={@attach_form}
               phx-submit="attach_address" phx-target={@myself}
