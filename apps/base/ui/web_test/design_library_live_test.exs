@@ -232,7 +232,11 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
              "the list width, for a record or dashboard"
            )
 
-    assert has_element?(view, "#design-library-header-default", "Title, subtitle, and trailing action")
+    assert has_element?(
+             view,
+             "#design-library-header-default",
+             "Title, subtitle, and trailing action"
+           )
 
     assert has_element?(
              view,
@@ -253,8 +257,18 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#component-flash", "preference status line")
     assert has_element?(view, "#design-library-card-titled .border-b h3", "Company profile")
     refute has_element?(view, "#design-library-card-untitled h3")
-    assert has_element?(view, "#design-library-card-boundary", "no loading, empty, error, or disabled")
-    assert has_element?(view, "#design-library-list-boundary", "no loading, empty, or error state")
+
+    assert has_element?(
+             view,
+             "#design-library-card-boundary",
+             "no loading, empty, error, or disabled"
+           )
+
+    assert has_element?(
+             view,
+             "#design-library-list-boundary",
+             "no loading, empty, or error state"
+           )
 
     for area <- ~w(components component-composite-patterns component-feedback-states) do
       assert has_element?(view, "##{area}")
