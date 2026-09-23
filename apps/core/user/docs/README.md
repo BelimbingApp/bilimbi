@@ -128,8 +128,8 @@ one and no route reaches `list_unaffiliated_users/2` or
 every fact it shows has a company to be written through. An account whose
 company is archived reads as "Archived company" rather than as no company;
 its company select opens on that archived company as a selected, unchoosable
-option, and every refused write on the account names the archived company as
-the cause. Whether those editors open at all is a separate product decision.
+option, and a refused write on the company, name or email fact names the
+archived company as the cause. Whether those editors open at all is a separate product decision.
 `clear_user_company/5` remains in the API with no surface offering it. The header is Belimbing's quiet labelled
 row — History, Impersonate and "← Back" — with no button; the Impersonate
 guards (`admin.user.impersonate`, never the signed-in account, never while
