@@ -37,7 +37,12 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   Attribute values are normalised to `{:literal, term}` when the template
   spells a value out (a string, `{:info}`, `{false}`, a bare `disabled`) and
   `{:dynamic, code}` otherwise, so guards can tell a presented state from one
-  computed at runtime.
+  computed at runtime. A `~p` sigil whose path is wholly literal is spelled
+  out too: it is the string it wraps plus compile-time route verification,
+  which is why internal paths must use it, so `navigate={~p"/companies"}`
+  normalises to `{:literal, "/companies"}`. A `~p` that interpolates, carries
+  modifiers or sits inside a larger expression is computed at runtime and
+  stays dynamic.
 
   Every node shape the parser can produce is matched explicitly. An unknown
   one raises rather than being skipped, because a silently dropped subtree
@@ -528,6 +533,9 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
     case Code.string_to_quoted(code) do
       {:ok, value} when is_atom(value) or is_binary(value) or is_number(value) ->
         {:literal, value}
+
+      {:ok, {:sigil_p, _meta, [{:<<>>, _, [path]}, []]}} when is_binary(path) ->
+        {:literal, path}
 
       _ ->
         {:dynamic, String.trim(code)}
