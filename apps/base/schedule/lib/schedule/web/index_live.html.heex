@@ -216,7 +216,15 @@
       </div>
     </section>
 
-    <section :if={@state.tab == "history"} id="schedule-history-panel" aria-labelledby="schedule-tab-history">
+    <%!-- The hook reports the browser's zone so local-mode filters can bound
+         the days the Started column shows; the server ignores it in the two
+         modes it decides itself. --%>
+    <section
+      :if={@state.tab == "history"}
+      id="schedule-history-panel"
+      aria-labelledby="schedule-tab-history"
+      phx-hook="BrowserTimeZone"
+    >
       <.filter_toolbar
         id="schedule-history-filters"
         form={@run_form}
@@ -247,15 +255,15 @@
           type={:date}
           field={@run_form[:start_date]}
           id="schedule-run-start-date"
-          label="Start date (UTC)"
-          hint="UTC"
+          label="Start date"
+          hint={@run_zone}
         />
         <:control
           type={:date}
           field={@run_form[:end_date]}
           id="schedule-run-end-date"
-          label="End date (UTC)"
-          hint="UTC"
+          label="End date"
+          hint={@run_zone}
         />
         <:control
           type={:select}

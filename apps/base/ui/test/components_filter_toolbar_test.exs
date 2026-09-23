@@ -43,7 +43,7 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
         type={:date}
         field={@form[:start_date]}
         id="tb-start-date"
-        label="Start date (UTC)"
+        label="Start date"
         hint="UTC"
       />
       <:control
@@ -51,7 +51,7 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
         type={:date}
         field={@form[:end_date]}
         id="tb-end-date"
-        label="End date (UTC)"
+        label="End date"
         hint="UTC"
       />
       <:control

@@ -139,6 +139,61 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert {:error, :invalid_options} = Schedule.list_runs(search: String.duplicate("x", 256))
   end
 
+  test "history date filters select the calendar days of the caller's display zone", %{
+    definition: definition
+  } do
+    # Each run sits on one side of a UTC day and the other side of a displayed
+    # day: 23:30 UTC on the 20th is already 07:30 on the 21st in Kuala Lumpur,
+    # and 02:00 UTC on the 21st is still 22:00 on the 20th in New York.
+    insert_run!(definition, "Late UTC twentieth", ~N[2026-08-20 23:30:00])
+    insert_run!(definition, "Early UTC twenty-first", ~N[2026-08-21 02:00:00])
+
+    assert history_names(start_date: ~D[2026-08-21]) == ["Early UTC twenty-first"]
+    assert history_names(end_date: ~D[2026-08-20]) == ["Late UTC twentieth"]
+
+    assert history_names(start_date: ~D[2026-08-21], timezone: "Asia/Kuala_Lumpur") ==
+             ["Early UTC twenty-first", "Late UTC twentieth"]
+
+    assert history_names(end_date: ~D[2026-08-20], timezone: "Asia/Kuala_Lumpur") == []
+    assert history_names(start_date: ~D[2026-08-21], timezone: "America/New_York") == []
+
+    assert history_names(end_date: ~D[2026-08-20], timezone: "America/New_York") ==
+             ["Early UTC twenty-first", "Late UTC twentieth"]
+
+    assert history_names(
+             start_date: ~D[2026-08-21],
+             end_date: ~D[2026-08-21],
+             timezone: "Asia/Kuala_Lumpur"
+           ) == ["Early UTC twenty-first", "Late UTC twentieth"]
+
+    assert {:error, :invalid_options} = Schedule.list_runs(timezone: "Atlantis/Sunken")
+    assert {:error, :invalid_options} = Schedule.list_runs(timezone: :utc)
+  end
+
+  test "a displayed day whose midnight is skipped or repeated still begins where it displays",
+       %{definition: definition} do
+    # Santiago springs forward at midnight on 2026-09-06: the day has no
+    # 00:00 and begins at 01:00 -03, which is 04:00 UTC. Havana falls back at
+    # midnight on 2026-11-01: the day has two midnights and begins at the
+    # first, 00:00 CDT, which is also 04:00 UTC.
+    insert_run!(definition, "Santiago night before", ~N[2026-09-06 03:59:00])
+    insert_run!(definition, "Santiago first minute", ~N[2026-09-06 04:00:00])
+    insert_run!(definition, "Havana night before", ~N[2026-11-01 03:59:00])
+    insert_run!(definition, "Havana first midnight", ~N[2026-11-01 04:30:00])
+
+    assert history_names(start_date: ~D[2026-09-06], timezone: "America/Santiago") ==
+             ["Havana first midnight", "Havana night before", "Santiago first minute"]
+
+    assert history_names(end_date: ~D[2026-09-05], timezone: "America/Santiago") ==
+             ["Santiago night before"]
+
+    assert history_names(start_date: ~D[2026-11-01], timezone: "America/Havana") ==
+             ["Havana first midnight"]
+
+    assert history_names(end_date: ~D[2026-10-31], timezone: "America/Havana") ==
+             ["Havana night before", "Santiago first minute", "Santiago night before"]
+  end
+
   test "operator commands persist actor-attributed audit facts and reject stale definitions", %{
     definition: definition
   } do
@@ -464,6 +519,21 @@ defmodule Bilimbi.Base.ScheduleTest do
     assert log =~ "key=test.badtz"
     assert log =~ "reason=:invalid_timezone"
     refute log =~ "time_resolution_failed"
+  end
+
+  defp insert_run!(definition, name, started_at) do
+    Repo.insert!(%Run{
+      source: "scheduler",
+      key: definition.key,
+      name: name,
+      status: "succeeded",
+      started_at: started_at
+    })
+  end
+
+  defp history_names(options) do
+    {:ok, page} = Schedule.list_runs(Keyword.merge([sort_by: :name, sort_dir: :asc], options))
+    Enum.map(page.entries, & &1.name)
   end
 
   defp definition do

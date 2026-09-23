@@ -79,11 +79,19 @@ Audit in the same transaction as the controlled state change; operational run
 rows remain separate best-effort evidence.
 
 History filtering, ordering, exact totals, and pagination happen in PostgreSQL
-before rows reach the LiveView. The start and end date filters bound UTC
-calendar days of `started_at`, and the operator board names that zone in the
-controls: the Started column renders in the operator's display timezone, so a
-run can appear on one local day while a different UTC day bounds it. Worker
-arguments and recorded output excerpts never cross the operator-facing Schedule
-API. Diagnostics report scheduler, Queue, recorder, and due-work evidence
+before rows reach the LiveView. The start and end date filters bound calendar
+days of `started_at` in the zone the caller passes as `timezone` (default
+`UTC`), and the operator board passes the zone its Started column displays in,
+read from the same per-process context `<.datetime>` renders from: the company
+zone under company time, UTC under stored UTC, and under local time the zone
+the browser reports through the `BrowserTimeZone` hook, with UTC — the text
+the server rendered itself — until that report arrives or when the name is not
+in the server's time zone database. The controls name the zone the current
+results were bounded in, and a saved clock change reloads the results, so a
+run that reads 21/08 is always selected by a start date of 21/08. A displayed
+day whose midnight is skipped or repeated by a clock change begins where it
+displays: at the instant clocks resume, or at the first of its two midnights.
+Worker arguments and recorded output excerpts never cross the operator-facing
+Schedule API. Diagnostics report scheduler, Queue, recorder, and due-work evidence
 independently, using unknown or unavailable states rather than deriving health
 from missing rows.

@@ -9,6 +9,7 @@ defmodule BilimbiWeb.ScheduleLiveTest do
 
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.DateTime, as: DateTimePolicy
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Schedule
@@ -19,6 +20,8 @@ defmodule BilimbiWeb.ScheduleLiveTest do
   alias Bilimbi.Base.Schedule.TestFixtures, as: ScheduleFixtures
   alias Bilimbi.Base.Schedule.TestWorker
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Settings.Scope, as: SettingsScope
+  alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
@@ -181,44 +184,86 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     assert {:error, :unreviewed} = Schedule.run_now(definition.key)
   end
 
-  test "history date filters name the UTC day they bound", %{conn: conn} do
+  test "history date filters bound the day the Started column shows, in every clock mode", %{
+    conn: conn
+  } do
     grant_capabilities!(@view)
-
-    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule?tab=history")
-
-    assert has_element?(view, "label[for='schedule-run-start-date']", "Start date (UTC)")
-    assert has_element?(view, "label[for='schedule-run-end-date']", "End date (UTC)")
-    assert has_element?(view, "#schedule-run-start-date + p", "UTC")
-    assert has_element?(view, "#schedule-run-end-date + p", "UTC")
-  end
-
-  test "history date filters still select the runs of a UTC calendar day", %{conn: conn} do
-    grant_capabilities!(@view)
+    display_company_in!("Asia/Kuala_Lumpur")
     insert_boundary_runs!()
 
+    # Company time: 23:30 UTC on the 20th reads 07:30 on the 21st, so the
+    # start date that names that day selects it, and a UTC day would not.
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule?tab=history")
-
-    assert has_element?(view, "#schedule-runs", "Late on the twentieth")
-    assert has_element?(view, "#schedule-runs", "Early on the twenty-first")
+    assert has_element?(view, "#schedule-runs", "21/08/2026, 07:30 +08")
+    assert has_element?(view, "#schedule-run-start-date + p", "Asia/Kuala_Lumpur")
+    assert has_element?(view, "#schedule-run-end-date + p", "Asia/Kuala_Lumpur")
+    assert has_element?(view, "label[for='schedule-run-start-date']", "Start date")
+    refute has_element?(view, "label[for='schedule-run-start-date']", "UTC")
 
     filter_runs(view, %{"start_date" => "2026-08-21", "end_date" => ""})
-
-    refute has_element?(view, "#schedule-runs", "Late on the twentieth")
-    assert has_element?(view, "#schedule-runs", "Early on the twenty-first")
-    assert has_element?(view, "#schedule-history-pagination-summary", ~r/\b1 run\b/)
-    refute render(view) =~ "Page 1 of 1"
-
-    filter_runs(view, %{"start_date" => "", "end_date" => "2026-08-20"})
-
-    assert has_element?(view, "#schedule-runs", "Late on the twentieth")
-    refute has_element?(view, "#schedule-runs", "Early on the twenty-first")
-    assert has_element?(view, "#schedule-history-pagination-summary", ~r/\b1 run\b/)
-
-    filter_runs(view, %{"start_date" => "2026-08-20", "end_date" => "2026-08-21"})
-
     assert has_element?(view, "#schedule-runs", "Late on the twentieth")
     assert has_element?(view, "#schedule-runs", "Early on the twenty-first")
     assert has_element?(view, "#schedule-history-pagination-summary", "2 runs")
+
+    filter_runs(view, %{"start_date" => "", "end_date" => "2026-08-20"})
+    refute has_element?(view, "#schedule-runs", "Late on the twentieth")
+    refute has_element?(view, "#schedule-runs", "Early on the twenty-first")
+    assert has_element?(view, "#schedule-runs-empty", "No runs match the current filters.")
+
+    # Stored UTC: the same rows read 20/08 and 21/08, and the same start date
+    # now selects only the run that began on the UTC 21st.
+    {:ok, :utc} = DateTimePolicy.put_mode(SettingsScope.user(91, 73, 41), :utc)
+
+    {:ok, view, _html} =
+      conn |> log_in_as() |> live(~p"/system/schedule?tab=history&start_date=2026-08-21")
+
+    assert has_element?(view, "#schedule-runs", "21/08/2026, 00:30 UTC")
+    assert has_element?(view, "#schedule-run-start-date + p", "UTC")
+    refute has_element?(view, "#schedule-runs", "Late on the twentieth")
+    assert has_element?(view, "#schedule-runs", "Early on the twenty-first")
+    assert has_element?(view, "#schedule-history-pagination-summary", ~r/\b1 run\b/)
+
+    # Local time: the server does not know the browser's zone, so it bounds
+    # the UTC text it rendered until the browser reports the zone it formats
+    # in, and then bounds that zone's days.
+    {:ok, :local} = DateTimePolicy.put_mode(SettingsScope.user(91, 73, 41), :local)
+
+    {:ok, view, _html} =
+      conn |> log_in_as() |> live(~p"/system/schedule?tab=history&start_date=2026-08-21")
+
+    assert has_element?(view, "#schedule-run-start-date + p", "UTC")
+    refute has_element?(view, "#schedule-runs", "Late on the twentieth")
+
+    render_hook(view, "browser_timezone", %{"timezone" => "Asia/Kuala_Lumpur"})
+    assert has_element?(view, "#schedule-run-start-date + p", "Asia/Kuala_Lumpur")
+    assert has_element?(view, "#schedule-runs", "Late on the twentieth")
+    assert has_element?(view, "#schedule-history-pagination-summary", "2 runs")
+
+    # A zone the server's database does not know cannot bound a query, so
+    # the filter says UTC rather than pretending.
+    render_hook(view, "browser_timezone", %{"timezone" => "Atlantis/Sunken"})
+    assert has_element?(view, "#schedule-run-start-date + p", "UTC")
+    refute has_element?(view, "#schedule-runs", "Late on the twentieth")
+  end
+
+  test "a saved clock change re-bounds the history the operator is looking at", %{conn: conn} do
+    grant_capabilities!(@view)
+    display_company_in!("Asia/Kuala_Lumpur")
+    insert_boundary_runs!()
+
+    {:ok, view, _html} =
+      conn |> log_in_as() |> live(~p"/system/schedule?tab=history&start_date=2026-08-21")
+
+    assert has_element?(view, "#schedule-run-start-date + p", "Asia/Kuala_Lumpur")
+    assert has_element?(view, "#schedule-history-pagination-summary", "2 runs")
+
+    # The shell's own hook saves the mode and halts the event before this view
+    # sees it; the results still follow the Started column without a reload.
+    render_hook(view, "shell:preference", %{kind: "timezone", value: "utc"})
+
+    assert has_element?(view, "#schedule-run-start-date + p", "UTC")
+    refute has_element?(view, "#schedule-runs", "Late on the twentieth")
+    assert has_element?(view, "#schedule-history-pagination-summary", ~r/\b1 run\b/)
   end
 
   test "a history holding more than one page still names the page it is on", %{conn: conn} do
@@ -321,8 +366,20 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     assert has_element?(view, "#schedule-run-page-size option[value='25'][selected]")
   end
 
+  # The company clock is what the product shows by default; the settings table
+  # holds both the company zone and the account's clock mode.
+  defp display_company_in!(timezone) do
+    SettingsFixtures.create_settings_table!()
+
+    {:ok, _value} =
+      Settings.put("localization.timezone", timezone, SettingsScope.company(73, 41))
+
+    {:ok, :company} = DateTimePolicy.put_mode(SettingsScope.user(91, 73, 41), :company)
+    :ok
+  end
+
   # The two instants straddle UTC midnight, so a timezone-shifted Started column
-  # shows them on one day while the filters bound two.
+  # shows them on one day while the filters, bounding UTC days, would show two.
   defp insert_boundary_runs! do
     Repo.insert!(%Run{
       source: "scheduler",

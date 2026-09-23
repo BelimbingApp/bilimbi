@@ -26,6 +26,7 @@ import {hooks as colocatedHooks} from "phoenix-colocated/web"
 import topbar from "../vendor/topbar"
 import AppShell from "./app_shell"
 import DateTime from "./date_time"
+import BrowserTimeZone from "./browser_time_zone"
 import InlineEdit from "./inline_edit"
 import DashboardSort from "./dashboard_sort"
 import MultiSelectDismiss from "./multi_select"
@@ -37,7 +38,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, AppShell, DateTime, InlineEdit, DashboardSort, MultiSelectDismiss, SecretReveal, Modal, FlashAutoDismiss},
+  hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, DashboardSort, MultiSelectDismiss, SecretReveal, Modal, FlashAutoDismiss},
 })
 
 // Show progress bar on live navigation and form submits

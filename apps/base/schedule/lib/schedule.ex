@@ -38,6 +38,8 @@ defmodule Bilimbi.Base.Schedule do
   @task_sorts [:last_run, :name, :next_due]
   @run_sorts [:name, :source, :started_at, :status]
   @retention_key "schedule.history.keep_days"
+  @utc "UTC"
+  @tz_db TimeZoneInfo.TimeZoneDatabase
 
   @spec definitions() :: [Definition.t()]
   def definitions do
@@ -82,7 +84,14 @@ defmodule Bilimbi.Base.Schedule do
 
   def list_tasks(_options), do: {:error, :invalid_options}
 
-  @doc "Returns an exact, database-filtered page of redacted run history."
+  @doc """
+  Returns an exact, database-filtered page of redacted run history.
+
+  `start_date` and `end_date` select whole calendar days of `started_at` in
+  `timezone`, an IANA zone name that defaults to `UTC`. A caller passes the
+  zone it displays the rows in, so a run shown on a day is selected by that
+  day; an unknown zone is `{:error, :invalid_options}`.
+  """
   @spec list_runs(keyword()) ::
           {:ok, RunPage.t()} | {:error, :invalid_options | :unavailable}
   def list_runs(options \\ [])
@@ -399,13 +408,25 @@ defmodule Bilimbi.Base.Schedule do
   end
 
   defp validate_run_options(options) do
-    allowed = [:end_date, :page, :page_size, :search, :sort_by, :sort_dir, :start_date, :status]
+    allowed = [
+      :end_date,
+      :page,
+      :page_size,
+      :search,
+      :sort_by,
+      :sort_dir,
+      :start_date,
+      :status,
+      :timezone
+    ]
+
     page = Keyword.get(options, :page, 1)
     page_size = Keyword.get(options, :page_size, 25)
     search = Keyword.get(options, :search)
     status = Keyword.get(options, :status)
     start_date = Keyword.get(options, :start_date)
     end_date = Keyword.get(options, :end_date)
+    timezone = Keyword.get(options, :timezone, @utc)
     sort_by = run_sort(Keyword.get(options, :sort_by, :started_at))
     sort_dir = sort_direction(Keyword.get(options, :sort_dir, :desc))
 
@@ -415,8 +436,8 @@ defmodule Bilimbi.Base.Schedule do
          (is_nil(status) or status in @run_statuses) and
          (is_nil(start_date) or match?(%Date{}, start_date)) and
          (is_nil(end_date) or match?(%Date{}, end_date)) and
-         valid_date_range?(start_date, end_date) and sort_by in @run_sorts and
-         sort_dir in [:asc, :desc] do
+         valid_date_range?(start_date, end_date) and valid_timezone?(timezone) and
+         sort_by in @run_sorts and sort_dir in [:asc, :desc] do
       {:ok,
        %{
          page: page,
@@ -425,6 +446,7 @@ defmodule Bilimbi.Base.Schedule do
          status: status,
          start_date: start_date,
          end_date: end_date,
+         timezone: timezone,
          sort_by: sort_by,
          sort_dir: sort_dir
        }}
@@ -437,6 +459,15 @@ defmodule Bilimbi.Base.Schedule do
     do: Date.compare(start_date, end_date) != :gt
 
   defp valid_date_range?(_start_date, _end_date), do: true
+
+  # The filter zone is a caller-supplied string, so it is proved against the
+  # real database before it can bound a query; an unknown name is refused
+  # rather than silently read as UTC.
+  defp valid_timezone?(timezone) when is_binary(timezone) do
+    match?({:ok, _now}, DateTime.now(timezone, @tz_db))
+  end
+
+  defp valid_timezone?(_timezone), do: false
 
   defp bounded_search?(nil), do: true
   defp bounded_search?(search) when is_binary(search), do: byte_size(search) <= 255
@@ -609,8 +640,8 @@ defmodule Bilimbi.Base.Schedule do
     Run
     |> maybe_search_runs(filters.search)
     |> maybe_filter_run_status(filters.status)
-    |> maybe_filter_run_start(filters.start_date)
-    |> maybe_filter_run_end(filters.end_date)
+    |> maybe_filter_run_start(filters.start_date, filters.timezone)
+    |> maybe_filter_run_end(filters.end_date, filters.timezone)
   end
 
   defp maybe_search_runs(query, nil), do: query
@@ -629,18 +660,42 @@ defmodule Bilimbi.Base.Schedule do
   defp maybe_filter_run_status(query, status),
     do: from(run in query, where: run.status == ^status)
 
-  defp maybe_filter_run_start(query, nil), do: query
+  # A date filter bounds calendar days of the zone the caller displays
+  # `started_at` in, so the day a row is shown on and the day a filter selects
+  # are the same day. Both boundaries are that zone's midnight expressed as the
+  # stored UTC instant: the start day begins at its own midnight and the end
+  # day ends where the next day begins.
+  defp maybe_filter_run_start(query, nil, _timezone), do: query
 
-  defp maybe_filter_run_start(query, start_date) do
-    boundary = NaiveDateTime.new!(start_date, ~T[00:00:00])
+  defp maybe_filter_run_start(query, start_date, timezone) do
+    boundary = day_start(start_date, timezone)
     from(run in query, where: run.started_at >= ^boundary)
   end
 
-  defp maybe_filter_run_end(query, nil), do: query
+  defp maybe_filter_run_end(query, nil, _timezone), do: query
 
-  defp maybe_filter_run_end(query, end_date) do
-    boundary = end_date |> Date.add(1) |> NaiveDateTime.new!(~T[00:00:00])
+  defp maybe_filter_run_end(query, end_date, timezone) do
+    boundary = end_date |> Date.add(1) |> day_start(timezone)
     from(run in query, where: run.started_at < ^boundary)
+  end
+
+  defp day_start(date, timezone) do
+    case DateTime.new(date, ~T[00:00:00], timezone, @tz_db) do
+      {:ok, midnight} ->
+        midnight
+
+      # Clocks jumped forward over midnight: the day begins the moment they
+      # resume, so nothing that happened that night is dropped.
+      {:gap, _just_before, just_after} ->
+        just_after
+
+      # Clocks fell back over midnight: the day begins at the first of its two
+      # midnights, so the repeated hour still belongs to the day it displays in.
+      {:ambiguous, first, _second} ->
+        first
+    end
+    |> DateTime.shift_zone!(@utc, @tz_db)
+    |> DateTime.to_naive()
   end
 
   defp order_runs(query, :started_at, :asc),
