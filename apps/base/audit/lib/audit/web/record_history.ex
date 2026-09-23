@@ -9,36 +9,78 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
   gives every demoted header action. Belimbing's `admin/*/show` pages present
   it exactly so, as a labelled ghost control in the row with Impersonate and
   Back, so the word is visible rather than kept for assistive technology.
+
+  ## Staying current
+
+  The trail is read from the database, so it is only as fresh as the last
+  time this component ran. Two things keep it truthful:
+
+    * The panel re-reads the trail every time it is opened, so what the
+      reader sees on opening it is the record's history as of that moment,
+      whoever wrote it. The open state is the server's (`open={@open}`),
+      because a browser-only `open` attribute would be dropped by the next
+      DOM patch, and the summary's click flips both in step.
+    * The page passes the record itself as `record`, beside the
+      `auditable_id` the read needs. A LiveView re-renders a component only
+      when an assign it was given changes, and it tracks `@user.id` at the
+      field level, so the id alone never re-renders this panel after an
+      in-page edit — the trail stood still while the page's own Updated
+      fact moved. The whole record changes with every write, so passing it
+      is what re-runs `update/2`, and an open panel follows the edit.
+
+  Values inside a diff render through `Bilimbi.Base.Audit.Web.MutationDiff`,
+  so a stored timestamp shows in the page's chosen clock, the same as the
+  entry's own time beside the badge.
   """
 
   use Bilimbi.Base.UI, :live_component
 
   alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.Audit.Web.MutationDiff
+
+  import MutationDiff, only: [diff_value: 1]
 
   @impl true
   def update(assigns, socket) do
+    socket =
+      socket
+      |> assign(assigns)
+      |> assign_new(:title, fn -> "Record History" end)
+      |> assign_new(:open, fn -> false end)
+
+    {:ok, load_entries(socket)}
+  end
+
+  @impl true
+  def handle_event("toggle", _params, socket) do
+    if socket.assigns.open do
+      {:noreply, assign(socket, :open, false)}
+    else
+      {:noreply, socket |> assign(:open, true) |> load_entries()}
+    end
+  end
+
+  defp load_entries(socket) do
     {:ok, entries} =
       Audit.list_subject_mutations(
-        assigns.current_scope.scope,
-        assigns.auditable_types,
-        assigns.auditable_id
+        socket.assigns.current_scope.scope,
+        socket.assigns.auditable_types,
+        socket.assigns.auditable_id
       )
 
-    {:ok,
-     socket
-     |> assign(assigns)
-     |> assign_new(:title, fn -> "Record History" end)
-     |> assign(:entries, entries)}
+    assign(socket, :entries, entries)
   end
 
   @impl true
   def render(assigns) do
     ~H"""
     <div id={@id} class="relative inline-block text-left">
-      <details class="group">
+      <details class="group" open={@open}>
         <summary
           id={"#{@id}-toggle"}
           title="History"
+          phx-click="toggle"
+          phx-target={@myself}
           class={[
             Bilimbi.Base.UI.Components.demoted_action_class(),
             "cursor-pointer list-none [&::-webkit-details-marker]:hidden"
@@ -78,7 +120,7 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
                 {actor_label(entry)}
               </div>
 
-              <% field_diffs = diffs(entry) %>
+              <% field_diffs = MutationDiff.rows(entry) %>
               <div :if={field_diffs != []} class="mt-2 space-y-1">
                 <div :for={diff <- field_diffs} class="grid grid-cols-[7rem_minmax(0,1fr)] gap-2 font-mono text-xs">
                   <span class="truncate font-semibold text-ink-muted">{diff.field}</span>
@@ -86,9 +128,17 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
                     <%= if diff.sensitive do %>
                       redacted
                     <% else %>
-                      <span class="text-danger-ink">{diff.old}</span>
+                      <.diff_value
+                        id={"#{@id}-entry-#{entry.id}-#{diff.field}-old"}
+                        value={diff.old}
+                        class="text-danger-ink"
+                      />
                       <span class="px-1 text-ink-muted">-></span>
-                      <span class="text-success-ink">{diff.new}</span>
+                      <.diff_value
+                        id={"#{@id}-entry-#{entry.id}-#{diff.field}-new"}
+                        value={diff.new}
+                        class="text-success-ink"
+                      />
                     <% end %>
                   </span>
                 </div>
@@ -138,56 +188,4 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
   defp event_badge("deleted"), do: {:danger, "Deleted"}
   defp event_badge("updated"), do: {:neutral, "Updated"}
   defp event_badge(other), do: {:neutral, String.capitalize(to_string(other))}
-
-  defp diffs(%{event: "created", new_values: new_vals}) when is_map(new_vals) do
-    Enum.map(new_vals, fn {key, value} ->
-      %{field: to_string(key), old: "-", new: format_value(value), sensitive: sensitive_key?(key)}
-    end)
-  end
-
-  defp diffs(%{event: "deleted", old_values: old_vals}) when is_map(old_vals) do
-    Enum.map(old_vals, fn {key, value} ->
-      %{field: to_string(key), old: format_value(value), new: "-", sensitive: sensitive_key?(key)}
-    end)
-  end
-
-  defp diffs(%{old_values: old_vals, new_values: new_vals}) do
-    old_map = old_vals || %{}
-    new_map = new_vals || %{}
-
-    (Map.keys(old_map) ++ Map.keys(new_map))
-    |> Enum.uniq()
-    |> Enum.sort()
-    |> Enum.filter(&(Map.get(old_map, &1) != Map.get(new_map, &1)))
-    |> Enum.map(fn key ->
-      %{
-        field: to_string(key),
-        old: format_value(Map.get(old_map, key)),
-        new: format_value(Map.get(new_map, key)),
-        sensitive: sensitive_key?(key)
-      }
-    end)
-  end
-
-  defp format_value(nil), do: "-"
-  defp format_value(value) when is_binary(value), do: value
-  defp format_value(value) when is_boolean(value), do: to_string(value)
-  defp format_value(value) when is_number(value), do: to_string(value)
-
-  defp format_value(value) when is_map(value) or is_list(value) do
-    case Jason.encode(value) do
-      {:ok, json} -> json
-      _ -> inspect(value)
-    end
-  end
-
-  defp format_value(value), do: inspect(value)
-
-  defp sensitive_key?(key) when is_binary(key) do
-    key
-    |> String.downcase()
-    |> String.contains?(["password", "secret", "token", "key", "hash"])
-  end
-
-  defp sensitive_key?(key), do: sensitive_key?(to_string(key))
 end

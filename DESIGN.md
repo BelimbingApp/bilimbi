@@ -309,7 +309,12 @@ page:
   registry's `history` glyph (Belimbing's clock) beside the word "History",
   in the same quiet `text-link` treatment as the back link, as Belimbing's
   `admin/*/show` pages present it. The `record.history` panel renders it; a
-  page never builds its own.
+  page never builds its own. The page passes the record itself as `record`
+  beside the `auditable_id`: the id never changes, so it alone would never
+  re-render the panel, and a trail that stands still after an in-page edit
+  states something untrue. A timestamp inside a diff follows the page's
+  clock like the entry's own time, and reads to the second so two changes
+  inside one minute do not read as the same value.
 
 ## Demoted secondary actions
 

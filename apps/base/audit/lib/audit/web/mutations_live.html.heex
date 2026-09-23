@@ -76,17 +76,23 @@
         </:col>
 
         <:col :let={mutation} label="Details">
-          <% field_diffs = diffs(mutation) %>
+          <% field_diffs = MutationDiff.rows(mutation) %>
           <div :if={field_diffs != []} class="space-y-1">
             <div :for={diff <- field_diffs} class="flex items-baseline gap-2 font-mono text-xs">
               <span class="min-w-[100px] font-semibold text-ink-muted">{diff.field}:</span>
               <code :if={diff.sensitive} class="text-ink-muted italic">
-                {diff.old} → {diff.new}
+                <.diff_value id={"mutation-#{mutation.id}-#{diff.field}-old"} value={diff.old} />
+                →
+                <.diff_value id={"mutation-#{mutation.id}-#{diff.field}-new"} value={diff.new} />
               </code>
               <div :if={!diff.sensitive} class="flex items-baseline gap-1.5 flex-wrap">
-                <code class="text-status-danger">{diff.old}</code>
+                <code class="text-status-danger">
+                  <.diff_value id={"mutation-#{mutation.id}-#{diff.field}-old"} value={diff.old} />
+                </code>
                 <span class="text-ink-muted">→</span>
-                <code class="text-status-success">{diff.new}</code>
+                <code class="text-status-success">
+                  <.diff_value id={"mutation-#{mutation.id}-#{diff.field}-new"} value={diff.new} />
+                </code>
               </div>
             </div>
           </div>

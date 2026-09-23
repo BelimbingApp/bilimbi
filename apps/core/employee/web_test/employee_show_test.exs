@@ -482,6 +482,25 @@ defmodule BilimbiWeb.EmployeeShowTest do
              Employee.get_employee(scope, 73, orchestrator.id)
   end
 
+  test "an in-place edit appears in the record history without a remount", %{
+    conn: conn,
+    employee: employee
+  } do
+    AuditFixtures.create_audit_tables!()
+    grant_capabilities!(["admin.employee.view", "admin.employee.update", "admin.audit.log.list"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+    assert has_element?(view, "#employee-record-history-empty")
+
+    render_hook(view, "save_field", %{"id" => to_string(employee.id), "full_name" => "Jane Doe"})
+    assert has_element?(view, "h1", "Jane Doe")
+
+    refute has_element?(view, "#employee-record-history-empty")
+    assert has_element?(view, "#employee-record-history-panel", "Updated")
+    assert has_element?(view, "#employee-record-history-panel", "John Doe")
+    assert has_element?(view, "#employee-record-history-panel", "Jane Doe")
+  end
+
   test "shows record history and impersonation attribution when the actor can list audit logs", %{
     conn: conn,
     employee: employee

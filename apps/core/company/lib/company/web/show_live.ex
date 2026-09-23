@@ -967,7 +967,11 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
                 key="record.history"
                 id="company-record-history"
                 current_scope={@current_scope}
-                opts={%{auditable_types: company_auditable_types(), auditable_id: @company.id}}
+                opts={%{
+                  auditable_types: company_auditable_types(),
+                  auditable_id: @company.id,
+                  record: @company
+                }}
               />
               <.back_link id="company-back" navigate={~p"/companies"} title="Back to companies" />
             </div>

@@ -796,7 +796,13 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                 key="record.history"
                 id="employee-record-history"
                 current_scope={@current_scope}
-                opts={%{auditable_types: employee_auditable_types(), auditable_id: @employee.id}}
+                opts={
+                  %{
+                    auditable_types: employee_auditable_types(),
+                    auditable_id: @employee.id,
+                    record: @employee
+                  }
+                }
               />
               <.back_link id="employee-back" navigate={~p"/employees"} title="Back to employees" />
             </div>
