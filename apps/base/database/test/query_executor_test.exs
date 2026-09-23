@@ -227,6 +227,7 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
 
     test "refuses to run at all while its connection could write", %{
       role: role,
+      sequence: sequence,
       writable: table
     } do
       committed!(fn -> Repo.query!("GRANT INSERT ON #{table} TO #{role}") end)
@@ -245,6 +246,15 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
       assert msg =~ "may write public.#{table}"
 
       committed!(fn -> Repo.query!("REVOKE UPDATE (id) ON #{table} FROM #{role}") end)
+
+      assert {:ok, %{rows: [%{"?column?" => 1}]}} = as_operator("SELECT 1")
+
+      committed!(fn -> Repo.query!("GRANT USAGE ON SEQUENCE #{sequence} TO #{role}") end)
+
+      assert {:error, msg} = as_operator("SELECT 1")
+      assert msg =~ "may write public.#{sequence}"
+
+      committed!(fn -> Repo.query!("REVOKE USAGE ON SEQUENCE #{sequence} FROM #{role}") end)
 
       assert {:ok, %{rows: [%{"?column?" => 1}]}} = as_operator("SELECT 1")
     end

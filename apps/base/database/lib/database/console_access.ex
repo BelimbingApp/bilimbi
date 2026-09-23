@@ -80,7 +80,7 @@ defmodule Bilimbi.Base.Database.ConsoleAccess do
     WHERE #{@user_schema}
       AND c.relkind IN #{@relation_kinds}
       AND CASE WHEN c.relkind = 'S'
-            THEN has_sequence_privilege(c.oid, 'UPDATE')
+            THEN has_sequence_privilege(c.oid, 'USAGE, UPDATE')
             ELSE has_table_privilege(c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE')
               OR has_any_column_privilege(c.oid, 'INSERT, UPDATE')
           END
