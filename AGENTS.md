@@ -624,7 +624,9 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   (`hover:bg-action-hover`, `lime-600` light / `lime-500` dark). Lime `brand`
   is reserved for orientation and selection, never an action or status. The
   strip above the workspace renders only while impersonating; the
-  platform-operator marker is a `warning`-token row in the account menu
+  platform-operator marker is a `warning`-token row in the account menu, and
+  an operator-only surface whose reach is not filtered to one company carries
+  its own `warning`-token caution naming what is unfiltered, never a gate
   (`DESIGN.md` "Application shell"). Async actions
   must show in-flight state, reject duplicate work, and truthfully report the data
   outcome and recovery: `phx-disable-with` covers one socket round trip, which

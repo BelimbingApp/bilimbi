@@ -461,9 +461,28 @@ registry's `warning` glyph, so it still reads as a caution rather than a
 neutral scope line. The row names the company's platform-operator status, not
 a personal entitlement: an account in that company may still be refused the
 operator-only surfaces, which is why it is not worded as ownership. Nothing
-about it changes what any capability or impersonation guard permits. The
-operator-only surfaces themselves, such as the raw SQL console, do not warn
-that an action is unfiltered; that is a known gap.
+about it changes what any capability or impersonation guard permits.
+
+The operator-only surfaces carry their own caution, on the screen, where an
+action or a listing is genuinely not filtered to one company. It uses the same
+`warning` tokens and says what is unfiltered, never who the operator is: the
+account marker already covers identity, and repeating it is what made the old
+strip invisible. Its form follows what the reach is. The raw SQL console, whose
+executor carries no tenant predicate, shows `<.alert kind={:warning}>` beside
+the query it runs, stating that SQL there reads across every company and
+tenant. The authorization listings, which the platform-operator scope widens to
+rows attached to no company, carry a one-line `text-warning-ink` caption with
+the registry's `warning` glyph directly above the table, because that widening
+is a standing property of the rows rather than an event. The roles list is not
+widened, but its per-role Principals counts are, so it carries the same caption
+naming the counts rather than the rows. Neither is a gate:
+no confirmation, no extra click, and no change to what the surface returns. An
+ordinary scope never sees either caution, and a surface whose reach is
+filtered to one company carries none. Belimbing does not caution on these
+surfaces at all — it answers a non-operator on the console with 403 and marks
+its widened decision log with an "All tenants" toggle plus a table caption —
+so the caption is the closer adaptation and the console alert is the
+deliberate departure, made because a query there is unbounded.
 
 The timezone and theme selectors are compact top-bar utilities, not settings
 navigation. A selection applies immediately and persists for the signed-in

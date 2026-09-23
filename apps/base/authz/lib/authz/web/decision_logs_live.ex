@@ -21,6 +21,7 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Tenancy.Scope
 
   # Belimbing also sorts by actor name, which needs a join this read model does
   # not offer. The rest map one to one.
@@ -34,7 +35,7 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, page_title: "Decision Logs")}
+    {:ok, assign(socket, page_title: "Decision Logs", reach_caution?: reach_caution?(socket))}
   end
 
   @impl true
@@ -198,4 +199,11 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
   defp resource_label(%{resource_type: nil}), do: "—"
   defp resource_label(%{resource_type: type, resource_id: nil}), do: type
   defp resource_label(%{resource_type: type, resource_id: id}), do: "#{type} ##{id}"
+
+  # `Authz` widens this listing for the platform-operator scope to rows attached
+  # to no company (`Administration.company_visibility/2`). The caution names that
+  # widening where the list is read; it changes nothing about what is listed.
+  defp reach_caution?(socket) do
+    Scope.platform_operator?(socket.assigns.current_scope.scope)
+  end
 end

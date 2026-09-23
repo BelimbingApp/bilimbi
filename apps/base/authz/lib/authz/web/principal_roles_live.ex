@@ -21,6 +21,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Tenancy.Scope
 
   @sortable ~w(created_at principal_type principal_id principal_name role_name company_id company_name)
 
@@ -31,6 +32,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
     {:ok,
      socket
      |> assign(:page_title, "Principal Roles")
+     |> assign(:reach_caution?, reach_caution?(socket))
      |> assign(:company_names, Map.new(companies, &{&1.id, &1.name}))
      |> assign(:company_order, Enum.map(companies, & &1.id))}
   end
@@ -182,5 +184,12 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
       {:ok, name} -> name
       :error -> to_string(company_id)
     end
+  end
+
+  # `Authz` widens this listing for the platform-operator scope to rows attached
+  # to no company (`Administration.company_visibility/2`). The caution names that
+  # widening where the list is read; it changes nothing about what is listed.
+  defp reach_caution?(socket) do
+    Scope.platform_operator?(socket.assigns.current_scope.scope)
   end
 end

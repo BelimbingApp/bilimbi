@@ -193,6 +193,39 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       assert render_click(view, "delete") =~ "You are not authorized to modify queries."
     end
 
+    test "warns, where SQL runs, that the console reads across every company", %{
+      conn: conn,
+      scope: scope
+    } do
+      # `Database.QueryExecutor` applies no tenant predicate, and only the
+      # operator scope reaches this page, so the caution is true whenever it is
+      # read: on a saved query and on a new one, in the warning tokens.
+      grant_capabilities!("admin.system.database-table.list")
+
+      {:ok, query} =
+        User.create_database_query(scope, 91, %{
+          name: "Reach Query",
+          sql_query: "SELECT id FROM users;"
+        })
+
+      {:ok, view, _html} =
+        conn |> log_in_as() |> live(~p"/admin/system/database-queries/#{query.slug}")
+
+      assert has_element?(
+               view,
+               "#sql-editor-card #database-query-reach-caution.bg-warning-surface",
+               "every company and tenant"
+             )
+
+      {:ok, view, _html} =
+        conn |> log_in_as() |> live(~p"/admin/system/database-queries/_new")
+
+      assert has_element?(view, "#database-query-reach-caution", "every company and tenant")
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/admin/system/database-queries")
+      refute has_element?(view, "#database-query-reach-caution")
+    end
+
     test "creates a new query via _new with edit capability", %{conn: conn, scope: scope} do
       grant_capabilities!([
         "admin.system.database-table.list",

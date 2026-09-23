@@ -125,6 +125,18 @@
           >{@sql_query}</textarea>
         </form>
 
+        <%!-- The console carries no tenant predicate (Database.QueryExecutor), so
+             say what is unfiltered where the query runs. Only the operator scope
+             reaches this page, and only that scope reads this far. --%>
+        <.alert
+          :if={@reach_caution?}
+          kind={:warning}
+          id="database-query-reach-caution"
+          class="mt-2"
+        >
+          Not filtered to one company: SQL run here reads across every company and tenant in the database.
+        </.alert>
+
         <%!-- Detected Named Parameters --%>
         <%= if @detected_params != [] do %>
           <div id="detected-parameters-section" class="mt-4 pt-3 border-t border-line">

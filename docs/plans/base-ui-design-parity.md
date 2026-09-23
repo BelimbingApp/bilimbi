@@ -884,8 +884,55 @@ tokens and absent otherwise; the dashboard asserting the marker in the panel
 and no strip.
 
 Not delivered by this slice: the operator-only surfaces themselves, such as
-the raw SQL console, do not warn that an action is unfiltered. That is a
-known gap.
+the raw SQL console, did not warn that an action is unfiltered. The operator
+surface caution slice below closes that gap.
+
+### Operator surface caution slice — LAY-02 safety context, completed
+
+Goal: put a caution where an action or a listing genuinely is not filtered to
+one company, on the screen itself, saying what is unfiltered rather than who
+the operator is.
+
+Belimbing evidence, read at the reference checkout before choosing a form: it
+does not caution on either surface. The database console answers a
+non-operator tenant with 403 (`RequiresPlatformOperatorTenant`) and its blade
+carries no scope note; its decision log offers the operator an "All tenants"
+checkbox and captions the table "(all tenants)" or "(current tenant)"
+(`AuditTenantScope::retentionCaption`), so a widened read is opt-in and named
+in a caption. Its roles list shows system roles to every tenant. Bilimbi's
+widening is different in kind: `Authz.Administration.company_visibility/2`
+adds company-less rows for the platform-operator scope on the decision log and
+principal listings, and company-less assignments to the roles list's
+Principals counts, with no toggle, and the console reads without any tenant predicate at all.
+
+Shipped:
+
+- [x] `Bilimbi.Core.User.Web.DatabaseQueriesLive.Show` renders
+  `<.alert kind={:warning}>` inside the SQL editor card, between the Run
+  Query row and the parameter inputs, reading "Not filtered to one company:
+  SQL run here reads across every company and tenant in the database." It is
+  the one prominent form, because a query there is unbounded; it is not a
+  gate, and `Database.execute_readonly/3` is unchanged.
+- [x] The three widened listings — Decision Logs, Principal Capabilities and
+  Principal Roles — carry a one-line `text-warning-ink` caption with the
+  registry's `warning` glyph directly above the table, "Beyond this tenant's
+  companies: this list also includes … attached to no company." A caption
+  rather than a banner, following Belimbing's shape, because the widening is
+  a standing property of the rows. The listings' queries are unchanged.
+- [x] The Roles listing's rows are not widened — every scope sees the same
+  roles — but each row's Principals count is, so it carries the same caption
+  reading "Beyond this tenant's companies: the Principals counts also include
+  assignments attached to no company." Its query is unchanged.
+- [x] Both render only for a platform-operator scope. Coverage: each of the
+  five surfaces asserts the caution, by id and warning token, for the
+  operator scope, and each listing asserts its absence for a fully-capable
+  account in an ordinary tenant; the console's non-operator refusal at mount
+  is already covered.
+
+Follow-ups, deliberately not built here: any change to what the console or
+the listings query; any confirmation step; the account-menu marker itself;
+and the user detail page's role panel, which `list_principal_role_assignments`
+widens the same way but which is a detail section rather than a listing.
 
 ### User detail Belimbing parity slice — CMP-03, INT-02, LAY-05 and NAV-03, partial
 
