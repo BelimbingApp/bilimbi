@@ -13,5 +13,8 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryComponentsLive do
     do: DesignLibraryLive.handle_event(event, params, socket)
 
   @impl true
+  def handle_info(message, socket), do: DesignLibraryLive.handle_info(message, socket)
+
+  @impl true
   def render(assigns), do: DesignLibraryLive.render(assigns)
 end

@@ -638,9 +638,10 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
 - **Flash messages:** `put_flash` kinds are `:success`, `:info`, `:warning`,
   and `:error`. The layout's `flash_group` is the single stacked outlet:
   only success carries the eight-second timer, while info, warning and error
-  stay until dismissed. That timer is dormant groundwork: no caller emits a
-  success flash, and info stays sticky because callers use it for actionable
-  failure notices, so nothing times out until those call sites migrate.
+  stay until dismissed. A delete confirmed through `<.confirm_dialog>` emits
+  the success flash; the other completed writes still use info, which stays
+  sticky because callers also use it for actionable failure notices, so
+  nothing else times out until those call sites migrate.
   `:success` and `:info` still share the success colouring because
   most `put_flash(:info, ...)` call sites report a completed write; correcting
   that means migrating those callers, not repainting `:info`. The shell's
@@ -653,7 +654,12 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   border. Every icon-only action has a truthful
   accessible label and title. Keep primary and unfamiliar actions as text.
   Destructive actions use calm danger text with quiet hover feedback, not a
-  solid danger fill.
+  solid danger fill. An action that cannot be undone confirms through
+  `<.confirm_dialog>`, never a native `data-confirm`: the caller holds the
+  requested record in an assign, renders the dialog with `:if` while it is
+  pending, acts on that held record from `on_confirm`, and stops rendering
+  it whatever the outcome (`DESIGN.md` "Confirmation dialogs"). The native
+  confirms that remain are pending conversion, not a second convention.
 - **Data tables & inline editing:** Tables use compact density (`py-0.5` row
   cells, `py-1.5` header cells, `px-2` cell horizontal padding,
   `bg-surface-sunken` header background, proper case

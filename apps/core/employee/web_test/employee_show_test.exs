@@ -559,15 +559,35 @@ defmodule BilimbiWeb.EmployeeShowTest do
     {:ok, [attached]} = Address.list_employee_attached_addresses(scope, employee.id)
     assert attached.priority == 4
 
-    # Unlinking is a demoted icon action; the empty state then says what to do.
+    # Unlinking is a demoted icon action confirmed through the shared dialog,
+    # which leads with the consequence; the empty state then says what to do.
     assert has_element?(
              view,
-             "button#unlink-address-#{home.id}[aria-label='Unlink address'][data-confirm] .hero-link-slash"
+             "button#unlink-address-#{home.id}[aria-label='Unlink address'] .hero-link-slash"
            )
 
-    view |> element("#unlink-address-#{home.id}") |> render_click()
+    refute has_element?(view, "#unlink-address-#{home.id}[data-confirm]")
 
+    view |> element("#unlink-address-#{home.id}") |> render_click()
+    assert_modal_dialog(view, "unlink-address-confirm", "“Home” will be unlinked from this employee.")
+
+    assert has_element?(
+             view,
+             "#unlink-address-confirm-description",
+             "The address itself is kept and can be attached again."
+           )
+
+    view |> element("#unlink-address-confirm-cancel", "Cancel") |> render_click()
+    refute has_element?(view, "#unlink-address-confirm")
+    assert has_element?(view, "#address-row-#{home.id}")
+
+    view |> element("#unlink-address-#{home.id}") |> render_click()
+    view |> element("#unlink-address-confirm-confirm", "Unlink") |> render_click()
+
+    refute has_element?(view, "#unlink-address-confirm")
     refute has_element?(view, "#address-row-#{home.id}")
+    assert has_element?(view, "#addresses-panel-notice[role='status']", "Address unlinked.")
+    assert {:ok, _home} = Address.get_address(scope, home.id)
     assert has_element?(view, "#addresses-table-empty", "No addresses linked.")
 
     assert has_element?(

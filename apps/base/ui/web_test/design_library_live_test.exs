@@ -641,6 +641,83 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     refute has_element?(view, "#design-library-wide-modal")
   end
 
+  test "walks the confirmation flow: consequence, cancel, in flight, success, failure, recovery",
+       %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    assert has_element?(view, "#component-overlays #component-confirm-dialog")
+    refute has_element?(view, "#design-library-confirm")
+    refute has_element?(view, "#design-library-confirm-delete-sole[data-confirm]")
+
+    # Entry: a demoted danger action opens the dialog, which leads with the
+    # consequence and says what cannot be undone.
+    view |> element("#design-library-confirm-delete-sole") |> render_click()
+
+    assert_modal_dialog(
+      view,
+      "design-library-confirm",
+      "Legal entity type “Sole Proprietorship” will be deleted."
+    )
+
+    assert has_element?(view, "dialog#design-library-confirm[role='alertdialog']")
+
+    assert has_element?(
+             view,
+             "#design-library-confirm-description",
+             "It can no longer be chosen for a company. This cannot be undone."
+           )
+
+    # Cancel keeps the example.
+    view |> element("#design-library-confirm-cancel", "Cancel") |> render_click()
+    refute has_element?(view, "#design-library-confirm")
+    assert has_element?(view, "#design-library-confirm-row-sole", "Sole Proprietorship")
+
+    # In flight: the confirm spins and Cancel is disabled while the server works.
+    view |> element("#design-library-confirm-delete-sole") |> render_click()
+    view |> element("#design-library-confirm-confirm", "Delete") |> render_click()
+
+    assert has_element?(view, "#design-library-confirm-confirm[aria-busy='true'][disabled]")
+    assert has_element?(view, "#design-library-confirm-cancel[disabled]")
+
+    # A working request can no longer be cancelled.
+    render_click(view, "confirm-cancel", %{})
+    assert has_element?(view, "#design-library-confirm-confirm[aria-busy='true']")
+
+    # Success: the wait ends, the row is gone and the outcome says so.
+    send(view.pid, {:confirm_done, %{id: "sole", name: "Sole Proprietorship", used_by: 0}})
+
+    refute has_element?(view, "#design-library-confirm")
+    refute has_element?(view, "#design-library-confirm-row-sole")
+    assert has_element?(view, "#design-library-confirm-outcome", "Legal entity type deleted.")
+
+    # Failure and recovery: the refused example stays, the message says why
+    # and what to do, and the examples can be restored.
+    view |> element("#design-library-confirm-delete-llc") |> render_click()
+
+    assert_modal_dialog(
+      view,
+      "design-library-confirm",
+      "Legal entity type “Limited Liability Company” will be deleted."
+    )
+
+    view |> element("#design-library-confirm-confirm") |> render_click()
+    send(view.pid, {:confirm_done, %{id: "llc", name: "Limited Liability Company", used_by: 3}})
+
+    refute has_element?(view, "#design-library-confirm")
+    assert has_element?(view, "#design-library-confirm-row-llc", "Limited Liability Company")
+
+    assert has_element?(
+             view,
+             "#design-library-confirm-outcome",
+             "Limited Liability Company was not deleted: 3 companies still use it. " <>
+               "Change those companies' legal entity type first."
+           )
+
+    view |> element("#design-library-confirm-reset", "Restore examples") |> render_click()
+    assert has_element?(view, "#design-library-confirm-row-sole", "Sole Proprietorship")
+    refute has_element?(view, "#design-library-confirm-outcome")
+  end
+
   test "keeps inline editing interactive without persisting business data", %{conn: conn} do
     {:ok, view, _html} = open(conn, "/system/design-library/components")
 

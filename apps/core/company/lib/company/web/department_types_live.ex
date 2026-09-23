@@ -27,6 +27,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
      |> assign(:selected_category, "all")
      |> assign(:modal_action, nil)
      |> assign(:editing_type, nil)
+     |> assign(:pending_delete, nil)
      |> assign_form(nil)
      |> stream(:types, types)}
   end
@@ -203,29 +204,18 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
     end
   end
 
-  def handle_event("delete", _params, %{assigns: %{can_delete?: false}} = socket),
+  def handle_event("request_delete", _params, %{assigns: %{can_delete?: false}} = socket),
     do: write_forbidden(socket)
 
-  def handle_event("delete", %{"id" => id}, socket) do
+  # Deleting confirms through the shared dialog: the request holds the type
+  # whose consequence the dialog states, and `delete` acts on that held type
+  # rather than on a client-supplied id, so what was confirmed is what runs.
+  def handle_event("request_delete", %{"id" => id}, socket) do
     case Integer.parse(id) do
       {type_id, ""} ->
-        case Company.delete_department_type(type_id) do
-          :ok ->
-            {:ok, types} = reload_types(socket.assigns.selected_category)
-
-            {:noreply,
-             socket
-             |> put_flash(:info, "Department type deleted.")
-             |> assign(:types_count, length(types))
-             |> stream(:types, types, reset: true)}
-
-          {:error, :in_use} ->
-            {:noreply,
-             put_flash(
-               socket,
-               :error,
-               "Cannot delete department type because it is referenced by one or more company departments."
-             )}
+        case Company.get_department_type(type_id) do
+          {:ok, type} ->
+            {:noreply, socket |> clear_flash() |> assign(:pending_delete, type)}
 
           {:error, :not_found} ->
             {:noreply, put_flash(socket, :error, "Department type not found.")}
@@ -233,6 +223,43 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
 
       _ ->
         {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, :pending_delete, nil)}
+  end
+
+  def handle_event("delete", _params, %{assigns: %{can_delete?: false}} = socket),
+    do: write_forbidden(socket)
+
+  def handle_event("delete", _params, %{assigns: %{pending_delete: nil}} = socket),
+    do: {:noreply, socket}
+
+  def handle_event("delete", _params, %{assigns: %{pending_delete: type}} = socket) do
+    socket = assign(socket, :pending_delete, nil)
+
+    case Company.delete_department_type(type.id) do
+      :ok ->
+        {:ok, types} = reload_types(socket.assigns.selected_category)
+
+        {:noreply,
+         socket
+         |> put_flash(:success, "Department type deleted.")
+         |> assign(:types_count, length(types))
+         |> stream(:types, types, reset: true)}
+
+      {:error, :in_use} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "#{type.name} was not deleted: one or more company departments still use it. " <>
+             "Change those departments' type first."
+         )}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Department type not found.")}
     end
   end
 
@@ -361,9 +388,8 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
                   label={"Delete #{type.name}"}
                   kind={:danger}
                   id={"delete-dept-type-#{type.id}"}
-                  phx-click="delete"
+                  phx-click="request_delete"
                   phx-value-id={type.id}
-                  data-confirm="Are you sure you want to delete this department type?"
                 />
               </div>
             </:action>
@@ -442,6 +468,17 @@ defmodule Bilimbi.Core.Company.Web.DepartmentTypesLive do
               </div>
             </.form>
         </.modal>
+
+        <.confirm_dialog
+          :if={@pending_delete}
+          id="delete-dept-type-confirm"
+          consequence={"Department type “#{@pending_delete.name}” will be deleted."}
+          detail="It can no longer be chosen for a department. This cannot be undone."
+          confirm="Delete"
+          working="Deleting…"
+          on_confirm={JS.push("delete")}
+          on_cancel={JS.push("cancel_delete")}
+        />
       </.page>
     </Layouts.app>
     """

@@ -90,6 +90,16 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   @sample_initial_directions %{"updated_at" => "desc"}
   @sample_default_sort "name"
 
+  # The confirmation flow's example legal entity types. The second is still
+  # used by companies, so it refuses to be deleted: the failure and its
+  # recovery can be seen without a database. The wait is long enough to read
+  # the in-flight dialog and short enough not to feel broken.
+  @confirm_rows [
+    %{id: "sole", name: "Sole Proprietorship", used_by: 0},
+    %{id: "llc", name: "Limited Liability Company", used_by: 3}
+  ]
+  @confirm_delay_ms 1_200
+
   @impl true
   def mount(_params, _session, socket) do
     mount_area(:theme, socket)
@@ -153,6 +163,9 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> assign(:inline_value, "Editable entity value")
      |> assign(:click_count, 0)
      |> assign(:modal_width, nil)
+     |> assign(:confirm_rows, @confirm_rows)
+     |> assign(:confirm_request, nil)
+     |> assign(:confirm_outcome, nil)
      |> assign(
        :modal_form,
        to_form(%{"name" => "Example Sdn Bhd", "code" => "EX-01"}, as: :example)
@@ -253,6 +266,61 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      socket
      |> assign(:pattern_form, to_form(%{"search" => search}, as: :pattern))
      |> assign_preview_page(:pattern, 1, socket.assigns.pattern_page.page_size)}
+  end
+
+  # The confirmation flow: a request opens the dialog for one example row,
+  # confirming runs a wait the server knows about, and the outcome reports
+  # inside the card, where a production screen would raise its flash or
+  # panel notice. A working request cannot be cancelled: the action is
+  # already running.
+  def handle_event("confirm-request", %{"id" => id}, socket) do
+    row = Enum.find(socket.assigns.confirm_rows, &(&1.id == id))
+    request = if row, do: {:pending, row}
+
+    {:noreply, assign(socket, confirm_request: request, confirm_outcome: nil)}
+  end
+
+  def handle_event("confirm-cancel", _params, socket) do
+    case socket.assigns.confirm_request do
+      {:working, _row} -> {:noreply, socket}
+      _pending_or_nil -> {:noreply, assign(socket, :confirm_request, nil)}
+    end
+  end
+
+  def handle_event("confirm-run", _params, socket) do
+    case socket.assigns.confirm_request do
+      {:pending, row} ->
+        Process.send_after(self(), {:confirm_done, row}, @confirm_delay_ms)
+        {:noreply, assign(socket, :confirm_request, {:working, row})}
+
+      _working_or_nil ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("confirm-reset", _params, socket) do
+    {:noreply,
+     assign(socket, confirm_rows: @confirm_rows, confirm_request: nil, confirm_outcome: nil)}
+  end
+
+  @impl true
+  def handle_info({:confirm_done, %{used_by: 0} = row}, socket) do
+    {:noreply,
+     socket
+     |> assign(:confirm_request, nil)
+     |> assign(:confirm_outcome, {:success, "Legal entity type deleted."})
+     |> update(:confirm_rows, &List.delete(&1, row))}
+  end
+
+  def handle_info({:confirm_done, row}, socket) do
+    {:noreply,
+     assign(socket,
+       confirm_request: nil,
+       confirm_outcome:
+         {:error,
+          "#{row.name} was not deleted: #{row.used_by} companies still use it. " <>
+            "Change those companies' legal entity type first."}
+     )}
   end
 
   defp assign_sample_search(socket, search) do

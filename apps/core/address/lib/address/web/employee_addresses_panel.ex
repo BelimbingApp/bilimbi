@@ -24,7 +24,9 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
   page the label links to the address's read-first page, the kinds are a
   choice fact whose read state is the trigger, the primary flag toggles on
   click, priority commits on Enter or blur through `<.inline_edit>`, and
-  unlinking is a demoted icon action.
+  unlinking is a demoted icon action that confirms through the shared
+  `<.confirm_dialog>`, closed whatever the outcome so the notice reports it
+  above the table.
   """
 
   use Bilimbi.Base.UI, :live_component
@@ -45,6 +47,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
     {:ok,
      socket
      |> assign(:notice, nil)
+     |> assign(:pending_detach, nil)
      |> assign(:show_attach_modal, false)
      |> assign(:attach_form, to_form(%{}))
      |> assign(:attach_errors, %{})
@@ -136,21 +139,48 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
     end
   end
 
-  def handle_event("detach_address", %{"id" => address_id_str}, socket) do
+  # Unlinking confirms through the shared dialog: the request holds the
+  # attached address whose consequence the dialog states, and `detach_address`
+  # acts on that held address rather than on a client-supplied id, so what was
+  # confirmed is what runs.
+  def handle_event("request_detach", %{"id" => address_id_str}, socket) do
+    if can_manage?(socket) do
+      address_id = parse_id(address_id_str)
+
+      case Enum.find(socket.assigns.attached_addresses, &(&1.id == address_id)) do
+        nil ->
+          {:noreply, socket |> notice(:error, "That address is no longer linked.") |> reload()}
+
+        address ->
+          {:noreply, socket |> assign(:notice, nil) |> assign(:pending_detach, address)}
+      end
+    else
+      {:noreply, write_forbidden(socket)}
+    end
+  end
+
+  def handle_event("cancel_detach", _params, socket) do
+    {:noreply, assign(socket, :pending_detach, nil)}
+  end
+
+  def handle_event("detach_address", _params, socket) do
     if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
 
-      case parse_id(address_id_str) do
-        address_id when is_integer(address_id) and address_id > 0 ->
+      case socket.assigns.pending_detach do
+        %{id: address_id} ->
+          socket = assign(socket, :pending_detach, nil)
+
           case Address.detach_from_employee(scope, address_id, socket.assigns.employee_id) do
             :ok ->
               {:noreply, socket |> notice(:info, "Address unlinked.") |> reload()}
 
             {:error, _} ->
-              {:noreply, notice(socket, :error, "Failed to unlink address.")}
+              {:noreply,
+               notice(socket, :error, "The address was not unlinked. Try again.") |> reload()}
           end
 
-        _ ->
+        nil ->
           {:noreply, socket}
       end
     else
@@ -582,10 +612,10 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
             label="Unlink address"
             title="Unlink"
             kind={:danger}
-            phx-click="detach_address"
-            phx-target={@myself}
-            phx-value-id={addr.id}
-            data-confirm="Are you sure you want to unlink this address?"
+            phx-click={
+              JS.push("lv:clear-flash")
+              |> JS.push("request_detach", value: %{id: addr.id}, target: @myself)
+            }
           />
         </:action>
 
@@ -714,9 +744,23 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
               </div>
             </.form>
       </.modal>
+
+      <.confirm_dialog
+        :if={@pending_detach}
+        id="unlink-address-confirm"
+        consequence={"#{address_name(@pending_detach)} will be unlinked from this employee."}
+        detail="The address itself is kept and can be attached again."
+        confirm="Unlink"
+        working="Unlinking…"
+        on_confirm={JS.push("detach_address", target: @myself)}
+        on_cancel={JS.push("cancel_detach", target: @myself)}
+      />
     </div>
     """
   end
+
+  defp address_name(%{label: label}) when is_binary(label) and label != "", do: "“#{label}”"
+  defp address_name(_address), do: "This address"
 
   attr(:kinds, :list, required: true)
 

@@ -1789,9 +1789,11 @@ defmodule Bilimbi.Base.UI.Components do
   )
 
   attr(:width, :atom,
-    values: [:narrow, :wide],
+    values: [:compact, :narrow, :wide],
     default: :narrow,
-    doc: "`:narrow` for a single-column form, `:wide` for a two-column one"
+    doc:
+      "`:narrow` for a single-column form, `:wide` for a two-column one, " <>
+        "`:compact` for a confirmation that holds no form"
   )
 
   attr(:flash, :map,
@@ -1820,6 +1822,7 @@ defmodule Bilimbi.Base.UI.Components do
         "rounded-xl border border-line bg-surface p-6 text-ink shadow-lg",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/30",
         "backdrop:bg-ink/40",
+        @width == :compact && "max-w-md",
         @width == :narrow && "max-w-lg",
         @width == :wide && "max-w-2xl"
       ]}
@@ -1836,6 +1839,118 @@ defmodule Bilimbi.Base.UI.Components do
       </p>
       {render_slot(@inner_block)}
     </dialog>
+    """
+  end
+
+  @doc """
+  Renders a confirmation for an action that cannot be undone.
+
+  A confirmation is a `modal/1` that leads with the consequence, not with the
+  question. `consequence` is the dialog's title and so its accessible name —
+  "Legal entity type “LLC” will be deleted." — so it is the first thing a
+  sighted person reads and the first thing a screen reader announces; `detail`
+  says what is kept and whether the change can be undone, and is announced as
+  the description. Both are complete sentences. The dialog is an
+  `alertdialog`, the role assistive technology reserves for a message that
+  needs an answer before anything else continues.
+
+  Two actions and nothing else. Cancel comes first, so it takes focus when the
+  dialog opens and Enter, Escape and Cancel all keep the data as it is; the
+  confirm follows as a calm danger text control named by the verb alone
+  ("Delete", "Unlink"), because the consequence has already said what will
+  happen. Nobody retypes a name to prove they read the sentence above the
+  button: there is no typed acknowledgement.
+
+  The caller owns the dialog's existence exactly as for `modal/1`: render it
+  with `:if` while a request is pending, run the action from `on_confirm`, and
+  stop rendering it whatever the outcome. The outcome then reports through the
+  page's flash or the panel's notice, as any other write does, and a refusal
+  says what to do next. The confirm carries `phx-disable-with={@working}` for
+  the round trip, so it reads "Deleting…" and is announced busy until the
+  server replies. A wait the server knows about beyond one round trip passes
+  `busy`: the confirm spins and Cancel is disabled, because the action can no
+  longer be stopped.
+
+  ## Examples
+
+      <.confirm_dialog
+        :if={@pending_delete}
+        id="delete-type-confirm"
+        consequence={"Legal entity type “\#{@pending_delete.name}” will be deleted."}
+        detail="It can no longer be chosen for a company. This cannot be undone."
+        confirm="Delete"
+        working="Deleting…"
+        on_confirm={JS.push("delete")}
+        on_cancel={JS.push("cancel_delete")}
+      />
+  """
+  attr(:id, :string, required: true)
+
+  attr(:consequence, :string,
+    required: true,
+    doc: "what will happen to the data, as one sentence; the dialog's title and accessible name"
+  )
+
+  attr(:detail, :string,
+    required: true,
+    doc: "what is kept and whether the change can be undone; announced as the description"
+  )
+
+  attr(:confirm, :string,
+    required: true,
+    doc: ~s(the verb on the danger action, such as "Delete")
+  )
+
+  attr(:working, :string,
+    required: true,
+    doc: ~s(the confirm's label while the round trip is in flight, such as "Deleting…")
+  )
+
+  attr(:cancel, :string, default: "Cancel", doc: "the label of the action that keeps the data")
+
+  attr(:on_confirm, JS, required: true, doc: "the command that performs the action")
+
+  attr(:on_cancel, JS,
+    required: true,
+    doc: "the command that closes the dialog without acting; Escape runs the same one"
+  )
+
+  attr(:busy, :boolean,
+    default: false,
+    doc:
+      "the action is running and can no longer be stopped: the confirm spins " <>
+        "and Cancel is disabled"
+  )
+
+  attr(:rest, :global)
+
+  def confirm_dialog(assigns) do
+    ~H"""
+    <.modal
+      id={@id}
+      title={@consequence}
+      width={:compact}
+      on_cancel={@on_cancel}
+      role="alertdialog"
+      {@rest}
+    >
+      <:description>{@detail}</:description>
+      <div class="mt-5 flex flex-wrap justify-end gap-2">
+        <.button id={"#{@id}-cancel"} type="button" phx-click={@on_cancel} disabled={@busy}>
+          {@cancel}
+        </.button>
+        <.button
+          id={"#{@id}-confirm"}
+          type="button"
+          variant="danger"
+          phx-click={@on_confirm}
+          phx-disable-with={@working}
+          busy={@busy}
+        >
+          {@confirm}
+        </.button>
+      </div>
+    </.modal>
     """
   end
 
