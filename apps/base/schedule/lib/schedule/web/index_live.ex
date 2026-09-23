@@ -575,6 +575,12 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   defp command_consequence({:pause, task}), do: "Task “#{task.name}” will be paused."
   defp command_consequence({:disable, task}), do: "Task “#{task.name}” will be disabled."
 
+  defp command_detail({:enable, %{suppressed?: true} = task}),
+    do:
+      "Its definition is approved at fingerprint #{String.slice(task.fingerprint, 0, 12)}, " <>
+        "the one under review, but the task stays paused and runs nothing until it is resumed. " <>
+        "A later change to the definition needs review again."
+
   defp command_detail({:enable, task}),
     do:
       "It begins running automatically on its schedule (#{task.expression}, #{task.timezone}) " <>

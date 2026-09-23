@@ -268,6 +268,48 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     assert Repo.exists?(Occurrence)
   end
 
+  test "enabling a paused task says it stays paused until resumed", %{
+    conn: conn,
+    definition: definition
+  } do
+    grant_capabilities!([@view, @manage])
+    {:ok, manager, _html} = conn |> log_in_as() |> live(~p"/system/schedule")
+
+    for {button, verb} <- [enable: "Enable", pause: "Pause", disable: "Disable"] do
+      manager |> element("#schedule-task-test-schedule-#{button}") |> render_click()
+      manager |> element("#schedule-command-confirm-confirm", verb) |> render_click()
+    end
+
+    assert Repo.exists?(Suppression)
+    manager |> element("#schedule-task-test-schedule-enable") |> render_click()
+
+    assert_modal_dialog(
+      manager,
+      "schedule-command-confirm",
+      "Task “#{definition.name}” will be enabled."
+    )
+
+    assert has_element?(
+             manager,
+             "#schedule-command-confirm-description",
+             "Its definition is approved at fingerprint " <>
+               "#{String.slice(Schedule.fingerprint(definition), 0, 12)}, the one under review, " <>
+               "but the task stays paused and runs nothing until it is resumed."
+           )
+
+    refute has_element?(
+             manager,
+             "#schedule-command-confirm-description",
+             "begins running automatically"
+           )
+
+    manager |> element("#schedule-command-confirm-confirm") |> render_click()
+    assert has_element?(manager, "#flash-success", "Task enabled.")
+    assert has_element?(manager, "#schedule-task-test-schedule-resume")
+    assert Repo.exists?(Suppression)
+    assert {:error, :suppressed} = Schedule.run_now(definition.key)
+  end
+
   test "already-mounted handlers reject revoked manage capability", %{
     conn: conn,
     definition: definition
