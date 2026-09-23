@@ -191,12 +191,12 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
            )
 
     refute has_element?(view, "#component-catalog")
-    assert has_element?(view, "#component-input-guidance", "Choice guidance")
-    assert has_element?(view, "#component-input-live-state", "Live state")
+    assert has_element?(view, "#design-library-input-guidance", "Choice guidance")
+    assert has_element?(view, "#design-library-input-live-state", "Live state")
     assert has_element?(view, "#component-icon-button", "Compact icon actions")
     assert has_element?(view, "#component-actions button[aria-busy='true'][disabled]", "Saving…")
-    assert has_element?(view, "#component-icon-button-disabled[disabled]:not([aria-busy])")
-    assert has_element?(view, "#component-icon-button-busy[aria-busy='true'][disabled]")
+    assert has_element?(view, "#design-library-icon-button-disabled[disabled]:not([aria-busy])")
+    assert has_element?(view, "#design-library-icon-button-busy[aria-busy='true'][disabled]")
     assert has_element?(view, "#example-nav[aria-label='Example menu']")
     assert has_element?(view, "#example-nav #nav-example-companies", "Companies")
     assert has_element?(view, "#example-nav [data-nav-branch='example.system']")
@@ -209,40 +209,40 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#example-tabs [aria-current='page']", "Overview")
     assert has_element?(view, "#component-radio-group")
     assert has_element?(view, "#component-radio-group-system[checked]")
-    assert has_element?(view, "#component-radio-disabled[disabled]")
-    assert has_element?(view, "#component-radio-disabled-system[checked][disabled]")
+    assert has_element?(view, "#design-library-radio-disabled[disabled]")
+    assert has_element?(view, "#design-library-radio-disabled-system[checked][disabled]")
     assert has_element?(view, "#design-library-radio-locked[aria-label='Data region'][disabled]")
     assert has_element?(view, "#design-library-multi-select-plain[aria-label='Optional roles']")
 
     assert has_element?(
              view,
-             "#component-page-stage #component-page-list.max-w-7xl",
+             "#design-library-page-stage #design-library-page-list.max-w-7xl",
              "wide for filters and tables"
            )
 
     assert has_element?(
              view,
-             "#component-page-stage #component-page-form.max-w-2xl",
+             "#design-library-page-stage #design-library-page-form.max-w-2xl",
              "narrow for focused entry"
            )
 
     assert has_element?(
              view,
-             "#component-page-stage #component-page-detail.max-w-7xl",
+             "#design-library-page-stage #design-library-page-detail.max-w-7xl",
              "the list width, for a record or dashboard"
            )
 
-    assert has_element?(view, "#component-header-default", "Title, subtitle, and trailing action")
+    assert has_element?(view, "#design-library-header-default", "Title, subtitle, and trailing action")
 
     assert has_element?(
              view,
-             "#component-header-title-action",
+             "#design-library-header-title-action",
              "Title action without a trailing action"
            )
 
     assert has_element?(
              view,
-             "#component-header-title-action button.size-6[aria-label='Edit company']"
+             "#design-library-header-title-action button.size-6[aria-label='Edit company']"
            )
 
     for kind <- ~w(error warning success info) do
@@ -251,10 +251,10 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
 
     assert has_element?(view, "#component-flash", "Save failed")
     assert has_element?(view, "#component-flash", "preference status line")
-    assert has_element?(view, "#component-card-titled .border-b h3", "Company profile")
-    refute has_element?(view, "#component-card-untitled h3")
-    assert has_element?(view, "#component-card-boundary", "no loading, empty, error, or disabled")
-    assert has_element?(view, "#component-list-boundary", "no loading, empty, or error state")
+    assert has_element?(view, "#design-library-card-titled .border-b h3", "Company profile")
+    refute has_element?(view, "#design-library-card-untitled h3")
+    assert has_element?(view, "#design-library-card-boundary", "no loading, empty, error, or disabled")
+    assert has_element?(view, "#design-library-list-boundary", "no loading, empty, or error state")
 
     for area <- ~w(components component-composite-patterns component-feedback-states) do
       assert has_element?(view, "##{area}")
@@ -309,9 +309,9 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     })
     |> render_change()
 
-    assert has_element?(view, "#component-input-live-state", "Bilimbi Holdings")
-    assert has_element?(view, "#component-input-live-state", "operator")
-    assert has_element?(view, "#component-input-live-state", "dark")
+    assert has_element?(view, "#design-library-input-live-state", "Bilimbi Holdings")
+    assert has_element?(view, "#design-library-input-live-state", "operator")
+    assert has_element?(view, "#design-library-input-live-state", "dark")
 
     assert has_element?(view, "#design-library-multi-select", "1 role selected")
     assert has_element?(view, "#design-library-multi-select-required", "2 roles selected")

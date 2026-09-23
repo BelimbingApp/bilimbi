@@ -539,6 +539,38 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
   Both guards therefore still fail, stay tagged `:design_library_drift`, and stay
   out of the default run and `mix precommit`.
 
+  - **Imitation, anchor claims — closed by the anchor-hygiene slice of
+    2026-09-23.** The eleven anchors had two causes, both in the library.
+    Nested `component-*` sub-ids fractured an entry: `<.page>`, `<.header>`
+    and `<.list>` were called only inside `component-page-list`,
+    `component-header-default`, `component-list-populated` and their
+    siblings, which the guard reads as entries of their own, so the parent
+    anchor never called what it claimed. And scaffolding wore the prefix:
+    the choice-guidance card, the live-state card, the radio-group gap
+    note, the card and list boundary notes, the locked radio group and the
+    shell-rows card named guidance, a caption or a specimen that is not a
+    shared component. Twenty ids moved to the library's own
+    `design-library-` prefix (the fifteen the reported anchors needed plus
+    the five nested sub-ids under `<.card>`, `<.tabs>` and `<.icon_button>`
+    that fractured the same way without yet tripping it), every selector in
+    `web_test/design_library_live_test.exs` moved with them, and the three
+    cards that lost the prefix — Navigation, Choice guidance and Live state
+    — are declared in `@declared_specimens`, which is the rule's own
+    admission list. The live-state `<dl>` is now a `<.list>`, so that raw
+    element is gone. The guard itself is unchanged, and so are the
+    qualified sibling entries (`component-input-states`,
+    `component-table-framed` and the like), which the rule reads as the
+    named component's specimen qualified by what it shows.
+    `{fm/designlib-anchor-hygiene/claude-fable-5-1}`
+  - **Imitation, hand-written control markup — one left.** The example
+    `<nav>` rail around the shell's `Layouts.nav_branch` rows still fails.
+    No shared component owns that wrapper: the shell writes its own `<nav>`
+    in `Layouts.app`, and a `<div>` carrying `role="navigation"` or an
+    `aria-label` would trip the same rule or misuse ARIA. Closing it means
+    extracting the rail wrapper into a shared component, which is a
+    component decision rather than a library one, so it stays open beside
+    the coverage gaps below.
+
   - **Coverage reads verified routes.** `DesignLibrarySource` used to classify
     every `~p` sigil as a runtime value, so a specimen could register a
     presence axis for `navigate`, `href` or `patch` only by passing a bare
@@ -729,8 +761,9 @@ Not finished by #719 and #720: the `:design_library_drift` guards report four fa
 on `main`, so #722's guards land excluded from the default test run and from
 `mix precommit`. Correcting those four and activating the guards is the open Phase 1
 checklist row above. #722 being merged does not mean the guards are active. The
-state-coverage slice of 2026-09-18 corrected most of what those four report; that
-row records what it closed, what it leaves accepted and what stays open.
+state-coverage slice of 2026-09-18 corrected most of what those four report, and the
+anchor-hygiene slice of 2026-09-23 cleared the anchor rule; that row records what each
+closed, what it leaves accepted and what stays open.
 
 ### Empty and permission region slice — no child issue
 

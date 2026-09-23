@@ -69,8 +69,11 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   # first identified descendant. Keys are template facts, not line numbers, so
   # moving a specimen does not churn this list while renaming one does.
   @declared_specimens [
+    "Navigation",
+    "Choice guidance",
     "Text and long-form inputs",
     "Choice controls",
+    "Live state",
     "Date, time, and secret inputs",
     "Connection interrupted",
     "design-library-pattern-table"

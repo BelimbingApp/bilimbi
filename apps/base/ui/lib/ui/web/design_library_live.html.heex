@@ -545,10 +545,10 @@
               </p>
             </section>
             <.card id="component-page" title="Page widths" inner_class="space-y-2 p-4">
-              <div id="component-page-stage" class="overflow-x-auto">
+              <div id="design-library-page-stage" class="overflow-x-auto">
                 <div class="w-[1280px] space-y-3">
                   <.page
-                    id="component-page-list"
+                    id="design-library-page-list"
                     variant={:list}
                     class="rounded-md border border-dashed border-line p-2"
                   >
@@ -557,7 +557,7 @@
                     </p>
                   </.page>
                   <.page
-                    id="component-page-detail"
+                    id="design-library-page-detail"
                     variant={:detail}
                     class="rounded-md border border-dashed border-line p-2"
                   >
@@ -566,7 +566,7 @@
                     </p>
                   </.page>
                   <.page
-                    id="component-page-form"
+                    id="design-library-page-form"
                     variant={:form}
                     class="rounded-md border border-dashed border-line p-2"
                   >
@@ -581,7 +581,7 @@
               </p>
             </.card>
             <.card id="component-header" title="Page header" inner_class="space-y-5 p-4">
-              <div id="component-header-default">
+              <div id="design-library-header-default">
                 <p class="mb-2 text-xs text-ink-muted">Title, subtitle, and trailing action</p>
                 <.header>
                   Company settings<:subtitle>Manage identity and regional defaults.</:subtitle><:actions>
@@ -589,7 +589,7 @@
                   </:actions>
                 </.header>
               </div>
-              <div id="component-header-title-action" class="border-t border-line pt-4">
+              <div id="design-library-header-title-action" class="border-t border-line pt-4">
                 <p class="mb-2 text-xs text-ink-muted">
                   Title action without a trailing action
                 </p>
@@ -650,7 +650,7 @@
               </p>
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
-              <.card id="component-navigation" title="Navigation" inner_class="space-y-2 p-3">
+              <.card id="design-library-navigation" title="Navigation" inner_class="space-y-2 p-3">
                 <nav
                   id="example-nav"
                   aria-label="Example menu"
@@ -679,7 +679,7 @@
                   <:tab href="#component-tabs">History</:tab>
                   <:tab href="#component-tabs">Settings</:tab>
                 </.tabs>
-                <div id="component-tabs-single" class="border-t border-line pt-3">
+                <div id="design-library-tabs-single" class="border-t border-line pt-3">
                   <p class="mb-2 text-xs text-ink-muted">One section needs no switching</p>
                   <.tabs id="example-single-tab" aria-label="Example single view">
                     <:tab href="#component-tabs" current={true}>Overview</:tab>
@@ -754,7 +754,7 @@
                 <div class="flex items-center gap-2 text-sm text-ink-muted">
                   Disabled
                   <.icon_button
-                    id="component-icon-button-disabled"
+                    id="design-library-icon-button-disabled"
                     icon="bilimbi-impersonate"
                     label="Impersonate user"
                     disabled
@@ -763,7 +763,7 @@
                 <div class="flex items-center gap-2 text-sm text-ink-muted">
                   Busy
                   <.icon_button
-                    id="component-icon-button-busy"
+                    id="design-library-icon-button-busy"
                     icon="export"
                     label="Export companies"
                     busy
@@ -788,7 +788,7 @@
               </p>
             </div>
 
-            <.card id="component-input-guidance" title="Choice guidance" inner_class="p-4">
+            <.card id="design-library-input-guidance" title="Choice guidance" inner_class="p-4">
               <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 <div class="rounded-lg border border-line bg-canvas p-3">
                   <h3 class="text-sm font-semibold text-ink">Text</h3>
@@ -896,7 +896,7 @@
                   ]}
                   wrapper_class="mb-1.5"
                 />
-                <p id="component-radio-group-gap" class="text-xs text-ink-muted">
+                <p id="design-library-radio-group-gap" class="text-xs text-ink-muted">
                   Appearance Settings still hand-writes its own radios. That screen puts
                   each theme choice in a bordered card with a description, which this
                   component does not express, so it is the one screen this entry does not
@@ -982,45 +982,24 @@
                 />
               </.card>
 
-              <.card id="component-input-live-state" title="Live state" inner_class="p-4">
-                <dl class="divide-y divide-low-contrast-line text-sm">
-                  <div class="flex justify-between gap-4 py-2">
-                    <dt class="text-ink-muted">Text</dt>
-                    <dd class="max-w-64 truncate text-right text-ink">
-                      {@sample_form[:text_field].value}
-                    </dd>
-                  </div>
-                  <div class="flex justify-between gap-4 py-2">
-                    <dt class="text-ink-muted">Search</dt>
-                    <dd class="max-w-64 truncate text-right text-ink">
-                      {@sample_form[:search_field].value}
-                    </dd>
-                  </div>
-                  <div class="flex justify-between gap-4 py-2">
-                    <dt class="text-ink-muted">Select</dt>
-                    <dd class="text-right text-ink">{@sample_form[:select_field].value}</dd>
-                  </div>
-                  <div class="flex justify-between gap-4 py-2">
-                    <dt class="text-ink-muted">Multi-select</dt>
-                    <dd class="max-w-64 text-right text-ink">
-                      {Enum.join(List.wrap(@sample_form[:roles].value), ", ")}
-                    </dd>
-                  </div>
-                  <div class="flex justify-between gap-4 py-2">
-                    <dt class="text-ink-muted">Checkbox</dt>
-                    <dd class="text-right text-ink">{@sample_form[:checkbox_field].value}</dd>
-                  </div>
-                  <div class="flex justify-between gap-4 py-2">
-                    <dt class="text-ink-muted">Radio</dt>
-                    <dd class="text-right text-ink">{@sample_form[:radio_field].value}</dd>
-                  </div>
-                  <div class="flex justify-between gap-4 py-2">
-                    <dt class="text-ink-muted">Date and time</dt>
-                    <dd class="text-right tabular-nums text-ink">
-                      {@sample_form[:datetime_field].value}
-                    </dd>
-                  </div>
-                </dl>
+              <.card id="design-library-input-live-state" title="Live state" inner_class="px-4">
+                <.list>
+                  <:item title="Text">
+                    <span class="block truncate">{@sample_form[:text_field].value}</span>
+                  </:item>
+                  <:item title="Search">
+                    <span class="block truncate">{@sample_form[:search_field].value}</span>
+                  </:item>
+                  <:item title="Select">{@sample_form[:select_field].value}</:item>
+                  <:item title="Multi-select">
+                    {Enum.join(List.wrap(@sample_form[:roles].value), ", ")}
+                  </:item>
+                  <:item title="Checkbox">{@sample_form[:checkbox_field].value}</:item>
+                  <:item title="Radio">{@sample_form[:radio_field].value}</:item>
+                  <:item title="Date and time">
+                    <span class="tabular-nums">{@sample_form[:datetime_field].value}</span>
+                  </:item>
+                </.list>
               </.card>
 
               <.card
@@ -1069,7 +1048,7 @@
                   />
                 </div>
                 <.radio_group
-                  id="component-radio-disabled"
+                  id="design-library-radio-disabled"
                   name="radio_disabled"
                   label="Locked appearance"
                   value="system"
@@ -1590,26 +1569,26 @@
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
               <.card id="component-card" title="Card" inner_class="space-y-4 p-4">
-                <div id="component-card-titled">
+                <div id="design-library-card-titled">
                   <p class="mb-2 text-xs text-ink-muted">With a title</p>
                   <.card title="Company profile" inner_class="p-3">
                     <p class="text-sm text-ink">A title adds the bordered heading strip.</p>
                   </.card>
                 </div>
-                <div id="component-card-untitled">
+                <div id="design-library-card-untitled">
                   <p class="mb-2 text-xs text-ink-muted">Without a title</p>
                   <.card inner_class="p-3">
                     <p class="text-sm text-ink">Without one, the body stands alone.</p>
                   </.card>
                 </div>
-                <div id="component-card-boundary" class="border-t border-line pt-3">
+                <div id="design-library-card-boundary" class="border-t border-line pt-3">
                   <p class="text-xs text-ink-muted">
                     A card has no loading, empty, error, or disabled state; those belong to the content placed inside it.
                   </p>
                 </div>
               </.card>
               <.card id="component-list" title="Record facts" inner_class="space-y-4 px-4">
-                <div id="component-list-populated">
+                <div id="design-library-list-populated">
                   <p class="mb-1 text-xs text-ink-muted">Facts for one record</p>
                   <.list>
                     <:item title="Company">Acme Holdings</:item><:item title="Status">
@@ -1617,13 +1596,13 @@
                     </:item><:item title="Jurisdiction">Malaysia</:item>
                   </.list>
                 </div>
-                <div id="component-list-single" class="border-t border-line pt-3">
+                <div id="design-library-list-single" class="border-t border-line pt-3">
                   <p class="mb-1 text-xs text-ink-muted">One fact</p>
                   <.list>
                     <:item title="Company">Acme Holdings</:item>
                   </.list>
                 </div>
-                <div id="component-list-boundary" class="border-t border-line pt-3">
+                <div id="design-library-list-boundary" class="border-t border-line pt-3">
                   <p class="text-xs text-ink-muted">
                     This list has no loading, empty, or error state; the screen around it supplies the facts.
                   </p>
