@@ -486,7 +486,7 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     ID. Letters also need no zero-padding, so a twelfth family cannot silently
     break the sort the way unpadded numbers would.
 
-- [ ] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source. **Dropped 2026-09-23:** the problem it was written for — fake specimens drifting away from the real components — was already solved by #723 (which replaced hand-written navigation, tabs and radio specimens with the real components) plus the route guards. Splitting the 1,369-line template would touch every anchor and all 14 web tests, and only a few Design Library slices remain, so rebasing those is cheaper than the split. `{codex-sol-specimens-1/gpt-5.6-sol}`
+- [x] Separate family specimens into mergeable family-owned view boundaries while retaining one Design Library shell and production component source. **Dropped 2026-09-23:** the problem it was written for — fake specimens drifting away from the real components — was already solved by #723 (which replaced hand-written navigation, tabs and radio specimens with the real components) plus the route guards. Splitting the 1,369-line template would touch every anchor and all 14 web tests, and only a few Design Library slices remain, so rebasing those is cheaper than the split. `{codex-sol-specimens-1/gpt-5.6-sol}`
 - [x] Show the current Bilimbi component in every meaningful state for the active family. `{codex-luna-states-1/gpt-5.6-luna}`
 
   Both landed on 2026-09-15 and neither finished the job: the `:design_library_drift`
