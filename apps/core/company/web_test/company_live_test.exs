@@ -959,6 +959,45 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert {:ok, _depot} = Address.get_address(scope, depot.id)
     end
 
+    test "unlinking an address whose link is already gone informs rather than refuses", %{
+      conn: conn
+    } do
+      grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
+      {:ok, scope} = Tenancy.scope(41)
+      {:ok, depot} = Address.create_address(scope, %{label: "Depot", line1: "9 Dock Road"})
+      {:ok, dock} = Address.create_address(scope, %{label: "Dock", line1: "3 Quay Lane"})
+      {:ok, :attached} = Address.attach_to_company(scope, depot.id, 73)
+      {:ok, :attached} = Address.attach_to_company(scope, dock.id, 73)
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+
+      # Another operator unlinks the address while this list still shows it:
+      # the confirmation runs against a link that is already gone.
+      :ok = Address.detach_from_company(scope, depot.id, 73)
+      view |> element("#unlink-address-#{depot.id}") |> render_click()
+      view |> element("#unlink-address-confirm-confirm", "Unlink") |> render_click()
+
+      refute has_element?(view, "#unlink-address-confirm")
+      refute has_element?(view, "#address-row-#{depot.id}")
+
+      assert has_element?(
+               view,
+               "#company-addresses-panel-notice[role='status'][data-kind='info']",
+               "That address is no longer linked."
+             )
+
+      # A request naming an address the refreshed list no longer holds.
+      view |> element("#unlink-address-#{dock.id}") |> render_click(%{"id" => "#{depot.id}"})
+
+      refute has_element?(view, "#unlink-address-confirm")
+
+      assert has_element?(
+               view,
+               "#company-addresses-panel-notice[role='status'][data-kind='info']",
+               "That address is no longer linked."
+             )
+    end
+
     test "the addresses panel shows a viewer the facts and the shared empty state", %{
       conn: conn
     } do

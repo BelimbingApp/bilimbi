@@ -645,6 +645,49 @@ defmodule BilimbiWeb.EmployeeShowTest do
            )
   end
 
+  test "unlinking an address whose link is already gone informs rather than refuses", %{
+    conn: conn,
+    employee: employee
+  } do
+    AddressFixtures.create_geonames_tables!()
+    AddressFixtures.create_address_tables!()
+    {:ok, scope} = Tenancy.scope(41)
+    {:ok, home} = Address.create_address(scope, %{label: "Home", line1: "12 Jalan Damai"})
+    {:ok, flat} = Address.create_address(scope, %{label: "Flat", line1: "4 Jalan Seri"})
+    {:ok, :attached} = Address.attach_to_employee(scope, home.id, employee.id)
+    {:ok, :attached} = Address.attach_to_employee(scope, flat.id, employee.id)
+
+    grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+    # Another operator unlinks the address while this list still shows it:
+    # the confirmation runs against a link that is already gone.
+    :ok = Address.detach_from_employee(scope, home.id, employee.id)
+    view |> element("#unlink-address-#{home.id}") |> render_click()
+    view |> element("#unlink-address-confirm-confirm", "Unlink") |> render_click()
+
+    refute has_element?(view, "#unlink-address-confirm")
+    refute has_element?(view, "#address-row-#{home.id}")
+
+    assert has_element?(
+             view,
+             "#addresses-panel-notice[role='status'][data-kind='info']",
+             "That address is no longer linked."
+           )
+
+    # A request naming an address the refreshed list no longer holds.
+    view |> element("#unlink-address-#{flat.id}") |> render_click(%{"id" => "#{home.id}"})
+
+    refute has_element?(view, "#unlink-address-confirm")
+
+    assert has_element?(
+             view,
+             "#addresses-panel-notice[role='status'][data-kind='info']",
+             "That address is no longer linked."
+           )
+  end
+
   test "hides the destructive action without admin.employee.delete", %{
     conn: conn,
     employee: employee

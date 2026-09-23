@@ -14,7 +14,8 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
   an authorization decision. Outcomes render through the shared
   `<.panel_notice>` because a LiveComponent cannot reach the page's flash
   without a parent contract; a completed write says `:success` there, as it
-  would in the page's flash, and a refusal or failure `:error`. While
+  would in the page's flash, an unlink whose link is already gone `:info`,
+  and a refusal or failure `:error`. While
   the attach dialog is open the notice renders inside it instead of above the
   cards: the page behind a modal dialog is inert, so a notice left outside
   could be neither read nor dismissed. An unexpected failure recovered by
@@ -151,7 +152,7 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
 
       case Enum.find(socket.assigns.attached_addresses, &(&1.id == address_id)) do
         nil ->
-          {:noreply, socket |> notice(:error, "That address is no longer linked.") |> reload()}
+          {:noreply, socket |> notice(:info, "That address is no longer linked.") |> reload()}
 
         address ->
           {:noreply, socket |> assign(:notice, nil) |> assign(:pending_detach, address)}
@@ -176,6 +177,9 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
           case Address.detach_from_employee(scope, address_id, socket.assigns.employee_id) do
             :ok ->
               {:noreply, socket |> notice(:success, "Address unlinked.") |> reload()}
+
+            {:error, reason} when reason in [:attachment_not_found, :address_not_found] ->
+              {:noreply, socket |> notice(:info, "That address is no longer linked.") |> reload()}
 
             {:error, _} ->
               {:noreply,
@@ -466,134 +470,134 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
             <span class="text-ink-subtle">{format_address_summary(addr)}</span>
           </:col>
 
-        <:col :let={addr} label="Kind" sort="kind">
-          <%= if @editing_kinds_address_id == addr.id do %>
-            <div class="space-y-1">
-              <%= for k <- @address_kinds do %>
-                <label class="flex cursor-pointer items-center gap-1.5 text-xs">
-                  <input
-                    type="checkbox"
-                    value={k}
-                    checked={k in @selected_edit_kinds}
-                    phx-click="toggle_edit_kind"
+          <:col :let={addr} label="Kind" sort="kind">
+            <%= if @editing_kinds_address_id == addr.id do %>
+              <div class="space-y-1">
+                <%= for k <- @address_kinds do %>
+                  <label class="flex cursor-pointer items-center gap-1.5 text-xs">
+                    <input
+                      type="checkbox"
+                      value={k}
+                      checked={k in @selected_edit_kinds}
+                      phx-click="toggle_edit_kind"
+                      phx-target={@myself}
+                      phx-value-kind={k}
+                      class="rounded border-line"
+                    /> <span>{String.capitalize(k)}</span>
+                  </label>
+                <% end %>
+
+                <div class="flex items-center gap-1 pt-1">
+                  <.button
+                    id={"save-kinds-#{addr.id}"}
+                    type="button"
+                    phx-click="save_address_kinds"
                     phx-target={@myself}
-                    phx-value-kind={k}
-                    class="rounded border-line"
-                  /> <span>{String.capitalize(k)}</span>
-                </label>
-              <% end %>
+                    phx-value-address_id={addr.id}
+                    variant="primary"
+                    class="text-xs px-2 py-0.5"
+                  >
+                    Save
+                  </.button>
 
-              <div class="flex items-center gap-1 pt-1">
-                <.button
-                  id={"save-kinds-#{addr.id}"}
-                  type="button"
-                  phx-click="save_address_kinds"
-                  phx-target={@myself}
-                  phx-value-address_id={addr.id}
-                  variant="primary"
-                  class="text-xs px-2 py-0.5"
-                >
-                  Save
-                </.button>
-
-                <.button
-                  id={"cancel-kinds-#{addr.id}"}
-                  type="button"
-                  phx-click="cancel_address_kinds"
-                  phx-target={@myself}
-                  class="text-xs px-2 py-0.5"
-                >
-                  Cancel
-                </.button>
+                  <.button
+                    id={"cancel-kinds-#{addr.id}"}
+                    type="button"
+                    phx-click="cancel_address_kinds"
+                    phx-target={@myself}
+                    class="text-xs px-2 py-0.5"
+                  >
+                    Cancel
+                  </.button>
+                </div>
               </div>
-            </div>
-          <% else %>
-            <%!-- The kinds are a choice fact: the read state is the trigger
+            <% else %>
+              <%!-- The kinds are a choice fact: the read state is the trigger
                  and the checkboxes commit through Save, as on Belimbing. --%>
+              <button
+                :if={@can_manage?}
+                type="button"
+                id={"edit-kinds-#{addr.id}"}
+                phx-click="edit_address_kinds"
+                phx-target={@myself}
+                phx-value-id={addr.id}
+                aria-label="Edit kinds"
+                class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer flex-wrap items-center gap-1 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
+              >
+                <.address_kinds kinds={addr.kind} />
+                <.icon
+                  name="edit"
+                  class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                />
+              </button>
+              <div :if={not @can_manage?} class="flex flex-wrap items-center gap-1">
+                <.address_kinds kinds={addr.kind} />
+              </div>
+            <% end %>
+          </:col>
+
+          <:col :let={addr} label="Primary" sort="is_primary">
             <button
               :if={@can_manage?}
+              id={"toggle-primary-#{addr.id}"}
               type="button"
-              id={"edit-kinds-#{addr.id}"}
-              phx-click="edit_address_kinds"
+              phx-click="toggle_address_primary"
               phx-target={@myself}
               phx-value-id={addr.id}
-              aria-label="Edit kinds"
-              class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer flex-wrap items-center gap-1 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
+              aria-pressed={to_string(addr.is_primary == true)}
+              class="cursor-pointer"
+              title="Toggle primary status"
             >
-              <.address_kinds kinds={addr.kind} />
-              <.icon
-                name="edit"
-                class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-              />
+              <.badge :if={addr.is_primary} kind={:success}>Yes</.badge>
+              <span :if={not addr.is_primary} class="text-ink-subtle hover:text-ink">No</span>
             </button>
-            <div :if={not @can_manage?} class="flex flex-wrap items-center gap-1">
-              <.address_kinds kinds={addr.kind} />
-            </div>
-          <% end %>
-        </:col>
+            <span :if={not @can_manage?}>
+              <.badge :if={addr.is_primary} kind={:success}>Yes</.badge>
+              <span :if={not addr.is_primary} class="text-ink-subtle">No</span>
+            </span>
+          </:col>
 
-        <:col :let={addr} label="Primary" sort="is_primary">
-          <button
-            :if={@can_manage?}
-            id={"toggle-primary-#{addr.id}"}
-            type="button"
-            phx-click="toggle_address_primary"
-            phx-target={@myself}
-            phx-value-id={addr.id}
-            aria-pressed={to_string(addr.is_primary == true)}
-            class="cursor-pointer"
-            title="Toggle primary status"
-          >
-            <.badge :if={addr.is_primary} kind={:success}>Yes</.badge>
-            <span :if={not addr.is_primary} class="text-ink-subtle hover:text-ink">No</span>
-          </button>
-          <span :if={not @can_manage?}>
-            <.badge :if={addr.is_primary} kind={:success}>Yes</.badge>
-            <span :if={not addr.is_primary} class="text-ink-subtle">No</span>
-          </span>
-        </:col>
-
-        <:col :let={addr} label="Priority" sort="priority">
-          <%!-- Priority commits on Enter or blur through the shared in-place
+          <:col :let={addr} label="Priority" sort="priority">
+            <%!-- Priority commits on Enter or blur through the shared in-place
                editor, as Belimbing's priority cell does; the outcome reports
                through the panel notice. The hook addresses its event to its
                own element, so it reaches this component in the browser;
                `phx-target` says the same for the test client. --%>
-          <.inline_edit
-            :if={@can_manage?}
-            id={"address-priority-#{addr.id}"}
-            value={to_string(addr.priority || 0)}
-            id_value={addr.id}
-            name="priority"
-            label="Priority"
-            save_event="save_address_priority"
-            phx-target={@myself}
-            class="tabular-nums"
-          />
-          <span :if={not @can_manage?} class="tabular-nums">{addr.priority || 0}</span>
-        </:col>
+            <.inline_edit
+              :if={@can_manage?}
+              id={"address-priority-#{addr.id}"}
+              value={to_string(addr.priority || 0)}
+              id_value={addr.id}
+              name="priority"
+              label="Priority"
+              save_event="save_address_priority"
+              phx-target={@myself}
+              class="tabular-nums"
+            />
+            <span :if={not @can_manage?} class="tabular-nums">{addr.priority || 0}</span>
+          </:col>
 
-        <:col :let={addr} label="Valid From" sort="valid_from">
-          <span class="tabular-nums text-ink-subtle">{display_or_dash(addr.valid_from)}</span>
-        </:col>
+          <:col :let={addr} label="Valid From" sort="valid_from">
+            <span class="tabular-nums text-ink-subtle">{display_or_dash(addr.valid_from)}</span>
+          </:col>
 
-        <:col :let={addr} label="Valid To" sort="valid_to">
-          <span class="tabular-nums text-ink-subtle">{display_or_dash(addr.valid_to)}</span>
-        </:col>
+          <:col :let={addr} label="Valid To" sort="valid_to">
+            <span class="tabular-nums text-ink-subtle">{display_or_dash(addr.valid_to)}</span>
+          </:col>
 
-        <:action :let={addr} :if={@can_manage?}>
-          <.icon_button
-            id={"unlink-address-#{addr.id}"}
-            icon="unlink"
-            label="Unlink address"
-            title="Unlink"
-            kind={:danger}
-            phx-click={
-              JS.push("lv:clear-flash")
-              |> JS.push("request_detach", value: %{id: addr.id}, target: @myself)
-            }
-          />
-        </:action>
+          <:action :let={addr} :if={@can_manage?}>
+            <.icon_button
+              id={"unlink-address-#{addr.id}"}
+              icon="unlink"
+              label="Unlink address"
+              title="Unlink"
+              kind={:danger}
+              phx-click={
+                JS.push("lv:clear-flash")
+                |> JS.push("request_detach", value: %{id: addr.id}, target: @myself)
+              }
+            />
+          </:action>
 
           <:empty
             :if={@sorted_addresses == []}
@@ -622,111 +626,117 @@ defmodule Bilimbi.Core.Address.Web.EmployeeAddressesPanel do
         >
           {elem(@notice, 1)}
         </.panel_notice>
-            <.form
-              for={@attach_form}
-              phx-submit="attach_address" phx-target={@myself}
-              id="attach-address-modal-form"
-              class="mt-4 space-y-4"
+        <.form
+          for={@attach_form}
+          phx-submit="attach_address"
+          phx-target={@myself}
+          id="attach-address-modal-form"
+          class="mt-4 space-y-4"
+        >
+          <div>
+            <label
+              for="employee-attach-address"
+              class="block text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-1"
             >
-              <div>
-                <label
-                  for="employee-attach-address"
-                  class="block text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-1"
-                >
-                  Address
+              Address
+            </label>
+
+            <select
+              id="employee-attach-address"
+              name="address[address_id]"
+              class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+            >
+              <option value="">Select an address...</option>
+
+              <%= for addr <- @available_addresses do %>
+                <option value={addr.id}>
+                  {addr.label} — {format_address_summary(addr)}
+                </option>
+              <% end %>
+            </select>
+
+            <%= if Map.has_key?(@attach_errors, :address_id) do %>
+              <p class="text-xs text-danger mt-1">{@attach_errors.address_id}</p>
+            <% end %>
+          </div>
+
+          <div>
+            <span class="block text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-1">
+              Kind
+            </span>
+
+            <div class="flex flex-wrap gap-x-4 gap-y-2">
+              <%= for k <- @address_kinds do %>
+                <label class="flex items-center gap-2 text-xs text-ink cursor-pointer">
+                  <input
+                    id={"employee-attach-kind-#{k}"}
+                    type="checkbox"
+                    name="address[kinds][]"
+                    value={k}
+                    class="rounded border-line"
+                  /> <span>{String.capitalize(k)}</span>
                 </label>
+              <% end %>
+            </div>
+          </div>
 
-                <select
-                  id="employee-attach-address"
-                  name="address[address_id]"
-                  class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
-                >
-                  <option value="">Select an address...</option>
+          <div class="flex items-center gap-2">
+            <input
+              id="employee-attach-is-primary"
+              type="checkbox"
+              name="address[is_primary]"
+              value="true"
+              class="rounded border-line"
+            />
+            <label
+              for="employee-attach-is-primary"
+              class="text-xs font-medium text-ink cursor-pointer"
+            >
+              Primary Address
+            </label>
+          </div>
 
-                  <%= for addr <- @available_addresses do %>
-                    <option value={addr.id}>
-                      {addr.label} — {format_address_summary(addr)}
-                    </option>
-                  <% end %>
-                </select>
+          <div>
+            <label
+              for="employee-attach-priority"
+              class="block text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-1"
+            >
+              Priority
+            </label>
 
-                <%= if Map.has_key?(@attach_errors, :address_id) do %>
-                  <p class="text-xs text-danger mt-1">{@attach_errors.address_id}</p>
-                <% end %>
-              </div>
+            <input
+              id="employee-attach-priority"
+              type="number"
+              name="address[priority]"
+              value="0"
+              min="0"
+              class="w-24 rounded-md border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+            />
+            <p class="text-xs text-ink-subtle mt-1">
+              Lower number = higher priority. Used to order addresses of the same kind (0 = top).
+            </p>
+          </div>
 
-              <div>
-                <span class="block text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-1">
-                  Kind
-                </span>
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-line">
+            <.button
+              type="button"
+              phx-click="close_attach_modal"
+              phx-target={@myself}
+              class="text-xs px-3 py-1.5"
+            >
+              Cancel
+            </.button>
 
-                <div class="flex flex-wrap gap-x-4 gap-y-2">
-                  <%= for k <- @address_kinds do %>
-                    <label class="flex items-center gap-2 text-xs text-ink cursor-pointer">
-                      <input
-                        id={"employee-attach-kind-#{k}"}
-                        type="checkbox"
-                        name="address[kinds][]"
-                        value={k}
-                        class="rounded border-line"
-                      /> <span>{String.capitalize(k)}</span>
-                    </label>
-                  <% end %>
-                </div>
-              </div>
-
-              <div class="flex items-center gap-2">
-                <input
-                  id="employee-attach-is-primary"
-                  type="checkbox"
-                  name="address[is_primary]"
-                  value="true"
-                  class="rounded border-line"
-                />
-                <label
-                  for="employee-attach-is-primary"
-                  class="text-xs font-medium text-ink cursor-pointer"
-                >
-                  Primary Address
-                </label>
-              </div>
-
-              <div>
-                <label
-                  for="employee-attach-priority"
-                  class="block text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-1"
-                >
-                  Priority
-                </label>
-
-                <input
-                  id="employee-attach-priority"
-                  type="number"
-                  name="address[priority]"
-                  value="0"
-                  min="0"
-                  class="w-24 rounded-md border border-line bg-surface px-3 py-1.5 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
-                />
-                <p class="text-xs text-ink-subtle mt-1">
-                  Lower number = higher priority. Used to order addresses of the same kind (0 = top).
-                </p>
-              </div>
-
-              <div class="flex items-center justify-end gap-2 pt-2 border-t border-line">
-                <.button type="button" phx-click="close_attach_modal" phx-target={@myself} class="text-xs px-3 py-1.5">
-                  Cancel
-                </.button>
-
-                <.button
-                  id="btn-submit-attach-address"
-                  type="submit"
-                  variant="primary"
-                  class="text-xs px-3 py-1.5"
-                >
-                  Attach
-                </.button>
-              </div>
-            </.form>
+            <.button
+              id="btn-submit-attach-address"
+              type="submit"
+              variant="primary"
+              class="text-xs px-3 py-1.5"
+            >
+              Attach
+            </.button>
+          </div>
+        </.form>
       </.modal>
 
       <.confirm_dialog
