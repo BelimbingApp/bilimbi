@@ -13,6 +13,7 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Tenancy.Scope
 
   # Belimbing also sorts by company name and by the two counts. Authz's
   # administration query does not offer those, and a header that sorts by
@@ -26,7 +27,8 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
     {:ok,
      assign(socket,
        page_title: "Roles",
-       can_create?: allowed?(socket.assigns.current_scope, "admin.authz.role.create")
+       can_create?: allowed?(socket.assigns.current_scope, "admin.authz.role.create"),
+       reach_caution?: reach_caution?(socket)
      )}
   end
 
@@ -161,4 +163,11 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
   defp scope_kind(%{is_system: true}), do: :neutral
   defp scope_kind(%{company_id: nil}), do: :warning
   defp scope_kind(_role), do: :success
+
+  # `Authz` widens this listing for the platform-operator scope to rows attached
+  # to no company (`Administration.company_visibility/2`). The caution names that
+  # widening where the list is read; it changes nothing about what is listed.
+  defp reach_caution?(socket) do
+    Scope.platform_operator?(socket.assigns.current_scope.scope)
+  end
 end

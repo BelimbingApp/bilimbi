@@ -25,6 +25,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
     {:ok,
      socket
      |> assign(:active_nav, "admin.system.database-query")
+     |> assign(:reach_caution?, operator?(socket))
      |> assign(:is_new, false)
      |> assign(:query, nil)
      |> assign(:name, "Untitled Query")

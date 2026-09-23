@@ -218,6 +218,49 @@ defmodule BilimbiWeb.AuthzPrincipalRolesLiveTest do
     assert has_element?(view, "#assignments-sort-created_at .hero-chevron-down")
   end
 
+  describe "operator reach caution" do
+    # `Authz` widens this listing for the platform-operator scope to rows
+    # attached to no company. A caption above the table says so where the list
+    # is read, in the warning tokens, and only for that scope: an ordinary
+    # tenant never sees those rows, so it has nothing to be warned about.
+    test "warns the platform operator that the list reaches rows attached to no company", %{
+      conn: conn
+    } do
+      grant_capabilities!("admin.authz.principal-role.list")
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/principal-roles")
+
+      assert has_element?(view, "#principal-roles-reach-caution.text-warning-ink", "role assignments attached to no company")
+    end
+
+    test "says nothing to an ordinary tenant", %{conn: conn} do
+      CompanyFixtures.insert_tenant!(%{id: 42, name: "Other tenant", is_platform_operator: false})
+
+      CompanyFixtures.insert_company!(%{
+        id: 74,
+        tenant_id: 42,
+        name: "Elsewhere",
+        code: "elsewhere"
+      })
+
+      UserFixtures.insert_user!(%{
+        id: 92,
+        company_id: 74,
+        name: "Grace Hopper",
+        email: "grace@example.com"
+      })
+
+      grant_capabilities!("admin.authz.principal-role.list", tenant_id: 42, company_id: 74, user_id: 92)
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_as(session_user(%{"user_id" => 92, "company_id" => 74}))
+        |> live(~p"/authz/principal-roles")
+
+      assert has_element?(view, "#principal-roles-index")
+      refute has_element?(view, "#principal-roles-reach-caution")
+    end
+  end
+
   defp patched_params(view) do
     assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
   end

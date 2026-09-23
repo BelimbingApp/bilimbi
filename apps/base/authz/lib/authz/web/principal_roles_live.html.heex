@@ -50,6 +50,18 @@
       </div>
     </.form>
 
+    <%!-- A caption, not a banner: the widening is a standing property of the
+         rows, so it reads as a quiet caution in the warning tokens. --%>
+    <p
+      :if={@reach_caution?}
+      id="principal-roles-reach-caution"
+      role="note"
+      class="mb-2 inline-flex items-center gap-1.5 text-xs text-warning-ink"
+    >
+      <.icon name="warning" class="size-4 shrink-0" />
+      <span>Beyond this tenant's companies: this list also includes role assignments attached to no company.</span>
+    </p>
+
     <.card id="principal-roles-card" inner_class="p-0">
 
 
