@@ -531,15 +531,20 @@ defmodule Bilimbi.Core.User do
   @spec reorder_user_pins(pos_integer(), [pos_integer()]) :: {:ok, [Pin.t()]}
   def reorder_user_pins(user_id, ordered_pin_ids)
       when is_integer(user_id) and user_id > 0 and is_list(ordered_pin_ids) do
-    Repo.transaction(fn ->
-      Enum.each(Enum.with_index(ordered_pin_ids), fn {pin_id, index} ->
-        from(p in Pin,
-          where: p.user_id == ^user_id and p.id == ^pin_id
-        )
-        |> Repo.update_all(set: [sort_order: index])
-      end)
+    # The order pins appear in is a display preference of the signed-in
+    # user's own, not a business fact; pinning and unpinning are ordinary
+    # writes and stay captured.
+    Audit.without_auditing(fn ->
+      Repo.transaction(fn ->
+        Enum.each(Enum.with_index(ordered_pin_ids), fn {pin_id, index} ->
+          from(p in Pin,
+            where: p.user_id == ^user_id and p.id == ^pin_id
+          )
+          |> Repo.update_all(set: [sort_order: index])
+        end)
 
-      list_user_pins(user_id)
+        list_user_pins(user_id)
+      end)
     end)
   end
 
@@ -781,11 +786,16 @@ defmodule Bilimbi.Core.User do
       morph = notifiable_identity()
       now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
+      # A read receipt on the actor's own notifications: high volume, and
+      # it records nothing about the business the notifications are about.
       {count, _} =
-        from(n in Notification,
-          where: n.notifiable_type == ^morph and n.notifiable_id == ^user_id and is_nil(n.read_at)
-        )
-        |> Repo.update_all(set: [read_at: now, updated_at: now])
+        Audit.without_auditing(fn ->
+          from(n in Notification,
+            where:
+              n.notifiable_type == ^morph and n.notifiable_id == ^user_id and is_nil(n.read_at)
+          )
+          |> Repo.update_all(set: [read_at: now, updated_at: now])
+        end)
 
       broadcast_notification(scope, user_id, {:all_read, count})
       {:ok, count}

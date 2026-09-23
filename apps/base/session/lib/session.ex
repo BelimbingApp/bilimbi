@@ -9,6 +9,7 @@ defmodule Bilimbi.Base.Session do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Database.WriteCapture
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Session.Entry
   alias Bilimbi.Base.Session.Page
@@ -123,7 +124,14 @@ defmodule Bilimbi.Base.Session do
 
   @spec delete_session(String.t()) :: :ok
   def delete_session(id) when is_binary(id) do
-    Repo.delete_all(from(session in Schema, where: session.id == ^id))
+    # Signing out is the actor ending their own session, and the sign-out
+    # itself belongs in `base_audit_actions`, not in the mutation trail as
+    # a deleted row. Terminating *another* session is a different act and
+    # is captured -- see `terminate_session/2` below.
+    WriteCapture.without_capture(fn ->
+      Repo.delete_all(from(session in Schema, where: session.id == ^id))
+    end)
+
     :ok
   end
 
@@ -171,10 +179,14 @@ defmodule Bilimbi.Base.Session do
   @spec prune_expired(non_neg_integer()) :: non_neg_integer()
   def prune_expired(before_last_activity)
       when is_integer(before_last_activity) and before_last_activity >= 0 do
+    # Housekeeping over sessions that already expired: nobody decided to
+    # end them, and the sweep would write one audit row per stale session.
     {count, _rows} =
-      Repo.delete_all(
-        from(session in Schema, where: session.last_activity < ^before_last_activity)
-      )
+      WriteCapture.without_capture(fn ->
+        Repo.delete_all(
+          from(session in Schema, where: session.last_activity < ^before_last_activity)
+        )
+      end)
 
     count
   end

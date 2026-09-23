@@ -255,6 +255,9 @@ defmodule Bilimbi.Core.Compatibility do
     now = DateTime.utc_now() |> DateTime.to_naive() |> NaiveDateTime.truncate(:second)
     rows = Enum.map(versions, &%{version: &1, inserted_at: now})
 
+    # A raw table name rather than an Ecto schema, which is also why the
+    # repo's write capture leaves it alone: the migration ledger is
+    # lifecycle bookkeeping, not business data (ADR 0002, ADR 0013).
     {count, _} = repo.insert_all(migration_source(repo), rows, prefix: schema)
 
     if count != length(versions) do

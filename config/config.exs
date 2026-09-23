@@ -35,6 +35,53 @@ config :phoenix_live_view,
 # them here so no compile-time edge crosses the module graph.
 config :bilimbi_base_database, write_capture: Bilimbi.Base.Audit.MutationCapture
 
+# ADR 0013 (#785): the port of Belimbing's `audit.exclude_models`. Capture
+# is comprehensive by default, so silence is explicit and justified here,
+# one entry at a time. A schema belongs on this list only when *nothing*
+# written to it is an actor's business decision; where the same table holds
+# both, the machine-only call site wraps itself in
+# `Bilimbi.Base.Database.WriteCapture.without_capture/1` instead, and says
+# why there.
+config :bilimbi_base_audit,
+  exclude_schemas: [
+    # One row per authorization decision the platform evaluates. The
+    # decision log is its own operational surface with its own retention;
+    # auditing writes to it records nothing about who changed anything.
+    Bilimbi.Base.Authz.DecisionLog,
+
+    # Performance samples: machine measurements, written on a timer and
+    # pruned on a timer.
+    Bilimbi.Base.Perf.Sample,
+
+    # Scheduler state. An occurrence moves between claimed, running and
+    # finished as the job runs; a run is the history of one execution.
+    # Neither is an actor's decision — pausing a job is, and
+    # `Bilimbi.Base.Schedule.Suppression` is deliberately absent from this
+    # list so suppress and unsuppress both leave a row.
+    Bilimbi.Base.Schedule.Occurrence,
+    Bilimbi.Base.Schedule.Run,
+
+    # Geonames reference data, imported and re-imported wholesale from
+    # upstream files. The largest import in the product is 34,140 city
+    # rows; auditing it would bury the trail in place names nobody
+    # decided.
+    Bilimbi.Core.Geonames.Country,
+    Bilimbi.Core.Geonames.Admin1,
+    Bilimbi.Core.Geonames.City,
+    Bilimbi.Core.Geonames.Postcode,
+
+    # Ecto's own migration ledger. `bilimbi_schema_migrations` records
+    # which migrations ran; a migration is not an actor's mutation, and
+    # ADR 0002 keeps the ledger outside business data entirely.
+    Ecto.Migration.SchemaMigration,
+
+    # Password-reset tokens: credential machinery with its own lifecycle.
+    # The password change they complete is audited on the user row; the
+    # token rows are secrets, and the trail is better off not holding
+    # their metadata at all.
+    Bilimbi.Core.User.PasswordResetToken
+  ]
+
 config :esbuild,
   version: "0.25.4",
   bilimbi_web: [

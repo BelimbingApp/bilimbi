@@ -4,7 +4,10 @@ Date: 2026-08-22
 
 ## Status
 
-Proposed
+Accepted
+
+Amended 2026-09-23 (#785): bulk writes are captured. The original decision
+excluded them and the Consequences below record what changed.
 
 ## Context
 
@@ -37,8 +40,12 @@ functions non-overridable by default, but `defoverridable Ecto.Repo` after
 module itself can wrap `insert/2`, `update/2`, `delete/2`, their `!`
 variants, and `insert_or_update/2` around `super`. The adapter layer was
 rejected: adapter callbacks see changed fields but not originals, and the
-canonical row records old values. Postgres triggers were rejected: they
-cannot see the actor.
+canonical row records old values. Postgres triggers were rejected; #785
+built and measured them, and the accurate reason is recorded there and in
+the Decision below — not that they cannot see the actor, but that they can
+only see one the application declares inside the same transaction, which
+is the same cooperation this seam already needs, bought at a higher price
+and with a silent-falsehood failure mode.
 
 ## Decision
 
@@ -46,20 +53,72 @@ cannot see the actor.
 (policy), wired in workspace configuration.**
 
 - `Bilimbi.Base.Database.WriteCapture` (Base Database) defines the
-  behaviour — `after_write(action, changeset_or_struct, result)` — the
-  process-scoped kill switch `without_capture/1`, and the dispatcher the
-  repo calls after each **successful** struct write. The capture module is
+  behaviour — `after_write(action, changeset_or_struct, result)`,
+  `after_bulk_write(schema, changes)`, and `capture_schema?(schema)` — the
+  process-scoped kill switch `without_capture/1`, and the dispatchers the
+  repo calls after each **successful** write. The capture module is
   read from `:bilimbi_base_database, :write_capture` application
   configuration; unset means no capture. Base Database gains **no**
   dependency edge: it defines a seam and calls whatever the workspace
   configured, the same wiring shape as Core User's `:pubsub_server`.
-- `Bilimbi.Base.Repo` overrides the seven struct write functions via
-  `defoverridable Ecto.Repo` + `super`, dispatching to `WriteCapture` on
-  success. Query-based bulk writes (`update_all`, `delete_all`,
-  `insert_all`) and raw SQL are **not** captured — Eloquent model events do
-  not fire for query-builder bulk writes either, so this is canonical
-  parity, not a gap; a bulk operation that needs audit records one
-  explicitly (the data-operation ledger pattern).
+- `Bilimbi.Base.Repo` overrides the eight struct write functions
+  (`insert`, `update`, `delete`, `insert_or_update` and their `!` variants)
+  **and the three query-based bulk writes** (`insert_all`, `update_all`,
+  `delete_all`) via `defoverridable Ecto.Repo` + `super`, dispatching to
+  `WriteCapture` on success.
+- **Bulk capture** (#785). A bulk write hands the repo a query rather than
+  a changeset, so `Bilimbi.Base.Database.BulkCapture` gathers the rows the
+  statement affected and dispatches them as
+  `after_bulk_write(schema, changes)`, one `{action, old_row, new_row}` per
+  row. What that costs differs by operation: `insert_all` reads the new
+  rows from `RETURNING`; for `delete_all` the returned rows **are** the old
+  values; only `update_all` needs anything extra, one `SELECT` of the
+  originals before the statement. The caller's result is preserved exactly
+  — the added `select` and `returning: true` never reach them. Capture
+  writes **one** `insert_all` per bulk statement, never one insert per row:
+  a row-at-a-time capture measured about 33x worse on a large batch,
+  because the cost is an Elixir round trip, not database work. `insert_all`
+  dumps but does not cast, so each row is shaped by the same
+  `MutationSchema.changeset/2` the struct path uses and applied before
+  batching, which is what casts `ip_address`.
+- **Belimbing parity is deliberately departed from here.** Eloquent model
+  events do not fire for query-builder writes, and the original decision
+  read that as canonical parity rather than a gap. It was a gap: granting
+  or revoking a role or a capability from the product UI left no audit row
+  at all, and 39 bulk-write call sites reached this path. Parity with the
+  source is not a reason to leave a hole in an audit trail.
+- **Upserts.** `insert_all` with a replacing `:on_conflict` returns the row
+  whether it inserted or replaced. When the conflict target names fields,
+  the rows it could collide with are read first and a returned row already
+  in that set is recorded as the update it was. When the target is an
+  `:unsafe_fragment` index predicate, the write is **not** captured, logged
+  and counted on the capture-failure event: a record calling a replacement
+  a creation would be a false one, and a missing record is the lesser
+  failure.
+- **Raw SQL remains uncaptured, and is kept empty of auditable writes
+  rather than covered.** The operator SQL console is `SELECT`-only and its
+  transaction is genuinely read-only (#781); giving it its own
+  `SELECT`-only PostgreSQL role is separate work that makes the claim a
+  database-enforced fact rather than an application property.
+  `Bilimbi.Base.Database.RawSqlWriteGuardTest` reads the AST of every
+  module under `lib/` and fails when DML appears in an
+  `Ecto.Adapters.SQL.query/3` call outside the allowlisted lifecycle
+  modules.
+- **Postgres triggers were built, measured and rejected** (#785). They
+  work, and they are the only mechanism that sees a write the application
+  did not make. They were rejected because they do not remove the
+  application's obligation to declare the actor — they relocate it into a
+  transaction-local setting many call sites are not positioned to provide —
+  and when that obligation is missed the trail does not go quiet, it
+  **lies**, recording `guest` where an administrator acted. They also
+  cannot see `without_auditing/1`, would duplicate the redaction policy in
+  SQL, double-record against this capture, and cost the same: auditing the
+  largest bulk write in the codebase added about 3.5s either way, because
+  the cost is writing the audit rows, not intercepting the statement.
+- **Neither mechanism defends against someone holding database
+  credentials.** A direct connection bypasses an application-layer capture
+  entirely, and a superuser can disable a trigger. The control for that is
+  credential custody and connection policy, not audit design.
 - `Bilimbi.Base.Audit.MutationCapture` (Base Audit) implements the
   behaviour and owns the canonical row shape (§5 of the audit port):
   actor columns from the per-process `Bilimbi.Base.Audit.Context` (set at
@@ -76,7 +135,13 @@ cannot see the actor.
 - **Recursion and exclusion**: capture always skips Base Audit's own
   schemas; further schemas opt out via `:bilimbi_base_audit,
   :exclude_schemas` configuration — the port of `audit.exclude_models`,
-  with the same justification discipline (a comment per entry).
+  with the same justification discipline (a comment per entry). A schema
+  belongs on that list only when *nothing* written to it is an actor's
+  business decision. Where one table holds both — sessions, employee
+  types, the operator tenant — the machine-only call site wraps itself in
+  `WriteCapture.without_capture/1` and says why there, so the actor's
+  writes to the same table stay captured. These two controls are the whole
+  flooding answer; there is no third concept.
 - **`withoutAuditing` semantics**: `Audit.without_auditing/1` delegates to
   `WriteCapture.without_capture/1` — a process flag, restored by `after`,
   exactly the source's static-flag try/finally. Production seeding and
@@ -99,8 +164,8 @@ cannot see the actor.
 
 ## Consequences
 
-- Every struct write through the shared Repo is audited by default; a new
-  module gets a complete audit trail by existing, and silence becomes an
+- Every write through the shared Repo is audited by default; a new module
+  gets a complete audit trail by existing, and silence becomes an
   explicit, greppable opt-out instead of a forgotten opt-in.
 - The three existing `Audit.record_mutation` call sites remain valid for
   semantic rows the capture cannot infer; capture writes `source:
@@ -109,10 +174,27 @@ cannot see the actor.
 - The runtime wiring crosses the module graph by configuration, not by
   compile-time reference; the graph gate keeps holding for code, and this
   ADR is the record for the one sanctioned config edge.
-- Multi/`insert_or_update` flow through the overridden functions;
-  anything bypassing the repo's struct API bypasses capture, and the
-  write-session test in `apps/web` pins the guarantee for real domain
-  writes (Employee, Company) so a regression in the seam fails loudly.
+- Multi/`insert_or_update` flow through the overridden functions. The
+  residual boundary is now the repo itself: anything bypassing
+  `Bilimbi.Base.Repo` entirely bypasses capture, which is why raw-SQL DML
+  is allowlisted and guarded by a test. The write-session test in
+  `apps/web` pins the guarantee for real domain writes (Employee, Company)
+  and, since #785, for a real permission change driven through the User
+  detail screen — the regression that would have caught the bulk-write gap
+  in the first place.
+- A bulk write on a captured schema now costs one extra statement at most
+  (`update_all`'s pre-read), and `RETURNING` on the others. Nothing is read
+  for an excluded schema: the repo asks the capture module before it
+  gathers anything. The realistic audited bulk write in this codebase —
+  replacing a role's forty capabilities — measured 13ms including that
+  pre-read.
+- The `update_all` pre-read and the update are two statements, so under
+  `READ COMMITTED` a concurrent write between them can leave a row with no
+  known original. Such a row records the full new row rather than a diff
+  against a guess. PostgreSQL 18's `RETURNING WITH (OLD AS ...)` would
+  close the window entirely; Ecto's query builder cannot express it yet,
+  and reaching it through hand-written SQL would bypass the seam this
+  decision strengthens.
 - Subject expansion (`getAuditSubject`/`getAuditSubjectEntries`) is
   deferred: capture leaves the subject columns null until a schema needs
   them, at which point optional callbacks port the source's

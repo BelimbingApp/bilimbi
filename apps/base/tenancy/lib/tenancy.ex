@@ -8,6 +8,7 @@ defmodule Bilimbi.Base.Tenancy do
 
   import Ecto.Query
 
+  alias Bilimbi.Base.Database.WriteCapture
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Identity
   alias Bilimbi.Base.Tenancy.InvariantError
@@ -168,20 +169,26 @@ defmodule Bilimbi.Base.Tenancy do
       nil ->
         now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
 
+        # Install-time provisioning: there is no actor and no tenant yet,
+        # so capture would record the platform coming into existence as a
+        # guest's doing. Later changes to the operator tenant are ordinary
+        # struct writes and stay captured.
         {count, _} =
-          Repo.insert_all(
-            Tenant,
-            [
-              %{
-                name: name || "Platform operator",
-                status: "active",
-                is_platform_operator: true,
-                created_at: now,
-                updated_at: now
-              }
-            ],
-            on_conflict: :nothing
-          )
+          WriteCapture.without_capture(fn ->
+            Repo.insert_all(
+              Tenant,
+              [
+                %{
+                  name: name || "Platform operator",
+                  status: "active",
+                  is_platform_operator: true,
+                  created_at: now,
+                  updated_at: now
+                }
+              ],
+              on_conflict: :nothing
+            )
+          end)
 
         tenant = require_platform_operator!()
         tenant = if count == 0, do: maybe_update_operator(tenant, name), else: tenant
