@@ -419,21 +419,19 @@ defmodule BilimbiWeb.UserShowTest do
     refute has_element?(view, "#app-content", "Unaffiliated")
 
     # The notice stands for a viewer too: it explains the account, not the
-    # reader's permission, and it promises no restore the product lacks.
+    # reader's permission, it states archiving as final, and it says only what
+    # the page blocks.
     assert has_element?(
              view,
              "#user-archived-company[role='alert']",
-             "Ada Archived's company is archived, so this account is read-only"
+             "Ada Archived's company is archived, and archiving is final, so this account is read-only"
            )
 
     assert has_element?(view, "#user-archived-company", "nobody can sign in as or impersonate")
 
-    assert has_element?(
-             view,
-             "#user-archived-company",
-             "has no way to restore an archived company"
-           )
-
+    assert has_element?(view, "#user-archived-company", "employee links can't be changed")
+    refute has_element?(view, "#user-archived-company", "employee records")
+    refute has_element?(view, "#user-archived-company", "yet")
     refute has_element?(view, "#user-archived-company", "Restore")
     refute has_element?(view, "#user-password-card")
   end
@@ -469,7 +467,7 @@ defmodule BilimbiWeb.UserShowTest do
     assert has_element?(
              view,
              "#user-archived-company[role='alert']",
-             "Ada Archived's company is archived, so this account is read-only"
+             "Ada Archived's company is archived, and archiving is final, so this account is read-only"
            )
 
     # The facts read as text: no in-place editors, no company trigger, no

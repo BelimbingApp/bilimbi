@@ -34,10 +34,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   nobody can sign in as or impersonate the account for the same reason. So
   the page offers no editor, picker, password form, employee action, delete
   or Impersonate for it, and one warning under the header says why. No
-  declared Company API returns an archived company's name, and Bilimbi has
-  no way to restore one (Belimbing's retire is a soft delete with no
-  restore), so the notice names neither the company nor a step the product
-  cannot offer. Hiding the controls is presentation: every write handler
+  declared Company API returns an archived company's name, archiving is
+  final (no restore, and no moving an account to another company), and the
+  account's email stays unique platform-wide, so a replacement account
+  cannot reuse it; the notice therefore names neither the company nor a
+  next step, and states the finality as a rule. Hiding the controls is presentation: every write handler
   still asks Authz and then Core Company, so a forged or stale commit is
   refused on the fact or through the error flash.
 
@@ -1284,8 +1285,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
         <%!-- The one place the page says why it is read-only, before the
              reader reaches a fact. It names the condition and what it
-             prevents; it does not promise a restore the product cannot
-             offer. --%>
+             prevents, and states that archiving is final. --%>
         <.alert :if={@company_archived?} id="user-archived-company" kind={:warning}>
           {archived_account_notice(@user)}
         </.alert>
@@ -2422,16 +2422,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   defp archived_account_message,
     do: "This user's company is archived, so the account can't be changed."
 
-  # What the warning under the header says: the condition, what it prevents
-  # on this page and beyond it, and that the product cannot lift it. No
-  # declared Company API names an archived company, and no Bilimbi screen
-  # restores one, so the notice neither names it nor sends the reader to a
-  # step that does not exist.
+  # What the warning under the header says: the condition, that it is final,
+  # and what it prevents on this page and beyond it. No declared Company API
+  # names an archived company, archiving is never undone, and the account's
+  # email stays taken platform-wide, so the notice neither names the company
+  # nor offers a next step.
   defp archived_account_notice(user) do
-    "#{user.name}'s company is archived, so this account is read-only: its details, " <>
-      "roles, permissions, password and employee records can't be changed, and nobody " <>
-      "can sign in as or impersonate this user. Bilimbi has no way to restore an " <>
-      "archived company yet, so nothing here can make the account editable again."
+    "#{user.name}'s company is archived, and archiving is final, so this account is " <>
+      "read-only: its details, roles, permissions, password and employee links can't " <>
+      "be changed, and nobody can sign in as or impersonate this user."
   end
 
   # The select offers no choosable blank; a blank that still arrives is refused

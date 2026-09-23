@@ -132,9 +132,10 @@ select, role or capability picker, password form, employee action, delete
 zone or Impersonate is offered, because every write on the account resolves
 its company and an archived one is refused, and the host cannot open a
 session for it. One `<.alert kind={:warning}>` under the header says so and
-says what it prevents; it names neither the company (no declared Company
-API returns an archived company) nor a restore step (Bilimbi has none; the
-company's own page is unreachable once archived). Hiding the controls is
+says what it prevents; archiving is final, so it states that as a rule and
+names neither the company (no declared Company API returns an archived
+company) nor a next step (there is no restore or move, and `users.email` is
+unique platform-wide, so a replacement account cannot reuse the email). Hiding the controls is
 presentation: each write handler asks Authz and then Core Company again, so
 a forged or stale commit is still refused on its fact or through the error
 flash. `clear_user_company/5` remains in the API with no surface offering

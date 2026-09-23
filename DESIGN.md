@@ -308,7 +308,8 @@ page:
   record no write can reach: a user whose company is archived shows every
   fact as text, offers no picker, password form, employee action or delete,
   and says why once, in a `<.alert kind={:warning}>` under the header that
-  names what is prevented and does not promise a step the product lacks. The
+  names what is prevented, states that archiving is final, and offers no
+  step the product lacks. The
   write handlers keep refusing, so a forged commit is still met on its fact.
 - **Record history** is a demoted labelled action in the header: the
   registry's `history` glyph (Belimbing's clock) beside the word "History",
