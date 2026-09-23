@@ -1665,18 +1665,24 @@ defmodule Bilimbi.Base.UI.Components do
   @doc """
   Renders a card container with a subtle border (Belimbing's `x-ui.card` counterpart).
 
-  `inner_class` carrying `p-0` is the flat-corner signal and nothing more.
-  It is what every list-page card already passes — a card framing a table
-  and its pager — so the card reads it to drop the radius: a table must not
-  pick up a corner from the frame around it. This is the only place that
-  decision is made, which is why no list screen passes a corner class of its
-  own. Any other card keeps its radius.
+  The body pads itself with `p-2` unless `inner_class` sets a padding of its
+  own. A padding shorthand the caller passes (`p-0`, `p-3`, `p-5 sm:p-6`)
+  replaces the default outright, resolved here before the classes reach the
+  markup: two utilities of equal specificity are decided by their order in
+  the generated stylesheet, where `.p-0` is emitted before `.p-2`, so a
+  caller that merely appended `p-0` would still render 8px. An axis-only
+  class (`px-4`, `px-3 py-2`) keeps the default on the axis it leaves alone,
+  exactly as the cascade already renders it. The same convention as
+  `field_class/4`: what the caller states replaces what the component would
+  have assumed.
 
-  The signal does not change padding. The card emits `p-2` either way, so a
-  card passing `p-0` renders `class="p-2 p-0"` and still shows 8px, because
-  the generated `.p-2` follows `.p-0` in the stylesheet. That cascade is
-  tracked as its own defect: do not resolve it by dropping the `p-2` here,
-  which would reflow every list screen at once.
+  `inner_class` carrying `p-0` is also the flat-corner signal. It is what
+  every list-page card passes — a card framing a table and its pager, the
+  full-bleed case where the card edge is the table's frame — so the card
+  reads it to drop the radius: a table must not pick up a corner from the
+  frame around it. This is the only place that decision is made, which is
+  why no list screen passes a corner class of its own. Any other card keeps
+  its radius.
   """
   attr(:id, :string, default: nil)
   attr(:title, :string, default: nil)
@@ -1686,7 +1692,12 @@ defmodule Bilimbi.Base.UI.Components do
   slot(:inner_block, required: true)
 
   def card(assigns) do
-    assigns = assign(assigns, :flat, flat_corner_signal?(assigns.inner_class))
+    tokens = class_tokens(assigns.inner_class)
+
+    assigns =
+      assigns
+      |> assign(:flat, "p-0" in tokens)
+      |> assign(:inner_padding, inner_padding(tokens))
 
     ~H"""
     <div
@@ -1697,18 +1708,25 @@ defmodule Bilimbi.Base.UI.Components do
       <div :if={@title} class="border-b border-line px-4 py-3">
         <h3 class="text-base font-semibold text-ink">{@title}</h3>
       </div>
-      <div class={["p-2", @inner_class]}>
+      <div class={[@inner_padding, @inner_class]}>
         {render_slot(@inner_block)}
       </div>
     </div>
     """
   end
 
-  defp flat_corner_signal?(inner_class) do
-    inner_class
+  defp class_tokens(class) do
+    class
     |> List.wrap()
+    |> Enum.reject(&(&1 in [nil, false]))
     |> Enum.flat_map(&String.split(to_string(&1)))
-    |> Enum.member?("p-0")
+  end
+
+  # The default gives way only to a base-variant padding shorthand. A
+  # responsive one (`sm:p-6`) sets nothing below its breakpoint, and an
+  # axis-only one (`px-4`) sets nothing on the other axis, so both keep it.
+  defp inner_padding(tokens) do
+    if Enum.any?(tokens, &match?("p-" <> _, &1)), do: nil, else: "p-2"
   end
 
   @doc """
