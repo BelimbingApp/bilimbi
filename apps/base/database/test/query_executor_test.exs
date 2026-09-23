@@ -2,8 +2,12 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
   use Bilimbi.Base.Database.DataCase, async: false
 
   alias Bilimbi.Base.Database
+  alias Bilimbi.Base.Database.ConsoleAccess
+  alias Bilimbi.Base.Database.ConsoleRepo
   alias Bilimbi.Base.Database.QueryExecutor
+  alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.Repo
+  alias Ecto.Adapters.SQL
 
   describe "extract_named_parameters/1" do
     test "extracts named parameters" do
@@ -38,6 +42,8 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
   defp as_operator(sql, params \\ %{}, opts \\ []) do
     Database.execute_readonly(sql, params, Keyword.put(opts, :operator, true))
   end
+
+  defp committed!(fun), do: Ecto.Adapters.SQL.Sandbox.unboxed_run(Repo, fun)
 
   describe "execute_readonly/3" do
     test "executes simple select query" do
@@ -138,10 +144,45 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
 
   # The string guards (SELECT/WITH first word, forbidden keywords) are text
   # checks over user-authored SQL and are not the boundary. The boundary is
-  # PostgreSQL's own read-only transaction mode, so these tests prove it by
-  # observing the database: a write that both text guards let through must be
-  # refused by PostgreSQL, and must leave no data behind.
-  describe "read-only transaction boundary" do
+  # the console connection's PostgreSQL role, which holds SELECT and nothing
+  # else, so these tests prove it by observing the database, never a setting.
+  #
+  # The console sees only committed state, so every probe object is created
+  # outside the sandbox transaction and dropped afterwards.
+  describe "database-enforced boundary" do
+    setup do
+      suffix = System.unique_integer([:positive])
+      role = SchemaVerifier.quote_identifier!(ConsoleAccess.role_name())
+      sequence = "__blb_console_probe_seq_#{suffix}"
+      writable = "__blb_console_writable_#{suffix}"
+      partial = "__blb_console_partial_#{suffix}"
+      hidden = "__blb_console_hidden_#{suffix}"
+
+      committed!(fn ->
+        Repo.query!("CREATE SEQUENCE #{sequence} START 1")
+        Repo.query!("CREATE TABLE #{writable} (id integer)")
+        Repo.query!("CREATE TABLE #{partial} (id integer, secret text)")
+        Repo.query!("INSERT INTO #{partial} VALUES (1, 'hidden')")
+        Repo.query!("GRANT SELECT (id) ON #{partial} TO #{role}")
+        Repo.query!("CREATE TABLE #{hidden} (id integer)")
+      end)
+
+      on_exit(fn ->
+        committed!(fn ->
+          Repo.query!("DROP SEQUENCE IF EXISTS #{sequence}")
+          Repo.query!("DROP TABLE IF EXISTS #{writable}, #{partial}, #{hidden}")
+        end)
+      end)
+
+      %{role: role, sequence: sequence, writable: writable, partial: partial, hidden: hidden}
+    end
+
+    test "runs as the console's own role, not the application's login" do
+      assert {:ok, result} = as_operator("SELECT current_user::text AS role")
+      assert result.rows == [%{"role" => ConsoleAccess.role_name()}]
+      refute ConsoleAccess.role_name() == Repo.config()[:username]
+    end
+
     test "the executor's transaction is read-only as PostgreSQL sees it" do
       assert {:ok, result} =
                as_operator("SELECT current_setting('transaction_read_only') AS mode")
@@ -149,29 +190,69 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
       assert result.rows == [%{"mode" => "on"}]
     end
 
-    test "PostgreSQL refuses a write that passes both text guards" do
+    test "PostgreSQL refuses, on privileges, a write that passes both text guards", %{
+      sequence: sequence
+    } do
       # `SELECT setval(...)` starts with SELECT and contains no forbidden
-      # keyword, so it reaches PostgreSQL. setval/2 is also non-transactional:
-      # had it run, the new value would survive the rollback, so an unchanged
-      # sequence afterwards proves the write never executed rather than being
-      # undone.
-      Repo.query!("CREATE SEQUENCE __blb_readonly_probe START 1")
-
-      assert {:error, msg} = as_operator("SELECT setval('__blb_readonly_probe', 42)")
-      assert msg =~ "read-only transaction"
+      # keyword, so it reaches PostgreSQL, which checks the role's UPDATE
+      # privilege on the sequence before it checks the transaction mode. The
+      # refusal names the privilege, not the read-only transaction. setval/2 is
+      # also non-transactional: had it run, the new value would survive, so an
+      # unchanged sequence proves the write never executed.
+      assert {:error, msg} = as_operator("SELECT setval('#{sequence}', 42)")
+      assert msg =~ "permission denied for sequence #{sequence}"
+      refute msg =~ "read-only transaction"
 
       assert %{rows: [[1, false]]} =
-               Repo.query!("SELECT last_value, is_called FROM __blb_readonly_probe")
+               committed!(fn -> Repo.query!("SELECT last_value, is_called FROM #{sequence}") end)
     end
 
-    test "the read-only mode does not outlive the executor's transaction" do
-      # In production the mode ends with the transaction's COMMIT/ROLLBACK; in
-      # the SQL sandbox the executor runs inside a savepoint, and the caller's
-      # enclosing transaction must be able to write again afterwards.
-      assert {:ok, _} = as_operator("SELECT 1")
+    test "the console connection cannot write even outside the executor", %{
+      writable: table
+    } do
+      # No executor, no text guards, and a read-write transaction opened on
+      # purpose: only the role's privileges stand, and they are enough.
+      assert {:error, %Postgrex.Error{postgres: %{code: :insufficient_privilege}}} =
+               ConsoleRepo.transaction(fn ->
+                 SQL.query!(ConsoleRepo, "SET TRANSACTION READ WRITE", [])
 
-      assert %{rows: [["off"]]} =
-               Repo.query!("SELECT current_setting('transaction_read_only')")
+                 case SQL.query(ConsoleRepo, "INSERT INTO #{table} VALUES (1)", []) do
+                   {:error, error} -> ConsoleRepo.rollback(error)
+                   {:ok, result} -> result
+                 end
+               end)
+
+      assert %{rows: [[0]]} = committed!(fn -> Repo.query!("SELECT count(*) FROM #{table}") end)
+    end
+
+    test "refuses to run at all while its connection could write", %{
+      role: role,
+      writable: table
+    } do
+      committed!(fn -> Repo.query!("GRANT INSERT ON #{table} TO #{role}") end)
+
+      assert {:error, msg} = as_operator("SELECT 1")
+      assert msg =~ "cannot run because its connection can write"
+      assert msg =~ "may write public.#{table}"
+
+      committed!(fn -> Repo.query!("REVOKE INSERT ON #{table} FROM #{role}") end)
+
+      assert {:ok, %{rows: [%{"?column?" => 1}]}} = as_operator("SELECT 1")
+    end
+
+    test "names the readable columns when SELECT * hits a column-restricted table", %{
+      partial: partial,
+      hidden: hidden
+    } do
+      assert {:error, msg} = as_operator("SELECT * FROM #{partial}")
+      assert msg =~ "permission denied for table #{partial}"
+      assert msg =~ ~s(can read only these columns of "#{partial}": id. Name them instead of *.)
+
+      assert {:ok, result} = as_operator("SELECT id FROM #{partial}")
+      assert result.rows == [%{"id" => 1}]
+
+      assert {:error, msg} = as_operator("SELECT id FROM #{hidden}")
+      assert msg =~ ~s(has no read access to "#{hidden}")
     end
   end
 

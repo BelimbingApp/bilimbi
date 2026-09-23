@@ -6,6 +6,7 @@ defmodule Bilimbi.Base.Database do
   on the Base composition application, keeping the dependency graph acyclic.
   """
 
+  alias Bilimbi.Base.Database.ConsoleAccess
   alias Bilimbi.Base.Database.ProductionSeed
   alias Bilimbi.Base.Database.ProductionSeeds
   alias Bilimbi.Base.Database.QueryExecutor
@@ -37,6 +38,20 @@ defmodule Bilimbi.Base.Database do
   def list_production_seed_runs(opts \\ []) do
     {repo, opts} = Keyword.pop(opts, :repo, Repo)
     ProductionSeeds.list_runs(repo, opts)
+  end
+
+  @doc """
+  Grants the operator SQL console's role exactly its reads.
+
+  The role reads every table in the prefix, minus the columns installed schema
+  contracts mark in `secret_columns/0`; every other privilege is revoked.
+  `mix bilimbi.migrate` runs this after every migration. A failure explains
+  what the operator must do through `ConsoleAccess.explain/1`.
+  """
+  @spec reconcile_console_access(Ecto.Repo.t(), keyword()) ::
+          {:ok, ConsoleAccess.summary()} | {:error, ConsoleAccess.failure()}
+  def reconcile_console_access(repo \\ Repo, opts \\ []) do
+    ConsoleAccess.reconcile(repo, opts)
   end
 
   @doc """

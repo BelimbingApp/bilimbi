@@ -3,6 +3,8 @@ defmodule Mix.Tasks.Bilimbi.MigrateTest do
 
   @package_root Path.expand("..", __DIR__)
 
+  alias Bilimbi.Base.Database.ConsoleAccess
+  alias Bilimbi.Base.Database.ConsoleRepo
   alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.Repo
   alias Bilimbi.Core.Compatibility
@@ -70,6 +72,52 @@ defmodule Mix.Tasks.Bilimbi.MigrateTest do
 
     assert relation(MigrationTestRepo, schema, "bilimbi_only_task_probe") != nil
     assert synthetic_version in recorded_versions(MigrationTestRepo, schema)
+  end
+
+  test "operational task grants the SQL console role its reads from the installed contracts", %{
+    schema: schema
+  } do
+    Mix.Tasks.Bilimbi.Migrate.run(["--prefix", schema, "--quiet"], MigrationTestRepo)
+
+    role = ConsoleAccess.role_name()
+    users = qualified(schema, "users")
+    sessions = qualified(schema, "sessions")
+    companies = qualified(schema, "companies")
+
+    assert column_privilege?(role, users, "email")
+    refute column_privilege?(role, users, "password")
+    refute column_privilege?(role, users, "remember_token")
+    refute column_privilege?(role, sessions, "payload")
+    assert column_privilege?(role, sessions, "user_agent")
+    assert table_privilege?(role, companies, "SELECT")
+    assert table_privilege?(role, qualified(schema, "bilimbi_schema_migrations"), "SELECT")
+    # A Bilimbi-only table no compatibility contract pins is readable too.
+    assert table_privilege?(role, qualified(schema, "base_schedule_occurrences"), "SELECT")
+
+    for table <- [users, sessions, companies], privilege <- ~w(INSERT UPDATE DELETE TRUNCATE) do
+      refute table_privilege?(role, table, privilege), "#{table} #{privilege}"
+    end
+  end
+
+  test "operational task stops with instructions when the console role does not exist", %{
+    schema: schema
+  } do
+    config = Application.fetch_env!(:bilimbi_base_database, ConsoleRepo)
+
+    Application.put_env(
+      :bilimbi_base_database,
+      ConsoleRepo,
+      Keyword.put(config, :username, "blb_absent_console_role")
+    )
+
+    on_exit(fn -> Application.put_env(:bilimbi_base_database, ConsoleRepo, config) end)
+
+    assert_raise Mix.Error, ~r/CREATE ROLE "blb_absent_console_role" LOGIN/, fn ->
+      Mix.Tasks.Bilimbi.Migrate.run(["--prefix", schema, "--quiet"], MigrationTestRepo)
+    end
+
+    # The migrations themselves had already run; only the grants are missing.
+    assert relation(MigrationTestRepo, schema, "users") != nil
   end
 
   test "operational task rejects unsupported and positional arguments" do
@@ -154,6 +202,28 @@ defmodule Mix.Tasks.Bilimbi.MigrateTest do
       []
     ).rows
     |> Enum.map(fn [version] -> version end)
+  end
+
+  defp column_privilege?(role, table, column) do
+    [[held?]] =
+      SQL.query!(
+        MigrationTestRepo,
+        "SELECT has_column_privilege($1::text::name, $2::text::regclass, $3::text, 'SELECT')",
+        [role, table, column]
+      ).rows
+
+    held?
+  end
+
+  defp table_privilege?(role, table, privilege) do
+    [[held?]] =
+      SQL.query!(
+        MigrationTestRepo,
+        "SELECT has_table_privilege($1::text::name, $2::text::regclass, $3::text)",
+        [role, table, privilege]
+      ).rows
+
+    held?
   end
 
   defp qualified(schema, table) do

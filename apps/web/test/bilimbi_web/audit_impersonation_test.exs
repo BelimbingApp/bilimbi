@@ -107,11 +107,14 @@ defmodule BilimbiWeb.AuditImpersonationTest do
   } do
     grant_capabilities!(["admin.system.database-table.list"], user_id: @target_id)
 
+    # The console runs through its own select-only connection and sees only
+    # committed state, never this sandbox's temporary tables, so the query
+    # carries its own row.
     {:ok, query} =
       User.create_database_query(scope, @target_id, %{
         name: "Count users",
         description: "Borrowed session query",
-        sql_query: "SELECT count(*) FROM users;"
+        sql_query: "SELECT 1 AS n;"
       })
 
     impersonating =

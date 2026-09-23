@@ -12,5 +12,18 @@ defmodule Bilimbi.Base.Database.SchemaContract do
   @callback contributions() :: [SchemaVerifier.table_contribution_spec()]
   @callback verify_invariants(Ecto.Repo.t(), keyword()) :: :ok | {:error, [String.t()]}
 
-  @optional_callbacks contributions: 0, verify_invariants: 2
+  @doc """
+  Columns holding credentials, tokens, or opaque session state that no read
+  surface may expose, keyed by the owned table's name.
+
+  The operator SQL console's role is granted every other column of such a
+  table and never these, so `SELECT *` on it is refused and the console names
+  the columns it may read. A table absent here is readable in full. Keys are
+  tables the module owns in the database, whether or not `tables/0` pins them
+  as compatible baseline; a named column the table does not have fails
+  reconciliation.
+  """
+  @callback secret_columns() :: %{String.t() => [String.t(), ...]}
+
+  @optional_callbacks contributions: 0, verify_invariants: 2, secret_columns: 0
 end

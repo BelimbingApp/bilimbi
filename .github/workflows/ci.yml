@@ -182,6 +182,13 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
+      # The SQL console connects through its own select-only role, provisioned
+      # outside the application like the login above (docs/architecture/database.md).
+      - name: Create the SQL console database role
+        run: |
+          psql -h localhost -U bilimbi -d postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE bilimbi_console LOGIN PASSWORD 'bilimbi_console_dev_7c41e9f0b2a6'"
+
       - name: Run the project precommit suite
         id: precommit
         env:

@@ -9,6 +9,17 @@ config :bilimbi_base_database, Bilimbi.Base.Repo,
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: System.schedulers_online() * 2
 
+# The SQL console's own login. It is deliberately not sandboxed: the console
+# sees only committed state, so a test that needs it to read something
+# creates that outside the sandbox and drops it afterwards.
+config :bilimbi_base_database, Bilimbi.Base.Database.ConsoleRepo,
+  username: System.get_env("CONSOLE_PGUSER", "bilimbi_console"),
+  password: System.get_env("CONSOLE_PGPASSWORD", "bilimbi_console_dev_7c41e9f0b2a6"),
+  hostname: System.get_env("PGHOST", "localhost"),
+  port: String.to_integer(System.get_env("PGPORT", "5433")),
+  database: "bilimbi_test#{System.get_env("MIX_TEST_PARTITION")}",
+  pool_size: 2
+
 config :web, BilimbiWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "MRty3402yaFk5Y1BBT0o3cqcXutsDD8jd0H3eALvFlKUJsWJjN609o5+P3RE94JQ",

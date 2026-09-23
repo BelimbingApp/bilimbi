@@ -5,7 +5,7 @@ defmodule Bilimbi.Base.Database.Application do
 
   @impl true
   def start(_type, _args) do
-    Supervisor.start_link([Bilimbi.Base.Repo],
+    Supervisor.start_link([Bilimbi.Base.Repo, Bilimbi.Base.Database.ConsoleRepo],
       strategy: :one_for_one,
       name: Bilimbi.Base.Database.Supervisor
     )

@@ -46,6 +46,23 @@ if config_env() == :prod do
     pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
     socket_options: maybe_ipv6
 
+  # The operator SQL console connects through its own select-only role so the
+  # database, not the application, refuses writes. Boot refuses without it
+  # rather than letting the console fall back to the read-write login.
+  console_database_url =
+    System.get_env("CONSOLE_DATABASE_URL") ||
+      raise """
+      environment variable CONSOLE_DATABASE_URL is missing.
+      The SQL console connects through its own select-only PostgreSQL role.
+      For example: ecto://bilimbi_console:PASS@HOST/DATABASE
+      See docs/architecture/database.md, "Operator SQL console".
+      """
+
+  config :bilimbi_base_database, Bilimbi.Base.Database.ConsoleRepo,
+    url: console_database_url,
+    pool_size: String.to_integer(System.get_env("CONSOLE_POOL_SIZE") || "2"),
+    socket_options: maybe_ipv6
+
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
       raise """

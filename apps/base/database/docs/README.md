@@ -19,6 +19,37 @@ The module owns no business tables or migrations. Higher modules ship their
 own migrations and the platform executes all installed migration paths through
 `Bilimbi.Base.Repo` and the shared `bilimbi_schema_migrations` ledger.
 
+## Operator SQL console
+
+`Bilimbi.Base.Database.QueryExecutor` runs the operator SQL console's SQL
+through `Bilimbi.Base.Database.ConsoleRepo`, this module's second Ecto Repo,
+which connects as a PostgreSQL role holding `SELECT` and nothing else. The
+platform rules, the role's provisioning, what it may read, and how a
+misconfigured console fails are in the architecture document's "Operator SQL
+console" section; this section covers the implementation.
+
+- `ConsoleRepo` is configured per environment beside `Bilimbi.Base.Repo`
+  (`config/dev.exs`, `config/test.exs`, `CONSOLE_DATABASE_URL` in
+  `config/runtime.exs`). It is `read_only: true` and is never in
+  `ecto_repos`: it owns no storage and runs no migrations.
+- `ConsoleAccess.reconcile/2` grants the role `SELECT` on every table in the
+  prefix minus the installed contracts' `secret_columns/0` and revokes every
+  other privilege it holds there, inside one transaction through the
+  application's Repo. `mix bilimbi.migrate` calls it
+  through `Bilimbi.Base.Database.reconcile_console_access/2`; a failure is
+  turned into operator instructions by `ConsoleAccess.explain/1`.
+- A schema contract declares the columns the console must never read in the
+  optional `secret_columns/0` callback of
+  `Bilimbi.Base.Database.SchemaContract`, keyed by owned table name.
+- `ConsoleAccess.held_write_privileges/1` is the executor's per-run proof:
+  it asks PostgreSQL, as the connected role, for every way the connection
+  could write, and the executor refuses to run while the list is not empty.
+- The console sees only committed state. Its test connection is not
+  sandboxed, so a test that needs the console to read something creates it
+  with `Ecto.Adapters.SQL.Sandbox.unboxed_run/2` and drops it afterwards;
+  `test/console_access_test.exs` and `test/query_executor_test.exs` show
+  the shape.
+
 ## Production seeds
 
 Production reference data runs separately from structural migrations through

@@ -43,6 +43,37 @@ config :bilimbi_base_database,
            pool_size: 10
          ]
 
+# The operator SQL console connects through its own select-only PostgreSQL
+# role, never through the application's login. Create the role once per
+# cluster as a superuser (docs/architecture/database.md, "Operator SQL
+# console"):
+#
+#     CREATE ROLE bilimbi_console LOGIN PASSWORD 'bilimbi_console_dev_7c41e9f0b2a6';
+console_options =
+  case {System.get_env("DATABASE_URL"), System.get_env("CONSOLE_DATABASE_URL")} do
+    {nil, nil} ->
+      [
+        username: System.get_env("CONSOLE_PGUSER", "bilimbi_console"),
+        password: System.get_env("CONSOLE_PGPASSWORD", "bilimbi_console_dev_7c41e9f0b2a6"),
+        hostname: System.get_env("PGHOST", "localhost"),
+        port: String.to_integer(System.get_env("PGPORT", "5433")),
+        database: System.get_env("PGDATABASE", "bilimbi_dev")
+      ]
+
+    {_database_url, nil} ->
+      raise """
+      DATABASE_URL is set, so CONSOLE_DATABASE_URL must name the SQL console's
+      own select-only login for the same database.
+      """
+
+    {_database_url, console_url} ->
+      [url: console_url]
+  end
+
+config :bilimbi_base_database,
+       Bilimbi.Base.Database.ConsoleRepo,
+       console_options ++ [show_sensitive_data_on_connection_error: true, pool_size: 2]
+
 config :web, BilimbiWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PORT", "4000"))],
   check_origin: false,

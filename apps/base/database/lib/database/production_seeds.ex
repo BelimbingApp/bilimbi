@@ -8,6 +8,10 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
 
   @table "bilimbi_production_seeds"
   @interrupted_error "Seed execution was interrupted before completion and will be retried."
+  @doc false
+  @spec table() :: String.t()
+  def table, do: @table
+
   @status_constraint_definition "CHECK (status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying, 'skipped'::character varying]::text[]))"
 
   @spec run(Ecto.Repo.t(), [ProductionSeed.t()], keyword()) ::

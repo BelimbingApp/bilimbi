@@ -7,7 +7,7 @@
 **Purpose:** Define Bilimbi's database ownership, dependency, migration,
 compatibility, verification, adoption, and seeding rules.
 
-**Last Updated:** 2026-08-24
+**Last Updated:** 2026-09-23
 
 ## Purpose and authority
 
@@ -184,7 +184,7 @@ The normal operational commands are:
 
 | Command | Purpose |
 | --- | --- |
-| `mix bilimbi.migrate` | Run every pending installed migration through the shared Repo after disposition and ledger validation. |
+| `mix bilimbi.migrate` | Run every pending installed migration through the shared Repo after disposition and ledger validation, then grant the SQL console role its reads. |
 | `mix bilimbi.migrations` | Display installed Bilimbi migration status. |
 | `mix bilimbi.rollback` | Roll back installed migrations using all discovered migration paths and the shared ledger. |
 | `mix bilimbi.schema.verify` | Read-only verification of owned structure, contributions, and live-data invariants. |
@@ -274,6 +274,78 @@ Development, demonstration, and test fixtures are not production seeds. Test
 DDL and fixtures remain defined once by their owning module; cross-module
 tests use public APIs or declared test support from dependencies.
 
+## Operator SQL console
+
+The operator SQL console (`Bilimbi.Base.Database.execute_readonly/3`, the
+`/admin/system/database-queries` pages) is the one product surface that runs
+caller-authored SQL. It does not run through `Bilimbi.Base.Repo`. It runs
+through `Bilimbi.Base.Database.ConsoleRepo`, a second connection whose
+PostgreSQL role holds `SELECT` and nothing else, so a write is refused by the
+database on privileges whatever the query says and whatever the application
+checks. The executor's `SELECT`/`WITH` and forbidden-keyword text checks give
+early, readable refusals; they are not the boundary. Its `READ ONLY`
+transaction backs the role up for what privileges do not cover, such as
+temporary objects. ADR 0016 records the decision.
+
+**Where the role lives.** A PostgreSQL role is cluster state, not database
+state, and needs a credential, so it is provisioned outside the application
+the same way the application's own login is: by whoever operates the
+cluster, once, as a superuser. Migrations, seeds, and the running application
+never create it.
+
+```sql
+CREATE ROLE bilimbi_console LOGIN PASSWORD '<password>';
+```
+
+Development and CI use the name and password in `config/dev.exs`; production
+names the role's own connection string in `CONSOLE_DATABASE_URL`, and boot
+refuses without it rather than letting the console reach the read-write
+login. The role name is whatever that connection uses.
+
+**What it reads.** `mix bilimbi.migrate` ends by granting the role exactly
+its reads in the migrated prefix, through the application's own Repo, which
+owns the tables:
+
+- `SELECT` on every table and view in the prefix. Schema contracts pin only
+  the compatible baseline, and the tables Bilimbi has added since (schedule
+  occurrences, postcode overrides, perf samples, Oban) are the ones an
+  operator most needs to inspect, so readability is not limited to declared
+  tables. In an adopted database this includes Laravel's inert framework
+  tables;
+- minus the columns a schema contract names in `secret_columns/0`:
+  credentials, tokens, and opaque session state that no read surface may
+  expose. Such a table is granted column by column, so `SELECT *` on it is
+  refused and the console names the columns that may be read instead. Core
+  User hides `users.password`, `users.remember_token`, and
+  `password_reset_tokens.token`; Base Session hides `sessions.payload`;
+- nothing else: no sequence privilege, no `CREATE`, and any other privilege
+  the role holds in the prefix is revoked. Reconciliation is idempotent;
+  re-run `mix bilimbi.migrate` after creating the role late or after a hand
+  grant.
+
+A contract that names a column its table does not have fails reconciliation
+before any grant changes; a secret declared on a table the prefix does not
+hold is reported, not refused, because a contract may know a table the
+database has not migrated yet.
+
+**How a misconfigured console fails.** Before every run the executor asks
+PostgreSQL, as the connected role, whether the connection could write
+anything: superuser, role- or database-creation flags, `CREATE` on the
+database or a schema, or any write privilege on any relation. While the
+answer is not empty the console refuses to run and says why. A console
+connected as the application's login therefore fails visibly and never
+falls back to the read-write connection. The same holds for the grant step:
+a missing role, or a console configured with the application's own login,
+stops `mix bilimbi.migrate` with the instructions above after the migrations
+have run.
+
+**Upgrading an existing deployment.** Create the role, set
+`CONSOLE_DATABASE_URL`, and run `mix bilimbi.migrate`. Until the role exists
+the migrate task stops with instructions; until the connection string is set
+production does not boot; until the grants are applied the console reports
+"permission denied" on every table. None of these is silent. In an adopted
+Belimbing database the grant step must run as the role that owns the tables.
+
 ## Change checklist
 
 When adding or changing persistent behavior:
@@ -284,7 +356,8 @@ When adding or changing persistent behavior:
 4. place migrations, schema changes, tests, and contracts with the owner;
 5. use a globally unique migration version and exact disposition;
 6. update both sides of a cross-module contribution atomically;
-7. update the schema contract and live-data invariants;
+7. update the schema contract, its live-data invariants, and its
+   `secret_columns/0` when a new column holds a credential or token;
 8. verify fresh migration and, when relevant, existing-schema adoption;
 9. run `mix bilimbi.migrations`, focused tests, formatting, and the required
    repository checks; and

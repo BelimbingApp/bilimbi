@@ -387,6 +387,16 @@ shared Repo even though its physical owner and primary package namespace are
 Base Database. Do not generalize this documented Ecto convention into
 permission for other modules to escape their declared namespaces.
 
+The operator SQL console is the one exception to that single connection: it
+runs through `Bilimbi.Base.Database.ConsoleRepo` as a PostgreSQL role holding
+`SELECT` and nothing else, provisioned outside the application like the
+login itself, and refuses to run while PostgreSQL says its connection could
+write. `mix bilimbi.migrate` grants that role the tables installed schema
+contracts declare minus their `secret_columns/0`. Never route the console
+through `Bilimbi.Base.Repo`, and declare a new credential or token column in
+its owner's `secret_columns/0`; the rules are in
+`docs/architecture/database.md`, "Operator SQL console".
+
 The Base and Core composition applications contain no `lib/`, `priv/`, or
 `test/` directory. Do not place schemas, services, application callbacks,
 mailers, namespace marker modules, migrations, seeds, runtime resources,

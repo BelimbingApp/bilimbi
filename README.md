@@ -53,7 +53,15 @@ raise an issue in Belimbing so that both projects benefit from our discovery.
 ## Development setup
 
 The repository pins the local Erlang and Elixir toolchain in `.mise.toml`.
-Install those versions with mise, then run:
+Install those versions with mise. The operator SQL console connects through
+its own select-only PostgreSQL role, so create that role once per cluster as
+a superuser (the name and password `config/dev.exs` expects):
+
+```sql
+CREATE ROLE bilimbi_console LOGIN PASSWORD 'bilimbi_console_dev_7c41e9f0b2a6';
+```
+
+Then run:
 
 ```bash
 mix setup
@@ -63,7 +71,7 @@ mix bilimbi.server
 Open [http://localhost:4000](http://localhost:4000).
 
 `mix setup` creates the database, runs the Base and Core compatibility
-migrations, and builds the web assets. The baseline creates no tenant or
+migrations, grants the console role its reads, and builds the web assets. The baseline creates no tenant or
 company rows; platform-operator and primary-company provisioning are explicit
 setup steps and numeric IDs carry no runtime meaning.
 

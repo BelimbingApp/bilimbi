@@ -18,6 +18,17 @@ defmodule Bilimbi.Core.User.SchemaContract do
     [users(), password_reset_tokens(), user_pins(), user_database_queries(), notifications()]
   end
 
+  # Credentials never leave this module (`Summary`), and the operator SQL
+  # console reads through a role that is granted every other column of these
+  # tables and never these.
+  @impl true
+  def secret_columns do
+    %{
+      "users" => ["password", "remember_token"],
+      "password_reset_tokens" => ["token"]
+    }
+  end
+
   defp users do
     %{
       name: "users",

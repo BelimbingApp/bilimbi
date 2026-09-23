@@ -3,6 +3,9 @@ defmodule Mix.Tasks.Bilimbi.Migrate do
 
   use Mix.Task
 
+  alias Bilimbi.Base.Database
+  alias Bilimbi.Base.Database.ConsoleAccess
+
   @shortdoc "Runs installed Bilimbi module migrations"
   @requirements ["app.config"]
 
@@ -29,7 +32,23 @@ defmodule Mix.Tasks.Bilimbi.Migrate do
         if parsed[:quiet], do: Keyword.put(opts, :log, false), else: opts
       end)
 
-    Bilimbi.Core.Compatibility.migrate(repo, opts)
+    versions = Bilimbi.Core.Compatibility.migrate(repo, opts)
+    reconcile_console_access!(repo, Keyword.take(opts, [:prefix]), parsed[:quiet])
+    versions
+  end
+
+  # The SQL console role's read grants are privileges on the tables the
+  # migrations just created or changed, so they are reconciled on the one
+  # path every deployment already runs after a schema change. A missing role
+  # stops the task here, after the migrations, with instructions.
+  defp reconcile_console_access!(repo, opts, quiet) do
+    case Database.reconcile_console_access(repo, opts) do
+      {:ok, summary} ->
+        unless quiet, do: Mix.shell().info(ConsoleAccess.describe(summary))
+
+      {:error, failure} ->
+        Mix.raise(ConsoleAccess.explain(failure))
+    end
   end
 
   defp with_repo!(repo, operation) do

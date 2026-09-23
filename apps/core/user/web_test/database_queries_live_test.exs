@@ -6,10 +6,17 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
   alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Audit.TestFixtures, as: AuditFixtures
   alias Bilimbi.Base.Database
+  alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
+  alias Ecto.Adapters.SQL.Sandbox
+
+  # The console runs through its own select-only connection and sees only
+  # committed state, never this sandbox's temporary fixture tables, so the
+  # queries that execute on the show page carry their own rows.
+  @people "SELECT id, name FROM (VALUES (91, 'Ada Lovelace'), (92, 'Grace Hopper')) AS people (id, name)"
 
   setup do
     UserFixtures.create_user_tables!()
@@ -207,7 +214,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
         User.create_database_query(scope, 91, %{
           name: "Read Only Query",
           description: "For viewing",
-          sql_query: "SELECT id, name FROM users;"
+          sql_query: "#{@people};"
         })
 
       {:ok, view, html} =
@@ -244,7 +251,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       {:ok, query} =
         User.create_database_query(scope, 91, %{
           name: "Reach Query",
-          sql_query: "SELECT id FROM users;"
+          sql_query: "#{@people};"
         })
 
       {:ok, view, _html} =
@@ -311,7 +318,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
         User.create_database_query(scope, 91, %{
           name: "Find User By Name",
           description: "Search user by name parameter",
-          sql_query: "SELECT id, name FROM users WHERE name = :user_name;"
+          sql_query: "#{@people} WHERE name = :user_name;"
         })
 
       {:ok, view, html} =
@@ -349,7 +356,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       {:ok, query} =
         User.create_database_query(scope, 91, %{
           name: "Header Roles",
-          sql_query: "SELECT id, name FROM users;"
+          sql_query: "#{@people};"
         })
 
       {:ok, view, _html} =
@@ -403,13 +410,52 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       refute has_element?(view, "#query-results-card table.font-mono")
     end
 
+    test "shows PostgreSQL refusing, on privileges, a write that passes the text guards", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.system.database-table.list")
+
+      # A committed sequence the console can see; `SELECT setval(...)` starts
+      # with SELECT and names no forbidden keyword, so it reaches the database.
+      sequence = "__blb_console_web_probe_#{System.unique_integer([:positive])}"
+      Sandbox.unboxed_run(Repo, fn -> Repo.query!("CREATE SEQUENCE #{sequence} START 1") end)
+
+      on_exit(fn ->
+        Sandbox.unboxed_run(Repo, fn -> Repo.query!("DROP SEQUENCE IF EXISTS #{sequence}") end)
+      end)
+
+      {:ok, query} =
+        User.create_database_query(scope, 91, %{
+          name: "Disguised Write",
+          sql_query: "SELECT setval('#{sequence}', 42);"
+        })
+
+      {:ok, view, _html} =
+        conn |> log_in_as() |> live(~p"/admin/system/database-queries/#{query.slug}")
+
+      assert has_element?(
+               view,
+               "#query-execution-error",
+               "permission denied for sequence #{sequence}"
+             )
+
+      refute has_element?(view, "#query-execution-error", "read-only transaction")
+      refute has_element?(view, "#query-results-card")
+
+      assert %{rows: [[1, false]]} =
+               Sandbox.unboxed_run(Repo, fn ->
+                 Repo.query!("SELECT last_value, is_called FROM #{sequence}")
+               end)
+    end
+
     test "says when a query matched nothing", %{conn: conn, scope: scope} do
       grant_capabilities!("admin.system.database-table.list")
 
       {:ok, query} =
         User.create_database_query(scope, 91, %{
           name: "Nobody",
-          sql_query: "SELECT id FROM users WHERE id = -1;"
+          sql_query: "#{@people} WHERE id = -1;"
         })
 
       {:ok, view, _html} =

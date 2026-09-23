@@ -2,19 +2,29 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
   @moduledoc """
   Safe, read-only SQL query execution engine.
 
-  Runs user-defined SQL inside a PostgreSQL `READ ONLY` transaction with a
-  statement timeout and a row limit, after text checks that reject anything
-  but a `SELECT`/`WITH` statement and known write/DDL keywords. The text checks
-  give early, readable refusals; the read-only transaction is the boundary
-  PostgreSQL enforces regardless of what the text checks miss.
+  Runs user-defined SQL through `Bilimbi.Base.Database.ConsoleRepo`, the
+  console's own connection as a PostgreSQL role holding `SELECT` and nothing
+  else, inside a `READ ONLY` transaction with a statement timeout and a row
+  limit. Before every run it asks PostgreSQL whether that connection could
+  write anything and refuses to run while it could, so a misconfigured
+  console fails visibly rather than reading through the application's
+  read-write connection.
+
+  The text checks that reject anything but a `SELECT`/`WITH` statement and
+  known write/DDL keywords give early, readable refusals. They are not the
+  boundary: the role's privileges are, and the read-only transaction backs
+  them up for what privileges do not cover, such as temporary objects.
   """
 
-  alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Database.ConsoleAccess
+  alias Bilimbi.Base.Database.ConsoleRepo
   alias Ecto.Adapters.SQL
 
   @max_rows 1000
   @default_timeout_ms 10_000
 
+  # Refused before reaching PostgreSQL so the operator gets a plain sentence
+  # instead of a privilege error; the database refuses these regardless.
   @forbidden_keywords ~w(
     INSERT
     UPDATE
@@ -173,47 +183,48 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
          order_dir,
          timeout_ms
        ) do
-    Repo.transaction(fn ->
-      # The text guards in validate_sql/1 are not the boundary; this is.
+    ConsoleRepo.transaction(fn ->
       # `SET TRANSACTION READ ONLY` applies to the transaction already open
-      # here, so PostgreSQL itself refuses any write that reaches it. (The
-      # similar-looking `SET LOCAL default_transaction_read_only = on` only
-      # sets the default for *later* transactions and leaves this one
-      # read-write.) The mode ends with the transaction, and in the SQL
-      # sandbox it ends with the executor's savepoint.
-      SQL.query!(Repo, "SET TRANSACTION READ ONLY", [])
+      # here. (The similar-looking `SET LOCAL default_transaction_read_only =
+      # on` only sets the default for *later* transactions and leaves this
+      # one read-write.) It is the second line: the connection's role holds
+      # no write privilege, and `refuse_writable_connection!/0` proves that
+      # on every run.
+      SQL.query!(ConsoleRepo, "SET TRANSACTION READ ONLY", [])
 
       # `timeout_ms` is an internal clamped integer from options/defaults, never reachable from client parameters.
-      SQL.query!(Repo, "SET LOCAL statement_timeout = #{timeout_ms}", [])
+      SQL.query!(ConsoleRepo, "SET LOCAL statement_timeout = #{timeout_ms}", [])
+
+      refuse_writable_connection!()
 
       # 1. Count total rows
       count_sql = "SELECT COUNT(*) FROM (#{sql}) AS __blb_count"
 
       total =
-        case SQL.query(Repo, count_sql, params) do
+        case SQL.query(ConsoleRepo, count_sql, params) do
           {:ok, %Postgrex.Result{rows: [[count]]}} ->
             count
 
           {:error, %Postgrex.Error{postgres: %{message: msg}}} ->
-            Repo.rollback("SQL error counting results: #{msg}")
+            ConsoleRepo.rollback("SQL error counting results: #{msg}")
 
           {:error, err} ->
-            Repo.rollback("Database error: #{inspect(err)}")
+            ConsoleRepo.rollback("Database error: #{inspect(err)}")
         end
 
       # 2. Extract column metadata by running an empty sample or checking columns
       sample_sql = "SELECT * FROM (#{sql}) AS __blb_sample LIMIT 0"
 
       columns =
-        case SQL.query(Repo, sample_sql, params) do
+        case SQL.query(ConsoleRepo, sample_sql, params) do
           {:ok, %Postgrex.Result{columns: cols}} ->
             cols
 
           {:error, %Postgrex.Error{postgres: %{message: msg}}} ->
-            Repo.rollback("SQL error: #{msg}")
+            ConsoleRepo.rollback("SQL error: #{msg}")
 
           {:error, err} ->
-            Repo.rollback("Database error: #{inspect(err)}")
+            ConsoleRepo.rollback("Database error: #{inspect(err)}")
         end
 
       # 3. Build paginated query
@@ -231,17 +242,17 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
         "SELECT * FROM (#{sql}) AS __blb_view#{order_clause} LIMIT #{per_page} OFFSET #{offset}"
 
       rows =
-        case SQL.query(Repo, paginated_sql, params) do
+        case SQL.query(ConsoleRepo, paginated_sql, params) do
           {:ok, %Postgrex.Result{rows: raw_rows}} ->
             Enum.map(raw_rows, fn row_list ->
               Enum.zip(columns, row_list) |> Map.new()
             end)
 
           {:error, %Postgrex.Error{postgres: %{message: msg}}} ->
-            Repo.rollback("SQL error executing query: #{msg}")
+            ConsoleRepo.rollback("SQL error executing query: #{msg}")
 
           {:error, err} ->
-            Repo.rollback("Database error: #{inspect(err)}")
+            ConsoleRepo.rollback("Database error: #{inspect(err)}")
         end
 
       last_page = max(ceil(total / per_page), 1)
@@ -259,8 +270,37 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
     end)
     |> case do
       {:ok, result} -> {:ok, result}
-      {:error, reason} when is_binary(reason) -> {:error, reason}
+      {:error, reason} when is_binary(reason) -> {:error, explain_permission_denied(reason)}
       {:error, other} -> {:error, inspect(other)}
+    end
+  end
+
+  # A console that could write would reinstate the hole the select-only role
+  # closes, so it does not run at all. Asking PostgreSQL, rather than reading
+  # a configuration value, is what makes the refusal true.
+  defp refuse_writable_connection! do
+    case ConsoleAccess.held_write_privileges(ConsoleRepo) do
+      %{reasons: []} ->
+        :ok
+
+      %{role: role, reasons: reasons} ->
+        ConsoleRepo.rollback(
+          "The database console cannot run because its connection can write: role " <>
+            "#{inspect(role)} #{Enum.join(reasons, "; ")}. Connect the console through " <>
+            "its select-only role (see docs/architecture/database.md, \"Operator SQL " <>
+            "console\") and run `mix bilimbi.migrate` to grant its reads."
+        )
+    end
+  end
+
+  # A column-restricted table refuses `SELECT *` with a bare "permission
+  # denied"; say which columns the console may name instead.
+  @permission_denied ~r/permission denied for (?:table|view|materialized view) "?([^"\s]+)"?/
+
+  defp explain_permission_denied(reason) do
+    case Regex.run(@permission_denied, reason) do
+      [_, relation] -> reason <> " " <> ConsoleAccess.read_scope_hint(ConsoleRepo, relation)
+      nil -> reason
     end
   end
 end

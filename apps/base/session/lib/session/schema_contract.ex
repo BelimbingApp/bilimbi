@@ -30,6 +30,11 @@ defmodule Bilimbi.Base.Session.SchemaContract do
     ]
   end
 
+  # Payloads are opaque compatibility data that no operational listing exposes
+  # (`Session.list_sessions_page/1`); the SQL console is no exception.
+  @impl true
+  def secret_columns, do: %{"sessions" => ["payload"]}
+
   defp column(type, nullable \\ true), do: %{type: type, nullable: nullable, default: nil}
   defp index(columns, unique \\ false), do: %{columns: columns, unique: unique, where: nil}
 end
