@@ -2,8 +2,9 @@ defmodule Bilimbi.Base.UI.ComponentsFlashTest do
   @moduledoc """
   Tests for `<.flash>`: one message per severity, with the ARIA role and the
   visual role its severity implies. The look is asserted through what a
-  reader perceives — the role announced and the icon shown — not through
-  colour class strings, so a restyle does not break these.
+  reader perceives — the role announced, the icon shown, and that no two
+  severities share one colouring — not through colour class strings, so a
+  restyle does not break these.
   """
 
   use ExUnit.Case, async: true
@@ -35,10 +36,18 @@ defmodule Bilimbi.Base.UI.ComponentsFlashTest do
     end
   end
 
-  defp role(kind) do
+  defp announcement(kind) do
     tag = message_tag(render_flash(kind, %{Atom.to_string(kind) => "message"}), kind)
     [_, role] = Regex.run(~r/\srole="([a-z]+)"/, tag)
-    role
+    [_, live] = Regex.run(~r/\saria-live="([a-z]+)"/, tag)
+    {role, live}
+  end
+
+  # The class list of the coloured surface inside the message element.
+  defp surface_classes(kind) do
+    html = render_flash(kind, %{Atom.to_string(kind) => "message"})
+    [_, classes] = Regex.run(~r/<div class="([^"]*rounded-2xl[^"]*)"/, html)
+    classes
   end
 
   defp icon_name(kind) do
@@ -47,8 +56,16 @@ defmodule Bilimbi.Base.UI.ComponentsFlashTest do
     name
   end
 
-  test "every severity is announced as an alert" do
-    for kind <- @kinds, do: assert(role(kind) == "alert")
+  test "success and info are a polite status; warning and error an assertive alert" do
+    assert announcement(:success) == {"status", "polite"}
+    assert announcement(:info) == {"status", "polite"}
+    assert announcement(:warning) == {"alert", "assertive"}
+    assert announcement(:error) == {"alert", "assertive"}
+  end
+
+  test "no two severities share one colouring" do
+    surfaces = Enum.map(@kinds, &surface_classes/1)
+    assert Enum.uniq(surfaces) == surfaces
   end
 
   test "each severity renders only its own message" do
