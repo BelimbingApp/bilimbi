@@ -43,7 +43,7 @@
               id="btn-duplicate-query"
               phx-click="duplicate"
             >
-              <.icon name="hero-document-duplicate" class="size-4 mr-1.5" />
+              <.icon name="duplicate" class="size-4 mr-1.5" />
               Duplicate
             </.button>
             <.button
@@ -56,15 +56,10 @@
               Delete
             </.button>
           <% else %>
-            <button
-              type="button"
-              id="btn-discard-query"
-              phx-click="delete"
-              class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition border border-high-contrast-line bg-surface text-ink hover:bg-surface-sunken"
-            >
+            <.button id="btn-discard-query" phx-click="delete">
               <.icon name="close" class="size-4 mr-1.5" />
               Discard
-            </button>
+            </.button>
           <% end %>
 
           <.button
@@ -80,12 +75,10 @@
     </.header>
 
     <div class="space-y-6">
-      <%!-- Prompt Card --%>
-      <.card id="prompt-card">
-        <div class="flex items-center gap-2 mb-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-          <.icon name="hero-chat-bubble-bottom-center-text" class="size-4" />
-          <span>Prompt</span>
-        </div>
+      <%!-- Every section is a card opened by the shared heading, as on every
+           record page (DESIGN.md "Detail sections and facts"). --%>
+      <.card id="prompt-card" inner_class="p-5 sm:p-6" role="region" aria-labelledby="prompt-heading">
+        <.section_heading id="prompt-heading" title="Prompt" />
         <form id="query-prompt-form" phx-change="change_field">
           <textarea
             id="query-prompt-textarea"
@@ -97,23 +90,25 @@
         </form>
       </.card>
 
-      <%!-- SQL Editor Card --%>
-      <.card id="sql-editor-card">
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink-subtle">
-            <.icon name="hero-code-bracket" class="size-4" />
-            <span>SQL Query</span>
-          </div>
-          <.button
-            id="btn-run-query"
-            phx-click="run_query"
-            variant="primary"
-            class="px-3 py-1 text-xs"
-          >
-            <.icon name="play" class="size-3.5 mr-1" />
-            Run Query
-          </.button>
-        </div>
+      <.card
+        id="sql-editor-card"
+        inner_class="p-5 sm:p-6"
+        role="region"
+        aria-labelledby="sql-editor-heading"
+      >
+        <.section_heading id="sql-editor-heading" title="SQL Query">
+          <:actions>
+            <.button
+              id="btn-run-query"
+              phx-click="run_query"
+              variant="primary"
+              class="px-3 py-1 text-xs"
+            >
+              <.icon name="play" class="size-3.5 mr-1" />
+              Run Query
+            </.button>
+          </:actions>
+        </.section_heading>
 
         <form id="query-sql-form" phx-change="change_field">
           <textarea
@@ -173,61 +168,51 @@
         </.alert>
       <% end %>
 
-      <%!-- Query Results Table --%>
+      <%!-- Query Results: the shared table, unframed inside the section card
+           and sorted by this page. Columns come from the result set, so each
+           header is a sort button for the column it names. --%>
       <%= if @results do %>
-        <.card id="query-results-card">
-          <div class="mb-3 flex items-center justify-between text-xs text-ink-subtle">
-            <span class="font-medium">
-              {@results.columns |> length()} columns · {@results.total_count} total rows
-            </span>
-          </div>
+        <.card
+          id="query-results-card"
+          inner_class="p-5 sm:p-6"
+          role="region"
+          aria-labelledby="query-results-heading"
+        >
+          <.section_heading id="query-results-heading" title="Results">
+            <:description>
+              <span id="query-results-summary">
+                {@results.columns |> length()} columns · {@results.total_count} total rows
+              </span>
+            </:description>
+          </.section_heading>
 
-          <div class="overflow-x-auto border border-line max-h-[500px]">
-            <table id="query-results-table" class="w-full text-left font-mono text-xs text-ink">
-              <thead class="sticky top-0 border-b border-line bg-surface-muted text-xs font-semibold uppercase text-ink-subtle">
-                <tr>
-                  <%= for col <- @results.columns do %>
-                    <th
-                      scope="col"
-                      class="px-3 py-2 cursor-pointer select-none hover:text-ink whitespace-nowrap"
-                      phx-click="sort_results"
-                      phx-value-column={col}
-                    >
-                      <div class="flex items-center gap-1">
-                        <span>{col}</span>
-                        <.icon :if={@result_sort_by == col && @result_sort_dir == :asc} name="sort-asc" class="size-3" />
-                        <.icon :if={@result_sort_by == col && @result_sort_dir == :desc} name="sort-desc" class="size-3" />
-                      </div>
-                    </th>
-                  <% end %>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-line">
-                <%= if @results.rows == [] do %>
-                  <tr>
-                    <td colspan={max(length(@results.columns), 1)} class="px-3 py-6 text-center text-xs text-ink-subtle">
-                      No rows returned.
-                    </td>
-                  </tr>
+          <.table
+            id="query-results-table"
+            rows={Enum.with_index(@results.rows)}
+            row_id={fn {_row, index} -> "result-row-#{index}" end}
+            row_item={fn {row, _index} -> row end}
+            sort_by={@result_sort_by}
+            sort_dir={@result_sort_dir}
+            sort_event="sort_results"
+            caption="Query results"
+            framed={false}
+          >
+            <:col :for={col <- @results.columns} :let={row} label={col} sort={col}>
+              <% val = Map.get(row, col) %>
+              <span class="block max-w-sm truncate whitespace-nowrap font-mono text-xs">
+                <%= if is_nil(val) do %>
+                  <span class="text-ink-faint">—</span>
                 <% else %>
-                  <%= for {row, row_idx} <- Enum.with_index(@results.rows) do %>
-                    <tr id={"result-row-#{row_idx}"} class="hover:bg-surface-muted/50 transition">
-                      <%= for col <- @results.columns do %>
-                        <td class="px-3 py-2 whitespace-nowrap max-w-sm truncate text-ink">
-                          <% val = Map.get(row, col) %>
-                          <%= if is_nil(val) do %>
-                            <span class="text-ink-faint">—</span>
-                          <% else %>
-                            {to_string(val)}
-                          <% end %>
-                        </td>
-                      <% end %>
-                    </tr>
-                  <% end %>
+                  {to_string(val)}
                 <% end %>
-              </tbody>
-            </table>
-          </div>
+              </span>
+            </:col>
+            <:empty
+              :if={@results.rows == []}
+              title="No rows returned"
+              reason="The query ran and matched nothing."
+            />
+          </.table>
 
           <%= if @results.total_pages > 1 do %>
             <div class="mt-4 flex items-center justify-between text-xs text-ink-subtle">

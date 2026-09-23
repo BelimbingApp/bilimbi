@@ -63,6 +63,123 @@ defmodule BilimbiWeb.EmployeeShowTest do
     refute has_element?(view, "main header button:not(#employee-pin)")
   end
 
+  test "presents the facts as the shared list and the subordinates as the shared table", %{
+    conn: conn,
+    employee: employee
+  } do
+    grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+    # One heading treatment: every section is a named region whose title is
+    # the shared level-two heading, and none writes its own h3, dl or table.
+    for id <- ~w(employee-details employment-info) do
+      assert has_element?(
+               view,
+               "##{id}-card[role='region'][aria-labelledby='#{id}-heading'] h2##{id}-heading"
+             )
+
+      refute has_element?(view, "##{id}-card h3")
+    end
+
+    assert has_element?(
+             view,
+             "#subordinates-card[role='region'][aria-labelledby='employee-subordinates-heading'] h2#employee-subordinates-heading",
+             "Subordinates"
+           )
+
+    refute has_element?(view, "#subordinates-card h3")
+
+    # The facts are rows of one definition list; every value cell keeps its id
+    # and hosts the in-place editor at full width.
+    assert has_element?(view, "#employee-details-card dl dd#employee-view-full-name", "John Doe")
+
+    assert has_element?(
+             view,
+             "dd#employee-view-full-name #employee-full-name[phx-hook='InlineEdit']"
+           )
+
+    assert has_element?(view, "#employee-details-card dl dt", "Employee Number")
+    assert has_element?(view, "dd#employee-view-employee-number", "EMP-001")
+    refute has_element?(view, "dd#employee-view-job-description")
+
+    assert has_element?(view, "#employment-info-card dl dd#employee-view-company")
+    assert has_element?(view, "dd#employee-view-department #employee-department-display")
+    assert has_element?(view, "dd#employee-view-status .rounded-full", "Active")
+    assert has_element?(view, "dd#employee-view-employment-start")
+
+    # The linked account is a row of the same list, its value the Core User
+    # embed with its choice, under the label this page gives the fact.
+    assert has_element?(view, "#employment-info-card dl dt", "User")
+    assert has_element?(view, "dd#employee-view-user #account-panel form#employee-user-form")
+    assert has_element?(view, "#employee-user option[value='91']", "Ada Lovelace")
+
+    # The subordinates are the shared table: caption, sortable heads with a
+    # truthful sort state, the empty row saying what is missing, and the
+    # section's own action in its heading row.
+    assert has_element?(view, "#subordinates-card caption", "Subordinates")
+    assert has_element?(view, "#employee-subordinates-heading + span", "0")
+
+    assert has_element?(
+             view,
+             "#subordinates-card th[aria-sort='ascending'] button#subordinates-table-sort-full_name"
+           )
+
+    assert has_element?(view, "#subordinates-table-empty", "No subordinates")
+    assert has_element?(view, "#subordinates-table-empty", "appear here")
+    assert has_element?(view, "#subordinates-card #btn-toggle-add-subordinate", "Add")
+
+    {:ok, scope} = Tenancy.scope(41)
+
+    {:ok, report} =
+      Employee.create_employee(scope, 73, %{
+        employee_number: "EMP-002",
+        full_name: "Sam Report",
+        email: "sam@example.test"
+      })
+
+    view |> element("#btn-toggle-add-subordinate") |> render_click()
+
+    view
+    |> form("#add-subordinate-form")
+    |> render_submit(%{"subordinate_id" => to_string(report.id)})
+
+    assert has_element?(view, "tbody#subordinates-table tr#subordinate-row-#{report.id}")
+
+    assert has_element?(
+             view,
+             "#subordinate-link-#{report.id}[href='/employees/#{report.id}']",
+             "Sam Report"
+           )
+
+    assert has_element?(view, "#employee-subordinates-heading + span", "1")
+
+    # Sorting stays with the page, through the shared sort buttons.
+    view |> element("#subordinates-table-sort-status") |> render_click()
+    assert has_element?(view, "th[aria-sort='ascending'] #subordinates-table-sort-status")
+
+    # Removing is a demoted icon action that still asks first.
+    assert has_element?(
+             view,
+             "button#remove-subordinate-#{report.id}[aria-label='Remove Sam Report as subordinate'][data-confirm] .hero-x-mark"
+           )
+
+    refute has_element?(view, "#remove-subordinate-#{report.id}", "Remove")
+  end
+
+  test "an agent has no linked-account row", %{conn: conn} do
+    CompanyFixtures.assign_primary_company!(41, 73)
+    {:ok, orchestrator, :created} = Employee.ensure_platform_orchestrator()
+    grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{orchestrator.id}")
+
+    assert has_element?(view, "dd#employee-view-employee-type", "Agent")
+    assert has_element?(view, "dd#employee-view-job-description")
+    refute has_element?(view, "dd#employee-view-user")
+    refute has_element?(view, "#account-panel")
+  end
+
   test "a viewer without admin.employee.update sees the facts with no editors", %{
     conn: conn,
     employee: employee

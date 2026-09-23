@@ -39,6 +39,14 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   The header is the quiet labelled row Belimbing's page carries — the record
   history beside the word "History" and "← Back" — and no button.
 
+  Every section below it has the anatomy DESIGN.md's "Detail sections and
+  facts" sets out: a `<.card>` region opened by `<.section_heading>`, its
+  facts the shared `<.list>` (the linked account is one of those rows, its
+  value the `employee.accounts` embed) and its subordinates the shared
+  `<.table>`, unframed inside the card, sorted by this page, with assigning
+  as the heading's own action and removal as a demoted icon action on the
+  row. Nothing here hand-writes a heading, a `<dl>` or a `<table>`.
+
   Deleting the platform orchestrator (`SYS-001` / `agent`) is refused by the
   domain as `:invariant_violation`; this screen reports that honestly rather
   than hiding the row.
@@ -593,9 +601,11 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   # --- Fact Components ---
 
-  # A read-first text fact. An operator who may update edits it in place and
-  # the fact reports its own outcome; a nullable column may be emptied. Anyone
-  # else sees the stored value with no affordance.
+  # The value cell of a read-first text fact — the row itself, its label and
+  # its `employee-view-*` id are the shared `<.list>` item that renders it. An
+  # operator who may update edits it in place and the fact reports its own
+  # outcome; a nullable column may be emptied. Anyone else sees the stored
+  # value with no affordance.
   attr(:name, :string, required: true)
   attr(:employee, :map, required: true)
   attr(:can_manage?, :boolean, required: true)
@@ -609,29 +619,23 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       |> assign(:value, Map.fetch!(assigns.employee, Map.fetch!(@inline_fields, assigns.name)))
       |> assign(:allow_empty?, assigns.name in @nullable_fields)
       |> assign(:dom_id, fact_dom_id(assigns.name))
-      |> assign(:view_id, "employee-view-" <> String.replace(assigns.name, "_", "-"))
 
     ~H"""
-    <div>
-      <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">{@label}</dt>
-      <dd id={@view_id} class="mt-0.5 text-sm text-ink">
-        <.inline_edit
-          :if={@can_manage?}
-          id={@dom_id}
-          name={@name}
-          label={@label}
-          value={@value || ""}
-          id_value={@employee.id}
-          save_event="save_field"
-          allow_empty={@allow_empty?}
-          status={@field_status[@name]}
-          class={@class}
-        />
-        <span :if={not @can_manage?} class={[is_nil(@value) && "text-ink-muted", @class]}>
-          {@value || "—"}
-        </span>
-      </dd>
-    </div>
+    <.inline_edit
+      :if={@can_manage?}
+      id={@dom_id}
+      name={@name}
+      label={@label}
+      value={@value || ""}
+      id_value={@employee.id}
+      save_event="save_field"
+      allow_empty={@allow_empty?}
+      status={@field_status[@name]}
+      class={@class}
+    />
+    <span :if={not @can_manage?} class={[is_nil(@value) && "text-ink-muted", @class]}>
+      {@value || "—"}
+    </span>
     """
   end
 
@@ -730,26 +734,36 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
         </.header>
 
         <div class="mt-6 space-y-6">
-          <!-- Card 1: Employee Details, read-first -->
-          <.card id="employee-details-card">
-            <div class="p-5 sm:p-6 space-y-4">
-              <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                Employee Details
-              </h3>
+          <%!-- Section 1: Employee Details. The facts are the shared `<.list>`
+               under the shared `<.section_heading>`, as on `/companies/:id` and
+               `/addresses/:id`; each fact edits in place and reports on
+               itself, so the heading carries no button. --%>
+          <.card
+            id="employee-details-card"
+            inner_class="p-5 sm:p-6"
+            role="region"
+            aria-labelledby="employee-details-heading"
+          >
+            <.section_heading id="employee-details-heading" title="Employee Details" />
 
-              <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <.list id="employee-details">
+              <:item title={fact_label("full_name")} id="employee-view-full-name">
                 <.text_fact
                   name="full_name"
                   employee={@employee}
                   can_manage?={@can_manage?}
                   field_status={@field_status}
                 />
+              </:item>
+              <:item title={fact_label("short_name")} id="employee-view-short-name">
                 <.text_fact
                   name="short_name"
                   employee={@employee}
                   can_manage?={@can_manage?}
                   field_status={@field_status}
                 />
+              </:item>
+              <:item title={fact_label("employee_number")} id="employee-view-employee-number">
                 <.text_fact
                   name="employee_number"
                   employee={@employee}
@@ -757,483 +771,387 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   field_status={@field_status}
                   class="font-mono"
                 />
+              </:item>
+              <:item
+                :if={@employee.employee_type == "agent"}
+                title={fact_label("job_description")}
+                id="employee-view-job-description"
+              >
                 <.text_fact
-                  :if={@employee.employee_type == "agent"}
                   name="job_description"
                   employee={@employee}
                   can_manage?={@can_manage?}
                   field_status={@field_status}
                 />
+              </:item>
+              <:item title={fact_label("designation")} id="employee-view-designation">
                 <.text_fact
                   name="designation"
                   employee={@employee}
                   can_manage?={@can_manage?}
                   field_status={@field_status}
                 />
+              </:item>
+              <:item title={fact_label("email")} id="employee-view-email">
                 <.text_fact
                   name="email"
                   employee={@employee}
                   can_manage?={@can_manage?}
                   field_status={@field_status}
                 />
+              </:item>
+              <:item title={fact_label("mobile_number")} id="employee-view-mobile-number">
                 <.text_fact
                   name="mobile_number"
                   employee={@employee}
                   can_manage?={@can_manage?}
                   field_status={@field_status}
                 />
-              </dl>
-            </div>
+              </:item>
+            </.list>
           </.card>
-          <!-- Card 2: Employment Information -->
-          <.card id="employment-info-card">
-            <div class="p-5 sm:p-6 space-y-4">
-              <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                Employment Information
-              </h3>
 
-              <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                    Company
-                  </dt>
+          <%!-- Section 2: Employment Information. The linked account is a fact
+               of the same list; its value is the discovered `employee.accounts`
+               embed Core User owns, and an agent has no account row. --%>
+          <.card
+            id="employment-info-card"
+            inner_class="p-5 sm:p-6"
+            role="region"
+            aria-labelledby="employment-info-heading"
+          >
+            <.section_heading id="employment-info-heading" title="Employment Information" />
 
-                  <dd id="employee-view-company" class="mt-0.5 text-sm text-ink px-1 -mx-1 py-0.5">
-                    {@company_name}
-                  </dd>
-                </div>
+            <.list id="employment-info">
+              <:item title="Company" id="employee-view-company">
+                {@company_name}
+              </:item>
 
-                <div>
-                  <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                    Department
-                  </dt>
-
-                  <dd id="employee-view-department" class="mt-0.5 text-sm text-ink">
-                    <.choice_fact
-                      field="department"
-                      label="Edit department"
-                      editing={@editing_field == "department"}
-                      can_manage?={@can_manage?}
-                      status={@field_status["department"]}
+              <:item title="Department" id="employee-view-department">
+                <.choice_fact
+                  field="department"
+                  label="Edit department"
+                  editing={@editing_field == "department"}
+                  can_manage?={@can_manage?}
+                  status={@field_status["department"]}
+                >
+                  <:display>
+                    <span class={[
+                      "truncate",
+                      is_nil(@employee.department_id) && "text-ink-muted"
+                    ]}>
+                      {Map.get(@department_map, @employee.department_id, "None")}
+                    </span>
+                  </:display>
+                  <:editor>
+                    <form
+                      phx-change="save_department"
+                      id="employee-department-form"
+                      class="inline-block"
                     >
-                      <:display>
-                        <span class={[
-                          "truncate",
-                          is_nil(@employee.department_id) && "text-ink-muted"
-                        ]}>
-                          {Map.get(@department_map, @employee.department_id, "None")}
-                        </span>
-                      </:display>
-                      <:editor>
-                        <form
-                          phx-change="save_department"
-                          id="employee-department-form"
-                          class="inline-block"
-                        >
-                          <select
-                            id="employee-department"
-                            name="department_id"
-                            aria-label="Department"
-                            phx-mounted={JS.focus()}
-                            phx-blur="cancel_edit_field"
-                            class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
-                          >
-                            <option value="" selected={is_nil(@employee.department_id)}>None</option>
+                      <select
+                        id="employee-department"
+                        name="department_id"
+                        aria-label="Department"
+                        phx-mounted={JS.focus()}
+                        phx-blur="cancel_edit_field"
+                        class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                      >
+                        <option value="" selected={is_nil(@employee.department_id)}>None</option>
 
-                            <%= for dept <- @departments do %>
-                              <option value={dept.id} selected={@employee.department_id == dept.id}>
-                                {if dept.type, do: dept.type.name, else: "Department #{dept.id}"}
-                              </option>
-                            <% end %>
-                          </select>
-                        </form>
-                      </:editor>
-                    </.choice_fact>
-                  </dd>
-                </div>
+                        <%= for dept <- @departments do %>
+                          <option value={dept.id} selected={@employee.department_id == dept.id}>
+                            {if dept.type, do: dept.type.name, else: "Department #{dept.id}"}
+                          </option>
+                        <% end %>
+                      </select>
+                    </form>
+                  </:editor>
+                </.choice_fact>
+              </:item>
 
-                <div>
-                  <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                    Supervisor
-                  </dt>
-
-                  <dd id="employee-view-supervisor" class="mt-0.5 text-sm text-ink">
-                    <.choice_fact
-                      field="supervisor"
-                      label="Edit supervisor"
-                      editing={@editing_field == "supervisor"}
-                      can_manage?={@can_manage?}
-                      status={@field_status["supervisor"]}
+              <:item title="Supervisor" id="employee-view-supervisor">
+                <.choice_fact
+                  field="supervisor"
+                  label="Edit supervisor"
+                  editing={@editing_field == "supervisor"}
+                  can_manage?={@can_manage?}
+                  status={@field_status["supervisor"]}
+                >
+                  <:display>
+                    <span class={[
+                      "truncate",
+                      is_nil(@employee.supervisor_id) && "text-ink-muted"
+                    ]}>
+                      {Map.get(@supervisor_map, @employee.supervisor_id, "None")}
+                    </span>
+                  </:display>
+                  <:editor>
+                    <form
+                      phx-change="save_supervisor"
+                      id="employee-supervisor-form"
+                      class="inline-block"
                     >
-                      <:display>
-                        <span class={[
-                          "truncate",
-                          is_nil(@employee.supervisor_id) && "text-ink-muted"
-                        ]}>
-                          {Map.get(@supervisor_map, @employee.supervisor_id, "None")}
-                        </span>
-                      </:display>
-                      <:editor>
-                        <form
-                          phx-change="save_supervisor"
-                          id="employee-supervisor-form"
-                          class="inline-block"
-                        >
-                          <select
-                            id="employee-supervisor"
-                            name="supervisor_id"
-                            aria-label="Supervisor"
-                            phx-mounted={JS.focus()}
-                            phx-blur="cancel_edit_field"
-                            class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
-                          >
-                            <option value="" selected={is_nil(@employee.supervisor_id)}>None</option>
+                      <select
+                        id="employee-supervisor"
+                        name="supervisor_id"
+                        aria-label="Supervisor"
+                        phx-mounted={JS.focus()}
+                        phx-blur="cancel_edit_field"
+                        class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                      >
+                        <option value="" selected={is_nil(@employee.supervisor_id)}>None</option>
 
-                            <%= for sup <- @supervisors do %>
-                              <option value={sup.id} selected={@employee.supervisor_id == sup.id}>
-                                {sup.full_name}
-                              </option>
-                            <% end %>
-                          </select>
-                        </form>
-                      </:editor>
-                    </.choice_fact>
-                  </dd>
-                </div>
+                        <%= for sup <- @supervisors do %>
+                          <option value={sup.id} selected={@employee.supervisor_id == sup.id}>
+                            {sup.full_name}
+                          </option>
+                        <% end %>
+                      </select>
+                    </form>
+                  </:editor>
+                </.choice_fact>
+              </:item>
 
-                <div>
-                  <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                    Employee Type
-                  </dt>
-
-                  <dd id="employee-view-employee-type" class="mt-0.5 text-sm text-ink">
-                    <.choice_fact
-                      field="employee_type"
-                      label="Edit employee type"
-                      editing={@editing_field == "employee_type"}
-                      can_manage?={@can_manage?}
-                      status={@field_status["employee_type"]}
+              <:item title="Employee Type" id="employee-view-employee-type">
+                <.choice_fact
+                  field="employee_type"
+                  label="Edit employee type"
+                  editing={@editing_field == "employee_type"}
+                  can_manage?={@can_manage?}
+                  status={@field_status["employee_type"]}
+                >
+                  <:display>
+                    <%!-- Neutral for every type, matching the index table
+                         (same thing, same look); status alone carries color. --%>
+                    <.badge kind={:neutral}>
+                      {employee_type_label(@employee_types, @employee.employee_type)}
+                    </.badge>
+                  </:display>
+                  <:editor>
+                    <form
+                      phx-change="save_employee_type"
+                      id="employee-type-form"
+                      class="inline-block"
                     >
-                      <:display>
-                        <%!-- Neutral for every type, matching the index table
-                             (same thing, same look); status alone carries color. --%>
-                        <.badge kind={:neutral}>
-                          {employee_type_label(@employee_types, @employee.employee_type)}
-                        </.badge>
-                      </:display>
-                      <:editor>
-                        <form
-                          phx-change="save_employee_type"
-                          id="employee-type-form"
-                          class="inline-block"
-                        >
-                          <select
-                            id="employee-type"
-                            name="employee_type"
-                            aria-label="Employee type"
-                            phx-mounted={JS.focus()}
-                            phx-blur="cancel_edit_field"
-                            class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
-                          >
-                            <optgroup label="Human">
-                              <%= for type <- Enum.reject(@employee_types, &(&1.code == "agent")) do %>
-                                <option
-                                  value={type.code}
-                                  selected={@employee.employee_type == type.code}
-                                >
-                                  {type.label}
-                                </option>
-                              <% end %>
-                            </optgroup>
-
-                            <optgroup label="Agent">
-                              <%= for type <- Enum.filter(@employee_types, &(&1.code == "agent")) do %>
-                                <option
-                                  value={type.code}
-                                  selected={@employee.employee_type == type.code}
-                                >
-                                  {type.label}
-                                </option>
-                              <% end %>
-                            </optgroup>
-                          </select>
-                        </form>
-                      </:editor>
-                    </.choice_fact>
-                  </dd>
-                </div>
-
-                <div>
-                  <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                    Status
-                  </dt>
-
-                  <dd id="employee-view-status" class="mt-0.5 text-sm text-ink">
-                    <.choice_fact
-                      field="status"
-                      label="Edit status"
-                      editing={@editing_field == "status"}
-                      can_manage?={@can_manage?}
-                      status={@field_status["status"]}
-                    >
-                      <:display>
-                        <.badge kind={status_badge_kind(@employee.status)}>
-                          {String.capitalize(@employee.status)}
-                        </.badge>
-                      </:display>
-                      <:editor>
-                        <form phx-change="save_status" id="employee-status-form" class="inline-block">
-                          <select
-                            id="employee-status"
-                            name="status"
-                            aria-label="Status"
-                            phx-mounted={JS.focus()}
-                            phx-blur="cancel_edit_field"
-                            class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
-                          >
+                      <select
+                        id="employee-type"
+                        name="employee_type"
+                        aria-label="Employee type"
+                        phx-mounted={JS.focus()}
+                        phx-blur="cancel_edit_field"
+                        class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                      >
+                        <optgroup label="Human">
+                          <%= for type <- Enum.reject(@employee_types, &(&1.code == "agent")) do %>
                             <option
-                              :for={status <- statuses()}
-                              value={status}
-                              selected={@employee.status == status}
+                              value={type.code}
+                              selected={@employee.employee_type == type.code}
                             >
-                              {String.capitalize(status)}
+                              {type.label}
                             </option>
-                          </select>
-                        </form>
-                      </:editor>
-                    </.choice_fact>
-                  </dd>
-                </div>
+                          <% end %>
+                        </optgroup>
 
+                        <optgroup label="Agent">
+                          <%= for type <- Enum.filter(@employee_types, &(&1.code == "agent")) do %>
+                            <option
+                              value={type.code}
+                              selected={@employee.employee_type == type.code}
+                            >
+                              {type.label}
+                            </option>
+                          <% end %>
+                        </optgroup>
+                      </select>
+                    </form>
+                  </:editor>
+                </.choice_fact>
+              </:item>
+
+              <:item title="Status" id="employee-view-status">
+                <.choice_fact
+                  field="status"
+                  label="Edit status"
+                  editing={@editing_field == "status"}
+                  can_manage?={@can_manage?}
+                  status={@field_status["status"]}
+                >
+                  <:display>
+                    <.badge kind={status_badge_kind(@employee.status)}>
+                      {String.capitalize(@employee.status)}
+                    </.badge>
+                  </:display>
+                  <:editor>
+                    <form phx-change="save_status" id="employee-status-form" class="inline-block">
+                      <select
+                        id="employee-status"
+                        name="status"
+                        aria-label="Status"
+                        phx-mounted={JS.focus()}
+                        phx-blur="cancel_edit_field"
+                        class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                      >
+                        <option
+                          :for={status <- statuses()}
+                          value={status}
+                          selected={@employee.status == status}
+                        >
+                          {String.capitalize(status)}
+                        </option>
+                      </select>
+                    </form>
+                  </:editor>
+                </.choice_fact>
+              </:item>
+
+              <:item :if={@employee.employee_type != "agent"} title="User" id="employee-view-user">
                 <.discovered_panel
                   key="employee.accounts"
                   id="account-panel"
                   current_scope={@current_scope}
-                  opts={
-                    %{
-                      employee_id: @employee.id,
-                      company_id: @employee.company_id,
-                      employee_type: @employee.employee_type
-                    }
-                  }
+                  opts={%{employee_id: @employee.id, company_id: @employee.company_id}}
                 />
+              </:item>
 
-                <div>
-                  <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                    Employment Start
-                  </dt>
+              <:item title="Employment Start" id="employee-view-employment-start">
+                <span class="tabular-nums">
+                  <.datetime
+                    id="employee-employment-start"
+                    value={@employee.employment_start}
+                    format={:date}
+                  />
+                </span>
+              </:item>
 
-                  <dd class="mt-0.5 text-sm text-ink px-1 -mx-1 py-0.5 tabular-nums">
-                    <.datetime
-                      id="employee-employment-start"
-                      value={@employee.employment_start}
-                      format={:date}
-                    />
-                  </dd>
-                </div>
-
-                <div>
-                  <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-                    Employment End
-                  </dt>
-
-                  <dd class="mt-0.5 text-sm text-ink px-1 -mx-1 py-0.5 tabular-nums">
-                    <.datetime
-                      id="employee-employment-end"
-                      value={@employee.employment_end}
-                      format={:date}
-                    />
-                  </dd>
-                </div>
-              </dl>
-            </div>
+              <:item title="Employment End" id="employee-view-employment-end">
+                <span class="tabular-nums">
+                  <.datetime
+                    id="employee-employment-end"
+                    value={@employee.employment_end}
+                    format={:date}
+                  />
+                </span>
+              </:item>
+            </.list>
           </.card>
-          <!-- Card 3: Direct Subordinates -->
-          <.card id="subordinates-card">
-            <div class="p-5 sm:p-6 space-y-4">
-              <div class="flex items-center justify-between">
-                <h3 class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle flex items-center gap-1.5">
-                  <span>Subordinates</span>
-                  <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-surface-muted text-ink">
-                    {length(@subordinates)}
-                  </span>
-                </h3>
 
-                <%= if @can_manage? do %>
-                  <div class="flex items-center gap-2">
-                    <%= if @adding_subordinate do %>
-                      <form
-                        phx-submit="add_subordinate"
-                        id="add-subordinate-form"
-                        class="flex items-center gap-2"
-                      >
-                        <select
-                          id="employee-subordinate-select"
-                          name="subordinate_id"
-                          class="min-w-48 rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
-                        >
-                          <option value="">Select employee...</option>
+          <%!-- Section 3: Subordinates. The shared table, unframed inside the
+               section card, sorted by the page; assigning is the section's
+               own action in the heading row and removing is a demoted icon
+               action on the row. --%>
+          <.card
+            id="subordinates-card"
+            inner_class="p-5 sm:p-6"
+            role="region"
+            aria-labelledby="employee-subordinates-heading"
+          >
+            <.section_heading
+              id="employee-subordinates-heading"
+              title="Subordinates"
+              count={length(@subordinates)}
+            >
+              <:actions :if={@can_manage?}>
+                <%= if @adding_subordinate do %>
+                  <form
+                    phx-submit="add_subordinate"
+                    id="add-subordinate-form"
+                    class="flex flex-wrap items-center gap-2"
+                  >
+                    <select
+                      id="employee-subordinate-select"
+                      name="subordinate_id"
+                      aria-label="Employee to assign"
+                      class="min-w-48 rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+                    >
+                      <option value="">Select employee...</option>
 
-                          <%= for avail <- @available_subordinates do %>
-                            <option value={avail.id}>{avail.full_name}</option>
-                          <% end %>
-                        </select>
-
-                        <.button
-                          id="btn-assign-subordinate"
-                          type="submit"
-                          variant="primary"
-                          class="text-xs px-2.5 py-1"
-                        >
-                          Assign
-                        </.button>
-
-                        <.button
-                          id="btn-cancel-add-subordinate"
-                          type="button"
-                          phx-click="toggle_add_subordinate"
-                          class="text-xs px-2.5 py-1"
-                        >
-                          Cancel
-                        </.button>
-                      </form>
-                    <% else %>
-                      <.button
-                        id="btn-toggle-add-subordinate"
-                        phx-click="toggle_add_subordinate"
-                        variant="primary"
-                        class="text-xs px-2.5 py-1"
-                      >
-                        <.icon name="create" class="size-3.5" /> <span>Add</span>
-                      </.button>
-                    <% end %>
-                  </div>
-                <% end %>
-              </div>
-
-              <div class="overflow-x-auto">
-                <table id="subordinates-table" class="w-full text-left text-xs text-ink">
-                  <thead>
-                    <tr class="border-b border-line text-ink-subtle">
-                      <th class="py-2 pr-4 font-semibold">
-                        <button
-                          type="button"
-                          phx-click="sort_subordinates"
-                          phx-value-sort_by="full_name"
-                          class="flex items-center gap-1 hover:text-ink cursor-pointer"
-                        >
-                          <span>Name</span>
-                          <%= if @subordinates_sort_by == "full_name" do %>
-                            <span>{if @subordinates_sort_dir == "asc", do: "↑", else: "↓"}</span>
-                          <% end %>
-                        </button>
-                      </th>
-
-                      <th class="py-2 px-4 font-semibold">
-                        <button
-                          type="button"
-                          phx-click="sort_subordinates"
-                          phx-value-sort_by="designation"
-                          class="flex items-center gap-1 hover:text-ink cursor-pointer"
-                        >
-                          <span>Designation</span>
-                          <%= if @subordinates_sort_by == "designation" do %>
-                            <span>{if @subordinates_sort_dir == "asc", do: "↑", else: "↓"}</span>
-                          <% end %>
-                        </button>
-                      </th>
-
-                      <th class="py-2 px-4 font-semibold">
-                        <button
-                          type="button"
-                          phx-click="sort_subordinates"
-                          phx-value-sort_by="status"
-                          class="flex items-center gap-1 hover:text-ink cursor-pointer"
-                        >
-                          <span>Status</span>
-                          <%= if @subordinates_sort_by == "status" do %>
-                            <span>{if @subordinates_sort_dir == "asc", do: "↑", else: "↓"}</span>
-                          <% end %>
-                        </button>
-                      </th>
-
-                      <th class="py-2 px-4 font-semibold">
-                        <button
-                          type="button"
-                          phx-click="sort_subordinates"
-                          phx-value-sort_by="department"
-                          class="flex items-center gap-1 hover:text-ink cursor-pointer"
-                        >
-                          <span>Department</span>
-                          <%= if @subordinates_sort_by == "department" do %>
-                            <span>{if @subordinates_sort_dir == "asc", do: "↑", else: "↓"}</span>
-                          <% end %>
-                        </button>
-                      </th>
-
-                      <th :if={@can_manage?} class="py-2 pl-4 text-right font-semibold">Actions</th>
-                    </tr>
-                  </thead>
-
-                  <tbody class="divide-y divide-line">
-                    <%= if @sorted_subordinates == [] do %>
-                      <tr>
-                        <td
-                          colspan={if @can_manage?, do: 5, else: 4}
-                          class="py-6 text-center text-ink-subtle"
-                        >
-                          No subordinates.
-                        </td>
-                      </tr>
-                    <% else %>
-                      <%= for sub <- @sorted_subordinates do %>
-                        <tr
-                          id={"subordinate-row-#{sub.id}"}
-                          class="hover:bg-surface-sunken/40 transition"
-                        >
-                          <td class="py-2 pr-4 font-medium text-ink">
-                            <.link
-                              navigate={~p"/employees/#{sub.id}"}
-                              class="text-brand-strong hover:underline"
-                            >
-                              {sub.full_name}
-                            </.link>
-                          </td>
-
-                          <td class="py-2 px-4 text-ink-subtle">
-                            {display_or_dash(sub.designation)}
-                          </td>
-
-                          <td class="py-2 px-4">
-                            <.badge kind={status_badge_kind(sub.status)}>
-                              {String.capitalize(sub.status)}
-                            </.badge>
-                          </td>
-
-                          <td class="py-2 px-4 text-ink-subtle">
-                            {Map.get(@department_map, sub.department_id, "—")}
-                          </td>
-
-                          <td :if={@can_manage?} class="py-2 pl-4 text-right">
-                            <.button
-                              id={"remove-subordinate-#{sub.id}"}
-                              type="button"
-                              phx-click="remove_subordinate"
-                              phx-value-id={sub.id}
-                              data-confirm={"Remove #{sub.full_name} as subordinate?"}
-                              class="text-danger hover:bg-danger/10 text-xs px-2 py-1"
-                            >
-                              <.icon name="close" class="size-3.5" />
-                              <span class="sr-only">Remove</span>
-                            </.button>
-                          </td>
-                        </tr>
+                      <%= for avail <- @available_subordinates do %>
+                        <option value={avail.id}>{avail.full_name}</option>
                       <% end %>
-                    <% end %>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                    </select>
+
+                    <.button
+                      id="btn-assign-subordinate"
+                      type="submit"
+                      variant="primary"
+                      class="text-xs px-2.5 py-1"
+                    >
+                      Assign
+                    </.button>
+
+                    <.button
+                      id="btn-cancel-add-subordinate"
+                      type="button"
+                      phx-click="toggle_add_subordinate"
+                      class="text-xs px-2.5 py-1"
+                    >
+                      Cancel
+                    </.button>
+                  </form>
+                <% else %>
+                  <.button
+                    id="btn-toggle-add-subordinate"
+                    phx-click="toggle_add_subordinate"
+                    variant="primary"
+                    class="text-xs px-2.5 py-1"
+                  >
+                    <.icon name="create" class="size-3.5" /> <span>Add</span>
+                  </.button>
+                <% end %>
+              </:actions>
+            </.section_heading>
+
+            <.table
+              id="subordinates-table"
+              rows={@sorted_subordinates}
+              row_id={fn sub -> "subordinate-row-#{sub.id}" end}
+              sort_by={@subordinates_sort_by}
+              sort_dir={@subordinates_sort_dir}
+              sort_event="sort_subordinates"
+              caption="Subordinates"
+              framed={false}
+            >
+              <:col :let={sub} label="Name" sort="full_name">
+                <.link
+                  id={"subordinate-link-#{sub.id}"}
+                  navigate={~p"/employees/#{sub.id}"}
+                  class="font-medium text-action hover:underline"
+                >
+                  {sub.full_name}
+                </.link>
+              </:col>
+              <:col :let={sub} label="Designation" sort="designation">
+                <span class="text-ink-subtle">{display_or_dash(sub.designation)}</span>
+              </:col>
+              <:col :let={sub} label="Status" sort="status">
+                <.badge kind={status_badge_kind(sub.status)}>
+                  {String.capitalize(sub.status)}
+                </.badge>
+              </:col>
+              <:col :let={sub} label="Department" sort="department">
+                <span class="text-ink-subtle">
+                  {Map.get(@department_map, sub.department_id, "—")}
+                </span>
+              </:col>
+              <:action :let={sub}>
+                <.icon_button
+                  :if={@can_manage?}
+                  icon="close"
+                  label={"Remove #{sub.full_name} as subordinate"}
+                  kind={:danger}
+                  id={"remove-subordinate-#{sub.id}"}
+                  phx-click="remove_subordinate"
+                  phx-value-id={sub.id}
+                  data-confirm={"Remove #{sub.full_name} as subordinate?"}
+                />
+              </:action>
+              <:empty
+                :if={@sorted_subordinates == []}
+                title="No subordinates"
+                reason="Employees who report to this employee appear here."
+              />
+            </.table>
           </.card>
           <.discovered_panel
             key="employee.addresses"

@@ -68,11 +68,12 @@ defmodule BilimbiWeb.ThemeContrastTest do
   #
   # `ink-subtle` carries 12px semibold table headers, so it is gated as body
   # text on each background those headers actually render on: the shared
-  # `<.table>` head on `surface-sunken`, the database-query head on
-  # `surface-muted`, and hand-written heads inside a card on `surface`
-  # (parity finding C2). `ink-muted` is the role the decision-log acting-for
-  # line moved onto; its rows sit on `surface` and hover to `surface-sunken`
-  # (finding C3).
+  # `<.table>` head on `surface-sunken` (every detail-section table, the
+  # database-query results included, renders that head), the notification
+  # panel's head on `surface-muted`, and hand-written heads inside a card on
+  # `surface` (parity finding C2). `ink-muted` is the role the decision-log
+  # acting-for line moved onto; its rows sit on `surface` and hover to
+  # `surface-sunken` (finding C3).
   @pairs [
     {"ink", "surface", 4.5},
     {"ink", "canvas", 4.5},

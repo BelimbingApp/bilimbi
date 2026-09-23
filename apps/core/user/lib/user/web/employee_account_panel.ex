@@ -1,10 +1,14 @@
 defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
   @moduledoc """
-  Employee-page linked-account row, contributed as a discovered embed.
+  Employee-page linked-account fact, contributed as a discovered embed.
 
   Core User owns the `users.employee_id` link and every write behind this
   panel; the employee page renders it by the `"employee.accounts"` manifest
-  key and never names this module (#581, mechanism from #570/#575).
+  key and never names this module (#581, mechanism from #570/#575). The page
+  owns the row: it names the "User" fact in its shared `<.list>` and decides
+  whether an employee has one (an agent does not), and this panel renders
+  only the value cell — the outcome notice, then the account choice for an
+  operator who may manage employees or the linked account for anyone else.
 
   The panel also declares the operations the employee pages use for account
   choices, replacement, and type transitions. Those operations run through the
@@ -138,71 +142,62 @@ defmodule Bilimbi.Core.User.Web.EmployeeAccountPanel do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class="contents">
-      <div :if={@employee_type != "agent" or @notice} id={"#{@id}-row"}>
-        <dt class="text-[11px] uppercase tracking-wider font-semibold text-ink-subtle">
-          User
-        </dt>
-
-        <dd class="mt-0.5 text-sm text-ink">
-          <div
-            :if={@notice}
-            id={"#{@id}-notice"}
-            class={[
-              "mb-1.5 rounded-lg border px-2.5 py-1.5 text-xs",
-              elem(@notice, 0) == :info && "border-line bg-brand-surface text-ink",
-              elem(@notice, 0) == :error && "border-danger/40 bg-surface text-danger"
-            ]}
-          >
-            {elem(@notice, 1)}
-          </div>
-
-          <%= if @employee_type != "agent" do %>
-            <%= if @can_manage? do %>
-              <form
-                phx-change="save_user"
-                phx-target={@myself}
-                id="employee-user-form"
-                class="inline-flex items-center gap-2"
-              >
-                <select
-                  id="employee-user"
-                  name="user_id"
-                  class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
-                >
-                  <option value="" selected={is_nil(@linked_user)}>None</option>
-
-                  <%= for u <- @available_users do %>
-                    <option value={u.id} selected={@linked_user && @linked_user.id == u.id}>
-                      {u.name}
-                    </option>
-                  <% end %>
-                </select>
-
-                <%= if @linked_user do %>
-                  <.link
-                    navigate={~p"/users/#{@linked_user.id}"}
-                    class="text-xs font-medium text-brand-strong hover:underline"
-                  >
-                    {@linked_user.name}
-                  </.link>
-                <% end %>
-              </form>
-            <% else %>
-              <%= if @linked_user do %>
-                <.link
-                  navigate={~p"/users/#{@linked_user.id}"}
-                  class="text-sm text-brand-strong hover:underline"
-                >
-                  {@linked_user.name}
-                </.link>
-              <% else %>
-                <span class="text-sm text-ink-subtle">None</span>
-              <% end %>
-            <% end %>
-          <% end %>
-        </dd>
+    <div id={@id}>
+      <div
+        :if={@notice}
+        id={"#{@id}-notice"}
+        role={if elem(@notice, 0) == :error, do: "alert", else: "status"}
+        class={[
+          "mb-1.5 rounded-lg border px-2.5 py-1.5 text-xs",
+          elem(@notice, 0) == :info && "border-line bg-brand-surface text-ink",
+          elem(@notice, 0) == :error && "border-danger/40 bg-surface text-danger"
+        ]}
+      >
+        {elem(@notice, 1)}
       </div>
+
+      <%= if @can_manage? do %>
+        <form
+          phx-change="save_user"
+          phx-target={@myself}
+          id="employee-user-form"
+          class="inline-flex flex-wrap items-center gap-2"
+        >
+          <select
+            id="employee-user"
+            name="user_id"
+            aria-label="Linked user account"
+            class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
+          >
+            <option value="" selected={is_nil(@linked_user)}>None</option>
+
+            <%= for u <- @available_users do %>
+              <option value={u.id} selected={@linked_user && @linked_user.id == u.id}>
+                {u.name}
+              </option>
+            <% end %>
+          </select>
+
+          <.link
+            :if={@linked_user}
+            id="employee-user-link"
+            navigate={~p"/users/#{@linked_user.id}"}
+            class="text-xs font-medium text-action hover:underline"
+          >
+            {@linked_user.name}
+          </.link>
+        </form>
+      <% else %>
+        <.link
+          :if={@linked_user}
+          id="employee-user-link"
+          navigate={~p"/users/#{@linked_user.id}"}
+          class="text-action hover:underline"
+        >
+          {@linked_user.name}
+        </.link>
+        <span :if={is_nil(@linked_user)} class="text-ink-muted">None</span>
+      <% end %>
     </div>
     """
   end

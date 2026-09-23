@@ -67,6 +67,7 @@ defmodule Bilimbi.Base.UI.IconRegistryTest do
              "retain" => "hero-bookmark",
              "retained" => "hero-bookmark-solid",
              "copy" => "hero-clipboard",
+             "duplicate" => "hero-document-duplicate",
              "attach" => "hero-paper-clip",
              "share" => "hero-share",
              "help" => "hero-question-mark-circle",

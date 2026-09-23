@@ -232,6 +232,25 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
       assert has_element?(view, "#bell-item-#{n1.id}")
       assert render(view) =~ "Alert for Bell"
 
+      # The open panel follows the shell's disclosure contract: focus moves
+      # into it on open, Escape closes it and returns focus to the bell. The
+      # listener is the panel's own, so a closed bell claims no key.
+      assert has_element?(view, "#app-notifications-dropdown[phx-mounted][phx-key='escape']")
+      refute has_element?(view, "#topbar-notification-bell[phx-window-keydown]")
+
+      panel = view |> element("#app-notifications-dropdown") |> render()
+      assert panel =~ ~s(phx-window-keydown)
+      assert panel =~ ~s(&quot;focus&quot;)
+      assert panel =~ ~s(#app-notifications-bell)
+      assert panel =~ ~s(close_dropdown)
+
+      view |> element("#app-notifications-dropdown") |> render_keydown(%{"key" => "Escape"})
+      refute has_element?(view, "#app-notifications-dropdown")
+      assert has_element?(view, "#app-notifications-bell[aria-expanded='false']")
+
+      view |> element("#app-notifications-bell") |> render_click()
+      assert has_element?(view, "#app-notifications-dropdown")
+
       # Mark all as read from dropdown
       view |> element("#bell-mark-all-read") |> render_click()
       assert User.unread_notification_count(scope, 91) == {:ok, 0}

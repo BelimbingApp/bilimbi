@@ -197,8 +197,9 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
     end
   end
 
+  # The shared `<.table>` names the column in `phx-value-sort`.
   @impl true
-  def handle_event("sort_results", %{"column" => column}, socket) do
+  def handle_event("sort_results", %{"sort" => column}, socket) do
     sort_dir =
       if socket.assigns.result_sort_by == column do
         if socket.assigns.result_sort_dir == :asc, do: :desc, else: :asc
