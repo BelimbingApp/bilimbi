@@ -157,13 +157,13 @@ defmodule Bilimbi.Base.UI.DesignLibraryRulesTest do
   end
 
   describe "the specimen rule" do
-    test "rejects an id-less card the library never names" do
+    test "rejects an unanchored card the library never names" do
       nodes = area(~S|<.card title="Brand new specimen"><p>Bars</p></.card>|)
 
       assert Enum.any?(Source.specimen_problems(nodes), &(&1 =~ "Brand new specimen"))
     end
 
-    test "accepts an id-less card the library declares" do
+    test "accepts an unanchored card the library declares" do
       nodes = area(~S|<.card title="Choice controls"><p>Bars</p></.card>|)
 
       refute Enum.any?(Source.specimen_problems(nodes), &(&1 =~ "Choice controls"))

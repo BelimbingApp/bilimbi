@@ -525,9 +525,12 @@ not call or recreate it elsewhere.
   `id="component-<name>"` block of its own that calls `<.name>`; framing
   another specimen is not presenting it. The exempt anchors are the sidebar
   menu, the grouping sections it links to and the wrapper around them, so a
-  new grouping section is linked from the menu or drops the prefix. An id-less
-  `<.card>` in the components area names nothing, so it is anchored, nested
-  inside an anchored block, or listed in the `@declared_specimens` of
+  new grouping section is linked from the menu or drops the prefix. A nested
+  `component-` id is an entry of its own and splits the block above it, so
+  the library's stage wrappers, captions and boundary notes take the
+  `design-library-` prefix instead. A `<.card>` in the components area with
+  no `component-` anchor names nothing, so it is anchored, nested inside an
+  anchored block, or listed in the `@declared_specimens` of
   `Bilimbi.Base.UI.DesignLibrarySource`, which owns the rules that read the
   template. Hand-written control markup and single-state specimens fail the
   guards in `apps/base/ui/test/design_library_*_test.exs`, which read it and

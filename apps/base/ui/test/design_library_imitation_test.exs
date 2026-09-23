@@ -21,8 +21,9 @@ defmodule Bilimbi.Base.UI.DesignLibraryImitationTest do
       and design-spec areas are reference surfaces that claim no component, so
       only the components area is checked.
     * **An undeclared `<.card>` in the components area.** A card frames a
-      specimen, so an id-less one presents something the library never names.
-      It has to be anchored, sit inside an anchored block, or be listed in
+      specimen, so one carrying no `component-` anchor — id-less or under a
+      library id of its own — presents something the library never names. It
+      has to be anchored, sit inside an anchored block, or be listed in
       `@declared_specimens`.
 
   What this does not catch: a fake built from raw non-card, non-control markup
