@@ -97,7 +97,7 @@ defmodule BilimbiWeb.TenantsLiveTest do
     )
     |> render_submit()
 
-    assert has_element?(view, "#flash-info", "Tenant created.")
+    assert has_element?(view, "#flash-success", "Tenant created.")
     assert has_element?(view, "#tenants td", "Customer Sub-Tenant")
 
     created = Enum.find(Tenancy.list_tenants(), &(&1.name == "Customer Sub-Tenant"))

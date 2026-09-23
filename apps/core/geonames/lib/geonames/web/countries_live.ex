@@ -41,7 +41,7 @@ defmodule Bilimbi.Core.Geonames.Web.CountriesLive do
         {:noreply,
          socket
          |> stream_insert(:countries, updated_country)
-         |> put_flash(:info, "Country #{updated_country.iso} name updated.")}
+         |> put_flash(:success, "Country #{updated_country.iso} name updated.")}
 
       {:error, _reason} ->
         {:noreply,

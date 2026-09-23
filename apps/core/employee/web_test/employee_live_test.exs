@@ -789,12 +789,12 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       |> form("#add-subordinate-form")
       |> render_submit(%{"subordinate_id" => to_string(subordinate.id)})
 
-      assert has_element?(view, "#flash-info", "Subordinate assigned.")
+      assert has_element?(view, "#flash-success", "Subordinate assigned.")
 
       # Open modal
       view |> element("#btn-open-attach-address") |> render_click()
       assert_modal_dialog(view, "attach-address-modal", "Attach Address")
-      refute has_element?(view, "#flash-info")
+      refute has_element?(view, "#flash-success")
 
       # Attach address with shipping kind and priority 5
       view

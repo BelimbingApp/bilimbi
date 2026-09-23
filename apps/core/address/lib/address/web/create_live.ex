@@ -64,7 +64,7 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
         {:ok, _address} ->
           {:noreply,
            socket
-           |> put_flash(:info, "Address created successfully.")
+           |> put_flash(:success, "Address created successfully.")
            |> push_navigate(to: ~p"/addresses")}
 
         {:error, %Changeset{} = domain_changeset} ->

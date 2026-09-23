@@ -267,7 +267,7 @@ defmodule BilimbiWeb.DashboardLive do
          |> assign(:widgets, widgets)
          |> assign(:available_widgets, available)
          |> schedule_refresh(widgets)
-         |> put_flash(:info, "#{widget.label} added to dashboard.")}
+         |> put_flash(:success, "#{widget.label} added to dashboard.")}
     end
   end
 
@@ -288,7 +288,7 @@ defmodule BilimbiWeb.DashboardLive do
          |> assign(:widgets, widgets)
          |> assign(:available_widgets, available)
          |> schedule_refresh(widgets)
-         |> put_flash(:info, "Widget removed.")}
+         |> put_flash(:success, "Widget removed.")}
 
       {[], _} ->
         {:noreply, socket}
@@ -309,7 +309,7 @@ defmodule BilimbiWeb.DashboardLive do
        socket
        |> assign(:visible_sections, visible_sections)
        |> assign(:available_sections, available_sections)
-       |> put_flash(:info, "#{section_label(id)} added to dashboard.")}
+       |> put_flash(:success, "#{section_label(id)} added to dashboard.")}
     else
       {:noreply, socket}
     end
@@ -329,7 +329,7 @@ defmodule BilimbiWeb.DashboardLive do
        socket
        |> assign(:visible_sections, visible_sections)
        |> assign(:available_sections, available_sections)
-       |> put_flash(:info, "#{section_label(id)} removed from dashboard.")}
+       |> put_flash(:success, "#{section_label(id)} removed from dashboard.")}
     else
       {:noreply, socket}
     end

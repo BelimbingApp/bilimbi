@@ -58,7 +58,7 @@ defmodule Bilimbi.Core.User.Web.PasswordLive do
         {:ok, _user} ->
           socket =
             socket
-            |> put_flash(:info, "Password updated successfully.")
+            |> put_flash(:success, "Password updated successfully.")
             |> assign_empty_form()
 
           {:noreply, socket}

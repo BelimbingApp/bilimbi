@@ -39,9 +39,9 @@ defmodule Bilimbi.Base.UI.Components do
   The message is the flash entry for `kind`, or the inner block. Every
   severity is `role="alert"`; announcing success and info politely instead
   is deliberate follow-up work, not part of this contract.
-  `:success` and `:info` share the success colouring and differ by icon: most
-  `put_flash(:info, ...)` call sites report a completed write, so the two
-  cannot be told apart by colour until those callers move to `:success`.
+  `:success` and `:info` share the success colouring and differ by icon:
+  `put_flash(:info, ...)` call sites inform without confirming a write, so a
+  later change can give `:info` its own colouring without touching callers.
 
   Clicking the message clears it on the server and hides it. The component
   itself never dismisses on a timer; `Bilimbi.Base.UI.Layouts.flash_group/1`,

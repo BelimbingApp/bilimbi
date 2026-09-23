@@ -82,7 +82,7 @@ defmodule Bilimbi.Core.User.Web.AppearanceLive do
 
     case refused do
       [] ->
-        put_flash(socket, :info, "Appearance settings saved.")
+        put_flash(socket, :success, "Appearance settings saved.")
 
       refused ->
         put_flash(socket, :error, Enum.join(saved_note(saved) ++ refusal_notes(refused), " "))

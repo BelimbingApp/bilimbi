@@ -42,7 +42,7 @@ defmodule Bilimbi.Core.Employee.Web.TypeFormLive do
         {:ok, new_type} ->
           {:noreply,
            socket
-           |> put_flash(:info, "#{new_type.label} was created.")
+           |> put_flash(:success, "#{new_type.label} was created.")
            |> push_navigate(to: ~p"/employee-types")}
 
         {:error, :company_not_found} ->

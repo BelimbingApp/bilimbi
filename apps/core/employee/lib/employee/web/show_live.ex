@@ -360,7 +360,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
             {:ok, _sub} ->
               {:noreply,
                socket
-               |> put_flash(:info, "Subordinate assigned.")
+               |> put_flash(:success, "Subordinate assigned.")
                |> assign(:adding_subordinate, false)
                |> assign(:selected_subordinate_id, "")
                |> load_data(employee)}

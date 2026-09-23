@@ -119,7 +119,7 @@ defmodule BilimbiWeb.UserProfileLiveTest do
     # Asserted on the flash, not the page: my first version matched
     # "needs verifying" and passed against the standing help text in the form,
     # which says the same thing whether or not anything was saved.
-    assert has_element?(view, "#flash-info", "unverified until you confirm it")
+    assert has_element?(view, "#flash-success", "unverified until you confirm it")
   end
 
   test "does not warn when the email is unchanged", %{conn: conn} do
@@ -131,8 +131,8 @@ defmodule BilimbiWeb.UserProfileLiveTest do
     })
     |> render_submit()
 
-    refute has_element?(view, "#flash-info", "unverified until you confirm it")
-    assert has_element?(view, "#flash-info", "Profile saved.")
+    refute has_element?(view, "#flash-success", "unverified until you confirm it")
+    assert has_element?(view, "#flash-success", "Profile saved.")
   end
 
   test "a case-only email difference is not an email change", %{conn: conn} do
@@ -152,8 +152,8 @@ defmodule BilimbiWeb.UserProfileLiveTest do
     # Case only, not whitespace: `form_changeset/2` rejects whitespace with
     # `~r/^[^\s@]+@[^\s@]+$/` before the domain ever sees it, so a padded
     # address cannot reach this path from the UI.
-    refute has_element?(view, "#flash-info", "unverified until you confirm it")
-    assert has_element?(view, "#flash-info", "Profile saved.")
+    refute has_element?(view, "#flash-success", "unverified until you confirm it")
+    assert has_element?(view, "#flash-success", "Profile saved.")
 
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
     assert {:ok, user} = User.get_tenant_user(scope, 91)

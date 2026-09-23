@@ -149,7 +149,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
 
             {:noreply,
              socket
-             |> put_flash(:info, "Relationship established successfully.")
+             |> put_flash(:success, "Relationship established successfully.")
              |> assign(:modal_action, nil)
              |> assign(:relationships_count, length(relationships))
              |> assign_form(nil)
@@ -171,7 +171,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
 
             {:noreply,
              socket
-             |> put_flash(:info, "Relationship updated successfully.")
+             |> put_flash(:success, "Relationship updated successfully.")
              |> assign(:modal_action, nil)
              |> assign(:editing_rel, nil)
              |> assign_form(nil)

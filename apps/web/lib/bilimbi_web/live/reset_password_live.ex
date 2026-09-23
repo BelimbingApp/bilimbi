@@ -39,7 +39,7 @@ defmodule BilimbiWeb.ResetPasswordLive do
       {:ok, _user} ->
         {:noreply,
          socket
-         |> put_flash(:info, "Your password has been reset.")
+         |> put_flash(:success, "Your password has been reset.")
          |> push_navigate(to: ~p"/")}
 
       {:error, :invalid_or_expired_token} ->

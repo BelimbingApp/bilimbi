@@ -453,7 +453,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
           {:noreply,
            socket
-           |> put_flash(:info, msg)
+           |> put_flash(:success, msg)
            |> assign(:selected_role_ids, [])
            |> assign(:show_assign_roles, false)
            |> load_data(user)}
@@ -574,7 +574,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
           {:noreply,
            socket
-           |> put_flash(:info, msg)
+           |> put_flash(:success, msg)
            |> assign(:selected_capability_keys, [])
            |> load_data(user)}
 
@@ -712,7 +712,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           {:ok, updated_user} ->
             {:noreply,
              socket
-             |> put_flash(:info, "Password updated successfully.")
+             |> put_flash(:success, "Password updated successfully.")
              |> assign(
                :password_form,
                to_form(%{"password" => "", "password_confirmation" => ""})
@@ -760,7 +760,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             {:ok, updated_user} ->
               {:noreply,
                socket
-               |> put_flash(:info, "Employee linked.")
+               |> put_flash(:success, "Employee linked.")
                |> assign(:show_link_employee, false)
                |> load_data(updated_user)}
 
@@ -895,7 +895,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                User.update_user(scope, user.company_id, user.id, %{employee_id: employee.id}) do
           {:noreply,
            socket
-           |> put_flash(:info, "Employee created and linked.")
+           |> put_flash(:success, "Employee created and linked.")
            |> assign(:show_add_employee_modal, false)
            |> load_data(updated_user)}
         else

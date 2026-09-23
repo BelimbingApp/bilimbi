@@ -57,7 +57,7 @@ defmodule Bilimbi.Core.User.Web.FormLive do
         {:ok, user} ->
           {:noreply,
            socket
-           |> put_flash(:info, "User created successfully.")
+           |> put_flash(:success, "User created successfully.")
            |> push_navigate(to: ~p"/users/#{user.id}")}
 
         {:error, :company_not_found} ->

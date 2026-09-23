@@ -93,7 +93,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
         {:ok, duplicate} ->
           {:noreply,
            socket
-           |> put_flash(:info, "Query duplicated.")
+           |> put_flash(:success, "Query duplicated.")
            |> push_navigate(to: ~p"/admin/system/database-queries/#{duplicate.slug}")}
 
         {:error, _reason} ->

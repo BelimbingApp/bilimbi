@@ -126,7 +126,7 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
        socket.assigns.per_page,
        reset: true
      )
-     |> put_flash(:info, "All notifications marked as read.")}
+     |> put_flash(:success, "All notifications marked as read.")}
   end
 
   @impl true

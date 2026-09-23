@@ -417,14 +417,14 @@ defmodule BilimbiWeb.GeonamesLiveTest do
       "place_name" => "Kuala Lumpur City"
     })
 
-    assert has_element?(postcodes, "#flash-info", "Postcode 50000 updated.")
+    assert has_element?(postcodes, "#flash-success", "Postcode 50000 updated.")
 
     postcodes |> element("#postcodes-new") |> render_click()
     assert_modal_dialog(postcodes, "postcode-modal", "New Postcode")
 
     refute has_element?(postcodes, "dialog#postcode-modal #postcode-modal-flash-info")
     refute has_element?(postcodes, "dialog#postcode-modal #postcode-modal-flash-error")
-    refute has_element?(postcodes, "#flash-info")
+    refute has_element?(postcodes, "#flash-success")
   end
 
   test "forged postcode writes fail closed without the update capability", %{conn: conn} do
