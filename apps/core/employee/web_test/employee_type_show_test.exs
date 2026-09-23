@@ -74,7 +74,9 @@ defmodule BilimbiWeb.EmployeeTypeShowTest do
            )
 
     {:ok, scope} = Tenancy.scope(41)
-    assert {:ok, %{label: "Temporary Contractor"}} = Employee.get_employee_type(scope, 73, type.id)
+
+    assert {:ok, %{label: "Temporary Contractor"}} =
+             Employee.get_employee_type(scope, 73, type.id)
   end
 
   test "saves the committed label in place and reports the outcome on that fact", %{
@@ -142,7 +144,9 @@ defmodule BilimbiWeb.EmployeeTypeShowTest do
     assert has_element?(view, "h1", "Temporary Contractor")
     refute has_element?(view, "#employee-type-label-status", "Saved")
     refute has_element?(view, "#flash-group", "was not saved")
-    assert {:ok, %{label: "Temporary Contractor"}} = Employee.get_employee_type(scope, 73, type.id)
+
+    assert {:ok, %{label: "Temporary Contractor"}} =
+             Employee.get_employee_type(scope, 73, type.id)
 
     # An overlong label is refused with its reason and the rejected value
     # truncated to what identifies it.

@@ -1039,7 +1039,13 @@ defmodule BilimbiWeb.UserShowTest do
 
     view |> element("#remove-denial-admin-company-view") |> render_click()
     view |> element("#user-authz-confirm-confirm", "Remove") |> render_click()
-    assert has_element?(view, "#flash-success", "The deny rule for admin.company.view was removed.")
+
+    assert has_element?(
+             view,
+             "#flash-success",
+             "The deny rule for admin.company.view was removed."
+           )
+
     refute has_element?(view, "#denied-cap-badge-admin-company-view")
 
     view

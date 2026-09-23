@@ -3,7 +3,7 @@
   plugins: [Phoenix.LiveView.HTMLFormatter],
   inputs: [
     "{mix,.formatter}.exs",
-    "{config,lib,test}/**/*.{heex,ex,exs}",
+    "{config,lib,test,web_test}/**/*.{heex,ex,exs}",
     "priv/repo/migrations/*.exs",
     "priv/web_routes.exs"
   ]
