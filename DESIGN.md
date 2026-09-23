@@ -557,6 +557,13 @@ state and clear recovery paths.
 Use plain, respectful operational language. Write for the person doing the
 work, not for enterprise theatre or system internals.
 
+Operator-facing surfaces carry the idea, not its identifier. A catalog row
+(`FND-01`), a Design Spec number (`D01`) or a decision code is a working
+reference for plans, `DESIGN.md`, comments and test names; a rendered heading,
+menu entry or description leads with the statement itself and never with the
+code. A code that a link or test depends on stays as the element's `id` and
+nothing more.
+
 ## Accessibility and resilience
 
 Design for keyboard use, readable contrast, visible focus, semantic structure,

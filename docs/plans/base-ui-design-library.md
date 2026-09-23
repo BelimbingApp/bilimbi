@@ -3,7 +3,7 @@
 **Status:** Foundation merged; the parity campaign continues under Issue #709
 **Last Updated:** 2026-09-20
 **Tracking:** [Issue #691](https://github.com/BelimbingApp/bilimbi/issues/691)
-**Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`; `fm/parity-designlib-specimens/grok-4.6`; `fm/designlib-catalog-ids-in-ui/opus-5`; `fm/designlib-state-coverage-gaps/opus-5`; `fm/addresses-detail-read-first/opus-5`; `fm/companies-detail-belimbing-parity/claude-fable-5-1`
+**Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`; `fm/parity-designlib-specimens/grok-4.6`; `fm/designlib-catalog-ids-in-ui/opus-5`; `fm/designlib-state-coverage-gaps/opus-5`; `fm/addresses-detail-read-first/opus-5`; `fm/companies-detail-belimbing-parity/claude-fable-5-1`; `fm/designspec-codes-off-the-ui/claude-fable-5-1`
 **Related:** `docs/plans/base-ui-design-parity.md`
 
 ## Problem
@@ -133,6 +133,7 @@ Goal: Turn accepted decisions into one coherent Bilimbi default.
 - [x] Issue #720 — give the components shown in only one presentation their real states: the three page widths as live page calls on one wide stage, a header whose action sits beside the title, cards with and without a title, an error flash under the info flash, and the outline, solid and mini icon treatments each drawn at its own natural size, above a separate pair showing that size and colour are chosen where the icon is used. Where the component has no further state — card, record facts and icon — the specimen says so instead of inventing one. `{fm/parity-designlib-states/opus-5}`
 - [x] Replace the Design Library's fake Navigation, Tabs, and Radio group specimens with the real rail and shared Base UI components, and adopt tabs on the Schedule board and the Settings group strip. `{fm/parity-designlib-specimens/grok-4.6}`
 - [x] Drop the parity ledger's row identifiers and family codes from every operator-facing heading, menu entry and description in the Components and Design Spec areas, including the eleven family headings and sidebar descriptions introduced by #724 — the eleven-family grouping and its A–K menu order stay — and give the canonical table specimen the sortable single-card shape `/users` uses. `{fm/designlib-catalog-ids-in-ui/opus-5}`
+- [x] Drop the Design Spec numbers (`T01`, `D01`–`D06`, `C01`–`C06`) from the rendered card headings as well, keeping each as the card's anchor `id` and in this plan's references; the captain ruled that catalog IDs are noise to users, over the recommendation to keep them visible as a citable ledger. `{fm/designspec-codes-off-the-ui/claude-fable-5-1}`
 - [ ] Complete the approved catalog and parity campaign in `docs/plans/base-ui-design-parity.md`; that plan owns the detailed IDs, agent lanes and acceptance evidence.
 - [ ] Give each changeable design fact one owner in the smallest useful default-library structure.
 - [ ] Create a small Design Library agent skill for inspection, focused edits, browser review and validation.
