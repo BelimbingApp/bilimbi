@@ -545,7 +545,8 @@ defmodule Bilimbi.Base.UI.Layouts do
   notices are errors and keep that rule.
 
   The group is a permanent polite live region, so a message inserted into it
-  is announced; every message is an alert, whatever its severity.
+  is announced. Each message carries its own role: success and info are a
+  polite `status`, while warning and error interrupt as an assertive `alert`.
 
   The shell's preference status line under the top bar is deliberately not
   part of this outlet: see the Design Library's Feedback section.

@@ -1182,7 +1182,7 @@
             </div>
             <div id="component-flash" class="space-y-3">
               <p class="text-sm text-ink-muted">
-                One message per severity. The layout's flash group is the single production outlet: it stacks messages in one column at the top right, most severe first, so several stay readable at once. Info, warning and error stay until dismissed, because a message someone must act on must not disappear on a timer. Only a success times out, after eight seconds: every completed write reports one, and info is for a message that informs without confirming a write. Success and info still share one colour and differ by icon; giving info a colour of its own is follow-up work now that the callers have moved.
+                One message per severity. The layout's flash group is the single production outlet: it stacks messages in one column at the top right, most severe first, so several stay readable at once. Info, warning and error stay until dismissed, because a message someone must act on must not disappear on a timer. Only a success times out, after eight seconds: every completed write reports one, and info is for a message that informs without confirming a write. Each kind has a colour and an icon of its own, so the four can be told apart here side by side; info is blue, as in Belimbing, and never reads as a success. Success and info are announced politely as a status; warning and error interrupt as an alert.
               </p>
               <div class="flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
                 <.flash
@@ -1249,7 +1249,8 @@
                 raised behind an open dialog could be neither read nor dismissed. The kinds follow
                 the flash's rule for what a message does, not how it is worded: a completed write
                 says success and reads as the success flash at inline strength, a plain statement
-                is info, and a refusal is an error that interrupts. Dismiss clears it.
+                is info and reads as the info flash, and a refusal is an error that interrupts.
+                Dismiss clears it.
               </p>
               <div class="grid gap-2 lg:grid-cols-2">
                 <.panel_notice

@@ -644,8 +644,9 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   stay until dismissed. A completed write flashes `:success`; `:info` is for
   a notice that informs without confirming a write. Pick the kind from what
   the message does and, where one handler reports different outcomes, from
-  the branch. `:success` and `:info` still share the success colouring;
-  giving `:info` its own treatment is follow-up work that touches no caller.
+  the branch. `:info` paints on the blue `info` role and `:success` on
+  `success`, so they never look alike; success and info are announced as a
+  polite `status`, warning and error as an assertive `alert`.
   A LiveComponent panel that cannot reach the page's flash reports through
   `<.panel_notice>` under the same kind rule (`:success`, `:info`, `:error`),
   above its table or inside its open dialog; do not hand-write a notice. The
@@ -694,7 +695,7 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   is chosen. Components and templates use the semantic roles it declares —
   `canvas`, `surface`, `surface-sunken`, `surface-muted`, `surface-sidebar`,
   `brand-surface`, `line`, `ink`, `link`, `muted`, `action`, `brand`, `brand-strong`,
-  `success`, `warning`, `danger` — as ordinary Tailwind utilities such as
+  `success`, `info`, `warning`, `danger` — as ordinary Tailwind utilities such as
   `bg-surface`, `text-ink-muted`, `text-link`, `border-line`, `text-danger`.
 - A raw palette class such as `stone-200` or `emerald-600` outside that
   `@theme` block is a defect. It is greppable, so treat it as one:

@@ -63,12 +63,12 @@ module may add a semantic role only when its workflow genuinely needs one.
 - **`action` / `action-hover` / `action-ink`**: Confident primary action
   colours used for primary buttons and page `<h1>` headings. The base remains
   distinct from its brighter hover in both themes.
-- **`success` / `warning` / `danger`** (each with `-surface`, `-line`,
-  `-ink`): Honest status roles for real feedback. A neutral statement has no
-  status role of its own yet: an `:info` flash is still painted with
-  `success`, while an `:info` alert or panel notice stays on the neutral
-  surface. Completed writes report `:success`, so giving `:info` a treatment
-  of its own is follow-up work that touches no caller.
+- **`success` / `info` / `warning` / `danger`** (each with `-surface`,
+  `-line`, `-ink`): Honest status roles for real feedback. `info` is blue, as
+  in Belimbing: a statement that informs without confirming a write, so an
+  `:info` flash, alert or panel notice never looks like the `:success` a
+  completed write reports. Each kind is announced by what it does: success
+  and info are a polite `status`, warning and error an assertive `alert`.
 
 ## Compact typography
 
@@ -620,12 +620,14 @@ readable at once. Info, warning and error stay until the person dismisses
 them, because a message someone must act on must not disappear on a timer.
 Only a success times out, after eight seconds. Every completed write reports
 one, whether or not it was confirmed through the shared confirmation dialog;
-an info flash informs without confirming a write. A panel that cannot reach
-the page's flash reports through `<.panel_notice>` under the same rule: a
-completed write says success and reads as the success flash at inline
-strength, a plain statement stays info, and a refusal is an error announced
-as an alert. The notice renders above the panel's table, or inside the
-panel's open dialog, and is dismissed in place.
+an info flash informs without confirming a write and is painted on the blue
+`info` role, so the two never look alike. Success and info are announced
+politely as a `status`; warning and error interrupt as an `alert`. A panel
+that cannot reach the page's flash reports through `<.panel_notice>` under
+the same rule: a completed write says success and reads as the success flash
+at inline strength, a plain statement stays info and reads as the info flash,
+and a refusal is an error announced as an alert. The notice renders above the
+panel's table, or inside the panel's open dialog, and is dismissed in place.
 
 ## Reduce anxiety
 

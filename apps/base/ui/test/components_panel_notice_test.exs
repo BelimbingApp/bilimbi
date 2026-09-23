@@ -43,6 +43,8 @@ defmodule Bilimbi.Base.UI.ComponentsPanelNoticeTest do
     value
   end
 
+  defp surface_classes(kind), do: attribute(notice_tag(render_notice(kind)), "class")
+
   defp icon_name(html) do
     [_, name] = Regex.run(~r/class="(hero-[a-z0-9-]+) mt-0.5 size-4 shrink-0"/, html)
     name
@@ -53,6 +55,7 @@ defmodule Bilimbi.Base.UI.ComponentsPanelNoticeTest do
 
     assert attribute(tag, "data-kind") == "success"
     assert attribute(tag, "role") == "status"
+    assert attribute(tag, "aria-live") == "polite"
   end
 
   test "an informational notice renders the info kind and is announced politely" do
@@ -60,6 +63,7 @@ defmodule Bilimbi.Base.UI.ComponentsPanelNoticeTest do
 
     assert attribute(tag, "data-kind") == "info"
     assert attribute(tag, "role") == "status"
+    assert attribute(tag, "aria-live") == "polite"
   end
 
   test "an error renders the error kind and interrupts as an alert" do
@@ -67,6 +71,12 @@ defmodule Bilimbi.Base.UI.ComponentsPanelNoticeTest do
 
     assert attribute(tag, "data-kind") == "error"
     assert attribute(tag, "role") == "alert"
+    assert attribute(tag, "aria-live") == "assertive"
+  end
+
+  test "no two kinds share one colouring" do
+    surfaces = Enum.map(@kinds, &surface_classes/1)
+    assert Enum.uniq(surfaces) == surfaces
   end
 
   test "each kind shows its own status icon, the same glyphs the flash uses" do

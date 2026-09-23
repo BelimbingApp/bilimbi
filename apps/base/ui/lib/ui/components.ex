@@ -12,7 +12,7 @@ defmodule Bilimbi.Base.UI.Components do
   design directly rather than delegating product appearance to a component
   theme. Every component here styles itself with the semantic color roles
   declared in `assets/css/app.css` — `surface`, `ink`, `line`, `action`,
-  `brand`, `success`, `warning`, and `danger`. A raw palette class such as
+  `brand`, `success`, `info`, `warning`, and `danger`. A raw palette class such as
   `stone-200` or `emerald-600` does not belong in a component or a template.
 
   Here are useful references:
@@ -36,12 +36,12 @@ defmodule Bilimbi.Base.UI.Components do
   @doc """
   Renders one flash message.
 
-  The message is the flash entry for `kind`, or the inner block. Every
-  severity is `role="alert"`; announcing success and info politely instead
-  is deliberate follow-up work, not part of this contract.
-  `:success` and `:info` share the success colouring and differ by icon:
-  `put_flash(:info, ...)` call sites inform without confirming a write, so a
-  later change can give `:info` its own colouring without touching callers.
+  The message is the flash entry for `kind`, or the inner block. Each kind
+  has a colour role of its own: a completed write is `:success`, a statement
+  that informs without confirming one is `:info` and reads on the blue `info`
+  role, so the two never look alike. Announcement follows the same split as
+  Belimbing's alert: success and info are a polite `status`, while warning
+  and error interrupt as an assertive `alert`.
 
   Clicking the message clears it on the server and hides it. The component
   itself never dismisses on a timer; `Bilimbi.Base.UI.Layouts.flash_group/1`,
@@ -81,14 +81,15 @@ defmodule Bilimbi.Base.UI.Components do
       :if={msg = render_slot(@inner_block) || Phoenix.Flash.get(@flash, @kind)}
       id={@id}
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
-      role="alert"
+      role={status_role(@kind)}
+      aria-live={status_live(@kind)}
       class="w-full"
       {@rest}
     >
       <div class={[
         "flex items-start gap-3 rounded-2xl border p-4 text-sm shadow-xl shadow-ink/[0.08] backdrop-blur",
-        @kind in [:success, :info] &&
-          "border-success-line bg-success-surface/95 text-success-ink",
+        @kind == :success && "border-success-line bg-success-surface/95 text-success-ink",
+        @kind == :info && "border-info-line bg-info-surface/95 text-info-ink",
         @kind == :warning && "border-warning-line bg-warning-surface/95 text-warning-ink",
         @kind == :error && "border-danger-line bg-danger-surface/95 text-danger-ink"
       ]}>
@@ -110,6 +111,17 @@ defmodule Bilimbi.Base.UI.Components do
   defp status_icon(:success), do: "success"
   defp status_icon(:warning), do: "warning"
   defp status_icon(:error), do: "error"
+
+  # How a status kind is announced, shared by `flash/1`, `alert/1` and
+  # `panel_notice/1`: success and info are a polite `status` that waits for
+  # the reader, while warning and error interrupt as an assertive `alert`.
+  # `aria-live` is stated even though each role implies it, so the message
+  # keeps its own politeness inside any live region that contains it.
+  defp status_role(kind) when kind in [:warning, :error], do: "alert"
+  defp status_role(kind) when kind in [:success, :info], do: "status"
+
+  defp status_live(kind) when kind in [:warning, :error], do: "assertive"
+  defp status_live(kind) when kind in [:success, :info], do: "polite"
 
   @doc """
   Renders the two connection banners for one container.
@@ -183,7 +195,8 @@ defmodule Bilimbi.Base.UI.Components do
   Renders an inline status alert (Belimbing's `x-ui.alert` counterpart).
 
   Kinds map to the honest status roles: `:info`, `:success`, `:warning`,
-  `:error`.
+  `:error`. Success and info are announced politely as a `status`; warning
+  and error interrupt as an `alert`.
 
   ## Examples
 
@@ -197,7 +210,8 @@ defmodule Bilimbi.Base.UI.Components do
   def alert(assigns) do
     ~H"""
     <div
-      role="alert"
+      role={status_role(@kind)}
+      aria-live={status_live(@kind)}
       class={[
         "flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm",
         status_surface(@kind),
@@ -214,7 +228,7 @@ defmodule Bilimbi.Base.UI.Components do
   # The one inline colouring per status role, shared by `alert/1` and
   # `panel_notice/1` so a success reads as the same idea wherever it lands.
   # The page-level `flash/1` uses the same roles at banner strength.
-  defp status_surface(:info), do: "border-line bg-surface-sunken text-ink"
+  defp status_surface(:info), do: "border-info-line bg-info-surface text-info-ink"
   defp status_surface(:success), do: "border-success-line bg-success-surface text-success-ink"
   defp status_surface(:warning), do: "border-warning-line bg-warning-surface text-warning-ink"
   defp status_surface(:error), do: "border-danger-line bg-danger-surface text-danger-ink"
@@ -233,8 +247,9 @@ defmodule Bilimbi.Base.UI.Components do
   `kind` is what the message does, not how it is worded: a write that
   finished says `:success`, a notice that merely informs stays `:info`, and
   a refusal or failure is `:error`. A completed write and an error look like
-  their page-level flash counterparts at inline strength. Success and info
-  are announced politely as a `status`; an error interrupts as an `alert`.
+  their page-level flash counterparts at inline strength, and so does an
+  informational notice on the `info` role. Success and info are announced
+  politely as a `status`; an error interrupts as an `alert`.
 
   ## Examples
 
@@ -264,7 +279,8 @@ defmodule Bilimbi.Base.UI.Components do
     ~H"""
     <div
       id={@id}
-      role={if @kind == :error, do: "alert", else: "status"}
+      role={status_role(@kind)}
+      aria-live={status_live(@kind)}
       data-kind={@kind}
       class={[
         "flex items-start gap-2 rounded-lg border px-3 py-2 text-sm",

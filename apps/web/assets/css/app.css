@@ -86,11 +86,18 @@
   /* Selection — current place or choice. */
   --color-selection-line: var(--color-lime-300);
 
-  /* Status — honest feedback only. */
+  /* Status — honest feedback only. `info` is a statement that informs without
+   * confirming a write; it is blue, as in Belimbing, so it never reads as a
+   * success. */
   --color-success: var(--color-emerald-600);
   --color-success-surface: var(--color-emerald-50);
   --color-success-line: var(--color-emerald-200);
   --color-success-ink: var(--color-emerald-900);
+
+  --color-info: var(--color-blue-600);
+  --color-info-surface: var(--color-blue-50);
+  --color-info-line: var(--color-blue-200);
+  --color-info-ink: var(--color-blue-900);
 
   --color-warning: var(--color-amber-500);
   --color-warning-surface: var(--color-amber-50);
@@ -146,6 +153,10 @@
     --color-success-surface: var(--color-emerald-950);
     --color-success-line: var(--color-emerald-800);
     --color-success-ink: var(--color-emerald-200);
+    --color-info: var(--color-blue-500);
+    --color-info-surface: var(--color-blue-950);
+    --color-info-line: var(--color-blue-800);
+    --color-info-ink: var(--color-blue-200);
     --color-warning: var(--color-amber-400);
     --color-warning-surface: var(--color-amber-950);
     --color-warning-line: var(--color-amber-700);
@@ -189,6 +200,10 @@
   --color-success-surface: var(--color-emerald-950);
   --color-success-line: var(--color-emerald-800);
   --color-success-ink: var(--color-emerald-200);
+  --color-info: var(--color-blue-500);
+  --color-info-surface: var(--color-blue-950);
+  --color-info-line: var(--color-blue-800);
+  --color-info-ink: var(--color-blue-200);
   --color-warning: var(--color-amber-400);
   --color-warning-surface: var(--color-amber-950);
   --color-warning-line: var(--color-amber-700);
