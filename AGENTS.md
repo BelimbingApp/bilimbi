@@ -488,7 +488,9 @@ mix usage_rules.docs Module.function/arity
 mix usage_rules.search_docs "phrase" -p package
 ```
 
-Those tasks read this project's locked versions. In `iex -S mix`,
+`usage_rules.docs` reads this project's locked version. `search_docs`
+searches the latest Hex release, not the lock, so use it only to find a
+page, then confirm the API with `usage_rules.docs`. In `iex -S mix`,
 `h Module.function` shows the same installed docs. The source is
 `deps/<package>` (`ls`, `rg`, its `README` or `CHANGELOG`). When a
 dependency is upgraded, record the new pattern and the retired one in the
