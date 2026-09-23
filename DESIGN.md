@@ -250,21 +250,18 @@ page:
   when the resolution ends at UTC. Belimbing always says UTC there, which is
   untrue under a tenant-level setting; Belimbing keeps that one control
   always visible with a saved note beside it, and Bilimbi's read-state
-  trigger is the deliberate shape. One option of a choice may be
-  irreversible — the user's company offers "None", after which the account
-  leaves every user screen and nothing can reopen it — and an irreversible
-  option does not commit on change. Irreversibility is the test, not cost: every company
-  change ends the account's sessions, so that alone does not earn a
-  confirmation. `phoenix_html` confirms a click and never a select's
-  change, so choosing it replaces the select on the fact with a
-  `<.button variant="danger">` carrying the `data-confirm` that names the
-  record and the consequences, beside a Cancel that restores the read state.
-  The write happens on the confirmed click and re-asks Authz there. This is
-  a deliberate deviation from Belimbing, whose edit-in-place select saves a
-  blank on change: Belimbing has a surface that manages an unaffiliated
-  account afterwards and Bilimbi has none, so copying the affordance without
-  that safety net would be parity in shape rather than in substance. The
-  captain may overrule it.
+  trigger is the deliberate shape. A choice offers only values the product
+  can stand behind: the user's company offers the workspace's live
+  companies and no "None", because a user always belongs to a company and
+  an account with none is reachable from no screen. Belimbing's select
+  offers the blank and saves it on change; Bilimbi drops the option rather
+  than guarding it with a confirmation, so the choice commits on change like
+  every other. A change whose cost the operator cannot see — a company
+  change ends every session the account holds — says so in the open editor,
+  as a `text-warning-ink` note beside the select that the select's
+  `aria-describedby` names, before the choice is made. Cost alone does not
+  earn a second click; a note is the warning, and a confirmation is reserved
+  for a choice that cannot be undone.
 - **Interdependent facts** — the address location, where a country change
   invalidates the division, postcode and locality — commit together through
   one grouped editor with a primary Apply and a Cancel. The group is opened

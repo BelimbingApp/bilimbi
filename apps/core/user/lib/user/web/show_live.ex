@@ -9,28 +9,26 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   - the name and email commit on Enter or on leaving the field, through
     `<.inline_edit>`; Escape cancels. Neither column is nullable, so an
     emptied value commits nothing;
-  - the company is a choice fact: it reads as the company name (or "None")
-    and becomes a select on click; the select commits on change, and Escape
-    or leaving it cancels, as Belimbing's `admin/users/show` edit-in-place
-    select does. Every company change ends every session the account holds:
-    `reassign_user_company/6` and `clear_user_company/5` both terminate them,
-    so that is not what sets one option apart. Choosing "None" is the one
-    irreversible choice — the account leaves every user screen and nothing
-    can reopen it — so it arms a confirmation on the fact instead of writing,
-    and the write happens on the confirmed click. That control is disabled
-    for its round trip, and a confirmed click that arrives after the removal
-    has landed finds nothing to remove and leaves the stored outcome
-    standing.
+  - the company is a choice fact: it reads as the company name and becomes
+    a select on click; the select commits on change, and Escape or leaving
+    it cancels, as Belimbing's `admin/users/show` edit-in-place select does.
+    The select offers this workspace's live companies and nothing else: a
+    user always belongs to a company, and is the same person operating
+    under a different one, so there is no blank option and no way to detach
+    an account here. Belimbing offers "None" on that select; Bilimbi does
+    not, because `User.get_tenant_user/2` resolves a user through its
+    company and no screen could reopen a detached account. A blank value
+    that still arrives is refused on the fact and writes nothing.
+    `reassign_user_company/6` ends every session the account holds, so the
+    open editor says so before the operator chooses; the warning is a note
+    beside the select, not a second click, because the change is reversible
+    by choosing the previous company again.
 
-  An account with no company has no company for Core User to write its facts
-  through, so its name and email show no editor and an info notice says so.
-  The notice states only what is reachable: inside the platform-operator
-  tenant an operator holding `admin.user.unaffiliated.manage` can affiliate
-  the account again from this page while it is open; in any other tenant the
-  affiliation is refused outright. In both cases leaving the page is final —
-  `User.get_tenant_user/2` resolves a user through its company, so no user
-  screen can reopen an account with none, and neither the notice nor a
-  refusal offers a recovery that does not exist.
+  Every account this page mounts has a company — `get_tenant_user/2`
+  returns no other — so every fact has a company for Core User to write it
+  through. When that company is archived, `Company.list_companies/1` does not
+  name it and the page reads it as an archived company rather than as no
+  company at all.
 
   Each fact reports its own outcome through the shared commit status that
   `Bilimbi.Base.UI.CommitStatus` keeps: "Saving…" while the round trip is in
@@ -58,7 +56,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                           toggle_effective_permissions toggle_link_employee)
 
   alias Bilimbi.Base.Authz
-  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.UI.CommitStatus
 
   @manage_capability "admin.user.update"
@@ -96,7 +93,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     socket
     |> CommitStatus.init()
     |> assign(:editing_field, nil)
-    |> assign(:confirm_clear_company?, false)
     |> assign(:show_assign_roles, false)
     |> assign(:role_search, "")
     |> assign(:selected_role_ids, [])
@@ -129,7 +125,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     scope = socket.assigns.current_scope.scope
     current_scope = socket.assigns.current_scope
     can_manage? = allowed?(current_scope, @manage_capability)
-    platform_operator? = Scope.platform_operator?(scope)
 
     {:ok, companies} = Company.list_companies(scope)
     company_names = Map.new(companies, &{&1.id, Company.Summary.display_name(&1)})
@@ -267,7 +262,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     |> assign(:user, user)
     |> assign(:page_title, user.name)
     |> assign(:can_manage?, can_manage?)
-    |> assign(:platform_operator?, platform_operator?)
     |> assign(:companies, companies)
     |> assign(:company_names, company_names)
     |> assign(:company_name, Map.get(company_names, user.company_id))
@@ -346,43 +340,33 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     {:noreply, close_company_editor(socket)}
   end
 
-  # The company choice commits on change. Belimbing's saveCompany routes the
-  # same three transitions — reassign, clear, and affiliate an unaffiliated
-  # account — and each stays its own audited Core User operation here.
-  # Clearing is the destructive one and is the only one this event does not
-  # perform: it arms the confirmation the operator then clicks.
+  # The company choice commits on change, as Belimbing's saveCompany does.
+  # Only a reassignment is offered: the select carries no choosable blank, so a
+  # blank value is a forged or stale submission and is refused on the fact
+  # without a write. The reassignment ends the account's sessions; the open
+  # editor warned about that before the choice was made.
   def handle_event("save_company", params, socket) do
     if can_manage?(socket) do
       scope = socket.assigns.current_scope.scope
       user = socket.assigns.user
-      target_company_id = chosen_company_id(params)
-      choice = company_choice_label(socket, target_company_id)
+      current_company_id = user.company_id
 
-      cond do
-        user.company_id == target_company_id ->
-          {:noreply, commit_company(socket, :unchanged, {:ok, user}, choice)}
-
-        is_nil(target_company_id) ->
-          {:noreply, assign(socket, :confirm_clear_company?, true)}
-
-        is_nil(user.company_id) ->
-          actor = current_actor(socket, target_company_id)
-
+      case chosen_company_id(params) do
+        nil ->
           {:noreply,
-           commit_company(
-             socket,
-             :affiliate,
-             User.assign_unaffiliated_user(actor, scope, user.id, target_company_id),
-             choice
-           )}
+           socket
+           |> close_company_editor()
+           |> CommitStatus.put("company", {:error, detach_refused_message()})}
 
-        true ->
+        ^current_company_id ->
+          {:noreply, commit_company(socket, {:ok, user}, socket.assigns.company_name)}
+
+        target_company_id ->
           actor = current_actor(socket, user.company_id)
 
           {:noreply,
            commit_company(
              socket,
-             :reassign,
              User.reassign_user_company(
                actor,
                scope,
@@ -390,36 +374,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                user.id,
                target_company_id
              ),
-             choice
-           )}
-      end
-    else
-      {:noreply, write_forbidden(socket)}
-    end
-  end
-
-  # The confirmed removal. The confirmation decides only what the page shows;
-  # this write re-asks Authz like every other one, and an account that already
-  # has no company has nothing to remove: the outcome on the fact is the one
-  # the write that landed put there.
-  def handle_event("remove_company", _params, socket) do
-    if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      user = socket.assigns.user
-
-      case user.company_id do
-        nil ->
-          {:noreply, close_company_editor(socket)}
-
-        company_id ->
-          actor = current_actor(socket, company_id)
-
-          {:noreply,
-           commit_company(
-             socket,
-             :clear,
-             User.clear_user_company(actor, scope, company_id, user.id),
-             "None"
+             company_choice_label(socket, target_company_id)
            )}
       end
     else
@@ -966,7 +921,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
             <%= if @company_name do %>
               {@company_name}
             <% else %>
-              Unaffiliated
+              Archived company
             <% end %>
           </:subtitle>
           <:actions>
@@ -1003,27 +958,6 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
               User Details
             </h3>
 
-            <%!-- Core User writes an account's facts through its company, so an
-                 unaffiliated account has no in-place editor for them; the page
-                 says so instead of offering a commit it would always refuse. --%>
-            <.alert
-              :if={@can_manage? and is_nil(@user.company_id)}
-              kind={:info}
-              id="user-unaffiliated-notice"
-              class="mb-4"
-            >
-              <%= if @platform_operator? do %>
-                This account has no company. Its name and email can be edited once a company is
-                assigned, and affiliating it again needs the
-                admin.user.unaffiliated.manage capability. Do it here, while this page is open:
-                once you leave, no user screen can reopen this account.
-              <% else %>
-                This account has no company. Its name and email can be edited once a company is
-                assigned, and this tenant may not affiliate an unaffiliated account. Once you
-                leave, no user screen can reopen this account.
-              <% end %>
-            </.alert>
-
             <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <.text_fact
                 name="name"
@@ -1054,7 +988,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
                   >
                     <span :if={@company_name} class="text-ink">{@company_name}</span>
-                    <span :if={is_nil(@company_name)} class="text-ink-muted">None</span>
+                    <span :if={is_nil(@company_name)} class="text-ink-muted">Archived company</span>
                     <.icon
                       name="edit"
                       class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
@@ -1069,21 +1003,19 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                     phx-window-keydown="cancel_edit_field"
                     phx-key="Escape"
                   >
-                    <form
-                      :if={not @confirm_clear_company?}
-                      id="user-company-form"
-                      phx-change="save_company"
-                      class="inline-block"
-                    >
+                    <form id="user-company-form" phx-change="save_company" class="inline-block">
                       <select
                         id="user-company-select"
                         name="company_id"
                         aria-label="Company"
+                        aria-describedby="user-company-warning"
                         phx-mounted={JS.focus()}
                         phx-blur="cancel_edit_field"
                         class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                       >
-                        <option value="" selected={is_nil(@user.company_id)}>None</option>
+                        <option :if={is_nil(@company_name)} value="" selected disabled>
+                          Archived company
+                        </option>
                         <option
                           :for={company <- @companies}
                           value={company.id}
@@ -1094,27 +1026,13 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                       </select>
                     </form>
 
-                    <%!-- phoenix_html confirms a click, never a select's
-                         change, so the blank choice arms this control and the
-                         write happens on the confirmed click. --%>
-                    <div
-                      :if={@confirm_clear_company?}
-                      id="user-company-clear"
-                      class="flex flex-wrap items-center gap-2"
-                    >
-                      <.button
-                        id="user-company-clear-confirm"
-                        variant="danger"
-                        phx-click="remove_company"
-                        phx-disable-with="Removing…"
-                        data-confirm={company_clear_confirmation(@user.name, @company_name)}
-                      >
-                        Remove from company
-                      </.button>
-                      <.button id="user-company-clear-cancel" phx-click="cancel_edit_field">
-                        Cancel
-                      </.button>
-                    </div>
+                    <%!-- The choice commits on change and the write ends the
+                         account's sessions, so the warning stands before the
+                         choice, beside the select, where the operator reads it
+                         first; it is a note, not a second click. --%>
+                    <p id="user-company-warning" class="mt-1 text-xs text-warning-ink">
+                      Changing the company signs {@user.name} out of every session.
+                    </p>
                   </div>
 
                   <%= if not @can_manage? do %>
@@ -1126,7 +1044,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                         {@company_name}
                       </.link>
                     <% else %>
-                      <span class="text-ink-muted">None</span>
+                      <span class="text-ink-muted">Archived company</span>
                     <% end %>
                   <% end %>
 
@@ -1969,7 +1887,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       assigns
       |> assign(:label, fact_label(assigns.name))
       |> assign(:value, Map.fetch!(assigns.user, Map.fetch!(@inline_fields, assigns.name)))
-      |> assign(:editable?, assigns.can_manage? and not is_nil(assigns.user.company_id))
+      |> assign(:editable?, assigns.can_manage?)
 
     ~H"""
     <div id={"user-detail-#{@name}"}>
@@ -2009,10 +1927,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     scope = socket.assigns.current_scope.scope
     user = socket.assigns.user
 
-    case user.company_id && User.update_user(scope, user.company_id, user.id, attrs) do
-      nil ->
-        CommitStatus.put(socket, name, {:error, unaffiliated_message()})
-
+    case User.update_user(scope, user.company_id, user.id, attrs) do
       {:ok, updated_user} ->
         socket
         |> load_data(updated_user)
@@ -2020,6 +1935,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
       {:error, %Ecto.Changeset{} = changeset} ->
         CommitStatus.put(socket, name, {:error, refusal_message(name, submitted, changeset)})
+
+      {:error, :company_not_found} when is_nil(socket.assigns.company_name) ->
+        CommitStatus.put(socket, name, {:error, archived_company_message()})
 
       {:error, reason} ->
         CommitStatus.put(socket, name, {:error, failure_message(reason)})
@@ -2041,39 +1959,34 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   defp failure_message(_reason), do: CommitStatus.failure_message()
 
-  # Each refusal names the rule that applied to the transition that was asked
-  # for, and the company that rule was evaluated against. Reassign and clear
-  # both authorize `admin.user.update` on the account's CURRENT company, so
-  # naming the chosen one — or "None", which names no company at all — would
-  # point at the wrong rule. Affiliating is the operator-only transition and
-  # is refused by the tenant before the capability.
-  defp company_failure_message(:not_platform_operator, _transition, choice, _company_name),
-    do: "#{inspect(choice)} was not saved: this tenant may not affiliate an unaffiliated account."
+  # A refusal names the rule that applied and the company it was evaluated
+  # against. A reassignment authorizes `admin.user.update` on the account's
+  # CURRENT company, so naming the chosen one would point at the wrong rule.
+  # An archived current company refuses every write on the account, so it is
+  # the cause whatever the rule reported.
+  defp company_failure_message(_reason, choice, nil),
+    do: "#{inspect(choice)} was not saved: this user's company is archived."
 
-  defp company_failure_message(:unauthorized, :affiliate, choice, _company_name),
-    do:
-      "#{inspect(choice)} was not saved: affiliating an unaffiliated account needs the " <>
-        "admin.user.unaffiliated.manage capability."
-
-  defp company_failure_message(:unauthorized, :clear, _choice, company_name),
-    do: "The change was not saved: you may not manage users of #{company_name}."
-
-  defp company_failure_message(:unauthorized, _transition, choice, company_name),
+  defp company_failure_message(:unauthorized, choice, company_name),
     do: "#{inspect(choice)} was not saved: you may not manage users of #{company_name}."
 
-  defp company_failure_message(:company_not_found, transition, choice, _company_name)
-       when transition in [:affiliate, :reassign],
-       do: "#{inspect(choice)} was not saved: that company is not in this workspace."
+  defp company_failure_message(:company_not_found, choice, _company_name),
+    do: "#{inspect(choice)} was not saved: that company is not in this workspace."
 
-  defp company_failure_message(reason, _transition, _choice, _company_name),
+  defp company_failure_message(reason, _choice, _company_name),
     do: failure_message(reason)
 
-  defp company_clear_confirmation(user_name, company_name) do
-    "Remove #{user_name} from #{company_name}? Every session this account holds ends " <>
-      "immediately, and afterwards it is not reachable from any user screen."
-  end
+  # The account's own company is archived, so no write on it can land; the
+  # refusal names that company rather than the value the operator submitted.
+  defp archived_company_message,
+    do: "The change was not saved: this user's company is archived."
 
-  defp commit_company(socket, transition, result, choice) do
+  # The select offers no choosable blank; a blank that still arrives is refused
+  # in the words the product means, not as a missing company.
+  defp detach_refused_message,
+    do: "The change was not saved: a user always belongs to a company."
+
+  defp commit_company(socket, result, choice) do
     company_name = socket.assigns.company_name
     socket = close_company_editor(socket)
 
@@ -2094,16 +2007,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         CommitStatus.put(
           socket,
           "company",
-          {:error, company_failure_message(reason, transition, choice, company_name)}
+          {:error, company_failure_message(reason, choice, company_name)}
         )
     end
   end
 
-  defp close_company_editor(socket) do
-    socket
-    |> assign(:editing_field, nil)
-    |> assign(:confirm_clear_company?, false)
-  end
+  defp close_company_editor(socket), do: assign(socket, :editing_field, nil)
 
   defp chosen_company_id(params) do
     company_id_param =
@@ -2120,14 +2029,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     end
   end
 
-  defp unaffiliated_message,
-    do: "The change was not saved: this account has no company to write it through."
-
   # What the operator chose, as the alert names it: the company's display
-  # name when the option came from this workspace's list, "None" for the
-  # blank option, and the raw ID for anything else.
-  defp company_choice_label(_socket, nil), do: "None"
-
+  # name when the option came from this workspace's list, and the raw ID for
+  # anything else.
   defp company_choice_label(socket, company_id) do
     Map.get(socket.assigns.company_names, company_id, Integer.to_string(company_id))
   end
