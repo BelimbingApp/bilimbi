@@ -229,7 +229,11 @@ defmodule BilimbiWeb.AuthzPrincipalRolesLiveTest do
       grant_capabilities!("admin.authz.principal-role.list")
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/principal-roles")
 
-      assert has_element?(view, "#principal-roles-reach-caution.text-warning-ink", "role assignments attached to no company")
+      assert has_element?(
+               view,
+               "#principal-roles-reach-caution.text-warning-ink",
+               "role assignments attached to no company"
+             )
     end
 
     test "says nothing to an ordinary tenant", %{conn: conn} do
@@ -249,7 +253,11 @@ defmodule BilimbiWeb.AuthzPrincipalRolesLiveTest do
         email: "grace@example.com"
       })
 
-      grant_capabilities!("admin.authz.principal-role.list", tenant_id: 42, company_id: 74, user_id: 92)
+      grant_capabilities!("admin.authz.principal-role.list",
+        tenant_id: 42,
+        company_id: 74,
+        user_id: 92
+      )
 
       {:ok, view, _html} =
         conn

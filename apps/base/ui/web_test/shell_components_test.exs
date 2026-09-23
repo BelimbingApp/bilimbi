@@ -28,7 +28,10 @@ defmodule Bilimbi.Base.UI.ShellComponentsTest do
   end
 
   defp render_warning(current_scope) do
-    render_component(&ShellComponents.scope_warning/1, id: "warning", current_scope: current_scope)
+    render_component(&ShellComponents.scope_warning/1,
+      id: "warning",
+      current_scope: current_scope
+    )
     |> LazyHTML.from_fragment()
   end
 

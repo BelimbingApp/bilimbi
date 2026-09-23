@@ -88,7 +88,11 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     # The action keeps its capability gate and its glyph; it leads to the
     # record page, where the label edits in place, not to a separate form.
-    assert has_element?(view, "a#employee-type-edit-#{type.id}[href='/employee-types/#{type.id}']")
+    assert has_element?(
+             view,
+             "a#employee-type-edit-#{type.id}[href='/employee-types/#{type.id}']"
+           )
+
     refute has_element?(view, "a[href$='/edit']")
 
     {:ok, show, _html} =
@@ -112,7 +116,10 @@ defmodule BilimbiWeb.EmployeeTypeLiveTest do
 
     {:ok, show, _html} =
       view
-      |> element("a#employee-type-#{type.id}-link[href='/employee-types/#{type.id}']", "Temporary")
+      |> element(
+        "a#employee-type-#{type.id}-link[href='/employee-types/#{type.id}']",
+        "Temporary"
+      )
       |> render_click()
       |> follow_redirect(conn |> log_in_as(), ~p"/employee-types/#{type.id}")
 

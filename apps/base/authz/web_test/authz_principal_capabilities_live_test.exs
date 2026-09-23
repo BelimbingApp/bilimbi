@@ -346,7 +346,11 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
       grant_capabilities!("admin.authz.principal-capability.list")
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/principal-capabilities")
 
-      assert has_element?(view, "#principal-capabilities-reach-caution.text-warning-ink", "direct grants attached to no company")
+      assert has_element?(
+               view,
+               "#principal-capabilities-reach-caution.text-warning-ink",
+               "direct grants attached to no company"
+             )
     end
 
     test "says nothing to an ordinary tenant", %{conn: conn} do
@@ -366,7 +370,11 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
         email: "grace@example.com"
       })
 
-      grant_capabilities!("admin.authz.principal-capability.list", tenant_id: 42, company_id: 74, user_id: 92)
+      grant_capabilities!("admin.authz.principal-capability.list",
+        tenant_id: 42,
+        company_id: 74,
+        user_id: 92
+      )
 
       {:ok, view, _html} =
         conn

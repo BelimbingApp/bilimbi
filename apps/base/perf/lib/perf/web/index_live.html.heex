@@ -10,7 +10,7 @@
           id="performance-pin"
           data-nav-pin="nav-admin-system-performance"
           aria-pressed="false"
-          />
+        />
       </:title_actions>
       <:subtitle>Redacted route and background-job diagnostics</:subtitle>
     </.header>
@@ -41,9 +41,15 @@
     <.card id="performance-regressions" title="Recent regressions" inner_class="p-0" class="mb-2">
       <.table id="performance-regression-table" rows={@regressions} framed={false}>
         <:col :let={row} label="Route / worker">{row.identity}</:col>
-        <:col :let={row} label="Baseline avg"><span class="tabular-nums">{Float.round(row.baseline_average_ms, 1)} ms</span></:col>
-        <:col :let={row} label="Current p95"><span class="tabular-nums">{Float.round(row.current_p95_ms, 1)} ms</span></:col>
-        <:col :let={row} label="Change"><span class="tabular-nums">{row.delta_percent}%</span></:col>
+        <:col :let={row} label="Baseline avg">
+          <span class="tabular-nums">{Float.round(row.baseline_average_ms, 1)} ms</span>
+        </:col>
+        <:col :let={row} label="Current p95">
+          <span class="tabular-nums">{Float.round(row.current_p95_ms, 1)} ms</span>
+        </:col>
+        <:col :let={row} label="Change">
+          <span class="tabular-nums">{row.delta_percent}%</span>
+        </:col>
         <:empty>No regressions met the current sample and latency thresholds.</:empty>
       </.table>
     </.card>
@@ -55,19 +61,62 @@
       phx-submit="filter"
       class="mb-2 grid gap-2 sm:grid-cols-3"
     >
-      <.input type="search" id="performance-identity" field={@filters_form[:identity]} label="Route or worker" placeholder="Exact identity" phx-debounce="300" />
-      <.input type="select" id="performance-kind" field={@filters_form[:kind]} label="Kind" options={[{"All", ""}, {"Request", "request"}, {"LiveView", "liveview"}, {"Job", "job"}, {"Runtime", "runtime"}]} />
-      <.input type="select" id="performance-outcome" field={@filters_form[:outcome]} label="Outcome" options={[{"All", ""}, {"OK", "ok"}, {"Error", "error"}, {"Cancelled", "cancelled"}, {"Discarded", "discarded"}]} />
+      <.input
+        type="search"
+        id="performance-identity"
+        field={@filters_form[:identity]}
+        label="Route or worker"
+        placeholder="Exact identity"
+        phx-debounce="300"
+      />
+      <.input
+        type="select"
+        id="performance-kind"
+        field={@filters_form[:kind]}
+        label="Kind"
+        options={[
+          {"All", ""},
+          {"Request", "request"},
+          {"LiveView", "liveview"},
+          {"Job", "job"},
+          {"Runtime", "runtime"}
+        ]}
+      />
+      <.input
+        type="select"
+        id="performance-outcome"
+        field={@filters_form[:outcome]}
+        label="Outcome"
+        options={[
+          {"All", ""},
+          {"OK", "ok"},
+          {"Error", "error"},
+          {"Cancelled", "cancelled"},
+          {"Discarded", "discarded"}
+        ]}
+      />
     </.form>
 
     <.card id="performance-history" inner_class="p-0">
-      <.table id="performance-sample-table" rows={@streams.samples} row_id={fn {id, _sample} -> id end} row_item={fn {_id, sample} -> sample end} framed={false}>
-        <:col :let={sample} label="Observed"><.datetime id={"performance-observed-#{sample.id}"} value={sample.observed_at} /></:col>
+      <.table
+        id="performance-sample-table"
+        rows={@streams.samples}
+        row_id={fn {id, _sample} -> id end}
+        row_item={fn {_id, sample} -> sample end}
+        framed={false}
+      >
+        <:col :let={sample} label="Observed">
+          <.datetime id={"performance-observed-#{sample.id}"} value={sample.observed_at} />
+        </:col>
         <:col :let={sample} label="Kind">{sample.kind}</:col>
         <:col :let={sample} label="Route / worker">{sample.identity}</:col>
         <:col :let={sample} label="Outcome">{sample.outcome}</:col>
-        <:col :let={sample} label="Duration"><span class="tabular-nums">{sample.duration_ms} ms</span></:col>
-        <:col :let={sample} label="DB"><span class="tabular-nums">{sample.db_count} / {sample.db_duration_ms} ms</span></:col>
+        <:col :let={sample} label="Duration">
+          <span class="tabular-nums">{sample.duration_ms} ms</span>
+        </:col>
+        <:col :let={sample} label="DB">
+          <span class="tabular-nums">{sample.db_count} / {sample.db_duration_ms} ms</span>
+        </:col>
         <:empty :if={@total == 0}>No matching performance history.</:empty>
       </.table>
 

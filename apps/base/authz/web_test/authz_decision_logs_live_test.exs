@@ -247,7 +247,11 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
       grant_capabilities!("admin.authz.decision-log.list")
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/authz/decision-logs")
 
-      assert has_element?(view, "#decision-logs-reach-caution.text-warning-ink", "decisions recorded against no company")
+      assert has_element?(
+               view,
+               "#decision-logs-reach-caution.text-warning-ink",
+               "decisions recorded against no company"
+             )
     end
 
     test "says nothing to an ordinary tenant", %{conn: conn} do
@@ -267,7 +271,11 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
         email: "grace@example.com"
       })
 
-      grant_capabilities!("admin.authz.decision-log.list", tenant_id: 42, company_id: 74, user_id: 92)
+      grant_capabilities!("admin.authz.decision-log.list",
+        tenant_id: 42,
+        company_id: 74,
+        user_id: 92
+      )
 
       {:ok, view, _html} =
         conn

@@ -386,7 +386,12 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
 
       # The columns come from the result set, each a sort button that reports
       # its state; sorting reruns the query through the page.
-      assert has_element?(view, "th[aria-sort='none'] button#query-results-table-sort-name", "name")
+      assert has_element?(
+               view,
+               "th[aria-sort='none'] button#query-results-table-sort-name",
+               "name"
+             )
+
       assert has_element?(view, "tbody#query-results-table tr#result-row-0", "Ada Lovelace")
 
       view |> element("#query-results-table-sort-name") |> render_click()
