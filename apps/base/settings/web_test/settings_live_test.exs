@@ -79,7 +79,11 @@ defmodule BilimbiWeb.SettingsLiveTest do
              "You do not have permission to see the settings in this group"
            )
 
-    assert has_element?(view, "#settings-group-operator-withheld", "Ask an operator to review your role.")
+    assert has_element?(
+             view,
+             "#settings-group-operator-withheld",
+             "Ask an operator to review your role."
+           )
 
     # Named in the key form the Roles and Capabilities pages use, one per
     # capability the withheld settings require, so the reader knows what to
