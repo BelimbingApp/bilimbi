@@ -1287,12 +1287,18 @@
                 </:empty>
               </.table>
             </div>
-            <div class="grid gap-3 lg:grid-cols-3">
-              <.card title="Connection interrupted" inner_class="p-4">
-                <.alert kind={:warning}>
-                  Bilimbi is reconnecting. Your work has not been submitted twice.
-                </.alert>
-              </.card>
+            <div id="component-connection-banners" class="space-y-2">
+              <p class="text-xs text-ink-muted">
+                The two banners the client reveals by itself when the websocket drops: "Connection
+                interrupted" while the browser cannot reach the server, "Server unavailable" when
+                the server refused or lost the view. Shown here already revealed and bound to no
+                connection event, so a real drop is still reported once, by the layout's own pair
+                at the top right, or by an open dialog's.
+              </p>
+              <div class="grid gap-3 lg:grid-cols-2">
+                <.connection_banners id="design-library-connection" revealed={:client} />
+                <.connection_banners id="design-library-connection" revealed={:server} />
+              </div>
             </div>
           </section>
 

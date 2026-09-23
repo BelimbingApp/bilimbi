@@ -124,40 +124,54 @@ defmodule Bilimbi.Base.UI.Components do
   the dimmer, announced nor dismissed while one is open. `modal/1` renders a
   second pair inside the dialog for that reason, and the layout's is hidden
   while a dialog is open so the same banner never appears twice.
+
+  `revealed` renders only that banner, already shown and bound to no
+  connection event, so the Design Library can present what a drop looks like
+  without becoming a second live outlet that would report it again.
   """
   attr(:id, :string, required: true)
+
+  attr(:revealed, :atom,
+    values: [:client, :server],
+    doc: "renders only this banner, shown and unbound, for presentation"
+  )
 
   def connection_banners(assigns) do
     assigns =
       assigns
+      |> assign_new(:revealed, fn -> nil end)
       |> assign(:client_id, "#{assigns.id}-client-error")
       |> assign(:server_id, "#{assigns.id}-server-error")
 
     ~H"""
     <.flash
+      :if={@revealed != :server}
       id={@client_id}
       kind={:error}
       title={gettext("Connection interrupted")}
       phx-disconnected={
-        show(".phx-client-error ##{@client_id}")
-        |> JS.remove_attribute("hidden", to: ".phx-client-error ##{@client_id}")
+        !@revealed &&
+          show(".phx-client-error ##{@client_id}")
+          |> JS.remove_attribute("hidden", to: ".phx-client-error ##{@client_id}")
       }
-      phx-connected={hide("##{@client_id}") |> JS.set_attribute({"hidden", ""})}
-      hidden
+      phx-connected={!@revealed && hide("##{@client_id}") |> JS.set_attribute({"hidden", ""})}
+      hidden={!@revealed}
     >
       {gettext("Reconnecting…")}
     </.flash>
 
     <.flash
+      :if={@revealed != :client}
       id={@server_id}
       kind={:error}
       title={gettext("Server unavailable")}
       phx-disconnected={
-        show(".phx-server-error ##{@server_id}")
-        |> JS.remove_attribute("hidden", to: ".phx-server-error ##{@server_id}")
+        !@revealed &&
+          show(".phx-server-error ##{@server_id}")
+          |> JS.remove_attribute("hidden", to: ".phx-server-error ##{@server_id}")
       }
-      phx-connected={hide("##{@server_id}") |> JS.set_attribute({"hidden", ""})}
-      hidden
+      phx-connected={!@revealed && hide("##{@server_id}") |> JS.set_attribute({"hidden", ""})}
+      hidden={!@revealed}
     >
       {gettext("Attempting to reconnect")}
       <.icon name="hero-arrow-path" class="ml-1 size-3 animate-spin" />

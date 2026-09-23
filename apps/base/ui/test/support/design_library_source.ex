@@ -76,7 +76,6 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
     "Choice controls",
     "Live state",
     "Date, time, and secret inputs",
-    "Connection interrupted",
     "design-library-pattern-table"
   ]
 

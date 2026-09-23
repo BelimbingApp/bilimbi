@@ -501,7 +501,9 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
   the modal specimen rather than through an anchor of its own. A second live
   instance on that page would announce a dropped connection twice — the component
   has no presentational mode, and giving it one to satisfy a guard would be the
-  guard shaping the product.
+  guard shaping the product. Superseded 2026-09-23 by the `revealed` state
+  recorded under the coverage entry below: the library presents the banners
+  static, so the layout's pair stays the page's only live outlet.
 - [ ] Correct the `:design_library_drift` failures those two slices left, then move the guards into the default test run and `mix precommit`.
 
   Reconciled by the Design Library state-coverage slice of 2026-09-18, measured
@@ -522,7 +524,12 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     pair on every page, so a second live pair here would tell an operator
     "Connection interrupted" twice on a real disconnect. Presenting it honestly
     needs a suppression seam in the shared component and in `app.css`, which is
-    its own slice.
+    its own slice. **Closed 2026-09-23:** `<.connection_banners>` gained
+    `revealed` (`:client` or `:server`), which renders that one banner shown
+    and bound to no connection event. The library presents both under
+    Feedback and states without adding a live outlet, so a disconnect on that
+    page is reported once, by the layout's pair or an open dialog's, and no
+    suppression seam is needed.
   - **Coverage, declared states — all but one closed.** Twenty-one axes across
     `filter_toolbar`, `icon`, `input`, `list`, `multi_select`, `radio_group`,
     `table` and `tabs` were presented in a single state; every one is varied now
@@ -584,7 +591,7 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     `:present` and needs `:absent`, which only an `href` specimen can give;
     the `href` and `method` axes are unchanged. A request-form specimen
     needs a POST destination the library does not have, so those three axes
-    stay open beside `<.connection_banners>` and the `<:control>` slot.
+    stay open beside the `<:control>` slot.
 - [ ] Record dispositions in the ledger as steward review closes; the accepted choices already live in the Design Spec cards and this plan's ledger. **Rewritten 2026-09-23:** the in-library alternatives surface with catalog IDs is dropped — only one row (INP-09) is still at steward review, catalog IDs are ruled out of the rendered library, and building a surface for a one-row queue is speculative.
 - [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
 
