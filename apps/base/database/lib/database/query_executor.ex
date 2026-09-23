@@ -7,8 +7,15 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
   but a `SELECT`/`WITH` statement and known write/DDL keywords. The text checks
   give early, readable refusals; the read-only transaction is the boundary
   PostgreSQL enforces regardless of what the text checks miss.
+
+  Every command is handed to `Bilimbi.Base.Database.ConsoleCapture` with its
+  outcome — succeeded, refused (and by which guard), or failed — before the
+  answer returns to the caller. The record is the control on this console:
+  the executor never returns or raises without dispatching it, and a capture never
+  sees result rows.
   """
 
+  alias Bilimbi.Base.Database.ConsoleCapture
   alias Bilimbi.Base.Repo
   alias Ecto.Adapters.SQL
 
@@ -41,11 +48,36 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
 
   @doc """
   Executes a read-only SQL query with pagination, sorting, and parameter binding.
+
+  A `:name` option is recorded with the command (a saved query's name) and
+  plays no part in execution.
   """
   @spec execute_readonly(String.t(), map() | list(), keyword()) ::
           {:ok, result()} | {:error, String.t()}
   def execute_readonly(sql, params \\ %{}, opts \\ [])
       when is_binary(sql) and (is_map(params) or is_list(params)) and is_list(opts) do
+    outcome =
+      try do
+        run(sql, params, opts)
+      rescue
+        exception ->
+          ConsoleCapture.dispatch(sql, {:failed, Exception.message(exception)}, opts)
+          reraise exception, __STACKTRACE__
+      end
+
+    ConsoleCapture.dispatch(sql, captured_outcome(outcome), opts)
+    answer(outcome)
+  end
+
+  # The command as the capture sees it: the count of a success, never its rows.
+  defp captured_outcome({:ok, result}), do: {:succeeded, result.total}
+  defp captured_outcome(other), do: other
+
+  defp answer({:ok, result}), do: {:ok, result}
+  defp answer({:refused, _guard, message}), do: {:error, message}
+  defp answer({:failed, message}), do: {:error, message}
+
+  defp run(sql, params, opts) do
     trimmed_sql = sql |> String.trim() |> String.trim_trailing(";") |> String.trim()
 
     with :ok <- require_operator(opts),
@@ -77,7 +109,7 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
   defp require_operator(opts) do
     if Keyword.get(opts, :operator) == true,
       do: :ok,
-      else: {:error, "The database console is restricted to the platform operator."}
+      else: {:refused, :operator, "The database console is restricted to the platform operator."}
   end
 
   @doc """
@@ -103,7 +135,7 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
 
   # --- Internal Helpers ---
 
-  defp validate_sql(sql) when sql == "", do: {:error, "Query cannot be empty."}
+  defp validate_sql(sql) when sql == "", do: {:refused, :empty, "Query cannot be empty."}
 
   defp validate_sql(sql) do
     # Strip comments and string literals for keyword analysis
@@ -123,10 +155,10 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
 
     cond do
       first_word not in ["SELECT", "WITH"] ->
-        {:error, "Only SELECT or WITH queries are permitted."}
+        {:refused, :statement, "Only SELECT or WITH queries are permitted."}
 
       contains_forbidden_keywords?(stripped) ->
-        {:error, "Write or DDL statements are not permitted in queries."}
+        {:refused, :keyword, "Write or DDL statements are not permitted in queries."}
 
       true ->
         :ok
@@ -194,11 +226,8 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
           {:ok, %Postgrex.Result{rows: [[count]]}} ->
             count
 
-          {:error, %Postgrex.Error{postgres: %{message: msg}}} ->
-            Repo.rollback("SQL error counting results: #{msg}")
-
           {:error, err} ->
-            Repo.rollback("Database error: #{inspect(err)}")
+            Repo.rollback(database_outcome("SQL error counting results", err))
         end
 
       # 2. Extract column metadata by running an empty sample or checking columns
@@ -209,11 +238,8 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
           {:ok, %Postgrex.Result{columns: cols}} ->
             cols
 
-          {:error, %Postgrex.Error{postgres: %{message: msg}}} ->
-            Repo.rollback("SQL error: #{msg}")
-
           {:error, err} ->
-            Repo.rollback("Database error: #{inspect(err)}")
+            Repo.rollback(database_outcome("SQL error", err))
         end
 
       # 3. Build paginated query
@@ -237,11 +263,8 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
               Enum.zip(columns, row_list) |> Map.new()
             end)
 
-          {:error, %Postgrex.Error{postgres: %{message: msg}}} ->
-            Repo.rollback("SQL error executing query: #{msg}")
-
           {:error, err} ->
-            Repo.rollback("Database error: #{inspect(err)}")
+            Repo.rollback(database_outcome("SQL error executing query", err))
         end
 
       last_page = max(ceil(total / per_page), 1)
@@ -259,8 +282,23 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
     end)
     |> case do
       {:ok, result} -> {:ok, result}
-      {:error, reason} when is_binary(reason) -> {:error, reason}
-      {:error, other} -> {:error, inspect(other)}
+      {:error, {:refused, _guard, _message} = refused} -> refused
+      {:error, {:failed, _message} = failed} -> failed
+      {:error, other} -> {:failed, inspect(other)}
     end
   end
+
+  # A write that both text guards let through is refused by PostgreSQL's
+  # read-only transaction (SQLSTATE 25006); that is a refusal by the boundary
+  # guard, not a failure of the query. Any other database error is a failure,
+  # reported with the message the database gave.
+  defp database_outcome(prefix, %Postgrex.Error{
+         postgres: %{code: :read_only_sql_transaction, message: msg}
+       }),
+       do: {:refused, :read_only_transaction, "#{prefix}: #{msg}"}
+
+  defp database_outcome(prefix, %Postgrex.Error{postgres: %{message: msg}}),
+    do: {:failed, "#{prefix}: #{msg}"}
+
+  defp database_outcome(_prefix, err), do: {:failed, "Database error: #{inspect(err)}"}
 end

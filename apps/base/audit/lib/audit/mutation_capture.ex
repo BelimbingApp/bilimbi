@@ -21,7 +21,7 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
       `[redacted]`; the change is recorded, the value never is. `payload`
       is the durable session's opaque Laravel blob, which can carry a CSRF
       token or a password hash that no field name reveals. Long
-      strings truncate at #{2000} characters with an explicit marker;
+      strings are bounded by `Bilimbi.Base.Audit.PayloadText`;
     * `auditable_type` defaults to the Ecto schema module name; a schema
       that must match a Belimbing morph string defines
       `__audit_auditable_type__/0`;
@@ -45,11 +45,11 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
   alias Bilimbi.Base.Audit.ActionSchema
   alias Bilimbi.Base.Audit.Context
   alias Bilimbi.Base.Audit.MutationSchema
+  alias Bilimbi.Base.Audit.PayloadText
   alias Bilimbi.Base.Repo
 
   @redacted_fields ~w(password password_hash remember_token secret api_key token payload)a
   @redacted_marker "[redacted]"
-  @truncate_at 2000
   @bulk_chunk_size 1000
   @excluded_schemas [ActionSchema, MutationSchema]
 
@@ -298,14 +298,7 @@ defmodule Bilimbi.Base.Audit.MutationCapture do
 
   defp field_value(field, _value) when field in @redacted_fields, do: @redacted_marker
 
-  defp field_value(_field, value) when is_binary(value) do
-    if String.length(value) > @truncate_at do
-      String.slice(value, 0, @truncate_at) <>
-        " [truncated #{String.length(value)} chars]"
-    else
-      value
-    end
-  end
+  defp field_value(_field, value) when is_binary(value), do: PayloadText.bounded(value)
 
   defp field_value(_field, %NaiveDateTime{} = value), do: NaiveDateTime.to_iso8601(value)
   defp field_value(_field, %DateTime{} = value), do: DateTime.to_iso8601(value)

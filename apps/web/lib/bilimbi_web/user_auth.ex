@@ -643,10 +643,25 @@ defmodule BilimbiWeb.UserAuth do
     current_scope = socket.assigns.current_scope
 
     apply_locale(current_scope)
-    put_audit_context(current_scope)
+    put_audit_context(current_scope, socket)
 
-    socket
+    follow_page_url(socket, current_scope)
   end
+
+  # A LiveView process handles many navigations; each one's URL is the
+  # `url` of what is recorded while the page is shown. The hook needs a
+  # routed root socket, which is where `handle_params` runs.
+  defp follow_page_url(%{router: router} = socket, current_scope)
+       when not is_nil(router) and not is_nil(current_scope) do
+    Phoenix.LiveView.attach_hook(socket, :audit_context_url, :handle_params, fn _params,
+                                                                                uri,
+                                                                                socket ->
+      AuditContext.put(%{AuditContext.get() | url: uri})
+      {:cont, socket}
+    end)
+  end
+
+  defp follow_page_url(socket, _current_scope), do: socket
 
   defp apply_locale(nil) do
     put_gettext_locale(Locale.resolve(nil, locale_bootstrap()).language)
@@ -684,33 +699,66 @@ defmodule BilimbiWeb.UserAuth do
       end
   end
 
-  # Captured mutations record who acted (ADR 0013). Resolved in the same
-  # per-process lifecycle as the locale; an anonymous request records the
-  # guest default rather than a stale actor from a previous request. Under
-  # impersonation the actor is the account acted as and the impersonator is
-  # the operator behind the session, so every row names both.
-  defp put_audit_context(current_scope, conn \\ nil)
-
-  defp put_audit_context(nil, _conn), do: AuditContext.put(nil)
+  # Captured mutations and recorded actions record who acted (ADR 0013), and
+  # from where: the trail exists to tell a developer's own work from a
+  # command run through their stolen or hijacked session. Resolved in the
+  # same per-process lifecycle as the locale; an anonymous request records
+  # the guest default rather than a stale actor from a previous request.
+  # Under impersonation the actor is the account acted as and the
+  # impersonator is the operator behind the session, so every row names both.
+  defp put_audit_context(nil, _source), do: AuditContext.put(nil)
 
   defp put_audit_context(
          %{user: %{"user_id" => _} = user, scope: %Scope{} = scope, actor: actor} = current_scope,
-         conn
+         source
        ) do
-    AuditContext.put(%AuditContext{
-      actor_type: Atom.to_string(actor.type),
-      actor_id: actor.id,
-      impersonator_id: impersonator_id(current_scope),
-      company_id: user["company_id"],
-      tenant_id: Scope.tenant_id(scope),
-      ip_address: conn && conn.remote_ip |> :inet.ntoa() |> to_string(),
-      url: conn && request_url(conn),
-      user_agent: conn && get_req_header(conn, "user-agent") |> List.first(),
-      trace_id: Logger.metadata()[:request_id]
-    })
+    AuditContext.put(
+      struct!(
+        %AuditContext{
+          actor_type: Atom.to_string(actor.type),
+          actor_id: actor.id,
+          impersonator_id: impersonator_id(current_scope),
+          company_id: user["company_id"],
+          tenant_id: Scope.tenant_id(scope),
+          trace_id: Logger.metadata()[:request_id]
+        },
+        request_facts(source)
+      )
+    )
   end
 
-  defp put_audit_context(_current_scope, _conn), do: AuditContext.put(nil)
+  defp put_audit_context(_current_scope, _source), do: AuditContext.put(nil)
+
+  defp request_facts(%Plug.Conn{} = conn) do
+    %{
+      ip_address: conn.remote_ip |> :inet.ntoa() |> to_string(),
+      url: request_url(conn),
+      user_agent: get_req_header(conn, "user-agent") |> List.first()
+    }
+  end
+
+  # A LiveView process serves no HTTP request. The socket's connect info
+  # names the client's address and agent (the endpoint asks the transport
+  # for both); the page URL arrives per navigation through the
+  # `handle_params` hook attached at mount. There is no request id to
+  # trace once the socket is connected, so `trace_id` is only what the
+  # disconnected render's request left in the Logger metadata.
+  defp request_facts(%Phoenix.LiveView.Socket{} = socket) do
+    %{
+      ip_address: socket |> connect_info(:peer_data) |> peer_ip(),
+      user_agent: connect_info(socket, :user_agent)
+    }
+  end
+
+  defp connect_info(%{parent_pid: nil} = socket, key),
+    do: Phoenix.LiveView.get_connect_info(socket, key)
+
+  defp connect_info(_child_socket, _key), do: nil
+
+  defp peer_ip(%{address: address}) when is_tuple(address),
+    do: address |> :inet.ntoa() |> to_string()
+
+  defp peer_ip(_peer_data), do: nil
 
   defp impersonator_id(%{impersonator: %{id: id}}) when is_integer(id) and id > 0, do: id
   defp impersonator_id(_current_scope), do: nil

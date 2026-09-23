@@ -542,6 +542,86 @@ defmodule BilimbiWeb.AuditLiveTest do
       assert has_element?(view, "#actions-pagination-summary", "Showing 1 to 1 of 1 results")
     end
 
+    test "a console command shows what was typed and what became of it", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.audit.log.list")
+
+      {:ok, _executed} =
+        Audit.record_action(scope, %{
+          actor_type: "user",
+          actor_id: 91,
+          event: "database_query.executed",
+          payload: %{
+            "sql" => "SELECT id FROM users",
+            "name" => "All ids",
+            "result" => "succeeded",
+            "row_count" => 3
+          },
+          occurred_at: ~N[2026-08-18 09:00:00]
+        })
+
+      {:ok, _refused} =
+        Audit.record_action(scope, %{
+          actor_type: "user",
+          actor_id: 91,
+          event: "database_query.refused",
+          payload: %{
+            "sql" => "SELECT 1; DELETE FROM users",
+            "result" => "refused",
+            "guard" => "keyword",
+            "message" => "Write or DDL statements are not permitted in queries."
+          },
+          occurred_at: ~N[2026-08-18 09:01:00]
+        })
+
+      {:ok, _failed} =
+        Audit.record_action(scope, %{
+          actor_type: "user",
+          actor_id: 91,
+          event: "database_query.failed",
+          payload: %{
+            "sql" => "SELECT * FROM nowhere",
+            "result" => "failed",
+            "message" => "relation \"nowhere\" does not exist"
+          },
+          occurred_at: ~N[2026-08-18 09:02:00]
+        })
+
+      {:ok, _unrelated} =
+        Audit.record_action(scope, %{
+          actor_type: "guest",
+          actor_id: 0,
+          event: "auth.login.failed",
+          payload: %{"email" => "hacker@example.test"},
+          occurred_at: ~N[2026-08-18 09:03:00]
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/actions")
+
+      assert has_element?(view, "#actions-table", "All ids")
+      assert has_element?(view, "#actions-table", "Succeeded · 3 rows")
+      assert has_element?(view, "#actions-table", "SELECT id FROM users")
+      assert has_element?(view, "#actions-table", "Refused · Keyword")
+      assert has_element?(view, "#actions-table", "SELECT 1; DELETE FROM users")
+      assert has_element?(view, "#actions-table", "Failed")
+
+      # The family filter finds every console command and nothing else.
+      view |> form("#actions-filters", %{"event_family" => "database"}) |> render_change()
+      assert has_element?(view, "#actions-pagination-summary", "Showing 1 to 3 of 3 results")
+      refute has_element?(view, "#actions-table", "hacker@example.test")
+
+      # A refused command is a failure to a reader looking for trouble.
+      view
+      |> form("#actions-filters", %{"event_family" => "", "result" => "failure"})
+      |> render_change()
+
+      assert has_element?(view, "#actions-table", "Refused · Keyword")
+      assert has_element?(view, "#actions-table", "SELECT * FROM nowhere")
+      refute has_element?(view, "#actions-table", "All ids")
+    end
+
     test "filters actions by family, actor_type, result, and diagnostics", %{
       conn: conn,
       scope: scope

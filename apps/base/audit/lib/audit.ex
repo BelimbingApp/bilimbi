@@ -368,6 +368,9 @@ defmodule Bilimbi.Base.Audit do
   defp maybe_filter_action_family(query, "console"),
     do: from(a in query, where: a.event == "console.command")
 
+  defp maybe_filter_action_family(query, "database"),
+    do: from(a in query, where: like(a.event, "database\\_query.%"))
+
   defp maybe_filter_action_family(query, "queue"),
     do: from(a in query, where: like(a.event, "queue.job.%"))
 
@@ -390,6 +393,7 @@ defmodule Bilimbi.Base.Audit do
              fragment("coalesce(nullif(?->>'status', '')::int, 0) >= 400", a.payload)) or
           (a.event == "console.command" and
              fragment("coalesce(nullif(?->>'exit_code', '')::int, 0) != 0", a.payload)) or
+          a.event in ["database_query.refused", "database_query.failed"] or
           fragment("?::text ILIKE '%failed%'", a.payload)
     )
   end

@@ -300,7 +300,7 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       assert created.sql_query == "SELECT id, name FROM users;"
     end
 
-    test "executes query, detects named parameters, records audit action, and displays results",
+    test "executes query, detects named parameters, records the command, and displays results",
          %{
            conn: conn,
            scope: scope
@@ -315,10 +315,20 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
         })
 
       {:ok, view, html} =
-        conn |> log_in_as() |> live(~p"/admin/system/database-queries/#{query.slug}")
+        conn
+        |> put_req_header("user-agent", "ConsoleTest/1.0 (needle-agent)")
+        |> log_in_as()
+        |> live(~p"/admin/system/database-queries/#{query.slug}")
 
       assert html =~ "Find User By Name"
       assert html =~ ":user_name"
+
+      # The page ran the saved query on each of its two mounts (the
+      # disconnected render, then the socket): both are commands, recorded
+      # before the reader has clicked anything.
+      mounted = console_actions(scope)
+      assert length(mounted) == 2
+      assert Enum.all?(mounted, &(&1.event == "database_query.executed"))
 
       # Set parameter value
       view
@@ -331,13 +341,162 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       assert result_html =~ "Ada Lovelace"
       assert result_html =~ "1 total rows"
 
-      # Verify audit record was created
-      assert {:ok, actions} = Audit.list_actions(scope)
+      # One record per command, naming who ran it, from where, what they
+      # typed, and what it did — and never the row it returned.
+      assert [run] = console_actions(scope) -- mounted
+      assert run.event == "database_query.executed"
+      assert run.actor_type == "user"
+      assert run.actor_id == 91
+      assert run.company_id == 73
+      assert run.tenant_id == 41
+      assert run.impersonator_id == nil
+      assert run.ip_address == %Postgrex.INET{address: {127, 0, 0, 1}}
+      assert run.user_agent == "ConsoleTest/1.0 (needle-agent)"
+      assert run.url =~ ~p"/admin/system/database-queries/#{query.slug}"
+      assert run.is_retained == false
 
-      assert Enum.any?(actions, fn a ->
-               a.event == "database_query.executed" and
-                 a.payload["name"] == "Find User By Name"
-             end)
+      assert run.payload == %{
+               "sql" => "SELECT id, name FROM users WHERE name = :user_name;",
+               "name" => "Find User By Name",
+               "result" => "succeeded",
+               "row_count" => 1
+             }
+
+      refute inspect(run.payload) =~ "Ada Lovelace"
+    end
+
+    test "a command refused by the first-word check is recorded as refused, with the actor", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.system.database-table.list")
+
+      {:ok, view, _html} =
+        conn |> log_in_as() |> live(~p"/admin/system/database-queries/_new")
+
+      view
+      |> form("#query-sql-form", %{sql_query: "DELETE FROM users"})
+      |> render_change()
+
+      html = view |> element("#btn-run-query") |> render_click()
+      assert html =~ "Only SELECT or WITH queries are permitted."
+
+      assert [refused] = console_actions(scope)
+      assert refused.event == "database_query.refused"
+      assert refused.actor_id == 91
+      assert refused.ip_address == %Postgrex.INET{address: {127, 0, 0, 1}}
+      assert refused.url =~ ~p"/admin/system/database-queries/_new"
+
+      assert refused.payload == %{
+               "sql" => "DELETE FROM users",
+               "name" => "Untitled Query",
+               "result" => "refused",
+               "guard" => "statement",
+               "message" => "Only SELECT or WITH queries are permitted."
+             }
+    end
+
+    test "a command refused by the keyword block is recorded as refused by that guard", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.system.database-table.list")
+
+      {:ok, view, _html} =
+        conn |> log_in_as() |> live(~p"/admin/system/database-queries/_new")
+
+      view
+      |> form("#query-sql-form", %{sql_query: "SELECT 1; DELETE FROM users"})
+      |> render_change()
+
+      html = view |> element("#btn-run-query") |> render_click()
+      assert html =~ "Write or DDL statements are not permitted in queries."
+
+      assert [refused] = console_actions(scope)
+      assert refused.event == "database_query.refused"
+      assert refused.actor_id == 91
+      assert refused.payload["guard"] == "keyword"
+      assert refused.payload["sql"] == "SELECT 1; DELETE FROM users"
+    end
+
+    test "a write PostgreSQL refuses is recorded as refused by the read-only transaction", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.system.database-table.list")
+      Bilimbi.Base.Repo.query!("CREATE SEQUENCE __blb_console_page_probe START 1")
+
+      {:ok, view, _html} =
+        conn |> log_in_as() |> live(~p"/admin/system/database-queries/_new")
+
+      # Passes both text guards; only the database can refuse it.
+      view
+      |> form("#query-sql-form", %{sql_query: "SELECT setval('__blb_console_page_probe', 42)"})
+      |> render_change()
+
+      html = view |> element("#btn-run-query") |> render_click()
+      assert html =~ "read-only transaction"
+
+      assert [refused] = console_actions(scope)
+      assert refused.event == "database_query.refused"
+      assert refused.actor_id == 91
+      assert refused.payload["guard"] == "read_only_transaction"
+      assert refused.payload["message"] =~ "read-only transaction"
+      assert refused.payload["sql"] == "SELECT setval('__blb_console_page_probe', 42)"
+    end
+
+    test "a failing command is recorded as failed, with the database's message and the actor",
+         %{
+           conn: conn,
+           scope: scope
+         } do
+      grant_capabilities!("admin.system.database-table.list")
+
+      {:ok, view, _html} =
+        conn |> log_in_as() |> live(~p"/admin/system/database-queries/_new")
+
+      view
+      |> form("#query-sql-form", %{sql_query: "SELECT * FROM __blb_absent_console_table"})
+      |> render_change()
+
+      html = view |> element("#btn-run-query") |> render_click()
+      assert html =~ "does not exist"
+
+      assert [failed] = console_actions(scope)
+      assert failed.event == "database_query.failed"
+      assert failed.actor_type == "user"
+      assert failed.actor_id == 91
+      assert failed.ip_address == %Postgrex.INET{address: {127, 0, 0, 1}}
+      assert failed.payload["result"] == "failed"
+      assert failed.payload["message"] =~ "does not exist"
+      assert failed.payload["sql"] == "SELECT * FROM __blb_absent_console_table"
+    end
+
+    test "paging and sorting a result re-run the command, and each run is recorded", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.system.database-table.list")
+
+      {:ok, query} =
+        User.create_database_query(scope, 91, %{
+          name: "Users",
+          sql_query: "SELECT id, name FROM users"
+        })
+
+      {:ok, view, _html} =
+        conn |> log_in_as() |> live(~p"/admin/system/database-queries/#{query.slug}")
+
+      mounted = console_actions(scope)
+      assert length(mounted) == 2
+
+      render_click(view, "sort_results", %{"sort" => "name"})
+      assert [sorted] = console_actions(scope) -- mounted
+      assert sorted.payload["result"] == "succeeded"
+
+      render_click(view, "page_results", %{"page" => "1"})
+      assert [_sorted, paged] = console_actions(scope) -- mounted
+      assert paged.payload["result"] == "succeeded"
     end
 
     test "renders the result set through the shared table, one sort button per column", %{
@@ -557,6 +716,11 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       refute db_msg =~ "platform operator"
       assert db_msg =~ "does not exist"
     end
+  end
+
+  defp console_actions(scope) do
+    {:ok, actions} = Audit.list_actions(scope)
+    Enum.filter(actions, &String.starts_with?(&1.event, "database_query."))
   end
 
   defp opening_tag_classes(html) do
