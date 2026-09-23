@@ -949,7 +949,13 @@ defmodule BilimbiWeb.CompanyLiveTest do
       refute has_element?(view, "#unlink-address-confirm")
       refute has_element?(view, "#address-row-#{depot.id}")
       assert has_element?(view, "#company-addresses-heading + span", "1")
-      assert has_element?(view, "#company-addresses-panel-notice[role='status']", "Address unlinked.")
+
+      assert has_element?(
+               view,
+               "#company-addresses-panel-notice[role='status']",
+               "Address unlinked."
+             )
+
       assert {:ok, _depot} = Address.get_address(scope, depot.id)
     end
 

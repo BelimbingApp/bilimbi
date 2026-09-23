@@ -569,7 +569,12 @@ defmodule BilimbiWeb.EmployeeShowTest do
     refute has_element?(view, "#unlink-address-#{home.id}[data-confirm]")
 
     view |> element("#unlink-address-#{home.id}") |> render_click()
-    assert_modal_dialog(view, "unlink-address-confirm", "“Home” will be unlinked from this employee.")
+
+    assert_modal_dialog(
+      view,
+      "unlink-address-confirm",
+      "“Home” will be unlinked from this employee."
+    )
 
     assert has_element?(
              view,
