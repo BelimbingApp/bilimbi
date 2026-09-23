@@ -544,18 +544,35 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#nav-admin-system-design-library-graphic[aria-current='page']")
   end
 
+  # Each accepted choice keeps its Design Spec number as a stable anchor id so
+  # tests and links can reach the card, but the rendered heading carries only
+  # the statement: the number is a working reference, not something an
+  # operator reads (DESIGN.md "Write for humans").
+  @design_spec_cards [
+    {"spec-t01", "Theme contrast stays distinct"},
+    {"spec-d01", "Colour has meaning"},
+    {"spec-d02", "Type stays quiet"},
+    {"spec-c01", "Compact fields always win"},
+    {"spec-c02", "Focus uses the lively brand accent"},
+    {"spec-c03", "Destructive actions stay calm"},
+    {"spec-c04", "Filters use an open toolbar"},
+    {"spec-c05", "Familiar row actions use icons"},
+    {"spec-c06", "Icon size follows context"},
+    {"spec-d03", "Width follows the work"},
+    {"spec-d04", "Data stays compact"},
+    {"spec-d05", "Copy is for the user"},
+    {"spec-d06", "Every state is designed"}
+  ]
+
   test "Design Spec contains only accepted choices grouped by purpose", %{conn: conn} do
     {:ok, view, _html} = open(conn, "/system/design-library/design-spec")
 
     assert has_element?(view, "#specifications")
     assert has_element?(view, "#accepted-design")
-    assert has_element?(view, "#spec-d01")
-    assert has_element?(view, "#spec-d06")
-    assert has_element?(view, "#spec-t01", "Theme contrast stays distinct")
     assert has_element?(view, "#spec-components", "Components")
 
-    for number <- 1..6 do
-      assert has_element?(view, "#spec-c0#{number}", "C0#{number}")
+    for {id, statement} <- @design_spec_cards do
+      assert has_element?(view, "##{id} h4", statement)
     end
 
     assert has_element?(view, "#spec-theme", "Theme")
@@ -566,9 +583,24 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#nav-admin-system-design-library-design-spec[aria-current='page']")
   end
 
+  test "Design Spec headings carry the statement, not its number", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/design-spec")
+
+    for {id, _statement} <- @design_spec_cards do
+      code = id |> String.replace_prefix("spec-", "") |> String.upcase()
+
+      assert has_element?(view, "##{id} h4")
+      refute has_element?(view, "##{id}", code)
+    end
+  end
+
   test "keeps development metadata out of every Design Library screen", %{conn: conn} do
     for path <- @paths do
       {:ok, _view, html} = open(conn, path)
+
+      # A catalog or decision code leading a statement, such as `D01 ·` or
+      # `FND-01 ·`, is a working reference and never operator-facing copy.
+      refute html =~ ~r/\b[A-Z]{1,4}-?\d{2,3}\s*(·|—|–|:)\s/
 
       refute html =~ "bilimbi/default"
       refute html =~ "Git working tree"
