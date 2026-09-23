@@ -426,8 +426,10 @@ defmodule Bilimbi.Base.UI.Components do
 
   defp link?(rest), do: !!(rest[:href] || rest[:navigate] || rest[:patch])
 
-  # A busy control is also disabled: the activation that made it busy is the
-  # one whose outcome is pending, and a second one would duplicate the work.
+  # An async action rejects duplicate work. A busy control is also disabled:
+  # the activation that made it busy is the one whose outcome is pending, and
+  # a second one would duplicate the work. `button/1` and `icon_button/1` both
+  # pass through here.
   # A link cannot be disabled, so `busy` is already resolved to false on one
   # and never reaches here.
   defp busy_rest(rest, false), do: rest
@@ -1985,8 +1987,9 @@ defmodule Bilimbi.Base.UI.Components do
   stop rendering it whatever the outcome. The outcome then reports through the
   page's flash or the panel's notice, as any other write does, and a refusal
   says what to do next. The confirm carries `phx-disable-with={@working}` for
-  the round trip, so it reads "Deleting…" and is announced busy until the
-  server replies.
+  the round trip, so it reads "Deleting…", is announced busy, and stays
+  disabled until the server replies, so a second click cannot repeat the
+  action.
 
   ## Examples
 

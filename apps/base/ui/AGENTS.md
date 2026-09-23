@@ -30,7 +30,13 @@ Do not use `@apply`. Do not add an external script or stylesheet URL. Do not wri
 
 `phx.gen.live`, `phx.gen.html`, and `phx.gen.schema` use `Bilimbi.Base.UI.Components`. `phx.gen.auth` emits daisyUI classes; convert them to semantic roles in the same change. Name an action through `Bilimbi.Base.UI.IconRegistry`. Logout stays `hero-arrow-right-on-rectangle`.
 
-`phx-disable-with` belongs on a text control only; it replaces the label, so it wipes an icon button. A wait the server knows about is `<.button busy>` or `<.icon_button busy>`.
+`phx-disable-with` belongs on a text control only; it replaces the label, so it wipes an icon button. A wait the server knows about is `<.button busy>` or `<.icon_button busy>`. An async action rejects duplicate work; see the comment on `busy_rest/2`.
+
+Keep the `source(none)` and `@source` lines in `app.css`; the comment above them says why.
+
+## Lists
+
+An operational list keeps its page, search, filters, sort and page size in URL state. See `DESIGN.md` "Pagination controls".
 
 ## Maintaining this file
 
