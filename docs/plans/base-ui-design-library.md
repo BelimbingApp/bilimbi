@@ -1,7 +1,7 @@
 # Base UI Design Library
 
 **Status:** Foundation merged; the parity campaign continues under Issue #709
-**Last Updated:** 2026-09-20
+**Last Updated:** 2026-09-23
 **Tracking:** [Issue #691](https://github.com/BelimbingApp/bilimbi/issues/691)
 **Agents:** `agent:kiatng-sol-medium`; `astra_pr_gate/gpt-6-astra`; `fm/parity-designlib-states/opus-5`; `fm/parity-designlib-specimens/grok-4.6`; `fm/designlib-catalog-ids-in-ui/opus-5`; `fm/designlib-state-coverage-gaps/opus-5`; `fm/addresses-detail-read-first/opus-5`; `fm/companies-detail-belimbing-parity/claude-fable-5-1`; `fm/designspec-codes-off-the-ui/claude-fable-5-1`
 **Related:** `docs/plans/base-ui-design-parity.md`
