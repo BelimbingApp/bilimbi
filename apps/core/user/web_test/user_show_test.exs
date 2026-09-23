@@ -266,6 +266,79 @@ defmodule BilimbiWeb.UserShowTest do
     refute has_element?(view, "#app-content", "Unaffiliated")
   end
 
+  test "an archived current company is the selected value and the named cause of every refusal",
+       %{conn: conn} do
+    CompanyFixtures.insert_company!(%{
+      id: 76,
+      tenant_id: 41,
+      code: "archived",
+      deleted_at: ~N[2026-08-11 12:00:00]
+    })
+
+    UserFixtures.insert_user!(%{id: 91, company_id: 73})
+
+    UserFixtures.insert_user!(%{
+      id: 95,
+      company_id: 76,
+      name: "Ada Archived",
+      email: "archived@example.com"
+    })
+
+    grant_capabilities!(["admin.user.view", "admin.user.update"])
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/95")
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    # The select opens on the account's archived company, which cannot be
+    # chosen; the live companies stay the only choices.
+    view |> element("#user-company-display") |> render_click()
+
+    assert has_element?(
+             view,
+             "#user-company-select option[selected][disabled]",
+             "Archived company"
+           )
+
+    refute has_element?(view, "#user-company-select option[value='73'][selected]")
+    assert has_element?(view, "#user-company-select option[value='73']:not([disabled])")
+
+    view
+    |> form("#user-company-form")
+    |> render_change(%{"company_id" => "73"})
+
+    assert has_element?(
+             view,
+             "#user-company-status[role='alert']",
+             "\"Bilimbi Industries\" was not saved: this user's company is archived."
+           )
+
+    refute has_element?(view, "#user-company-status", "not in this workspace")
+    refute has_element?(view, "#user-company-status", "may not manage")
+
+    render_hook(view, "save_field", %{"id" => "95", "name" => "Ada Lovelace"})
+
+    assert has_element?(
+             view,
+             "#user-name-status[role='alert']",
+             "The change was not saved: this user's company is archived."
+           )
+
+    render_hook(view, "save_field", %{"id" => "95", "email" => "ada@example.com"})
+
+    assert has_element?(
+             view,
+             "#user-email-status[role='alert']",
+             "The change was not saved: this user's company is archived."
+           )
+
+    refute has_element?(view, "#app-content", "could not be found")
+
+    {:ok, users} = User.list_users(scope)
+
+    assert %{company_id: 76, name: "Ada Archived", email: "archived@example.com"} =
+             Enum.find(users, &(&1.id == 95))
+  end
+
   test "refuses to delete a user whose company is archived", %{conn: conn} do
     CompanyFixtures.insert_company!(%{
       id: 76,

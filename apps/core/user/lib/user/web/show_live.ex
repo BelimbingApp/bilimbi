@@ -341,7 +341,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   end
 
   # The company choice commits on change, as Belimbing's saveCompany does.
-  # Only a reassignment is offered: the select carries no blank option, so a
+  # Only a reassignment is offered: the select carries no choosable blank, so a
   # blank value is a forged or stale submission and is refused on the fact
   # without a write. The reassignment ends the account's sessions; the open
   # editor warned about that before the choice was made.
@@ -1013,6 +1013,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                         phx-blur="cancel_edit_field"
                         class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
                       >
+                        <option :if={is_nil(@company_name)} value="" selected disabled>
+                          Archived company
+                        </option>
                         <option
                           :for={company <- @companies}
                           value={company.id}
@@ -1933,6 +1936,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
       {:error, %Ecto.Changeset{} = changeset} ->
         CommitStatus.put(socket, name, {:error, refusal_message(name, submitted, changeset)})
 
+      {:error, :company_not_found} when is_nil(socket.assigns.company_name) ->
+        CommitStatus.put(socket, name, {:error, archived_company_message()})
+
       {:error, reason} ->
         CommitStatus.put(socket, name, {:error, failure_message(reason)})
     end
@@ -1956,6 +1962,11 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   # A refusal names the rule that applied and the company it was evaluated
   # against. A reassignment authorizes `admin.user.update` on the account's
   # CURRENT company, so naming the chosen one would point at the wrong rule.
+  # An archived current company refuses every write on the account, so it is
+  # the cause whatever the rule reported.
+  defp company_failure_message(_reason, choice, nil),
+    do: "#{inspect(choice)} was not saved: this user's company is archived."
+
   defp company_failure_message(:unauthorized, choice, company_name),
     do: "#{inspect(choice)} was not saved: you may not manage users of #{company_name}."
 
@@ -1965,7 +1976,12 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   defp company_failure_message(reason, _choice, _company_name),
     do: failure_message(reason)
 
-  # The select offers no blank option; a blank that still arrives is refused
+  # The account's own company is archived, so no write on it can land; the
+  # refusal names that company rather than the value the operator submitted.
+  defp archived_company_message,
+    do: "The change was not saved: this user's company is archived."
+
+  # The select offers no choosable blank; a blank that still arrives is refused
   # in the words the product means, not as a missing company.
   defp detach_refused_message,
     do: "The change was not saved: a user always belongs to a company."
