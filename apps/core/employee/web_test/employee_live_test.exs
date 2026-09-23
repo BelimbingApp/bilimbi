@@ -415,9 +415,38 @@ defmodule BilimbiWeb.EmployeeLiveTest do
     assert has_element?(view, "#employee-#{to_delete.id}-delete")
     assert has_element?(view, "#employees-pagination-summary", "Showing 26 to 26 of 26 results")
 
+    # Deleting confirms through the shared dialog, which names the employee
+    # and says what cannot be undone; no native confirm remains.
+    refute has_element?(view, "#employee-#{to_delete.id}-delete[data-confirm]")
     view |> element("#employee-#{to_delete.id}-delete") |> render_click()
 
-    assert render(view) =~ "Employee deleted successfully."
+    assert_modal_dialog(view, "delete-employee-confirm", "Temp Worker will be deleted.")
+    assert has_element?(view, "dialog#delete-employee-confirm[role='alertdialog']")
+
+    assert has_element?(
+             view,
+             "#delete-employee-confirm-description",
+             "The employment record is removed and the person no longer appears in the directory. This cannot be undone."
+           )
+
+    # Cancelling keeps the employee.
+    view |> element("#delete-employee-confirm-cancel", "Cancel") |> render_click()
+    refute has_element?(view, "#delete-employee-confirm")
+    assert has_element?(view, "#employees td", "Temp Worker")
+
+    # Confirming deletes and reports the completed write as a success.
+    view |> element("#employee-#{to_delete.id}-delete") |> render_click()
+
+    assert has_element?(
+             view,
+             "#delete-employee-confirm-confirm[phx-disable-with='Deleting…']",
+             "Delete"
+           )
+
+    view |> element("#delete-employee-confirm-confirm") |> render_click()
+    refute has_element?(view, "#delete-employee-confirm")
+
+    assert has_element?(view, "#flash-success", "Temp Worker was deleted.")
     refute has_element?(view, "#employees td", "Temp Worker")
 
     # Because page 2 is now empty (total 25 employees on 25-per-page), it automatically clamped and patched to page 1
@@ -729,12 +758,11 @@ defmodule BilimbiWeb.EmployeeLiveTest do
                "#subordinates-card th[aria-sort='ascending'] #subordinates-table-sort-status"
              )
 
-      # Remove subordinate
-      view
-      |> element("#remove-subordinate-#{subordinate.id}")
-      |> render_click()
+      # Remove subordinate, confirming through the shared dialog
+      view |> element("#remove-subordinate-#{subordinate.id}") |> render_click()
+      view |> element("#remove-subordinate-confirm-confirm") |> render_click()
 
-      assert render(view) =~ "Subordinate removed."
+      assert render(view) =~ "no longer reports to"
       refute has_element?(view, "#subordinate-row-#{subordinate.id}")
 
       {:ok, subs_after} = Employee.list_subordinates(scope, 73, employee.id)
@@ -851,6 +879,7 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       assert has_element?(view, "#employee-delete")
 
       view |> element("#employee-delete") |> render_click()
+      view |> element("#delete-employee-confirm-confirm") |> render_click()
 
       assert_redirect(view, ~p"/employees")
       assert {:error, :employee_not_found} = Employee.get_employee(scope, 73, subordinate.id)
@@ -866,8 +895,9 @@ defmodule BilimbiWeb.EmployeeLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{orchestrator.id}")
 
       view |> element("#employee-delete") |> render_click()
+      view |> element("#delete-employee-confirm-confirm") |> render_click()
 
-      assert render(view) =~ "The platform orchestrator cannot be deleted."
+      assert render(view) =~ "the platform orchestrator cannot be deleted."
       assert {:ok, _still_exists} = Employee.get_employee(scope, 73, orchestrator.id)
     end
   end

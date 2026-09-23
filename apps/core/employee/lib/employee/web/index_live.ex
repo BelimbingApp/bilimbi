@@ -50,6 +50,7 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
      |> assign(:index_state, %State{})
      |> assign(:employees_page, empty_page())
      |> assign(:department_map, %{})
+     |> assign(:pending_delete, nil)
      |> assign(:filters_form, to_form(filters_form_params(%State{}), as: :filters))}
   end
 
@@ -90,39 +91,87 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
   end
 
   @impl true
-  def handle_event("delete", %{"id" => id}, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.employee.delete") do
-      scope = resolve_scope(socket)
-      company_id = resolve_company_id(socket)
+  # Deleting confirms through the shared dialog: the request holds the listed
+  # employee whose consequence the dialog states, and `delete` acts on that held
+  # employee rather than on a client-supplied id, so what was confirmed is what
+  # runs.
+  def handle_event("request_delete", %{"id" => id}, socket) do
+    cond do
+      not allowed?(socket.assigns.current_scope, "admin.employee.delete") ->
+        delete_forbidden(socket)
 
-      case positive_integer(id) do
-        employee_id when is_integer(employee_id) ->
-          case Employee.delete_employee(scope, company_id, employee_id) do
-            :ok ->
-              socket =
-                socket
-                |> put_flash(:info, "Employee deleted successfully.")
-                |> load_page(socket.assigns.index_state)
+      employee = find_listed(socket, id) ->
+        {:noreply, socket |> clear_flash() |> assign(:pending_delete, employee)}
 
-              {:noreply, socket}
+      true ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "That employee no longer exists.")
+         |> load_page(socket.assigns.index_state)}
+    end
+  end
 
-            {:error, :employee_not_found} ->
-              socket =
-                socket
-                |> put_flash(:error, "That employee no longer exists.")
-                |> load_page(socket.assigns.index_state)
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, :pending_delete, nil)}
+  end
 
-              {:noreply, socket}
+  def handle_event("delete", _params, socket) do
+    cond do
+      not allowed?(socket.assigns.current_scope, "admin.employee.delete") ->
+        delete_forbidden(socket)
 
-            {:error, _reason} ->
-              {:noreply, put_flash(socket, :error, "Failed to delete employee.")}
-          end
+      is_nil(socket.assigns.pending_delete) ->
+        {:noreply, socket}
 
-        _ ->
-          {:noreply, put_flash(socket, :error, "Failed to delete employee.")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to delete employees.")}
+      true ->
+        employee = socket.assigns.pending_delete
+        socket = assign(socket, :pending_delete, nil)
+        scope = resolve_scope(socket)
+        company_id = resolve_company_id(socket)
+
+        case Employee.delete_employee(scope, company_id, employee.id) do
+          :ok ->
+            {:noreply,
+             socket
+             |> put_flash(:success, "#{employee.full_name} was deleted.")
+             |> load_page(socket.assigns.index_state)}
+
+          {:error, :employee_not_found} ->
+            {:noreply,
+             socket
+             |> put_flash(:error, "That employee no longer exists.")
+             |> load_page(socket.assigns.index_state)}
+
+          {:error, :invariant_violation} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "#{employee.full_name} was not deleted: the platform orchestrator cannot be deleted."
+             )}
+
+          {:error, _reason} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "#{employee.full_name} was not deleted. Reload the page and try again."
+             )}
+        end
+    end
+  end
+
+  defp delete_forbidden(socket) do
+    {:noreply, put_flash(socket, :error, "You do not have permission to delete employees.")}
+  end
+
+  defp find_listed(socket, id) do
+    case positive_integer(id) do
+      employee_id when is_integer(employee_id) ->
+        Enum.find(socket.assigns.employees_page.entries, &(&1.id == employee_id))
+
+      _ ->
+        nil
     end
   end
 
@@ -477,9 +526,8 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
                   label={"Delete #{employee.full_name}"}
                   kind={:danger}
                   id={"employee-#{employee.id}-delete"}
-                  phx-click="delete"
+                  phx-click="request_delete"
                   phx-value-id={employee.id}
-                  data-confirm={"Are you sure you want to delete #{employee.full_name}?"}
                 />
               </div>
             </:action>
@@ -496,6 +544,17 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
             filters_form={@filters_form}
           />
         </.card>
+
+        <.confirm_dialog
+          :if={@pending_delete}
+          id="delete-employee-confirm"
+          consequence={"#{@pending_delete.full_name} will be deleted."}
+          detail="The employment record is removed and the person no longer appears in the directory. This cannot be undone."
+          confirm="Delete"
+          working="Deleting…"
+          on_confirm={JS.push("delete")}
+          on_cancel={JS.push("cancel_delete")}
+        />
       </.page>
     </Layouts.app>
     """

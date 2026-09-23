@@ -418,11 +418,16 @@ focus, ignored Escape and painted its Delete solid red.
   entry, consequence, in flight, success, failure and recovery — on example
   records, not only the resting dialog.
 
-The reference-type deletes on `/companies/legal-entity-types` and
-`/companies/department-types` and the address unlinks on `/companies/:id`
-and `/employees/:id` confirm this way. The other destructive controls still
-carry a native `data-confirm`; they are pending conversion to this dialog,
-one owner at a time, and are not a second convention.
+Every destructive control confirms this way: the reference-type deletes, the
+address unlinks and deletes, the company relationship and department removals,
+the business activity chip, the employee and employee type deletes, the
+subordinate removal, the user deletes, the employee unlink, the role and
+capability rule changes on `/users/:id`, the saved database query deletes, the
+session terminate, the settings restore and the schedule pause and disable. No
+`data-confirm` attribute remains in the product. The schedule's enable and
+resume lose nothing and run on click, matching Belimbing, where a confirmation
+is reserved for a choice that cannot be undone; discarding an unsaved database
+query is the same case.
 
 ## Subtle depth and motion
 
@@ -610,8 +615,8 @@ the recovery (an operator must assign a role), not a blank rail.
 Flash messages stack at the top right, most severe first, so several stay
 readable at once. Info, warning and error stay until the person dismisses
 them, because a message someone must act on must not disappear on a timer.
-Only a success times out, after eight seconds. A delete confirmed through the
-shared confirmation dialog reports one; the other completed writes still
+Only a success times out, after eight seconds. An action confirmed through
+the shared confirmation dialog reports one; the other completed writes still
 report info and stay until dismissed, until their callers move to success.
 
 ## Reduce anxiety

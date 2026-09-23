@@ -124,6 +124,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     |> assign(:employees_sort_dir, "asc")
     |> assign(:external_accesses_sort_by, "company")
     |> assign(:external_accesses_sort_dir, "asc")
+    |> assign(:pending_authz, nil)
+    |> assign(:pending_unlink, nil)
+    |> assign(:pending_delete?, false)
   end
 
   defp load_data(socket, user) do
@@ -463,32 +466,55 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     end
   end
 
-  def handle_event(
-        "remove_role",
-        %{"assignment-id" => assignment_id_str, "role-id" => role_id_str},
-        socket
-      ) do
+  # Every authorization change on this card confirms through the shared
+  # dialog. The request holds the rule the dialog names -- a role assignment, a
+  # direct grant, a deny rule or a capability to deny -- and the confirm acts
+  # on that held rule rather than on a client-supplied id, so what was
+  # confirmed is what changes.
+  def handle_event("request_remove_role", %{"assignment-id" => assignment_id_str}, socket) do
     if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      user = socket.assigns.user
-
-      with {assignment_id, ""} <- Integer.parse(assignment_id_str),
-           {role_id, ""} <- Integer.parse(role_id_str) do
-        case Authz.unassign_role(scope, role_id, assignment_id) do
-          {:ok, _} ->
-            {:noreply,
-             socket
-             |> put_flash(:info, "Role removed.")
-             |> load_data(user)}
-
-          {:error, _} ->
-            {:noreply, put_flash(socket, :error, "Failed to remove role.")}
-        end
-      else
-        _ -> {:noreply, socket}
+      case find_assignment(socket, assignment_id_str) do
+        nil -> {:noreply, socket}
+        assignment -> hold_authz(socket, {:remove_role, assignment})
       end
     else
       {:noreply, put_flash(socket, :error, "You do not have permission to manage roles.")}
+    end
+  end
+
+  def handle_event("cancel_authz", _params, socket) do
+    {:noreply, assign(socket, :pending_authz, nil)}
+  end
+
+  def handle_event("remove_role", _params, socket) do
+    cond do
+      not can_manage?(socket) ->
+        {:noreply, put_flash(socket, :error, "You do not have permission to manage roles.")}
+
+      not match?({:remove_role, _}, socket.assigns.pending_authz) ->
+        {:noreply, socket}
+
+      true ->
+        {:remove_role, assignment} = socket.assigns.pending_authz
+        socket = assign(socket, :pending_authz, nil)
+        scope = socket.assigns.current_scope.scope
+        user = socket.assigns.user
+
+        case Authz.unassign_role(scope, assignment.role_id, assignment.id) do
+          {:ok, _} ->
+            {:noreply,
+             socket
+             |> put_flash(:success, "The #{assignment.role_name} role was removed.")
+             |> load_data(user)}
+
+          {:error, _} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "The #{assignment.role_name} role was not removed. Reload the page and try again."
+             )}
+        end
     end
   end
 
@@ -560,12 +586,36 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     end
   end
 
-  def handle_event("deny_capability", %{"capability-key" => cap_key}, socket) do
-    if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      user = socket.assigns.user
+  def handle_event("request_deny_capability", %{"capability-key" => cap_key}, socket) do
+    cond do
+      not can_manage?(socket) ->
+        capabilities_forbidden(socket)
 
-      if user.company_id do
+      is_nil(socket.assigns.user.company_id) ->
+        {:noreply, socket}
+
+      cap_key in socket.assigns.effective_keys ->
+        hold_authz(socket, {:deny, cap_key})
+
+      true ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("deny_capability", _params, socket) do
+    cond do
+      not can_manage?(socket) ->
+        capabilities_forbidden(socket)
+
+      not match?({:deny, _}, socket.assigns.pending_authz) ->
+        {:noreply, socket}
+
+      true ->
+        {:deny, cap_key} = socket.assigns.pending_authz
+        socket = assign(socket, :pending_authz, nil)
+        scope = socket.assigns.current_scope.scope
+        user = socket.assigns.user
+
         case Authz.put_principal_capability(
                scope,
                user.company_id,
@@ -577,43 +627,66 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           {:ok, _} ->
             {:noreply,
              socket
-             |> put_flash(:info, "Capability #{cap_key} denied.")
+             |> put_flash(:success, "#{cap_key} is denied for #{user.name}.")
              |> load_data(user)}
 
           {:error, _} ->
-            {:noreply, put_flash(socket, :error, "Failed to deny capability.")}
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "#{cap_key} was not denied. Reload the page and try again."
+             )}
         end
-      else
-        {:noreply, socket}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to manage capabilities.")}
     end
   end
 
-  def handle_event("remove_capability", %{"grant-id" => grant_id_str}, socket) do
+  # A grant id backs two controls -- a direct grant and a deny rule -- so the
+  # request resolves which one it is from the page's own maps before it opens
+  # a dialog, and the copy says what removing that rule does.
+  def handle_event("request_remove_capability", %{"grant-id" => grant_id_str}, socket) do
     if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      user = socket.assigns.user
-
-      case Integer.parse(grant_id_str) do
-        {grant_id, ""} ->
-          case Authz.remove_principal_capability(scope, grant_id) do
-            {:ok, _} ->
-              {:noreply,
-               socket
-               |> put_flash(:info, "Capability rule removed.")
-               |> load_data(user)}
-
-            {:error, _} ->
-              {:noreply, put_flash(socket, :error, "Failed to remove capability rule.")}
-          end
-
-        _ ->
-          {:noreply, socket}
+      case find_capability_rule(socket, grant_id_str) do
+        nil -> {:noreply, socket}
+        rule -> hold_authz(socket, rule)
       end
     else
-      {:noreply, put_flash(socket, :error, "You do not have permission to manage capabilities.")}
+      capabilities_forbidden(socket)
+    end
+  end
+
+  def handle_event("remove_capability", _params, socket) do
+    cond do
+      not can_manage?(socket) ->
+        capabilities_forbidden(socket)
+
+      not match?(
+        {kind, _, _} when kind in [:remove_grant, :remove_denial],
+        socket.assigns.pending_authz
+      ) ->
+        {:noreply, socket}
+
+      true ->
+        {kind, cap_key, grant_id} = socket.assigns.pending_authz
+        socket = assign(socket, :pending_authz, nil)
+        scope = socket.assigns.current_scope.scope
+        user = socket.assigns.user
+
+        case Authz.remove_principal_capability(scope, grant_id) do
+          {:ok, _} ->
+            {:noreply,
+             socket
+             |> put_flash(:success, capability_removed_message(kind, cap_key))
+             |> load_data(user)}
+
+          {:error, _} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "The rule for #{cap_key} was not removed. Reload the page and try again."
+             )}
+        end
     end
   end
 
@@ -703,23 +776,55 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
     end
   end
 
-  def handle_event("unlink_employee", %{"employee-id" => _employee_id_str}, socket) do
-    if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      user = socket.assigns.user
+  # Unlinking confirms through the shared dialog: the request holds the listed
+  # employee record the dialog names, and `unlink_employee` clears the account's
+  # link only once one is held.
+  def handle_event("request_unlink_employee", %{"employee-id" => employee_id_str}, socket) do
+    cond do
+      not can_manage?(socket) ->
+        {:noreply, put_flash(socket, :error, "You do not have permission to edit users.")}
 
-      case User.update_user(scope, user.company_id, user.id, %{employee_id: nil}) do
-        {:ok, updated_user} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Employee unlinked.")
-           |> load_data(updated_user)}
+      emp = find_linked_employee(socket, employee_id_str) ->
+        {:noreply, socket |> clear_flash() |> assign(:pending_unlink, emp)}
 
-        {:error, _} ->
-          {:noreply, put_flash(socket, :error, "Failed to unlink employee.")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to edit users.")}
+      true ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("cancel_unlink_employee", _params, socket) do
+    {:noreply, assign(socket, :pending_unlink, nil)}
+  end
+
+  def handle_event("unlink_employee", _params, socket) do
+    cond do
+      not can_manage?(socket) ->
+        {:noreply, put_flash(socket, :error, "You do not have permission to edit users.")}
+
+      is_nil(socket.assigns.pending_unlink) ->
+        {:noreply, socket}
+
+      true ->
+        emp = socket.assigns.pending_unlink
+        socket = assign(socket, :pending_unlink, nil)
+        scope = socket.assigns.current_scope.scope
+        user = socket.assigns.user
+
+        case User.update_user(scope, user.company_id, user.id, %{employee_id: nil}) do
+          {:ok, updated_user} ->
+            {:noreply,
+             socket
+             |> put_flash(:success, "#{emp.full_name} was unlinked from #{user.name}.")
+             |> load_data(updated_user)}
+
+          {:error, _} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "#{emp.full_name} was not unlinked. Reload the page and try again."
+             )}
+        end
     end
   end
 
@@ -867,23 +972,48 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   # --- Event Handlers: Deletion ---
 
+  # Deleting confirms through the shared dialog, which states what happens to
+  # this account. The signed-in account is refused before any dialog opens;
+  # `delete` runs only once a request is held.
+  def handle_event("request_delete", _params, socket) do
+    cond do
+      not allowed?(socket.assigns.current_scope, "admin.user.delete") ->
+        {:noreply, put_flash(socket, :error, "You do not have permission to delete users.")}
+
+      own_account?(socket) ->
+        {:noreply, put_flash(socket, :error, "You cannot delete your own account.")}
+
+      true ->
+        {:noreply, socket |> clear_flash() |> assign(:pending_delete?, true)}
+    end
+  end
+
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, :pending_delete?, false)}
+  end
+
   def handle_event("delete", _params, socket) do
     scope = socket.assigns.current_scope.scope
     user = socket.assigns.user
 
     cond do
-      user.id == socket.assigns.current_scope.user["user_id"] ->
-        {:noreply, put_flash(socket, :error, "You cannot delete your own account.")}
-
       not allowed?(socket.assigns.current_scope, "admin.user.delete") ->
         {:noreply, put_flash(socket, :error, "You do not have permission to delete users.")}
 
+      own_account?(socket) ->
+        {:noreply, put_flash(socket, :error, "You cannot delete your own account.")}
+
+      not socket.assigns.pending_delete? ->
+        {:noreply, socket}
+
       true ->
+        socket = assign(socket, :pending_delete?, false)
+
         case User.delete_user(scope, user.company_id, user.id) do
           :ok ->
             {:noreply,
              socket
-             |> put_flash(:info, "User deleted successfully.")
+             |> put_flash(:success, "#{user.name}'s account was deleted.")
              |> push_navigate(to: ~p"/users")}
 
           {:error, :company_not_found} ->
@@ -891,14 +1021,109 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
              put_flash(
                socket,
                :error,
-               "That user cannot be deleted while their company is archived."
+               "#{user.name} was not deleted: their company is archived. " <>
+                 "Restore the company first."
              )}
 
           {:error, _reason} ->
-            {:noreply, put_flash(socket, :error, "That user could not be deleted.")}
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "#{user.name} was not deleted. Reload the page and try again."
+             )}
         end
     end
   end
+
+  defp own_account?(socket) do
+    socket.assigns.user.id == socket.assigns.current_scope.user["user_id"]
+  end
+
+  # --- Confirmation helpers ---
+
+  defp hold_authz(socket, rule) do
+    {:noreply, socket |> clear_flash() |> assign(:pending_authz, rule)}
+  end
+
+  defp capabilities_forbidden(socket) do
+    {:noreply, put_flash(socket, :error, "You do not have permission to manage capabilities.")}
+  end
+
+  defp find_assignment(socket, assignment_id_str) do
+    case Integer.parse(assignment_id_str) do
+      {id, ""} -> Enum.find(socket.assigns.assigned_roles, &(&1.id == id))
+      _ -> nil
+    end
+  end
+
+  defp find_capability_rule(socket, grant_id_str) do
+    with {grant_id, ""} <- Integer.parse(grant_id_str) do
+      grants = socket.assigns.direct_grant_ids
+      denials = socket.assigns.direct_deny_ids
+
+      case {Enum.find(grants, &match?({_cap, ^grant_id}, &1)),
+            Enum.find(denials, &match?({_cap, ^grant_id}, &1))} do
+        {{cap, _id}, _} -> {:remove_grant, cap, grant_id}
+        {_, {cap, _id}} -> {:remove_denial, cap, grant_id}
+        _ -> nil
+      end
+    else
+      _ -> nil
+    end
+  end
+
+  defp find_linked_employee(socket, employee_id_str) do
+    case Integer.parse(employee_id_str) do
+      {id, ""} -> Enum.find(socket.assigns.employees, &(&1.id == id))
+      _ -> nil
+    end
+  end
+
+  defp capability_removed_message(:remove_grant, cap_key),
+    do: "The direct grant of #{cap_key} was removed."
+
+  defp capability_removed_message(:remove_denial, cap_key),
+    do: "The deny rule for #{cap_key} was removed."
+
+  # The dialog states what the held rule does to this person's access.
+  defp authz_consequence({:remove_role, assignment}, user),
+    do: "The #{assignment.role_name} role will be removed from #{user.name}."
+
+  defp authz_consequence({:deny, cap_key}, user),
+    do: "#{cap_key} will be denied for #{user.name}."
+
+  defp authz_consequence({:remove_grant, cap_key, _id}, user),
+    do: "The direct grant of #{cap_key} will be removed from #{user.name}."
+
+  defp authz_consequence({:remove_denial, cap_key, _id}, _user),
+    do: "The deny rule for #{cap_key} will be removed."
+
+  defp authz_detail({:remove_role, _assignment}, _user),
+    do:
+      "They lose every capability this role grants unless another role or direct grant " <>
+        "also provides it. The role can be assigned again."
+
+  defp authz_detail({:deny, _cap_key}, _user),
+    do:
+      "The deny rule overrides every role that grants it and takes effect at once. " <>
+        "It can be removed again from the denied list."
+
+  defp authz_detail({:remove_grant, _cap_key, _id}, _user),
+    do:
+      "They keep this capability only if an assigned role still grants it. " <>
+        "The grant can be added again."
+
+  defp authz_detail({:remove_denial, _cap_key, _id}, user),
+    do: "#{user.name} regains this capability from any role or direct grant that provides it."
+
+  defp authz_verb({:deny, _cap_key}), do: "Deny"
+  defp authz_verb(_rule), do: "Remove"
+  defp authz_working({:deny, _cap_key}), do: "Denying…"
+  defp authz_working(_rule), do: "Removing…"
+  defp authz_event({:remove_role, _assignment}), do: "remove_role"
+  defp authz_event({:deny, _cap_key}), do: "deny_capability"
+  defp authz_event(_rule), do: "remove_capability"
 
   # --- Render Template ---
 
@@ -1129,14 +1354,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                         context={:inline}
                         kind={:danger}
                         id={"remove-role-#{assignment.id}"}
-                        phx-click="remove_role"
+                        phx-click="request_remove_role"
                         phx-value-assignment-id={assignment.id}
-                        phx-value-role-id={assignment.role_id}
-                        data-confirm={
-                          "Remove the #{assignment.role_name} role from #{@user.name}? " <>
-                            "They lose every capability this role grants, unless another " <>
-                            "role or direct grant also provides it."
-                        }
                         class="-mr-1"
                       />
                     </span>
@@ -1284,13 +1503,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                                 context={:inline}
                                 kind={:danger}
                                 id={"remove-direct-cap-#{String.replace(cap, ".", "-")}"}
-                                phx-click="remove_capability"
+                                phx-click="request_remove_capability"
                                 phx-value-grant-id={@direct_grant_ids[cap]}
-                                data-confirm={
-                                  "Remove the direct grant of #{cap} from #{@user.name}? " <>
-                                    "They keep this capability only if an assigned role " <>
-                                    "still grants it."
-                                }
                               />
                             <% else %>
                               <%= if not is_nil(@user.company_id) do %>
@@ -1300,12 +1514,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                                   context={:inline}
                                   kind={:danger}
                                   id={"deny-cap-#{String.replace(cap, ".", "-")}"}
-                                  phx-click="deny_capability"
+                                  phx-click="request_deny_capability"
                                   phx-value-capability-key={cap}
-                                  data-confirm={
-                                    "Deny #{cap} for #{@user.name}? This overrides every " <>
-                                      "role that grants it and takes effect immediately."
-                                  }
                                 />
                               <% end %>
                             <% end %>
@@ -1346,12 +1556,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                           context={:inline}
                           kind={:danger}
                           id={"remove-denial-#{String.replace(cap, ".", "-")}"}
-                          phx-click="remove_capability"
+                          phx-click="request_remove_capability"
                           phx-value-grant-id={@direct_deny_ids[cap]}
-                          data-confirm={
-                            "Remove the deny rule for #{cap}? #{@user.name} regains this " <>
-                              "capability from any role or direct grant that provides it."
-                          }
                         />
                       </span>
                       </div>
@@ -1581,9 +1787,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   label={"Unlink #{emp.full_name}"}
                   kind={:danger}
                   id={"unlink-employee-#{emp.id}"}
-                  phx-click="unlink_employee"
+                  phx-click="request_unlink_employee"
                   phx-value-employee-id={emp.id}
-                  data-confirm="Unlink this employee record from the user?"
                 />
               </:action>
               <:empty :if={@employees == []}>
@@ -1742,17 +1947,45 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   Permanently deletes this account. This cannot be undone.
                 </p>
               </div>
-              <.button
-                id="user-delete"
-                variant="danger"
-                phx-click="delete"
-                data-confirm={"Delete #{@user.name}? This cannot be undone."}
-              >
+              <.button id="user-delete" variant="danger" phx-click="request_delete">
                 Delete user
               </.button>
             </div>
           </section>
         </div>
+
+        <.confirm_dialog
+          :if={@pending_authz}
+          id="user-authz-confirm"
+          consequence={authz_consequence(@pending_authz, @user)}
+          detail={authz_detail(@pending_authz, @user)}
+          confirm={authz_verb(@pending_authz)}
+          working={authz_working(@pending_authz)}
+          on_confirm={JS.push(authz_event(@pending_authz))}
+          on_cancel={JS.push("cancel_authz")}
+        />
+
+        <.confirm_dialog
+          :if={@pending_unlink}
+          id="unlink-employee-confirm"
+          consequence={"#{@pending_unlink.full_name} will be unlinked from #{@user.name}."}
+          detail="The employee record is kept and can be linked again."
+          confirm="Unlink"
+          working="Unlinking…"
+          on_confirm={JS.push("unlink_employee")}
+          on_cancel={JS.push("cancel_unlink_employee")}
+        />
+
+        <.confirm_dialog
+          :if={@pending_delete?}
+          id="delete-user-confirm"
+          consequence={"#{@user.name}'s account will be deleted."}
+          detail="They can no longer sign in. This cannot be undone."
+          confirm="Delete"
+          working="Deleting…"
+          on_confirm={JS.push("delete")}
+          on_cancel={JS.push("cancel_delete")}
+        />
 
         <.modal
           :if={@show_add_employee_modal}

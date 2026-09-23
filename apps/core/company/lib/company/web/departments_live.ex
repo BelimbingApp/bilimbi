@@ -32,6 +32,7 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
              |> assign(:departments_count, length(departments))
              |> assign(:department_head_names, department_head_names)
              |> assign(:modal_action, nil)
+             |> assign(:pending_delete, nil)
              |> assign(:available_types, [])
              |> assign(:head_options, [])
              |> assign_form(nil)
@@ -55,12 +56,24 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
 
   @impl true
   def handle_event(event, params, socket)
-      when event in ["new", "save", "update_status", "delete", "edit_head", "save_head"] do
+      when event in [
+             "new",
+             "save",
+             "update_status",
+             "request_delete",
+             "delete",
+             "edit_head",
+             "save_head"
+           ] do
     if can_update?(socket) do
       handle_write_event(event, params, socket)
     else
       write_forbidden(socket)
     end
+  end
+
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, :pending_delete, nil)}
   end
 
   def handle_event("close_modal", _params, socket) do
@@ -156,28 +169,58 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
     end
   end
 
-  defp handle_write_event("delete", %{"id" => id}, socket) do
+  # Removing confirms through the shared dialog: the request holds the
+  # department whose consequence the dialog states, and `delete` acts on that
+  # held department rather than on a client-supplied id, so what was confirmed
+  # is what runs.
+  defp handle_write_event("request_delete", %{"id" => id}, socket) do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.company.id
 
-    case Integer.parse(id) do
-      {dept_id, ""} ->
-        case Company.delete_department(scope, company_id, dept_id) do
-          :ok ->
-            {:ok, departments} = Company.list_departments(scope, company_id)
+    with {dept_id, ""} <- Integer.parse(id),
+         {:ok, departments} <- Company.list_departments(scope, company_id),
+         %{} = dept <- Enum.find(departments, &(&1.id == dept_id)) do
+      {:noreply, socket |> clear_flash() |> assign(:pending_delete, dept)}
+    else
+      nil -> {:noreply, put_flash(socket, :error, "Department not found.")}
+      _other -> {:noreply, socket}
+    end
+  end
 
-            {:noreply,
-             socket
-             |> put_flash(:info, "Department removed.")
-             |> assign(:departments_count, length(departments))
-             |> stream(:departments, departments, reset: true)}
+  defp handle_write_event("delete", _params, %{assigns: %{pending_delete: nil}} = socket),
+    do: {:noreply, socket}
 
-          {:error, _reason} ->
-            {:noreply, put_flash(socket, :error, "Could not remove department.")}
-        end
+  defp handle_write_event("delete", _params, %{assigns: %{pending_delete: dept}} = socket) do
+    scope = socket.assigns.current_scope.scope
+    company_id = socket.assigns.company.id
+    socket = assign(socket, :pending_delete, nil)
 
-      _ ->
-        {:noreply, socket}
+    case Company.delete_department(scope, company_id, dept.id) do
+      :ok ->
+        {:ok, departments} = Company.list_departments(scope, company_id)
+
+        {:noreply,
+         socket
+         |> put_flash(:success, "Department removed.")
+         |> assign(:departments_count, length(departments))
+         |> stream(:departments, departments, reset: true)}
+
+      {:error, :not_found} ->
+        {:ok, departments} = Company.list_departments(scope, company_id)
+
+        {:noreply,
+         socket
+         |> put_flash(:error, "That department had already been removed.")
+         |> assign(:departments_count, length(departments))
+         |> stream(:departments, departments, reset: true)}
+
+      {:error, _reason} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "The department was not removed. Reload the page and try again."
+         )}
     end
   end
 
@@ -474,9 +517,8 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
                   label={"Remove #{dept.type.name}"}
                   kind={:danger}
                   id={"delete-dept-#{dept.id}"}
-                  phx-click="delete"
+                  phx-click="request_delete"
                   phx-value-id={dept.id}
-                  data-confirm="Are you sure you want to remove this department?"
                 />
               </div>
             </:action>
@@ -575,6 +617,17 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
               </div>
             </.form>
         </.modal>
+
+        <.confirm_dialog
+          :if={@pending_delete}
+          id="delete-dept-confirm"
+          consequence={"The #{@pending_delete.type.name} department will be removed from this company."}
+          detail="Employees assigned to it keep their records but lose this department. This cannot be undone."
+          confirm="Remove"
+          working="Removing…"
+          on_confirm={JS.push("delete")}
+          on_cancel={JS.push("cancel_delete")}
+        />
       </.page>
     </Layouts.app>
     """

@@ -97,9 +97,8 @@
             label="Terminate session"
             kind={:danger}
             id={"sessions-terminate-#{session.id}"}
-            phx-click="terminate"
+            phx-click="request_terminate"
             phx-value-id={session.id}
-            data-confirm="Are you sure you want to terminate this session?"
           />
         </:action>
 
@@ -115,5 +114,16 @@
         filters_form={@filters_form}
       />
     </.card>
+
+    <.confirm_dialog
+      :if={@pending_terminate}
+      id="terminate-session-confirm"
+      consequence={"#{session_name(@pending_terminate, @user_names)} will be terminated."}
+      detail="Whoever holds it is signed out on that device at once and must sign in again. This cannot be undone."
+      confirm="Terminate"
+      working="Terminating…"
+      on_confirm={JS.push("terminate")}
+      on_cancel={JS.push("cancel_terminate")}
+    />
   </.page>
 </Layouts.app>

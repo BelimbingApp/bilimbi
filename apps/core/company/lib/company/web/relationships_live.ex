@@ -29,6 +29,7 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
              |> assign(:relationships_count, length(relationships))
              |> assign(:modal_action, nil)
              |> assign(:editing_rel, nil)
+             |> assign(:pending_delete, nil)
              |> assign(:available_companies, [])
              |> assign(:available_types, [])
              |> assign_form(nil)
@@ -188,28 +189,62 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
     end
   end
 
-  def handle_event("delete", %{"id" => id}, socket) do
+  # Removing confirms through the shared dialog: the request holds the
+  # relationship whose consequence the dialog states, and `delete` acts on that
+  # held relationship rather than on a client-supplied id, so what was
+  # confirmed is what runs.
+  def handle_event("request_delete", %{"id" => id}, socket) do
     scope = socket.assigns.current_scope.scope
     company_id = socket.assigns.company.id
 
-    case Integer.parse(id) do
-      {rel_id, ""} ->
-        case Company.delete_relationship(scope, company_id, rel_id) do
-          :ok ->
-            {:ok, relationships} = Company.list_relationships(scope, company_id)
+    with {rel_id, ""} <- Integer.parse(id),
+         {:ok, relationships} <- Company.list_relationships(scope, company_id),
+         %{} = item <- Enum.find(relationships, &(&1.id == rel_id)) do
+      {:noreply, socket |> clear_flash() |> assign(:pending_delete, item)}
+    else
+      nil -> {:noreply, put_flash(socket, :error, "Relationship not found.")}
+      _other -> {:noreply, socket}
+    end
+  end
 
-            {:noreply,
-             socket
-             |> put_flash(:info, "Relationship removed.")
-             |> assign(:relationships_count, length(relationships))
-             |> stream(:relationships, relationships, reset: true)}
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, :pending_delete, nil)}
+  end
 
-          {:error, _reason} ->
-            {:noreply, put_flash(socket, :error, "Could not remove relationship.")}
-        end
+  def handle_event("delete", _params, %{assigns: %{pending_delete: nil}} = socket),
+    do: {:noreply, socket}
 
-      _ ->
-        {:noreply, socket}
+  def handle_event("delete", _params, %{assigns: %{pending_delete: item}} = socket) do
+    scope = socket.assigns.current_scope.scope
+    company_id = socket.assigns.company.id
+    socket = assign(socket, :pending_delete, nil)
+
+    case Company.delete_relationship(scope, company_id, item.id) do
+      :ok ->
+        {:ok, relationships} = Company.list_relationships(scope, company_id)
+
+        {:noreply,
+         socket
+         |> put_flash(:success, "Relationship removed.")
+         |> assign(:relationships_count, length(relationships))
+         |> stream(:relationships, relationships, reset: true)}
+
+      {:error, :not_found} ->
+        {:ok, relationships} = Company.list_relationships(scope, company_id)
+
+        {:noreply,
+         socket
+         |> put_flash(:error, "That relationship had already been removed.")
+         |> assign(:relationships_count, length(relationships))
+         |> stream(:relationships, relationships, reset: true)}
+
+      {:error, _reason} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "The relationship was not removed. Reload the page and try again."
+         )}
     end
   end
 
@@ -322,9 +357,8 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
                   label="Remove relationship"
                   kind={:danger}
                   id={"delete-rel-#{item.id}"}
-                  phx-click="delete"
+                  phx-click="request_delete"
                   phx-value-id={item.id}
-                  data-confirm="Are you sure you want to remove this relationship?"
                 />
               </div>
             </:action>
@@ -402,6 +436,17 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
               </div>
             </.form>
         </.modal>
+
+        <.confirm_dialog
+          :if={@pending_delete}
+          id="delete-rel-confirm"
+          consequence={"The #{@pending_delete.type.name} relationship with #{@pending_delete.other_company.name} will be removed."}
+          detail="Both companies are kept. The relationship's dates are lost and it would have to be added again."
+          confirm="Remove"
+          working="Removing…"
+          on_confirm={JS.push("delete")}
+          on_cancel={JS.push("cancel_delete")}
+        />
       </.page>
     </Layouts.app>
     """

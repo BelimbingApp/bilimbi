@@ -46,12 +46,7 @@
               <.icon name="duplicate" class="size-4 mr-1.5" />
               Duplicate
             </.button>
-            <.button
-              variant="danger"
-              id="btn-delete-query"
-              phx-click="delete"
-              data-confirm="Are you sure you want to delete this query?"
-            >
+            <.button variant="danger" id="btn-delete-query" phx-click="request_delete">
               <.icon name="delete" class="size-4 mr-1.5" />
               Delete
             </.button>
@@ -242,5 +237,16 @@
         </.card>
       <% end %>
     </div>
+
+    <.confirm_dialog
+      :if={@pending_delete?}
+      id="delete-query-confirm"
+      consequence={"Query “#{@name}” will be deleted."}
+      detail="Its saved SQL and parameters are removed. This cannot be undone."
+      confirm="Delete"
+      working="Deleting…"
+      on_confirm={JS.push("delete")}
+      on_cancel={JS.push("cancel_delete")}
+    />
   </.page>
 </Layouts.app>

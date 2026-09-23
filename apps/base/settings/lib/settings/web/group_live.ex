@@ -44,6 +44,7 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
      |> assign(:page, page)
      |> assign(:page_title, page.title)
      |> assign(:active_tab, hd(page.groups))
+     |> assign(:pending_restore, nil)
      |> load_fields()}
   end
 
@@ -78,14 +79,38 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
     end
   end
 
+  # Restoring confirms through the shared dialog: the request holds the
+  # overrides the dialog counts, and `restore_defaults` acts only once one is
+  # held, so what was confirmed is what runs. With nothing overridden there is
+  # nothing to confirm, and the page says so instead of asking.
   @impl true
+  def handle_event("request_restore", _params, socket) do
+    case Enum.filter(socket.assigns.fields, & &1.overridden?) do
+      [] ->
+        {:noreply, put_flash(socket, :info, restored_message([]))}
+
+      overridden ->
+        {:noreply, socket |> clear_flash() |> assign(:pending_restore, overridden)}
+    end
+  end
+
+  @impl true
+  def handle_event("cancel_restore", _params, socket) do
+    {:noreply, assign(socket, :pending_restore, nil)}
+  end
+
+  @impl true
+  def handle_event("restore_defaults", _params, %{assigns: %{pending_restore: nil}} = socket),
+    do: {:noreply, socket}
+
   def handle_event("restore_defaults", _params, socket) do
     {:ok, cleared} = Form.restore_defaults(socket.assigns.fields, scope(socket))
 
     {:noreply,
      socket
+     |> assign(:pending_restore, nil)
      |> load_fields()
-     |> put_flash(:info, restored_message(cleared))}
+     |> put_flash(:success, restored_message(cleared))}
   end
 
   # This page edits the global scope, which is what `operator` settings declare.

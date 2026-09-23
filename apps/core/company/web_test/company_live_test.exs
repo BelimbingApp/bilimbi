@@ -1221,6 +1221,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#scope-activities-section", "training")
 
       view |> element("#remove-activity-0") |> render_click()
+      view |> element("#remove-activity-confirm-confirm") |> render_click()
       refute has_element?(view, "#scope-activities-section", "consulting")
       assert has_element?(view, "#scope-activities-section", "training")
       assert has_element?(view, "#company-new-activity-status", "Saved")
@@ -1230,8 +1231,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
     end
 
     # `remove_activity` writes the company row immediately -- there is no
-    # surrounding modal to cancel out of -- so the control asks first and names
-    # the activity it is about to drop.
+    # surrounding editor to cancel out of -- so the control confirms through the
+    # shared dialog, which names the activity it is about to drop.
     test "confirms business activity removal and names the activity", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
 
@@ -1239,11 +1240,48 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       render_hook(view, "add_activity", %{"id" => "73", "activity" => "consulting"})
 
+      refute has_element?(view, "#remove-activity-0[data-confirm]")
+      view |> element("#remove-activity-0") |> render_click()
+
+      assert_modal_dialog(
+        view,
+        "remove-activity-confirm",
+        "Business activity “consulting” will be removed from this company."
+      )
+
+      assert has_element?(view, "dialog#remove-activity-confirm[role='alertdialog']")
+
       assert has_element?(
                view,
-               ~s(#remove-activity-0[data-confirm="Remove the business activity consulting? ) <>
-                 ~s(The change is saved immediately."])
+               "#remove-activity-confirm-description",
+               "The change is saved at once. The company's other activities are kept, and this one can be added again."
              )
+
+      # Cancelling keeps the activity.
+      view |> element("#remove-activity-confirm-cancel", "Cancel") |> render_click()
+      refute has_element?(view, "#remove-activity-confirm")
+      assert has_element?(view, "#scope-activities-section", "consulting")
+
+      # A confirm with nothing held is a stale click and changes nothing.
+      render_hook(view, "remove_activity", %{})
+      assert has_element?(view, "#scope-activities-section", "consulting")
+
+      # Confirming removes it and reports on the fact itself.
+      view |> element("#remove-activity-0") |> render_click()
+
+      assert has_element?(
+               view,
+               "#remove-activity-confirm-confirm[phx-disable-with='Removing…']",
+               "Remove"
+             )
+
+      view |> element("#remove-activity-confirm-confirm") |> render_click()
+      refute has_element?(view, "#remove-activity-confirm")
+      refute has_element?(view, "#scope-activities-section", "consulting")
+      assert has_element?(view, "#company-new-activity-status", "Saved")
+
+      {:ok, scope} = Tenancy.scope(41)
+      assert {:ok, %{scope_activities: nil}} = Company.get_company(scope, 73)
     end
 
     test "edits, validates, and clears metadata JSON in place", %{conn: conn} do
@@ -2211,8 +2249,42 @@ defmodule BilimbiWeb.CompanyLiveTest do
       view |> element("#deactivate-dept-#{dept.id}") |> render_click()
       assert has_element?(view, "#company-departments span", "inactive")
 
-      # Remove
+      # Removing confirms through the shared dialog, which names the department
+      # and says what happens to the employees assigned to it.
+      refute has_element?(view, "#delete-dept-#{dept.id}[data-confirm]")
       view |> element("#delete-dept-#{dept.id}") |> render_click()
+
+      assert_modal_dialog(
+        view,
+        "delete-dept-confirm",
+        "The Engineering department will be removed from this company."
+      )
+
+      assert has_element?(view, "dialog#delete-dept-confirm[role='alertdialog']")
+
+      assert has_element?(
+               view,
+               "#delete-dept-confirm-description",
+               "Employees assigned to it keep their records but lose this department. This cannot be undone."
+             )
+
+      # Cancelling keeps the department.
+      view |> element("#delete-dept-confirm-cancel", "Cancel") |> render_click()
+      refute has_element?(view, "#delete-dept-confirm")
+      refute has_element?(view, "#company-departments-empty")
+
+      # Confirming removes it and reports the completed write as a success.
+      view |> element("#delete-dept-#{dept.id}") |> render_click()
+
+      assert has_element?(
+               view,
+               "#delete-dept-confirm-confirm[phx-disable-with='Removing…']",
+               "Remove"
+             )
+
+      view |> element("#delete-dept-confirm-confirm") |> render_click()
+      refute has_element?(view, "#delete-dept-confirm")
+      assert has_element?(view, "#flash-success", "Department removed.")
       assert has_element?(view, "#company-departments-empty")
     end
 
@@ -2511,8 +2583,37 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(view, "#company-relationships", "2027-12-31")
 
-      # Delete
+      # Removing confirms through the shared dialog, which names the related
+      # company and the relationship type and says what is lost.
+      refute has_element?(view, "#delete-rel-#{rel.id}[data-confirm]")
       view |> element("#delete-rel-#{rel.id}") |> render_click()
+
+      assert_modal_dialog(view, "delete-rel-confirm", "relationship with")
+      assert has_element?(view, "dialog#delete-rel-confirm[role='alertdialog']")
+
+      assert has_element?(
+               view,
+               "#delete-rel-confirm-description",
+               "Both companies are kept. The relationship's dates are lost and it would have to be added again."
+             )
+
+      # Cancelling keeps the relationship.
+      view |> element("#delete-rel-confirm-cancel", "Cancel") |> render_click()
+      refute has_element?(view, "#delete-rel-confirm")
+      refute has_element?(view, "#company-relationships-empty")
+
+      # Confirming removes it and reports the completed write as a success.
+      view |> element("#delete-rel-#{rel.id}") |> render_click()
+
+      assert has_element?(
+               view,
+               "#delete-rel-confirm-confirm[phx-disable-with='Removing…']",
+               "Remove"
+             )
+
+      view |> element("#delete-rel-confirm-confirm") |> render_click()
+      refute has_element?(view, "#delete-rel-confirm")
+      assert has_element?(view, "#flash-success", "Relationship removed.")
       assert has_element?(view, "#company-relationships-empty")
     end
 

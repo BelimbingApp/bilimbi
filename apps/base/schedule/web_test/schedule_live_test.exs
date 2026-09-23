@@ -93,6 +93,11 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     assert render_click(view, "run_now", %{"key" => definition.key}) =~
              "You do not have permission to perform that action."
 
+    assert render_click(view, "request_pause", %{"key" => definition.key}) =~
+             "You do not have permission to perform that action."
+
+    refute has_element?(view, "#schedule-command-confirm")
+
     assert render_click(view, "pause", %{"key" => definition.key}) =~
              "You do not have permission to perform that action."
 
@@ -109,13 +114,77 @@ defmodule BilimbiWeb.ScheduleLiveTest do
 
     assert has_element?(manager, "#schedule-task-test-schedule-enable")
     refute has_element?(manager, "#schedule-task-test-schedule-run")
-    assert render_click(manager, "enable", %{"key" => definition.key}) =~ "Task enabled."
+
+    # Enabling loses nothing, so it runs on click without a confirmation.
+    refute has_element?(manager, "#schedule-task-test-schedule-enable[data-confirm]")
+    assert manager |> element("#schedule-task-test-schedule-enable") |> render_click() =~ "Task enabled."
     assert has_element?(manager, "#schedule-task-test-schedule-pause")
 
-    assert render_click(manager, "pause", %{"key" => definition.key}) =~ "Task paused."
-    assert Repo.exists?(Suppression)
-    assert render_click(manager, "resume", %{"key" => definition.key}) =~ "Task resumed."
+    # Pausing cancels queued work, so it confirms through the shared dialog,
+    # which names the task and says what resuming does not bring back.
+    refute has_element?(manager, "#schedule-task-test-schedule-pause[data-confirm]")
+    manager |> element("#schedule-task-test-schedule-pause") |> render_click()
+
+    assert_modal_dialog(
+      manager,
+      "schedule-command-confirm",
+      "Task “#{definition.name}” will be paused."
+    )
+
+    assert has_element?(manager, "dialog#schedule-command-confirm[role='alertdialog']")
+
+    assert has_element?(
+             manager,
+             "#schedule-command-confirm-description",
+             "Work already queued for it is cancelled before it starts."
+           )
+
+    # Cancelling keeps the task running.
+    manager |> element("#schedule-command-confirm-cancel", "Cancel") |> render_click()
+    refute has_element?(manager, "#schedule-command-confirm")
     refute Repo.exists?(Suppression)
+
+    # A confirm with nothing held is a stale click and does nothing.
+    render_click(manager, "pause", %{"key" => definition.key})
+    refute Repo.exists?(Suppression)
+
+    # Confirming pauses it and reports the completed write as a success.
+    manager |> element("#schedule-task-test-schedule-pause") |> render_click()
+
+    assert has_element?(
+             manager,
+             "#schedule-command-confirm-confirm[phx-disable-with='Pausing…']",
+             "Pause"
+           )
+
+    manager |> element("#schedule-command-confirm-confirm") |> render_click()
+    refute has_element?(manager, "#schedule-command-confirm")
+    assert has_element?(manager, "#flash-success", "Task paused.")
+    assert Repo.exists?(Suppression)
+
+    # Resuming loses nothing, so it runs on click without a confirmation.
+    refute has_element?(manager, "#schedule-task-test-schedule-resume[data-confirm]")
+    assert manager |> element("#schedule-task-test-schedule-resume") |> render_click() =~ "Task resumed."
+    refute Repo.exists?(Suppression)
+
+    # Disabling confirms the same way and names its own consequence.
+    manager |> element("#schedule-task-test-schedule-disable") |> render_click()
+
+    assert_modal_dialog(
+      manager,
+      "schedule-command-confirm",
+      "Task “#{definition.name}” will be disabled."
+    )
+
+    assert has_element?(
+             manager,
+             "#schedule-command-confirm-description",
+             "stops queuing it until this definition is reviewed and enabled again."
+           )
+
+    manager |> element("#schedule-command-confirm-cancel", "Cancel") |> render_click()
+    refute has_element?(manager, "#schedule-command-confirm")
+    assert has_element?(manager, "#schedule-task-test-schedule-pause")
 
     manager
     |> element("#schedule-tab-settings")

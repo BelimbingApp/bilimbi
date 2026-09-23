@@ -11,7 +11,10 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, stream_configure(socket, :addresses, dom_id: &"address-#{&1.id}")}
+    {:ok,
+     socket
+     |> assign(:pending_delete, nil)
+     |> stream_configure(:addresses, dom_id: &"address-#{&1.id}")}
   end
 
   @impl true
@@ -46,11 +49,55 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
     {:noreply, push_patch(socket, to: addresses_path(state))}
   end
 
-  def handle_event("delete", %{"id" => id}, socket) do
-    if allowed?(socket.assigns.current_scope, "admin.address.delete") do
-      delete_address(socket, id)
-    else
-      {:noreply, put_flash(socket, :error, "You do not have permission to delete addresses.")}
+  # Deleting confirms through the shared dialog: the request holds the listed
+  # address whose consequence the dialog states, and `delete` acts on that held
+  # address rather than on a client-supplied id, so what was confirmed is what
+  # runs.
+  def handle_event("request_delete", %{"id" => id}, socket) do
+    cond do
+      not allowed?(socket.assigns.current_scope, "admin.address.delete") ->
+        delete_forbidden(socket)
+
+      address = find_listed(socket, id) ->
+        {:noreply, socket |> clear_flash() |> assign(:pending_delete, address)}
+
+      true ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "That address no longer exists.")
+         |> load_page(socket.assigns.index_state)}
+    end
+  end
+
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, :pending_delete, nil)}
+  end
+
+  def handle_event("delete", _params, socket) do
+    cond do
+      not allowed?(socket.assigns.current_scope, "admin.address.delete") ->
+        delete_forbidden(socket)
+
+      is_nil(socket.assigns.pending_delete) ->
+        {:noreply, socket}
+
+      true ->
+        address = socket.assigns.pending_delete
+
+        socket
+        |> assign(:pending_delete, nil)
+        |> delete_address(address)
+    end
+  end
+
+  defp delete_forbidden(socket) do
+    {:noreply, put_flash(socket, :error, "You do not have permission to delete addresses.")}
+  end
+
+  defp find_listed(socket, id) do
+    case Integer.parse(id) do
+      {address_id, ""} -> Enum.find(socket.assigns.addresses_page.entries, &(&1.id == address_id))
+      _ -> nil
     end
   end
 
@@ -173,9 +220,8 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
                 label={"Delete #{address.label || "address"}"}
                 kind={:danger}
                 id={"address-delete-#{address.id}"}
-                phx-click="delete"
+                phx-click="request_delete"
                 phx-value-id={address.id}
-                data-confirm={"Delete #{address.label || "this address"}?"}
               />
             </:action>
             <:empty :if={@addresses_page.entries == []}>
@@ -190,6 +236,17 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
             filters_form={@filters_form}
           />
         </.card>
+
+        <.confirm_dialog
+          :if={@pending_delete}
+          id="delete-address-confirm"
+          consequence={"#{address_name(@pending_delete)} will be deleted."}
+          detail="It can no longer be attached to a company or employee. This cannot be undone."
+          confirm="Delete"
+          working="Deleting…"
+          on_confirm={JS.push("delete")}
+          on_cancel={JS.push("cancel_delete")}
+        />
       </.page>
     </Layouts.app>
     """
@@ -223,22 +280,41 @@ defmodule Bilimbi.Core.Address.Web.IndexLive do
     )
   end
 
-  defp delete_address(socket, id) do
-    with {address_id, ""} <- Integer.parse(id),
-         :ok <- Address.delete_address(socket.assigns.current_scope.scope, address_id) do
-      {:noreply,
-       socket
-       |> put_flash(:info, "Address deleted successfully.")
-       |> load_page(socket.assigns.index_state)}
-    else
+  defp delete_address(socket, address) do
+    case Address.delete_address(socket.assigns.current_scope.scope, address.id) do
+      :ok ->
+        {:noreply,
+         socket
+         |> put_flash(:success, "Address deleted.")
+         |> load_page(socket.assigns.index_state)}
+
       {:error, :address_in_use} ->
         {:noreply,
-         put_flash(socket, :error, "This address is linked. Unlink it before deleting it.")}
+         put_flash(
+           socket,
+           :error,
+           "#{address_name(address)} was not deleted: it is still attached to a company or " <>
+             "employee. Unlink it there first."
+         )}
 
-      _error ->
-        {:noreply, put_flash(socket, :error, "That address could not be deleted.")}
+      {:error, :address_not_found} ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "That address no longer exists.")
+         |> load_page(socket.assigns.index_state)}
+
+      {:error, _changeset} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "#{address_name(address)} was not deleted. Reload the page and try again."
+         )}
     end
   end
+
+  defp address_name(%{label: label}) when is_binary(label) and label != "", do: "“#{label}”"
+  defp address_name(_address), do: "This address"
 
   defp state_from_params(params) do
     %{

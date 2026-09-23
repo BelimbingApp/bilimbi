@@ -34,6 +34,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
      |> assign(:page_title, "User Management")
      |> assign(:active_nav, "admin.user")
      |> assign(:page_sizes, @page_sizes)
+     |> assign(:pending_delete, nil)
      |> assign(:role_options, role_options(scope))
      |> stream_configure(:users, dom_id: &"user-#{&1.id}")}
   end
@@ -79,33 +80,54 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
     {:noreply, push_patch(socket, to: users_path(state))}
   end
 
-  def handle_event("delete", %{"id" => raw_id}, socket) do
-    scope = socket.assigns.current_scope.scope
+  # Deleting confirms through the shared dialog: the request holds the listed
+  # user whose consequence the dialog states, and `delete` acts on that held
+  # user rather than on a client-supplied id, so what was confirmed is what
+  # runs. The signed-in account is refused before any dialog opens.
+  def handle_event("request_delete", %{"id" => raw_id}, socket) do
     actor_id = socket.assigns.current_scope.user["user_id"]
 
     cond do
       not allowed?(socket.assigns.current_scope, "admin.user.delete") ->
-        {:noreply, put_flash(socket, :error, "You do not have permission to delete users.")}
+        delete_forbidden(socket)
 
       match?({id, ""} when id == actor_id, Integer.parse(to_string(raw_id))) ->
         {:noreply, put_flash(socket, :error, "You cannot delete your own account.")}
 
-      true ->
-        with {user_id, ""} <- Integer.parse(to_string(raw_id)),
-             %{} = entry <- Enum.find(socket.assigns.users_page.entries, &(&1.id == user_id)),
-             :ok <- delete_listed_user(scope, entry) do
-          {:noreply,
-           socket
-           |> put_flash(:info, "User deleted successfully.")
-           |> load_page(socket.assigns.index_state)}
-        else
-          :error ->
-            {:noreply, put_flash(socket, :error, "That user could not be deleted.")}
+      entry = find_listed(socket, raw_id) ->
+        {:noreply, socket |> clear_flash() |> assign(:pending_delete, entry)}
 
-          nil ->
+      true ->
+        {:noreply,
+         socket
+         |> put_flash(:error, "That user no longer exists.")
+         |> load_page(socket.assigns.index_state)}
+    end
+  end
+
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, :pending_delete, nil)}
+  end
+
+  def handle_event("delete", _params, socket) do
+    scope = socket.assigns.current_scope.scope
+
+    cond do
+      not allowed?(socket.assigns.current_scope, "admin.user.delete") ->
+        delete_forbidden(socket)
+
+      is_nil(socket.assigns.pending_delete) ->
+        {:noreply, socket}
+
+      true ->
+        entry = socket.assigns.pending_delete
+        socket = assign(socket, :pending_delete, nil)
+
+        case delete_listed_user(scope, entry) do
+          :ok ->
             {:noreply,
              socket
-             |> put_flash(:error, "That user no longer exists.")
+             |> put_flash(:success, "#{entry.name}'s account was deleted.")
              |> load_page(socket.assigns.index_state)}
 
           {:error, :company_not_found} ->
@@ -113,12 +135,26 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
              put_flash(
                socket,
                :error,
-               "That user cannot be deleted while their company is archived."
+               "#{entry.name} was not deleted: their company is archived. Restore the company first."
              )}
 
-          {:error, _reason} ->
-            {:noreply, put_flash(socket, :error, "That user could not be deleted.")}
+          {:error, :user_not_found} ->
+            {:noreply,
+             socket
+             |> put_flash(:error, "That user no longer exists.")
+             |> load_page(socket.assigns.index_state)}
         end
+    end
+  end
+
+  defp delete_forbidden(socket) do
+    {:noreply, put_flash(socket, :error, "You do not have permission to delete users.")}
+  end
+
+  defp find_listed(socket, raw_id) do
+    case Integer.parse(to_string(raw_id)) do
+      {user_id, ""} -> Enum.find(socket.assigns.users_page.entries, &(&1.id == user_id))
+      _ -> nil
     end
   end
 

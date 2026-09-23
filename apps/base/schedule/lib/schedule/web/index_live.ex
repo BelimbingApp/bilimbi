@@ -55,6 +55,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
       |> assign(:retention_days, retention_days())
       |> assign(:retention_form, retention_form(retention_days()))
       |> assign(:run_page, empty_run_page())
+      |> assign(:pending_command, nil)
       |> assign(:browser_timezone, nil)
       |> stream_configure(:tasks, dom_id: &task_dom_id/1)
       |> stream_configure(:runs, dom_id: &run_dom_id/1)
@@ -172,17 +173,42 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
     )
   end
 
-  def handle_event("disable", %{"key" => key}, socket) do
-    command(
-      socket,
-      @manage,
-      fn actor -> Schedule.review_definition(actor, key, false) end,
-      "Task disabled."
-    )
+  # Pausing and disabling cancel work already queued for the task before it
+  # starts, which resuming does not bring back, so both confirm through the
+  # shared dialog: the request holds the task whose consequence the dialog
+  # states, and the command acts on that held task rather than on a
+  # client-supplied key. Enabling and resuming lose nothing and run on click.
+  def handle_event("request_pause", %{"key" => key}, socket),
+    do: request_command(socket, :pause, key)
+
+  def handle_event("request_disable", %{"key" => key}, socket),
+    do: request_command(socket, :disable, key)
+
+  def handle_event("cancel_command", _params, socket),
+    do: {:noreply, assign(socket, :pending_command, nil)}
+
+  def handle_event("disable", _params, socket) do
+    confirmed_command(socket, :disable, fn socket, key ->
+      command(
+        socket,
+        @manage,
+        fn actor -> Schedule.review_definition(actor, key, false) end,
+        "Task disabled.",
+        :success
+      )
+    end)
   end
 
-  def handle_event("pause", %{"key" => key}, socket) do
-    command(socket, @manage, fn actor -> Schedule.suppress(actor, key) end, "Task paused.")
+  def handle_event("pause", _params, socket) do
+    confirmed_command(socket, :pause, fn socket, key ->
+      command(
+        socket,
+        @manage,
+        fn actor -> Schedule.suppress(actor, key) end,
+        "Task paused.",
+        :success
+      )
+    end)
   end
 
   def handle_event("resume", %{"key" => key}, socket) do
@@ -225,14 +251,44 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
 
   def handle_info(:refresh, socket), do: {:noreply, load(socket, socket.assigns.state)}
 
-  defp command(socket, capability, operation, success_message) do
+  defp request_command(socket, action, key) do
+    with true <- authorized?(socket, @manage),
+         {:ok, tasks} <- Schedule.list_tasks(),
+         %{} = task <- Enum.find(tasks, &(&1.key == key)) do
+      {:noreply, socket |> clear_flash() |> assign(:pending_command, {action, task})}
+    else
+      false -> write_forbidden(socket)
+      nil -> {:noreply, put_flash(socket, :error, error_message(:not_found))}
+      {:error, reason} -> {:noreply, put_flash(socket, :error, error_message(reason))}
+    end
+  end
+
+  # The forbidden answer comes first so a revoked operator hears it even from a
+  # forged event; a confirm with nothing held is a stale click and does nothing.
+  defp confirmed_command(socket, action, run) do
+    cond do
+      not authorized?(socket, @manage) ->
+        write_forbidden(socket)
+
+      match?({^action, _task}, socket.assigns.pending_command) ->
+        {^action, task} = socket.assigns.pending_command
+        run.(assign(socket, :pending_command, nil), task.key)
+
+      true ->
+        {:noreply, socket}
+    end
+  end
+
+  # A command confirmed through the dialog reports its completed write as a
+  # success, so the flash timer runs; the one-click commands stay info.
+  defp command(socket, capability, operation, success_message, kind \\ :info) do
     if authorized?(socket, capability) do
       case operation.(socket.assigns.current_scope.actor) do
         :ok ->
-          {:noreply, socket |> load(socket.assigns.state) |> put_flash(:info, success_message)}
+          {:noreply, socket |> load(socket.assigns.state) |> put_flash(kind, success_message)}
 
         {:ok, _result} ->
-          {:noreply, socket |> load(socket.assigns.state) |> put_flash(:info, success_message)}
+          {:noreply, socket |> load(socket.assigns.state) |> put_flash(kind, success_message)}
 
         {:error, reason} ->
           {:noreply, put_flash(socket, :error, error_message(reason))}
@@ -504,6 +560,28 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   defp error_message(:suppressed), do: "Resume this task before queuing it."
   defp error_message(:unreviewed), do: "Review and enable this definition before queuing it."
   defp error_message(_reason), do: "Schedule state is unavailable; no action was confirmed."
+
+  # The dialog states what the command does to the task's queued work, which
+  # is the part resuming or re-enabling does not bring back.
+  defp command_consequence({:pause, task}), do: "Task “#{task.name}” will be paused."
+  defp command_consequence({:disable, task}), do: "Task “#{task.name}” will be disabled."
+
+  defp command_detail({:pause, _task}),
+    do:
+      "Work already queued for it is cancelled before it starts. " <>
+        "The task keeps its definition and can be resumed."
+
+  defp command_detail({:disable, _task}),
+    do:
+      "Work already queued for it is cancelled before it starts, and the scheduler " <>
+        "stops queuing it until this definition is reviewed and enabled again."
+
+  defp command_verb({:pause, _task}), do: "Pause"
+  defp command_verb({:disable, _task}), do: "Disable"
+  defp command_working({:pause, _task}), do: "Pausing…"
+  defp command_working({:disable, _task}), do: "Disabling…"
+  defp command_event({:pause, _task}), do: "pause"
+  defp command_event({:disable, _task}), do: "disable"
 
   defp task_status_label(%{suppressed?: true}), do: "Paused"
   defp task_status_label(%{review_state: :unreviewed}), do: "Unreviewed"

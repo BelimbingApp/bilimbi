@@ -24,6 +24,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
      |> assign(:sort_dir, :desc)
      |> assign(:page, 1)
      |> assign(:per_page, 25)
+     |> assign(:pending_delete, nil)
      |> load_queries()}
   end
 
@@ -103,27 +104,71 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
     end
   end
 
+  # Deleting confirms through the shared dialog: the request holds the listed
+  # query whose consequence the dialog states, and `delete` acts on that held
+  # query rather than on a client-supplied id, so what was confirmed is what
+  # runs.
   @impl true
-  def handle_event("delete", %{"id" => id_str}, socket) do
-    if operator?(socket) and
-         allowed?(socket.assigns.current_scope, "admin.system.database-table.edit") do
-      scope = socket.assigns.current_scope.scope
-      user_id = current_user_id(socket.assigns.current_scope)
-      query_id = to_integer(id_str, 0)
+  def handle_event("request_delete", %{"id" => id_str}, socket) do
+    cond do
+      not can_modify?(socket) ->
+        modify_forbidden(socket)
 
-      case User.delete_database_query(scope, user_id, query_id) do
-        {:ok, _deleted} ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "Query deleted.")
-           |> load_queries()}
+      query = Enum.find(socket.assigns.queries, &(&1.id == to_integer(id_str, 0))) ->
+        {:noreply, socket |> clear_flash() |> assign(:pending_delete, query)}
 
-        {:error, _reason} ->
-          {:noreply, put_flash(socket, :error, "Could not delete query.")}
-      end
-    else
-      {:noreply, put_flash(socket, :error, "You are not authorized to modify queries.")}
+      true ->
+        {:noreply, socket |> put_flash(:error, "That query no longer exists.") |> load_queries()}
     end
+  end
+
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, :pending_delete, nil)}
+  end
+
+  def handle_event("delete", _params, socket) do
+    cond do
+      not can_modify?(socket) ->
+        modify_forbidden(socket)
+
+      is_nil(socket.assigns.pending_delete) ->
+        {:noreply, socket}
+
+      true ->
+        query = socket.assigns.pending_delete
+        socket = assign(socket, :pending_delete, nil)
+        scope = socket.assigns.current_scope.scope
+        user_id = current_user_id(socket.assigns.current_scope)
+
+        case User.delete_database_query(scope, user_id, query.id) do
+          {:ok, _deleted} ->
+            {:noreply,
+             socket
+             |> put_flash(:success, "Query “#{query.name}” was deleted.")
+             |> load_queries()}
+
+          {:error, :not_found} ->
+            {:noreply,
+             socket |> put_flash(:error, "That query no longer exists.") |> load_queries()}
+
+          {:error, _reason} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "Query “#{query.name}” was not deleted. Reload the page and try again."
+             )}
+        end
+    end
+  end
+
+  defp can_modify?(socket) do
+    operator?(socket) and
+      allowed?(socket.assigns.current_scope, "admin.system.database-table.edit")
+  end
+
+  defp modify_forbidden(socket) do
+    {:noreply, put_flash(socket, :error, "You are not authorized to modify queries.")}
   end
 
   defp default_sort_dir(col) when col in ["created_at", "updated_at"], do: :desc

@@ -137,6 +137,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     |> assign(:selected_subordinate_id, "")
     |> assign(:subordinates_sort_by, "full_name")
     |> assign(:subordinates_sort_dir, "asc")
+    |> assign(:pending_subordinate, nil)
+    |> assign(:pending_delete?, false)
   end
 
   defp load_data(socket, employee) do
@@ -376,29 +378,59 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     end
   end
 
-  def handle_event("remove_subordinate", %{"id" => sub_id_str}, socket) do
-    if can_manage?(socket) do
-      scope = socket.assigns.current_scope.scope
-      employee = socket.assigns.employee
+  # Removing a subordinate confirms through the shared dialog: the request holds
+  # the listed subordinate whose consequence the dialog states, and
+  # `remove_subordinate` acts on that held record rather than on a
+  # client-supplied id, so what was confirmed is what runs.
+  def handle_event("request_remove_subordinate", %{"id" => sub_id_str}, socket) do
+    cond do
+      not can_manage?(socket) ->
+        {:noreply, write_forbidden(socket)}
 
-      case Integer.parse(sub_id_str) do
-        {sub_id, ""} ->
-          case Employee.remove_subordinate(scope, employee.company_id, employee.id, sub_id) do
-            {:ok, _} ->
-              {:noreply,
-               socket
-               |> put_flash(:info, "Subordinate removed.")
-               |> load_data(employee)}
+      sub = find_subordinate(socket, sub_id_str) ->
+        {:noreply, socket |> clear_flash() |> assign(:pending_subordinate, sub)}
 
-            {:error, _} ->
-              {:noreply, put_flash(socket, :error, "Failed to remove subordinate.")}
-          end
+      true ->
+        {:noreply, socket}
+    end
+  end
 
-        _ ->
-          {:noreply, socket}
-      end
-    else
-      {:noreply, write_forbidden(socket)}
+  def handle_event("cancel_remove_subordinate", _params, socket) do
+    {:noreply, assign(socket, :pending_subordinate, nil)}
+  end
+
+  def handle_event("remove_subordinate", _params, socket) do
+    cond do
+      not can_manage?(socket) ->
+        {:noreply, write_forbidden(socket)}
+
+      is_nil(socket.assigns.pending_subordinate) ->
+        {:noreply, socket}
+
+      true ->
+        sub = socket.assigns.pending_subordinate
+        socket = assign(socket, :pending_subordinate, nil)
+        scope = socket.assigns.current_scope.scope
+        employee = socket.assigns.employee
+
+        case Employee.remove_subordinate(scope, employee.company_id, employee.id, sub.id) do
+          {:ok, _} ->
+            {:noreply,
+             socket
+             |> put_flash(
+               :success,
+               "#{sub.full_name} no longer reports to #{employee.full_name}."
+             )
+             |> load_data(employee)}
+
+          {:error, _} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "#{sub.full_name} was not removed. Reload the page and try again."
+             )}
+        end
     end
   end
 
@@ -431,31 +463,69 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
   # --- Event Handlers: Danger Zone ---
 
-  def handle_event("delete", _params, socket) do
-    scope = socket.assigns.current_scope.scope
-    employee = socket.assigns.employee
-    company_id = socket.assigns.current_scope.user["company_id"]
-
+  # Deleting confirms through the shared dialog, which states what happens to
+  # this employee's record; `delete` runs only once a request is held.
+  def handle_event("request_delete", _params, socket) do
     if socket.assigns.can_delete? do
-      case Employee.delete_employee(scope, company_id, employee.id) do
-        :ok ->
-          {:noreply,
-           socket
-           |> put_flash(:info, "#{employee.full_name} was deleted.")
-           |> push_navigate(to: ~p"/employees")}
-
-        {:error, :invariant_violation} ->
-          {:noreply, put_flash(socket, :error, "The platform orchestrator cannot be deleted.")}
-
-        {:error, _reason} ->
-          {:noreply, put_flash(socket, :error, "That employee could not be deleted.")}
-      end
+      {:noreply, socket |> clear_flash() |> assign(:pending_delete?, true)}
     else
       {:noreply, put_flash(socket, :error, "You do not have access to that action.")}
     end
   end
 
+  def handle_event("cancel_delete", _params, socket) do
+    {:noreply, assign(socket, :pending_delete?, false)}
+  end
+
+  def handle_event("delete", _params, socket) do
+    scope = socket.assigns.current_scope.scope
+    employee = socket.assigns.employee
+    company_id = socket.assigns.current_scope.user["company_id"]
+
+    cond do
+      not socket.assigns.can_delete? ->
+        {:noreply, put_flash(socket, :error, "You do not have access to that action.")}
+
+      not socket.assigns.pending_delete? ->
+        {:noreply, socket}
+
+      true ->
+        socket = assign(socket, :pending_delete?, false)
+
+        case Employee.delete_employee(scope, company_id, employee.id) do
+          :ok ->
+            {:noreply,
+             socket
+             |> put_flash(:success, "#{employee.full_name} was deleted.")
+             |> push_navigate(to: ~p"/employees")}
+
+          {:error, :invariant_violation} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "#{employee.full_name} was not deleted: the platform orchestrator cannot be deleted."
+             )}
+
+          {:error, _reason} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "#{employee.full_name} was not deleted. Reload the page and try again."
+             )}
+        end
+    end
+  end
+
   # --- Saving ---
+
+  defp find_subordinate(socket, sub_id_str) do
+    case Integer.parse(sub_id_str) do
+      {sub_id, ""} -> Enum.find(socket.assigns.subordinates, &(&1.id == sub_id))
+      _ -> nil
+    end
+  end
 
   # A text fact: the write, then the outcome on the fact that made it.
   defp save_fact(socket, name, attrs, submitted) do
@@ -1141,9 +1211,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   label={"Remove #{sub.full_name} as subordinate"}
                   kind={:danger}
                   id={"remove-subordinate-#{sub.id}"}
-                  phx-click="remove_subordinate"
+                  phx-click="request_remove_subordinate"
                   phx-value-id={sub.id}
-                  data-confirm={"Remove #{sub.full_name} as subordinate?"}
                 />
               </:action>
               <:empty
@@ -1174,17 +1243,34 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                 </p>
               </div>
 
-              <.button
-                id="employee-delete"
-                variant="danger"
-                phx-click="delete"
-                data-confirm={"Delete #{@employee.full_name}? This cannot be undone."}
-              >
+              <.button id="employee-delete" variant="danger" phx-click="request_delete">
                 Delete employee
               </.button>
             </div>
           </div>
         </div>
+
+        <.confirm_dialog
+          :if={@pending_subordinate}
+          id="remove-subordinate-confirm"
+          consequence={"#{@pending_subordinate.full_name} will no longer report to #{@employee.full_name}."}
+          detail="Both employee records are kept. The reporting line can be set again."
+          confirm="Remove"
+          working="Removing…"
+          on_confirm={JS.push("remove_subordinate")}
+          on_cancel={JS.push("cancel_remove_subordinate")}
+        />
+
+        <.confirm_dialog
+          :if={@pending_delete?}
+          id="delete-employee-confirm"
+          consequence={"#{@employee.full_name} will be deleted."}
+          detail="The employment record is removed and the person no longer appears in the directory. This cannot be undone."
+          confirm="Delete"
+          working="Deleting…"
+          on_confirm={JS.push("delete")}
+          on_cancel={JS.push("cancel_delete")}
+        />
       </.page>
     </Layouts.app>
     """
