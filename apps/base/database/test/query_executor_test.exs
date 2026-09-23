@@ -275,6 +275,22 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
     end
   end
 
+  describe "unreachable console connection" do
+    @tag :capture_log
+    test "reports an error instead of crashing" do
+      unreachable =
+        start_supervised!(
+          {ConsoleRepo, name: nil, port: 1, pool_size: 1, queue_target: 10, queue_interval: 10}
+        )
+
+      ConsoleRepo.put_dynamic_repo(unreachable)
+
+      assert {:error, msg} = as_operator("SELECT 1")
+      assert msg =~ "cannot connect through its select-only role"
+      assert msg =~ ~s(docs/architecture/database.md, "Operator SQL console")
+    end
+  end
+
   describe "operator gate (#650)" do
     test "fails closed when the operator tenant is not asserted" do
       # The gate runs before SQL validation, so even a well-formed SELECT is

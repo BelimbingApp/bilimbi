@@ -350,8 +350,13 @@ have run.
 `CONSOLE_DATABASE_URL`, and run `mix bilimbi.migrate`. Until the role exists
 the migrate task stops with instructions; until the connection string is set
 production does not boot; until the grants are applied the console reports
-"permission denied" on every table. None of these is silent. In an adopted
-Belimbing database the grant step must run as the role that owns the tables.
+"permission denied" on every table; and a console login that cannot connect
+is reported on the console page. None of these is silent. In an adopted
+Belimbing database the grant step must run as the role that owns the tables:
+PostgreSQL only warns when another role grants or revokes, so after granting
+the step confirms the console holds exactly its reads on every relation, and
+refuses, naming the relation, when it does not, as it also does when a grant
+to PUBLIC or to a role the console belongs to exposes more.
 
 ## Change checklist
 

@@ -44,6 +44,7 @@ defmodule Bilimbi.Base.Database.ConsoleAccess do
           {:role_missing, String.t()}
           | {:role_is_application_login, String.t()}
           | {:unknown_secret_column, String.t(), String.t()}
+          | {:grant_not_applied, String.t(), String.t()}
 
   @relation_kinds "('r', 'p', 'v', 'm', 'f', 'S')"
 
@@ -89,6 +90,32 @@ defmodule Bilimbi.Base.Database.ConsoleAccess do
   UNION ALL SELECT current_user::text, reason FROM schemas
   UNION ALL SELECT current_user::text, reason FROM relations
   LIMIT 10
+  """
+
+  # After granting, any relation where the console role holds a privilege
+  # beyond its reads, or where a column's readability differs from its
+  # secrecy. PostgreSQL only warns when a non-owner grants or revokes, and
+  # privileges reached through PUBLIC or role membership survive a revoke.
+  @unapplied_reads_sql """
+  SELECT c.relname
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = $1
+    AND c.relkind IN #{@relation_kinds}
+    AND CASE WHEN c.relkind = 'S'
+          THEN has_sequence_privilege($2::name, c.oid, 'USAGE, SELECT, UPDATE')
+          ELSE has_table_privilege($2::name, c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+            OR has_any_column_privilege($2::name, c.oid, 'INSERT, UPDATE, REFERENCES')
+            OR EXISTS (
+              SELECT 1
+              FROM pg_attribute a
+              WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+                AND has_column_privilege($2::name, c.oid, a.attnum, 'SELECT') =
+                  ((c.relname, a.attname) IN (SELECT * FROM unnest($3::text[], $4::text[])))
+            )
+        END
+  ORDER BY c.relname
+  LIMIT 1
   """
 
   @doc "The console role's name, as the console Repo is configured to connect."
@@ -210,6 +237,18 @@ defmodule Bilimbi.Base.Database.ConsoleAccess do
       "as secret."
   end
 
+  def explain({:grant_not_applied, role, relation}) do
+    """
+    The SQL console role #{inspect(role)} does not hold exactly its reads on
+    #{inspect(relation)} after the grant step. PostgreSQL only warns, and
+    changes nothing, when a role that does not own a table grants or revokes on
+    it, and privileges granted to PUBLIC or to a role the console belongs to
+    are not taken back by revoking from the console. Run `mix bilimbi.migrate`
+    as the role that owns the tables and remove any such grant; see
+    docs/architecture/database.md, "Operator SQL console".
+    """
+  end
+
   # --- Declared secrets -----------------------------------------------------
 
   defp installed_contracts do
@@ -256,29 +295,47 @@ defmodule Bilimbi.Base.Database.ConsoleAccess do
     present = Enum.map(relations, fn {name, _kind} -> name end)
     absent = secrets |> Map.keys() |> Enum.reject(&(&1 in present)) |> Enum.sort()
 
-    Enum.reduce_while(
-      relations,
-      {:ok, %{role: role, tables: 0, restricted: [], absent: absent}},
-      fn
-        {name, "S"}, {:ok, summary} ->
-          revoke_all!(repo, quoted_prefix, name, "S", quoted_role)
-          {:cont, {:ok, summary}}
+    ctx = {repo, prefix, quoted_prefix, quoted_role, secrets}
+    initial = {:ok, %{role: role, tables: 0, restricted: [], absent: absent}}
 
-        {name, kind}, {:ok, summary} ->
-          case grant_read(repo, quoted_prefix, prefix, name, kind, secrets[name], quoted_role) do
-            :whole ->
-              {:cont, {:ok, %{summary | tables: summary.tables + 1}}}
+    with {:ok, summary} <-
+           Enum.reduce_while(relations, initial, &grant_relation(&1, &2, ctx)),
+         :ok <- confirm_reads(repo, prefix, role, secrets) do
+      {:ok, summary}
+    end
+  end
 
-            :columns ->
-              {:cont,
-               {:ok,
-                %{summary | tables: summary.tables + 1, restricted: summary.restricted ++ [name]}}}
+  defp grant_relation({name, "S"}, {:ok, summary}, {repo, _, quoted_prefix, quoted_role, _}) do
+    revoke_all!(repo, quoted_prefix, name, "S", quoted_role)
+    {:cont, {:ok, summary}}
+  end
 
-            {:error, failure} ->
-              {:halt, {:error, failure}}
-          end
-      end
-    )
+  defp grant_relation({name, kind}, {:ok, summary}, ctx) do
+    {repo, prefix, quoted_prefix, quoted_role, secrets} = ctx
+
+    case grant_read(repo, quoted_prefix, prefix, name, kind, secrets[name], quoted_role) do
+      :whole ->
+        {:cont, {:ok, %{summary | tables: summary.tables + 1}}}
+
+      :columns ->
+        {:cont,
+         {:ok, %{summary | tables: summary.tables + 1, restricted: summary.restricted ++ [name]}}}
+
+      {:error, failure} ->
+        {:halt, {:error, failure}}
+    end
+  end
+
+  defp confirm_reads(repo, prefix, role, secrets) do
+    {tables, columns} =
+      secrets
+      |> Enum.flat_map(fn {table, names} -> Enum.map(names, &{table, &1}) end)
+      |> Enum.unzip()
+
+    case SQL.query!(repo, @unapplied_reads_sql, [prefix, role, tables, columns]).rows do
+      [] -> :ok
+      [[relation]] -> {:error, {:grant_not_applied, role, relation}}
+    end
   end
 
   defp grant_read(repo, quoted_prefix, _prefix, name, kind, nil, quoted_role) do

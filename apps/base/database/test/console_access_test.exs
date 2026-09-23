@@ -174,6 +174,27 @@ defmodule Bilimbi.Base.Database.ConsoleAccessTest do
       assert {:ok, _rows} = console("INSERT INTO #{quoted}.laravel_leftover VALUES (2)")
     end
 
+    test "refuses when a grant did not leave the console with exactly its reads", %{
+      schema: schema,
+      quoted: quoted
+    } do
+      # A PUBLIC grant survives revoking from the console, so its secret
+      # columns stay readable; the same check catches a grant a non-owner
+      # made, which PostgreSQL only warns about.
+      committed!(fn -> SQL.query!(Repo, "GRANT SELECT ON #{quoted}.users TO PUBLIC", []) end)
+
+      assert {:error, {:grant_not_applied, role, "users"} = failure} =
+               committed!(fn ->
+                 Database.reconcile_console_access(Repo, [prefix: schema] ++ @reconcile)
+               end)
+
+      assert role == ConsoleAccess.role_name()
+      assert ConsoleAccess.explain(failure) =~ "role that owns the tables"
+
+      # The transaction rolled back: the hand grants from setup still stand.
+      assert {:ok, _rows} = console("INSERT INTO #{quoted}.laravel_leftover VALUES (2)")
+    end
+
     test "refuses when the console role does not exist", %{schema: schema} do
       configure_console_role!("blb_absent_console_role")
 

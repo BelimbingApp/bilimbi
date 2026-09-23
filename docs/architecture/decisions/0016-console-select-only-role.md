@@ -55,7 +55,11 @@ read-only login it is true because the database will not allow otherwise."
    connection could write (superuser or creation flags, `CREATE` on the
    database or a schema, any write privilege on any relation) and refuses to
    run while the answer is not empty. The grant step likewise refuses a
-   missing role or a console configured with the application's login.
+   missing role or a console configured with the application's login, and
+   after granting confirms the role holds exactly its reads, refusing when a
+   grant did not take (PostgreSQL only warns when a non-owner grants) or when
+   PUBLIC or another role reaches further. A console login that cannot
+   connect is reported to the operator rather than crashing the page.
 5. **The text checks stay as messages.** The `SELECT`/`WITH` and forbidden
    keyword checks remain for early, readable refusals; the `READ ONLY`
    transaction remains for what privileges do not cover, such as temporary
