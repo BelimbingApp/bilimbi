@@ -35,6 +35,11 @@ config :phoenix_live_view,
 # them here so no compile-time edge crosses the module graph.
 config :bilimbi_base_database, write_capture: Bilimbi.Base.Audit.MutationCapture
 
+# Every database console command — succeeded, refused, or failed — is one
+# audit action. The console runs on the application's own connection with
+# no login of its own; the record is its control. Same seam shape as above.
+config :bilimbi_base_database, console_capture: Bilimbi.Base.Audit.ConsoleCapture
+
 # ADR 0013 (#785): the port of Belimbing's `audit.exclude_models`. Capture
 # is comprehensive by default, so silence is explicit and justified here,
 # one entry at a time. A schema belongs on this list only when *nothing*

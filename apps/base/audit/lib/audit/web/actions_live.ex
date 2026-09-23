@@ -14,7 +14,7 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
 
   @sortable ~w(occurred_at actor_type event url trace_id)
   @actor_types ~w(user agent guest console scheduler queue)
-  @event_families ~w(http auth console queue domain)
+  @event_families ~w(http auth console database queue domain)
   @results ~w(failure retained)
   @diagnostics ~w(hide show)
   @page_sizes [25, 50, 100, 300]
@@ -293,6 +293,38 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
       source: "Console",
       summary: "#{command}",
       context: "CLI",
+      result: result_text,
+      variant: variant,
+      diagnostic: false
+    }
+  end
+
+  # One row per console command, whatever became of it. The context column
+  # carries the SQL as typed so the command a reader is looking for can be
+  # found without opening the payload.
+  defp action_presentation(%{event: "database_query." <> _ = event, payload: payload}) do
+    payload = payload || %{}
+    sql = Map.get(payload, "sql", "—")
+
+    {result_text, variant} =
+      case event do
+        "database_query.executed" ->
+          {"Succeeded · #{Map.get(payload, "row_count", "?")} rows", :success}
+
+        "database_query.refused" ->
+          {"Refused · #{humanize(Map.get(payload, "guard", "guard"))}", :danger}
+
+        "database_query.failed" ->
+          {"Failed", :danger}
+
+        _other ->
+          {"Recorded", :default}
+      end
+
+    %{
+      source: "Database console",
+      summary: Map.get(payload, "name") || "Console command",
+      context: sql,
       result: result_text,
       variant: variant,
       diagnostic: false

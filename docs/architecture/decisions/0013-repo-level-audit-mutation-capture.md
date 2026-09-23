@@ -97,15 +97,26 @@ and with a silent-falsehood failure mode.
   and counted on the capture-failure event: a record calling a replacement
   a creation would be a false one, and a missing record is the lesser
   failure.
-- **Raw SQL remains uncaptured, and is kept empty of auditable writes
-  rather than covered.** The operator SQL console is `SELECT`-only and its
-  transaction is genuinely read-only (#781); its own `SELECT`-only
-  PostgreSQL role (#783) makes that a database-enforced fact, and is the
-  only database-enforced control on raw SQL — it covers the console only.
-  Elsewhere, raw-SQL DML is confined to the lifecycle modules that need it
-  (the production-seed ledger and the compatibility cutover) by review
-  convention, not by a mechanical guard. A real mechanical control for the
-  rest of the codebase is follow-up work.
+- **Raw SQL remains uncaptured as a mutation, and is kept empty of
+  auditable writes rather than covered.** The database console is a
+  developer tool that runs on the application's own connection, by
+  decision: developers are trusted, and a console login of its own would
+  restrict nothing worth restricting. Its transaction is genuinely
+  read-only (#781), so a console write is refused by PostgreSQL itself,
+  and every console command — succeeded, refused by a text guard or by
+  the read-only transaction, or failed at the database — is recorded in
+  the audit actions log through the `ConsoleCapture` seam in Base
+  Database, with the actor, impersonator, client address, agent, and page
+  the web edge put in the audit context. The record, not a restriction,
+  is the control: it exists to tell a developer's own work from a command
+  run through their stolen or hijacked session. The write block serves
+  the same purpose — because the console cannot write, an intruder in a
+  developer's session cannot use it to delete or edit the very audit
+  records that would reveal them. Elsewhere, raw-SQL DML is confined to
+  the lifecycle modules that need it (the production-seed ledger and the
+  compatibility cutover) by review convention, not by a mechanical guard.
+  A real mechanical control for the rest of the codebase is follow-up
+  work.
 - **Postgres triggers were built, measured and rejected** (#785). They
   work, and they are the only mechanism that sees a write the application
   did not make. They were rejected because they do not remove the

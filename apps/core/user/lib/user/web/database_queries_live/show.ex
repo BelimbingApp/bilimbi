@@ -352,37 +352,20 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
       sort_dir: sort_dir,
       # #650: pass the mount-proven operator marker at the engine boundary. The
       # executor fails closed without it; this guard does not re-resolve tenancy.
-      operator: operator?(socket)
+      operator: operator?(socket),
+      # Recorded with the command. This page keeps no recorder of its own:
+      # the executor records every command it is handed, whatever the
+      # outcome, with the actor and client the web edge put in the audit
+      # context at mount. A handler added here cannot run SQL unrecorded.
+      name: socket.assigns.name
     ]
 
     case Database.execute_readonly(sql, params, opts) do
       {:ok, results} ->
-        maybe_record_audit(socket, sql)
         socket |> assign(:results, results) |> assign(:error, nil)
 
       {:error, reason} ->
         socket |> assign(:results, nil) |> assign(:error, format_db_error(reason))
-    end
-  end
-
-  defp maybe_record_audit(socket, sql) do
-    if Map.has_key?(socket.assigns, :current_scope) and
-         Map.has_key?(socket.assigns.current_scope, :scope) and
-         Map.has_key?(socket.assigns.current_scope, :actor) do
-      scope = socket.assigns.current_scope.scope
-      actor = socket.assigns.current_scope.actor
-
-      audit_attrs = %{
-        actor_type: to_string(actor.type),
-        actor_id: actor.id,
-        company_id: actor.company_id,
-        event: "database_query.executed",
-        payload: %{"name" => socket.assigns.name, "sql" => sql},
-        is_retained: false,
-        occurred_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-      }
-
-      Bilimbi.Base.Audit.record_action(scope, audit_attrs)
     end
   end
 

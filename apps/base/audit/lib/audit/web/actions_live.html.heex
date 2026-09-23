@@ -31,6 +31,9 @@
           <option value="http" selected={@state.event_family == "http"}>HTTP</option>
           <option value="auth" selected={@state.event_family == "auth"}>Authentication</option>
           <option value="console" selected={@state.event_family == "console"}>Console</option>
+          <option value="database" selected={@state.event_family == "database"}>
+            Database console
+          </option>
           <option value="queue" selected={@state.event_family == "queue"}>Queue</option>
           <option value="domain" selected={@state.event_family == "domain"}>Domain</option>
         </select>

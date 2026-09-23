@@ -41,6 +41,30 @@ or schema-contract contributor. That descriptor edit is shared and must be
 called out on issue #43; this package still does not hard-code coordinator
 internals.
 
+## Database console commands
+
+`Bilimbi.Base.Audit.ConsoleCapture` implements Base Database's
+`ConsoleCapture` seam (`config :bilimbi_base_database, :console_capture`),
+so every command handed to `Bilimbi.Base.Database.execute_readonly/3` is one
+`base_audit_actions` row whatever its outcome: `database_query.executed`
+with the matched row count, `database_query.refused` with the guard
+(`operator`, `empty`, `statement`, `keyword`, or `read_only_transaction`)
+and its message, or `database_query.failed` with the database's error
+message. The actor pair, role, company, tenant, `impersonator_id`,
+`ip_address`, `url`, `user_agent`, and `trace_id` come from
+`Bilimbi.Base.Audit.Context`; an absent context records the guest default.
+Result rows never reach the record.
+
+The SQL is stored **as typed**, bounded by `Bilimbi.Base.Audit.PayloadText`
+(the same 2000-character cut, with marker, that captured mutation values
+get). Nothing redacts by content: a secret pasted into a query is recorded.
+Rows are `is_retained: false` like every other recorded action; nothing in
+Bilimbi prunes `base_audit_actions`, retained or not, so the flag only
+marks a row and drives the "Retained" filter. The actions screen presents a
+console row with the query name, the text, and the outcome, lists them
+under the "Database console" family, and counts refused and failed
+commands as failures.
+
 ## Audit log screens
 
 `/audit/actions` and `/audit/mutations` are the module's own LiveViews under

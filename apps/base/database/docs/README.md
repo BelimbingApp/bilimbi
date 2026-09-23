@@ -103,3 +103,22 @@ or raising.
 
 Development, demonstration, and test fixtures are intentionally outside this
 provider contract and are never discovered by `mix bilimbi.seeds.run`.
+
+## Database console execution
+
+`Bilimbi.Base.Database.execute_readonly/3` runs developer SQL through
+`QueryExecutor`: an operator assertion, a first-word check, a keyword block,
+and a PostgreSQL `READ ONLY` transaction that is the boundary the text
+checks are not. It runs on the application's own connection, by decision;
+there is no console login.
+
+Every command, whatever its outcome, is handed to the
+`Bilimbi.Base.Database.ConsoleCapture` seam before the answer returns:
+succeeded with its matched row count, refused with the guard that stopped
+it, or failed with the database's message — never the result rows. The
+capture module comes from `config :bilimbi_base_database, :console_capture`
+(Base Audit's `ConsoleCapture` in the workspace), the same wiring shape as
+`WriteCapture`. A raising capture is logged and counted on the audit
+capture-failure telemetry event and never changes the command's answer.
+Because the seam sits in the executor, a screen or caller cannot run console
+SQL unrecorded.

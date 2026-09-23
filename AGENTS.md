@@ -767,9 +767,14 @@ Do not use deprecated `phx-update="append"` or `phx-update="prepend"`.
   other writes stay captured. There is no third mechanism. Raw SQL bypasses
   the repo and so cannot carry an audited write. Raw-SQL DML outside the
   lifecycle modules that need it (production-seed ledger, compatibility
-  cutover) is a review defect, a convention with no mechanical guard yet;
-  the one database-enforced control is the SQL console's select-only role
-  (#783), which covers the console only.
+  cutover) is a review defect, a convention with no mechanical guard yet.
+  The database console is a developer tool on the application's own
+  connection, with no login of its own: its read-only transaction makes a
+  console write refused by PostgreSQL itself, and every console command,
+  refused and failed ones included, is one row in the audit actions log
+  (`Bilimbi.Base.Database.ConsoleCapture` is the seam,
+  `Bilimbi.Base.Audit.ConsoleCapture` the record). Do not add a recorder to
+  a console screen: the executor records every command it is handed.
 - Generate migrations with `mix ecto.gen.migration`, but first confirm that
   the migration belongs to Bilimbi's compatibility plan and will not alter an
   existing Belimbing table unexpectedly.
