@@ -11,7 +11,7 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
   Every command is handed to `Bilimbi.Base.Database.ConsoleCapture` with its
   outcome — succeeded, refused (and by which guard), or failed — before the
   answer returns to the caller. The record is the control on this console:
-  the executor never returns without dispatching it, and a capture never
+  the executor never returns or raises without dispatching it, and a capture never
   sees result rows.
   """
 
@@ -56,7 +56,15 @@ defmodule Bilimbi.Base.Database.QueryExecutor do
           {:ok, result()} | {:error, String.t()}
   def execute_readonly(sql, params \\ %{}, opts \\ [])
       when is_binary(sql) and (is_map(params) or is_list(params)) and is_list(opts) do
-    outcome = run(sql, params, opts)
+    outcome =
+      try do
+        run(sql, params, opts)
+      rescue
+        exception ->
+          ConsoleCapture.dispatch(sql, {:failed, Exception.message(exception)}, opts)
+          reraise exception, __STACKTRACE__
+      end
+
     ConsoleCapture.dispatch(sql, captured_outcome(outcome), opts)
     answer(outcome)
   end

@@ -136,6 +136,32 @@ defmodule Bilimbi.Base.Audit.ConsoleCaptureTest do
            }
   end
 
+  test "a command that raises is still exactly one failed row" do
+    sql = "SELECT :id::int AS id"
+
+    assert_raise DBConnection.EncodeError, fn ->
+      Database.execute_readonly(sql, %{"id" => "abc"}, operator: true)
+    end
+
+    assert [row] = console_rows()
+    assert row.event == "database_query.failed"
+    assert row.actor_id == 91
+    assert row.payload["sql"] == sql
+    assert row.payload["result"] == "failed"
+    assert row.payload["message"] =~ "abc"
+  end
+
+  test "a command whose text carries a NUL is recorded with its text stored" do
+    sql = "DELETE FROM users\u0000"
+
+    assert {:error, _message} = run(sql)
+
+    assert [row] = console_rows()
+    assert row.event == "database_query.refused"
+    assert row.payload["guard"] == "statement"
+    assert row.payload["sql"] == "DELETE FROM users\u2400"
+  end
+
   test "every command is its own row, refused and failed ones included" do
     assert {:ok, _} = run("SELECT 1")
     assert {:error, _} = run("DELETE FROM users")

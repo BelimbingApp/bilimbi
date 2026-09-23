@@ -92,6 +92,16 @@ defmodule Bilimbi.Base.Database.ConsoleCaptureTest do
     assert_receive {:captured, ^sql, {:failed, ^message}, %{}}
   end
 
+  test "a command that raises dispatches its failure before the exception propagates" do
+    sql = "SELECT :id::int AS id"
+
+    assert_raise DBConnection.EncodeError, fn -> as_operator(sql, %{"id" => "abc"}) end
+
+    assert_receive {:captured, ^sql, {:failed, message}, %{}}
+    assert message =~ "abc"
+    refute_receive {:captured, _sql, _outcome, _meta}
+  end
+
   test "a raising capture is contained: the answer stands and telemetry counts it" do
     Application.put_env(:bilimbi_base_database, :console_capture, RaisingCapture)
 

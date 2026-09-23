@@ -75,17 +75,23 @@ defmodule Bilimbi.Base.Audit.ConsoleCapture do
     |> Map.merge(outcome_payload(outcome))
   end
 
-  defp put_name(payload, %{name: name}) when is_binary(name), do: Map.put(payload, "name", name)
+  defp put_name(payload, %{name: name}) when is_binary(name),
+    do: Map.put(payload, "name", PayloadText.bounded(name))
+
   defp put_name(payload, _meta), do: payload
 
   defp outcome_payload({:succeeded, count}),
     do: %{"result" => "succeeded", "row_count" => count}
 
   defp outcome_payload({:refused, guard, message}),
-    do: %{"result" => "refused", "guard" => Atom.to_string(guard), "message" => message}
+    do: %{
+      "result" => "refused",
+      "guard" => Atom.to_string(guard),
+      "message" => PayloadText.bounded(message)
+    }
 
   defp outcome_payload({:failed, message}),
-    do: %{"result" => "failed", "message" => message}
+    do: %{"result" => "failed", "message" => PayloadText.bounded(message)}
 
   defp bounded(nil, _max), do: nil
   defp bounded(value, max) when is_binary(value), do: String.slice(value, 0, max)

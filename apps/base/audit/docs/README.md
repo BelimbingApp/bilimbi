@@ -57,12 +57,14 @@ Result rows never reach the record.
 
 The SQL is stored **as typed**, bounded by `Bilimbi.Base.Audit.PayloadText`
 (the same 2000-character cut, with marker, that captured mutation values
-get). Nothing redacts by content: a secret pasted into a query is recorded.
+get, with each NUL character stored as `␀` because PostgreSQL `jsonb`
+cannot hold one). Nothing redacts by content: a secret pasted into a query is recorded.
 Rows are `is_retained: false` like every other recorded action; nothing in
 Bilimbi prunes `base_audit_actions`, retained or not, so the flag only
 marks a row and drives the "Retained" filter. The actions screen presents a
 console row with the query name, the text, and the outcome, lists them
-under the "Database console" family, and counts refused and failed
+under the "SQL console" family (value `database`, distinct from the
+"Console" family of `console.command`), and counts refused and failed
 commands as failures.
 
 ## Audit log screens

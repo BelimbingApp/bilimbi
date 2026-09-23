@@ -322,7 +322,7 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
       end
 
     %{
-      source: "Database console",
+      source: "SQL console",
       summary: Map.get(payload, "name") || "Console command",
       context: sql,
       result: result_text,
