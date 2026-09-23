@@ -115,7 +115,9 @@ there is no console login.
 Every command, whatever its outcome, is handed to the
 `Bilimbi.Base.Database.ConsoleCapture` seam before the answer returns:
 succeeded with its matched row count, refused with the guard that stopped
-it, or failed with the database's message — never the result rows. The
+it, or failed with the database's message — never the result rows. A
+command that raises is recorded as failed with the exception's message and
+the exception then propagates unchanged. The
 capture module comes from `config :bilimbi_base_database, :console_capture`
 (Base Audit's `ConsoleCapture` in the workspace), the same wiring shape as
 `WriteCapture`. A raising capture is logged and counted on the audit
