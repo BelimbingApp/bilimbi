@@ -28,7 +28,7 @@ grep -rnE '\b(bg|text|border|ring|shadow|divide|accent)-(slate|gray|zinc|neutral
 
 Do not use `@apply`. Do not add an external script or stylesheet URL. Do not write a raw `<script>` in HEEx. A colocated hook uses `:type={Phoenix.LiveView.ColocatedHook}` and a name that starts with `.`. An external hook lives in `assets/js/`, has a DOM id, and `phx-update="ignore"` when it owns its DOM. Rebind the socket `push_event/3` returns.
 
-`phx.gen.live`, `phx.gen.html`, and `phx.gen.schema` use `Bilimbi.Base.UI.Components`. `phx.gen.auth` emits daisyUI classes; convert them to semantic roles in the same change. Name an action through `Bilimbi.Base.UI.IconRegistry`. Logout stays `hero-arrow-right-on-rectangle`.
+`phx.gen.live`, `phx.gen.html`, and `phx.gen.schema` use `Bilimbi.Base.UI.Components`. `phx.gen.auth` emits daisyUI classes; convert them to semantic roles in the same change. Base UI components are hand-written Tailwind, and no third-party component library, daisyUI included, becomes the design system. Name an action through `Bilimbi.Base.UI.IconRegistry`. Logout stays `hero-arrow-right-on-rectangle`.
 
 `phx-disable-with` belongs on a text control only; it replaces the label, so it wipes an icon button. A wait the server knows about is `<.button busy>` or `<.icon_button busy>`. An async action rejects duplicate work; see the comment on `busy_rest/2`.
 

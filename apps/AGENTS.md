@@ -24,7 +24,7 @@ A record's page reads first and edits in place. There is no separate Edit button
 
 ## Tests
 
-Assert what the running system does. Do not add a test that reads or pattern-matches a source file to prove a bug is gone: two did that and passed while the problem they claimed to catch was still in the tree. A security or database boundary makes PostgreSQL do the refusing. See `apps/base/database/AGENTS.md`.
+Assert what the running system does. Do not add a test that reads or pattern-matches a source file to prove a bug is gone: two did that and passed while the problem they claimed to catch was still in the tree. A security or database boundary makes PostgreSQL do the refusing; for the SQL console that is `QueryExecutor`'s `READ ONLY` transaction. See `apps/base/database/AGENTS.md`.
 
 ## Follow-up
 
