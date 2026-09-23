@@ -27,7 +27,8 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
       the page chrome is not. A call that is, or sits inside, a nested anchor
       belongs to that nested entry, so an entry never counts the blocks that
       frame its neighbours.
-    * **Declared specimens** — an id-less `<.card>` in the components area
+    * **Declared specimens** — a `<.card>` in the components area with no
+      `component-` anchor, whether id-less or under a library id of its own,
       claims to present something without saying what, and carries no control
       markup to catch it. `@declared_specimens` is the library's admission of
       the ones it already has; anything else has to be anchored or added
@@ -64,13 +65,16 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   @control_attrs ~w(aria-current aria-expanded aria-pressed aria-selected phx-change phx-click
                     phx-submit role tabindex)
 
-  # The id-less specimen cards the components area presents today, keyed by the
-  # card's literal `title`, or for an untitled card by the literal id of its
+  # The unanchored specimen cards the components area presents today, keyed by
+  # the card's literal `title`, or for an untitled card by the literal id of its
   # first identified descendant. Keys are template facts, not line numbers, so
   # moving a specimen does not churn this list while renaming one does.
   @declared_specimens [
+    "Navigation",
+    "Choice guidance",
     "Text and long-form inputs",
     "Choice controls",
+    "Live state",
     "Date, time, and secret inputs",
     "Connection interrupted",
     "design-library-pattern-table"
@@ -392,7 +396,7 @@ defmodule Bilimbi.Base.UI.DesignLibrarySource do
   end
 
   defp stale(key) do
-    "declared specimen #{inspect(key)} matches no id-less <.card> in the components area; " <>
+    "declared specimen #{inspect(key)} matches no unanchored <.card> in the components area; " <>
       "drop the declaration"
   end
 

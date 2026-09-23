@@ -1,6 +1,6 @@
 # Base UI Design Parity
 
-**Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families (#724). Merged to `main` through 2026-09-15: application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display. Since then the library has been stripped of catalog IDs (#728), and the shared layer has taken much of the accepted action and feedback contract — destructive confirmation (#733), reduced motion with 4.5:1 contrast (#738), stacked flash messages (#741), busy controls and a login screen that reports its progress (#743), the empty and permission region pattern (#740), real dialog semantics on modal overlays (#731), one shared filter toolbar (#745), field shell states (#744), secret reveal and multi-select corrections (#746) and a released shell observer (#747) — alongside icon-name validity (#727, #734), Schedule timestamps and UTC day labels through the datetime component (#735, #737), impersonation reader coverage (#729), corrected catalog rows (#730), drift-guard documentation folded into this plan (#726) and the Belimbing cutover value remap (#725); the drift guards stay excluded from the default run — the Design Library state-coverage slice of 2026-09-18 corrected all but two of the uncovered names and axes the coverage guard reports and records those two as accepted rather than pending, while the imitation guard's anchor and control-markup failures are still open
+**Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families (#724). Merged to `main` through 2026-09-15: application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display. Since then the library has been stripped of catalog IDs (#728), and the shared layer has taken much of the accepted action and feedback contract — destructive confirmation (#733), reduced motion with 4.5:1 contrast (#738), stacked flash messages (#741), busy controls and a login screen that reports its progress (#743), the empty and permission region pattern (#740), real dialog semantics on modal overlays (#731), one shared filter toolbar (#745), field shell states (#744), secret reveal and multi-select corrections (#746) and a released shell observer (#747) — alongside icon-name validity (#727, #734), Schedule timestamps and UTC day labels through the datetime component (#735, #737), impersonation reader coverage (#729), corrected catalog rows (#730), drift-guard documentation folded into this plan (#726) and the Belimbing cutover value remap (#725); the drift guards stay excluded from the default run — the Design Library state-coverage slice of 2026-09-18 corrected all but two of the uncovered names and axes the coverage guard reports and records those two as accepted rather than pending, and the anchor-hygiene slice of 2026-09-23 cleared the imitation guard's anchor failures, leaving one hand-written control-markup failure (the example `<nav>` rail) open
 **Last Updated:** 2026-09-23
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
 **Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1); `fm/parity-plan-checklist-reconcile/muse-spark` (checklist reconciliation on 2026-09-18, not audit authorship); `fm/icon-registry-name-validity/opus-5`; `fm/designlib-state-coverage-gaps/opus-5` (Design Library state coverage on 2026-09-18); `fm/addresses-detail-read-first/opus-5` (read-first detail page, shared commit status and demoted back link on 2026-09-20); `fm/companies-detail-belimbing-parity/claude-fable-5-1` (company detail header settled against Belimbing on 2026-09-20: the history icon, demoted Manage links and no header buttons); `fm/companies-detail-read-first/claude-fable-5-1` (company detail facts read-first on 2026-09-23); `fm/records-whose-only-page-is-a-form/claude-fable-5-1` (employee type record page read-first and the employee and employee-type edit routes retired on 2026-09-23); `fm/designspec-codes-off-the-ui/claude-fable-5-1` (Design Spec numbers dropped from the rendered card headings on 2026-09-23); `crewmate scout` (firstmate scout tasks that record no model — the FND-06 icon inventory and the four Phase 2 lane audits of 2026-09-16; separate sessions from the `crewmate/gpt-6` entry above, which is why these rows carry no model)
@@ -539,6 +539,38 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
   Both guards therefore still fail, stay tagged `:design_library_drift`, and stay
   out of the default run and `mix precommit`.
 
+  - **Imitation, anchor claims — closed by the anchor-hygiene slice of
+    2026-09-23.** The eleven anchors had two causes, both in the library.
+    Nested `component-*` sub-ids fractured an entry: `<.page>`, `<.header>`
+    and `<.list>` were called only inside `component-page-list`,
+    `component-header-default`, `component-list-populated` and their
+    siblings, which the guard reads as entries of their own, so the parent
+    anchor never called what it claimed. And scaffolding wore the prefix:
+    the choice-guidance card, the live-state card, the radio-group gap
+    note, the card and list boundary notes, the locked radio group and the
+    shell-rows card named guidance, a caption or a specimen that is not a
+    shared component. Twenty ids moved to the library's own
+    `design-library-` prefix (the fifteen the reported anchors needed plus
+    the five nested sub-ids under `<.card>`, `<.tabs>` and `<.icon_button>`
+    that fractured the same way without yet tripping it), every selector in
+    `web_test/design_library_live_test.exs` moved with them, and the three
+    cards that lost the prefix — Navigation, Choice guidance and Live state
+    — are declared in `@declared_specimens`, which is the rule's own
+    admission list. The live-state `<dl>` is now a `<.list>`, so that raw
+    element is gone. The guard itself is unchanged, and so are the
+    qualified sibling entries (`component-input-states`,
+    `component-table-framed` and the like), which the rule reads as the
+    named component's specimen qualified by what it shows.
+    `{fm/designlib-anchor-hygiene/claude-fable-5-1}`
+  - **Imitation, hand-written control markup — one left.** The example
+    `<nav>` rail around the shell's `Layouts.nav_branch` rows still fails.
+    No shared component owns that wrapper: the shell writes its own `<nav>`
+    in `Layouts.app`, and a `<div>` carrying `role="navigation"` or an
+    `aria-label` would trip the same rule or misuse ARIA. Closing it means
+    extracting the rail wrapper into a shared component, which is a
+    component decision rather than a library one, so it stays open beside
+    the coverage gaps below.
+
   - **Coverage reads verified routes.** `DesignLibrarySource` used to classify
     every `~p` sigil as a runtime value, so a specimen could register a
     presence axis for `navigate`, `href` or `patch` only by passing a bare
@@ -729,8 +761,9 @@ Not finished by #719 and #720: the `:design_library_drift` guards report four fa
 on `main`, so #722's guards land excluded from the default test run and from
 `mix precommit`. Correcting those four and activating the guards is the open Phase 1
 checklist row above. #722 being merged does not mean the guards are active. The
-state-coverage slice of 2026-09-18 corrected most of what those four report; that
-row records what it closed, what it leaves accepted and what stays open.
+state-coverage slice of 2026-09-18 corrected most of what those four report, and the
+anchor-hygiene slice of 2026-09-23 cleared the anchor rule; that row records what each
+closed, what it leaves accepted and what stays open.
 
 ### Empty and permission region slice — no child issue
 
