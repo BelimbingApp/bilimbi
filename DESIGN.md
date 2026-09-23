@@ -403,8 +403,7 @@ focus, ignored Escape and painted its Delete solid red.
   an answer before anything else continues.
 - **Two actions:** Cancel first, so it takes focus when the dialog opens and
   Enter, Escape and Cancel all keep the data as it is; then the confirm as a
-  calm danger text control named by the verb alone ("Delete", "Unlink"). The
-  cancel label may name what is kept ("Keep") where that reads better. No
+  calm danger text control named by the verb alone ("Delete", "Unlink"). No
   typed acknowledgement: nobody retypes a name to prove they read the
   sentence above the button.
 - **Ownership:** the caller holds the requested record in an assign, renders
@@ -414,9 +413,7 @@ focus, ignored Escape and painted its Delete solid red.
   flash — a completed delete as `:success`, so it times out — or the panel's
   notice, and a refusal names what to do next ("one or more companies still
   use it. Change those companies' legal entity type first."). The confirm
-  carries `phx-disable-with` for the round trip ("Deleting…"); a wait the
-  server knows about beyond that passes `busy`, which spins the confirm and
-  disables Cancel because the action can no longer be stopped.
+  carries `phx-disable-with` for the round trip ("Deleting…").
 - **Specimen:** the Design Library's Overlays section shows the whole flow —
   entry, consequence, in flight, success, failure and recovery — on example
   records, not only the resting dialog.

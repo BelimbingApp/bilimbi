@@ -1867,9 +1867,7 @@ defmodule Bilimbi.Base.UI.Components do
   page's flash or the panel's notice, as any other write does, and a refusal
   says what to do next. The confirm carries `phx-disable-with={@working}` for
   the round trip, so it reads "Deleting…" and is announced busy until the
-  server replies. A wait the server knows about beyond one round trip passes
-  `busy`: the confirm spins and Cancel is disabled, because the action can no
-  longer be stopped.
+  server replies.
 
   ## Examples
 
@@ -1906,20 +1904,11 @@ defmodule Bilimbi.Base.UI.Components do
     doc: ~s(the confirm's label while the round trip is in flight, such as "Deleting…")
   )
 
-  attr(:cancel, :string, default: "Cancel", doc: "the label of the action that keeps the data")
-
   attr(:on_confirm, JS, required: true, doc: "the command that performs the action")
 
   attr(:on_cancel, JS,
     required: true,
     doc: "the command that closes the dialog without acting; Escape runs the same one"
-  )
-
-  attr(:busy, :boolean,
-    default: false,
-    doc:
-      "the action is running and can no longer be stopped: the confirm spins " <>
-        "and Cancel is disabled"
   )
 
   attr(:rest, :global)
@@ -1936,8 +1925,8 @@ defmodule Bilimbi.Base.UI.Components do
     >
       <:description>{@detail}</:description>
       <div class="mt-5 flex flex-wrap justify-end gap-2">
-        <.button id={"#{@id}-cancel"} type="button" phx-click={@on_cancel} disabled={@busy}>
-          {@cancel}
+        <.button id={"#{@id}-cancel"} type="button" phx-click={@on_cancel}>
+          Cancel
         </.button>
         <.button
           id={"#{@id}-confirm"}
@@ -1945,7 +1934,6 @@ defmodule Bilimbi.Base.UI.Components do
           variant="danger"
           phx-click={@on_confirm}
           phx-disable-with={@working}
-          busy={@busy}
         >
           {@confirm}
         </.button>

@@ -672,19 +672,23 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     refute has_element?(view, "#design-library-confirm")
     assert has_element?(view, "#design-library-confirm-row-sole", "Sole Proprietorship")
 
-    # In flight: the confirm spins and Cancel is disabled while the server works.
+    # In flight: the confirm shows its working label while LiveView holds it.
+    assert has_element?(
+             view,
+             "#component-confirm-dialog #design-library-confirm-in-flight[aria-busy='true'][disabled]",
+             "Deleting…"
+           )
+
+    # Success: the row is gone and the outcome says so.
     view |> element("#design-library-confirm-delete-sole") |> render_click()
+
+    assert has_element?(
+             view,
+             "#design-library-confirm-confirm[phx-disable-with='Deleting…']",
+             "Delete"
+           )
+
     view |> element("#design-library-confirm-confirm", "Delete") |> render_click()
-
-    assert has_element?(view, "#design-library-confirm-confirm[aria-busy='true'][disabled]")
-    assert has_element?(view, "#design-library-confirm-cancel[disabled]")
-
-    # A working request can no longer be cancelled.
-    render_click(view, "confirm-cancel", %{})
-    assert has_element?(view, "#design-library-confirm-confirm[aria-busy='true']")
-
-    # Success: the wait ends, the row is gone and the outcome says so.
-    send(view.pid, {:confirm_done, %{id: "sole", name: "Sole Proprietorship", used_by: 0}})
 
     refute has_element?(view, "#design-library-confirm")
     refute has_element?(view, "#design-library-confirm-row-sole")
@@ -701,7 +705,6 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     )
 
     view |> element("#design-library-confirm-confirm") |> render_click()
-    send(view.pid, {:confirm_done, %{id: "llc", name: "Limited Liability Company", used_by: 3}})
 
     refute has_element?(view, "#design-library-confirm")
     assert has_element?(view, "#design-library-confirm-row-llc", "Limited Liability Company")
