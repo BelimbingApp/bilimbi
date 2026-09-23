@@ -4,6 +4,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Audit
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Session
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Tenancy
@@ -224,6 +225,83 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
       # View remains alive and responsive
       assert has_element?(view, "#stat-companies")
+    end
+
+    test "a grid emptied only by capability says so and names the capabilities",
+         %{conn: conn} do
+      # Every contributed widget is gated, and this account holds none of the
+      # capabilities. Pointing at Customize would be a dead end: there is
+      # nothing this account could add.
+      with_dashboard_catalogue!(gated_catalogue())
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      refute has_element?(view, "#dashboard-widgets-empty")
+      refute has_element?(view, "#dashboard-widgets-none")
+
+      assert has_element?(
+               view,
+               "#dashboard-widgets-withheld",
+               "You do not have permission to see the dashboard widgets"
+             )
+
+      assert has_element?(
+               view,
+               "#dashboard-widgets-withheld",
+               "Ask an operator to review your role."
+             )
+
+      for capability <- ["admin.audit.log.list", "admin.system.session.list"] do
+        assert has_element?(view, "#dashboard-widgets-withheld", capability)
+      end
+
+      {rest, [last]} =
+        gated_catalogue()
+        |> Enum.map(& &1.capability)
+        |> Enum.uniq()
+        |> Enum.sort()
+        |> Enum.split(-1)
+
+      assert has_element?(
+               view,
+               "#dashboard-widgets-withheld",
+               "You do not have permission to see the dashboard widgets; each widget needs its " <>
+                 "own permission, and these widgets use #{Enum.join(rest, ", ")} and #{last}."
+             )
+
+      refute has_element?(view, "#dashboard-widgets-withheld", "one of")
+    end
+
+    test "a grid withheld by one capability names it alone", %{conn: conn} do
+      with_dashboard_catalogue!(
+        Enum.filter(gated_catalogue(), &(&1.capability == "admin.audit.log.list"))
+      )
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      assert has_element?(
+               view,
+               "#dashboard-widgets-withheld",
+               "You do not have permission to see the dashboard widgets, each of which " <>
+                 "needs admin.audit.log.list."
+             )
+
+      refute has_element?(view, "#dashboard-widgets-withheld", "its own permission")
+      refute has_element?(view, "#dashboard-widgets-withheld", "one of")
+    end
+
+    test "a catalogue nothing contributes to says so, not that it is out of reach",
+         %{conn: conn} do
+      with_dashboard_catalogue!([])
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
+
+      refute has_element?(view, "#dashboard-widgets-empty")
+      refute has_element?(view, "#dashboard-widgets-withheld")
+
+      assert has_element?(
+               view,
+               "#dashboard-widgets-none",
+               "No installed module contributes dashboard widgets."
+             )
     end
 
     test "shows gated widgets when corresponding capabilities are granted", %{conn: conn} do
@@ -589,5 +667,19 @@ defmodule BilimbiWeb.DashboardLiveTest do
     ~r{id="dashboard-(current-company|recent-users)"}
     |> Regex.scan(html)
     |> Enum.map(fn [_match, id] -> id end)
+  end
+
+  defp gated_catalogue do
+    Enum.filter(Bilimbi.Base.Dashboard.widgets(), &(&1.capability != nil))
+  end
+
+  # The installed snapshot with only this dashboard catalogue, restored on exit.
+  defp with_dashboard_catalogue!(catalogue) do
+    installed = ContributionRegistry.snapshot!()
+    on_exit(fn -> ContributionRegistry.put_snapshot_for_test!(installed) end)
+
+    ContributionRegistry.put_snapshot_for_test!(
+      put_in(installed, [:consumers, :dashboard], catalogue)
+    )
   end
 end

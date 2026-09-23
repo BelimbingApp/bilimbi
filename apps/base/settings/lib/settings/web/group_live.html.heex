@@ -81,12 +81,21 @@
           </div>
         </div>
 
-        <p
+        <div
           :if={fields_in(@fields, group) == []}
-          class="rounded-xl border border-line bg-surface px-4 py-8 text-center text-sm text-ink-muted"
+          class="rounded-xl border border-line bg-surface px-4 py-8"
         >
-          No installed module contributes settings to this group.
-        </p>
+          <.empty_state
+            :if={withheld_in(@withheld_capabilities, group) == []}
+            id={"settings-group-#{group}-empty"}
+            title="No installed module contributes settings to this group."
+          />
+          <.empty_state
+            :if={withheld_in(@withheld_capabilities, group) != []}
+            id={"settings-group-#{group}-withheld"}
+            forbidden={withheld_wording(withheld_in(@withheld_capabilities, group))}
+          />
+        </div>
       </div>
 
       <div class="flex items-center justify-between gap-4">
@@ -98,7 +107,7 @@
             id="settings-restore"
             type="button"
             phx-click="restore_defaults"
-            data-confirm="Remove every override on this page and fall back to inherited values?"
+            data-confirm="Remove every override shown on this page and fall back to inherited values?"
           >
             Restore Defaults
           </.button>

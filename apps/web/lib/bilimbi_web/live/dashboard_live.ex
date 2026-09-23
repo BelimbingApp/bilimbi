@@ -194,6 +194,22 @@ defmodule BilimbiWeb.DashboardLive do
     )
   end
 
+  # Completes `<.empty_state forbidden>` into "You do not have permission to
+  # ...", naming each capability the withheld widgets require in the key form
+  # the Roles and Capabilities pages use. Only reached when every widget the
+  # catalogue holds was withheld, so each one carries a capability.
+  defp withheld_widgets_wording(catalogue) do
+    case catalogue |> Enum.map(& &1.capability) |> Enum.uniq() |> Enum.sort() do
+      [capability] ->
+        "see the dashboard widgets, each of which needs #{capability}"
+
+      capabilities ->
+        {rest, [last]} = Enum.split(capabilities, -1)
+
+        "see the dashboard widgets; each widget needs its own permission, and these widgets use #{Enum.join(rest, ", ")} and #{last}"
+    end
+  end
+
   defp authorized_catalogue(catalogue, current_scope) do
     Enum.filter(catalogue, fn widget ->
       is_nil(widget.capability) or UserAuth.allowed?(current_scope, widget.capability)
@@ -517,7 +533,15 @@ defmodule BilimbiWeb.DashboardLive do
           />
         </div>
 
-        <p :if={@widgets == []} id="dashboard-widgets-empty" class="mt-5 text-sm text-ink-subtle">
+        <%!-- An empty grid has three causes and each asks something different
+             of the reader: widgets are available but none is placed; every
+             contributed widget is withheld by capability; or no module
+             contributes any. Only the first is recovered by Customize. --%>
+        <p
+          :if={@widgets == [] and @available_widgets != []}
+          id="dashboard-widgets-empty"
+          class="mt-5 text-sm text-ink-subtle"
+        >
           No widgets configured.
           <.link
             phx-click="toggle-layout-edit"
@@ -527,6 +551,20 @@ defmodule BilimbiWeb.DashboardLive do
           </.link>
           &nbsp;to add widgets.
         </p>
+
+        <.empty_state
+          :if={@widgets == [] and @available_widgets == [] and @full_catalogue != []}
+          id="dashboard-widgets-withheld"
+          class="mt-5"
+          forbidden={withheld_widgets_wording(@full_catalogue)}
+        />
+
+        <.empty_state
+          :if={@full_catalogue == []}
+          id="dashboard-widgets-none"
+          class="mt-5"
+          title="No installed module contributes dashboard widgets."
+        />
 
         <%= for section_id <- @visible_sections do %>
           <%= case section_id do %>
