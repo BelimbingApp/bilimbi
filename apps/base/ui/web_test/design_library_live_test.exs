@@ -255,6 +255,22 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
 
     assert has_element?(view, "#component-flash", "Save failed")
     assert has_element?(view, "#component-flash", "preference status line")
+
+    for kind <- ~w(client server) do
+      assert has_element?(
+               view,
+               "#component-connection-banners #design-library-connection-#{kind}-error[data-connection-banners]:not([data-yields])[hidden]"
+             )
+
+      assert has_element?(
+               view,
+               "#component-connection-banners #design-library-connection-yielding-#{kind}-error[data-connection-banners][data-yields][hidden]"
+             )
+    end
+
+    assert has_element?(view, "#design-library-connection-show-client", "Connection interrupted")
+    assert has_element?(view, "#design-library-connection-show-server", "Server unavailable")
+    assert has_element?(view, "#flash-group #connection-client-error[data-yields]")
     assert has_element?(view, "#design-library-card-titled .border-b h3", "Company profile")
     refute has_element?(view, "#design-library-card-untitled h3")
 

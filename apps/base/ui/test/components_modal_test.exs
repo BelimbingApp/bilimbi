@@ -150,6 +150,9 @@ defmodule Bilimbi.Base.UI.ComponentsModalTest do
 
       assert [tag] = Regex.run(~r/<div[^>]*id="#{id}"[^>]*>/, markup)
       assert tag =~ ~r/\shidden[\s>]/
+      # The dialog's pair is the one that reports; the layout's yields to it.
+      assert tag =~ ~r/\sdata-connection-banners[\s>]/
+      refute tag =~ "data-yields"
 
       assert Enum.any?(banner_command(markup, id, "phx-disconnected"), fn
                ["remove_attr", %{"attr" => "hidden", "to" => to}] ->

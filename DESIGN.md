@@ -372,7 +372,10 @@ A short workflow that must finish or be abandoned before the screen continues
   the dialog. Every dialog also carries its own connection banners, so a
   dropped websocket is still announced and dismissable while one is open. The
   layout's copy of whatever the dialog carries is hidden, so the same message
-  never appears twice; a dialog that carries no `flash` copy leaves the
+  never appears twice: its flash copy while a dialog marked `data-owns-flash`
+  is open, and its connection banners because that pair `yields`, standing
+  down while any other pair is in the document (a dialog's, or the Design
+  Library's specimen). A dialog that carries no `flash` copy leaves the
   layout's `:info` and `:error` in the DOM, dimmed behind the backdrop until it
   closes. Opening a
   dialog in a production workflow dismisses an earlier action's flash, so a

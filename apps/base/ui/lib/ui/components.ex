@@ -112,20 +112,34 @@ defmodule Bilimbi.Base.UI.Components do
   defp status_icon(:error), do: "error"
 
   @doc """
-  Renders the two connection banners for one container.
+  Renders the two connection banners for one outlet.
 
   They report a dropped or unreachable websocket, and LiveView reveals them
   from the client — the server is by definition not reachable to re-render
-  when they matter. Both ids derive from `id`, so a container can carry its
+  when they matter. Both ids derive from `id`, so an outlet can carry its
   own pair without colliding with another's.
 
-  An open modal dialog is promoted to the browser's top layer and makes the
-  rest of the page inert, so the layout's pair can be neither painted above
-  the dimmer, announced nor dismissed while one is open. `modal/1` renders a
-  second pair inside the dialog for that reason, and the layout's is hidden
-  while a dialog is open so the same banner never appears twice.
+  A page reports a dropped connection once. Every pair is marked
+  `data-connection-banners`, and a pair that `yields` stands down — is kept
+  invisible by `app.css` — while any other pair is in the document. The
+  layout's pair yields; every other pair is an outlet that outranks it
+  because the layout's cannot serve there: an open modal dialog is promoted
+  to the browser's top layer and makes the rest of the page inert, so
+  `modal/1` renders its own pair where it can be painted above the dimmer,
+  announced and dismissed, and the Design Library presents a pair of its own
+  so the component can be reviewed. Nothing else decides which outlet
+  reports: two outranking pairs on one page both report, so a dialog opened
+  over the Design Library specimen leaves that specimen's banner dimmed
+  behind the dialog, as it leaves the page's flash.
   """
   attr(:id, :string, required: true)
+
+  attr(:yields, :boolean,
+    default: false,
+    doc:
+      "whether this pair stands down while any other pair is in the document; " <>
+        "only the layout's pair yields"
+  )
 
   def connection_banners(assigns) do
     assigns =
@@ -143,6 +157,8 @@ defmodule Bilimbi.Base.UI.Components do
         |> JS.remove_attribute("hidden", to: ".phx-client-error ##{@client_id}")
       }
       phx-connected={hide("##{@client_id}") |> JS.set_attribute({"hidden", ""})}
+      data-connection-banners
+      data-yields={@yields}
       hidden
     >
       {gettext("Reconnecting…")}
@@ -157,6 +173,8 @@ defmodule Bilimbi.Base.UI.Components do
         |> JS.remove_attribute("hidden", to: ".phx-server-error ##{@server_id}")
       }
       phx-connected={hide("##{@server_id}") |> JS.set_attribute({"hidden", ""})}
+      data-connection-banners
+      data-yields={@yields}
       hidden
     >
       {gettext("Attempting to reconnect")}
@@ -1755,7 +1773,8 @@ defmodule Bilimbi.Base.UI.Components do
 
   The dialog also carries its own `connection_banners/1`, because the page
   behind it is inert and painted under the dimmer: a dropped websocket must
-  still be announced and dismissable while a dialog is open.
+  still be announced and dismissable while a dialog is open. The layout's
+  pair yields to it, so the banner still appears once.
 
   Every production caller dismisses the layout flash as it opens a dialog, so
   a message about finished work is neither adopted as the new dialog's own
