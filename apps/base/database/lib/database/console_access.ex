@@ -82,6 +82,7 @@ defmodule Bilimbi.Base.Database.ConsoleAccess do
       AND CASE WHEN c.relkind = 'S'
             THEN has_sequence_privilege(c.oid, 'UPDATE')
             ELSE has_table_privilege(c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE')
+              OR has_any_column_privilege(c.oid, 'INSERT, UPDATE')
           END
   )
   SELECT current_user::text, reason FROM flags

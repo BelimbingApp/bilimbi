@@ -238,6 +238,15 @@ defmodule Bilimbi.Base.Database.QueryExecutorTest do
       committed!(fn -> Repo.query!("REVOKE INSERT ON #{table} FROM #{role}") end)
 
       assert {:ok, %{rows: [%{"?column?" => 1}]}} = as_operator("SELECT 1")
+
+      committed!(fn -> Repo.query!("GRANT UPDATE (id) ON #{table} TO #{role}") end)
+
+      assert {:error, msg} = as_operator("SELECT 1")
+      assert msg =~ "may write public.#{table}"
+
+      committed!(fn -> Repo.query!("REVOKE UPDATE (id) ON #{table} FROM #{role}") end)
+
+      assert {:ok, %{rows: [%{"?column?" => 1}]}} = as_operator("SELECT 1")
     end
 
     test "names the readable columns when SELECT * hits a column-restricted table", %{
