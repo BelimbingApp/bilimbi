@@ -118,6 +118,8 @@ defmodule Bilimbi.Base.UI.Layouts do
       phx-hook="AppShell"
       data-theme-choice={@preferences.theme}
       data-display-mode={@preferences.mode}
+      data-impersonating={to_string(not is_nil(@current_scope[:impersonator]))}
+      data-served-routes={Jason.encode!(Bilimbi.Base.UI.RouteContract.navigable_paths())}
       data-sidebar-mode="desktop"
       data-sidebar-rail="false"
       data-sidebar-open="false"
@@ -195,6 +197,7 @@ defmodule Bilimbi.Base.UI.Layouts do
               Pinned
             </p>
             <div id="app-pinned-items"></div>
+            <p id="app-pinned-announcement" class="sr-only" role="status" aria-live="polite"></p>
             <div class="app-pinned-divider mx-1 my-0.5 h-px bg-line/50" aria-hidden="true"></div>
           </div>
 
@@ -274,6 +277,7 @@ defmodule Bilimbi.Base.UI.Layouts do
   attr(:id, :string, required: true)
   attr(:label, :string, required: true)
   attr(:pinnable, :boolean, default: true)
+  attr(:impersonating, :boolean, default: false)
 
   defp nav_item(assigns) do
     ~H"""
@@ -301,7 +305,12 @@ defmodule Bilimbi.Base.UI.Layouts do
         />
         <span class="app-nav-label min-w-0 truncate">{@label}</span>
       </.link>
-      <.nav_pin :if={@pinnable} item_id={@id} label={@label} />
+      <.nav_pin
+        :if={@pinnable}
+        item_id={@id}
+        label={@label}
+        impersonating={@impersonating}
+      />
     </div>
     """
   end
@@ -364,6 +373,7 @@ defmodule Bilimbi.Base.UI.Layouts do
   attr(:active_nav, :string, default: nil)
   attr(:depth, :integer, default: 0)
   attr(:pinnable, :boolean, default: true)
+  attr(:impersonating, :boolean, default: false)
 
   def nav_branch(assigns) do
     item = assigns.node.item
@@ -389,6 +399,7 @@ defmodule Bilimbi.Base.UI.Layouts do
       id={"nav-" <> @dom_id}
       label={@node.item.label}
       pinnable={@pinnable}
+      impersonating={@impersonating}
     />
 
     <section
@@ -471,6 +482,7 @@ defmodule Bilimbi.Base.UI.Layouts do
           :if={@pinnable and @node.item.route}
           item_id={"nav-" <> @dom_id}
           label={@node.item.label}
+          impersonating={@impersonating}
         />
       </div>
 
@@ -485,6 +497,7 @@ defmodule Bilimbi.Base.UI.Layouts do
           active_nav={@active_nav}
           depth={@depth + 1}
           pinnable={@pinnable}
+          impersonating={@impersonating}
         />
       </div>
     </section>
@@ -505,6 +518,7 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   attr(:item_id, :string, required: true)
   attr(:label, :string, required: true)
+  attr(:impersonating, :boolean, default: false)
 
   defp nav_pin(assigns) do
     ~H"""
@@ -514,6 +528,7 @@ defmodule Bilimbi.Base.UI.Layouts do
       context={:inline}
       id={"nav-pin-" <> String.trim_leading(@item_id, "nav-")}
       data-nav-pin={@item_id}
+      disabled={@impersonating}
       class="app-nav-pin opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
     />
     """

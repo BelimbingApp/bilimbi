@@ -1,10 +1,11 @@
 import ShellControls from "./shell_controls.js"
 
 // Authenticated shell chrome. Owns only what the server cannot: the desktop
-// rail choice (localStorage), the mobile drawer, Escape/backdrop close, and
-// returning focus to the toggle. The top-bar display controls and the account
-// disclosure belong to ShellControls, which this hook drives through the same
-// lifecycle. Navigation, capabilities, and status values stay server-rendered.
+// rail choice (localStorage), durable pin hydration/migration, the mobile
+// drawer, Escape/backdrop close, and returning focus to the toggle. The top-bar
+// display controls and account disclosure belong to ShellControls, which this
+// hook drives through the same lifecycle. Navigation, capabilities, and status
+// values stay server-rendered.
 const DESKTOP = "(min-width: 1024px)"
 const RAIL_WIDTH = 56
 const MIN_WIDTH = 180
@@ -27,11 +28,14 @@ const AppShell = {
     this.drag = this.el.querySelector("#app-sidebar-drag")
     this.pinned = this.el.querySelector("#app-pinned")
     this.pinnedItems = this.el.querySelector("#app-pinned-items")
+    this.pinnedAnnouncement = this.el.querySelector("#app-pinned-announcement")
+    this.impersonating = this.el.dataset.impersonating === "true"
+    this.servedRoutes = this.readServedRoutes()
     this.mq = window.matchMedia(DESKTOP)
     this.rail = window.localStorage.getItem("sidebarRail") === "1"
     this.width = this.readWidth()
     this.expandedBranches = this.readExpandedBranches()
-    this.pinnedEntries = this.readPinnedItems()
+    this.pinnedEntries = []
     this.drawerOpen = false
     this.lastFocus = null
     this.dragging = false
@@ -50,6 +54,7 @@ const AppShell = {
     this.onPinnedDragOver = (event) => this.overPinnedDrag(event)
     this.onPinnedDrop = (event) => this.dropPinnedDrag(event)
     this.onPinnedDragEnd = () => this.endPinnedDrag()
+    this.onPinnedKey = (event) => this.onPinnedKeyboard(event)
 
     this.toggle?.addEventListener("click", this.onToggle)
     this.backdrop?.addEventListener("click", this.onBackdrop)
@@ -59,10 +64,12 @@ const AppShell = {
     this.pinnedItems?.addEventListener("dragover", this.onPinnedDragOver)
     this.pinnedItems?.addEventListener("drop", this.onPinnedDrop)
     this.pinnedItems?.addEventListener("dragend", this.onPinnedDragEnd)
+    this.pinnedItems?.addEventListener("keydown", this.onPinnedKey)
     window.addEventListener("keydown", this.onKey)
     this.mq.addEventListener("change", this.onMq)
     this.controls = new ShellControls(this)
     this.apply()
+    this.loadPinnedItems()
   },
 
   disconnected() { this.controls?.connection(false) },
@@ -83,6 +90,7 @@ const AppShell = {
     this.pinnedItems?.removeEventListener("dragover", this.onPinnedDragOver)
     this.pinnedItems?.removeEventListener("drop", this.onPinnedDrop)
     this.pinnedItems?.removeEventListener("dragend", this.onPinnedDragEnd)
+    this.pinnedItems?.removeEventListener("keydown", this.onPinnedKey)
     window.removeEventListener("mousemove", this.onDragMove)
     window.removeEventListener("mouseup", this.onDragEnd)
     window.removeEventListener("keydown", this.onKey)
@@ -112,7 +120,7 @@ const AppShell = {
     window.localStorage.setItem(NAV_EXPANSION_STORAGE, JSON.stringify(this.expandedBranches))
   },
 
-  readPinnedItems() {
+  readLegacyPinnedItems() {
     try {
       const stored = JSON.parse(window.localStorage.getItem(PINNED_STORAGE) ?? "[]")
 
@@ -132,20 +140,34 @@ const AppShell = {
     }
   },
 
-  savePinnedItems() {
-    window.localStorage.setItem(PINNED_STORAGE, JSON.stringify(this.pinnedEntries))
+  readServedRoutes() {
+    try {
+      const routes = JSON.parse(this.root?.dataset.servedRoutes ?? "[]")
+      return Array.isArray(routes) ? routes.filter((route) => typeof route === "string") : []
+    } catch {
+      return []
+    }
   },
 
   normalizePinnedItem(item) {
     if (typeof item === "string") {
       const id = item.trim()
-      return id ? {id} : null
+      return id ? {navId: id} : null
     }
 
     if (!item || typeof item !== "object" || Array.isArray(item)) return null
 
+    const pinId = Number.isInteger(item.id) || (typeof item.id === "string" && /^\d+$/.test(item.id))
+    if (pinId && typeof item.url === "string") {
+      const url = this.normalizePinnedUrl(item.url)
+      const label = typeof item.label === "string" ? item.label.trim() : ""
+      return label && url
+        ? {pinId: String(item.id), label, url, icon: item.icon || null}
+        : null
+    }
+
     const id = typeof item.id === "string" ? item.id.trim() : ""
-    if (id) return {id}
+    if (id) return {navId: id}
 
     const label = typeof item.label === "string" ? item.label.trim() : ""
     const url = this.normalizePinnedUrl(item.url)
@@ -167,9 +189,119 @@ const AppShell = {
   },
 
   pinnedItemKey(item) {
-    if (item?.id) return `nav:${item.id}`
+    if (item?.pinId) return `pin:${item.pinId}`
+    if (item?.navId) return `nav:${item.navId}`
     if (item?.url) return `url:${item.url}`
     return null
+  },
+
+  pinnedUrl(item) {
+    if (item?.url) return this.normalizePinnedUrl(item.url)
+    if (item?.navId) return this.navItem(item.navId)?.href || null
+    return null
+  },
+
+  isServedUrl(url) {
+    const normalized = this.normalizePinnedUrl(url)
+    if (!normalized) return false
+
+    const path = normalized.split("?", 1)[0].split("#", 1)[0]
+    const actual = path.split("/").filter(Boolean)
+
+    return this.servedRoutes.some((route) => {
+      const pattern = route.split("/", -1).filter(Boolean)
+      return pattern.length === actual.length && pattern.every((segment, index) =>
+        segment.startsWith(":") || segment === actual[index]
+      )
+    })
+  },
+
+  pinRequest(path, options = {}) {
+    const headers = {...(options.headers || {}), Accept: "application/json"}
+    if (options.method && options.method !== "GET") {
+      headers["Content-Type"] = "application/json"
+      headers["X-CSRF-Token"] = document.querySelector("meta[name='csrf-token']")?.content || ""
+    }
+
+    return fetch(path, {...options, headers, credentials: "same-origin"})
+  },
+
+  async loadPinnedItems() {
+    try {
+      const response = await this.pinRequest("/api/pins")
+      if (!response.ok) throw new Error(`Pin load failed with status ${response.status}`)
+
+      let pins = this.acceptServerPins((await response.json()).pins)
+      const legacy = this.readLegacyPinnedItems()
+      for (const legacyItem of legacy) {
+        const item = this.migratablePinnedItem(legacyItem)
+        const url = this.pinnedUrl(item)
+
+        if (!item || !url || !this.isServedUrl(url) || pins.some((pin) => this.pinnedUrl(pin) === url)) {
+          continue
+        }
+
+        const imported = await this.pinRequest("/api/pins/toggle", {
+          method: "POST",
+          body: JSON.stringify({label: item.label, url, icon: item.icon || null}),
+        })
+        if (!imported.ok) throw new Error(`Pin migration failed with status ${imported.status}`)
+        pins = this.acceptServerPins((await imported.json()).pins)
+      }
+
+      const legacyUrls = legacy
+        .map((item) => this.pinnedUrl(this.migratablePinnedItem(item)))
+        .filter((url) => url && this.isServedUrl(url))
+      const ordered = [
+        ...legacyUrls.map((url) => pins.find((pin) => this.pinnedUrl(pin) === url)).filter(Boolean),
+        ...pins.filter((pin) => !legacyUrls.includes(this.pinnedUrl(pin))),
+      ]
+
+      if (ordered.length && ordered.some((pin, index) => pin.pinId !== pins[index]?.pinId)) {
+        const reordered = await this.reorderServerPins(ordered, false)
+        pins = reordered || pins
+      }
+
+      this.pinnedEntries = pins
+      window.localStorage.removeItem?.(PINNED_STORAGE)
+      this.renderPinnedItems()
+    } catch (_error) {
+      // Keep the durable API as the only source of truth. A transient outage
+      // leaves the shell empty and leaves legacy data available for retry.
+      this.pinnedEntries = []
+      this.renderPinnedItems()
+    }
+  },
+
+  migratablePinnedItem(item) {
+    if (!item) return null
+    if (item.navId) {
+      const nav = this.navItem(item.navId)
+      return nav ? {label: nav.dataset.navLabel, url: nav.href} : null
+    }
+    return item
+  },
+
+  acceptServerPins(pins) {
+    if (!Array.isArray(pins)) return []
+    return pins.map((pin) => this.normalizePinnedItem(pin)).filter((pin) =>
+      pin && this.isServedUrl(pin.url)
+    )
+  },
+
+  async reorderServerPins(pins, focus = true) {
+    if (this.impersonating || !pins.length) return null
+    const focusedKey = focus ? this.pinnedRow(document.activeElement)?.dataset.pinnedItem : null
+    const response = await this.pinRequest("/api/pins/reorder", {
+      method: "POST",
+      body: JSON.stringify({pins: pins.map((pin) => ({id: pin.pinId}))}),
+    })
+    if (!response.ok) throw new Error(`Pin reorder failed with status ${response.status}`)
+    const updated = this.acceptServerPins((await response.json()).pins)
+    this.pinnedEntries = updated
+    this.renderPinnedItems()
+    if (focusedKey) this.focusPinnedKey(focusedKey)
+    return updated
   },
 
   startDrag(event) {
@@ -271,6 +403,14 @@ const AppShell = {
   },
 
   onSidebarClick(event) {
+    const move = event.target.closest("[data-nav-move]")
+
+    if (move && this.root?.contains(move)) {
+      event.preventDefault()
+      this.movePinnedItem(move.dataset.pinnedItem, move.dataset.navMove)
+      return
+    }
+
     const unpin = event.target.closest("[data-nav-unpin]")
 
     if (unpin && this.root?.contains(unpin)) {
@@ -340,30 +480,42 @@ const AppShell = {
     return this.normalizePinnedItem(pin.dataset.navPin)
   },
 
-  togglePinnedItem(item) {
-    const key = this.pinnedItemKey(item)
-    if (!key) return
+  async togglePinnedItem(item) {
+    if (this.impersonating) return
+    const candidate = this.migratablePinnedItem(item)
+    const url = this.pinnedUrl(candidate)
+    if (!candidate || !url || !this.isServedUrl(url)) return
 
-    if (this.pinnedEntries.some((pinnedItem) => this.pinnedItemKey(pinnedItem) === key)) {
-      this.pinnedEntries = this.pinnedEntries.filter(
-        (pinnedItem) => this.pinnedItemKey(pinnedItem) !== key
-      )
-    } else {
-      this.pinnedEntries.push(item)
+    try {
+      const response = await this.pinRequest("/api/pins/toggle", {
+        method: "POST",
+        body: JSON.stringify({label: candidate.label, url, icon: candidate.icon || null}),
+      })
+      if (!response.ok) return
+      this.pinnedEntries = this.acceptServerPins((await response.json()).pins)
+      this.renderPinnedItems()
+    } catch (_error) {
+      this.setPinAnnouncement("Unable to update pinned pages.")
     }
-
-    this.savePinnedItems()
-    this.renderPinnedItems()
   },
 
-  removePinnedItem(key) {
-    if (!key) return
+  async removePinnedItem(key) {
+    if (this.impersonating) return
+    const item = this.pinnedEntries.find((pinnedItem) => this.pinnedItemKey(pinnedItem) === key)
+    const url = this.pinnedUrl(item)
+    if (!item || !url) return
 
-    this.pinnedEntries = this.pinnedEntries.filter(
-      (pinnedItem) => this.pinnedItemKey(pinnedItem) !== key
-    )
-    this.savePinnedItems()
-    this.renderPinnedItems()
+    try {
+      const response = await this.pinRequest("/api/pins/toggle", {
+        method: "POST",
+        body: JSON.stringify({label: item.label, url, icon: item.icon || null}),
+      })
+      if (!response.ok) return
+      this.pinnedEntries = this.acceptServerPins((await response.json()).pins)
+      this.renderPinnedItems()
+    } catch (_error) {
+      this.setPinAnnouncement("Unable to update pinned pages.")
+    }
   },
 
   navItem(id) {
@@ -372,8 +524,8 @@ const AppShell = {
   },
 
   resolvePinnedItem(pinnedItem) {
-    if (pinnedItem.id) {
-      const item = this.navItem(pinnedItem.id)
+    if (pinnedItem.navId) {
+      const item = this.navItem(pinnedItem.navId)
       if (!item) return null
 
       return {
@@ -385,6 +537,8 @@ const AppShell = {
       }
     }
 
+    if (!this.isServedUrl(pinnedItem.url)) return null
+
     return {
       key: this.pinnedItemKey(pinnedItem),
       pinnedItem,
@@ -395,10 +549,53 @@ const AppShell = {
   },
 
   pinnedRow(event) {
-    if (!(event.target instanceof Element)) return null
+    const target = event?.target || event
+    if (!target?.closest) return null
 
-    const row = event.target.closest("[data-pinned-item]")
+    const row = target.closest("[data-pinned-item]")
     return this.pinnedItems?.contains(row) ? row : null
+  },
+
+  onPinnedKeyboard(event) {
+    const move = event.target.closest?.("[data-nav-move]")
+    if (!move || this.impersonating) return
+    if (event.key !== "Enter" && event.key !== " ") return
+    event.preventDefault()
+    this.movePinnedItem(move.dataset.pinnedItem, move.dataset.navMove)
+  },
+
+  async movePinnedItem(key, direction) {
+    if (this.impersonating) return
+    const index = this.pinnedEntries.findIndex((item) => this.pinnedItemKey(item) === key)
+    const targetIndex = direction === "up" ? index - 1 : index + 1
+    if (index < 0 || targetIndex < 0 || targetIndex >= this.pinnedEntries.length) return
+
+    const moved = [...this.pinnedEntries]
+    const [item] = moved.splice(index, 1)
+    moved.splice(targetIndex, 0, item)
+    try {
+      const updated = await this.reorderServerPins(moved)
+      if (updated) {
+        const label = item.label || "Pinned page"
+        this.setPinAnnouncement(`Moved ${label} ${direction}.`)
+        this.focusPinnedKey(key)
+      }
+    } catch (_error) {
+      this.setPinAnnouncement("Unable to reorder pinned pages.")
+    }
+  },
+
+  focusPinnedKey(key) {
+    for (const row of this.pinnedItems?.querySelectorAll("[data-pinned-item]") ?? []) {
+      if (row.dataset.pinnedItem === key) {
+        row.querySelector(".app-pinned-link")?.focus()
+        break
+      }
+    }
+  },
+
+  setPinAnnouncement(message) {
+    if (this.pinnedAnnouncement) this.pinnedAnnouncement.textContent = message
   },
 
   startPinnedDrag(event) {
@@ -451,8 +648,9 @@ const AppShell = {
           (pinnedItem) => this.pinnedItemKey(pinnedItem) === draggedKey
         )
         reordered.splice(targetIndex, 0, draggedItem)
-        this.pinnedEntries = reordered
-        this.savePinnedItems()
+        void this.reorderServerPins(reordered, false).catch(() => {
+          this.setPinAnnouncement("Unable to reorder pinned pages.")
+        })
       }
     }
 
@@ -491,7 +689,6 @@ const AppShell = {
 
     if (items.length !== this.pinnedEntries.length) {
       this.pinnedEntries = items.map(({pinnedItem}) => pinnedItem)
-      this.savePinnedItems()
     }
 
     this.pinnedItems.replaceChildren()
@@ -500,7 +697,7 @@ const AppShell = {
       const row = document.createElement("div")
       row.className = "app-pinned-row group flex min-w-0 items-center"
       row.dataset.pinnedItem = key
-      row.draggable = !this.rail
+      row.draggable = !this.rail && !this.impersonating
 
       const grip = document.createElement("span")
       grip.className =
@@ -536,9 +733,32 @@ const AppShell = {
       label.textContent = pinLabel
       link.append(label)
 
+      const moveUp = document.createElement("button")
+      moveUp.type = "button"
+      moveUp.dataset.navMove = "up"
+      moveUp.dataset.pinnedItem = key
+      moveUp.disabled = this.impersonating || items[0] === items.find(({key: itemKey}) => itemKey === key)
+      moveUp.title = `Move ${pinLabel} up`
+      moveUp.setAttribute("aria-label", `Move ${pinLabel} up`)
+      moveUp.className =
+        "app-pinned-move grid size-6 shrink-0 place-items-center rounded-sm text-muted opacity-0 transition hover:bg-surface-muted hover:text-ink group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong disabled:cursor-not-allowed disabled:opacity-30"
+      moveUp.textContent = "↑"
+
+      const moveDown = document.createElement("button")
+      moveDown.type = "button"
+      moveDown.dataset.navMove = "down"
+      moveDown.dataset.pinnedItem = key
+      moveDown.disabled =
+        this.impersonating || items[items.length - 1] === items.find(({key: itemKey}) => itemKey === key)
+      moveDown.title = `Move ${pinLabel} down`
+      moveDown.setAttribute("aria-label", `Move ${pinLabel} down`)
+      moveDown.className = moveUp.className
+      moveDown.textContent = "↓"
+
       const unpin = document.createElement("button")
       unpin.type = "button"
       unpin.dataset.navUnpin = key
+      unpin.disabled = this.impersonating
       unpin.title = `Unpin ${pinLabel}`
       unpin.setAttribute("aria-label", `Unpin ${pinLabel}`)
       unpin.className =
@@ -547,7 +767,7 @@ const AppShell = {
       const pinIcon = item?.parentElement?.querySelector("[data-nav-pin] svg")?.cloneNode(true)
       if (pinIcon) unpin.append(pinIcon)
 
-      row.append(grip, link, unpin)
+      row.append(grip, link, moveUp, moveDown, unpin)
       this.pinnedItems.append(row)
     }
 
@@ -556,9 +776,12 @@ const AppShell = {
       const key = this.pinnedItemKey(pinnedItem)
       if (!key) continue
 
+      const url = this.pinnedUrl(pinnedItem)
       const pinned = this.pinnedEntries.some(
-        (item) => this.pinnedItemKey(item) === key
+        (item) => url && this.pinnedUrl(item) === url
       )
+      pin.disabled = this.impersonating
+      pin.setAttribute("aria-disabled", String(this.impersonating))
       pin.dataset.pinned = String(pinned)
       pin.setAttribute("aria-pressed", String(pinned))
       pin.title = `${pinned ? "Unpin" : "Pin"} ${pin.getAttribute("aria-label")
