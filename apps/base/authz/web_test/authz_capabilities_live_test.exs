@@ -47,7 +47,9 @@ defmodule BilimbiWeb.AuthzCapabilitiesLiveTest do
   test "shows pagination summary without dead controls on single page", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
-    view |> form("#capabilities-filters", %{"search" => "decision-log"}) |> render_change()
+    view
+    |> form("#capabilities-filters", filters: %{"search" => "decision-log"})
+    |> render_change()
 
     assert has_element?(view, "#capabilities-pagination-summary")
     refute has_element?(view, "#capabilities-prev")
@@ -57,7 +59,9 @@ defmodule BilimbiWeb.AuthzCapabilitiesLiveTest do
   test "filters capabilities by search query", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
-    view |> form("#capabilities-filters", %{"search" => "decision-log"}) |> render_change()
+    view
+    |> form("#capabilities-filters", filters: %{"search" => "decision-log"})
+    |> render_change()
 
     assert has_element?(view, "#capabilities-table", "admin.authz.decision-log.list")
     refute has_element?(view, "#capabilities-table", "admin.authz.role.list")
@@ -66,7 +70,9 @@ defmodule BilimbiWeb.AuthzCapabilitiesLiveTest do
   test "filters capabilities by module name search", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
-    view |> form("#capabilities-filters", %{"search" => "Core / User"}) |> render_change()
+    view
+    |> form("#capabilities-filters", filters: %{"search" => "Core / User"})
+    |> render_change()
 
     assert has_element?(view, "#capabilities-table", "admin.user.create")
     assert has_element?(view, "#capabilities-table", "Core / User")
@@ -76,7 +82,7 @@ defmodule BilimbiWeb.AuthzCapabilitiesLiveTest do
   test "filters capabilities by domain dropdown", %{conn: conn} do
     {:ok, view, _html} = open(conn)
 
-    view |> form("#capabilities-filters", %{"domain" => "admin"}) |> render_change()
+    view |> form("#capabilities-filters", filters: %{"domain" => "admin"}) |> render_change()
 
     assert has_element?(view, "#capabilities-table", "admin.authz.capability.list")
   end
@@ -85,10 +91,34 @@ defmodule BilimbiWeb.AuthzCapabilitiesLiveTest do
     {:ok, view, _html} = open(conn)
 
     view
-    |> form("#capabilities-filters", %{"search" => "xyz_nonexistent_token_123"})
+    |> form("#capabilities-filters", filters: %{"search" => "xyz_nonexistent_token_123"})
     |> render_change()
 
     assert has_element?(view, "#capabilities-table-empty", "No capabilities match these filters.")
+  end
+
+  test "filter state round-trips through URL state", %{conn: conn} do
+    {:ok, view, _html} = open(conn)
+
+    view
+    |> form("#capabilities-filters", filters: %{"search" => "decision-log", "domain" => "admin"})
+    |> render_change()
+
+    assert %{"search" => "decision-log", "domain" => "admin", "page" => "1"} =
+             patched_params(view)
+
+    {:ok, reloaded, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/authz/capabilities?search=decision-log&domain=admin&per_page=50")
+
+    assert has_element?(reloaded, "#capabilities-search[value='decision-log']")
+    assert has_element?(reloaded, "#filter-domain option[value='admin'][selected]")
+
+    assert has_element?(
+             reloaded,
+             "#capabilities-pagination-page-size option[value='50'][selected]"
+           )
   end
 
   test "sorts table by clicking column headers", %{conn: conn} do
@@ -109,5 +139,9 @@ defmodule BilimbiWeb.AuthzCapabilitiesLiveTest do
       view,
       ~p"/authz/capabilities?domain=&page=1&per_page=25&search=&sort_by=module&sort_dir=desc"
     )
+  end
+
+  defp patched_params(view) do
+    assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
   end
 end

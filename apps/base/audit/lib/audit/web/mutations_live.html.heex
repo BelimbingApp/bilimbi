@@ -5,35 +5,22 @@
       <:subtitle>Audit trail for all data changes, newest first</:subtitle>
     </.header>
 
-    <form id="mutations-filters" phx-change="filter" phx-submit="filter" class="mt-5 flex flex-wrap gap-3">
-      <div class="flex-1 min-w-[240px]">
-        <label for="mutations-search" class="sr-only">Search mutations</label>
-        <input
-          type="search"
-          id="mutations-search"
-          name="search"
-          value={@state.search}
-          placeholder="Search actor, model, subject, event, or trace..."
-          phx-debounce="300"
-          autocomplete="off"
-          class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
-        />
-      </div>
-
-      <div>
-        <label for="mutations-event" class="sr-only">Filter by event</label>
-        <select
-          id="mutations-event"
-          name="event"
-          class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
-        >
-          <option value="" selected={@state.event == ""}>All Events</option>
-          <option value="created" selected={@state.event == "created"}>Created</option>
-          <option value="updated" selected={@state.event == "updated"}>Updated</option>
-          <option value="deleted" selected={@state.event == "deleted"}>Deleted</option>
-        </select>
-      </div>
-    </form>
+    <.filter_toolbar id="mutations-filters" form={@filters_form} event="filter">
+      <:control
+        type={:search}
+        field={@filters_form[:search]}
+        id="mutations-search"
+        label="Search mutations"
+        placeholder="Search actor, model, subject, event, or trace..."
+      />
+      <:control
+        type={:select}
+        field={@filters_form[:event]}
+        id="mutations-event"
+        label="Filter by event"
+        options={[{"All Events", ""}, {"Created", "created"}, {"Updated", "updated"}, {"Deleted", "deleted"}]}
+      />
+    </.filter_toolbar>
 
     <div class="mt-4">
       <.table

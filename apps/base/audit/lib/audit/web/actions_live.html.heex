@@ -5,82 +5,43 @@
       <:subtitle>Operational action log, newest first</:subtitle>
     </.header>
 
-    <form id="actions-filters" phx-change="filter" phx-submit="filter" class="mt-5 flex flex-wrap gap-3">
-      <div class="flex-1 min-w-[200px]">
-        <label for="actions-search" class="sr-only">Search actions</label>
-        <input
-          type="search"
-          id="actions-search"
-          name="search"
-          value={@state.search}
-          placeholder="Search event, URL, actor role, or trace..."
-          phx-debounce="300"
-          autocomplete="off"
-          class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
-        />
-      </div>
-
-      <div>
-        <label for="actions-event-family" class="sr-only">Filter by event family</label>
-        <select
-          id="actions-event-family"
-          name="event_family"
-          class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
-        >
-          <option value="" selected={@state.event_family == ""}>All Events</option>
-          <option value="http" selected={@state.event_family == "http"}>HTTP</option>
-          <option value="auth" selected={@state.event_family == "auth"}>Authentication</option>
-          <option value="console" selected={@state.event_family == "console"}>Console</option>
-          <option value="database" selected={@state.event_family == "database"}>
-            SQL console
-          </option>
-          <option value="queue" selected={@state.event_family == "queue"}>Queue</option>
-          <option value="domain" selected={@state.event_family == "domain"}>Domain</option>
-        </select>
-      </div>
-
-      <div>
-        <label for="actions-result" class="sr-only">Filter by result</label>
-        <select
-          id="actions-result"
-          name="result"
-          class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
-        >
-          <option value="" selected={@state.result == ""}>All Results</option>
-          <option value="failure" selected={@state.result == "failure"}>Failures</option>
-          <option value="retained" selected={@state.result == "retained"}>Retained</option>
-        </select>
-      </div>
-
-      <div>
-        <label for="actions-diagnostics" class="sr-only">Diagnostic traffic</label>
-        <select
-          id="actions-diagnostics"
-          name="diagnostics"
-          class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
-        >
-          <option value="hide" selected={@state.diagnostics == "hide"}>Hide Diagnostics</option>
-          <option value="show" selected={@state.diagnostics == "show"}>Show Diagnostics</option>
-        </select>
-      </div>
-
-      <div>
-        <label for="actions-actor-type" class="sr-only">Filter by actor type</label>
-        <select
-          id="actions-actor-type"
-          name="actor_type"
-          class="rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-brand-strong focus:outline-none"
-        >
-          <option value="" selected={@state.actor_type == ""}>All Actor Types</option>
-          <option value="user" selected={@state.actor_type == "user"}>User</option>
-          <option value="agent" selected={@state.actor_type == "agent"}>Employee</option>
-          <option value="guest" selected={@state.actor_type == "guest"}>Guest</option>
-          <option value="console" selected={@state.actor_type == "console"}>Console</option>
-          <option value="scheduler" selected={@state.actor_type == "scheduler"}>Scheduler</option>
-          <option value="queue" selected={@state.actor_type == "queue"}>Queue</option>
-        </select>
-      </div>
-    </form>
+    <.filter_toolbar id="actions-filters" form={@filters_form} event="filter">
+      <:control
+        type={:search}
+        field={@filters_form[:search]}
+        id="actions-search"
+        label="Search actions"
+        placeholder="Search event, URL, actor role, or trace..."
+      />
+      <:control
+        type={:select}
+        field={@filters_form[:event_family]}
+        id="actions-event-family"
+        label="Filter by event family"
+        options={[{"All Events", ""}, {"HTTP", "http"}, {"Authentication", "auth"}, {"Console", "console"}, {"SQL console", "database"}, {"Queue", "queue"}, {"Domain", "domain"}]}
+      />
+      <:control
+        type={:select}
+        field={@filters_form[:result]}
+        id="actions-result"
+        label="Filter by result"
+        options={[{"All Results", ""}, {"Failures", "failure"}, {"Retained", "retained"}]}
+      />
+      <:control
+        type={:select}
+        field={@filters_form[:diagnostics]}
+        id="actions-diagnostics"
+        label="Diagnostic traffic"
+        options={[{"Hide Diagnostics", "hide"}, {"Show Diagnostics", "show"}]}
+      />
+      <:control
+        type={:select}
+        field={@filters_form[:actor_type]}
+        id="actions-actor-type"
+        label="Filter by actor type"
+        options={[{"All Actor Types", ""}, {"User", "user"}, {"Employee", "agent"}, {"Guest", "guest"}, {"Console", "console"}, {"Scheduler", "scheduler"}, {"Queue", "queue"}]}
+      />
+    </.filter_toolbar>
 
     <p :if={@state.diagnostics == "hide"} class="mt-2 text-xs text-ink-muted">
       Successful Livewire updates, AI event streams, and media streams are hidden. Failures still appear; switch to Show Diagnostics to inspect transport noise.
