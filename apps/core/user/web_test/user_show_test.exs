@@ -320,11 +320,20 @@ defmodule BilimbiWeb.UserShowTest do
 
     assert has_element?(view, "#user-record-history-entry-#{mutation.id}", "old@example.com")
 
-    panel = view |> element("#user-record-history-panel") |> render()
-    assert panel =~ "phx-window-keydown"
-    assert panel =~ "focus"
-    assert panel =~ "#user-record-history-toggle"
-    assert panel =~ "close"
+    panel =
+      view
+      |> element("#user-record-history-panel")
+      |> render()
+      |> LazyHTML.from_fragment()
+
+    assert [mounted] = LazyHTML.attribute(panel, "phx-mounted")
+    assert [["focus", focus]] = JSON.decode!(mounted)
+    refute Map.has_key?(focus, "to")
+
+    assert [escape] = LazyHTML.attribute(panel, "phx-window-keydown")
+
+    assert [["push", %{"event" => "close"}], ["focus", %{"to" => "#user-record-history-toggle"}]] =
+             JSON.decode!(escape)
 
     view |> element("#user-record-history-panel") |> render_keydown(%{"key" => "Escape"})
     assert has_element?(view, "#user-record-history-toggle[aria-expanded='false']")

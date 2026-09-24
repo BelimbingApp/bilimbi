@@ -150,23 +150,24 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
            ) ==
              "History"
 
-    refute closed =~ "<details"
-    refute closed =~ "<summary"
-    refute closed =~ "phx-window-keydown"
-    refute closed =~ "phx-click-away"
-    refute closed =~ "id=\"history-panel\""
+    refute present?(closed, "details, summary")
+    refute present?(closed, "#history[phx-click-away]")
+    refute present?(closed, "[phx-window-keydown]")
+    refute present?(closed, "#history-panel")
 
     open = render_panel(scope, mutation, open: true)
 
     assert text(open, "button#history-toggle[aria-expanded='true']") == "History"
-    assert open =~ "aria-expanded=\"true\""
-    assert open =~ "id=\"history-panel\""
-    assert open =~ "phx-mounted"
-    assert open =~ "phx-key=\"escape\""
-    assert open =~ "phx-window-keydown"
-    assert open =~ "phx-click-away"
-    assert open =~ "#history-toggle"
-    assert open =~ "tabindex=\"-1\""
+    assert present?(open, "#history[phx-click-away]")
+    assert present?(open, "#history-panel[tabindex='-1'][phx-key='escape']")
+
+    assert [["focus", mounted]] = js(open, "#history-panel", "phx-mounted")
+    refute Map.has_key?(mounted, "to")
+
+    assert [["push", %{"event" => "close"}], ["focus", %{"to" => "#history-toggle"}]] =
+             js(open, "#history-panel", "phx-window-keydown")
+
+    assert [["push", %{"event" => "close"}]] = js(open, "#history", "phx-click-away")
     assert text(open, "#history-entry-#{mutation.id}-name-new") == "Widget"
   end
 
@@ -179,6 +180,23 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
       record: nil,
       open: Keyword.get(opts, :open, true)
     )
+  end
+
+  defp present?(html, selector) do
+    html
+    |> LazyHTML.from_fragment()
+    |> LazyHTML.query(selector)
+    |> Enum.any?()
+  end
+
+  defp js(html, selector, attribute) do
+    [command] =
+      html
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.query(selector)
+      |> LazyHTML.attribute(attribute)
+
+    JSON.decode!(command)
   end
 
   defp text(html, selector) do
