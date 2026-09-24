@@ -161,7 +161,10 @@ behave exactly like the disposable Domain proved in Phase 1.
   independent repository with its first Production module and a declared
   dependency on Inventory/Stock's public contract. Keep
   `product_definition`, `process_definition`, `execution`, and `trace` as
-  internal boundaries until real module-level selection is needed.
+  internal boundaries until real module-level selection is needed. `trace`
+  holds only Manufacturing-side trace views, such as which run, step, and
+  resource produced or consumed a lot; it reads Inventory/Stock's public
+  ancestry/genealogy contract and stores no genealogy of its own.
 - [ ] Prove either repository can be absent when no mounted dependent requires
   it, and prove a missing Inventory/Stock dependency fails composition.
 - [ ] Begin the vertical slices in

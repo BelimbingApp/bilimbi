@@ -36,7 +36,7 @@ Three facts constrain the design more than any feature request:
 - **Inventory / Stock** — owns the one global append-only Material Transaction ledger and Lot/Unit Genealogy over identified material units, locations, quantities, and balanced transactions, and works standalone without Manufacturing. A per-station ledger is only a filtered view of this ledger, never a second store of truth.
 - **Lot and unit identity** — durable identity for a bag, a roll, or a pack, with parent/child links across transforms so a finished pack traces back to an extruder run and to a recycle receipt.
 - **Receiving and weigh tickets** — supplier, vehicle, gross/tare/net, tied to the movement that creates the lot.
-- **Manufacturing / Production Operations** — operation definitions and executions for extrusion, cure, lamination, coating, slitting, cutting, packing, and other configured process families. The first implementation is the Production module, with `product_definition`, `process_definition`, `execution`, and `trace` as internal boundaries until a real selection need justifies separate modules.
+- **Manufacturing / Production Operations** — operation definitions and executions for extrusion, cure, lamination, coating, slitting, cutting, packing, and other configured process families. The first implementation is the Production module, with `product_definition`, `process_definition`, `execution`, and `trace` as internal boundaries until a real selection need justifies separate modules. `trace` holds only Manufacturing-side trace views, such as which run, step, and resource produced or consumed a lot, read from Stock's public ancestry contract; it stores no genealogy of its own.
 - **Cut planning and trim accounting** — matching measured roll widths to widths from the confirmed demand source, with offcut recorded as an explicit output.
 - **Capture surface** — printed labels and scanning, plus the small number of manual measurements that cannot be automated.
 - **Reconciliation reporting** — expected against actual per operation, execution, supplier, order or batch, resource, and location.
@@ -114,8 +114,11 @@ This also makes the plant's selling unit largely irrelevant to the ledger, which
 The Manufacturing / Production Operations Domain owns the common logic and
 public contracts for definitions, operations, and executions; it owns no
 ledger. Production is the first module; its internal boundaries are
-`product_definition`, `process_definition`, `execution`, and `trace`. Keep
-them internal until a real customer needs independent module selection or
+`product_definition`, `process_definition`, `execution`, and `trace`.
+`trace` holds only Manufacturing-side trace views, such as which run, step,
+and resource produced or consumed a lot; it reads Stock's public
+ancestry/genealogy contract and stores no genealogy of its own. Keep them
+internal until a real customer needs independent module selection or
 ownership. Inventory/Stock owns the one Material Transaction ledger and
 Lot/Unit Genealogy and works standalone. Its public posting contract accepts
 optional opaque context references for operation execution, order or batch,
@@ -259,7 +262,7 @@ Work proceeds on these unless corrected; each is recorded because being wrong ab
 - **Selling unit is unconfirmed, and no longer blocking.** Recording native quantity plus provenance, with mass as the reconciliation basis, means the plant's pricing unit does not decide the ledger's shape. It still needs confirming for pricing and packing.
 - **Site validation is outstanding.** Label survivability, where weighing actually happens on the floor, network coverage at each capture point, the real demand source, and the applicable certification requirements all need checking on site before Phases 3 to 6 are committed to.
 - **Extension boundary is intentionally unpopulated.** Plant variation is configuration and data first. Muar foam and SBG tape are the two grounding cases; AX integration, customer vocabulary, and SBG jumbo-roll costing are examples of later Extensions if their public-contract seams are needed.
-- **Stable names are now chosen.** The Domain is Manufacturing / Production Operations, with Production first and `product_definition`, `process_definition`, `execution`, and `trace` internal boundaries. Inventory/Stock owns the related stock capability, the Material Transaction ledger, and Lot/Unit Genealogy. Repository selection does not remove the cost of renaming stable module and OTP application identities later.
+- **Stable names are now chosen.** The Domain is Manufacturing / Production Operations, with Production first and `product_definition`, `process_definition`, `execution`, and `trace` internal boundaries, where `trace` is only Manufacturing-side views over Stock's public ancestry contract and stores no genealogy. Inventory/Stock owns the related stock capability, the Material Transaction ledger, and Lot/Unit Genealogy. Repository selection does not remove the cost of renaming stable module and OTP application identities later.
 - **AutoCard is assumed to be replaced, not integrated.** No import or synchronisation work is planned. If it must survive, an integration phase is added and Phase 2 changes shape.
 - **Interim manual process.** The plant has no system until the composition proof passes and Inventory/Stock's receiving slice is available. A paper or spreadsheet weigh-ticket and cut-yield discipline started now would both deliver value immediately and produce a data shape to validate Phases 2 and 4 against. This is a client-side decision recorded here so it is not lost.
 
