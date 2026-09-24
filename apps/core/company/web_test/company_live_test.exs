@@ -2281,6 +2281,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(view, "h1", "Bilimbi Industries — Departments")
       assert has_element?(view, "#company-departments-empty")
+      assert has_element?(view, "#company-departments-card[role='region']")
+      assert has_element?(view, "#company-departments-heading", "Departments")
 
       assert has_element?(
                view,
@@ -2611,6 +2613,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       assert has_element?(view, "h1", "Bilimbi Industries — Relationships")
       assert has_element?(view, "#company-relationships-empty")
+      assert has_element?(view, "#company-relationships-card[role='region']")
+      assert has_element?(view, "#company-relationships-heading", "Relationships")
 
       assert has_element?(
                view,
