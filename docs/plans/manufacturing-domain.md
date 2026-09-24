@@ -2,31 +2,45 @@
 
 **Status:** Proposed
 **Last Updated:** 2026-09-25
-**Sources:** `docs/architecture/0010_composition-model.md`;
-`docs/plans/domain-extension-layer-rollout.md`;
-`docs/plans/commerce-material-flow-ledger.md`;
-`AGENTS.md` §4, §6; material-flow scout report (2026-09-25), with the
-accepted decision to use a generic Manufacturing / Production Operations
-Domain; https://github.com/BelimbingApp/bilimbi/pull/800
+**Sources:**
+- `docs/architecture/0010_composition-model.md`
+- `docs/plans/domain-extension-layer-rollout.md`
+- `docs/plans/commerce-material-flow-ledger.md`
+- `AGENTS.md` §4, §6
+- Material-flow scout report (2026-09-25), with the accepted decision to use a
+  generic Manufacturing / Production Operations Domain
+- https://github.com/BelimbingApp/bilimbi/pull/800
+
 **Agents:** claude/claude-opus-5, amp/medium-sol, codex/gpt-5
 
 ## Problem Essence
 
-Bilimbi needs a reusable manufacturing capability without turning one
-customer's LDPE foam process into the product model. The boundary is currently
-unclear: stock, genealogy, process definitions, execution, configuration, and
-customer-specific behaviour risk becoming one bespoke implementation or a set
-of parallel ledgers that cannot reconcile.
+Building manufacturing around one customer's LDPE foam process would make
+that process the product model. Bilimbi has no agreed boundary between stock,
+production, configuration, and customer behaviour, so that outcome is the
+default.
+
+- Stock, genealogy, process definitions, execution, configuration, and
+  customer-specific behaviour have no declared owners.
+- Without one owner, each operation, order, or station tends to grow its own
+  ledger, and parallel ledgers cannot reconcile.
+- Customer rules written into shared code block the second target, SBG, from
+  reusing the same capability.
 
 ## Desired Outcome
 
-Inventory/Stock works as a standalone capability with one append-only Material
-Transaction ledger, Lot/Unit Genealogy, and units of measure. A generic
-Manufacturing / Production Operations Domain defines and executes configured
-processes through Stock's public contracts, while customer Extensions contain
-only behaviour that the common contracts and configuration cannot express.
-Mr Packaging Sdn Bhd's LDPE foam workflow and SBG's adhesive-tape workflow
-validate the model without becoming its hidden assumptions.
+Stock owns the material truth, a generic Domain owns production, and
+customer Extensions hold only what configuration cannot express. Each concern
+then has one owner, and a second customer reuses the same code.
+
+- Inventory/Stock works standalone with one append-only Material Transaction
+  ledger, Lot/Unit Genealogy, and units of measure.
+- A generic Manufacturing / Production Operations Domain defines and executes
+  configured processes through Stock's public contracts.
+- Customer Extensions contain only behaviour that the common contracts and
+  configuration cannot express.
+- Mr Packaging Sdn Bhd's LDPE foam workflow and SBG's adhesive-tape workflow
+  validate the model without becoming its hidden assumptions.
 
 ## Top-Level Components
 

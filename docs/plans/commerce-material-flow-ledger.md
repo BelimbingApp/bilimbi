@@ -2,32 +2,45 @@
 
 **Status:** Proposed customer requirements
 **Last Updated:** 2026-09-25
-**Sources:** Client meeting notes, Mr Packaging Sdn Bhd, Muar LDPE foam
-plant (2026-08-15); `docs/plans/manufacturing-domain.md`;
-`docs/plans/domain-extension-layer-rollout.md`;
-`docs/architecture/0010_composition-model.md`; `docs/PORTING_STAGES.md`
-(S5); `AGENTS.md` §4, §5, §6; Belimbing
-`app/Domains/Commerce/Inventory` (item master, 3 models); material-flow scout
-report (2026-09-25)
+**Sources:**
+- Client meeting notes, Mr Packaging Sdn Bhd, Muar LDPE foam plant
+  (2026-08-15)
+- `docs/plans/manufacturing-domain.md`
+- `docs/plans/domain-extension-layer-rollout.md`
+- `docs/architecture/0010_composition-model.md`
+- `docs/PORTING_STAGES.md` (S5)
+- `AGENTS.md` §4, §5, §6
+- Belimbing `app/Domains/Commerce/Inventory` (item master, 3 models)
+- Material-flow scout report (2026-09-25)
+
 **Agents:** claude/claude-opus-5, amp/medium-sol, codex/gpt-5
 
 ## Problem Essence
 
-Mr Packaging Sdn Bhd in Muar currently relies on manual records for its LDPE
-foam material flow. The records do not consistently connect supplier receipts,
-extrusion output, cure ageing, lamination, cutting, packing, and despatch, so
-short-weighting, loss, theft, and cutting waste cannot be distinguished by
-measured evidence.
+Mr Packaging Sdn Bhd in Muar cannot explain missing LDPE foam with measured
+evidence, because its manual records do not connect one material step to the
+next.
+
+- Supplier receipts, extrusion output, cure ageing, lamination, cutting,
+  packing, and despatch are not consistently connected in the records.
+- Short-weighting, loss, theft, and cutting waste cannot be distinguished by
+  measured evidence.
+- No record keeps a roll identifiable through the 7–10 day cure and the
+  conversion steps that follow.
 
 ## Desired Outcome
 
-Mr Packaging Sdn Bhd can record each material step with a practical capture
-flow, preserve the observed quantity and its provenance, and reconcile input,
-output, trim, waste, and stock by supplier, run, operation, location, and
-period. A roll remains identifiable through 7–10 days of cure and through
-lamination, cutting, packing, and despatch. The acceptance evidence describes
-what the customer can operate and verify; it does not claim that this plan
-alone satisfies ISO certification.
+Every material step is recorded as a measured fact with its provenance, so
+the customer can explain any gap between input and output.
+
+- Each material step has a practical capture flow that preserves the observed
+  quantity and its provenance.
+- Input, output, trim, waste, and stock reconcile by supplier, run, operation,
+  location, and period.
+- A roll remains identifiable through 7–10 days of cure and through
+  lamination, cutting, packing, and despatch.
+- The acceptance evidence describes what the customer can operate and verify;
+  it does not claim that this plan alone satisfies ISO certification.
 
 ## Top-Level Components
 

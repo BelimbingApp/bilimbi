@@ -40,13 +40,13 @@ Because plans may be implemented by different agents, leave an accurate handoff:
 
 **Title:** the filename/path (optional lone `#` matching it). No filler "Plan"/"Notes" sections.
 
-**Preamble** (substantive plans): **Status**, **Last Updated** (`YYYY-MM-DD`), **Sources** (issue numbers/URLs/ADRs/parent plans/paths, or `None`), **Agents** (`{agent}/{model}` contributors, kept current).
+**Preamble** (substantive plans): **Status**, **Last Updated** (`YYYY-MM-DD`), **Sources** (issue numbers/URLs/ADRs/parent plans/paths, or `None`; one bullet per source when there are more than two), **Agents** (`{agent}/{model}` contributors, kept current).
 
 Status describes current reality; it is not a permission gate. Keep it short and action-oriented, for example `Proposed`, `In progress`, `Complete`, or `Superseded`. When GitHub issues exist, include the issue numbers in **Sources** so the plan remains traceable to the executing work items.
 
 **Body** — use a section only when it has real content; flow intent → system → why → contract → execution; never open with low-level tasks:
-1. **Problem Essence** (required) — 1–2 sentences.
-2. **Desired Outcome** (required) — what "done" achieves.
+1. **Problem Essence** (required) — open with a plain 1–2 sentence verdict that says why it is a problem (for example "A runtime that updates itself is a bad idea."), then list the concrete problems as bullets. No hedged framing; state the claim, then the evidence.
+2. **Desired Outcome** (required) — open with a plain 1–2 sentence statement of what changes and why that is better, then list what "done" achieves as bullets.
 3. **Top-Level Components** — nameable responsibilities.
 4. **Design Decisions** — 2–3 real options, trade-offs, recommended direction, and why it wins under root `AGENTS.md`.
 5. **Public Contract** — surface/promises once clear.
