@@ -296,19 +296,34 @@ defmodule Bilimbi.Core.Company.Web.RelationshipsLive do
               navigate={~p"/companies/#{@company.id}"}
               title={"Back to #{Company.Summary.display_name(@company)}"}
             />
-            <.button
-              :if={@can_update?}
-              id="add-rel-btn"
-              phx-click="new"
-              variant="primary"
-              class="text-xs"
-            >
-              Add Relationship
-            </.button>
           </:actions>
         </.header>
 
-        <.card id="company-relationships-card" inner_class="p-0">
+        <.card
+          id="company-relationships-card"
+          class="mt-6"
+          inner_class="p-5 sm:p-6"
+          role="region"
+          aria-labelledby="company-relationships-heading"
+        >
+          <.section_heading
+            id="company-relationships-heading"
+            title="Relationships"
+            count={@relationships_count}
+          >
+            <:actions>
+              <.button
+                :if={@can_update?}
+                id="add-rel-btn"
+                phx-click="new"
+                variant="primary"
+                class="text-xs"
+              >
+                Add Relationship
+              </.button>
+            </:actions>
+          </.section_heading>
+
           <.table
             id="company-relationships"
             rows={@streams.relationships}

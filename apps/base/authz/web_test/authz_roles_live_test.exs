@@ -221,6 +221,11 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       assert has_element?(view, "h1", "Auditor")
       assert has_element?(view, "#role-back[href='/authz/roles'][title='Back to roles']", "Back")
       assert has_element?(view, "#role-summary", "Custom")
+      assert has_element?(view, "#role-details-heading", "Role Details")
+      assert has_element?(view, "#role-capabilities-card[role='region']")
+      assert has_element?(view, "#role-capabilities-heading", "Capabilities")
+      assert has_element?(view, "#role-principals-card[role='region']")
+      assert has_element?(view, "#role-principals-heading", "Principals")
       assert has_element?(view, "#role-principals")
       assert has_element?(view, "#role-principals-empty", "Nobody in this tenant holds this role")
     end

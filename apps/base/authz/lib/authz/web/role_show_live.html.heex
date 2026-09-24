@@ -10,7 +10,14 @@
       </:actions>
     </.header>
 
-    <div id="role-summary" class="mt-5 rounded-xl border border-line bg-surface p-4">
+    <.card
+      id="role-summary"
+      class="mt-6"
+      inner_class="p-5 sm:p-6"
+      role="region"
+      aria-labelledby="role-details-heading"
+    >
+      <.section_heading id="role-details-heading" title="Role Details" />
       <.list>
         <:item title="Scope">
           <.badge kind={scope_kind(@role)}>{scope_label(@role)}</.badge>
@@ -21,10 +28,16 @@
           {if @role.grant_all, do: "Yes", else: "No"}
         </:item>
       </.list>
-    </div>
+    </.card>
 
-    <section class="mt-5">
-      <h2 class="text-sm font-semibold text-ink-strong">Capabilities</h2>
+    <.card
+      id="role-capabilities-card"
+      class="mt-6"
+      inner_class="p-5 sm:p-6"
+      role="region"
+      aria-labelledby="role-capabilities-heading"
+    >
+      <.section_heading id="role-capabilities-heading" title="Capabilities" />
 
       <p :if={@role.grant_all} id="role-grant-all" class="mt-1 text-xs text-ink-subtle">
         This role grants every capability, including ones added by modules installed later.
@@ -50,32 +63,37 @@
       >
         This role grants no capabilities.
       </p>
-    </section>
+    </.card>
 
-    <section class="mt-5">
-      <h2 class="text-sm font-semibold text-ink-strong">Principals</h2>
+    <.card
+      id="role-principals-card"
+      class="mt-6"
+      inner_class="p-5 sm:p-6"
+      role="region"
+      aria-labelledby="role-principals-heading"
+    >
+      <.section_heading id="role-principals-heading" title="Principals" />
 
-      <div class="mt-2">
-        <.table
-          id="role-principals"
-          rows={@principal_roles}
-          row_id={&"principal-role-#{&1.id}"}
-          caption="Principals"
-        >
-          <:col :let={assignment} label="Type">
-            <.badge>{principal_label(assignment)}</.badge>
-          </:col>
-          <:col :let={assignment} label="Principal">
-            <span class="tabular-nums text-ink-muted">{assignment.principal_id}</span>
-          </:col>
-          <:col :let={assignment} label="Company">
-            <span class="tabular-nums text-ink-muted">{assignment.company_id || "—"}</span>
-          </:col>
-          <:empty :if={@principal_roles == []}>
-            Nobody in this tenant holds this role.
-          </:empty>
-        </.table>
-      </div>
-    </section>
+      <.table
+        id="role-principals"
+        rows={@principal_roles}
+        row_id={&"principal-role-#{&1.id}"}
+        caption="Principals"
+        framed={false}
+      >
+        <:col :let={assignment} label="Type">
+          <.badge>{principal_label(assignment)}</.badge>
+        </:col>
+        <:col :let={assignment} label="Principal">
+          <span class="tabular-nums text-ink-muted">{assignment.principal_id}</span>
+        </:col>
+        <:col :let={assignment} label="Company">
+          <span class="tabular-nums text-ink-muted">{assignment.company_id || "—"}</span>
+        </:col>
+        <:empty :if={@principal_roles == []}>
+          Nobody in this tenant holds this role.
+        </:empty>
+      </.table>
+    </.card>
   </.page>
 </Layouts.app>

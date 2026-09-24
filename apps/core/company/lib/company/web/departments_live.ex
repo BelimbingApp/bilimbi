@@ -428,19 +428,34 @@ defmodule Bilimbi.Core.Company.Web.DepartmentsLive do
               navigate={~p"/companies/#{@company.id}"}
               title={"Back to #{Company.Summary.display_name(@company)}"}
             />
-            <.button
-              :if={@can_update?}
-              id="add-dept-btn"
-              phx-click="new"
-              variant="primary"
-              class="text-xs"
-            >
-              Add Department
-            </.button>
           </:actions>
         </.header>
 
-        <.card id="company-departments-card" inner_class="p-0">
+        <.card
+          id="company-departments-card"
+          class="mt-6"
+          inner_class="p-5 sm:p-6"
+          role="region"
+          aria-labelledby="company-departments-heading"
+        >
+          <.section_heading
+            id="company-departments-heading"
+            title="Departments"
+            count={@departments_count}
+          >
+            <:actions>
+              <.button
+                :if={@can_update?}
+                id="add-dept-btn"
+                phx-click="new"
+                variant="primary"
+                class="text-xs"
+              >
+                Add Department
+              </.button>
+            </:actions>
+          </.section_heading>
+
           <.table
             id="company-departments"
             rows={@streams.departments}
