@@ -16,7 +16,8 @@ In **Design Decisions**: name 2–3 real options, weigh trade-offs plainly, then
 2. When asked, the agent records a coherent plan on an md file — recommendations and tradeoffs stated plainly, not questionnaires or "Decision Needed" dumps.
 3. On user reaction, describe the proposed revision in the md file (short prose, naming affected sections + follow-on edits). Exempt: trivial mechanical fixes the user already specified.
 4. **HALT** — wait for explicit approval before implementing.
-5. A plan is the parent record; the active task queue is one or more GitHub issues. Each issue is a logical grouping of phases and is the operative work item for an agent. Plans are not the execution unit unless no issue exists.
+5. **Never commit/push unless asked.** When asked, treat that approval as single-use and limited to the already-implemented changes currently under discussion; later work needs a fresh explicit commit/push instruction. Add the agent as co-author with the model used.
+6. A plan is the parent record; the active task queue is one or more GitHub issues. Each issue is a logical grouping of phases and is the operative work item for an agent. Plans are not the execution unit unless no issue exists.
 
 Session/tool-only plans are fine as scratch **only** if mirrored here. Anyone opening the plan should see design, current phase, done vs open (checkboxes), and what changed.
 
@@ -77,6 +78,8 @@ Write tasks as observable outcomes. Use stable anchors such as classes, methods,
 - No solution-first or feature-first plans before **Problem Essence** and **Desired Outcome**.
 - No observability-only sections duplicating this doc.
 - No plan kept only in session state unless explicitly asked.
+- No autopush/autocommit.
+- No treating a prior commit request as standing permission for later work.
 - No stale or contradictory content.
 - No prose-only **Phases** when steps are concrete — use checkboxes.
 - No code in the plan.
