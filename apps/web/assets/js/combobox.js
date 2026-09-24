@@ -2,10 +2,13 @@
 //
 // The server owns the hidden form value and the option vocabulary. This hook
 // owns only the transient query, open state and active option, so typing does
-// not cause a LiveView round trip or lose the caret. A choice is committed by
-// copying its value to the hidden input and dispatching a normal bubbling
-// change event; forms therefore keep their existing phx-change and submit
-// contracts.
+// not cause a LiveView round trip or lose the caret: the filter input's own
+// input and change events stop here, before an enclosing form's phx-change
+// hears them. A choice is committed by copying its value to the hidden input
+// and dispatching a normal bubbling change event; forms therefore keep their
+// existing phx-change and submit contracts. Typing highlights the first match,
+// and Enter while the list is open commits the highlighted option or, with
+// none, does nothing, so it never submits the form.
 const Combobox = {
   mounted() {
     this.input = this.el.querySelector('[role="combobox"]')
@@ -119,7 +122,13 @@ const Combobox = {
       }
     }
 
-    this.onInput = () => this.openList(false)
+    this.onInput = event => {
+      event.stopPropagation()
+      if (!this.open) this.setOpen(true)
+      this.activeIndex = 0
+      this.applyFilter()
+    }
+    this.onChange = event => event.stopPropagation()
     this.onFocus = () => this.openList(true)
     this.onKeyDown = event => {
       const filtered = this.filteredOptions()
@@ -135,10 +144,9 @@ const Combobox = {
             : (this.activeIndex + delta + filtered.length) % filtered.length
         this.renderActive()
       } else if (event.key === "Enter") {
-        const active = this.filteredOptions()[this.activeIndex]
-        if (this.open && active) {
+        if (this.open) {
           event.preventDefault()
-          this.commit(active)
+          this.commit(filtered[this.activeIndex])
         }
       } else if (event.key === "Escape") {
         if (this.open) {
@@ -194,6 +202,7 @@ const Combobox = {
     this.onClearMouseDown = event => event.preventDefault()
 
     this.input.addEventListener("input", this.onInput)
+    this.input.addEventListener("change", this.onChange)
     this.input.addEventListener("focus", this.onFocus)
     this.input.addEventListener("keydown", this.onKeyDown)
     this.el.addEventListener("focusout", this.onFocusOut)
@@ -208,11 +217,13 @@ const Combobox = {
     this.bindOptions()
     this.bindClear()
     if (!this.open) this.restore()
+    this.setOpen(this.open)
     this.applyFilter()
   },
 
   destroyed() {
     this.input.removeEventListener("input", this.onInput)
+    this.input.removeEventListener("change", this.onChange)
     this.input.removeEventListener("focus", this.onFocus)
     this.input.removeEventListener("keydown", this.onKeyDown)
     this.el.removeEventListener("focusout", this.onFocusOut)

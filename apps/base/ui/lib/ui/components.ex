@@ -743,6 +743,157 @@ defmodule Bilimbi.Base.UI.Components do
     """
   end
 
+  def input(%{type: "multi_select"} = assigns) do
+    {required, rest} = Map.pop(assigns.rest, :required, false)
+
+    # `placeholder` names the empty-selection summary here rather than an HTML
+    # attribute, and a button has none to render. An absent key lets
+    # `multi_select/1` merge its own declared default; a nil one replaces that
+    # default with nothing, so what the caller omitted is dropped outright.
+    {placeholder, rest} = Map.pop(rest, :placeholder)
+
+    {omitted, supplied} =
+      Enum.split_with(
+        [placeholder: placeholder, selection_label: assigns.selection_label],
+        fn {_key, value} -> is_nil(value) end
+      )
+
+    assigns
+    |> Map.drop(Keyword.keys(omitted))
+    |> assign(required: required == true, rest: rest)
+    |> assign(supplied)
+    |> multi_select()
+  end
+
+  def input(%{type: "textarea"} = assigns) do
+    ~H"""
+    <div class={@wrapper_class || "mb-4"}>
+      <label
+        :if={@label}
+        for={@id}
+        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
+      >
+        {@label}<span :if={@rest[:required]} aria-hidden="true">*</span>
+      </label>
+      <textarea
+        id={@id}
+        name={@name}
+        aria-invalid={@errors != [] && "true"}
+        aria-describedby={described_by(@id, @hint, @errors)}
+        class={
+          field_class(@class, @error_class, @errors, extra: "min-h-24", readonly: @rest[:readonly])
+        }
+        {@rest}
+      >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
+      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
+    </div>
+    """
+  end
+
+  # A secret whose caller asked for a reveal control. The toggle is a real
+  # button whose accessible name states the action and the current state.
+  #
+  # The input's own `type` is the only record of masked-or-shown, and the
+  # click is the single JS command that flips it. LiveView keeps that
+  # attribute sticky across patches, so a form re-render never silently
+  # re-masks a value the user chose to see. The button's accessible name,
+  # title and glyph are derived from `type` by the `SecretReveal` hook rather
+  # than swapped alongside it: LiveView applies an attribute op synchronously
+  # but defers a class op to a later animation frame, so toggling both at once
+  # could invert them -- two clicks inside one frame flipped `type` twice and
+  # the glyph once, leaving a masked input showing the "hide" eye with no path
+  # back. The hook also keeps a pointer press from pulling focus out of the
+  # input.
+  def input(%{type: "password", reveal: reveal} = assigns) when reveal not in [false, nil] do
+    subject = if is_binary(reveal), do: reveal, else: gettext("secret")
+    show_label = gettext("Show %{subject}, currently hidden", subject: subject)
+    hide_label = gettext("Hide %{subject}, currently shown", subject: subject)
+    show_title = gettext("Show %{subject}", subject: subject)
+    hide_title = gettext("Hide %{subject}", subject: subject)
+
+    assigns =
+      assigns
+      |> assign(:show_label, show_label)
+      |> assign(:hide_label, hide_label)
+      |> assign(:show_title, show_title)
+      |> assign(:hide_title, hide_title)
+      |> assign(:toggle, JS.toggle_attribute({"type", "text", "password"}, to: "##{assigns.id}"))
+
+    ~H"""
+    <div class={@wrapper_class || "mb-4"}>
+      <label
+        :if={@label}
+        for={@id}
+        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
+      >
+        {@label}
+      </label>
+      <div class="flex items-center">
+        <input
+          type="password"
+          name={@name}
+          id={@id}
+          value={Phoenix.HTML.Form.normalize_value(@type, @value)}
+          class={[field_class(@class, @error_class, @errors), "pr-10"]}
+          {@rest}
+        />
+        <button
+          id={"#{@id}-reveal"}
+          type="button"
+          phx-hook="SecretReveal"
+          phx-click={@toggle}
+          aria-label={@show_label}
+          aria-controls={@id}
+          title={@show_title}
+          data-show-label={@show_label}
+          data-hide-label={@hide_label}
+          data-show-title={@show_title}
+          data-hide-title={@hide_title}
+          disabled={@rest[:disabled]}
+          class="-ml-[1.875rem] grid size-6 shrink-0 place-items-center rounded-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:text-ink-faint"
+        >
+          <span id={"#{@id}-reveal-show"} class="grid">
+            <.icon name="reveal" class="size-4" />
+          </span>
+          <span id={"#{@id}-reveal-hide"} class="grid hidden">
+            <.icon name="conceal" class="size-4" />
+          </span>
+        </button>
+      </div>
+      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={msg <- @errors}>{msg}</.error>
+    </div>
+    """
+  end
+
+  # All other inputs text, datetime-local, url, password, etc. are handled here...
+  def input(assigns) do
+    ~H"""
+    <div class={@wrapper_class || "mb-4"}>
+      <label
+        :if={@label}
+        for={@id}
+        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
+      >
+        {@label}<span :if={@rest[:required]} aria-hidden="true">*</span>
+      </label>
+      <input
+        type={@type}
+        name={@name}
+        id={@id}
+        value={Phoenix.HTML.Form.normalize_value(@type, @value)}
+        aria-invalid={@errors != [] && "true"}
+        aria-describedby={described_by(@id, @hint, @errors)}
+        class={field_class(@class, @error_class, @errors, readonly: @rest[:readonly])}
+        {@rest}
+      />
+      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
+    </div>
+    """
+  end
+
   @doc """
   Renders a single-value combobox backed by a hidden form field.
 
@@ -910,157 +1061,6 @@ defmodule Bilimbi.Base.UI.Components do
         </div>
       </div>
 
-      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
-      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
-    </div>
-    """
-  end
-
-  def input(%{type: "multi_select"} = assigns) do
-    {required, rest} = Map.pop(assigns.rest, :required, false)
-
-    # `placeholder` names the empty-selection summary here rather than an HTML
-    # attribute, and a button has none to render. An absent key lets
-    # `multi_select/1` merge its own declared default; a nil one replaces that
-    # default with nothing, so what the caller omitted is dropped outright.
-    {placeholder, rest} = Map.pop(rest, :placeholder)
-
-    {omitted, supplied} =
-      Enum.split_with(
-        [placeholder: placeholder, selection_label: assigns.selection_label],
-        fn {_key, value} -> is_nil(value) end
-      )
-
-    assigns
-    |> Map.drop(Keyword.keys(omitted))
-    |> assign(required: required == true, rest: rest)
-    |> assign(supplied)
-    |> multi_select()
-  end
-
-  def input(%{type: "textarea"} = assigns) do
-    ~H"""
-    <div class={@wrapper_class || "mb-4"}>
-      <label
-        :if={@label}
-        for={@id}
-        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
-      >
-        {@label}<span :if={@rest[:required]} aria-hidden="true">*</span>
-      </label>
-      <textarea
-        id={@id}
-        name={@name}
-        aria-invalid={@errors != [] && "true"}
-        aria-describedby={described_by(@id, @hint, @errors)}
-        class={
-          field_class(@class, @error_class, @errors, extra: "min-h-24", readonly: @rest[:readonly])
-        }
-        {@rest}
-      >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
-      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
-      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
-    </div>
-    """
-  end
-
-  # A secret whose caller asked for a reveal control. The toggle is a real
-  # button whose accessible name states the action and the current state.
-  #
-  # The input's own `type` is the only record of masked-or-shown, and the
-  # click is the single JS command that flips it. LiveView keeps that
-  # attribute sticky across patches, so a form re-render never silently
-  # re-masks a value the user chose to see. The button's accessible name,
-  # title and glyph are derived from `type` by the `SecretReveal` hook rather
-  # than swapped alongside it: LiveView applies an attribute op synchronously
-  # but defers a class op to a later animation frame, so toggling both at once
-  # could invert them -- two clicks inside one frame flipped `type` twice and
-  # the glyph once, leaving a masked input showing the "hide" eye with no path
-  # back. The hook also keeps a pointer press from pulling focus out of the
-  # input.
-  def input(%{type: "password", reveal: reveal} = assigns) when reveal not in [false, nil] do
-    subject = if is_binary(reveal), do: reveal, else: gettext("secret")
-    show_label = gettext("Show %{subject}, currently hidden", subject: subject)
-    hide_label = gettext("Hide %{subject}, currently shown", subject: subject)
-    show_title = gettext("Show %{subject}", subject: subject)
-    hide_title = gettext("Hide %{subject}", subject: subject)
-
-    assigns =
-      assigns
-      |> assign(:show_label, show_label)
-      |> assign(:hide_label, hide_label)
-      |> assign(:show_title, show_title)
-      |> assign(:hide_title, hide_title)
-      |> assign(:toggle, JS.toggle_attribute({"type", "text", "password"}, to: "##{assigns.id}"))
-
-    ~H"""
-    <div class={@wrapper_class || "mb-4"}>
-      <label
-        :if={@label}
-        for={@id}
-        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
-      >
-        {@label}
-      </label>
-      <div class="flex items-center">
-        <input
-          type="password"
-          name={@name}
-          id={@id}
-          value={Phoenix.HTML.Form.normalize_value(@type, @value)}
-          class={[field_class(@class, @error_class, @errors), "pr-10"]}
-          {@rest}
-        />
-        <button
-          id={"#{@id}-reveal"}
-          type="button"
-          phx-hook="SecretReveal"
-          phx-click={@toggle}
-          aria-label={@show_label}
-          aria-controls={@id}
-          title={@show_title}
-          data-show-label={@show_label}
-          data-hide-label={@hide_label}
-          data-show-title={@show_title}
-          data-hide-title={@hide_title}
-          disabled={@rest[:disabled]}
-          class="-ml-[1.875rem] grid size-6 shrink-0 place-items-center rounded-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 disabled:cursor-not-allowed disabled:opacity-50 disabled:text-ink-faint"
-        >
-          <span id={"#{@id}-reveal-show"} class="grid">
-            <.icon name="reveal" class="size-4" />
-          </span>
-          <span id={"#{@id}-reveal-hide"} class="grid hidden">
-            <.icon name="conceal" class="size-4" />
-          </span>
-        </button>
-      </div>
-      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
-      <.error :for={msg <- @errors}>{msg}</.error>
-    </div>
-    """
-  end
-
-  # All other inputs text, datetime-local, url, password, etc. are handled here...
-  def input(assigns) do
-    ~H"""
-    <div class={@wrapper_class || "mb-4"}>
-      <label
-        :if={@label}
-        for={@id}
-        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
-      >
-        {@label}<span :if={@rest[:required]} aria-hidden="true">*</span>
-      </label>
-      <input
-        type={@type}
-        name={@name}
-        id={@id}
-        value={Phoenix.HTML.Form.normalize_value(@type, @value)}
-        aria-invalid={@errors != [] && "true"}
-        aria-describedby={described_by(@id, @hint, @errors)}
-        class={field_class(@class, @error_class, @errors, readonly: @rest[:readonly])}
-        {@rest}
-      />
       <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
       <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
     </div>
