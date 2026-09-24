@@ -288,6 +288,18 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
 
     assert has_element?(
              view,
+             "#component-stat-strip #design-library-stat-linked[href='/system/design-library/components']",
+             "People"
+           )
+
+    assert has_element?(
+             view,
+             "#component-stat-strip #design-library-stat-unlinked:not([href])",
+             "Durable"
+           )
+
+    assert has_element?(
+             view,
              "#design-library-list-boundary",
              "no loading, empty, or error state"
            )

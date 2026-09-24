@@ -754,36 +754,48 @@ defmodule BilimbiWeb.DashboardLive do
 
       <%= case @id do %>
         <% "base-dashboard-company-stats" -> %>
-          <.company_stat_card
+          <.stat_strip
             id="stat-companies"
-            count={@company_count}
-            active_count={@active_company_count}
-            current_code={@current_company && @current_company.code}
+            title="Companies"
             navigate={
               if !@layout_editing and UserAuth.allowed?(@current_scope, "admin.company.list"),
                 do: ~p"/companies"
             }
-          />
+          >
+            <:item label="Total" value={@company_count} />
+            <:item label="Active" value={@active_company_count} />
+            <:item
+              label="Current"
+              kind={:text}
+              value={(@current_company && @current_company.code) || "—"}
+            />
+          </.stat_strip>
         <% "base-dashboard-user-stats" -> %>
-          <.user_stat_card
+          <.stat_strip
             id="stat-users"
-            count={@user_count}
-            verified_count={@verified_user_count}
-            unverified_count={@unverified_user_count}
+            title="Users"
             navigate={
               if !@layout_editing and UserAuth.allowed?(@current_scope, "admin.user.list"),
                 do: ~p"/users"
             }
-          />
+          >
+            <:item label="Total" value={@user_count} />
+            <:item label="Verified" value={@verified_user_count} />
+            <:item label="Pending" value={@unverified_user_count} />
+          </.stat_strip>
         <% "base-dashboard-session-stats" -> %>
-          <.session_stat_card
+          <.stat_strip
             id="stat-sessions"
-            count={@session_count}
+            title="Sessions"
             navigate={
               if !@layout_editing and UserAuth.allowed?(@current_scope, "admin.system.session.list"),
                 do: "/system/sessions"
             }
-          />
+          >
+            <:item label="Open" value={@session_count} />
+            <:item label="Store" kind={:text} value="Durable" />
+            <:item label="Scope" kind={:text} value="Platform" />
+          </.stat_strip>
         <% "base-dashboard-recent-audit" -> %>
           <.audit_activity_card
             id="stat-recent-audit"
@@ -880,208 +892,6 @@ defmodule BilimbiWeb.DashboardLive do
           <p class="mt-1 text-sm font-semibold tabular-nums text-ink-strong">
             {performance_samples(@diagnostics)}
           </p>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
-  attr(:id, :string, required: true)
-  attr(:count, :integer, required: true)
-  attr(:active_count, :integer, required: true)
-  attr(:current_code, :string, default: nil)
-  attr(:navigate, :string, default: nil)
-
-  defp company_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
-    ~H"""
-    <.link
-      navigate={@navigate}
-      id={@id}
-      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
-    >
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
-          Companies
-        </p>
-        <.action_arrow_icon />
-      </div>
-      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
-        <div class="pr-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Total</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
-        </div>
-        <div class="px-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Active</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@active_count}</p>
-        </div>
-        <div class="pl-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Current</p>
-          <p class="mt-1 truncate text-sm font-semibold text-ink-strong">{@current_code || "—"}</p>
-        </div>
-      </div>
-    </.link>
-    """
-  end
-
-  defp company_stat_card(assigns) do
-    ~H"""
-    <div
-      id={@id}
-      class="rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03]"
-    >
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
-          Companies
-        </p>
-      </div>
-      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
-        <div class="pr-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Total</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
-        </div>
-        <div class="px-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Active</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@active_count}</p>
-        </div>
-        <div class="pl-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Current</p>
-          <p class="mt-1 truncate text-sm font-semibold text-ink-strong">{@current_code || "—"}</p>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
-  attr(:id, :string, required: true)
-  attr(:count, :integer, required: true)
-  attr(:verified_count, :integer, required: true)
-  attr(:unverified_count, :integer, required: true)
-  attr(:navigate, :string, default: nil)
-
-  defp user_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
-    ~H"""
-    <.link
-      navigate={@navigate}
-      id={@id}
-      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
-    >
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">Users</p>
-        <.action_arrow_icon />
-      </div>
-      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
-        <div class="pr-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Total</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
-        </div>
-        <div class="px-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Verified</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">
-            {@verified_count}
-          </p>
-        </div>
-        <div class="pl-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Pending</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">
-            {@unverified_count}
-          </p>
-        </div>
-      </div>
-    </.link>
-    """
-  end
-
-  defp user_stat_card(assigns) do
-    ~H"""
-    <div
-      id={@id}
-      class="rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03]"
-    >
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">Users</p>
-      </div>
-      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
-        <div class="pr-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Total</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
-        </div>
-        <div class="px-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Verified</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">
-            {@verified_count}
-          </p>
-        </div>
-        <div class="pl-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Pending</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">
-            {@unverified_count}
-          </p>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
-  attr(:id, :string, required: true)
-  attr(:count, :integer, required: true)
-  attr(:navigate, :string, default: nil)
-
-  # The sessions screen is contributed by Base Session and injected through
-  # discovered routes, so its href is a plain string rather than a `~p` route.
-  defp session_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
-    ~H"""
-    <.link
-      navigate={@navigate}
-      id={@id}
-      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
-    >
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
-          Sessions
-        </p>
-        <.action_arrow_icon />
-      </div>
-      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
-        <div class="pr-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Open</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
-        </div>
-        <div class="px-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Store</p>
-          <p class="mt-1 text-sm font-semibold text-ink-strong">Durable</p>
-        </div>
-        <div class="pl-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Scope</p>
-          <p class="mt-1 text-sm font-semibold text-ink-strong">Platform</p>
-        </div>
-      </div>
-    </.link>
-    """
-  end
-
-  defp session_stat_card(assigns) do
-    ~H"""
-    <div
-      id={@id}
-      class="rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03]"
-    >
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
-          Sessions
-        </p>
-      </div>
-      <div class="mt-2.5 grid grid-cols-3 divide-x divide-line">
-        <div class="pr-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Open</p>
-          <p class="mt-1 text-xl font-semibold tabular-nums text-ink-strong">{@count}</p>
-        </div>
-        <div class="px-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Store</p>
-          <p class="mt-1 text-sm font-semibold text-ink-strong">Durable</p>
-        </div>
-        <div class="pl-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Scope</p>
-          <p class="mt-1 text-sm font-semibold text-ink-strong">Platform</p>
         </div>
       </div>
     </div>

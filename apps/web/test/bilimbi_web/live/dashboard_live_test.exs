@@ -89,6 +89,10 @@ defmodule BilimbiWeb.DashboardLiveTest do
 
     assert has_element?(view, "#stat-companies", "1")
     assert has_element?(view, "#stat-users", "1")
+    assert has_element?(view, "#stat-companies-item-2")
+    refute has_element?(view, "#stat-companies-item-3")
+    assert has_element?(view, "#stat-users-item-2")
+    refute has_element?(view, "#stat-users-item-3")
 
     assert has_element?(
              view,

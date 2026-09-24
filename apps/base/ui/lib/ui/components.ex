@@ -330,6 +330,101 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Renders a compact strip of related statistics.
+
+  A stat strip is a small dashboard surface: its title identifies the subject
+  and each item supplies one label and value. Passing `navigate` makes the
+  whole strip a quiet destination link; omitting it keeps the same surface
+  readable when the viewer cannot open the related workflow.
+
+  Numeric values use the larger tabular treatment by default. Pass
+  `kind={:text}` for a textual value such as a storage or scope description.
+
+  ## Examples
+
+      <.stat_strip id="company-stats" title="Companies" navigate={~p"/companies"}>
+        <:item label="Total" value={@company_count} />
+        <:item label="Active" value={@active_count} />
+        <:item label="Current" kind={:text} value={@current_code || "—"} />
+      </.stat_strip>
+  """
+  attr(:id, :string, required: true)
+  attr(:title, :string, required: true)
+  attr(:navigate, :string, default: nil)
+
+  slot :item, required: true do
+    attr(:label, :string, required: true)
+    attr(:value, :any, required: true)
+    attr(:kind, :atom, values: [:number, :text])
+  end
+
+  def stat_strip(assigns) do
+    assigns = assign(assigns, :linked?, is_binary(assigns.navigate))
+
+    ~H"""
+    <.link
+      :if={@linked?}
+      navigate={@navigate}
+      id={@id}
+      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
+    >
+      <.stat_strip_content id={@id} title={@title} items={@item} linked={@linked?} />
+    </.link>
+    <div
+      :if={!@linked?}
+      id={@id}
+      class="rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03]"
+    >
+      <.stat_strip_content id={@id} title={@title} items={@item} linked={@linked?} />
+    </div>
+    """
+  end
+
+  defp stat_strip_content(assigns) do
+    assigns = assign(assigns, :item_count, length(assigns.items))
+
+    ~H"""
+    <div class="flex items-center justify-between gap-3">
+      <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
+        {@title}
+      </p>
+      <.icon
+        :if={@linked}
+        name="forward"
+        class="size-4 shrink-0 text-brand-strong transition group-hover:translate-x-0.5"
+      />
+    </div>
+    <div class={["mt-2.5 grid divide-x divide-line", stat_strip_columns(@item_count)]}>
+      <div
+        :for={{item, index} <- Enum.with_index(@items)}
+        id={"#{@id}-item-#{index}"}
+        class={["min-w-0", stat_strip_cell(index, @item_count)]}
+      >
+        <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">{item.label}</p>
+        <p class={[
+          "mt-1 font-semibold text-ink-strong",
+          stat_strip_value_class(Map.get(item, :kind, :number))
+        ]}>
+          {item.value}
+        </p>
+      </div>
+    </div>
+    """
+  end
+
+  defp stat_strip_columns(1), do: "grid-cols-1"
+  defp stat_strip_columns(2), do: "grid-cols-2"
+  defp stat_strip_columns(_count), do: "grid-cols-3"
+
+  defp stat_strip_cell(0, 1), do: "px-0"
+  defp stat_strip_cell(0, count) when count > 1, do: "pr-3"
+  defp stat_strip_cell(index, count) when index == count - 1, do: "pl-3"
+  defp stat_strip_cell(_index, _count), do: "px-3"
+
+  defp stat_strip_value_class(:text), do: "truncate text-sm"
+  defp stat_strip_value_class(_kind), do: "text-xl tabular-nums"
+
+  @doc """
   Renders a button with navigation support.
 
   ## Examples
