@@ -2964,7 +2964,7 @@ defmodule Bilimbi.Base.UI.Components do
   request rather than navigating — Impersonate on `/users/:id`, a `POST` —
   passes `href` and `method` in place of `navigate`; the treatment is the
   same, so the header reads as one labelled row (History, Impersonate,
-  Back) with no button among them.
+  Back) whose only button is History's disclosure.
 
   The surface is closed: `id`, `icon` and `title` are required, exactly one
   of `navigate` or `href` names the destination, and there is nothing else,
