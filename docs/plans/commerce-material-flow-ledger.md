@@ -70,13 +70,15 @@ ledger”, and similar screens are filtered views grouped by execution, location
 order or batch, and resource. They must not create parallel balances or
 genealogy.
 
-Variation is layered deliberately: plant differences are configuration and
-data first — process families, route templates, units of measure, conversion
-bases, tolerances, and output roles. An Extension is for customer-specific
-behaviour that consumes public Domain contracts, such as AX integration,
-customer vocabulary, or SBG's proprietary jumbo-roll costing. The Muar foam
-plant uses the common Production logic with foam process-family and route
-configuration; SBG uses the same logic with adhesive-tape, coating, and
+There are two code layers. The **Manufacturing / Production Operations
+Domain** holds common, industry-neutral logic plus the configuration it owns;
+plants fill that configuration as data — process families, route templates,
+units of measure, conversion bases, tolerances, and output roles. **Extensions**
+hold customer-specific behaviour that consumes public Domain contracts, such
+as AX integration, customer vocabulary, or SBG's proprietary jumbo-roll
+costing. Configuration is data inside the Domain, not a third code layer. The
+Muar foam plant uses the common Production logic with foam process-family and
+route configuration; SBG uses the same logic with adhesive-tape, coating, and
 slitting configuration. No customer-specific calculation is pushed into the
 common Domain merely because two plants both manufacture.
 
