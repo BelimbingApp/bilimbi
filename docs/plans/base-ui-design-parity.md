@@ -249,7 +249,9 @@ products were read and the plan forbids treating existence as acceptance.
 - **DAT-05** — "Missing" is wrong. Five stat cards ship on `/dashboard`, duplicated
   into ten markup blocks with 65 arbitrary-value classes.
 - **DAT-04** — relative time already ships in notifications, in a bare `<span>` with
-  no `<time>`, no `datetime` and no `title`, frozen at render.
+  no `<time>`, no `datetime` and no `title`, frozen at render. It has since been
+  replaced: `/notifications` and the `/users` Created column render through
+  `<.datetime>`, absolute as Belimbing shows them, so no relative time ships.
 - **INT-03** — "Missing" is wrong. Bilimbi runs it in ten production LiveViews and
   Belimbing has no component either.
 - **INP-03** — Belimbing *removes* the native clear affordance Bilimbi keeps; there is
