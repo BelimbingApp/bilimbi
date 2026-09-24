@@ -269,12 +269,10 @@ products were read and the plan forbids treating existence as acceptance.
   disclosure primitive inherits it instead of defining its own.
 - **NAV-01** — "reorder" in the target has no observed counterpart in Belimbing's
   navigation; pin-to-top covers the keep-favourites-handy need on both sides (Lane A).
-  Dropped from parity acceptance rather than built to. Bilimbi does ship pinned drag
-  reordering in the shell today — mouse-only, and saved to `localStorage` like the pins
-  themselves. That order is account state: the pin drift recorded below leaves it in
-  the browser, and the steward decision above makes `user_pins` the sole store, so
-  `sort_order` and `reorder_user_pins/2` stay in scope when pins are wired. The
-  mouse-only limitation is recorded below as a defect, not adopted here as a target.
+  Dropped from parity acceptance rather than built to. Bilimbi does ship pinned
+  reordering in the shell: drag, plus Move up and Move down buttons for keyboard
+  users. That order is account state, saved through `user_pins.sort_order` and
+  `reorder_user_pins/2` like the pins themselves.
 - **ACT-01** — "basics" understates what ships: disabled, navigation-as-button and an
   in-flight `Working…` primary already render on the Design Library (Lane B), and a
   `busy` state that spins and announces `aria-busy` now ships beside them. The open
@@ -321,10 +319,14 @@ lost inside a design ledger:
   `/api/pins/toggle|reorder`, `User.toggle_user_pin/reorder_user_pins` and the
   `user_pins` table exist, and `app_shell.js` calls that API zero times while using
   `localStorage` ten times. Pins do not follow the account.
+  Resolved: the shell loads pins from `GET /api/pins` and writes through
+  `/api/pins/toggle|reorder`. It imports legacy browser navigation pins once and
+  drops legacy record pins.
 - Pinned reordering is mouse-only. `app_shell.js` wires HTML5 drag events on
   `[data-pinned-item]` with no keyboard or pointer-free equivalent, and the grip
   advertising it is `aria-hidden`, so keyboard and assistive-technology users cannot
   reorder pins at all.
+  Resolved: each pinned item has Move up and Move down buttons.
 - `<.header>` never stacks; its actions are clipped and unreachable at 420px, where
   Belimbing's header wraps.
 - `:info` flashes render with success (green) roles.
