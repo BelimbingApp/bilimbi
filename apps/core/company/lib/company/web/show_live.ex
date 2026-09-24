@@ -1636,12 +1636,13 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     assigns =
       assigns
       |> assign(:label, fact_label(assigns.name))
+      |> assign(:current, to_string(assigns.value || ""))
 
     ~H"""
     <.inline_choice
       id={@id}
       field={@name}
-      label={@label}
+      label={"Edit #{String.downcase(@label)}"}
       editing={@editing?}
       editable?={@can_update?}
       status={@status}

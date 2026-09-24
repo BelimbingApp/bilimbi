@@ -659,7 +659,7 @@
                   <p class="mb-2 text-xs text-ink-muted">Editing and cancel</p>
                   <.inline_choice id="design-library-inline-choice-edit" field="status" label="Edit status" editing editable? status={nil}>
                     <:display><span class="text-ink">Active</span></:display>
-                    <:editor><select aria-label="Status" phx-blur="cancel_edit_field"><option>Active</option><option>Pending</option></select></:editor>
+                    <:editor><select id="design-library-inline-choice-edit-select" aria-label="Status" phx-blur="cancel_edit_field"><option>Active</option><option>Pending</option></select></:editor>
                   </.inline_choice>
                 </div>
                 <div>

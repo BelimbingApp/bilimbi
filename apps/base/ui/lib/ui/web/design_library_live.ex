@@ -228,6 +228,9 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
     {:noreply, put_flash(socket, :info, gettext("Inline edit cancelled."))}
   end
 
+  def handle_event("edit_field", _params, socket), do: {:noreply, socket}
+  def handle_event("cancel_edit_field", _params, socket), do: {:noreply, socket}
+
   def handle_event("preview-company", %{"id" => id}, socket) do
     case Enum.find(@sample_rows, &(Integer.to_string(&1.id) == id)) do
       nil ->

@@ -2962,8 +2962,6 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:editing, :boolean, required: true)
   attr(:editable?, :boolean, required: true)
   attr(:status, :any, required: true)
-  attr(:edit_event, :string, default: "edit_field")
-  attr(:cancel_event, :string, default: "cancel_edit_field")
   attr(:status_id, :string, default: nil)
 
   slot(:display, required: true)
@@ -2972,7 +2970,7 @@ defmodule Bilimbi.Base.UI.Components do
   def inline_choice(assigns) do
     assigns =
       assigns
-      |> assign_new(:status_id, fn -> "#{assigns.id}-status" end)
+      |> assign(:status_id, assigns.status_id || "#{assigns.id}-status")
       |> assign(:status, normalize_commit_status(assigns.status))
 
     ~H"""
@@ -2980,7 +2978,7 @@ defmodule Bilimbi.Base.UI.Components do
       :if={@editable? and not @editing}
       type="button"
       id={"#{@id}-display"}
-      phx-click={@edit_event}
+      phx-click="edit_field"
       phx-value-field={@field}
       aria-label={@label}
       aria-describedby={@status && @status_id}
@@ -2998,7 +2996,7 @@ defmodule Bilimbi.Base.UI.Components do
          when focus leaves the control. --%>
     <div
       :if={@editable? and @editing}
-      phx-window-keydown={@cancel_event}
+      phx-window-keydown="cancel_edit_field"
       phx-key="Escape"
     >
       {render_slot(@editor)}
