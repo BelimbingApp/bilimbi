@@ -123,6 +123,18 @@ and never reach into Product Definition, Routing, Execution, or ledger
 internals. This gives one high-level abstraction with common logic while
 keeping customization out of the common model.
 
+### Configuration ownership
+
+Configuration is not a Domain of its own. Each Domain owns the meaning of its
+configuration: Manufacturing owns process families, route templates,
+operations, output roles, and process parameters (the Blueprint/Route
+definitions); Inventory owns items, locations, and lot rules. The generic
+per-company settings mechanism remains in Base Settings
+(`apps/base/settings`), while shared units of measure are an Inventory (or
+Base) concern rather than a Manufacturing concern. Extensions may consume
+both Domain contracts and Base Settings, but do not turn configuration into a
+parallel business layer.
+
 ### Capture mechanism
 
 **Option A — barcode labels and handheld scanners.** Cheap, printable on site, replaceable when damaged, and every touchpoint here already has a person handling one unit at a time.
