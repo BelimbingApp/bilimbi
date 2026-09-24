@@ -183,7 +183,7 @@ Phase 1 is a vertical slice deliberately narrower than the substrate beneath it.
 
 Goal: a receiving clerk records an arriving lorry in one screen, and a supplier's history of declared against measured weight is visible without further work.
 
-- [ ] Port Belimbing's canonical item master into the stock module, preserving
+- [ ] Port Belimbing's canonical item master into the Inventory/Stock module, preserving
   its schema under `AGENTS.md` §5.
 - [ ] Establish durable receiving and warehouse locations used by receipts and stock positions.
 - [ ] Record weigh tickets with supplier, vehicle, gross, tare, and net.
@@ -211,7 +211,7 @@ Goal: any step's input and output can be recorded as one balanced transaction, a
 
 Validation: tenant boundary, append-only enforcement, ancestry traversal, and double-consumption tests; `mix precommit` green.
 
-### Phase 3 — Roll identity, extrusion, and the process module
+### Phase 3 — Roll identity, extrusion, and the Production module
 
 Goal: every roll leaving an extruder carries a scannable label recording its measured width, thickness, and production date, and that label still resolves after ten days in cure.
 
