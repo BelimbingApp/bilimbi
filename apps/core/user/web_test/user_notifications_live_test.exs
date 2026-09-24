@@ -7,9 +7,14 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.DateTime, as: DateTimePolicy
+  alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
+  alias Ecto.Adapters.SQL
 
   setup do
     UserFixtures.create_user_tables!()
@@ -70,6 +75,40 @@ defmodule BilimbiWeb.UserNotificationsLiveTest do
     assert has_element?(view, "#mark-read-#{n1.id}")
     assert render(view) =~ "Welcome aboard"
     assert render(view) =~ "Your profile has been created."
+  end
+
+  test "renders each notification's created time through the shared datetime", %{
+    conn: conn,
+    scope: scope
+  } do
+    {:ok, note} = User.send_notification(scope, 91, %{title: "Clocked update"})
+    created_at = ~N[2026-08-18 10:00:00]
+
+    SQL.query!(Repo, "UPDATE notifications SET created_at = $1 WHERE id = $2", [
+      created_at,
+      Ecto.UUID.dump!(note.id)
+    ])
+
+    :ok =
+      Settings.put("localization.timezone", "Asia/Kuala_Lumpur", SettingsScope.company(73, 41))
+      |> case do
+        {:ok, _value} -> :ok
+        other -> other
+      end
+
+    {:ok, :company} = DateTimePolicy.put_mode(SettingsScope.user(91, 73, 41), "company")
+
+    {:ok, view, html} = open(conn)
+
+    assert has_element?(
+             view,
+             ~s(time#notification-created-#{note.id}[datetime="2026-08-18T10:00:00Z"][data-follow-shell="true"][phx-hook="DateTime"][data-text-company="18/08/2026, 18:00 +08"][data-text-utc="18/08/2026, 10:00 UTC"]),
+             "18/08/2026, 18:00 +08"
+           )
+
+    refute html =~ "m ago"
+    refute html =~ "Just now"
+    refute html =~ "ago"
   end
 
   test "renders a row whose stored icon name is a legacy Belimbing one", %{

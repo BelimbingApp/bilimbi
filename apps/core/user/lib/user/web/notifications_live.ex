@@ -254,31 +254,4 @@ defmodule Bilimbi.Core.User.Web.NotificationsLive do
     int = parse_pos_integer(val, default)
     if int in @allowed_per_page, do: int, else: default
   end
-
-  def format_relative_time(nil), do: ""
-
-  def format_relative_time(%NaiveDateTime{} = dt) do
-    now = NaiveDateTime.utc_now()
-    diff_seconds = NaiveDateTime.diff(now, dt)
-
-    cond do
-      diff_seconds < 60 ->
-        "Just now"
-
-      diff_seconds < 3600 ->
-        minutes = div(diff_seconds, 60)
-        "#{minutes}m ago"
-
-      diff_seconds < 86_400 ->
-        hours = div(diff_seconds, 3600)
-        "#{hours}h ago"
-
-      diff_seconds < 604_800 ->
-        days = div(diff_seconds, 86_400)
-        "#{days}d ago"
-
-      true ->
-        Calendar.strftime(dt, "%b %d, %Y")
-    end
-  end
 end

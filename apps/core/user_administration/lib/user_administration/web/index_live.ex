@@ -337,7 +337,4 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
   end
 
   defp initials(_name), do: "?"
-
-  defp format_created(%NaiveDateTime{} = value), do: Calendar.strftime(value, "%Y-%m-%d")
-  defp format_created(_value), do: "—"
 end

@@ -4,10 +4,15 @@ defmodule BilimbiWeb.UserLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.DateTime, as: DateTimePolicy
+  alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
   alias Bilimbi.Core.UserAdministration.Web.IndexLive
+  alias Ecto.Adapters.SQL
 
   setup do
     UserFixtures.create_user_tables!()
@@ -89,6 +94,35 @@ defmodule BilimbiWeb.UserLiveTest do
     assert has_element?(view, "#user-92", "Archived Company")
     assert has_element?(view, "#user-92", "archived")
     assert has_element?(view, "#user-92-impersonate[disabled]")
+  end
+
+  test "renders each user's created time through the shared datetime", %{conn: conn} do
+    insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
+
+    SQL.query!(Repo, "UPDATE users SET created_at = $1 WHERE id = $2", [
+      ~N[2026-08-18 10:00:00],
+      91
+    ])
+
+    :ok =
+      Settings.put("localization.timezone", "Asia/Kuala_Lumpur", SettingsScope.company(73, 41))
+      |> case do
+        {:ok, _value} -> :ok
+        other -> other
+      end
+
+    {:ok, :company} = DateTimePolicy.put_mode(SettingsScope.user(91, 73, 41), "company")
+    grant_capabilities!("admin.user.list")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
+
+    assert has_element?(
+             view,
+             ~s(time#user-created-91[datetime="2026-08-18T10:00:00Z"][data-follow-shell="true"][phx-hook="DateTime"][data-text-company="18/08/2026, 18:00 +08"][data-text-utc="18/08/2026, 10:00 UTC"]),
+             "18/08/2026, 18:00 +08"
+           )
+
+    refute has_element?(view, "#user-created-91", "2026-08-18")
   end
 
   test "gates create, view, and impersonate controls by existing capabilities", %{conn: conn} do

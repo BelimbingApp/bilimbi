@@ -133,9 +133,11 @@
               ]}>
                 {Bilimbi.Core.User.Notification.title(notification)}
               </p>
-              <span class="text-[11px] text-ink-faint tabular-nums shrink-0">
-                {format_relative_time(notification.created_at)}
-              </span>
+              <.datetime
+                id={"notification-created-#{notification.id}"}
+                value={notification.created_at}
+                class="text-[11px] text-ink-faint shrink-0"
+              />
             </div>
 
             <p
