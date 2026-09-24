@@ -58,7 +58,7 @@ defmodule BilimbiWeb.SessionsLiveTest do
     refute has_element?(view, "#sessions-terminate-guest-row")
 
     view
-    |> form("#sessions-search", filters: %{search: "no-such-agent-xyz"})
+    |> form("#sessions-filters", filters: %{search: "no-such-agent-xyz"})
     |> render_change()
 
     assert has_element?(view, "#sessions-empty", "No sessions found.")
@@ -91,6 +91,69 @@ defmodule BilimbiWeb.SessionsLiveTest do
 
     view |> element("#sessions-sort-ip_address") |> render_click()
     assert %{"sort" => "ip_address", "dir" => "desc"} = patched_params(view)
+  end
+
+  test "toolbar search round-trips through the URL", %{conn: conn} do
+    grant_capabilities!("admin.system.session.list")
+    now = System.system_time(:second)
+
+    {:ok, _} =
+      Session.put_session("toolbar-match", "{}", %{
+        ip_address: "198.51.100.8",
+        user_agent: "ToolbarMatch/1.0",
+        last_activity: now
+      })
+
+    {:ok, _} =
+      Session.put_session("toolbar-other", "{}", %{
+        ip_address: "203.0.113.9",
+        user_agent: "ToolbarOther/1.0",
+        last_activity: now - 1
+      })
+
+    conn = log_in_as(conn)
+    {:ok, view, _html} = live(conn, ~p"/system/sessions")
+
+    # The shared toolbar sends the same search a URL visit would carry.
+    view
+    |> form("#sessions-filters", filters: %{search: "ToolbarMatch"})
+    |> render_change()
+
+    assert_patch(view, ~p"/system/sessions?search=ToolbarMatch")
+    assert has_element?(view, "#sessions td", "ToolbarMatch/1.0")
+    refute has_element?(view, "#sessions td", "ToolbarOther/1.0")
+    assert has_element?(view, "#sessions-search[value='ToolbarMatch']")
+
+    # The patched URL reloads to the same rows with the toolbar state retained.
+    {:ok, reloaded, _html} = live(conn, ~p"/system/sessions?search=ToolbarMatch")
+    assert has_element?(reloaded, "#sessions td", "ToolbarMatch/1.0")
+    refute has_element?(reloaded, "#sessions td", "ToolbarOther/1.0")
+    assert has_element?(reloaded, "#sessions-search[value='ToolbarMatch']")
+
+    # An address query uses the same URL key and the same search box.
+    {:ok, by_address, _html} = live(conn, ~p"/system/sessions?search=203.0.113.9")
+    assert has_element?(by_address, "#sessions td", "ToolbarOther/1.0")
+    refute has_element?(by_address, "#sessions td", "ToolbarMatch/1.0")
+    assert has_element?(by_address, "#sessions-search[value='203.0.113.9']")
+
+    # Clearing the box returns to the unfiltered list.
+    by_address
+    |> form("#sessions-filters", filters: %{search: ""})
+    |> render_change()
+
+    assert_patch(by_address, ~p"/system/sessions")
+    assert has_element?(by_address, "#sessions td", "ToolbarMatch/1.0")
+    assert has_element?(by_address, "#sessions td", "ToolbarOther/1.0")
+
+    # Page size stays on the shared pagination control and the same URL state.
+    by_address
+    |> form("#sessions-pagination-page-size-form", filters: %{perPage: "50"})
+    |> render_change()
+
+    assert_patch(by_address, ~p"/system/sessions?per_page=50")
+
+    {:ok, sized, _html} = live(conn, ~p"/system/sessions?per_page=50")
+    assert has_element?(sized, "#sessions-pagination-page-size option[value='50'][selected]")
   end
 
   # The hybrid's other half. A join would name every row; the directory resolves
