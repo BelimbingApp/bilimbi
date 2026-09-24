@@ -926,6 +926,10 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
       unless is_atom(controller) and not is_nil(controller) do
         raise ArgumentError, "route controller must be a module atom"
       end
+
+      unless is_atom(Map.get(route, :action)) and not is_nil(Map.get(route, :action)) do
+        raise ArgumentError, "route action must be an atom when a controller is declared"
+      end
     end
 
     Map.put(route, :source, source)

@@ -12,6 +12,14 @@
     capability: "admin.system.design-library.view"
   },
   %{
+    path: "/system/design-library/components/specimen-request",
+    verb: :post,
+    controller: Bilimbi.Base.UI.Web.DesignLibrarySpecimenController,
+    action: :create,
+    session: :auth,
+    capability: "admin.system.design-library.view"
+  },
+  %{
     path: "/system/design-library/design-spec",
     live: Bilimbi.Base.UI.Web.DesignLibraryDesignSpecLive,
     session: :auth,

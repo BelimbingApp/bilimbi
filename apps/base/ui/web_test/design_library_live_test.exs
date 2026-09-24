@@ -344,12 +344,28 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
 
     assert has_element?(
              view,
-             "#design-library-action-link-submit[href='/admin/impersonate/leave'][data-method='post']",
-             "Stop viewing as another user"
+             "#design-library-action-link-submit[href='/system/design-library/components/specimen-request'][data-method='post']",
+             "Impersonate"
            )
 
     assert has_element?(view, "#design-library-date-time-second", "14:30:00")
     refute has_element?(view, "#design-library-date-time", "14:30:00")
+  end
+
+  test "the submitting action link specimen's request changes nothing and returns", %{
+    conn: conn
+  } do
+    path = "/system/design-library/components/specimen-request"
+
+    assert conn |> log_in_as() |> post(path) |> redirected_to() == "/dashboard"
+
+    grant_capabilities!(@view_cap)
+    conn = conn |> log_in_as() |> post(path)
+
+    assert redirected_to(conn) == "/system/design-library/components"
+
+    assert Phoenix.Flash.get(conn.assigns.flash, :info) ==
+             "The action link sent its request. Nothing changed."
   end
 
   test "Components input examples update their visible state", %{conn: conn} do

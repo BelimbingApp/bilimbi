@@ -716,15 +716,15 @@
                   <.action_link
                     id="design-library-action-link-submit"
                     icon="bilimbi-impersonate"
-                    href={~p"/admin/impersonate/leave"}
+                    href={~p"/system/design-library/components/specimen-request"}
                     method="post"
-                    title="Stop viewing as another user"
+                    title="Send a sample request that changes nothing"
                   >
-                    Stop viewing as another user
+                    Impersonate
                   </.action_link>
                 </div>
                 <p class="mt-2 text-xs text-ink-muted">
-                  An action that sends a request rather than opening a page takes a destination and a method in place of a page to open, and keeps the same treatment, so Impersonate sits in a header row beside History and Back. This one sends the real request to stop viewing as another user: it ends an impersonation, and with none in progress it returns to the dashboard.
+                  An action that sends a request rather than opening a page takes a destination and a method in place of a page to open, and keeps the same treatment, so Impersonate sits in a header row beside History and Back. This one sends a real request to the Design Library, which changes nothing and returns here.
                 </p>
               </.card>
             </div>
