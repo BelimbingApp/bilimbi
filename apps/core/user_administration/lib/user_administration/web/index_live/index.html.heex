@@ -115,7 +115,7 @@
         </:col>
         <:col :let={user} label="Created" sort="created_at" sort_id="users-sort-created">
           <span class="whitespace-nowrap tabular-nums text-ink-muted">
-            {format_created(user.created_at)}
+            <.datetime id={"user-created-#{user.id}"} value={user.created_at} />
           </span>
         </:col>
         <:action :let={user}>
