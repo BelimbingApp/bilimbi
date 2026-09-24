@@ -146,7 +146,7 @@ rather than being quietly reconciled.
 | LAY-03 Page header | Adopt adapted — responsive stacking, pin slot, help slot | NAV-01 pin decision; shared-component edit by the integration owner, not Phase 5 |
 | LAY-04 Side panel | Adopt adapted | LAY-02 drawer mechanics, #719 |
 | LAY-05 Page geometry | Keep Bilimbi | FND-03, LAY-03 |
-| NAV-01 Menu tree and pins | Adopt adapted — pins become account state; `user_pins` is the sole store (steward, 2026-09-16) | unblocks LAY-03; adoption-URL question escalated |
+| NAV-01 Menu tree and pins | Adopt adapted — pins become account state; `user_pins` is the sole store, written only through the `/api/pins` controller (steward, 2026-09-16; write path amended 2026-09-24) | unblocks LAY-03; adoption-URL question escalated |
 | NAV-02 Tabs | Adopt adapted — ARIA tablist, arrow keys, one URL rule | none |
 | NAV-03 Links | Adopt adapted | none |
 | NAV-04 Pagination | Keep Bilimbi | none |
@@ -195,7 +195,8 @@ rather than being quietly reconciled.
 
 ##### Steward decisions (2026-09-16)
 
-**NAV-01 — pins are account state.** The server-side path is already built and
+**NAV-01 — pins are account state.** *Superseded in part 2026-09-24; see the
+amendment after this decision.* The server-side path is already built and
 entirely unwired: the local shell landed 2026-08-17 and the `user_pins` API the next
 day (#316), and nothing ever connected them. Verified live — pinning a nav item and a
 record pin persisted across navigation while `user_pins` stayed at 0 rows and no
@@ -207,6 +208,14 @@ impersonated writes exactly as `DisplayPreferences.own_account/1` does, so
 Rail, width and branch expansion stay deliberately browser-local. Reason: a
 "Pin to sidebar" control that vanishes on another device fails silently against K09,
 and the round trip is the cost already accepted for theme and time display in #711.
+
+**NAV-01 amendment (2026-09-24) — the controller is the one write path.** The
+`ShellPins` hook, the scope's `:pins` snapshot and the deletion of `PinController`
+above are superseded. Pins are written only through the existing authenticated
+`PinController` (`/api/pins/toggle|reorder`) over `user_pins`, and the shell syncs
+from `GET /api/pins`; there is no `ShellPins` hook and no second write path. The
+controller refuses writes from an impersonated session. `user_pins` remaining the sole
+store, and rail, width and branch expansion staying browser-local, still stand.
 
 **CMP-03 — one detail assembly.** Bilimbi has five section-heading treatments, four
 `dt` label treatments, three grid rules, two card paddings and three editing models
