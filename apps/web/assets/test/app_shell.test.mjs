@@ -4,7 +4,7 @@
 import {test, beforeEach, afterEach} from "node:test"
 import assert from "node:assert/strict"
 import AppShell from "../js/app_shell.js"
-import {focused, mountHook, render} from "./support/hook.mjs"
+import {focused, mountHook, render, settle} from "./support/hook.mjs"
 
 // happy-dom answers media queries from a fixed window size, so the
 // breakpoint is stood in for here and can be crossed mid-test.
@@ -29,12 +29,14 @@ function setViewport(desktop) {
 // The shell as `Layouts.app` renders it, trimmed to what the hook touches.
 const SHELL = `
   <div id="app-shell" phx-hook="AppShell" data-theme-choice="light"
-       data-sidebar-mode="desktop" data-sidebar-rail="false" data-sidebar-open="false">
+       data-sidebar-mode="desktop" data-sidebar-rail="false" data-sidebar-open="false"
+       data-impersonating="false" data-served-routes='["/companies","/companies/:id","/users"]'>
     <header id="app-topbar">
       <button type="button" id="app-sidebar-toggle" aria-controls="app-sidebar" aria-expanded="false">Menu</button>
       <div id="app-topbar-main"><a id="app-brand" href="/dashboard">Bilimbi</a></div>
     </header>
     <div id="app-preference-feedback" hidden role="status"></div>
+    <div id="app-pinned-announcement" role="status" aria-live="polite"></div>
     <div id="app-workspace">
       <div id="app-sidebar-backdrop" aria-hidden="true"></div>
       <aside id="app-sidebar" tabindex="-1" role="navigation">
@@ -75,6 +77,46 @@ const SHELL = `
   </div>`
 
 let shell
+let serverPins
+let nextPinId
+let requests
+let failToggle
+let failReorder
+
+const reply = (body, status = 200) => ({ok: status < 400, status, json: async () => body})
+
+function installPinApi() {
+  serverPins = []
+  nextPinId = 1
+  requests = []
+  failToggle = null
+  failReorder = null
+
+  globalThis.fetch = async (path, options = {}) => {
+    const body = options.body ? JSON.parse(options.body) : null
+    requests.push({path, method: options.method || "GET", body})
+
+    if (path === "/api/pins") return reply({pins: serverPins})
+    if (path === "/api/pins/toggle") {
+      if (failToggle) return failToggle
+      const found = serverPins.find((pin) => pin.url === body.url)
+      serverPins = found
+        ? serverPins.filter((pin) => pin !== found)
+        : [...serverPins, {id: nextPinId++, label: body.label, url: body.url, icon: body.icon}]
+      return reply({pins: serverPins})
+    }
+    if (path === "/api/pins/reorder") {
+      if (failReorder) return failReorder
+      serverPins = body.pins.map(({id}) => serverPins.find((pin) => String(pin.id) === String(id)))
+      return reply({pins: serverPins})
+    }
+    return reply({}, 404)
+  }
+}
+
+const flush = async () => {
+  for (let i = 0; i < 4; i++) await settle()
+}
 
 function mount() {
   shell = mountHook(AppShell, render(SHELL, "app-shell"))
@@ -84,6 +126,7 @@ function mount() {
 beforeEach(() => {
   localStorage.clear()
   setViewport(true)
+  installPinApi()
 })
 
 afterEach(() => shell?.hook.destroyed())
@@ -95,7 +138,6 @@ const key = (name, init = {}) =>
 const inert = (id) => $(id).hasAttribute("inert")
 const pinnedLinks = () =>
   [...$("app-pinned-items").querySelectorAll("a")].map((a) => a.pathname + a.search)
-const storedPins = () => JSON.parse(localStorage.getItem("sidebarPinnedItems") ?? "[]")
 
 test("on a phone the closed drawer is inert and hidden from assistive technology", () => {
   setViewport(false)
@@ -243,63 +285,81 @@ test("a navigation branch opens, closes, and stays as it was left", () => {
   assert.equal($("nav-children-admin").hidden, false)
 })
 
-test("pinning a navigation item lists it above the navigation and presses its pin", () => {
+test("pinning and unpinning a navigation item uses the durable API", async () => {
   mount()
+  await flush()
   assert.equal($("app-pinned").hidden, true)
 
   click("nav-pin-companies")
+  await flush()
 
   assert.equal($("app-pinned").hidden, false)
   assert.deepEqual(pinnedLinks(), ["/companies"])
-  assert.equal($("app-pinned-items").querySelector("a").getAttribute("data-phx-link"), "redirect")
   assert.equal($("nav-pin-companies").getAttribute("aria-pressed"), "true")
   assert.equal($("nav-pin-companies").title, "Unpin Companies to sidebar")
-  assert.deepEqual(storedPins(), [{id: "nav-companies"}])
+  assert.deepEqual(requests.map(({path, method}) => `${method} ${path}`), [
+    "GET /api/pins",
+    "POST /api/pins/toggle",
+  ])
 
   click("nav-pin-companies")
+  await flush()
   assert.equal($("app-pinned").hidden, true)
-  assert.deepEqual(storedPins(), [])
+  assert.equal(serverPins.length, 0)
 })
 
-test("a page-header pin saves the record's label and URL beside the navigation pins", () => {
+test("pins survive reload through the authenticated API", async () => {
+  serverPins = [{id: 1, label: "Companies", url: "/companies"}]
   mount()
+  await flush()
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+
+  shell.hook.destroyed()
+  mount()
+  await flush()
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+  assert.deepEqual(serverPins, [{id: 1, label: "Companies", url: "/companies"}])
+})
+
+test("a page-header pin saves and removes its record through the durable API", async () => {
+  mount()
+  await flush()
 
   click("company-pin")
+  await flush()
 
   const link = $("app-pinned-items").querySelector("a")
   assert.equal(link.pathname, "/companies/1")
   assert.equal(link.textContent, "Administration / Companies / Acme")
-  assert.equal(link.getAttribute("data-phx-link"), "redirect")
   assert.equal($("company-pin").getAttribute("aria-pressed"), "true")
-  assert.deepEqual(storedPins(), [{label: "Administration / Companies / Acme", url: "/companies/1"}])
+  assert.deepEqual(serverPins.map(({label, url}) => ({label, url})), [
+    {label: "Administration / Companies / Acme", url: "/companies/1"},
+  ])
 
   $("app-pinned-items").querySelector("[data-nav-unpin]").click()
+  await flush()
   assert.deepEqual(pinnedLinks(), [])
   assert.equal($("company-pin").getAttribute("aria-pressed"), "false")
 })
 
-test("a stored pin is read back in every saved form, and a foreign or unknown one is dropped", () => {
-  localStorage.setItem(
-    "sidebarPinnedItems",
-    JSON.stringify([
-      "nav-companies",
-      {id: "nav-companies"},
-      {label: "Acme", url: "/companies/1?tab=users"},
-      {label: "Elsewhere", url: "https://attacker.test/phish"},
-      {id: "nav-removed"},
-      {label: "", url: "/blank"},
-    ])
-  )
+test("a served pin hydrates while a foreign or unserved pin is hidden", async () => {
+  serverPins = [
+    {id: 1, label: "Acme", url: "/companies/1?tab=users"},
+    {id: 2, label: "Elsewhere", url: "https://attacker.test/phish"},
+    {id: 3, label: "Removed", url: "/removed"},
+  ]
 
   mount()
+  await flush()
 
-  assert.deepEqual(pinnedLinks(), ["/companies", "/companies/1?tab=users"])
-  assert.deepEqual(storedPins(), [{id: "nav-companies"}, {label: "Acme", url: "/companies/1?tab=users"}])
+  assert.deepEqual(pinnedLinks(), ["/companies/1?tab=users"])
+  assert.equal($("app-pinned-items").querySelectorAll("a").length, 1)
 })
 
-test("a server patch that resets a pin's pressed state is corrected on update (#685)", () => {
-  localStorage.setItem("sidebarPinnedItems", JSON.stringify([{label: "Administration / Companies / Acme", url: "/companies/1"}]))
+test("a server patch that resets a pin's pressed state is corrected on update (#685)", async () => {
+  serverPins = [{id: 1, label: "Administration / Companies / Acme", url: "/companies/1"}]
   mount()
+  await flush()
   assert.equal($("company-pin").getAttribute("aria-pressed"), "true")
 
   // LiveView re-renders the title pin with the server's default.
@@ -312,26 +372,79 @@ test("a server patch that resets a pin's pressed state is corrected on update (#
   assert.equal($("app-pinned-items").querySelectorAll("a").length, 1)
 })
 
-test("dragging a pinned row onto another reorders and saves the pins", () => {
-  localStorage.setItem(
-    "sidebarPinnedItems",
-    JSON.stringify([{id: "nav-companies"}, {label: "Acme", url: "/companies/1"}])
-  )
+test("dragging a pinned row reorders through the durable API", async () => {
+  serverPins = [
+    {id: 1, label: "Companies", url: "/companies"},
+    {id: 2, label: "Acme", url: "/companies/1"},
+  ]
   mount()
+  await flush()
 
-  const rows = () => [...$("app-pinned-items").querySelectorAll("[data-pinned-item]")]
-  const dragEvent = (type, target) => {
-    const event = new Event(type, {bubbles: true, cancelable: true})
-    event.dataTransfer = {setData() {}}
-    target.dispatchEvent(event)
-  }
-
+  const rows = () => [...$("app-pinned-items").querySelectorAll(".app-pinned-row")]
   const [first, second] = rows()
-  dragEvent("dragstart", second)
-  dragEvent("dragover", first)
+  assert.equal(first.dataset.pinnedItem, "pin:1")
+  assert.equal(second.dataset.pinnedItem, "pin:2")
+  const dataTransfer = {setData() {}}
+  shell.hook.startPinnedDrag({target: second, dataTransfer, preventDefault() {}})
+  assert.equal(shell.hook.draggedPinnedKey, second.dataset.pinnedItem)
+  shell.hook.setPinnedDropTarget(first.dataset.pinnedItem)
   assert.equal(first.dataset.pinnedDropTarget, "true")
-  dragEvent("drop", first)
+  assert.equal(shell.hook.pinnedRow({target: first.querySelector("a")}), first)
+  shell.hook.dropPinnedDrag({target: first.querySelector("a"), preventDefault() {}})
+  assert.deepEqual(shell.hook.pinnedEntries.map(({pinId}) => pinId), ["2", "1"])
+  await flush()
 
   assert.deepEqual(pinnedLinks(), ["/companies/1", "/companies"])
-  assert.deepEqual(storedPins(), [{label: "Acme", url: "/companies/1"}, {id: "nav-companies"}])
+  assert.deepEqual(serverPins.map(({id}) => id), [2, 1])
+})
+
+test("keyboard move controls reorder durably, announce, and restore focus", async () => {
+  serverPins = [
+    {id: 1, label: "Companies", url: "/companies"},
+    {id: 2, label: "Acme", url: "/companies/1"},
+  ]
+  mount()
+  await flush()
+
+  const moveDown = $("app-pinned-items").querySelector('[data-nav-move="down"]')
+  moveDown.focus()
+  moveDown.click()
+  await flush()
+
+  assert.deepEqual(serverPins.map(({id}) => id), [2, 1])
+  assert.deepEqual(pinnedLinks(), ["/companies/1", "/companies"])
+  assert.equal($("app-pinned-announcement").textContent, "Moved Companies down.")
+  assert.equal(document.activeElement.className.includes("app-pinned-link"), true)
+})
+
+test("legacy migration imports navigation pins only and clears the browser key", async () => {
+  localStorage.setItem("sidebarPinnedItems", JSON.stringify([
+    {id: "nav-companies"},
+    {label: "Acme", url: "/companies/1"},
+  ]))
+  mount()
+  await flush()
+
+  assert.deepEqual(serverPins.map(({url}) => url), ["/companies"])
+  assert.equal(localStorage.getItem("sidebarPinnedItems"), null)
+  assert.deepEqual(pinnedLinks(), ["/companies"])
+})
+
+test("impersonated shells read pins but refuse pin writes and migration", async () => {
+  serverPins = [{id: 1, label: "Companies", url: "/companies"}]
+  localStorage.setItem("sidebarPinnedItems", JSON.stringify([{id: "nav-companies"}]))
+  const root = render(SHELL, "app-shell")
+  root.dataset.impersonating = "true"
+  shell = mountHook(AppShell, root)
+  await flush()
+
+  click("nav-pin-companies")
+  const moveDown = $("app-pinned-items").querySelector('[data-nav-move="down"]')
+  moveDown?.click()
+  await flush()
+
+  assert.deepEqual(requests.map(({path, method}) => `${method} ${path}`), ["GET /api/pins"])
+  assert.equal(localStorage.getItem("sidebarPinnedItems") !== null, true)
+  assert.equal($("nav-pin-companies").disabled, true)
+  assert.equal($("app-pinned-items").querySelector('[data-nav-unpin]').disabled, true)
 })
