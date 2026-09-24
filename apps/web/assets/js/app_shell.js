@@ -54,7 +54,6 @@ const AppShell = {
     this.onPinnedDragOver = (event) => this.overPinnedDrag(event)
     this.onPinnedDrop = (event) => this.dropPinnedDrag(event)
     this.onPinnedDragEnd = () => this.endPinnedDrag()
-    this.onPinnedKey = (event) => this.onPinnedKeyboard(event)
 
     this.toggle?.addEventListener("click", this.onToggle)
     this.backdrop?.addEventListener("click", this.onBackdrop)
@@ -64,7 +63,6 @@ const AppShell = {
     this.pinnedItems?.addEventListener("dragover", this.onPinnedDragOver)
     this.pinnedItems?.addEventListener("drop", this.onPinnedDrop)
     this.pinnedItems?.addEventListener("dragend", this.onPinnedDragEnd)
-    this.pinnedItems?.addEventListener("keydown", this.onPinnedKey)
     window.addEventListener("keydown", this.onKey)
     this.mq.addEventListener("change", this.onMq)
     this.controls = new ShellControls(this)
@@ -90,7 +88,6 @@ const AppShell = {
     this.pinnedItems?.removeEventListener("dragover", this.onPinnedDragOver)
     this.pinnedItems?.removeEventListener("drop", this.onPinnedDrop)
     this.pinnedItems?.removeEventListener("dragend", this.onPinnedDragEnd)
-    this.pinnedItems?.removeEventListener("keydown", this.onPinnedKey)
     window.removeEventListener("mousemove", this.onDragMove)
     window.removeEventListener("mouseup", this.onDragEnd)
     window.removeEventListener("keydown", this.onKey)
@@ -182,7 +179,12 @@ const AppShell = {
       const parsed = new URL(url, window.location.origin)
       if (parsed.origin !== window.location.origin) return null
 
-      return `${parsed.pathname}${parsed.search}${parsed.hash}`
+      const path = parsed.pathname.replace(/\/+$/, "") || "/"
+      const query = new URLSearchParams(parsed.search)
+      query.sort()
+      const search = query.toString()
+
+      return search ? `${path}?${search}` : path
     } catch {
       return null
     }
@@ -197,7 +199,7 @@ const AppShell = {
 
   pinnedUrl(item) {
     if (item?.url) return this.normalizePinnedUrl(item.url)
-    if (item?.navId) return this.navItem(item.navId)?.href || null
+    if (item?.navId) return this.normalizePinnedUrl(this.navItem(item.navId)?.href)
     return null
   },
 
@@ -232,6 +234,12 @@ const AppShell = {
       if (!response.ok) throw new Error(`Pin load failed with status ${response.status}`)
 
       let pins = this.acceptServerPins((await response.json()).pins)
+      if (this.impersonating) {
+        this.pinnedEntries = pins
+        this.renderPinnedItems()
+        return
+      }
+
       const legacy = this.readLegacyPinnedItems()
       for (const legacyItem of legacy) {
         const item = this.migratablePinnedItem(legacyItem)
@@ -277,7 +285,7 @@ const AppShell = {
     if (!item) return null
     if (item.navId) {
       const nav = this.navItem(item.navId)
-      return nav ? {label: nav.dataset.navLabel, url: nav.href} : null
+      return nav ? {label: nav.dataset.navLabel, url: this.pinnedUrl(item)} : null
     }
     return item
   },
@@ -556,14 +564,6 @@ const AppShell = {
     return this.pinnedItems?.contains(row) ? row : null
   },
 
-  onPinnedKeyboard(event) {
-    const move = event.target.closest?.("[data-nav-move]")
-    if (!move || this.impersonating) return
-    if (event.key !== "Enter" && event.key !== " ") return
-    event.preventDefault()
-    this.movePinnedItem(move.dataset.pinnedItem, move.dataset.navMove)
-  },
-
   async movePinnedItem(key, direction) {
     if (this.impersonating) return
     const index = this.pinnedEntries.findIndex((item) => this.pinnedItemKey(item) === key)
@@ -648,7 +648,11 @@ const AppShell = {
           (pinnedItem) => this.pinnedItemKey(pinnedItem) === draggedKey
         )
         reordered.splice(targetIndex, 0, draggedItem)
+        const previous = this.pinnedEntries
+        this.pinnedEntries = reordered
         void this.reorderServerPins(reordered, false).catch(() => {
+          this.pinnedEntries = previous
+          this.renderPinnedItems()
           this.setPinAnnouncement("Unable to reorder pinned pages.")
         })
       }
