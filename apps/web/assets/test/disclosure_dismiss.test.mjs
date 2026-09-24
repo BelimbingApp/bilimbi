@@ -1,9 +1,9 @@
-// multi_select.js: closing the `<.multi_select>` list on Escape and when focus
+// disclosure_dismiss.js: closing the `<.multi_select>` list on Escape and when focus
 // leaves the field. Opening and closing are the wrapper's own JS commands,
 // and the trigger's `aria-expanded` is the one record of open.
 import {test, beforeEach, afterEach} from "node:test"
 import assert from "node:assert/strict"
-import MultiSelectDismiss from "../js/multi_select.js"
+import DisclosureDismiss from "../js/disclosure_dismiss.js"
 import {focused, mountHook, render, settle} from "./support/hook.mjs"
 
 // The commands `multi_select/1` renders for `id="roles-filter"`.
@@ -16,7 +16,7 @@ let field
 beforeEach(() => {
   const wrapper = render(
     `<input id="page-search" type="search">
-     <div id="roles-filter-wrapper" phx-hook="MultiSelectDismiss"
+     <div id="roles-filter-wrapper" phx-hook="DisclosureDismiss"
           data-dismiss='${DISMISS}' data-escape='${ESCAPE}'>
        <button id="roles-filter" type="button" aria-expanded="false"
                aria-controls="roles-filter-options">Any role</button>
@@ -28,7 +28,7 @@ beforeEach(() => {
      <button id="apply" type="button">Apply</button>`,
     "roles-filter-wrapper"
   )
-  field = mountHook(MultiSelectDismiss, wrapper)
+  field = mountHook(DisclosureDismiss, wrapper)
 })
 
 afterEach(() => field.hook.destroyed())

@@ -1246,7 +1246,7 @@ defmodule Bilimbi.Base.UI.Components do
     # put it.
     #
     # Dismiss and escape are published on the wrapper for the
-    # `MultiSelectDismiss` hook, which owns the two dismissals LiveView has
+    # `DisclosureDismiss` hook, which owns the two dismissals LiveView has
     # no binding for: focus leaving the field, and Escape from wherever focus
     # actually is -- a list opened by mouse in Safari or macOS Firefox is open
     # with focus still on `body`. LiveView reads a key binding from the event
@@ -1290,7 +1290,7 @@ defmodule Bilimbi.Base.UI.Components do
     ~H"""
     <div
       id={"#{@id}-wrapper"}
-      phx-hook="MultiSelectDismiss"
+      phx-hook="DisclosureDismiss"
       data-dismiss={@dismiss}
       data-escape={@escape}
       phx-click-away={@dismiss}
@@ -2964,7 +2964,7 @@ defmodule Bilimbi.Base.UI.Components do
   request rather than navigating — Impersonate on `/users/:id`, a `POST` —
   passes `href` and `method` in place of `navigate`; the treatment is the
   same, so the header reads as one labelled row (History, Impersonate,
-  Back) with no button among them.
+  Back) whose only button is History's disclosure.
 
   The surface is closed: `id`, `icon` and `title` are required, exactly one
   of `navigate` or `href` names the destination, and there is nothing else,
@@ -3044,15 +3044,15 @@ defmodule Bilimbi.Base.UI.Components do
 
   @doc """
   The one treatment for a demoted secondary action: a quiet labelled control
-  in `text-link` that darkens on hover, never a button.
+  in `text-link` that darkens on hover.
 
   `<.back_link>` and `<.action_link>` are the link members of the family and
   apply it themselves. It is public for the one member that is structurally
-  not a link: the `record.history` trigger is the `<summary>` of a
-  `<details>` and takes this class so History sits in the header row as the
-  same kind of thing as Impersonate and Back, as Belimbing's
-  `admin/*/show` pages present it. Do not use it to style a button as a
-  link; a control that changes data is a `<.button>`.
+  not a link: the `record.history` trigger is a disclosure button. It takes
+  this class so History sits in the header row as the same kind of thing as
+  Impersonate and Back, as Belimbing's `admin/*/show` pages present it.
+  The button discloses; it does not change data. Do not use this class to
+  style a control that changes data — that control is a `<.button>`.
   """
   @spec demoted_action_class() :: String.t()
   def demoted_action_class do

@@ -128,14 +128,79 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
     assert old != new
   end
 
-  defp render_panel(scope, mutation) do
+  test "the trigger is a disclosure button whose dismissals only Escape inside returns focus", %{
+    scope: scope
+  } do
+    {:ok, mutation} =
+      Audit.record_mutation(scope, %{
+        company_id: 73,
+        actor_type: "user",
+        actor_id: 91,
+        auditable_type: "Bilimbi.Core.Widget.Schema",
+        auditable_id: "7",
+        event: "created",
+        occurred_at: ~N[2026-08-18 10:00:00],
+        old_values: %{},
+        new_values: %{"name" => "Widget"}
+      })
+
+    closed = render_panel(scope, mutation, open: false)
+
+    assert text(
+             closed,
+             "button#history-toggle[aria-expanded='false'][aria-controls='history-panel'][title='History']"
+           ) ==
+             "History"
+
+    refute present?(closed, "details, summary")
+    refute present?(closed, "#history[phx-click-away]")
+    refute present?(closed, "#history-panel")
+
+    open = render_panel(scope, mutation, open: true)
+
+    assert text(open, "button#history-toggle[aria-expanded='true']") == "History"
+    assert present?(open, "#history[phx-click-away]")
+    assert present?(open, "#history-panel[tabindex='-1']")
+    assert present?(open, "#history[phx-hook='DisclosureDismiss']")
+
+    assert [["focus", mounted]] = js(open, "#history-panel", "phx-mounted")
+    refute Map.has_key?(mounted, "to")
+
+    assert [["push", %{"event" => "close"}], ["focus", %{"to" => "#history-toggle"}]] =
+             js(open, "#history", "data-escape")
+
+    assert [["push", %{"event" => "close"}]] = js(open, "#history", "data-dismiss")
+
+    assert [["push", %{"event" => "close"}]] = js(open, "#history", "phx-click-away")
+    assert text(open, "#history-entry-#{mutation.id}-name-new") == "Widget"
+  end
+
+  defp render_panel(scope, mutation, opts \\ []) do
     render_component(RecordHistory,
       id: "history",
       current_scope: %{scope: scope},
       auditable_types: [mutation.auditable_type],
       auditable_id: mutation.auditable_id,
-      record: nil
+      record: nil,
+      open: Keyword.get(opts, :open, true)
     )
+  end
+
+  defp present?(html, selector) do
+    html
+    |> LazyHTML.from_fragment()
+    |> LazyHTML.query(selector)
+    |> Enum.any?()
+  end
+
+  defp js(html, selector, attribute) do
+    [command] =
+      html
+      |> LazyHTML.from_fragment()
+      |> LazyHTML.query(selector)
+      |> LazyHTML.attribute(attribute)
+
+    JSON.decode!(command)
   end
 
   defp text(html, selector) do

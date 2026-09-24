@@ -512,8 +512,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
       end
 
       # The page header (inside <main>; the shell's top bar is its own
-      # <header>) holds no button and no Departments or Relationships link:
-      # only the pin, the history icon and the back link.
+      # <header>) holds no Departments or Relationships link, and without
+      # audit permission no History disclosure: only the pin and the back link.
       refute has_element?(view, "main header a[href='/companies/73/departments']")
       refute has_element?(view, "main header a[href='/companies/73/relationships']")
       refute has_element?(view, "main header", "Departments")
@@ -564,19 +564,23 @@ defmodule BilimbiWeb.CompanyLiveTest do
       grant_capabilities!("admin.audit.log.list")
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      # History is a demoted labelled action carrying Belimbing's clock and
-      # its word, in the same quiet treatment as the back link, not a button.
+      # History is a demoted labelled disclosure: Belimbing's clock and its
+      # word, in the same quiet treatment as the back link, with the open
+      # state on the button.
       assert has_element?(
                view,
-               "summary#company-record-history-toggle[title='History']",
+               "button#company-record-history-toggle[title='History'][aria-expanded='false'][aria-controls='company-record-history-panel']",
                "History"
              )
 
       assert has_element?(view, "#company-record-history-toggle .hero-clock")
-      assert has_element?(view, "summary#company-record-history-toggle.text-link")
+      assert has_element?(view, "button#company-record-history-toggle.text-link")
       refute has_element?(view, "#company-record-history-toggle .sr-only")
-      refute has_element?(view, "button#company-record-history-toggle")
+      refute has_element?(view, "summary#company-record-history-toggle")
       refute has_element?(view, "#company-record-history-toggle.bg-action")
+      refute has_element?(view, "#company-record-history-panel")
+
+      view |> element("#company-record-history-toggle") |> render_click()
       assert has_element?(view, "#company-record-history-panel", "Old Name")
       assert has_element?(view, "#company-record-history-panel", "Bilimbi Industries")
       refute has_element?(view, "#company-record-history-panel", "Other Old")
@@ -1037,12 +1041,17 @@ defmodule BilimbiWeb.CompanyLiveTest do
       ])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
+      view |> element("#company-record-history-toggle") |> render_click()
+      assert has_element?(view, "#company-record-history-empty")
       refute has_element?(view, "#company-record-history-panel", "Bilimbi Global")
 
       render_hook(view, "save_field", %{"id" => "73", "name" => "Bilimbi Global"})
       assert has_element?(view, "h1", "Bilimbi Global")
 
+      # The panel was already open, so the trail follows the write on this
+      # view without a remount and without opening history again.
       refute has_element?(view, "#company-record-history-empty")
+      assert has_element?(view, "#company-record-history-toggle[aria-expanded='true']")
       assert has_element?(view, "#company-record-history-panel", "Updated")
       assert has_element?(view, "#company-record-history-panel", "Bilimbi Global")
     end

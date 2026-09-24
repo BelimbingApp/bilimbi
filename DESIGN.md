@@ -330,11 +330,14 @@ a button: `<.back_link navigate={...}>` renders "← Back" in `text-link`, and i
 `title` names the destination ("Back to company") when the page has more than
 one way back. This holds for every page — list, form and detail — so a
 "Back to …" `<.button>` anywhere is a defect. Record history is demoted the
-same way: it is a labelled action in the header, never a button. A quiet
-action that submits a request rather than navigating — Impersonate on
-`/users/:id`, a `POST` — is an `<.action_link>` with `href` and `method`,
-so a detail header reads as one labelled row: History, Impersonate, "← Back",
-each glyph beside its word, and no button among them.
+same way: it is a labelled disclosure `<button>` in the header's quiet
+treatment, never a `<.button>`. It carries `aria-expanded`, moves focus into
+its panel on opening, and Escape from inside the panel closes it and returns
+focus to History. A quiet action that submits a request rather than
+navigating — Impersonate on `/users/:id`, a `POST` — is an `<.action_link>`
+with `href` and `method`, so a detail header reads as one labelled row:
+History, Impersonate, "← Back", each glyph beside its word, and History's
+disclosure the only button among them.
 
 Reaching a related workflow is demoted too. A section that lists records
 another page manages — a company's Departments and Relationships — carries
@@ -354,9 +357,9 @@ action followed by demoted links (`/companies`, `/employees`) or only demoted
 actions and record metadata (`/companies/:id`, `/addresses/:id`). Without it
 the controls sit one collapsed space apart and read as a single run of text.
 The page header never repeats a section's link as a button; on
-`/companies/:id` its actions row holds the status badge, the history action
-and the back link and no button, while the title row keeps the pin icon
-action. Below the `sm` breakpoint the shared `<.header>` stacks the actions
+`/companies/:id` its actions row holds the status badge, the History
+disclosure button and the back link and no other button, while the title row
+keeps the pin icon action. Below the `sm` breakpoint the shared `<.header>` stacks the actions
 row under the title, as Belimbing's page header does, so a labelled row never
 squeezes the title into one word per line or clips at the viewport edge; the
 call-site row is also `flex-wrap`, so a long row wraps rather than overflows. `<.action_link>` is the general form of `<.back_link>`: the same

@@ -50,7 +50,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
   flash.
 
   The header presents the same quiet labelled row Belimbing does — History,
-  Impersonate and "← Back", each with its glyph and its word — and no button.
+  Impersonate and "← Back", each with its glyph and its word. History is the
+  disclosure button; Impersonate and Back stay links. There is no edit button.
   Impersonate keeps its guards unchanged: `admin.user.impersonate`, never the
   signed-in account, and never while already impersonating.
 
@@ -1259,8 +1260,8 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
           <:actions>
             <%!-- Belimbing's admin/users/show header: History, Impersonate
                  and Back as one quiet labelled row, each glyph beside its
-                 word, and no button. The row wraps at narrow widths instead
-                 of clipping. --%>
+                 word. History is the disclosure button; the other two stay
+                 links. The row wraps at narrow widths instead of clipping. --%>
             <div class="flex flex-wrap items-center gap-3">
               <.discovered_panel
                 key="record.history"

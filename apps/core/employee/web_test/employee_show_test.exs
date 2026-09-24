@@ -490,6 +490,7 @@ defmodule BilimbiWeb.EmployeeShowTest do
     grant_capabilities!(["admin.employee.view", "admin.employee.update", "admin.audit.log.list"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+    view |> element("#employee-record-history-toggle") |> render_click()
     assert has_element?(view, "#employee-record-history-empty")
 
     render_hook(view, "save_field", %{"id" => to_string(employee.id), "full_name" => "Jane Doe"})
@@ -541,7 +542,13 @@ defmodule BilimbiWeb.EmployeeShowTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
 
-    assert has_element?(view, "#employee-record-history-toggle", "History")
+    assert has_element?(
+             view,
+             "button#employee-record-history-toggle[aria-expanded='false']",
+             "History"
+           )
+
+    view |> element("#employee-record-history-toggle") |> render_click()
     assert has_element?(view, "#employee-record-history-panel", "Analyst")
     assert has_element?(view, "#employee-record-history-panel", "Lead Analyst")
 

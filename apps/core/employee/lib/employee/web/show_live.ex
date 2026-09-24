@@ -37,7 +37,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   `employee.addresses`); this page names neither module.
 
   The header is the quiet labelled row Belimbing's page carries — the record
-  history beside the word "History" and "← Back" — and no button.
+  history disclosure beside the word "History" and a "← Back" link. History
+  is that row's button; Back is a link. There is no edit button.
 
   Every section below it has the anatomy DESIGN.md's "Detail sections and
   facts" sets out: a `<.card>` region opened by `<.section_heading>`, its
