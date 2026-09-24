@@ -10,7 +10,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
 
   alias Bilimbi.Base.Menu.Item
 
-  # The Navigation entry renders `Layouts.nav_branch/1` -- the shell's own rail
+  # The Navigation entry renders `Layouts.nav_menu/1` -- the shell's own menu
   # -- over a fixed tree, so the card cannot drift from what the sidebar does.
   # Ids are namespaced away from the real menu because both trees share the page.
   @nav_example [
@@ -180,7 +180,8 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
          },
          as: :toolbar_full
        )
-     )}
+     )
+     |> assign(:filter_toolbar_search_form, to_form(%{"search" => ""}, as: :toolbar_search))}
   end
 
   @impl true
@@ -207,6 +208,11 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   def handle_event("filter-toolbar-preview", %{"toolbar_full" => toolbar_data}, socket) do
     {:noreply,
      assign(socket, :filter_toolbar_full_form, to_form(toolbar_data, as: :toolbar_full))}
+  end
+
+  def handle_event("filter-toolbar-search-preview", %{"toolbar_search" => toolbar_data}, socket) do
+    {:noreply,
+     assign(socket, :filter_toolbar_search_form, to_form(toolbar_data, as: :toolbar_search))}
   end
 
   @impl true

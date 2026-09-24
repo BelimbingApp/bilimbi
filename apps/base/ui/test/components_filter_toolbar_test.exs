@@ -89,12 +89,6 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
     )
   end
 
-  defp empty_toolbar(assigns) do
-    ~H"""
-    <.filter_toolbar id="tb-empty" form={@form} event="filters" />
-    """
-  end
-
   defp hinted_search(assigns) do
     ~H"""
     <.filter_toolbar id="tb-hinted" form={@form} event="filters">
@@ -261,17 +255,11 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
     assert html =~ ~s(id="tb-status")
   end
 
-  test "every control is optional and an empty toolbar is still a toolbar" do
+  test "every kind of control is optional, so one control is a whole toolbar" do
     html = render_toolbar(with_search: false, with_dates: false)
 
     assert html =~ ~s(id="tb-status")
     refute html =~ ~s(id="tb-search")
     refute html =~ ~s(id="tb-start-date")
-
-    empty = render_component(&empty_toolbar/1, form: form())
-
-    assert empty =~ ~s(id="tb-empty")
-    refute empty =~ "<input"
-    refute empty =~ "<select"
   end
 end

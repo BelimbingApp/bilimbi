@@ -1418,8 +1418,9 @@ defmodule Bilimbi.Base.UI.Components do
   Renders the shared list filter toolbar: search fields, selects, and date
   inputs framed as one open toolbar above the list surface (Design Spec C04).
 
-  Controls are declared through one repeating `control` slot and render in the
-  order they are written, so the template reads the way the toolbar looks.
+  Controls are declared through one repeating `control` slot, at least one of
+  them, and render in the order they are written, so the template reads the
+  way the toolbar looks.
 
   Filter state itself stays where it already lives — the caller's form, event,
   and URL round-trip are untouched, so the same inputs return the same rows.
@@ -1485,7 +1486,10 @@ defmodule Bilimbi.Base.UI.Components do
       "extra classes for page context (for example mt-4 below tabs); the open-toolbar framing stays owned here"
   )
 
-  slot :control, doc: "one filter control per entry, rendered in the order declared" do
+  # Required: a toolbar with no control is an empty form no list builds.
+  slot :control,
+    required: true,
+    doc: "one filter control per entry, rendered in the order declared" do
     attr(:type, :atom,
       values: [:search, :select, :date],
       required: true,

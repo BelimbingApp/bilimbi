@@ -5,6 +5,7 @@ defmodule BilimbiWeb.Router do
     only: [
       fetch_current_scope: 2,
       require_authenticated: 2,
+      require_capability: 2,
       redirect_if_authenticated: 2
     ]
 

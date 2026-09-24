@@ -12,7 +12,7 @@ Rendered text carries no catalog identifier. A Design Spec number may be the ele
 
 ## Design Library
 
-A specimen calls the real component. Do not fake behaviour to make an example look finished: a simulated 1.2-second wait was removed from the confirmation specimen. Do not mount a second live copy of something the layout already renders: the connection banners. Anchor, state, and catalog rules are `Bilimbi.Base.UI.DesignLibrarySource`.
+A specimen calls the real component. Do not fake behaviour to make an example look finished: a simulated 1.2-second wait was removed from the confirmation specimen. Do not mount a second live copy of something the layout already renders: the connection banners. Anchor, state, and catalog rules are `Bilimbi.Base.UI.DesignLibrarySource`. Its two guards, `design_library_coverage_test.exs` and `design_library_imitation_test.exs`, run in every `mix test`. When one fails, fix the specimen or the component, never the guard.
 
 ## Confirmation
 

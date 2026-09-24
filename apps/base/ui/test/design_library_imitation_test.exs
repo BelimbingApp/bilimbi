@@ -30,17 +30,11 @@ defmodule Bilimbi.Base.UI.DesignLibraryImitationTest do
   that takes no anchor — styled `<div>`s directly inside a grouping section,
   with no interaction attribute — is invisible to all three rules. Catching
   that needs a convention the library does not have yet.
-
-  These guards are excluded from the default run until the Design Library
-  specimens they report are corrected. Run them with
-  `mix test --include design_library_drift`.
   """
 
   use ExUnit.Case, async: true
 
   alias Bilimbi.Base.UI.DesignLibrarySource, as: Source
-
-  @moduletag :design_library_drift
 
   setup_all do
     tree = Source.tree()

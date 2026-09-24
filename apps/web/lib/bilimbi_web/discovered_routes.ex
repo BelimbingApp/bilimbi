@@ -56,8 +56,55 @@ defmodule BilimbiWeb.DiscoveredRoutes do
         end
       end
 
+    controller_blocks =
+      for route <- routes, is_atom(route[:controller]) and not is_nil(route[:controller]) do
+        controller_block(route)
+      end
+
     quote do
-      (unquote_splicing(blocks))
+      (unquote_splicing(blocks ++ controller_blocks))
+    end
+  end
+
+  defp controller_block(%{operator: true} = route) do
+    raise ArgumentError,
+          "controller route #{route.path} cannot be operator-only; no plug enforces that boundary"
+  end
+
+  defp controller_block(route) do
+    {_name, pipeline, _hooks} = session_options(Map.get(route, :session, :auth))
+    verb = Map.get(route, :verb, :get)
+
+    case route[:capability] do
+      nil ->
+        quote do
+          scope "/" do
+            pipe_through unquote(pipeline)
+
+            match unquote(verb),
+                  unquote(route.path),
+                  unquote(route.controller),
+                  unquote(route.action)
+          end
+        end
+
+      capability ->
+        name = :"bilimbi_capability:#{verb}:#{route.path}"
+
+        quote do
+          pipeline unquote(name) do
+            plug :require_capability, unquote(capability)
+          end
+
+          scope "/" do
+            pipe_through unquote(pipeline ++ [name])
+
+            match unquote(verb),
+                  unquote(route.path),
+                  unquote(route.controller),
+                  unquote(route.action)
+          end
+        end
     end
   end
 
