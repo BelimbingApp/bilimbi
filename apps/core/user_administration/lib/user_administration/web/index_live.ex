@@ -53,8 +53,14 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
 
     state =
       socket.assigns.index_state
-      |> Map.put(:search, normalize_search(Map.get(filters, "search", "")))
-      |> Map.put(:role_ids, normalize_role_ids(Map.get(filters, "roleIds", [])))
+      |> Map.put(
+        :search,
+        normalize_search(Map.get(filters, "search", socket.assigns.index_state.search))
+      )
+      |> Map.put(
+        :role_ids,
+        normalize_role_ids(Map.get(filters, "roleIds", socket.assigns.index_state.role_ids))
+      )
       |> Map.put(
         :page_size,
         normalize_page_size(Map.get(filters, "perPage", socket.assigns.index_state.page_size))

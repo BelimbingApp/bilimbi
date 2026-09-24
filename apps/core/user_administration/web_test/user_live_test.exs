@@ -241,6 +241,58 @@ defmodule BilimbiWeb.UserLiveTest do
     assert has_element?(view, "#user-15")
   end
 
+  test "shared toolbar filters round-trip search, roles, and page size through the URL", %{
+    conn: conn
+  } do
+    insert_user!(%{id: 91, company_id: 73, name: "Signed In"})
+    insert_user!(%{id: 1, company_id: 73, name: "Role User"})
+
+    {:ok, role} = Authz.create_role(scope!(), 73, %{name: "Reviewer", code: "reviewer"})
+    assert {:ok, :assigned} = Authz.assign_role(scope!(), 73, :user, 1, role.id)
+    grant_capabilities!("admin.user.list")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users")
+
+    view
+    |> form("#users-filters",
+      filters: %{
+        "search" => "Role User",
+        "roleIds" => [to_string(role.id)]
+      }
+    )
+    |> render_change()
+
+    params = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+    assert params["search"] == "Role User"
+    assert params["roleIds[]"] == to_string(role.id)
+    assert params["perPage"] == "25"
+    assert params["page"] == "1"
+    assert has_element?(view, "#users-search[value='Role User']")
+    assert has_element?(view, "#users-role-filter-option-#{role.id}[checked]")
+    assert has_element?(view, "#users-pagination-page-size option[value='25'][selected]")
+
+    view
+    |> form("#users-pagination-page-size-form", filters: %{perPage: "50"})
+    |> render_change()
+
+    params = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+    assert params["search"] == "Role User"
+    assert params["roleIds[]"] == to_string(role.id)
+    assert params["perPage"] == "50"
+    assert params["page"] == "1"
+    assert has_element?(view, "#users-pagination-page-size option[value='50'][selected]")
+
+    {:ok, reloaded, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/users?search=Role%20User&roleIds[]=#{role.id}&perPage=50")
+
+    assert has_element?(reloaded, "#user-1", "Role User")
+    assert has_element?(reloaded, "#users-search[value='Role User']")
+    assert has_element?(reloaded, "#users-role-filter", "1 role selected")
+    assert has_element?(reloaded, "#users-pagination-page-size option[value='50'][selected]")
+  end
+
   test "dispatches every sort direction with descending id ties and Created descending first", %{
     conn: conn
   } do

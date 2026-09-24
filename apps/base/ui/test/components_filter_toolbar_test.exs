@@ -39,6 +39,16 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
         options={[{"All statuses", "all"}, {"Active", "active"}]}
       />
       <:control
+        :if={@with_multi_select}
+        type={:multi_select}
+        field={@form[:roles]}
+        id="tb-roles"
+        label="Roles"
+        placeholder="All roles"
+        selection_label=":count role selected|:count roles selected"
+        options={[{"Administrator", "admin"}, {"Auditor", "auditor"}]}
+      />
+      <:control
         :if={@with_dates}
         type={:date}
         field={@form[:start_date]}
@@ -73,7 +83,8 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
         "status" => "all",
         "start_date" => "",
         "end_date" => "",
-        "page_size" => 25
+        "page_size" => 25,
+        "roles" => []
       },
       as: :filters
     )
@@ -84,6 +95,7 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
       form: form(),
       with_search: Keyword.get(opts, :with_search, true),
       with_select: Keyword.get(opts, :with_select, true),
+      with_multi_select: Keyword.get(opts, :with_multi_select, false),
       with_dates: Keyword.get(opts, :with_dates, true),
       with_trailing_select: Keyword.get(opts, :with_trailing_select, false)
     )
@@ -165,6 +177,19 @@ defmodule Bilimbi.Base.UI.ComponentsFilterToolbarTest do
       assert "focus:ring-brand-strong/30" in classes, "#{id} skips the shared focus ring"
       assert "shadow-xs" in classes, "#{id} skips the shared field elevation"
     end
+  end
+
+  test "a multi-select control keeps its shared toolbar framing and field state" do
+    html = render_toolbar(with_multi_select: true)
+
+    assert html =~ ~s(id="tb-roles")
+    assert html =~ ~s(id="tb-roles-option-admin")
+    assert html =~ ~s(name="filters[roles][]")
+    assert html =~ ~s(id="tb-roles-label")
+    assert html =~ ~s(All roles)
+    assert html =~ "focus:border-brand-strong"
+    assert html =~ "focus:ring-brand-strong/30"
+    assert html =~ "shadow-xs"
   end
 
   test "a search box always shows the magnifier over the room that clears it" do

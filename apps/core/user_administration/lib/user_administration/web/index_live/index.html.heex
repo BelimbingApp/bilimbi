@@ -25,43 +25,24 @@
       </:actions>
     </.header>
 
-    <.form
-      for={@filters_form}
-      id="users-filters"
-      phx-change="filters"
-      class="mb-2"
-    >
-      <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_16rem]">
-        <div class="relative">
-          <.icon
-            name="search"
-            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-          />
-          <.input
-            field={@filters_form[:search]}
-            id="users-search"
-            type="search"
-            phx-debounce="300"
-            maxlength="255"
-            label="Search users"
-            label_class="sr-only"
-            wrapper_class="mb-0"
-            placeholder="Search by name or email..."
-            class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-          />
-        </div>
-        <.multi_select
-          field={@filters_form[:roleIds]}
-          id="users-role-filter"
-          placeholder="All roles"
-          selection_label=":count role selected|:count roles selected"
-          label="Roles"
-          label_class="sr-only"
-          wrapper_class="mb-0"
-          options={@role_options}
-        />
-      </div>
-    </.form>
+    <.filter_toolbar id="users-filters" form={@filters_form} event="filters">
+      <:control
+        type={:search}
+        field={@filters_form[:search]}
+        id="users-search"
+        label="Search users"
+        placeholder="Search by name or email..."
+      />
+      <:control
+        type={:multi_select}
+        field={@filters_form[:roleIds]}
+        id="users-role-filter"
+        label="Roles"
+        placeholder="All roles"
+        selection_label=":count role selected|:count roles selected"
+        options={@role_options}
+      />
+    </.filter_toolbar>
 
     <.card id="users-card" inner_class="p-0">
       <h2 id="users-table-title" class="sr-only">Workspace users</h2>
