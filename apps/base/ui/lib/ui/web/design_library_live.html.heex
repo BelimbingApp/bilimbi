@@ -1581,7 +1581,7 @@
                 Data display
               </h2>
               <p class="text-sm text-ink-muted">
-                Tables and their pagination, cards, record facts, status badges, and dates. Statistics and record history have no specimen yet.
+                Tables and their pagination, cards, record facts, status badges, dates, and compact statistics. Record history has no specimen yet.
               </p>
             </div>
             <div class="space-y-2">
@@ -1718,6 +1718,27 @@
                 </div>
               </.card>
             </div>
+            <.card id="component-stat-strip" title="Statistics" inner_class="space-y-4 p-4">
+              <div>
+                <p class="mb-2 text-xs text-ink-muted">
+                  Linked strip with multiple numeric values
+                </p>
+                <.stat_strip
+                  id="design-library-stat-linked"
+                  title="Workspace"
+                  navigate={~p"/system/design-library/components"}
+                >
+                  <:item label="People" kind={:number} value={24} />
+                  <:item label="Active" kind={:text} value="18" />
+                </.stat_strip>
+              </div>
+              <div class="border-t border-line pt-4">
+                <p class="mb-2 text-xs text-ink-muted">Read-only strip with one text value</p>
+                <.stat_strip id="design-library-stat-unlinked" title="Storage">
+                  <:item label="Store" kind={:text} value="Durable" />
+                </.stat_strip>
+              </div>
+            </.card>
             <div class="grid gap-3 lg:grid-cols-2">
               <.card id="component-datetime" title="Date and time" inner_class="space-y-3 p-4">
                 <div class="flex justify-between gap-4 text-sm">
