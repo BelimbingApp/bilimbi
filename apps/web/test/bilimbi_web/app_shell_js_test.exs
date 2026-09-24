@@ -112,6 +112,7 @@ defmodule BilimbiWeb.AppShellJsTest do
   let serverPins = []
   let nextId = 1
   let failReorder = null
+  let failToggle = null
   const requests = []
   const reply = (body, status = 200) => ({ok: status < 400, status, json: async () => body})
   globalThis.fetch = async (path, options = {}) => {
@@ -119,6 +120,7 @@ defmodule BilimbiWeb.AppShellJsTest do
     requests.push({path, method: options.method || "GET", body})
     if (path === "/api/pins") return reply({pins: serverPins})
     if (path === "/api/pins/toggle") {
+      if (failToggle) return failToggle
       const found = serverPins.find((pin) => pin.url === body.url)
       serverPins = found
         ? serverPins.filter((pin) => pin !== found)
@@ -171,15 +173,24 @@ defmodule BilimbiWeb.AppShellJsTest do
     JSON.decode!(String.trim(output))
   end
 
-  test "pins hydrate from the API and legacy browser pins migrate in their saved order" do
+  test "pins hydrate from the API and only legacy navigation pins migrate, in their saved order" do
     result =
       run_pin_hook(~S"""
-      serverPins = [{id: nextId++, label: "Users", url: "/users", icon: null}]
+      serverPins = [
+        {id: nextId++, label: "Users", url: "/users", icon: null},
+        {id: nextId++, label: "Company 1", url: "/companies/1?a=1&b=2", icon: null},
+      ]
       storage.set("sidebarPinnedItems", JSON.stringify([
         {id: "nav-companies"},
-        {label: "Company 1", url: "/companies/1/?b=2&a=1#top"},
+        {label: "Company 9", url: "/companies/9"},
         {label: "Users again", url: "/users"},
       ]))
+      const recordPin = new El("button")
+      Object.assign(recordPin.dataset, {
+        navPin: "record", navPinRecord: "true", navPinLabel: "Company 1", navPinUrl: "/companies/1/?b=2&a=1#top",
+      })
+      recordPin.setAttribute("aria-label", "Pin this company")
+      root.append(recordPin)
 
       await hook.loadPinnedItems()
 
@@ -189,6 +200,7 @@ defmodule BilimbiWeb.AppShellJsTest do
         legacy: storage.has("sidebarPinnedItems"),
         pressed: navPin.getAttribute("aria-pressed"),
         title: navPin.title,
+        recordPressed: recordPin.getAttribute("aria-pressed"),
       }))
       """)
 
@@ -198,17 +210,44 @@ defmodule BilimbiWeb.AppShellJsTest do
                "path" => "/api/pins/toggle",
                "body" => %{"label" => "Companies", "url" => "/companies"}
              },
-             %{"path" => "/api/pins/toggle", "body" => %{"url" => "/companies/1?a=1&b=2"}},
              %{
                "path" => "/api/pins/reorder",
-               "body" => %{"pins" => [%{"id" => "2"}, %{"id" => "3"}, %{"id" => "1"}]}
+               "body" => %{"pins" => [%{"id" => "3"}, %{"id" => "1"}, %{"id" => "2"}]}
              }
            ] = result["requests"]
 
-    assert Enum.map(result["rows"], & &1["label"]) == ["Companies", "Company 1", "Users"]
+    assert Enum.map(result["rows"], & &1["label"]) == ["Companies", "Users", "Company 1"]
     assert result["legacy"] == false
     assert result["pressed"] == "true"
     assert result["title"] == "Unpin Companies"
+    assert result["recordPressed"] == "true"
+  end
+
+  test "a refused migration keeps the durable pins and a refused pin write is announced" do
+    result =
+      run_pin_hook(~S"""
+      serverPins = [
+        {id: nextId++, label: "Users", url: "/users"},
+        {id: nextId++, label: "Company 1", url: "/companies/1"},
+      ]
+      storage.set("sidebarPinnedItems", JSON.stringify([{id: "nav-companies"}]))
+      failToggle = reply({error: "invalid_pin"}, 422)
+      failReorder = reply({error: "x"}, 500)
+
+      await hook.loadPinnedItems()
+      const loaded = rows().map(({label}) => label)
+      const legacy = storage.has("sidebarPinnedItems")
+
+      hook.onSidebarClick({target: navPin, preventDefault: () => {}})
+      await flush()
+
+      console.log(JSON.stringify({loaded, legacy, rows: rows().map(({label}) => label), announcement: announcement.textContent}))
+      """)
+
+    assert result["loaded"] == ["Users", "Company 1"]
+    assert result["legacy"] == false
+    assert result["rows"] == ["Users", "Company 1"]
+    assert result["announcement"] == "Unable to update pinned pages."
   end
 
   test "a keyboard move button reorders durably, announces the move, and keeps focus" do

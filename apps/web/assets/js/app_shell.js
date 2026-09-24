@@ -229,56 +229,51 @@ const AppShell = {
   },
 
   async loadPinnedItems() {
+    let pins = []
+
     try {
       const response = await this.pinRequest("/api/pins")
       if (!response.ok) throw new Error(`Pin load failed with status ${response.status}`)
 
-      let pins = this.acceptServerPins((await response.json()).pins)
-      if (this.impersonating) {
-        this.pinnedEntries = pins
-        this.renderPinnedItems()
-        return
-      }
-
-      const legacy = this.readLegacyPinnedItems()
-      for (const legacyItem of legacy) {
-        const item = this.migratablePinnedItem(legacyItem)
-        const url = this.pinnedUrl(item)
-
-        if (!item || !url || !this.isServedUrl(url) || pins.some((pin) => this.pinnedUrl(pin) === url)) {
-          continue
-        }
-
-        const imported = await this.pinRequest("/api/pins/toggle", {
-          method: "POST",
-          body: JSON.stringify({label: item.label, url, icon: item.icon || null}),
-        })
-        if (!imported.ok) throw new Error(`Pin migration failed with status ${imported.status}`)
-        pins = this.acceptServerPins((await imported.json()).pins)
-      }
-
-      const legacyUrls = legacy
-        .map((item) => this.pinnedUrl(this.migratablePinnedItem(item)))
-        .filter((url) => url && this.isServedUrl(url))
-      const ordered = [
-        ...legacyUrls.map((url) => pins.find((pin) => this.pinnedUrl(pin) === url)).filter(Boolean),
-        ...pins.filter((pin) => !legacyUrls.includes(this.pinnedUrl(pin))),
-      ]
-
-      if (ordered.length && ordered.some((pin, index) => pin.pinId !== pins[index]?.pinId)) {
-        const reordered = await this.reorderServerPins(ordered, false)
-        pins = reordered || pins
-      }
-
-      this.pinnedEntries = pins
-      window.localStorage.removeItem?.(PINNED_STORAGE)
-      this.renderPinnedItems()
+      pins = this.acceptServerPins((await response.json()).pins)
+      if (!this.impersonating) pins = await this.migrateLegacyPins(pins)
     } catch (_error) {
       // Keep the durable API as the only source of truth. A transient outage
-      // leaves the shell empty and leaves legacy data available for retry.
-      this.pinnedEntries = []
-      this.renderPinnedItems()
+      // keeps the pins already read and leaves legacy data available for retry.
     }
+
+    this.pinnedEntries = pins
+    this.renderPinnedItems()
+  },
+
+  async migrateLegacyPins(pins) {
+    const legacyUrls = this.readLegacyPinnedItems()
+      .filter((item) => item.navId)
+      .map((item) => ({item: this.migratablePinnedItem(item), url: this.pinnedUrl(item)}))
+      .filter(({item, url}) => item && url && this.isServedUrl(url))
+
+    for (const {item, url} of legacyUrls) {
+      if (pins.some((pin) => this.pinnedUrl(pin) === url)) continue
+
+      const imported = await this.pinRequest("/api/pins/toggle", {
+        method: "POST",
+        body: JSON.stringify({label: item.label, url, icon: null}),
+      })
+      if (imported.ok) pins = this.acceptServerPins((await imported.json()).pins)
+    }
+
+    const urls = legacyUrls.map(({url}) => url)
+    const ordered = [
+      ...urls.map((url) => pins.find((pin) => this.pinnedUrl(pin) === url)).filter(Boolean),
+      ...pins.filter((pin) => !urls.includes(this.pinnedUrl(pin))),
+    ]
+
+    if (ordered.some((pin, index) => pin.pinId !== pins[index]?.pinId)) {
+      pins = (await this.reorderServerPins(ordered, false).catch(() => null)) || pins
+    }
+
+    window.localStorage.removeItem?.(PINNED_STORAGE)
+    return pins
   },
 
   migratablePinnedItem(item) {
@@ -499,7 +494,7 @@ const AppShell = {
         method: "POST",
         body: JSON.stringify({label: candidate.label, url, icon: candidate.icon || null}),
       })
-      if (!response.ok) return
+      if (!response.ok) throw new Error(`Pin update failed with status ${response.status}`)
       this.pinnedEntries = this.acceptServerPins((await response.json()).pins)
       this.renderPinnedItems()
     } catch (_error) {
@@ -518,7 +513,7 @@ const AppShell = {
         method: "POST",
         body: JSON.stringify({label: item.label, url, icon: item.icon || null}),
       })
-      if (!response.ok) return
+      if (!response.ok) throw new Error(`Pin update failed with status ${response.status}`)
       this.pinnedEntries = this.acceptServerPins((await response.json()).pins)
       this.renderPinnedItems()
     } catch (_error) {
