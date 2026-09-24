@@ -1322,32 +1322,26 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 />
               </:item>
               <:item title="Company" id="user-view-company">
-                <button
-                  :if={@can_edit? and @editing_field != "company"}
-                  type="button"
-                  id="user-company-display"
-                  phx-click="edit_field"
-                  phx-value-field="company"
-                  aria-label="Edit company"
-                  aria-describedby={@field_status["company"] && "user-company-status"}
-                  class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
+                <.inline_choice
+                  id="user-company"
+                  field="company"
+                  label="Edit company"
+                  editing={@editing_field == "company"}
+                  editable?={@can_edit?}
+                  status={@field_status["company"]}
                 >
-                  <span class="text-ink">{@company_name}</span>
-                  <.icon
-                    name="edit"
-                    class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-                  />
-                </button>
-
-                <%!-- Window-scoped: the select may not hold focus (JS.focus is
-                     best-effort), and Escape must cancel regardless. Only one
-                     editor mounts at a time, so the listener is unambiguous. --%>
-                <div
-                  :if={@can_edit? and @editing_field == "company"}
-                  phx-window-keydown="cancel_edit_field"
-                  phx-key="Escape"
-                >
-                  <form id="user-company-form" phx-change="save_company" class="inline-block">
+                  <:display>
+                    <%= if @company_name do %>
+                      <.link :if={not @can_edit?} navigate={~p"/companies/#{@user.company_id}"} class="text-action hover:underline">
+                        {@company_name}
+                      </.link>
+                      <span :if={@can_edit?} class="text-ink">{@company_name}</span>
+                    <% else %>
+                      <span class="text-ink-muted">Archived company</span>
+                    <% end %>
+                  </:display>
+                  <:editor>
+                    <form id="user-company-form" phx-change="save_company" class="inline-block">
                     <select
                       id="user-company-select"
                       name="company_id"
@@ -1365,7 +1359,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                         {Company.Summary.display_name(company)}
                       </option>
                     </select>
-                  </form>
+                    </form>
 
                   <%!-- The choice commits on change and the write ends the
                        account's sessions, so the warning stands before the
@@ -1374,25 +1368,9 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                   <p id="user-company-warning" class="mt-1 text-xs text-warning-ink">
                     Changing the company signs {@user.name} out of every session.
                   </p>
-                </div>
+                  </:editor>
+                </.inline_choice>
 
-                <%!-- Read-only: a viewer's live company links to its page; an
-                     archived company has no page to reach and no name the
-                     Company API returns. --%>
-                <%= if not @can_edit? do %>
-                  <%= if @company_name do %>
-                    <.link
-                      navigate={~p"/companies/#{@user.company_id}"}
-                      class="text-action hover:underline"
-                    >
-                      {@company_name}
-                    </.link>
-                  <% else %>
-                    <span class="text-ink-muted">Archived company</span>
-                  <% end %>
-                <% end %>
-
-                <.commit_status id="user-company-status" status={@field_status["company"]} />
               </:item>
               <:item title="Email Verified" id="user-view-email-verified">
                 <.badge kind={if @user.email_verified_at, do: :success, else: :warning}>

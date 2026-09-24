@@ -730,35 +730,19 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   slot(:editor, required: true)
 
   defp choice_fact(assigns) do
-    assigns = assign(assigns, :status_id, "#{fact_dom_id(assigns.field)}-status")
-
     ~H"""
-    <button
-      :if={@can_manage? and not @editing}
-      type="button"
-      id={"employee-#{@field}-display"}
-      phx-click="edit_field"
-      phx-value-field={@field}
-      aria-label={@label}
-      aria-describedby={@status && @status_id}
-      class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
+    <.inline_choice
+      id={"employee-#{@field}"}
+      field={@field}
+      label={@label}
+      editing={@editing}
+      editable?={@can_manage?}
+      status={@status}
+      status_id={"#{fact_dom_id(@field)}-status"}
     >
-      {render_slot(@display)}
-      <.icon
-        name="edit"
-        class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-      />
-    </button>
-
-    <%!-- Window-scoped: the select may not hold focus (JS.focus is
-         best-effort), and Escape must cancel regardless. Only one editor
-         mounts at a time, so the listener is unambiguous. --%>
-    <div :if={@can_manage? and @editing} phx-window-keydown="cancel_edit_field" phx-key="Escape">
-      {render_slot(@editor)}
-    </div>
-    <span :if={not @can_manage?}>{render_slot(@display)}</span>
-
-    <.commit_status id={@status_id} status={@status} />
+      <:display>{render_slot(@display)}</:display>
+      <:editor>{render_slot(@editor)}</:editor>
+    </.inline_choice>
     """
   end
 

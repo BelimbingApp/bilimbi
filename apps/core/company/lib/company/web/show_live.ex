@@ -1636,31 +1636,19 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     assigns =
       assigns
       |> assign(:label, fact_label(assigns.name))
-      |> assign(:current, to_string(assigns.value || ""))
 
     ~H"""
-    <button
-      :if={@can_update? and not @editing?}
-      type="button"
-      id={"#{@id}-display"}
-      phx-click="edit_field"
-      phx-value-field={@name}
-      aria-label={"Edit #{String.downcase(@label)}"}
-      aria-describedby={@status && "#{@id}-status"}
-      class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
+    <.inline_choice
+      id={@id}
+      field={@name}
+      label={@label}
+      editing={@editing?}
+      editable?={@can_update?}
+      status={@status}
     >
-      {render_slot(@inner_block)}
-      <.icon
-        name="edit"
-        class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-      />
-    </button>
-
-    <%!-- Window-scoped: the select may not hold focus (JS.focus is
-         best-effort), and Escape must cancel regardless. Only one choice
-         editor mounts at a time, so the listener is unambiguous. --%>
-    <div :if={@can_update? and @editing?} phx-window-keydown="cancel_edit_field" phx-key="Escape">
-      <form id={"#{@id}-form"} phx-change={@save_event} class="inline-block">
+      <:display>{render_slot(@inner_block)}</:display>
+      <:editor>
+        <form id={"#{@id}-form"} phx-change={@save_event} class="inline-block">
         <.combobox
           :if={@name == "jurisdiction"}
           id={"#{@id}-select"}
@@ -1691,12 +1679,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             {label}
           </option>
         </select>
-      </form>
-    </div>
-
-    <span :if={not @can_update?}>{render_slot(@inner_block)}</span>
-
-    <.commit_status id={"#{@id}-status"} status={@status} />
+        </form>
+      </:editor>
+    </.inline_choice>
     """
   end
 
