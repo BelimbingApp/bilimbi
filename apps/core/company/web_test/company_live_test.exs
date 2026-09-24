@@ -1822,18 +1822,19 @@ defmodule BilimbiWeb.CompanyLiveTest do
       refute Enum.any?(companies, &(&1.name == "Broken JSON Co"))
     end
 
-    test "renders jurisdiction country select and persists valid country", %{conn: conn} do
+    test "renders jurisdiction country combobox and persists valid country", %{conn: conn} do
       grant_capabilities!(["admin.company.create", "admin.company.list", "admin.company.view"])
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/create")
 
-      assert has_element?(view, "#company-jurisdiction")
-      assert has_element?(view, "#company-jurisdiction option[value='MY']", "Malaysia (MY)")
+      assert has_element?(view, "#company-jurisdiction[role='combobox']")
+      assert has_element?(view, "#company-jurisdiction-option-MY[role='option']", "Malaysia (MY)")
+      assert has_element?(view, "#company-jurisdiction[placeholder='Select country...']")
 
-      # Belimbing labels each select's empty option differently and on purpose:
-      # "None" for Parent Company, "Select type..." for Legal Entity Type,
-      # "Select country..." here (`create.blade.php:88`).
-      assert has_element?(view, "#company-jurisdiction option[value='']", "Select country...")
+      assert has_element?(
+               view,
+               "#company-jurisdiction-value[name='company[jurisdiction]'][value='']"
+             )
 
       view
       |> form("#company-form",

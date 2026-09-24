@@ -171,7 +171,9 @@ defmodule BilimbiWeb.AddressLiveTest do
 
     assert has_element?(view, "#address-cancel[href='/addresses']", "Cancel")
     assert has_element?(view, "#nav-admin-address[aria-current='page']")
-    assert has_element?(view, "#address-country option[value='MY']", "Malaysia")
+    assert has_element?(view, "#address-country[role='combobox']")
+    assert has_element?(view, "#address-country-option-MY[role='option']", "Malaysia")
+    assert has_element?(view, "#address-country-value[name='address[country_iso]'][value='']")
 
     view
     |> element("#address-form")

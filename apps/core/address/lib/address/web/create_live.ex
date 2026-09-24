@@ -123,12 +123,11 @@ defmodule Bilimbi.Core.Address.Web.CreateLive do
               Location
             </h2>
             <div class="grid gap-x-4 sm:grid-cols-2">
-              <.input
+              <.combobox
                 field={@form[:country_iso]}
                 id="address-country"
-                type="select"
                 label="Country"
-                prompt="Choose a country"
+                placeholder="Choose a country"
                 options={country_options(@countries)}
               />
               <div>

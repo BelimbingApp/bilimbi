@@ -1660,7 +1660,20 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          editor mounts at a time, so the listener is unambiguous. --%>
     <div :if={@can_update? and @editing?} phx-window-keydown="cancel_edit_field" phx-key="Escape">
       <form id={"#{@id}-form"} phx-change={@save_event} class="inline-block">
+        <.combobox
+          :if={@name == "jurisdiction"}
+          id={"#{@id}-select"}
+          name={@name}
+          value={@value}
+          aria-label={@label}
+          placeholder={@prompt || "Choose a country"}
+          options={@options}
+          cancel_event="cancel_edit_field"
+          autofocus
+          wrapper_class="mb-0 inline-block min-w-56"
+        />
         <select
+          :if={@name != "jurisdiction"}
           id={"#{@id}-select"}
           name={@name}
           aria-label={@label}

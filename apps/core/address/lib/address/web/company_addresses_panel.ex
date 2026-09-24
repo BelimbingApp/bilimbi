@@ -1052,11 +1052,11 @@ defmodule Bilimbi.Core.Address.Web.CompanyAddressesPanel do
           <.input field={@address_form[:line3]} id="create-address-line3" label="Address Line 3" />
 
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <.input
-              type="select"
+            <.combobox
               field={@address_form[:country_iso]}
               id="create-address-country-iso"
               label="Country"
+              placeholder="Choose a country"
               options={country_options(@countries)}
             />
             <.input
