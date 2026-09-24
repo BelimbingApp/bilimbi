@@ -323,6 +323,33 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     |> render_change()
 
     assert has_element?(view, "#design-library-filter-full-search[value='Acme']")
+
+    assert has_element?(view, "#filter-toolbar-search-only .hero-magnifying-glass")
+    refute has_element?(view, "#filter-toolbar-search-only select")
+
+    view
+    |> form("#design-library-filter-search-only", %{"toolbar_search" => %{"search" => "Globex"}})
+    |> render_change()
+
+    assert has_element?(view, "#design-library-filter-search-only-search[value='Globex']")
+  end
+
+  test "the action link and timestamp specimens show each way they are called", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    assert has_element?(
+             view,
+             "#design-library-action-link[href='/system/design-library']:not([data-method])"
+           )
+
+    assert has_element?(
+             view,
+             "#design-library-action-link-submit[href='/admin/impersonate/leave'][data-method='post']",
+             "Stop viewing as another user"
+           )
+
+    assert has_element?(view, "#design-library-date-time-second", "14:30:00")
+    refute has_element?(view, "#design-library-date-time", "14:30:00")
   end
 
   test "Components input examples update their visible state", %{conn: conn} do

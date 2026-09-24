@@ -504,7 +504,7 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
   guard shaping the product. Superseded 2026-09-23 by the `revealed` state
   recorded under the coverage entry below: the library presents the banners
   static, so the layout's pair stays the page's only live outlet.
-- [ ] Correct the `:design_library_drift` failures those two slices left, then move the guards into the default test run and `mix precommit`.
+- [x] Correct the `:design_library_drift` failures those two slices left, then move the guards into the default test run and `mix precommit`.
 
   Reconciled by the Design Library state-coverage slice of 2026-09-18, measured
   with `mix test --include design_library_drift` against `2b4a7e8` and against
@@ -592,6 +592,24 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     the `href` and `method` axes are unchanged. A request-form specimen
     needs a POST destination the library does not have, so those three axes
     stay open beside the `<:control>` slot.
+  - **Both guards active — closed 2026-09-24.** Measured again on `32654ee`
+    with `mix test --include design_library_drift`: the coverage guard
+    reported the three `<.action_link>` axes, `<.filter_toolbar>`'s
+    `<:control>` slot and `<.datetime>`'s `precision`, and the imitation
+    guard reported the example `<nav>`. Each was corrected in the library or
+    the component, and neither guard changed.
+    `Layouts.nav_menu/1` now owns the labelled `<nav>` and its
+    `.app-nav-rail` class, the shell's sidebar menu renders through it, and
+    so does the Navigation card, so the library no longer writes the
+    wrapper. A second `<.action_link>` sends a `POST` to the real
+    stop-impersonation route, which ends an impersonation and otherwise
+    returns to the dashboard; that gives `href` and `method` their present
+    state and `navigate` its absent one. `<.filter_toolbar>` declares its
+    `<:control>` slot required, since a toolbar with no control is an empty
+    form no list builds, and the library shows a search-only toolbar beside
+    the full one. The timestamp card adds a to-the-second instant. The
+    `:design_library_drift` tag and its exclusion are gone, so both guards
+    run in every `mix test` and in `mix precommit`.
 - [ ] Record dispositions in the ledger as steward review closes; the accepted choices already live in the Design Spec cards and this plan's ledger. **Rewritten 2026-09-23:** the in-library alternatives surface with catalog IDs is dropped — only one row (INP-09) is still at steward review, catalog IDs are ruled out of the rendered library, and building a surface for a one-row queue is speculative.
 - [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
 
@@ -660,7 +678,7 @@ Goal: Close the campaign with evidence that remains useful as Bilimbi evolves.
 - [ ] Classify every catalog item as Keep Bilimbi, Equivalent, Adopt adapted or Not applicable; no item remains ambiguous.
 - [ ] Verify applicable default, hover, focus, active/open, disabled, loading, validation, error, empty, dark and narrow states.
 - [ ] Verify keyboard movement, focus containment/return, screen-reader semantics, duplicate-work rejection and truthful recovery.
-- [x] Build the Design Library drift guards at the start of the campaign instead of at closeout, so later slices land against them rather than accumulating drift: `apps/base/ui/test/design_library_imitation_test.exs` rejects anchors that name no shared component, hand-written control markup and undeclared specimen cards; `design_library_coverage_test.exs` requires a `component-<name>` block per component and variation on the states it declares, showing at least two of an axis's declared states where it declares two or more and the single one where it declares one. Both read the template through `Bilimbi.Base.UI.DesignLibrarySource`, which owns the rules and is covered on fixtures by `design_library_rules_test.exs`. Both are tagged `:design_library_drift` and stay out of the default run and `mix precommit` until the specimens they report are corrected; run them with `mix test --include design_library_drift`. `{claude-fable-guards-1/claude-fable-5-1}`
+- [x] Build the Design Library drift guards at the start of the campaign instead of at closeout, so later slices land against them rather than accumulating drift: `apps/base/ui/test/design_library_imitation_test.exs` rejects anchors that name no shared component, hand-written control markup and undeclared specimen cards; `design_library_coverage_test.exs` requires a `component-<name>` block per component and variation on the states it declares, showing at least two of an axis's declared states where it declares two or more and the single one where it declares one. Both read the template through `Bilimbi.Base.UI.DesignLibrarySource`, which owns the rules and is covered on fixtures by `design_library_rules_test.exs`. Both landed tagged `:design_library_drift` and out of the default run until the specimens they reported were corrected; since 2026-09-24 they run in every `mix test` and `mix precommit`. `{claude-fable-guards-1/claude-fable-5-1}`
 - [ ] Add guards for raw palette use, local component forks, missing Design Library states and unregistered icons where deterministic checks are useful.
 - [ ] Run component, LiveView, module workflow, asset and full precommit validation.
 - [ ] Record the accepted dispositions in this plan and in HTML comments — catalog IDs stay in the plan, comments, test names and element ids, never in rendered text — and close the execution issues with browser evidence.
@@ -764,13 +782,12 @@ All four merged on 2026-09-15 and closed their issues:
 | #720 | Design Library missing component states | https://github.com/BelimbingApp/bilimbi/pull/716 |
 | #721 | Shell display controls with live-following timestamps | https://github.com/BelimbingApp/bilimbi/pull/717 |
 
-Not finished by #719 and #720: the `:design_library_drift` guards report four failures
-on `main`, so #722's guards land excluded from the default test run and from
-`mix precommit`. Correcting those four and activating the guards is the open Phase 1
-checklist row above. #722 being merged does not mean the guards are active. The
-state-coverage slice of 2026-09-18 corrected most of what those four report, and the
-anchor-hygiene slice of 2026-09-23 cleared the anchor rule; that row records what each
-closed, what it leaves accepted and what stays open.
+Not finished by #719 and #720: the `:design_library_drift` guards reported four failures
+on `main`, so #722's guards landed excluded from the default test run and from
+`mix precommit`. The state-coverage slice of 2026-09-18 corrected most of what those
+four reported, the anchor-hygiene slice of 2026-09-23 cleared the anchor rule, and the
+remaining specimens were corrected on 2026-09-24, when both guards joined the default
+run. The Phase 1 checklist row above records what each step closed.
 
 ### Empty and permission region slice — no child issue
 

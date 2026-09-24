@@ -3,15 +3,12 @@ defmodule Bilimbi.Base.UI.DesignLibraryRulesTest do
   Exercises the Design Library drift rules on fixtures rather than on the
   library itself.
 
-  `Bilimbi.Base.UI.DesignLibraryImitationTest` reports what today's template
-  does wrong, so it cannot also show that the rules still catch the next
-  imitation: a rule that silently stopped matching would leave that suite red
-  for the reasons it is already red. These fixtures close that gap. Each one
-  is a minimal components area, and each assertion says which specimens the
-  rules must reject and which they must leave alone.
-
-  This module is deliberately not tagged `:design_library_drift`; it runs on
-  every `mix test` and must stay green.
+  `Bilimbi.Base.UI.DesignLibraryImitationTest` passes when today's template
+  holds no imitation, so it cannot also show that the rules still catch the
+  next one: a rule that silently stopped matching would leave that suite green
+  for the wrong reason. These fixtures close that gap. Each one is a minimal
+  components area, and each assertion says which specimens the rules must
+  reject and which they must leave alone.
   """
 
   use ExUnit.Case, async: true

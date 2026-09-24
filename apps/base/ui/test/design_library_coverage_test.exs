@@ -26,10 +26,6 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   `component-<name>` block of its own that calls it; the library's own chrome
   and the containers that frame some *other* specimen do not count, and they
   contribute no state either.
-
-  These guards are excluded from the default run until the Design Library
-  specimens they report are corrected. Run them with
-  `mix test --include design_library_drift`.
   """
 
   use ExUnit.Case, async: true
@@ -37,8 +33,6 @@ defmodule Bilimbi.Base.UI.DesignLibraryCoverageTest do
   alias Bilimbi.Base.UI.Components
   alias Bilimbi.Base.UI.DesignLibrarySource, as: Source
   alias Bilimbi.Base.UI.IconRegistry
-
-  @moduletag :design_library_drift
 
   setup_all do
     tree = Source.tree()

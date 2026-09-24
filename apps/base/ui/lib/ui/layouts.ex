@@ -198,17 +198,13 @@ defmodule Bilimbi.Base.UI.Layouts do
             <div class="app-pinned-divider mx-1 my-0.5 h-px bg-line/50" aria-hidden="true"></div>
           </div>
 
-          <nav
+          <.nav_menu
             id="app-nav"
-            aria-label="Main navigation"
+            aria_label="Main navigation"
+            nodes={@nav}
+            active_nav={@active_nav}
             class="flex-1 overflow-y-auto px-0.5 py-0.5"
           >
-            <.nav_branch
-              :for={node <- @nav}
-              node={node}
-              active_nav={@active_nav}
-              depth={0}
-            />
             <p
               :if={@nav == []}
               id="app-nav-empty"
@@ -216,7 +212,7 @@ defmodule Bilimbi.Base.UI.Layouts do
             >
               No destinations are available for this account. Ask an operator to assign a role.
             </p>
-          </nav>
+          </.nav_menu>
 
           <ShellComponents.account_menu id="app-user" current_scope={@current_scope} />
         </aside>
@@ -311,17 +307,53 @@ defmodule Bilimbi.Base.UI.Layouts do
   end
 
   @doc """
+  The sidebar's navigation menu: a labelled `<nav>` holding one
+  `nav_branch/1` per root node.
+
+  The shell renders its menu through this, and so does the Design Library, so
+  the library shows the menu the sidebar ships rather than a copy of its
+  wrapper. The element always carries `.app-nav-rail`, the class `app.css`
+  keys the rows' type scale, colours and carets to, so the menu reads the same
+  inside `#app-sidebar` and anywhere else it is shown.
+
+  `pinnable` is false outside the sidebar, for the reason given on
+  `nav_branch/1`. The inner block renders after the rows; the shell uses it
+  for the sentence shown when an account has no destinations.
+  """
+  attr(:id, :string, required: true)
+  attr(:aria_label, :string, required: true, doc: "names the menu for assistive technology")
+  attr(:nodes, :list, required: true, doc: "root `Bilimbi.Base.UI.Nav` tree entries")
+  attr(:active_nav, :string, default: nil)
+  attr(:pinnable, :boolean, default: true)
+  attr(:class, :any, default: nil, doc: "the container's placement and surface")
+  slot(:inner_block)
+
+  def nav_menu(assigns) do
+    ~H"""
+    <nav id={@id} aria-label={@aria_label} class={["app-nav-rail", @class]}>
+      <.nav_branch
+        :for={node <- @nodes}
+        node={node}
+        active_nav={@active_nav}
+        depth={0}
+        pinnable={@pinnable}
+      />
+      {render_slot(@inner_block)}
+    </nav>
+    """
+  end
+
+  @doc """
   One sidebar navigation node: a leaf row, or a branch with its children.
 
-  Public so the Design Library renders the rail the shell actually ships rather
-  than a look-alike. `node` is a `Bilimbi.Base.UI.Nav` tree entry —
+  `nav_menu/1` renders these for the shell and the Design Library alike.
+  `node` is a `Bilimbi.Base.UI.Nav` tree entry —
   `%{item: %Bilimbi.Base.Menu.Item{}, children: [node]}` — and `active_nav` is
   the menu id of the current page, which marks that row and accents its
   ancestors.
 
   Rows take their type scale, colours, icon suppression and caret direction
-  from the `.app-nav-rail` rules in `app.css`, so a container outside
-  `#app-sidebar` must carry that class to render what the shell renders.
+  from the `.app-nav-rail` rules in `app.css`, which `nav_menu/1` carries.
 
   `pinnable` is false outside the sidebar. `AppShell.resolvePinnedItem/1`
   resolves a pinned id only against `#app-sidebar`, so a pin control anywhere

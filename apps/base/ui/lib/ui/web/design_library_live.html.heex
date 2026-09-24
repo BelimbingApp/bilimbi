@@ -656,20 +656,16 @@
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
               <.card id="design-library-navigation" title="Navigation" inner_class="space-y-2 p-3">
-                <nav
+                <Layouts.nav_menu
                   id="example-nav"
-                  aria-label="Example menu"
-                  class="app-nav-rail max-w-xs rounded-lg bg-surface-sidebar px-0.5 py-0.5"
-                >
-                  <Layouts.nav_branch
-                    :for={node <- @nav_example}
-                    node={node}
-                    active_nav={@nav_example_active}
-                    pinnable={false}
-                  />
-                </nav>
+                  aria_label="Example menu"
+                  nodes={@nav_example}
+                  active_nav={@nav_example_active}
+                  pinnable={false}
+                  class="max-w-xs rounded-lg bg-surface-sidebar px-0.5 py-0.5"
+                />
                 <p class="text-xs text-ink-muted">
-                  The shell's own rail rows, over an example tree: a leaf, an expanded
+                  The shell's own menu, over an example tree: a leaf, an expanded
                   branch accented for the current page, and the selected child. Both rail
                   behaviours belong to the sidebar rather than to these rows. Pinning is
                   left out: the shell resolves a pinned row only from the sidebar, and
@@ -717,7 +713,19 @@
                   >
                     Department Types
                   </.action_link>
+                  <.action_link
+                    id="design-library-action-link-submit"
+                    icon="bilimbi-impersonate"
+                    href={~p"/admin/impersonate/leave"}
+                    method="post"
+                    title="Stop viewing as another user"
+                  >
+                    Stop viewing as another user
+                  </.action_link>
                 </div>
+                <p class="mt-2 text-xs text-ink-muted">
+                  An action that sends a request rather than opening a page takes a destination and a method in place of a page to open, and keeps the same treatment, so Impersonate sits in a header row beside History and Back. This one sends the real request to stop viewing as another user: it ends an impersonation, and with none in progress it returns to the dashboard.
+                </p>
               </.card>
             </div>
           </section>
@@ -1674,6 +1682,12 @@
                     format={:time}
                   />
                 </div><div class="flex justify-between gap-4 text-sm">
+                  <span class="text-ink-muted">To the second</span><.datetime
+                    id="design-library-date-time-second"
+                    value={@sample_datetime}
+                    precision={:second}
+                  />
+                </div><div class="flex justify-between gap-4 text-sm">
                   <span class="text-ink-muted">Not set</span><.datetime
                     id="design-library-date-empty"
                     value={nil}
@@ -1804,6 +1818,22 @@
                     id="design-library-filter-full-end-date"
                     label="End date"
                     hint="UTC"
+                  />
+                </.filter_toolbar>
+              </div>
+              <div id="filter-toolbar-search-only" class="border-t border-line pt-4">
+                <h3 class="mb-2 text-sm font-semibold text-ink">Search alone</h3>
+                <.filter_toolbar
+                  id="design-library-filter-search-only"
+                  form={@filter_toolbar_search_form}
+                  event="filter-toolbar-search-preview"
+                >
+                  <:control
+                    type={:search}
+                    field={@filter_toolbar_search_form[:search]}
+                    id="design-library-filter-search-only-search"
+                    label="Search example records"
+                    placeholder="Search example records…"
                   />
                 </.filter_toolbar>
               </div>
