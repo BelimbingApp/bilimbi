@@ -1,0 +1,14 @@
+{
+  "name": "bilimbi-web-assets",
+  "private": true,
+  "description": "Tests for the LiveView hooks in js/. The hooks ship through esbuild, not npm; this manifest exists only for the test runner.",
+  "scripts": {
+    "test": "node --import ./test/support/dom.mjs --test --test-reporter=spec \"test/**/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "20.14.5"
+  }
+}

@@ -50,10 +50,12 @@ defmodule Bilimbi.Umbrella.MixProject do
         "compile --warnings-as-errors",
         "deps.unlock --unused",
         "format",
+        "assets.test",
         "precommit.test",
         "bilimbi.contributions.verify"
       ],
-      "precommit.test": &precommit_test/1
+      "precommit.test": &precommit_test/1,
+      "assets.test": &assets_test/1
     ]
   end
 
@@ -84,6 +86,40 @@ defmodule Bilimbi.Umbrella.MixProject do
     end)
 
     :ok
+  end
+
+  # The LiveView hooks in apps/web/assets/js are tested in Node, with the test
+  # runner Node ships and one DOM library (apps/web/assets/package.json). The
+  # library is installed on first use and again whenever the lockfile changes.
+  defp assets_test(_args) do
+    dir = Path.expand("apps/web/assets", __DIR__)
+
+    npm =
+      System.find_executable("npm") ||
+        Mix.raise("mix assets.test needs Node.js 22 or later, with npm, on the PATH")
+
+    unless assets_test_installed?(dir), do: npm!(npm, ["ci", "--no-audit", "--no-fund"], dir)
+
+    npm!(npm, ["test"], dir)
+  end
+
+  # `npm ci` writes node_modules/.package-lock.json last, so it is newer than
+  # the lockfile it installed from until that lockfile changes.
+  defp assets_test_installed?(dir) do
+    with {:ok, %{mtime: installed}} <-
+           File.stat(Path.join(dir, "node_modules/.package-lock.json")),
+         {:ok, %{mtime: locked}} <- File.stat(Path.join(dir, "package-lock.json")) do
+      installed >= locked
+    else
+      _missing -> false
+    end
+  end
+
+  defp npm!(npm, args, dir) do
+    case System.cmd(npm, args, cd: dir, into: IO.stream(:stdio, :line), stderr_to_stdout: true) do
+      {_output, 0} -> :ok
+      {_output, status} -> exit({:shutdown, status})
+    end
   end
 
   defp report_skipped_precommit_tests([]), do: :ok

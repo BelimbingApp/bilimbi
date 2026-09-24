@@ -55,8 +55,9 @@ window.addEventListener("phx:page-loading-stop", _info => topbar.hide())
 // server's attribute stands.
 //
 // This carries every `phx-disable-with` control in the product and no test
-// exercises it -- there is no JS runner here. It rests on three things that
-// hold in phoenix_live_view 1.2.9 and are not ours to guarantee:
+// exercises it: the hook tests in assets/test stand in for LiveView, and this
+// depends on LiveView's own push. It rests on three things that hold in
+// phoenix_live_view 1.2.9 and are not ours to guarantee:
 //
 //   1. `phx:push` details keep `isLoading` and a `loadingComplete` promise;
 //   2. LiveView keeps dispatching `phx:push` on the submitter -- once a submit
