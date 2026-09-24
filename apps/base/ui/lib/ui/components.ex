@@ -1415,8 +1415,9 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
-  Renders the shared list filter toolbar: search fields, selects, and date
-  inputs framed as one open toolbar above the list surface (Design Spec C04).
+  Renders the shared list filter toolbar: search fields, selects,
+  multi-selects, and date inputs framed as one open toolbar above the list
+  surface (Design Spec C04).
 
   Controls are declared through one repeating `control` slot, at least one of
   them, and render in the order they are written, so the template reads the
@@ -1441,10 +1442,10 @@ defmodule Bilimbi.Base.UI.Components do
     * Labels are always screen-reader only. A page that shows some and hides
       others drops the labelled controls below their row-mates, because a
       visible label adds a row of height only some cells carry.
-    * Helper text sits below its control in one shape. A select's and a date's
-      rides its own `input`; a search box's sits below the box the magnifier
-      is centred in, so helper text never stretches that box and drags the
-      magnifier off the input.
+    * Helper text sits below its control in one shape. A select's, a
+      multi-select's, and a date's rides its own field component; a search
+      box's sits below the box the magnifier is centred in, so helper text
+      never stretches that box and drags the magnifier off the input.
     * Cells wrap instead of squeezing. Each control is its own flex item, so
       native date inputs stack on a narrow viewport rather than holding a
       grid row wider than the page.
