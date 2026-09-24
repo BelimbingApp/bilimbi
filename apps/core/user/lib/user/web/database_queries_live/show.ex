@@ -109,7 +109,11 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
           |> assign(:results_filters_form, results_filters_form(page_size))
 
         # Automatically execute query if SQL is non-empty
-        {:noreply, if(String.trim(sql) != "", do: execute_query(socket), else: socket)}
+        {:noreply,
+         if(String.trim(sql) != "",
+           do: socket |> execute_query() |> clamp_result_page(),
+           else: socket
+         )}
 
       {:error, _} ->
         {:noreply,
@@ -212,10 +216,7 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
     if sql == "" do
       {:noreply, assign(socket, error: "Please enter a SQL query first.", results: nil)}
     else
-      {:noreply,
-       socket
-       |> assign(:result_page, 1)
-       |> execute_query()}
+      {:noreply, show_result_page(socket, 1)}
     end
   end
 
@@ -233,19 +234,12 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
      socket
      |> assign(:result_sort_by, column)
      |> assign(:result_sort_dir, sort_dir)
-     |> assign(:result_page, 1)
-     |> execute_query()}
+     |> show_result_page(1)}
   end
 
   @impl true
   def handle_event("page_results", %{"page" => page}, socket) do
-    page_num = result_page(page)
-
-    if persist_result_nav?(socket) do
-      {:noreply, push_patch(socket, to: result_path(socket, page: page_num))}
-    else
-      {:noreply, socket |> assign(:result_page, page_num) |> execute_query()}
-    end
+    {:noreply, show_result_page(socket, result_page(page))}
   end
 
   @impl true
@@ -395,6 +389,29 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
     |> assign(:result_per_page, page_size)
     |> assign(:results_filters_form, results_filters_form(page_size))
     |> execute_query()
+    |> clamp_result_page()
+  end
+
+  # Run, sort, and the pager all land on a result page. A saved query moves
+  # there through the URL, so a reload shows the page on screen.
+  defp show_result_page(socket, page) do
+    if persist_result_nav?(socket) do
+      push_patch(socket, to: result_path(socket, page: page))
+    else
+      socket |> assign(:result_page, page) |> execute_query()
+    end
+  end
+
+  # A URL page past the last result page, from a stale bookmark or a
+  # statement that now returns fewer rows, patches to the last page.
+  defp clamp_result_page(socket) do
+    case socket.assigns.results do
+      %{total_pages: last} when socket.assigns.result_page > last ->
+        push_patch(socket, to: result_path(socket, page: last), replace: true)
+
+      _ ->
+        socket
+    end
   end
 
   defp result_path(socket, opts) do

@@ -680,6 +680,48 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
              )
     end
 
+    test "a result page past the last page lands on the last page, and Run returns the URL to page one",
+         %{conn: conn, scope: scope} do
+      grant_capabilities!("admin.system.database-table.list")
+
+      {:ok, query} =
+        User.create_database_query(scope, 91, %{
+          name: "Series",
+          sql_query: "SELECT * FROM generate_series(1, 30)"
+        })
+
+      conn = log_in_as(conn)
+
+      assert {:error, {:live_redirect, %{to: clamped_path}}} =
+               live(conn, ~p"/admin/system/database-queries/#{query.slug}?page=9&page_size=25")
+
+      clamped = clamped_path |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+      assert clamped["page"] == "2"
+
+      {:ok, view, _html} = live(conn, clamped_path)
+
+      assert has_element?(
+               view,
+               "#query-results-pagination-summary",
+               "Showing 26 to 30 of 30 results"
+             )
+
+      view
+      |> form("#query-sql-form", %{sql_query: "SELECT * FROM generate_series(1, 5)"})
+      |> render_change()
+
+      view |> element("#btn-run-query") |> render_click()
+
+      ran = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+      assert ran["page"] == "1"
+
+      assert has_element?(
+               view,
+               "#query-results-pagination-summary",
+               "Showing 1 to 5 of 5 results"
+             )
+    end
+
     test "renders the result set through the shared table, one sort button per column", %{
       conn: conn,
       scope: scope
