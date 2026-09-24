@@ -2,13 +2,19 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
   @moduledoc """
   Header affordance for a single auditable record's recent mutation trail.
 
-  The trigger is a demoted labelled action, not a button: history is a
-  familiar secondary action, so it is the registry's `history` glyph (the
-  clock Belimbing uses for the same action) beside the word "History", in the
-  one quiet treatment `Bilimbi.Base.UI.Components.demoted_action_class/0`
+  The trigger is a demoted labelled action: the registry's `history` glyph
+  (the clock Belimbing uses for the same action) beside the word "History",
+  in the one quiet treatment `Bilimbi.Base.UI.Components.demoted_action_class/0`
   gives every demoted header action. Belimbing's `admin/*/show` pages present
   it exactly so, as a labelled ghost control in the row with Impersonate and
   Back, so the word is visible rather than kept for assistive technology.
+
+  It is a disclosure button, the same contract the shell's account and
+  timezone disclosures and the notification bell keep. `aria-expanded`
+  follows the server's open state. Opening moves focus into the panel.
+  Escape closes it and returns focus to the trigger, and a click outside
+  closes it. The panel exists only while open, so a closed history never
+  claims Escape. The trigger is not a data-changing `<.button>`: it discloses.
 
   ## Staying current
 
@@ -17,9 +23,10 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
 
     * The panel re-reads the trail every time it is opened, so what the
       reader sees on opening it is the record's history as of that moment,
-      whoever wrote it. The open state is the server's (`open={@open}`),
-      because a browser-only `open` attribute would be dropped by the next
-      DOM patch, and the summary's click flips both in step.
+      whoever wrote it. The open state is the server's (`aria-expanded` and
+      whether the panel is rendered), because a browser-only open flag would
+      be dropped by the next DOM patch, and the trigger's click flips both
+      in step.
     * The page passes the record itself as `record`, beside the
       `auditable_id` the read needs. A LiveView re-renders a component only
       when an assign it was given changes, and it tracks `@user.id` at the
@@ -60,6 +67,18 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
     end
   end
 
+  # Click-away and Escape close. They do not toggle: a click outside a
+  # closed history still reaches this handler, and opening it would turn
+  # every page click into a disclosure.
+  @impl true
+  def handle_event("close", _params, %{assigns: %{open: true}} = socket) do
+    {:noreply, assign(socket, :open, false)}
+  end
+
+  def handle_event("close", _params, socket) do
+    {:noreply, socket}
+  end
+
   defp load_entries(socket) do
     {:ok, entries} =
       Audit.list_subject_mutations(
@@ -74,28 +93,41 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
   @impl true
   def render(assigns) do
     ~H"""
-    <div id={@id} class="relative inline-block text-left">
-      <details class="group" open={@open}>
-        <summary
-          id={"#{@id}-toggle"}
-          title="History"
-          phx-click="toggle"
-          phx-target={@myself}
-          class={[
-            Bilimbi.Base.UI.Components.demoted_action_class(),
-            "cursor-pointer list-none [&::-webkit-details-marker]:hidden"
-          ]}
-        >
-          <.icon name="history" class="size-4" /> History
-        </summary>
+    <div
+      id={@id}
+      class="relative inline-block text-left"
+      phx-click-away={if(@open, do: JS.push("close", target: @myself))}
+    >
+      <button
+        type="button"
+        id={"#{@id}-toggle"}
+        title="History"
+        phx-click="toggle"
+        phx-target={@myself}
+        aria-expanded={to_string(@open)}
+        aria-controls={"#{@id}-panel"}
+        class={[Bilimbi.Base.UI.Components.demoted_action_class(), "cursor-pointer"]}
+      >
+        <.icon name="history" class="size-4" /> History
+      </button>
 
-        <div
-          id={"#{@id}-panel"}
-          class="absolute right-0 z-40 mt-2 w-[min(34rem,calc(100vw-2rem))] rounded-xl border border-line bg-surface p-3 text-left shadow-xl shadow-ink/[0.08]"
-        >
+      <%!-- The panel follows the shell's disclosures and the notification
+           bell: it mounts only while open, so phx-mounted moves focus in
+           and the Escape listener exists only then. The panel itself is
+           focusable because a trail is text, not a list of controls. --%>
+      <div
+        :if={@open}
+        id={"#{@id}-panel"}
+        tabindex="-1"
+        aria-labelledby={"#{@id}-heading"}
+        phx-mounted={JS.focus()}
+        phx-window-keydown={JS.push("close", target: @myself) |> JS.focus(to: "##{@id}-toggle")}
+        phx-key="escape"
+        class="absolute right-0 z-40 mt-2 w-[min(34rem,calc(100vw-2rem))] rounded-xl border border-line bg-surface p-3 text-left shadow-xl shadow-ink/[0.08] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
+      >
           <div class="flex items-start justify-between gap-3 border-b border-line pb-2">
             <div>
-              <h2 class="text-sm font-semibold text-ink">{@title}</h2>
+              <h2 id={"#{@id}-heading"} class="text-sm font-semibold text-ink">{@title}</h2>
               <p class="text-xs text-ink-muted">{history_count(@entries)}</p>
             </div>
           </div>
@@ -153,7 +185,6 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
             No record history found.
           </p>
         </div>
-      </details>
     </div>
     """
   end

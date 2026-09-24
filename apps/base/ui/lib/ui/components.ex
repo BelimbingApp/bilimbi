@@ -3044,15 +3044,15 @@ defmodule Bilimbi.Base.UI.Components do
 
   @doc """
   The one treatment for a demoted secondary action: a quiet labelled control
-  in `text-link` that darkens on hover, never a button.
+  in `text-link` that darkens on hover.
 
   `<.back_link>` and `<.action_link>` are the link members of the family and
   apply it themselves. It is public for the one member that is structurally
-  not a link: the `record.history` trigger is the `<summary>` of a
-  `<details>` and takes this class so History sits in the header row as the
-  same kind of thing as Impersonate and Back, as Belimbing's
-  `admin/*/show` pages present it. Do not use it to style a button as a
-  link; a control that changes data is a `<.button>`.
+  not a link: the `record.history` trigger is a disclosure button. It takes
+  this class so History sits in the header row as the same kind of thing as
+  Impersonate and Back, as Belimbing's `admin/*/show` pages present it.
+  The button discloses; it does not change data. Do not use this class to
+  style a control that changes data — that control is a `<.button>`.
   """
   @spec demoted_action_class() :: String.t()
   def demoted_action_class do

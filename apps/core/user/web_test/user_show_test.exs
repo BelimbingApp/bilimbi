@@ -216,14 +216,25 @@ defmodule BilimbiWeb.UserShowTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
 
-    # History is a demoted labelled action, as Belimbing's admin/users/show
+    # History is a demoted labelled disclosure, as Belimbing's admin/users/show
     # presents it: the clock beside its word, in the back link's quiet
-    # treatment, never a button.
-    assert has_element?(view, "summary#user-record-history-toggle[title='History']", "History")
-    assert has_element?(view, "summary#user-record-history-toggle.text-link")
+    # treatment. It is a button because that is the disclosure contract.
+    assert has_element?(
+             view,
+             "button#user-record-history-toggle[title='History'][aria-expanded='false'][aria-controls='user-record-history-panel']",
+             "History"
+           )
+
+    assert has_element?(view, "button#user-record-history-toggle.text-link")
     assert has_element?(view, "#user-record-history-toggle .hero-clock")
-    refute has_element?(view, "button#user-record-history-toggle")
-    refute has_element?(view, "main header button:not(#user-pin)")
+    refute has_element?(view, "summary#user-record-history-toggle")
+
+    refute has_element?(
+             view,
+             "main header button:not(#user-pin):not(#user-record-history-toggle)"
+           )
+
+    view |> element("#user-record-history-toggle") |> render_click()
     assert has_element?(view, "#user-record-history-panel", "old@example.com")
     assert has_element?(view, "#user-record-history-panel", "grace@example.com")
   end
@@ -241,10 +252,11 @@ defmodule BilimbiWeb.UserShowTest do
     grant_capabilities!(["admin.user.view", "admin.user.update", "admin.audit.log.list"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
+    view |> element("#user-record-history-toggle") |> render_click()
     assert has_element?(view, "#user-record-history-empty")
 
-    # The page's own Updated fact follows the write; the trail must too. A
-    # trail that stood still here was the loophole: the row was captured,
+    # The page's own Updated fact follows the write; the open trail must too.
+    # A trail that stood still here was the loophole: the row was captured,
     # and the panel never re-read it because the record's id had not changed.
     render_hook(view, "save_field", %{"id" => "92", "name" => "Grace Brewster Hopper"})
     assert has_element?(view, "h1", "Grace Brewster Hopper")
@@ -272,8 +284,10 @@ defmodule BilimbiWeb.UserShowTest do
     grant_capabilities!(["admin.user.view", "admin.audit.log.list"])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
-    assert has_element?(view, "#user-record-history-empty")
-    refute has_element?(view, "#user-record-history details[open]")
+    assert has_element?(view, "#user-record-history-toggle[aria-expanded='false']")
+    refute has_element?(view, "#user-record-history-panel")
+    refute has_element?(view, "#user-record-history [phx-window-keydown]")
+    refute has_element?(view, "#user-record-history details")
 
     # A write from elsewhere — another session, a job — lands after mount.
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
@@ -293,13 +307,36 @@ defmodule BilimbiWeb.UserShowTest do
       })
 
     # Opening the panel shows the trail as of now, and the panel stays open
-    # across the patch that carries it.
+    # across the patch that carries it. Focus moves into the panel; Escape
+    # closes it and returns focus to the trigger. A closed history claims
+    # no key.
     view |> element("#user-record-history-toggle") |> render_click()
-    assert has_element?(view, "#user-record-history details[open]")
+    assert has_element?(view, "#user-record-history-toggle[aria-expanded='true']")
+
+    assert has_element?(
+             view,
+             "#user-record-history-panel[tabindex='-1'][phx-mounted][phx-key='escape']"
+           )
+
     assert has_element?(view, "#user-record-history-entry-#{mutation.id}", "old@example.com")
 
+    panel = view |> element("#user-record-history-panel") |> render()
+    assert panel =~ "phx-window-keydown"
+    assert panel =~ "focus"
+    assert panel =~ "#user-record-history-toggle"
+    assert panel =~ "close"
+
+    view |> element("#user-record-history-panel") |> render_keydown(%{"key" => "Escape"})
+    assert has_element?(view, "#user-record-history-toggle[aria-expanded='false']")
+    refute has_element?(view, "#user-record-history-panel")
+    refute has_element?(view, "#user-record-history [phx-window-keydown]")
+
     view |> element("#user-record-history-toggle") |> render_click()
-    refute has_element?(view, "#user-record-history details[open]")
+    assert has_element?(view, "#user-record-history-toggle[aria-expanded='true']")
+
+    view |> element("#user-record-history-toggle") |> render_click()
+    assert has_element?(view, "#user-record-history-toggle[aria-expanded='false']")
+    refute has_element?(view, "#user-record-history-panel")
   end
 
   test "hides the destructive action without admin.user.delete", %{conn: conn} do

@@ -39,9 +39,10 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   every write re-asks Authz before it lands.
 
   The header's actions row carries the record's status, record history as the
-  demoted labelled action — the registry's `history` clock beside the visible
-  word "History" — and a plain "← Back" link, and no button; the title row
-  keeps the pin icon action. The Departments and Relationships
+  demoted labelled disclosure — the registry's `history` clock beside the
+  visible word "History" — and a plain "← Back" link. History is that row's
+  button; Back is a link. The title row keeps the pin icon action. There is
+  no edit button. The Departments and Relationships
   workflows are reached through the demoted "Manage" link on the section that
   lists them, carrying the registry's `manage` glyph, which is the cog
   Belimbing uses for the same action.
@@ -956,11 +957,11 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
           <:actions>
             <%!-- Status is record metadata, not an action: it leads the row so
                  the demoted actions (History, then Back) cluster after it
-                 (#685). This row holds no button — the pin icon action sits
-                 in the title row above: Departments and Relationships are
-                 reached from the sections that list them, as Belimbing's
-                 admin/companies/show does, so the header never duplicates a
-                 section's own "Manage" link. --%>
+                 (#685). History is the disclosure button; Back is a link.
+                 The pin icon action sits in the title row above. Departments
+                 and Relationships are reached from the sections that list
+                 them, as Belimbing's admin/companies/show does, so the header
+                 never duplicates a section's own "Manage" link. --%>
             <div class="flex items-center gap-3">
               <.status_badge status={@company.status} />
               <.discovered_panel

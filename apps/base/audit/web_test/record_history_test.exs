@@ -128,13 +128,56 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
     assert old != new
   end
 
-  defp render_panel(scope, mutation) do
+  test "the trigger is a disclosure button and only an open panel claims Escape", %{scope: scope} do
+    {:ok, mutation} =
+      Audit.record_mutation(scope, %{
+        company_id: 73,
+        actor_type: "user",
+        actor_id: 91,
+        auditable_type: "Bilimbi.Core.Widget.Schema",
+        auditable_id: "7",
+        event: "created",
+        occurred_at: ~N[2026-08-18 10:00:00],
+        old_values: %{},
+        new_values: %{"name" => "Widget"}
+      })
+
+    closed = render_panel(scope, mutation, open: false)
+
+    assert text(
+             closed,
+             "button#history-toggle[aria-expanded='false'][aria-controls='history-panel'][title='History']"
+           ) ==
+             "History"
+
+    refute closed =~ "<details"
+    refute closed =~ "<summary"
+    refute closed =~ "phx-window-keydown"
+    refute closed =~ "phx-click-away"
+    refute closed =~ "id=\"history-panel\""
+
+    open = render_panel(scope, mutation, open: true)
+
+    assert text(open, "button#history-toggle[aria-expanded='true']") == "History"
+    assert open =~ "aria-expanded=\"true\""
+    assert open =~ "id=\"history-panel\""
+    assert open =~ "phx-mounted"
+    assert open =~ "phx-key=\"escape\""
+    assert open =~ "phx-window-keydown"
+    assert open =~ "phx-click-away"
+    assert open =~ "#history-toggle"
+    assert open =~ "tabindex=\"-1\""
+    assert text(open, "#history-entry-#{mutation.id}-name-new") == "Widget"
+  end
+
+  defp render_panel(scope, mutation, opts \\ []) do
     render_component(RecordHistory,
       id: "history",
       current_scope: %{scope: scope},
       auditable_types: [mutation.auditable_type],
       auditable_id: mutation.auditable_id,
-      record: nil
+      record: nil,
+      open: Keyword.get(opts, :open, true)
     )
   end
 

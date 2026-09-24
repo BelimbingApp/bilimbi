@@ -497,10 +497,18 @@ defmodule BilimbiWeb.AddressLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
 
-    # History is a demoted icon action carrying Belimbing's clock, not a button.
-    assert has_element?(view, "summary#address-record-history-toggle[title='History']", "History")
+    # History is a demoted labelled disclosure carrying Belimbing's clock.
+    assert has_element?(
+             view,
+             "button#address-record-history-toggle[title='History'][aria-expanded='false']",
+             "History"
+           )
+
     assert has_element?(view, "#address-record-history-toggle .hero-clock")
     refute has_element?(view, "#address-record-history-toggle .hero-clipboard-document-list")
+    refute has_element?(view, "summary#address-record-history-toggle")
+
+    view |> element("#address-record-history-toggle") |> render_click()
 
     assert has_element?(
              view,
@@ -623,11 +631,13 @@ defmodule BilimbiWeb.AddressLiveTest do
     ])
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/addresses/#{address.id}")
+    view |> element("#address-record-history-toggle") |> render_click()
+    refute has_element?(view, "#address-record-history-panel", "Headquarters")
 
     render_hook(view, "save_field", %{"id" => to_string(address.id), "label" => "Headquarters"})
     assert has_element?(view, "#address-label-status[role='status']", "Saved")
 
-    # On the same view: the trail follows the edit without a remount.
+    # On the same view: the open trail follows the edit without a remount.
     refute has_element?(view, "#address-record-history-empty")
     assert has_element?(view, "#address-record-history-panel", "Head Office")
     assert has_element?(view, "#address-record-history-panel", "Headquarters")
