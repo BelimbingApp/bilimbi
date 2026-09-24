@@ -179,6 +179,12 @@ certification evidence.
   Formula/BOM, and Routing describe what may be made; Operation Execution
   records actual inputs, outputs, quantities, resources, locations, timings,
   and variance while retaining the selected definition and route context.
+- A configured minimum age, such as a cure duration, holds a material unit
+  from consumption until it has elapsed. Production refuses an under-age
+  consumption by default. An override requires an explicit Base Authz
+  capability and a mandatory reason, and is kept as an immutable operational
+  override record with actor, time, reason, and affected unit. The record is
+  not a Quality nonconformance; the later Quality module may consume it.
 - Operation is the logical step. Work Centre/Resource is the physical machine,
   line, station, or other capacity performing it. Both may be referenced by
   execution context without making Stock understand either concept.
@@ -244,11 +250,16 @@ standalone boundary.
   optional opaque execution, order or batch, and Work Centre/Resource context.
 - [ ] Implement Manufacturing trace as views over Stock genealogy, not a
   second ancestry store.
-- [ ] Store process families, route templates, tolerances, output roles, and
-  process-specific conversion bases as Domain-owned configuration data.
+- [ ] Store process families, route templates, tolerances, output roles,
+  minimum-age holds, and process-specific conversion bases as Domain-owned
+  configuration data.
+- [ ] Refuse under-age consumption by default, and accept an override only
+  with its explicit Base Authz capability and a mandatory reason, recorded as
+  an immutable operational override record.
 
 Validation: a configured execution can be posted and traced in both directions
-through Stock, while Stock remains usable with Production absent.
+through Stock, while Stock remains usable with Production absent; an under-age
+consumption is refused without the override capability and a reason.
 
 ### Phase 4 — Validating process families and Extensions
 

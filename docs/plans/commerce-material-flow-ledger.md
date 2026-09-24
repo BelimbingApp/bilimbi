@@ -152,6 +152,9 @@ the generic Domain must provide:
   reading Stock genealogy rather than storing it again;
 - configuration for foam process families, route steps, tolerances, output
   roles, cure duration, and process-specific conversion bases;
+- a consumption hold that refuses under-cured rolls by default, with an
+  override that requires an explicit Base Authz capability and a mandatory
+  reason and is kept as an immutable operational override record;
 - the idempotency, concurrent-consumption, backdating, reversal, and variance
   behaviour required by the generic public contract.
 
@@ -167,8 +170,8 @@ The Muar workflow must support the following observable facts:
   date/time, recipe or blend composition, and each roll's measured width,
   thickness, and length.
 - **Cure:** a roll's production time, current location, cure age, configured
-  minimum cure duration, and any authorised under-cure override with actor,
-  reason, time, and affected roll.
+  minimum cure duration, and any under-cure override, made under the generic
+  override capability, with actor, reason, time, and affected roll.
 - **Lamination and cutting:** input rolls, lamination output, demand source,
   target width, actual cut outputs, trim/offcut, waste, operator, and the
   attributable yield of each roll and run. The system must not assume that
@@ -210,7 +213,8 @@ workflow can demonstrate all of the following:
 - an extrusion operator creates individually labelled rolls with measured
   dimensions and the labels resolve after a 7–10 day cure;
 - the system shows cure age and refuses under-cured consumption by default,
-  while an authorised override records its reason and actor;
+  while an override by a user holding the override capability records its
+  mandatory reason and actor;
 - a cut from a known roll records product, trim, and waste as explicit outputs,
   and reports the roll's attributable yield;
 - a finished pack can be traced backward to the relevant roll, run, and
@@ -281,8 +285,10 @@ Production module and configuration.
 - [ ] Record the selected product/process definition, route, operation,
   execution, inputs, outputs, resource, and opaque context references through
   the generic contracts.
-- [ ] Refuse under-cured consumption by default and record an authorised
-  override as an immutable nonconformance with mandatory reason.
+- [ ] Configure the generic consumption hold so under-cured rolls are refused
+  by default, and prove an override requires the Base Authz override
+  capability and a mandatory reason and leaves an immutable operational
+  override record.
 - [ ] Add `MrPackaging` only if site validation identifies behaviour that
   configuration and public Domain contracts cannot express.
 
