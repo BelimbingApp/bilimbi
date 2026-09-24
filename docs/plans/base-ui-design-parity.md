@@ -601,10 +601,13 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     `Layouts.nav_menu/1` now owns the labelled `<nav>` and its
     `.app-nav-rail` class, the shell's sidebar menu renders through it, and
     so does the Navigation card, so the library no longer writes the
-    wrapper. A second `<.action_link>` sends a `POST` to the real
-    stop-impersonation route, which ends an impersonation and otherwise
-    returns to the dashboard; that gives `href` and `method` their present
-    state and `navigate` its absent one. `<.filter_toolbar>` declares its
+    wrapper. A second `<.action_link>` sends a `POST` to
+    `/system/design-library/components/specimen-request`, a no-op route
+    Base UI contributes behind the Design Library capability, which changes
+    no session or audit state and returns to the Components page; that
+    gives `href` and `method` their present state and `navigate` its absent
+    one. To mount it, `BilimbiWeb.DiscoveredRoutes` now mounts
+    module-declared controller routes as well as LiveView routes. `<.filter_toolbar>` declares its
     `<:control>` slot required, since a toolbar with no control is an empty
     form no list builds, and the library shows a search-only toolbar beside
     the full one. The timestamp card adds a to-the-second instant. The

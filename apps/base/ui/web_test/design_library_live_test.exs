@@ -344,8 +344,8 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
 
     assert has_element?(
              view,
-             "#design-library-action-link-submit[href='/system/design-library/components/specimen-request'][data-method='post']",
-             "Impersonate"
+             "#design-library-action-link-submit[href='/system/design-library/components/specimen-request'][data-method='post'][title='Try it: send a sample request that changes nothing']",
+             "Try it"
            )
 
     assert has_element?(view, "#design-library-date-time-second", "14:30:00")
