@@ -175,6 +175,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
            "search" => "",
            "status" => "",
            "kind" => "",
+           "roles" => [],
            "start_date" => "",
            "end_date" => ""
          },

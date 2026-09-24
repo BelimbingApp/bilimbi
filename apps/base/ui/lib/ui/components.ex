@@ -1415,8 +1415,9 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
-  Renders the shared list filter toolbar: search fields, selects, and date
-  inputs framed as one open toolbar above the list surface (Design Spec C04).
+  Renders the shared list filter toolbar: search fields, selects,
+  multi-selects, and date inputs framed as one open toolbar above the list
+  surface (Design Spec C04).
 
   Controls are declared through one repeating `control` slot, at least one of
   them, and render in the order they are written, so the template reads the
@@ -1441,10 +1442,10 @@ defmodule Bilimbi.Base.UI.Components do
     * Labels are always screen-reader only. A page that shows some and hides
       others drops the labelled controls below their row-mates, because a
       visible label adds a row of height only some cells carry.
-    * Helper text sits below its control in one shape. A select's and a date's
-      rides its own `input`; a search box's sits below the box the magnifier
-      is centred in, so helper text never stretches that box and drags the
-      magnifier off the input.
+    * Helper text sits below its control in one shape. A select's, a
+      multi-select's, and a date's rides its own field component; a search
+      box's sits below the box the magnifier is centred in, so helper text
+      never stretches that box and drags the magnifier off the input.
     * Cells wrap instead of squeezing. Each control is its own flex item, so
       native date inputs stack on a narrow viewport rather than holding a
       grid row wider than the page.
@@ -1491,7 +1492,7 @@ defmodule Bilimbi.Base.UI.Components do
     required: true,
     doc: "one filter control per entry, rendered in the order declared" do
     attr(:type, :atom,
-      values: [:search, :select, :date],
+      values: [:search, :select, :multi_select, :date],
       required: true,
       doc: "which control to render"
     )
@@ -1500,11 +1501,10 @@ defmodule Bilimbi.Base.UI.Components do
     attr(:id, :string, required: true, doc: "the control's DOM id")
     attr(:label, :string, required: true, doc: "the control's screen-reader-only label")
 
-    attr(:options, :list,
-      doc: "`:select` options passed to `Phoenix.HTML.Form.options_for_select/2`"
-    )
+    attr(:options, :list, doc: "options passed to the select or multi-select control")
 
     attr(:placeholder, :string, doc: "`:search` prompt text")
+    attr(:selection_label, :string, doc: "`:multi_select` singular|plural summary")
     attr(:hint, :string, doc: "helper text rendered below the control")
   end
 
@@ -1546,6 +1546,24 @@ defmodule Bilimbi.Base.UI.Components do
         />
       </div>
       <p :if={@control[:hint]} class="mt-1.5 text-xs text-ink-subtle">{@control[:hint]}</p>
+    </div>
+    """
+  end
+
+  defp toolbar_control(%{control: %{type: :multi_select}} = assigns) do
+    ~H"""
+    <div class="w-full min-w-0 sm:w-auto sm:min-w-36">
+      <.multi_select
+        field={@control[:field]}
+        id={@control[:id]}
+        label={@control[:label]}
+        label_class="sr-only"
+        wrapper_class="mb-0"
+        options={@control[:options]}
+        placeholder={@control[:placeholder]}
+        selection_label={@control[:selection_label]}
+        hint={@control[:hint]}
+      />
     </div>
     """
   end

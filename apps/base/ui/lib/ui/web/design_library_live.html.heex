@@ -1769,11 +1769,11 @@
               inner_class="space-y-5 p-4"
             >
               <p class="text-sm text-ink-muted">
-                One composition for every list's search, selects, and date pair. Every search box carries the same leading magnifier; labels are screen-reader only; helper text sits below its control; cells wrap on narrow screens.
+                One composition for every list's search, selects, multi-selects, and date pair. Every search box carries the same leading magnifier; labels are screen-reader only; helper text sits below its control; cells wrap on narrow screens.
               </p>
               <div id="filter-toolbar-full">
                 <h3 class="mb-2 text-sm font-semibold text-ink">
-                  Search, selects, and UTC date pair
+                  Search, selects, multi-select, and UTC date pair
                 </h3>
                 <.filter_toolbar
                   id="design-library-filter-full"
@@ -1803,6 +1803,19 @@
                       {"All kinds", ""},
                       {"Standard", "standard"},
                       {"Advanced", "advanced"}
+                    ]}
+                  />
+                  <:control
+                    type={:multi_select}
+                    field={@filter_toolbar_full_form[:roles]}
+                    id="design-library-filter-full-roles"
+                    label="Role filter"
+                    placeholder="All roles"
+                    selection_label=":count role selected|:count roles selected"
+                    options={[
+                      {"Administrator", "admin"},
+                      {"Operator", "operator"},
+                      {"Reviewer", "reviewer"}
                     ]}
                   />
                   <:control
