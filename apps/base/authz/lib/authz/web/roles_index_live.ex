@@ -40,7 +40,7 @@ defmodule Bilimbi.Base.Authz.Web.RolesIndexLive do
   @impl true
   def handle_event("search", params, socket) do
     current = socket.assigns.state
-    filters = Map.get(params, "filters", params)
+    filters = Map.get(params, "filters", %{})
 
     state = %{
       current

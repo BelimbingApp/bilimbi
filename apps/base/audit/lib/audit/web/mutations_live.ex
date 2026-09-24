@@ -30,13 +30,12 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
   end
 
   @impl true
-  # The toolbar inputs post top-level names; `<.pagination>`'s rows-per-page
-  # select posts under `filters[perPage]`. Both funnel through this event, so a
-  # key the posting form did not carry keeps its current value rather than
-  # resetting to the default.
+  # The toolbar and `<.pagination>`'s rows-per-page select both post under
+  # `filters` and funnel through this event, so a key the posting form did not
+  # carry keeps its current value rather than resetting to the default.
   def handle_event("filter", params, socket) do
     current = socket.assigns.state
-    filters = Map.get(params, "filters", params)
+    filters = Map.get(params, "filters", %{})
 
     state = %{
       current

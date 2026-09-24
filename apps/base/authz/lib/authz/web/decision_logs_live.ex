@@ -44,11 +44,11 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
   end
 
   @impl true
-  # The search/result inputs post top-level names; `<.pagination>`'s page-size
-  # select posts under `filters[perPage]`. Both funnel through this event.
+  # The toolbar and `<.pagination>`'s page-size select both post under
+  # `filters` and funnel through this event.
   def handle_event("filter", params, socket) do
     current = socket.assigns.state
-    filters = Map.get(params, "filters", params)
+    filters = Map.get(params, "filters", %{})
 
     state = %{
       current

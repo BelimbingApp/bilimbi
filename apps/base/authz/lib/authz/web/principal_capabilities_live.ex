@@ -75,7 +75,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalCapabilitiesLive do
   @impl true
   def handle_event("filter", params, socket) do
     current = socket.assigns.state
-    filters = Map.get(params, "filters", params)
+    filters = Map.get(params, "filters", %{})
 
     state = %{
       current
