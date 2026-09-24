@@ -132,8 +132,10 @@ the dependencies once and retries; other startup errors are reported without
 automatic recovery.
 
 `mix precommit` is the required final check for a change. It compiles with
-warnings as errors, unlocks unused dependencies, formats the project, and runs
-the test suite.
+warnings as errors, unlocks unused dependencies, formats the project, runs the
+LiveView hook tests in Node (`mix assets.test`), and runs the test suite. The
+hook tests need Node.js 22 or later, with npm, on the `PATH`; `.mise.toml` does
+not pin it.
 
 ## Architecture at a glance
 
