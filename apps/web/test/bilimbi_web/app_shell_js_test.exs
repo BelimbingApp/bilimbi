@@ -250,6 +250,25 @@ defmodule BilimbiWeb.AppShellJsTest do
     assert result["announcement"] == "Unable to update pinned pages."
   end
 
+  test "two tabs loading at once import a legacy pin once instead of toggling it away" do
+    result =
+      run_pin_hook(~S"""
+      storage.set("sidebarPinnedItems", JSON.stringify([{id: "nav-companies"}]))
+      const other = Object.create(AppShell)
+      Object.assign(other, {...hook, pinnedItems: new El(), pinnedEntries: []})
+
+      await Promise.all([hook.loadPinnedItems(), other.loadPinnedItems()])
+
+      console.log(JSON.stringify({
+        toggles: requests.filter(({path}) => path === "/api/pins/toggle").length,
+        server: serverPins.map(({url}) => url),
+        legacy: storage.has("sidebarPinnedItems"),
+      }))
+      """)
+
+    assert result == %{"toggles" => 1, "server" => ["/companies"], "legacy" => false}
+  end
+
   test "a keyboard move button reorders durably, announces the move, and keeps focus" do
     result =
       run_pin_hook(~S"""

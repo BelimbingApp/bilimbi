@@ -239,7 +239,7 @@ const AppShell = {
       if (!this.impersonating) pins = await this.migrateLegacyPins(pins)
     } catch (_error) {
       // Keep the durable API as the only source of truth. A transient outage
-      // keeps the pins already read and leaves legacy data available for retry.
+      // keeps the pins already read; a failed first read leaves legacy data for retry.
     }
 
     this.pinnedEntries = pins
@@ -247,7 +247,10 @@ const AppShell = {
   },
 
   async migrateLegacyPins(pins) {
-    const legacyUrls = this.readLegacyPinnedItems()
+    const legacy = this.readLegacyPinnedItems()
+    window.localStorage.removeItem?.(PINNED_STORAGE)
+
+    const legacyUrls = legacy
       .filter((item) => item.navId)
       .map((item) => ({item: this.migratablePinnedItem(item), url: this.pinnedUrl(item)}))
       .filter(({item, url}) => item && url && this.isServedUrl(url))
@@ -272,7 +275,6 @@ const AppShell = {
       pins = (await this.reorderServerPins(ordered, false).catch(() => null)) || pins
     }
 
-    window.localStorage.removeItem?.(PINNED_STORAGE)
     return pins
   },
 
