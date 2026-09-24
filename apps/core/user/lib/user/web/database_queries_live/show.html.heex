@@ -209,31 +209,14 @@
             />
           </.table>
 
-          <%= if @results.total_pages > 1 do %>
-            <div class="mt-4 flex items-center justify-between text-xs text-ink-subtle">
-              <span>
-                Page {@results.page} of {@results.total_pages}
-              </span>
-              <div class="inline-flex items-center gap-2">
-                <.button
-                  :if={@results.page > 1}
-                  phx-click="page_results"
-                  phx-value-page={@results.page - 1}
-                  class="px-2.5 py-1 text-xs"
-                >
-                  Previous
-                </.button>
-                <.button
-                  :if={@results.page < @results.total_pages}
-                  phx-click="page_results"
-                  phx-value-page={@results.page + 1}
-                  class="px-2.5 py-1 text-xs"
-                >
-                  Next
-                </.button>
-              </div>
-            </div>
-          <% end %>
+          <.pagination
+            id="query-results-pagination"
+            page={results_page(@results)}
+            page_sizes={@page_sizes}
+            filters_form={@results_filters_form}
+            filters_event="result_page_size"
+            page_event="page_results"
+          />
         </.card>
       <% end %>
     </div>

@@ -44,6 +44,8 @@ happy-dom has no top layer, makes nothing inert, and does not blur an element th
 
 An operational list keeps its page, search, filters, sort and page size in URL state. See `DESIGN.md` "Pagination controls".
 
+Those filters are `<.filter_toolbar>` and that pager is `<.pagination>`. A local form or Previous/Next pair is the pair those two replaced. The comments on `filter_toolbar/1` and `pagination/1` own the framing.
+
 ## Maintaining this file
 
 Keep this note short. Point at the component, its comment, or DESIGN.md; do not copy them.

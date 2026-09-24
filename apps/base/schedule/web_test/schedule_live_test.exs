@@ -356,7 +356,7 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     filter_runs(view, %{"start_date" => "2026-08-21", "end_date" => ""})
     assert has_element?(view, "#schedule-runs", "Late on the twentieth")
     assert has_element?(view, "#schedule-runs", "Early on the twenty-first")
-    assert has_element?(view, "#schedule-history-pagination-summary", "2 runs")
+    assert has_element?(view, "#schedule-history-pagination-summary", "of 2 results")
 
     filter_runs(view, %{"start_date" => "", "end_date" => "2026-08-20"})
     refute has_element?(view, "#schedule-runs", "Late on the twentieth")
@@ -374,7 +374,7 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     assert has_element?(view, "#schedule-run-start-date + p", "UTC")
     refute has_element?(view, "#schedule-runs", "Late on the twentieth")
     assert has_element?(view, "#schedule-runs", "Early on the twenty-first")
-    assert has_element?(view, "#schedule-history-pagination-summary", ~r/\b1 run\b/)
+    assert has_element?(view, "#schedule-history-pagination-summary", "of 1 results")
 
     # Local time: the server does not know the browser's zone, so it bounds
     # the UTC text it rendered until the browser reports the zone it formats
@@ -390,7 +390,7 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     render_hook(view, "browser_timezone", %{"timezone" => "Asia/Kuala_Lumpur"})
     assert has_element?(view, "#schedule-run-start-date + p", "Asia/Kuala_Lumpur")
     assert has_element?(view, "#schedule-runs", "Late on the twentieth")
-    assert has_element?(view, "#schedule-history-pagination-summary", "2 runs")
+    assert has_element?(view, "#schedule-history-pagination-summary", "of 2 results")
 
     # A zone the server's database does not know cannot bound a query, so
     # the filter says UTC rather than pretending.
@@ -408,7 +408,7 @@ defmodule BilimbiWeb.ScheduleLiveTest do
       conn |> log_in_as() |> live(~p"/system/schedule?tab=history&start_date=2026-08-21")
 
     assert has_element?(view, "#schedule-run-start-date + p", "Asia/Kuala_Lumpur")
-    assert has_element?(view, "#schedule-history-pagination-summary", "2 runs")
+    assert has_element?(view, "#schedule-history-pagination-summary", "of 2 results")
 
     # The shell's own hook saves the mode and halts the event before this view
     # sees it; the results still follow the Started column without a reload.
@@ -416,7 +416,7 @@ defmodule BilimbiWeb.ScheduleLiveTest do
 
     assert has_element?(view, "#schedule-run-start-date + p", "UTC")
     refute has_element?(view, "#schedule-runs", "Late on the twentieth")
-    assert has_element?(view, "#schedule-history-pagination-summary", ~r/\b1 run\b/)
+    assert has_element?(view, "#schedule-history-pagination-summary", "of 1 results")
   end
 
   test "a history holding more than one page still names the page it is on", %{conn: conn} do
@@ -425,16 +425,43 @@ defmodule BilimbiWeb.ScheduleLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/schedule?tab=history")
 
-    assert has_element?(view, "#schedule-history-pagination-summary", "Page 1 of 2")
-    assert has_element?(view, "#schedule-history-pagination-summary", "26 runs")
-    refute has_element?(view, "#schedule-history-prev")
-    assert has_element?(view, "#schedule-history-next")
+    assert has_element?(
+             view,
+             "#schedule-history-pagination-summary",
+             "Showing 1 to 25 of 26 results"
+           )
 
-    view |> element("#schedule-history-next") |> render_click()
+    assert has_element?(view, "#schedule-history-pagination-previous[disabled]")
+    assert has_element?(view, "#schedule-history-pagination-page-1[aria-current='page']")
+    assert has_element?(view, "#schedule-history-pagination-next")
 
-    assert has_element?(view, "#schedule-history-pagination-summary", "Page 2 of 2")
-    assert has_element?(view, "#schedule-history-prev")
-    refute has_element?(view, "#schedule-history-next")
+    view |> element("#schedule-history-pagination-next") |> render_click()
+
+    patched = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+    assert patched["tab"] == "history"
+    assert patched["page"] == "2"
+    assert patched["page_size"] == "25"
+
+    assert has_element?(
+             view,
+             "#schedule-history-pagination-summary",
+             "Showing 26 to 26 of 26 results"
+           )
+
+    assert has_element?(view, "#schedule-history-pagination-previous")
+    assert has_element?(view, "#schedule-history-pagination-next[disabled]")
+    assert has_element?(view, "#schedule-history-pagination-page-2[aria-current='page']")
+
+    {:ok, reloaded, _html} =
+      conn |> log_in_as() |> live(~p"/system/schedule?tab=history&page=2&page_size=25")
+
+    assert has_element?(reloaded, "#schedule-history-pagination-page-2[aria-current='page']")
+
+    assert has_element?(
+             reloaded,
+             "#schedule-history-pagination-summary",
+             "Showing 26 to 26 of 26 results"
+           )
   end
 
   test "an inverted history date range is rejected rather than ignored", %{conn: conn} do
@@ -462,21 +489,30 @@ defmodule BilimbiWeb.ScheduleLiveTest do
       "search" => "",
       "status" => "",
       "start_date" => "2026-08-21",
-      "end_date" => "",
-      "page_size" => "25"
+      "end_date" => ""
     })
 
-    assert has_element?(view, "#schedule-history-pagination-summary", ~r/\b1 run\b/)
+    assert has_element?(view, "#schedule-history-pagination-summary", "of 1 results")
 
     patched = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
     assert patched["tab"] == "history"
     assert patched["start_date"] == "2026-08-21"
 
+    # Page size posts on its own form and must keep the date already in the URL.
+    view
+    |> form("#schedule-history-pagination-page-size-form", %{"run" => %{"perPage" => "50"}})
+    |> render_change()
+
+    sized = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+    assert sized["start_date"] == "2026-08-21"
+    assert sized["page_size"] == "50"
+    assert sized["page"] == "1"
+
     # The patched URL reloads to the same rows with the toolbar state retained.
     {:ok, reloaded, _html} =
       conn |> log_in_as() |> live(~p"/system/schedule?tab=history&start_date=2026-08-21")
 
-    assert has_element?(reloaded, "#schedule-history-pagination-summary", ~r/\b1 run\b/)
+    assert has_element?(reloaded, "#schedule-history-pagination-summary", "of 1 results")
     refute has_element?(reloaded, "#schedule-runs", "Late on the twentieth")
     assert has_element?(reloaded, "#schedule-runs", "Early on the twenty-first")
     assert has_element?(reloaded, "#schedule-run-start-date[value='2026-08-21']")
@@ -516,7 +552,11 @@ defmodule BilimbiWeb.ScheduleLiveTest do
     send(view.pid, :refresh)
     assert has_element?(view, "#schedule-runs", "Cross-process refresh")
     assert has_element?(view, "#schedule-run-status option[value='failed'][selected]")
-    assert has_element?(view, "#schedule-run-page-size option[value='25'][selected]")
+
+    assert has_element?(
+             view,
+             "#schedule-history-pagination-page-size option[value='25'][selected]"
+           )
   end
 
   # The company clock is what the product shows by default; the settings table

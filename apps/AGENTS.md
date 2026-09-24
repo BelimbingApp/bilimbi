@@ -2,6 +2,10 @@
 
 Read this before editing a LiveView, a template, or a test. The component that can make a mistake impossible owns the rule: its comment is the text to follow, and `DESIGN.md` is the design source. This note only holds what no component owns.
 
+## List filters and pagination
+
+Use `<.filter_toolbar>` and `<.pagination>` for an operational list. A hand-written filter form or Previous/Next row is how Performance, Menu Inspector, Schedule history, and Database Queries drifted apart. The comments on `filter_toolbar/1` and `pagination/1` in `apps/base/ui/lib/ui/components.ex` own the framing; the URL contract is `DESIGN.md` "Pagination controls". A pager over unsaved editor state, such as database-query results, still uses `<.pagination>` and must not reload the saved record when the page changes.
+
 ## LiveView bindings
 
 Put `phx-change` on the `<form>`, and `phx-submit` aimed at the same handler. A control that is not inside a form uses `phx-keyup`. `phx-input` is not a LiveView binding and silently does nothing, which is how both search boxes on the user page shipped broken; without `phx-submit`, Enter native-GETs the page and reloads it.

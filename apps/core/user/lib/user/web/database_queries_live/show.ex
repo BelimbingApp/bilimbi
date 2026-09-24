@@ -13,6 +13,9 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Core.User
 
+  @page_sizes [25, 50, 100, 300]
+  @default_page_size 25
+
   # `run` is a write verb, so the write-handler guard treats `run_query` as
   # write-shaped. It is not: it calls `Database.execute_readonly/3`, which is
   # where read-only is enforced, and the route requires
@@ -37,8 +40,10 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
      |> assign(:param_values, %{})
      |> assign(:error, nil)
      |> assign(:results, nil)
+     |> assign(:page_sizes, @page_sizes)
      |> assign(:result_page, 1)
-     |> assign(:result_per_page, 25)
+     |> assign(:result_per_page, @default_page_size)
+     |> assign(:results_filters_form, results_filters_form(@default_page_size))
      |> assign(:result_sort_by, nil)
      |> assign(:result_sort_dir, :asc)
      |> assign(:is_dirty, false)}
@@ -63,7 +68,18 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
   end
 
   @impl true
-  def handle_params(%{"slug" => slug}, _uri, socket) do
+  # A result-page change on the query already open stays on this process:
+  # reloading the saved row here would discard SQL the operator has not saved.
+  # The first visit, and any other slug, still loads the stored query.
+  def handle_params(%{"slug" => slug} = params, _uri, socket) do
+    if loaded_query?(socket, slug) do
+      {:noreply, navigate_results(socket, params)}
+    else
+      load_saved_query(socket, slug, params)
+    end
+  end
+
+  defp load_saved_query(socket, slug, params) do
     scope = socket.assigns.current_scope.scope
     user_id = current_user_id(socket.assigns.current_scope)
 
@@ -72,6 +88,8 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
         sql = query.sql_query || ""
         detected = Database.extract_named_parameters(sql)
         default_params = Map.new(detected, fn p -> {p, ""} end)
+
+        page_size = result_page_size(params["page_size"] || params["perPage"])
 
         socket =
           socket
@@ -86,6 +104,9 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
           |> assign(:param_values, default_params)
           |> assign(:error, nil)
           |> assign(:is_dirty, false)
+          |> assign(:result_page, result_page(params["page"]))
+          |> assign(:result_per_page, page_size)
+          |> assign(:results_filters_form, results_filters_form(page_size))
 
         # Automatically execute query if SQL is non-empty
         {:noreply, if(String.trim(sql) != "", do: execute_query(socket), else: socket)}
@@ -218,13 +239,32 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
 
   @impl true
   def handle_event("page_results", %{"page" => page}, socket) do
-    page_num = to_integer(page, 1)
+    page_num = result_page(page)
 
-    {:noreply,
-     socket
-     |> assign(:result_page, page_num)
-     |> execute_query()}
+    if persist_result_nav?(socket) do
+      {:noreply, push_patch(socket, to: result_path(socket, page: page_num))}
+    else
+      {:noreply, socket |> assign(:result_page, page_num) |> execute_query()}
+    end
   end
+
+  @impl true
+  def handle_event("result_page_size", %{"results" => params}, socket) do
+    size = result_page_size(params["perPage"])
+
+    if persist_result_nav?(socket) do
+      {:noreply, push_patch(socket, to: result_path(socket, page: 1, page_size: size))}
+    else
+      {:noreply,
+       socket
+       |> assign(:result_page, 1)
+       |> assign(:result_per_page, size)
+       |> assign(:results_filters_form, results_filters_form(size))
+       |> execute_query()}
+    end
+  end
+
+  def handle_event("result_page_size", _params, socket), do: {:noreply, socket}
 
   @impl true
   def handle_event("duplicate", _params, socket) do
@@ -335,6 +375,53 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Show do
       %{scope: %Scope{} = scope} -> Scope.platform_operator?(scope)
       _ -> false
     end
+  end
+
+  defp loaded_query?(socket, slug) do
+    match?(%{slug: ^slug}, socket.assigns.query)
+  end
+
+  defp persist_result_nav?(socket) do
+    not socket.assigns.is_new and match?(%{slug: slug} when is_binary(slug), socket.assigns.query)
+  end
+
+  # Page and page size come from the URL. Sort and unsaved SQL stay on the
+  # process, because this patch is only the pager moving.
+  defp navigate_results(socket, params) do
+    page_size = result_page_size(params["page_size"] || params["perPage"])
+
+    socket
+    |> assign(:result_page, result_page(params["page"]))
+    |> assign(:result_per_page, page_size)
+    |> assign(:results_filters_form, results_filters_form(page_size))
+    |> execute_query()
+  end
+
+  defp result_path(socket, opts) do
+    page = Keyword.get(opts, :page, socket.assigns.result_page)
+    page_size = Keyword.get(opts, :page_size, socket.assigns.result_per_page)
+
+    ~p"/admin/system/database-queries/#{socket.assigns.query.slug}?#{%{page: page, page_size: page_size}}"
+  end
+
+  defp results_filters_form(page_size) do
+    to_form(%{"perPage" => Integer.to_string(page_size)}, as: :results)
+  end
+
+  defp results_page(results) do
+    %{
+      page: results.page,
+      page_size: results.per_page,
+      total_entries: results.total,
+      total_pages: if(results.total == 0, do: 0, else: results.total_pages)
+    }
+  end
+
+  defp result_page(value), do: max(to_integer(value, 1), 1)
+
+  defp result_page_size(value) do
+    parsed = to_integer(value, @default_page_size)
+    if parsed in @page_sizes, do: parsed, else: @default_page_size
   end
 
   defp execute_query(socket) do

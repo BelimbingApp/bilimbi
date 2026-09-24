@@ -40,11 +40,14 @@ defmodule BilimbiWeb.SystemMenuInspectorLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/menu-inspector")
 
-    view |> form("#menu-inspector-filters", %{"search" => "menu-inspector"}) |> render_change()
+    view
+    |> form("#menu-inspector-filters", %{"filters" => %{"search" => "menu-inspector"}})
+    |> render_change()
 
     assert has_element?(view, "#menu-inspector", "admin.system.menu-inspector")
     refute has_element?(view, "#menu-inspector", "admin.system.info")
-    assert has_element?(view, "#menu-inspector-pagination-summary", "item")
+    assert has_element?(view, "#menu-inspector-pagination-summary", "results")
+    refute has_element?(view, "#menu-inspector-pagination-page-2")
     refute render(view) =~ "Page 1 of 1"
   end
 
@@ -55,14 +58,17 @@ defmodule BilimbiWeb.SystemMenuInspectorLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/menu-inspector")
 
-    assert has_element?(view, "#menu-inspector-pagination-summary", "Page 1 of")
-    refute has_element?(view, "#menu-inspector-prev")
-    assert has_element?(view, "#menu-inspector-next")
+    assert has_element?(view, "#menu-inspector-pagination-summary", "Showing 1 to 25 of")
+    assert has_element?(view, "#menu-inspector-pagination-previous[disabled]")
+    assert has_element?(view, "#menu-inspector-pagination-page-1[aria-current='page']")
+    assert has_element?(view, "#menu-inspector-pagination-next")
 
-    view |> element("#menu-inspector-next") |> render_click()
+    view |> element("#menu-inspector-pagination-next") |> render_click()
 
-    assert has_element?(view, "#menu-inspector-pagination-summary", "Page 2 of")
-    assert has_element?(view, "#menu-inspector-prev")
+    assert_patch(view, ~p"/system/menu-inspector?page=2&page_size=25")
+    assert has_element?(view, "#menu-inspector-pagination-page-2[aria-current='page']")
+    assert has_element?(view, "#menu-inspector-pagination-previous")
+    assert has_element?(view, "#menu-inspector-pagination-next[disabled]")
   end
 
   test "source filter narrows by contributing module", %{conn: conn} do
@@ -70,9 +76,64 @@ defmodule BilimbiWeb.SystemMenuInspectorLiveTest do
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/menu-inspector")
 
-    view |> form("#menu-inspector-filters", %{"source" => "base/authz"}) |> render_change()
+    view
+    |> form("#menu-inspector-filters", %{"filters" => %{"source" => "base/authz"}})
+    |> render_change()
 
     assert has_element?(view, "#menu-inspector", "admin.authz")
     refute has_element?(view, "#menu-inspector", "admin.system.info")
+  end
+
+  test "search, source, and page size round-trip through the URL", %{conn: conn} do
+    grant_capabilities!("admin.system.menu-inspector.view")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/menu-inspector")
+
+    view
+    |> form("#menu-inspector-filters", %{
+      "filters" => %{"search" => "authz", "source" => "base/authz"}
+    })
+    |> render_change()
+
+    filtered = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+    assert filtered["page"] == "1"
+    assert filtered["page_size"] == "25"
+    assert filtered["search"] == "authz"
+    assert filtered["source"] == "base/authz"
+
+    {:ok, reloaded, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/system/menu-inspector?page=1&page_size=25&search=authz&source=base/authz")
+
+    assert has_element?(reloaded, "#menu-inspector-search[value='authz']")
+    assert has_element?(reloaded, "#menu-source-filter option[value='base/authz'][selected]")
+    assert has_element?(reloaded, "#menu-inspector", "admin.authz")
+    refute has_element?(reloaded, "#menu-inspector", "admin.system.info")
+
+    reloaded
+    |> form("#menu-inspector-pagination-page-size-form", %{"filters" => %{"perPage" => "100"}})
+    |> render_change()
+
+    sized_query =
+      assert_patch(reloaded) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+
+    assert sized_query["page"] == "1"
+    assert sized_query["page_size"] == "100"
+    assert sized_query["search"] == "authz"
+    assert sized_query["source"] == "base/authz"
+
+    {:ok, sized, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/system/menu-inspector?page=1&page_size=100&search=authz&source=base/authz")
+
+    assert has_element?(
+             sized,
+             "#menu-inspector-pagination-page-size option[value='100'][selected]"
+           )
+
+    assert has_element?(sized, "#menu-inspector-search[value='authz']")
+    refute has_element?(sized, "#menu-inspector", "admin.system.info")
   end
 end

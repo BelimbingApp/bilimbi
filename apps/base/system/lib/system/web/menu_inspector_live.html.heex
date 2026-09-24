@@ -21,48 +21,22 @@
       </:subtitle>
     </.header>
 
-    <.form
-      for={%{}}
-      as={:filters}
-      id="menu-inspector-filters"
-      phx-change="filter"
-      phx-submit="filter"
-      class="mb-2"
-    >
-      <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
-        <div class="relative">
-          <.icon
-            name="search"
-            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-          />
-          <.input
-            type="search"
-            id="menu-inspector-search"
-            name="search"
-            value={@state.search}
-            placeholder="Search id, label, capability, route, or source"
-            phx-debounce="300"
-            autocomplete="off"
-            label="Search menu items"
-            label_class="sr-only"
-            wrapper_class="mb-0"
-            class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-          />
-        </div>
-        <.input
-          type="select"
-          id="menu-source-filter"
-          name="source"
-          value={@state.source}
-          label="Filter by source"
-          label_class="sr-only"
-          wrapper_class="mb-0"
-          prompt="All sources"
-          options={Enum.map(@sources, &{&1, &1})}
-          class="h-[2.125rem] w-full rounded-md border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-        />
-      </div>
-    </.form>
+    <.filter_toolbar id="menu-inspector-filters" form={@filters_form} event="filter">
+      <:control
+        type={:search}
+        field={@filters_form[:search]}
+        id="menu-inspector-search"
+        label="Search menu items"
+        placeholder="Search id, label, capability, route, or source"
+      />
+      <:control
+        type={:select}
+        field={@filters_form[:source]}
+        id="menu-source-filter"
+        label="Filter by source"
+        options={[{"All sources", ""} | Enum.map(@sources, &{&1, &1})]}
+      />
+    </.filter_toolbar>
 
     <.card id="menu-inspector-card" inner_class="p-0">
 
@@ -111,33 +85,13 @@
         </:empty>
       </.table>
 
-      <div
-        :if={@total_pages > 0}
+      <.pagination
         id="menu-inspector-pagination"
-        class="flex items-center justify-between border-t border-line px-4 py-3 text-sm"
-      >
-        <p id="menu-inspector-pagination-summary" class="text-ink-subtle">
-          <span :if={@total_pages > 1}>Page {@state.page} of {@total_pages} · </span>{@total_entries} {item_noun(@total_entries)}
-        </p>
-        <div :if={@total_pages > 1} class="flex gap-2">
-          <.button
-            :if={@state.page > 1}
-            id="menu-inspector-prev"
-            phx-click="page"
-            phx-value-page={@state.page - 1}
-          >
-            Previous
-          </.button>
-          <.button
-            :if={@state.page < @total_pages}
-            id="menu-inspector-next"
-            phx-click="page"
-            phx-value-page={@state.page + 1}
-          >
-            Next
-          </.button>
-        </div>
-      </div>
+        page={@items_page}
+        page_sizes={@page_sizes}
+        filters_form={@filters_form}
+        filters_event="filter"
+      />
     </.card>
   </.page>
 </Layouts.app>
