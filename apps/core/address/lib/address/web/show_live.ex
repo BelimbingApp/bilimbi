@@ -481,65 +481,23 @@ defmodule Bilimbi.Core.Address.Web.ShowLive do
                 />
               </:item>
               <:item title="Verification Status" id="address-view-verification-status">
-                <button
-                  :if={@can_update? and @editing_field != "verification_status"}
-                  type="button"
-                  id="address-verification-status-display"
-                  phx-click="edit_field"
-                  phx-value-field="verification_status"
-                  aria-label="Edit verification status"
-                  aria-describedby={
-                    @field_status["verification_status"] && "address-verification-status-status"
-                  }
-                  class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
-                >
-                  <.verification_badge status={@address.verification_status} />
-                  <.icon
-                    name="edit"
-                    class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-                  />
-                </button>
-
-                <%!-- Window-scoped: the select may not hold focus (JS.focus is
-                     best-effort), and Escape must cancel regardless. Only one
-                     editor mounts at a time, so the listener is unambiguous. --%>
-                <div
-                  :if={@can_update? and @editing_field == "verification_status"}
-                  phx-window-keydown="cancel_edit_field"
-                  phx-key="Escape"
-                >
-                  <form
-                    id="address-verification-status-form"
-                    phx-change="save_verification_status"
-                    class="inline-block"
-                  >
-                    <select
-                      id="address-verification-status"
-                      name="verification_status"
-                      aria-label="Verification status"
-                      phx-mounted={JS.focus()}
-                      phx-blur="cancel_edit_field"
-                      class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong"
-                    >
-                      <option
-                        :for={{label, value} <- verification_status_options()}
-                        value={value}
-                        selected={@address.verification_status == value}
-                      >
-                        {label}
-                      </option>
-                    </select>
-                  </form>
-                </div>
-
-                <span :if={not @can_update?}>
-                  <.verification_badge status={@address.verification_status} />
-                </span>
-
-                <.commit_status
-                  id="address-verification-status-status"
+                <.inline_choice
+                  id="address-verification-status"
+                  field="verification_status"
+                  label="Edit verification status"
+                  editing={@editing_field == "verification_status"}
+                  editable?={@can_update?}
                   status={@field_status["verification_status"]}
-                />
+                >
+                  <:display><.verification_badge status={@address.verification_status} /></:display>
+                  <:editor>
+                    <form id="address-verification-status-form" phx-change="save_verification_status" class="inline-block">
+                      <select id="address-verification-status-select" name="verification_status" aria-label="Verification status" phx-mounted={JS.focus()} phx-blur="cancel_edit_field" class="rounded-md border border-line bg-surface px-2.5 py-1 text-xs text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong">
+                        <option :for={{label, value} <- verification_status_options()} value={value} selected={@address.verification_status == value}>{label}</option>
+                      </select>
+                    </form>
+                  </:editor>
+                </.inline_choice>
               </:item>
               <:item title={fact_label("line1")} id="address-view-line1">
                 <.text_fact

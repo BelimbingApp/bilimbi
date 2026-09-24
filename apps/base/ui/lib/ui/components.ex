@@ -2949,6 +2949,67 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Renders a read-first choice fact with a shared edit-in-place lifecycle.
+
+  The display slot remains the server-rendered value. An editable fact swaps it
+  for the caller's select or combobox editor, which owns its form and commit
+  event. Escape and blur cancellation therefore have one consistent shell,
+  while the owner keeps control of its option vocabulary and business rules.
+  """
+  attr(:id, :string, required: true)
+  attr(:field, :string, required: true)
+  attr(:label, :string, required: true)
+  attr(:editing, :boolean, required: true)
+  attr(:editable?, :boolean, required: true)
+  attr(:status, :any, required: true)
+  attr(:edit_event, :string, default: "edit_field")
+  attr(:cancel_event, :string, default: "cancel_edit_field")
+  attr(:status_id, :string, default: nil)
+
+  slot(:display, required: true)
+  slot(:editor, required: true)
+
+  def inline_choice(assigns) do
+    assigns =
+      assigns
+      |> assign_new(:status_id, fn -> "#{assigns.id}-status" end)
+      |> assign(:status, normalize_commit_status(assigns.status))
+
+    ~H"""
+    <button
+      :if={@editable? and not @editing}
+      type="button"
+      id={"#{@id}-display"}
+      phx-click={@edit_event}
+      phx-value-field={@field}
+      aria-label={@label}
+      aria-describedby={@status && @status_id}
+      class="group -mx-1.5 flex max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
+    >
+      {render_slot(@display)}
+      <.icon
+        name="edit"
+        class="size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+      />
+    </button>
+
+    <%!-- The editor may not hold focus while LiveView mounts it. Window Escape
+         keeps cancellation reliable, and the editor's blur binding closes it
+         when focus leaves the control. --%>
+    <div
+      :if={@editable? and @editing}
+      phx-window-keydown={@cancel_event}
+      phx-key="Escape"
+    >
+      {render_slot(@editor)}
+    </div>
+
+    <span :if={not @editable?}>{render_slot(@display)}</span>
+    <.commit_status id={@status_id} status={@status} />
+    """
+  end
+
+  @doc """
   Renders the outcome of one commit beside the fact that made it.
 
   This is the single voice every in-place write reports in, whether the fact
