@@ -12,8 +12,8 @@ defmodule BilimbiWeb.DateTimeJsTest do
   reader's own device would: their locale orders the fields and chooses the
   hour cycle, which is the point of choosing this device's local time at all.
   That is what is pinned here — the formatter is imported into Node and run
-  under two host locales, the same harness `app_shell_js_test.exs` uses,
-  because `LiveViewTest` cannot execute a hook.
+  under two host locales, which the in-process hook tests in
+  `apps/web/assets/test` cannot switch.
   """
 
   use ExUnit.Case, async: true

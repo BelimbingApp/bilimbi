@@ -38,7 +38,7 @@ Keep the `source(none)` and `@source` lines in `app.css`; the comment above them
 
 A hook in `apps/web/assets/js` is tested beside it in `apps/web/assets/test/<hook>.test.mjs`, with Node's own test runner and happy-dom. `mix precommit` runs them through `mix assets.test`; `npm test` in `apps/web/assets` runs them alone. Mount the hook with `test/support/hook.mjs` on the markup its component renders, carrying the JS commands the server really renders, and assert what a person meets: attributes, focus, events pushed. Compare focus by id with `focused()`, because a failed assertion on two DOM nodes never finishes printing.
 
-happy-dom has no top layer, makes nothing inert, and does not blur an element that becomes hidden. Check those in a browser. A new hook test goes in Node, not in an ExUnit test that shells out to `node`; the ones left there run Node under a host locale or against the LiveView bundle.
+happy-dom has no top layer, makes nothing inert, and does not blur an element that becomes hidden. Check those in a browser. A new hook test goes in Node, not in an ExUnit test that shells out to `node`. Shell out only for what this runner cannot give: another host locale, the shipped LiveView bundle, or markup the server renders in the same test.
 
 ## Lists
 
