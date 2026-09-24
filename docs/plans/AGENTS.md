@@ -2,7 +2,7 @@
 
 ## Purpose
 
-A plan is the **whiteboard** of a live discussion: capture what's agreed and why so future readers see it. `docs/plans/` is the in-repo single source of truth, the **status surface** (no parallel observability doc). Early on it holds intent; as the *how* firms up it **becomes the task list** (Phases checklists) in place. Plans should let a capable agent work autonomously after the user says to build: record contracts, invariants, coordination state, and proof of done rather than line-by-line instructions. **Prose only** for design — no code/patches/full-file dumps. Recommendation-driven copy, stable section names, a preamble for quick orientation.
+A plan is the **whiteboard** of a live discussion: capture what's agreed and why so future readers see it. `docs/plans/` is the in-repo single source of truth, the **status surface** (no parallel observability doc), and the coordination sheet when work spans agents or sessions. Early on it holds intent; as the *how* firms up it **becomes the task list** (Phases checklists) in place. Plans should let a capable agent work autonomously after the user says to build: record contracts, invariants, coordination state, and proof of done rather than line-by-line instructions. **Prose only** for design — no code/patches/full-file dumps. Recommendation-driven copy, stable section names, a preamble for quick orientation.
 
 ## Problem first
 

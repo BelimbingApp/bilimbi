@@ -1,13 +1,14 @@
 # docs/plans/domain-extension-layer-rollout.md
 
 **Status:** Proposed — Phase 1 must prove the composition model
-**Last Updated:** 2026-08-16
+**Last Updated:** 2026-09-25
 **Sources:** `docs/architecture/0010_composition-model.md`; review by sol
 (2026-08-16); ADR 0003 physical deep-module packages; ADR 0004 module
 contribution contract; `docs/PORTING_STAGES.md` (S5, S6,
-stage-change rule); `AGENTS.md` §4; `apps/base/module_registry/`; sibling
-plan `docs/plans/commerce-material-flow-ledger.md`
-**Agents:** claude/claude-opus-5, amp/medium-sol
+stage-change rule); `AGENTS.md` §4; `apps/base/module_registry/`; sibling plans
+`docs/plans/manufacturing-domain.md` and
+`docs/plans/commerce-material-flow-ledger.md`
+**Agents:** claude/claude-opus-5, amp/medium-sol, codex/gpt-5
 
 ## Problem Essence
 
@@ -167,9 +168,13 @@ behave exactly like the disposable Domain proved in Phase 1.
   ancestry/genealogy contract and stores no genealogy of its own.
 - [ ] Prove either repository can be absent when no mounted dependent requires
   it, and prove a missing Inventory/Stock dependency fails composition.
-- [ ] Begin the vertical slices in
-  `docs/plans/commerce-material-flow-ledger.md` only after the repository and
-  migration path works end to end.
+- [ ] Begin the generic Domain slices in
+  `docs/plans/manufacturing-domain.md` only after the repository and migration
+  path works end to end.
+- [ ] Begin Mr Packaging Sdn Bhd's customer requirements in
+  `docs/plans/commerce-material-flow-ledger.md` only after the generic Domain
+  slice is available; mount the `MrPackaging` Extension only for a confirmed
+  public-contract adaptation.
 
 ### Phase 4 — First real Extension
 
