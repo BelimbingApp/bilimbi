@@ -1,4 +1,4 @@
-import ShellControls from "./shell_controls"
+import ShellControls from "./shell_controls.js"
 
 // Authenticated shell chrome. Owns only what the server cannot: the desktop
 // rail choice (localStorage), the mobile drawer, Escape/backdrop close, and

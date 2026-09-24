@@ -16,6 +16,11 @@
 // first dialog of a page session lands before any dialog exists to mount a
 // hook. A keyboard activation needs no listener: the control holds focus while
 // it is activated, so document.activeElement is already the opener.
+//
+// The record describes the most recent activation only. A key press forgets
+// it, and each dialog consumes it, so an old click -- one that opened nothing,
+// or opened a dialog already gone -- cannot claim a dialog later opened from
+// the keyboard.
 const ACTIVATION_TARGETS = "button, a[href], [tabindex]"
 
 let lastActivated = null
@@ -25,10 +30,12 @@ function rememberActivation({target}) {
 }
 
 document.addEventListener("pointerdown", rememberActivation, true)
+document.addEventListener("keydown", () => (lastActivated = null), true)
 
 const Modal = {
   mounted() {
     this.opener = this.openerFrom(lastActivated) || this.openerFrom(document.activeElement)
+    lastActivated = null
 
     // The server renders `open` so a later patch never strips the attribute
     // and closes the dialog under the user. An open non-modal dialog cannot

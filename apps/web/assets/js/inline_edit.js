@@ -32,6 +32,11 @@ const InlineEdit = {
       if (e.key === "Enter") {
         e.preventDefault()
         this.commit()
+        // The editor is hidden now, and a browser drops focus from a hidden
+        // element to the page, so a keyboard user would lose their place.
+        // Escape returns focus the same way. A blur commit does not: the
+        // person already chose where focus went.
+        this.triggerEl.focus()
       } else if (e.key === "Escape") {
         e.preventDefault()
         this.cancel()
