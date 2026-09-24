@@ -201,11 +201,11 @@ demoted remove action on the row; the user's roles and each domain of its
 effective and denied permissions are rows of the same list, and its Employee
 Records and External Accesses sections open with the shared heading. The
 database-query console renders its result set through the same table, one
-sort button per returned column. The departments and relationships pages
-still hand-write their sections and adopt this anatomy as they are migrated,
-and the two disclosure triggers on `/users/:id` (Effective Permissions,
-Change Password) keep their hand-written heading until the shared disclosure
-lands.
+sort button per returned column. The company Departments and Relationships
+pages and `/authz/roles/:id` use the same anatomy; the company pages' add
+buttons sit in their section heading's `actions`. The two disclosure triggers on
+`/users/:id` (Effective Permissions, Change Password) keep their hand-written
+heading until the shared disclosure lands.
 
 ## Read-first detail pages
 
