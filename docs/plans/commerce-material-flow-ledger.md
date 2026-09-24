@@ -33,7 +33,7 @@ Three facts constrain the design more than any feature request:
 
 ## Top-Level Components
 
-- **Inventory / Stock** — one global append-only material-flow ledger over identified material units, locations, quantities, and balanced transactions. A per-station ledger is only a filtered view of this ledger, never a second store of truth.
+- **Inventory / Stock** — owns the one global append-only Material Transaction ledger and Lot/Unit Genealogy over identified material units, locations, quantities, and balanced transactions, and works standalone without Manufacturing. A per-station ledger is only a filtered view of this ledger, never a second store of truth.
 - **Lot and unit identity** — durable identity for a bag, a roll, or a pack, with parent/child links across transforms so a finished pack traces back to an extruder run and to a recycle receipt.
 - **Receiving and weigh tickets** — supplier, vehicle, gross/tare/net, tied to the movement that creates the lot.
 - **Manufacturing / Production Operations** — operation definitions and executions for extrusion, cure, lamination, coating, slitting, cutting, packing, and other configured process families. The first implementation is the Production module, with `product_definition`, `process_definition`, `execution`, and `trace` as internal boundaries until a real selection need justifies separate modules.
@@ -62,8 +62,10 @@ Formula/BOM, and Routing describe what may be made and how. Operation is the
 logical step; Work Centre/Resource is the physical machine, line, station, or
 other capacity that performs it. Production Order and Batch provide planning
 and execution context. Operation Execution records what actually happened and
-tags its Material Transactions with the execution, source and destination
-locations, order or batch, and Work Centre/Resource.
+posts its Material Transactions through the Inventory/Stock public posting
+contract, tagging them with source and destination locations and opaque
+context references to the execution, order or batch, and Work
+Centre/Resource.
 
 One global ledger is the source of truth. “Per-station ledger”, “per-order
 ledger”, and similar screens are filtered views grouped by execution, location,
@@ -73,7 +75,8 @@ genealogy.
 There are two code layers. The **Manufacturing / Production Operations
 Domain** holds common, industry-neutral logic plus the configuration it owns;
 plants fill that configuration as data — process families, route templates,
-units of measure, conversion bases, tolerances, and output roles. **Extensions**
+process-specific conversion bases, tolerances, and output roles. Units of
+measure and item-level conversions are Inventory/Stock data. **Extensions**
 hold customer-specific behaviour that consumes public Domain contracts, such
 as AX integration, customer vocabulary, or SBG's proprietary jumbo-roll
 costing. Configuration is data inside the Domain, not a third code layer. The
@@ -109,12 +112,15 @@ This also makes the plant's selling unit largely irrelevant to the ledger, which
 ### Module ownership
 
 The Manufacturing / Production Operations Domain owns the common logic and
-public contracts for definitions, operations, executions, material
-transactions, and genealogy. Production is the first module; its internal
-boundaries are `product_definition`, `process_definition`, `execution`, and
-`trace`. Keep them internal until a real customer needs independent module
-selection or ownership. Inventory/Stock remains a related capability with its
-own public contract; it does not need to know manufacturing semantics.
+public contracts for definitions, operations, and executions; it owns no
+ledger. Production is the first module; its internal boundaries are
+`product_definition`, `process_definition`, `execution`, and `trace`. Keep
+them internal until a real customer needs independent module selection or
+ownership. Inventory/Stock owns the one Material Transaction ledger and
+Lot/Unit Genealogy and works standalone. Its public posting contract accepts
+optional opaque context references for operation execution, order or batch,
+and Work Centre/Resource, so Manufacturing tags transactions without Stock
+depending upward or knowing manufacturing semantics.
 
 The Domain is selected as one cohesive capability. Foam, adhesive tape, web
 coating, and slitting are process families and route configuration, not stable
@@ -130,10 +136,10 @@ keeping customization out of the common model.
 Configuration is not a Domain of its own. Each Domain owns the meaning of its
 configuration: Manufacturing owns process families, route templates,
 operations, output roles, and process parameters (the Blueprint/Route
-definitions); Inventory owns items, locations, and lot rules. The generic
-per-company settings mechanism remains in Base Settings
-(`apps/base/settings`), while shared units of measure are an Inventory (or
-Base) concern rather than a Manufacturing concern. Extensions may consume
+definitions), and only process-specific conversion bases such as normalised
+mass per process family; Inventory owns items, locations, lot rules, units of
+measure, and item-level conversions. The generic per-company settings
+mechanism remains in Base Settings (`apps/base/settings`). Extensions may consume
 both Domain contracts and Base Settings, but do not turn configuration into a
 parallel business layer.
 
@@ -155,14 +161,14 @@ Label each roll individually rather than labelling the run. Per-roll identity is
 
 - Movements are append-only. Corrections are compensating movements carrying a reason and a reference to what they correct; nothing is deleted or edited in place. This supports audit evidence; whether it satisfies a particular certification depends on controls this plan does not yet cover — authorisation, timestamp integrity, correction procedure, retention, backup, calibration, and record review — so no claim is made that append-only records alone are ISO evidence.
 - **The transaction, not the movement, is the unit of record.** A transaction is immutable and contains balanced entries naming both source and destination; a movement that names one location cannot establish conservation or a stock position. Nothing is written as a lone half-entry.
-- Every entry names its operation execution, material unit, native quantity and unit, provenance, source and destination locations, order or batch where applicable, Work Centre/Resource where applicable, actor, and tenant. The Operation remains the logical step; the Work Centre/Resource identifies the physical performer.
+- Every entry names its material unit, native quantity and unit, provenance, source and destination locations, actor, and tenant, plus opaque context references to its operation execution, order or batch, and Work Centre/Resource where applicable. The Operation remains the logical step; the Work Centre/Resource identifies the physical performer.
 - A transform consumes input units and produces output units in one transaction, linking parent to child. A transform that does not balance within a configured tolerance is recorded together with its variance rather than rejected — the plant must be able to record reality, and an unexplained variance is the product, not an error to suppress.
 - The ledger states its behaviour for **idempotent submission** (a re-sent capture does not double-post), **concurrent consumption** (the same quantity cannot be consumed twice), **backdating** (an entry recorded late carries both its effective and recorded times), and **reversal** (a compensating transaction, never a delete). These are contract, not implementation detail.
 - Trim and waste are output units with their own identity, not an unrecorded difference between input and output.
 - Lot ancestry is queryable in both directions: from a shipped pack back to its recycle receipts, and from a supplier receipt forward to everything it became.
-- Inventory/Stock exposes no private manufacturing implementation. Manufacturing reaches it only through public contracts, while the global transaction ledger remains the single source of truth for all stations and operations.
-- Manufacturing is industry-neutral. Cure duration, tolerance, route steps, units of measure, conversion bases, and output roles are configuration and data. Foam, adhesive tape, web coating, and slitting are process-family or route choices, not hardcoded branches.
-- Definitions (Product Definition, Formula/BOM, and Routing) are not execution facts. Execution records actual quantities, resources, locations, timings, variances, and genealogy while preserving the selected definition and route context.
+- Inventory/Stock exposes no manufacturing concepts; it carries Manufacturing context only as optional opaque references on its public posting contract. Manufacturing reaches it only through public contracts, while the global transaction ledger remains the single source of truth for all stations and operations.
+- Manufacturing is industry-neutral. Cure duration, tolerance, route steps, process-specific conversion bases, and output roles are configuration and data. Foam, adhesive tape, web coating, and slitting are process-family or route choices, not hardcoded branches.
+- Definitions (Product Definition, Formula/BOM, and Routing) are not execution facts. Execution records actual quantities, resources, locations, timings, and variances while preserving the selected definition and route context, and posts the resulting Material Transactions and genealogy links through the Inventory/Stock public posting contract.
 - The Domain may be installed without any customer Extension. Muar foam and SBG tape behaviour remains expressible through configuration until a public-contract-consuming customer adaptation is proven necessary.
 - Cure gating refuses under-aged consumption by default. An override requires an explicit Base Authz capability and a mandatory reason, and records the actor, time, reason, and affected unit as an immutable nonconformance.
 
@@ -183,17 +189,15 @@ Goal: a receiving clerk records an arriving lorry in one screen, and a supplier'
 - [ ] Show a received stock position by material and location.
 - [ ] Report per-supplier declared-versus-measured variance over time.
 
-Assumptions: Inventory/Stock and the Manufacturing / Production Operations
-Domain are mounted through the composition model before this slice is built;
-Production is the first Manufacturing module and its internal boundaries are
-not independently selectable yet.
+Assumptions: only Inventory/Stock is mounted through the composition model
+before this slice is built; Manufacturing is not required.
 Validation: variance report over seeded receipts with known discrepancies; a clerk completing a real lorry in one screen.
 
 Deferred from this phase: landed recycle cost against virgin resin. It needs purchase price, currency, freight, and possibly duty — none of which any module owns yet. Valuable, but it is a costing feature wearing a receiving disguise.
 
 ### Phase 2 — Ledger foundation
 
-Goal: any step's input and output can be recorded as one balanced transaction, and a stock position or lot ancestry can be read back, with no manufacturing concept present in the module.
+Goal: any step's input and output can be recorded as one balanced transaction, and a stock position or lot ancestry can be read back, with no manufacturing concept present in the module beyond optional opaque context references.
 
 - [ ] Add material unit identity with parent/child ancestry across transforms.
 - [ ] Extend locations from receiving and warehouse into WIP, cure, and finished goods.
@@ -208,7 +212,7 @@ Validation: tenant boundary, append-only enforcement, ancestry traversal, and do
 
 Goal: every roll leaving an extruder carries a scannable label recording its measured width, thickness, and production date, and that label still resolves after ten days in cure.
 
-- [ ] Mount the Manufacturing / Production Operations Domain under `apps/` with its first Production module and declared dependency on Inventory/Stock's public contract. Extrusion output and blend composition belong in Production, not in Inventory/Stock.
+- [ ] Mount the Manufacturing / Production Operations Domain under `apps/` with its first Production module and declared dependency on Inventory/Stock's public contract. Extrusion output and blend composition belong in Production, not in Inventory/Stock. Production's internal boundaries are not independently selectable yet.
 - [ ] Create roll units at extrusion output with measured width, thickness, and length, each recorded as measured rather than derived.
 - [ ] Generate and print barcode labels carrying the durable unit identity and production date.
 - [ ] Scan-to-locate: resolve a scanned label to its unit, location, and cure age.
@@ -255,7 +259,7 @@ Work proceeds on these unless corrected; each is recorded because being wrong ab
 - **Selling unit is unconfirmed, and no longer blocking.** Recording native quantity plus provenance, with mass as the reconciliation basis, means the plant's pricing unit does not decide the ledger's shape. It still needs confirming for pricing and packing.
 - **Site validation is outstanding.** Label survivability, where weighing actually happens on the floor, network coverage at each capture point, the real demand source, and the applicable certification requirements all need checking on site before Phases 3 to 6 are committed to.
 - **Extension boundary is intentionally unpopulated.** Plant variation is configuration and data first. Muar foam and SBG tape are the two grounding cases; AX integration, customer vocabulary, and SBG jumbo-roll costing are examples of later Extensions if their public-contract seams are needed.
-- **Stable names are now chosen.** The Domain is Manufacturing / Production Operations, with Production first and `product_definition`, `process_definition`, `execution`, and `trace` internal boundaries. Inventory/Stock owns the related stock capability. Repository selection does not remove the cost of renaming stable module and OTP application identities later.
+- **Stable names are now chosen.** The Domain is Manufacturing / Production Operations, with Production first and `product_definition`, `process_definition`, `execution`, and `trace` internal boundaries. Inventory/Stock owns the related stock capability, the Material Transaction ledger, and Lot/Unit Genealogy. Repository selection does not remove the cost of renaming stable module and OTP application identities later.
 - **AutoCard is assumed to be replaced, not integrated.** No import or synchronisation work is planned. If it must survive, an integration phase is added and Phase 2 changes shape.
 - **Interim manual process.** The plant has no system until the composition proof passes and Inventory/Stock's receiving slice is available. A paper or spreadsheet weigh-ticket and cut-yield discipline started now would both deliver value immediately and produce a data shape to validate Phases 2 and 4 against. This is a client-side decision recorded here so it is not lost.
 
