@@ -5,13 +5,33 @@ defmodule BilimbiWeb.PinController do
 
   use BilimbiWeb, :controller
 
+  alias Bilimbi.Base.UI.RouteContract
   alias Bilimbi.Core.User
+
+  def index(conn, _params) do
+    scope = conn.assigns[:current_scope]
+
+    if scope && scope[:user] do
+      user_id = extract_user_id(scope)
+
+      pins =
+        user_id
+        |> User.list_user_pins()
+        |> Enum.filter(&served_pin?/1)
+
+      json(conn, %{pins: format_pins(pins)})
+    else
+      conn
+      |> put_status(:unauthorized)
+      |> json(%{error: "unauthorized"})
+    end
+  end
 
   def toggle(conn, %{"label" => label, "url" => url} = params)
       when is_binary(label) and is_binary(url) do
     scope = conn.assigns[:current_scope]
 
-    if scope && scope[:user] do
+    if scope && scope[:user] && is_nil(scope[:impersonator]) do
       user_id = extract_user_id(scope)
 
       case User.toggle_user_pin(user_id, params) do
@@ -27,9 +47,15 @@ defmodule BilimbiWeb.PinController do
           |> json(%{error: "invalid_pin"})
       end
     else
-      conn
-      |> put_status(:unauthorized)
-      |> json(%{error: "unauthorized"})
+      if scope && scope[:impersonator] do
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "impersonating"})
+      else
+        conn
+        |> put_status(:unauthorized)
+        |> json(%{error: "unauthorized"})
+      end
     end
   end
 
@@ -42,7 +68,7 @@ defmodule BilimbiWeb.PinController do
   def reorder(conn, %{"pins" => pin_list}) when is_list(pin_list) do
     scope = conn.assigns[:current_scope]
 
-    if scope && scope[:user] do
+    if scope && scope[:user] && is_nil(scope[:impersonator]) do
       user_id = extract_user_id(scope)
 
       case pin_ids(pin_list) do
@@ -56,9 +82,15 @@ defmodule BilimbiWeb.PinController do
           |> json(%{error: "invalid_parameters"})
       end
     else
-      conn
-      |> put_status(:unauthorized)
-      |> json(%{error: "unauthorized"})
+      if scope && scope[:impersonator] do
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "impersonating"})
+      else
+        conn
+        |> put_status(:unauthorized)
+        |> json(%{error: "unauthorized"})
+      end
     end
   end
 
@@ -66,6 +98,16 @@ defmodule BilimbiWeb.PinController do
     conn
     |> put_status(:unprocessable_entity)
     |> json(%{error: "invalid_parameters"})
+  end
+
+  # Keep stale durable pins out of the shell when a module route is removed.
+  # The toggle and reorder compatibility endpoints intentionally retain their
+  # existing response semantics; only the shell's read is route-aware.
+  defp served_pin?(pin) do
+    pin.url
+    |> URI.parse()
+    |> Map.get(:path)
+    |> then(&RouteContract.verified_route?([], String.split(&1 || "/", "/", trim: true)))
   end
 
   # The client controls this list. `String.to_integer/1` raises on anything

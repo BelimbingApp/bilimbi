@@ -156,6 +156,8 @@ pattern. There is no `/users/:id/edit` route; `FormLive` serves only
 ## Deferred
 
 Phoenix routes, forms, mail delivery, login throttling, and the authenticated
-Session adapter remain a Web slice. `user_pins` and `user_database_queries`
-have schema but no public API: they are UI features owned by Menu and the Base
-Database query surface in S3. `User::getLastUsedModel()` is Core AI's, in S4.
+Session adapter remain a Web slice. `user_pins` is served through
+`list_user_pins/1`, `toggle_user_pin/2` and `reorder_user_pins/2`, which the
+Web shell's pin API uses. `user_database_queries` has schema but no public API:
+it is a UI feature owned by the Base Database query surface in S3.
+`User::getLastUsedModel()` is Core AI's, in S4.

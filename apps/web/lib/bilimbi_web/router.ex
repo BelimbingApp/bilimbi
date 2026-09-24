@@ -82,6 +82,7 @@ defmodule BilimbiWeb.Router do
     pipe_through [:browser, :require_authenticated]
 
     post "/theme", ThemeController, :update
+    get "/pins", PinController, :index
     post "/pins/toggle", PinController, :toggle
     post "/pins/reorder", PinController, :reorder
   end

@@ -26,6 +26,19 @@ defmodule BilimbiWeb.PinControllerTest do
     assert redirected_to(conn) == ~p"/"
   end
 
+  test "GET /api/pins returns only pins whose routes are served", %{conn: conn} do
+    {:ok, :pinned, _} = User.toggle_user_pin(91, %{"label" => "Companies", "url" => "/companies"})
+    {:ok, :pinned, _} = User.toggle_user_pin(91, %{"label" => "Gone", "url" => "/gone"})
+
+    response =
+      conn
+      |> log_in_as()
+      |> get(~p"/api/pins")
+      |> json_response(200)
+
+    assert Enum.map(response["pins"], & &1["url"]) == ["/companies"]
+  end
+
   test "POST /api/pins/toggle pins and unpins URLs", %{conn: conn} do
     conn =
       conn
@@ -106,5 +119,24 @@ defmodule BilimbiWeb.PinControllerTest do
       |> json_response(200)
 
     assert Enum.map(response["pins"], & &1["id"]) == [pin.id]
+  end
+
+  test "pin writes are refused while impersonating", %{conn: conn} do
+    impersonating =
+      conn
+      |> log_in_as()
+      |> Plug.Test.init_test_session(%{
+        "impersonation" => %{"original_user_id" => 92, "original_user_name" => "Grace Hopper"}
+      })
+
+    assert json_response(
+             post(impersonating, ~p"/api/pins/toggle", %{
+               "label" => "Companies",
+               "url" => "/companies"
+             }),
+             403
+           ) == %{"error" => "impersonating"}
+
+    assert User.list_user_pins(91) == []
   end
 end
