@@ -79,6 +79,7 @@
         rows={@principal_roles}
         row_id={&"principal-role-#{&1.id}"}
         caption="Principals"
+        framed={false}
       >
         <:col :let={assignment} label="Type">
           <.badge>{principal_label(assignment)}</.badge>
