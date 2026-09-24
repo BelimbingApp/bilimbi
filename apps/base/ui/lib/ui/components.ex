@@ -368,14 +368,14 @@ defmodule Bilimbi.Base.UI.Components do
       id={@id}
       class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
     >
-      <.stat_strip_content title={@title} items={@item} linked={@linked?} />
+      <.stat_strip_content id={@id} title={@title} items={@item} linked={@linked?} />
     </.link>
     <div
       :if={!@linked?}
       id={@id}
       class="rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03]"
     >
-      <.stat_strip_content title={@title} items={@item} linked={@linked?} />
+      <.stat_strip_content id={@id} title={@title} items={@item} linked={@linked?} />
     </div>
     """
   end
@@ -397,7 +397,8 @@ defmodule Bilimbi.Base.UI.Components do
     <div class={["mt-2.5 grid divide-x divide-line", stat_strip_columns(@item_count)]}>
       <div
         :for={{item, index} <- Enum.with_index(@items)}
-        class={stat_strip_cell(index, @item_count)}
+        id={"#{@id}-item-#{index}"}
+        class={["min-w-0", stat_strip_cell(index, @item_count)]}
       >
         <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">{item.label}</p>
         <p class={[
@@ -420,7 +421,7 @@ defmodule Bilimbi.Base.UI.Components do
   defp stat_strip_cell(index, count) when index == count - 1, do: "pl-3"
   defp stat_strip_cell(_index, _count), do: "px-3"
 
-  defp stat_strip_value_class(:text), do: "text-sm"
+  defp stat_strip_value_class(:text), do: "truncate text-sm"
   defp stat_strip_value_class(_kind), do: "text-xl tabular-nums"
 
   @doc """

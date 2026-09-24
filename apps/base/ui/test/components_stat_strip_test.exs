@@ -42,9 +42,10 @@ defmodule Bilimbi.Base.UI.ComponentsStatStripTest do
     assert html =~ "Workspace"
     assert html =~ "Total"
     assert html =~ "24"
-    assert html =~ "grid-cols-2"
-    assert html =~ "text-xl tabular-nums"
-    assert html =~ "text-sm"
+    assert html =~ ~s(id="workspace-stats-item-0")
+    assert html =~ ~s(id="workspace-stats-item-1")
+    refute html =~ ~s(id="workspace-stats-item-2")
+    assert html =~ "Ready"
   end
 
   test "renders an unlinked strip as a readable surface" do
@@ -56,19 +57,19 @@ defmodule Bilimbi.Base.UI.ComponentsStatStripTest do
       })
 
     refute html =~ "href="
-    assert html =~ "rounded-xl border border-line bg-surface"
+    assert html =~ ~s(id="workspace-stats")
     assert html =~ "Workspace"
+    assert html =~ "Total"
   end
 
   test "supports a single text statistic without link affordance" do
     html = render_component(&single_stat/1, %{})
 
     assert html =~ ~s(id="storage-stats")
-    assert html =~ "grid-cols-1"
-    assert html =~ "px-0"
+    assert html =~ ~s(id="storage-stats-item-0")
+    refute html =~ ~s(id="storage-stats-item-1")
     assert html =~ "Store"
     assert html =~ "Durable"
-    assert html =~ "text-sm"
     refute html =~ "href="
   end
 end
