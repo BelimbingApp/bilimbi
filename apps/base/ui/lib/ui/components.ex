@@ -894,6 +894,172 @@ defmodule Bilimbi.Base.UI.Components do
     """
   end
 
+  @doc """
+  Renders a single-value combobox backed by a hidden form field.
+
+  The visible text input is deliberately unnamed: the `Combobox` hook filters
+  and navigates the rendered options, then copies only a committed option's
+  value into the hidden field. That keeps form params and changeset validation
+  identical to the native select this replaces. Escape and leaving the field
+  restore the last committed option; a caller that supplies `cancel_event`
+  also receives that event so an inline editor can leave edit mode.
+
+  Options are `{label, value}` pairs. An empty option list says that choices
+  are unavailable, while a query with no matches says that the filter found
+  nothing. The control follows the ARIA combobox/listbox pattern and keeps
+  `aria-activedescendant` on the text input as the active option changes.
+  """
+  attr(:id, :string, default: nil)
+  attr(:name, :string, default: nil)
+  attr(:label, :string, default: nil)
+  attr(:value, :any, default: nil)
+  attr(:field, Phoenix.HTML.FormField, default: nil)
+  attr(:options, :list, default: [])
+  attr(:placeholder, :string, default: "")
+  attr(:errors, :list, default: [])
+  attr(:cancel_event, :string, default: nil)
+  attr(:wrapper_class, :any, default: nil)
+  attr(:label_class, :any, default: nil)
+  attr(:class, :any, default: nil)
+  attr(:error_class, :any, default: nil)
+
+  attr(:rest, :global,
+    include:
+      ~w(aria-label aria-labelledby autofocus autocomplete form maxlength minlength placeholder readonly)
+  )
+
+  def combobox(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
+    errors = if Phoenix.Component.used_input?(field), do: field.errors, else: []
+    value = if is_nil(assigns.value), do: field.value, else: assigns.value
+
+    assigns
+    |> assign(
+      field: nil,
+      id: assigns.id || field.id,
+      name: assigns.name || field.name,
+      value: value
+    )
+    |> assign(:errors, Enum.map(errors, &translate_error(&1)))
+    |> combobox()
+  end
+
+  def combobox(%{id: nil, name: name} = assigns) when is_binary(name) do
+    assigns |> assign(:id, name) |> combobox()
+  end
+
+  def combobox(assigns) do
+    options = normalize_choice_options(assigns.options)
+    value = if is_nil(assigns.value), do: "", else: to_string(assigns.value)
+
+    selected_label =
+      Enum.find_value(options, "", fn {label, option} -> if option == value, do: label end)
+
+    described_by = described_by(assigns.id, nil, assigns.errors)
+
+    assigns =
+      assigns
+      |> assign(:normalized_options, options)
+      |> assign(:value_string, value)
+      |> assign(:selected_label, selected_label)
+      |> assign(:described_by, described_by)
+
+    ~H"""
+    <div
+      id={"#{@id}-wrapper"}
+      phx-hook="Combobox"
+      data-value-id={"#{@id}-value"}
+      data-cancel-event={@cancel_event}
+      class={["relative", @wrapper_class || "mb-4"]}
+    >
+      <%!-- `hidden` keeps the committed value out of the visual UI while leaving
+      the field fillable by Phoenix.LiveViewTest like a browser text input. --%>
+      <input
+        type="text"
+        hidden
+        id={"#{@id}-value"}
+        name={@name}
+        value={@value_string}
+      />
+      <label
+        :if={@label}
+        for={@id}
+        class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
+      >
+        {@label}
+      </label>
+
+      <div class="relative">
+        <input
+          id={@id}
+          type="text"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls={"#{@id}-options"}
+          aria-expanded="false"
+          aria-invalid={@errors != [] && "true"}
+          aria-describedby={@described_by}
+          autocomplete="off"
+          value={@selected_label}
+          placeholder={@placeholder}
+          class={[
+            field_class(@class, @error_class, @errors),
+            "pr-9"
+          ]}
+          {@rest}
+        />
+        <button
+          :if={@value_string != ""}
+          id={"#{@id}-clear"}
+          type="button"
+          aria-label={"Clear #{@label || "selection"}"}
+          tabindex="-1"
+          class="absolute inset-y-0 right-2 grid size-6 place-items-center rounded-sm text-ink-muted hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+        >
+          <.icon name="close" class="size-3.5" />
+        </button>
+      </div>
+
+      <div
+        id={"#{@id}-options"}
+        role="listbox"
+        aria-label={@label || "Options"}
+        tabindex="-1"
+        hidden
+        class="absolute left-0 z-30 mt-1 max-h-60 w-full min-w-56 overflow-y-auto rounded-xl border border-line bg-surface p-1.5 shadow-lg focus:outline-none"
+      >
+        <div
+          :if={@normalized_options == []}
+          id={"#{@id}-empty"}
+          class="px-2.5 py-2 text-sm text-ink-muted"
+        >
+          No options available.
+        </div>
+        <div
+          id={"#{@id}-no-matches"}
+          hidden
+          class="px-2.5 py-2 text-sm text-ink-muted"
+        >
+          No matches found.
+        </div>
+        <div :for={{label, option} <- @normalized_options}>
+          <div
+            id={"#{@id}-option-#{option}"}
+            role="option"
+            data-value={option}
+            data-label={label}
+            aria-selected={if(option == @value_string, do: "true", else: "false")}
+            class="cursor-pointer rounded-lg px-2.5 py-1.5 text-sm text-ink hover:bg-surface-sunken"
+          >
+            {label}
+          </div>
+        </div>
+      </div>
+
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
+    </div>
+    """
+  end
+
   # Relationships a person depends on: hint and error text must be announced
   # with the control, not stranded beside it. Returns the space-separated id
   # list for `aria-describedby`, or nil when there is nothing to point at so
@@ -917,6 +1083,22 @@ defmodule Bilimbi.Base.UI.Components do
       is_nil(class) && opts[:extra],
       field_state_class(errors, "border-high-contrast-line", error_class)
     ]
+  end
+
+  defp normalize_choice_options(options) do
+    Enum.map(options || [], fn
+      {label, value} ->
+        {to_string(label), to_string(value)}
+
+      [label, value] ->
+        {to_string(label), to_string(value)}
+
+      %{label: label, value: value} ->
+        {to_string(label), to_string(value)}
+
+      value when is_binary(value) or is_atom(value) or is_integer(value) ->
+        {to_string(value), to_string(value)}
+    end)
   end
 
   # A field in error reads the same whichever control draws it, so the invalid

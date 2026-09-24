@@ -172,12 +172,11 @@ defmodule Bilimbi.Core.Company.Web.CreateLive do
               />
             </div>
             <div class="grid gap-x-4 sm:grid-cols-3">
-              <.input
+              <.combobox
                 field={@form[:jurisdiction]}
                 id="company-jurisdiction"
-                type="select"
                 label="Jurisdiction"
-                prompt="Select country..."
+                placeholder="Select country..."
                 options={country_options(@countries)}
               />
               <.input

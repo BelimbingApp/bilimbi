@@ -1126,6 +1126,62 @@
                   than a visible one.
                 </p>
               </.card>
+
+              <.card
+                id="component-combobox"
+                title="Combobox"
+                inner_class="p-4 lg:col-span-2"
+                class="lg:col-span-2"
+              >
+                <p class="mb-3 text-xs text-ink-muted">
+                  Type to filter, use the arrow keys to move, and press Enter to commit. Escape or
+                  leaving the field restores the last committed choice. The unlabelled inline editor
+                  also reports the cancel to its LiveView, as an inline field editor does.
+                </p>
+                <div class="grid gap-x-3 sm:grid-cols-3">
+                  <.combobox
+                    id="design-library-combobox-country"
+                    name="example_country"
+                    label="Country"
+                    placeholder="Search countries…"
+                    options={[
+                      {"Malaysia (MY)", "MY"},
+                      {"Singapore (SG)", "SG"},
+                      {"Thailand (TH)", "TH"}
+                    ]}
+                  />
+                  <.combobox
+                    id="design-library-combobox-selected"
+                    name="example_selected_country"
+                    label="Selected country"
+                    value="SG"
+                    options={[
+                      {"Malaysia (MY)", "MY"},
+                      {"Singapore (SG)", "SG"},
+                      {"Thailand (TH)", "TH"}
+                    ]}
+                  />
+                  <.combobox
+                    id="design-library-combobox-empty"
+                    name="example_empty_country"
+                    label="Unavailable country list"
+                    placeholder="No countries"
+                    options={[]}
+                    errors={["Choose a country before continuing."]}
+                  />
+                  <.combobox
+                    id="design-library-combobox-inline"
+                    aria-label="Inline country editor"
+                    value="MY"
+                    cancel_event="preview-combobox-cancel"
+                    options={[
+                      {"Malaysia (MY)", "MY"},
+                      {"Singapore (SG)", "SG"},
+                      {"Thailand (TH)", "TH"}
+                    ]}
+                  />
+                </div>
+              </.card>
             </.form>
           </section>
 
