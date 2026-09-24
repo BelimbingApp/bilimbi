@@ -91,7 +91,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | OVR-02 [(contradicted)](#targets-the-evidence-contradicts) | Confirmation modal | `<.confirm_dialog>` on the shared modal: consequence-first `alertdialog`, calm danger confirm, Cancel first and focused, Escape cancels, no typed acknowledgement; adopted by every destructive control, so no native confirm remains | Add consequence-first confirmation without copying Belimbing's accessibility gaps. |
 | OVR-03 | Inspector drawer | Missing | Add only for a real inspector workflow; cover mobile width, resizing and remembered width. |
 | OVR-04 | Tooltip and popover behavior | No shared contract | Define only where labels or contextual actions genuinely require it. |
-| DAT-01 | Cards, facts and dense summaries | Shared card and definition-list fact rows exist; the Authz role detail adopts `<.list>` while `/companies/1` hand-writes its fact grid and dashboard summaries are ad hoc | Standardize metadata hierarchy and compact summary composition. |
+| DAT-01 | Cards, facts and dense summaries | Shared card and definition-list fact rows exist; the Authz role detail adopts `<.list>` while `/companies/1` hand-writes its fact grid and the dashboard's audit and performance summaries are ad hoc | Standardize metadata hierarchy and compact summary composition. |
 | DAT-02 | Badges and status treatments | Basic badge exists | Complete neutral, information and status roles without using brand as status. |
 | DAT-03 | Tables and sortable headings | Shared table exists | Cover caption, overflow, sticky header, hover, stripes, empty state, footer and truthful sorting. |
 | DAT-04 [(contradicted)](#targets-the-evidence-contradicts) | Absolute and relative time | Absolute datetime exists | Add relative time only with the absolute value available. |
@@ -247,7 +247,9 @@ products were read and the plan forbids treating existence as acceptance.
   hand-writes a Previous/Next pager instead of `<.pagination>` (Lane A), a Phase 5
   migration, not a pattern to copy.
 - **DAT-05** — "Missing" is wrong. Five stat cards ship on `/dashboard`, duplicated
-  into ten markup blocks with 65 arbitrary-value classes.
+  into ten markup blocks with 65 arbitrary-value classes. The Companies, Users and
+  Sessions cards now render through the shared `<.stat_strip>`, with a Data display
+  specimen; the recent-audit and performance cards keep their own markup.
 - **DAT-04** — relative time already ships in notifications, in a bare `<span>` with
   no `<time>`, no `datetime` and no `title`, frozen at render. It has since been
   replaced: `/notifications` and the `/users` Created column render through
