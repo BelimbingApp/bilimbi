@@ -128,7 +128,9 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
     assert old != new
   end
 
-  test "the trigger is a disclosure button and only an open panel claims Escape", %{scope: scope} do
+  test "the trigger is a disclosure button whose dismissals only Escape inside returns focus", %{
+    scope: scope
+  } do
     {:ok, mutation} =
       Audit.record_mutation(scope, %{
         company_id: 73,
@@ -152,20 +154,22 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistoryTest do
 
     refute present?(closed, "details, summary")
     refute present?(closed, "#history[phx-click-away]")
-    refute present?(closed, "[phx-window-keydown]")
     refute present?(closed, "#history-panel")
 
     open = render_panel(scope, mutation, open: true)
 
     assert text(open, "button#history-toggle[aria-expanded='true']") == "History"
     assert present?(open, "#history[phx-click-away]")
-    assert present?(open, "#history-panel[tabindex='-1'][phx-key='escape']")
+    assert present?(open, "#history-panel[tabindex='-1']")
+    assert present?(open, "#history[phx-hook='DisclosureDismiss']")
 
     assert [["focus", mounted]] = js(open, "#history-panel", "phx-mounted")
     refute Map.has_key?(mounted, "to")
 
     assert [["push", %{"event" => "close"}], ["focus", %{"to" => "#history-toggle"}]] =
-             js(open, "#history-panel", "phx-window-keydown")
+             js(open, "#history", "data-escape")
+
+    assert [["push", %{"event" => "close"}]] = js(open, "#history", "data-dismiss")
 
     assert [["push", %{"event" => "close"}]] = js(open, "#history", "phx-click-away")
     assert text(open, "#history-entry-#{mutation.id}-name-new") == "Widget"

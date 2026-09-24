@@ -177,7 +177,7 @@ defmodule Bilimbi.Base.UI.ComponentsMultiSelectTest do
     # Tabbing past the last option fires no LiveView binding -- it reads
     # `phx-blur` from the element losing focus, never the wrapper -- so the
     # hook watches `focusout` and runs the wrapper's own dismiss command.
-    assert html =~ ~s(phx-hook="MultiSelectDismiss")
+    assert html =~ ~s(phx-hook="DisclosureDismiss")
 
     ops = js_ops(html, "data-dismiss", "roles-filter-wrapper")
 

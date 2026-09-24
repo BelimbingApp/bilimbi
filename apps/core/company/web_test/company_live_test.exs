@@ -512,8 +512,8 @@ defmodule BilimbiWeb.CompanyLiveTest do
       end
 
       # The page header (inside <main>; the shell's top bar is its own
-      # <header>) holds no button and no Departments or Relationships link:
-      # only the pin, the history icon and the back link.
+      # <header>) holds no Departments or Relationships link, and without
+      # audit permission no History disclosure: only the pin and the back link.
       refute has_element?(view, "main header a[href='/companies/73/departments']")
       refute has_element?(view, "main header a[href='/companies/73/relationships']")
       refute has_element?(view, "main header", "Departments")

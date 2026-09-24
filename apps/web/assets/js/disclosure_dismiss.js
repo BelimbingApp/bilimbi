@@ -1,5 +1,6 @@
-// Companion to `<.multi_select>`. Opening, closing and `aria-expanded` are
-// LiveView JS commands on the markup, so they stay sticky across patches.
+// Companion to `<.multi_select>` and the record history disclosure. Their
+// wrapper publishes `data-dismiss` and `data-escape` commands, and the first
+// `[aria-expanded]` inside it is the trigger whose state records open.
 //
 // This hook runs two of them, because LiveView reads `phx-blur` and
 // `phx-keydown` from the event target alone and never from an ancestor:
@@ -33,7 +34,7 @@
 // could never close it there. The press ends on the release, which arrives
 // even when the click never does -- dragged off the field, a right-click, or
 // a touch that became a scroll.
-const MultiSelectDismiss = {
+const DisclosureDismiss = {
   mounted() {
     this.pressing = false
     this.listening = false
@@ -95,4 +96,4 @@ const MultiSelectDismiss = {
   },
 }
 
-export default MultiSelectDismiss
+export default DisclosureDismiss

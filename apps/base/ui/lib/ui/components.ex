@@ -1246,7 +1246,7 @@ defmodule Bilimbi.Base.UI.Components do
     # put it.
     #
     # Dismiss and escape are published on the wrapper for the
-    # `MultiSelectDismiss` hook, which owns the two dismissals LiveView has
+    # `DisclosureDismiss` hook, which owns the two dismissals LiveView has
     # no binding for: focus leaving the field, and Escape from wherever focus
     # actually is -- a list opened by mouse in Safari or macOS Firefox is open
     # with focus still on `body`. LiveView reads a key binding from the event
@@ -1290,7 +1290,7 @@ defmodule Bilimbi.Base.UI.Components do
     ~H"""
     <div
       id={"#{@id}-wrapper"}
-      phx-hook="MultiSelectDismiss"
+      phx-hook="DisclosureDismiss"
       data-dismiss={@dismiss}
       data-escape={@escape}
       phx-click-away={@dismiss}

@@ -12,9 +12,12 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
   It is a disclosure button, the same contract the shell's account and
   timezone disclosures and the notification bell keep. `aria-expanded`
   follows the server's open state. Opening moves focus into the panel.
-  Escape closes it and returns focus to the trigger, and a click outside
-  closes it. The panel exists only while open, so a closed history never
-  claims Escape. The trigger is not a data-changing `<.button>`: it discloses.
+  Escape pressed inside the disclosure closes it and returns focus to the
+  trigger; focus leaving it, or a click outside, closes it and leaves focus
+  where the user put it. Both dismissals are the `DisclosureDismiss` hook
+  `<.multi_select>` also uses, so an Escape that cancels an in-place edit
+  elsewhere on the page never takes the user's place. The trigger is not a
+  data-changing `<.button>`: it discloses.
 
   ## Staying current
 
@@ -67,7 +70,7 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
     end
   end
 
-  # Click-away and Escape close. They do not toggle: a click outside a
+  # Click-away, focus leaving and Escape close. They do not toggle: a click outside a
   # closed history still reaches this handler, and opening it would turn
   # every page click into a disclosure.
   @impl true
@@ -96,6 +99,9 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
     <div
       id={@id}
       class="relative inline-block text-left"
+      phx-hook="DisclosureDismiss"
+      data-dismiss={JS.push("close", target: @myself)}
+      data-escape={JS.push("close", target: @myself) |> JS.focus(to: "##{@id}-toggle")}
       phx-click-away={if(@open, do: JS.push("close", target: @myself))}
     >
       <button
@@ -111,18 +117,15 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
         <.icon name="history" class="size-4" /> History
       </button>
 
-      <%!-- The panel follows the shell's disclosures and the notification
-           bell: it mounts only while open, so phx-mounted moves focus in
-           and the Escape listener exists only then. The panel itself is
-           focusable because a trail is text, not a list of controls. --%>
+      <%!-- The panel mounts only while open, so phx-mounted moves focus
+           in. The panel itself is focusable because a trail is text, not a
+           list of controls. --%>
       <div
         :if={@open}
         id={"#{@id}-panel"}
         tabindex="-1"
         aria-labelledby={"#{@id}-heading"}
         phx-mounted={JS.focus()}
-        phx-window-keydown={JS.push("close", target: @myself) |> JS.focus(to: "##{@id}-toggle")}
-        phx-key="escape"
         class="absolute right-0 z-40 mt-2 w-[min(34rem,calc(100vw-2rem))] rounded-xl border border-line bg-surface p-3 text-left shadow-xl shadow-ink/[0.08] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong"
       >
           <div class="flex items-start justify-between gap-3 border-b border-line pb-2">

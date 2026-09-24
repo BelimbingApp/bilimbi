@@ -286,7 +286,7 @@ defmodule BilimbiWeb.UserShowTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/users/92")
     assert has_element?(view, "#user-record-history-toggle[aria-expanded='false']")
     refute has_element?(view, "#user-record-history-panel")
-    refute has_element?(view, "#user-record-history [phx-window-keydown]")
+    refute has_element?(view, "#user-record-history[phx-click-away]")
     refute has_element?(view, "#user-record-history details")
 
     # A write from elsewhere — another session, a job — lands after mount.
@@ -308,14 +308,14 @@ defmodule BilimbiWeb.UserShowTest do
 
     # Opening the panel shows the trail as of now, and the panel stays open
     # across the patch that carries it. Focus moves into the panel; Escape
-    # closes it and returns focus to the trigger. A closed history claims
-    # no key.
+    # from inside closes it and returns focus to the trigger, and focus
+    # leaving it closes it where the user is.
     view |> element("#user-record-history-toggle") |> render_click()
     assert has_element?(view, "#user-record-history-toggle[aria-expanded='true']")
 
     assert has_element?(
              view,
-             "#user-record-history-panel[tabindex='-1'][phx-mounted][phx-key='escape']"
+             "#user-record-history-panel[tabindex='-1'][phx-mounted]"
            )
 
     assert has_element?(view, "#user-record-history-entry-#{mutation.id}", "old@example.com")
@@ -330,15 +330,24 @@ defmodule BilimbiWeb.UserShowTest do
     assert [["focus", focus]] = JSON.decode!(mounted)
     refute Map.has_key?(focus, "to")
 
-    assert [escape] = LazyHTML.attribute(panel, "phx-window-keydown")
+    disclosure =
+      view
+      |> element("#user-record-history[phx-hook='DisclosureDismiss']")
+      |> render()
+      |> LazyHTML.from_fragment()
+
+    assert [escape] = LazyHTML.attribute(disclosure, "data-escape")
 
     assert [["push", %{"event" => "close"}], ["focus", %{"to" => "#user-record-history-toggle"}]] =
              JSON.decode!(escape)
 
-    view |> element("#user-record-history-panel") |> render_keydown(%{"key" => "Escape"})
+    assert [dismiss] = LazyHTML.attribute(disclosure, "data-dismiss")
+    assert [["push", %{"event" => "close"}]] = JSON.decode!(dismiss)
+
+    view |> with_target("#user-record-history") |> render_hook("close", %{})
     assert has_element?(view, "#user-record-history-toggle[aria-expanded='false']")
     refute has_element?(view, "#user-record-history-panel")
-    refute has_element?(view, "#user-record-history [phx-window-keydown]")
+    refute has_element?(view, "#user-record-history[phx-click-away]")
 
     view |> element("#user-record-history-toggle") |> render_click()
     assert has_element?(view, "#user-record-history-toggle[aria-expanded='true']")
