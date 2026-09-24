@@ -7,7 +7,12 @@ config :bilimbi_base_database, Bilimbi.Base.Repo,
   port: String.to_integer(System.get_env("PGPORT", "5433")),
   database: "bilimbi_test#{System.get_env("MIX_TEST_PARTITION")}",
   pool: Ecto.Adapters.SQL.Sandbox,
-  pool_size: System.schedulers_online() * 2
+  # Shared local PostgreSQL allows 100 connections. Uncapped
+  # `schedulers_online * 2` lets three concurrent suites exhaust it.
+  # TEST_POOL_SIZE overrides the cap when one run needs a larger pool.
+  pool_size:
+    System.get_env("TEST_POOL_SIZE", "#{min(System.schedulers_online() * 2, 10)}")
+    |> String.to_integer()
 
 config :web, BilimbiWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
