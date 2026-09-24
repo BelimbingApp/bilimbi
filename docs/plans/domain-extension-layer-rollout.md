@@ -152,15 +152,18 @@ Goal: turn the successful proof into the smallest maintained implementation.
 
 ### Phase 3 — First real Domains
 
-Goal: stock and sheet-goods repositories behave exactly like the disposable
-Domain proved in Phase 1.
+Goal: Inventory/Stock and the Manufacturing / Production Operations Domain
+behave exactly like the disposable Domain proved in Phase 1.
 
-- [ ] Create the stock Domain as an independent repository with one cohesive
+- [ ] Create Inventory/Stock as an independent repository with one cohesive
   initial module.
-- [ ] Create the sheet-goods Domain as an independent repository with a
-  declared dependency on stock's public contract.
+- [ ] Create the Manufacturing / Production Operations Domain as an
+  independent repository with its first Production module and a declared
+  dependency on Inventory/Stock's public contract. Keep
+  `product_definition`, `process_definition`, `execution`, and `trace` as
+  internal boundaries until real module-level selection is needed.
 - [ ] Prove either repository can be absent when no mounted dependent requires
-  it, and prove a missing stock dependency fails composition.
+  it, and prove a missing Inventory/Stock dependency fails composition.
 - [ ] Begin the vertical slices in
   `docs/plans/commerce-material-flow-ledger.md` only after the repository and
   migration path works end to end.
