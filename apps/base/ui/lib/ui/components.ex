@@ -916,10 +916,7 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:field, Phoenix.HTML.FormField, default: nil)
   attr(:options, :list, default: [])
   attr(:placeholder, :string, default: "")
-  attr(:hint, :string, default: nil)
   attr(:errors, :list, default: [])
-  attr(:required, :boolean, default: false)
-  attr(:disabled, :boolean, default: false)
   attr(:cancel_event, :string, default: nil)
   attr(:wrapper_class, :any, default: nil)
   attr(:label_class, :any, default: nil)
@@ -928,7 +925,7 @@ defmodule Bilimbi.Base.UI.Components do
 
   attr(:rest, :global,
     include:
-      ~w(aria-label aria-labelledby autofocus autocomplete form maxlength minlength placeholder readonly required)
+      ~w(aria-label aria-labelledby autofocus autocomplete form maxlength minlength placeholder readonly)
   )
 
   def combobox(%{field: %Phoenix.HTML.FormField{} = field} = assigns) do
@@ -957,7 +954,7 @@ defmodule Bilimbi.Base.UI.Components do
     selected_label =
       Enum.find_value(options, "", fn {label, option} -> if option == value, do: label end)
 
-    described_by = described_by(assigns.id, assigns.hint, assigns.errors)
+    described_by = described_by(assigns.id, nil, assigns.errors)
 
     assigns =
       assigns
@@ -982,14 +979,13 @@ defmodule Bilimbi.Base.UI.Components do
         id={"#{@id}-value"}
         name={@name}
         value={@value_string}
-        disabled={@disabled}
       />
       <label
         :if={@label}
         for={@id}
         class={["mb-1.5 block text-sm font-medium text-ink", @label_class]}
       >
-        {@label}<span :if={@required} aria-hidden="true">*</span>
+        {@label}
       </label>
 
       <div class="relative">
@@ -1000,13 +996,11 @@ defmodule Bilimbi.Base.UI.Components do
           aria-autocomplete="list"
           aria-controls={"#{@id}-options"}
           aria-expanded="false"
-          aria-required={@required && "true"}
           aria-invalid={@errors != [] && "true"}
           aria-describedby={@described_by}
           autocomplete="off"
           value={@selected_label}
           placeholder={@placeholder}
-          disabled={@disabled}
           class={[
             field_class(@class, @error_class, @errors),
             "pr-9"
@@ -1014,7 +1008,7 @@ defmodule Bilimbi.Base.UI.Components do
           {@rest}
         />
         <button
-          :if={@value_string != "" and not @disabled}
+          :if={@value_string != ""}
           id={"#{@id}-clear"}
           type="button"
           aria-label={"Clear #{@label || "selection"}"}
@@ -1061,7 +1055,6 @@ defmodule Bilimbi.Base.UI.Components do
         </div>
       </div>
 
-      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
       <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
     </div>
     """

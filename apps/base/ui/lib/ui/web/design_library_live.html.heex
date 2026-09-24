@@ -1135,7 +1135,8 @@
               >
                 <p class="mb-3 text-xs text-ink-muted">
                   Type to filter, use the arrow keys to move, and press Enter to commit. Escape or
-                  leaving the field restores the last committed choice.
+                  leaving the field restores the last committed choice. The unlabelled inline editor
+                  also reports the cancel to its LiveView, as an inline field editor does.
                 </p>
                 <div class="grid gap-x-3 sm:grid-cols-3">
                   <.combobox
@@ -1167,6 +1168,17 @@
                     placeholder="No countries"
                     options={[]}
                     errors={["Choose a country before continuing."]}
+                  />
+                  <.combobox
+                    id="design-library-combobox-inline"
+                    aria-label="Inline country editor"
+                    value="MY"
+                    cancel_event="preview-combobox-cancel"
+                    options={[
+                      {"Malaysia (MY)", "MY"},
+                      {"Singapore (SG)", "SG"},
+                      {"Thailand (TH)", "TH"}
+                    ]}
                   />
                 </div>
               </.card>
