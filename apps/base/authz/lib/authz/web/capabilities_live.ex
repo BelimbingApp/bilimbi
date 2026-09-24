@@ -32,14 +32,14 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
   @impl true
   def handle_event("filter", params, socket) do
     current = socket.assigns.state
-    per_page = get_in(params, ["filters", "perPage"]) || Map.get(params, "perPage")
+    filters = Map.get(params, "filters", params)
 
     state = %{
       current
-      | search: Map.get(params, "search", current.search),
+      | search: Map.get(filters, "search", current.search),
         domain:
-          member_or_blank(Map.get(params, "domain", current.domain), socket.assigns.domains),
-        page_size: page_size_from(per_page, current.page_size),
+          member_or_blank(Map.get(filters, "domain", current.domain), socket.assigns.domains),
+        page_size: page_size_from(Map.get(filters, "perPage"), current.page_size),
         page: 1
     }
 
@@ -89,10 +89,7 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
-      |> assign(
-        :filters_form,
-        to_form(%{"perPage" => Integer.to_string(state.page_size)}, as: :filters)
-      )
+      |> assign(:filters_form, filters_form(state))
       |> stream(:capabilities, page.entries, reset: true)
     end
   end
@@ -120,6 +117,17 @@ defmodule Bilimbi.Base.Authz.Web.CapabilitiesLive do
       "page" => state.page,
       "per_page" => state.page_size
     }
+  end
+
+  defp filters_form(state) do
+    to_form(
+      %{
+        "search" => state.search,
+        "domain" => state.domain,
+        "perPage" => Integer.to_string(state.page_size)
+      },
+      as: :filters
+    )
   end
 
   defp page_size_from(value, fallback) do

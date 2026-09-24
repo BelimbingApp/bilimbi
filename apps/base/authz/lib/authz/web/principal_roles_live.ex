@@ -47,12 +47,12 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
   @impl true
   def handle_event("filter", params, socket) do
     current = socket.assigns.state
-    per_page = get_in(params, ["filters", "perPage"]) || Map.get(params, "perPage")
+    filters = Map.get(params, "filters", params)
 
     state = %{
       current
-      | search: Map.get(params, "search", current.search),
-        page_size: page_size_from(per_page, current.page_size),
+      | search: Map.get(filters, "search", current.search),
+        page_size: page_size_from(Map.get(filters, "perPage"), current.page_size),
         page: 1
     }
 
@@ -105,10 +105,7 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
-      |> assign(
-        :filters_form,
-        to_form(%{"perPage" => Integer.to_string(state.page_size)}, as: :filters)
-      )
+      |> assign(:filters_form, filters_form(state))
       |> stream(:assignments, page.entries, reset: true)
     end
   end
@@ -134,6 +131,16 @@ defmodule Bilimbi.Base.Authz.Web.PrincipalRolesLive do
       "page" => state.page,
       "per_page" => state.page_size
     }
+  end
+
+  defp filters_form(state) do
+    to_form(
+      %{
+        "search" => state.search,
+        "perPage" => Integer.to_string(state.page_size)
+      },
+      as: :filters
+    )
   end
 
   defp page_size_from(value, fallback) do

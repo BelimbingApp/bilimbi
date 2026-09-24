@@ -120,13 +120,32 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
 
       {:ok, view, _html} = open_index(conn)
 
-      view |> form("#roles-filters", %{"search" => "Book"}) |> render_change()
+      view |> form("#roles-filters", filters: %{"search" => "Book"}) |> render_change()
 
       assert has_element?(view, "#roles", "Bookkeeper")
       refute has_element?(view, "#roles", "Auditor")
 
-      view |> form("#roles-filters", %{"search" => "zzz"}) |> render_change()
+      view |> form("#roles-filters", filters: %{"search" => "zzz"}) |> render_change()
       assert render(view) =~ "No roles match zzz"
+    end
+
+    test "filter state round-trips through URL state", %{conn: conn, ours: ours} do
+      {:ok, _} = Authz.create_role(ours, 73, %{name: "Auditor", code: "auditor"})
+      {:ok, view, _html} = open_index(conn)
+
+      view
+      |> form("#roles-filters", filters: %{"search" => "Auditor"})
+      |> render_change()
+
+      assert %{"search" => "Auditor", "page" => "1"} = patched_params(view)
+
+      {:ok, reloaded, _html} =
+        conn
+        |> log_in_as()
+        |> live(~p"/authz/roles?search=Auditor&page_size=50")
+
+      assert has_element?(reloaded, "#roles-search[value='Auditor']")
+      assert has_element?(reloaded, "#roles-pagination-page-size option[value='50'][selected]")
     end
 
     test "sorting toggles direction and survives in the URL", %{conn: conn, ours: ours} do
@@ -169,7 +188,7 @@ defmodule BilimbiWeb.AuthzRolesLiveTest do
       # populated table or never at all.
       assert has_element?(view, "#roles-empty", "No roles are visible in this tenant")
 
-      view |> form("#roles-filters", %{"search" => "zzz"}) |> render_change()
+      view |> form("#roles-filters", filters: %{"search" => "zzz"}) |> render_change()
       assert has_element?(view, "#roles-empty", "No roles match zzz")
     end
 

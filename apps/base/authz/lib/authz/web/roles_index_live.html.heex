@@ -27,34 +27,15 @@
       </:actions>
     </.header>
 
-    <.form
-      for={%{}}
-      as={:filters}
-      id="roles-filters"
-      phx-change="search"
-      phx-submit="search"
-      class="mb-2"
-    >
-      <div class="relative">
-        <.icon
-          name="search"
-          class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-        />
-        <.input
-          type="search"
-          id="roles-search"
-          name="search"
-          value={@state.search}
-          placeholder="Search name, code or description"
-          phx-debounce="300"
-          autocomplete="off"
-          label="Search roles"
-          label_class="sr-only"
-          wrapper_class="mb-0"
-          class="block w-full max-w-sm rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-        />
-      </div>
-    </.form>
+    <.filter_toolbar id="roles-filters" form={@filters_form} event="search">
+      <:control
+        type={:search}
+        field={@filters_form[:search]}
+        id="roles-search"
+        label="Search roles"
+        placeholder="Search name, code or description"
+      />
+    </.filter_toolbar>
 
     <%!-- A caption, not a banner: the widening is a standing property of the
          Principals counts, so it reads as a quiet caution in the warning tokens. --%>

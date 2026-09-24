@@ -145,13 +145,13 @@ defmodule BilimbiWeb.AuditLiveTest do
       assert has_element?(view, "#mutations-table", "Headquarters")
 
       # Filter by event
-      view |> form("#mutations-filters", %{"event" => "deleted"}) |> render_change()
+      view |> form("#mutations-filters", filters: %{"event" => "deleted"}) |> render_change()
       assert has_element?(view, "#mutations-table", "Headquarters")
       refute has_element?(view, "#mutations-table", "Ada Lovelace")
 
       # Search
       view
-      |> form("#mutations-filters", %{"search" => "Ada Lovelace", "event" => ""})
+      |> form("#mutations-filters", filters: %{"search" => "Ada Lovelace", "event" => ""})
       |> render_change()
 
       assert has_element?(view, "#mutations-table", "Ada Lovelace")
@@ -159,7 +159,7 @@ defmodule BilimbiWeb.AuditLiveTest do
 
       # Search no results
       view
-      |> form("#mutations-filters", %{"search" => "nonexistent-item-query"})
+      |> form("#mutations-filters", filters: %{"search" => "nonexistent-item-query"})
       |> render_change()
 
       assert has_element?(
@@ -281,7 +281,7 @@ defmodule BilimbiWeb.AuditLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/mutations")
 
       view
-      |> form("#mutations-filters", %{"search" => "Headquarters", "event" => "deleted"})
+      |> form("#mutations-filters", filters: %{"search" => "Headquarters", "event" => "deleted"})
       |> render_change()
 
       assert %{"search" => "Headquarters", "event" => "deleted"} = patched_params(view)
@@ -297,6 +297,19 @@ defmodule BilimbiWeb.AuditLiveTest do
       assert has_element?(view, "#mutations-pagination-summary", "Showing 1 to 1 of 1 results")
       assert has_element?(view, "#mutations-table", "Headquarters")
       refute has_element?(view, "#mutations-table", "Widget 01")
+
+      {:ok, reloaded, _html} =
+        conn
+        |> log_in_as()
+        |> live(~p"/audit/mutations?search=Headquarters&event=deleted&page_size=100")
+
+      assert has_element?(reloaded, "#mutations-search[value='Headquarters']")
+      assert has_element?(reloaded, "#mutations-event option[value='deleted'][selected]")
+
+      assert has_element?(
+               reloaded,
+               "#mutations-pagination-page-size option[value='100'][selected]"
+             )
     end
 
     test "sorts mutations by column", %{conn: conn, scope: scope} do
@@ -524,7 +537,7 @@ defmodule BilimbiWeb.AuditLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/actions")
 
       view
-      |> form("#actions-filters", %{"search" => "livewire", "diagnostics" => "show"})
+      |> form("#actions-filters", filters: %{"search" => "livewire", "diagnostics" => "show"})
       |> render_change()
 
       assert %{"search" => "livewire", "diagnostics" => "show"} = patched_params(view)
@@ -540,6 +553,15 @@ defmodule BilimbiWeb.AuditLiveTest do
 
       assert has_element?(view, "#actions-table", "trc-livewire")
       assert has_element?(view, "#actions-pagination-summary", "Showing 1 to 1 of 1 results")
+
+      {:ok, reloaded, _html} =
+        conn
+        |> log_in_as()
+        |> live(~p"/audit/actions?search=livewire&diagnostics=show&page_size=100")
+
+      assert has_element?(reloaded, "#actions-search[value='livewire']")
+      assert has_element?(reloaded, "#actions-diagnostics option[value='show'][selected]")
+      assert has_element?(reloaded, "#actions-pagination-page-size option[value='100'][selected]")
     end
 
     test "a console command shows what was typed and what became of it", %{
@@ -608,13 +630,16 @@ defmodule BilimbiWeb.AuditLiveTest do
       assert has_element?(view, "#actions-table", "Failed")
 
       # The family filter finds every console command and nothing else.
-      view |> form("#actions-filters", %{"event_family" => "database"}) |> render_change()
+      view
+      |> form("#actions-filters", filters: %{"event_family" => "database"})
+      |> render_change()
+
       assert has_element?(view, "#actions-pagination-summary", "Showing 1 to 3 of 3 results")
       refute has_element?(view, "#actions-table", "hacker@example.test")
 
       # A refused command is a failure to a reader looking for trouble.
       view
-      |> form("#actions-filters", %{"event_family" => "", "result" => "failure"})
+      |> form("#actions-filters", filters: %{"event_family" => "", "result" => "failure"})
       |> render_change()
 
       assert has_element?(view, "#actions-table", "Refused · Keyword")
@@ -655,13 +680,13 @@ defmodule BilimbiWeb.AuditLiveTest do
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/actions")
 
       # Filter by family = console
-      view |> form("#actions-filters", %{"event_family" => "console"}) |> render_change()
+      view |> form("#actions-filters", filters: %{"event_family" => "console"}) |> render_change()
       assert has_element?(view, "#actions-table", "bilimbi.migrate")
       refute has_element?(view, "#actions-table", "hacker@example.test")
 
       # Filter by result = failure
       view
-      |> form("#actions-filters", %{"event_family" => "", "result" => "failure"})
+      |> form("#actions-filters", filters: %{"event_family" => "", "result" => "failure"})
       |> render_change()
 
       assert has_element?(view, "#actions-table", "hacker@example.test")
@@ -669,14 +694,14 @@ defmodule BilimbiWeb.AuditLiveTest do
 
       # Filter by actor_type = guest
       view
-      |> form("#actions-filters", %{"actor_type" => "guest", "result" => ""})
+      |> form("#actions-filters", filters: %{"actor_type" => "guest", "result" => ""})
       |> render_change()
 
       assert has_element?(view, "#actions-table", "Guest")
 
       # Search
       view
-      |> form("#actions-filters", %{"search" => "migrate", "actor_type" => ""})
+      |> form("#actions-filters", filters: %{"search" => "migrate", "actor_type" => ""})
       |> render_change()
 
       assert has_element?(view, "#actions-table", "bilimbi.migrate")

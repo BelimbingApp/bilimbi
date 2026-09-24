@@ -94,7 +94,7 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
     {:ok, view, _html} = open(conn)
     assert has_element?(view, "#principal-capabilities", "admin.company.list")
 
-    view |> form("#grants-filters", %{"result" => "denied"}) |> render_change()
+    view |> form("#grants-filters", filters: %{"result" => "denied"}) |> render_change()
 
     assert has_element?(view, "#principal-capabilities", "admin.company.view")
     refute has_element?(view, "#principal-capabilities", "admin.company.list")
@@ -215,18 +215,38 @@ defmodule BilimbiWeb.AuthzPrincipalCapabilitiesLiveTest do
 
     {:ok, view, _html} = open(conn)
 
-    view |> form("#grants-filters", %{"search" => "company"}) |> render_change()
+    view |> form("#grants-filters", filters: %{"search" => "company"}) |> render_change()
 
     assert has_element?(view, "#principal-capabilities", "admin.company.list")
     refute has_element?(view, "#principal-capabilities", "admin.user.list")
 
-    view |> form("#grants-filters", %{"search" => "zzz"}) |> render_change()
+    view |> form("#grants-filters", filters: %{"search" => "zzz"}) |> render_change()
 
     assert has_element?(
              view,
              "#principal-capabilities-empty",
              "No direct capabilities match these filters"
            )
+  end
+
+  test "filter state round-trips through URL state", %{conn: conn, scope: scope} do
+    grant(scope, "admin.company.list", false)
+    {:ok, view, _html} = open(conn)
+
+    view
+    |> form("#grants-filters", filters: %{"search" => "company", "result" => "denied"})
+    |> render_change()
+
+    assert %{"search" => "company", "result" => "denied", "page" => "1"} = patched_params(view)
+
+    {:ok, reloaded, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/authz/principal-capabilities?search=company&result=denied&per_page=50")
+
+    assert has_element?(reloaded, "#grants-search[value='company']")
+    assert has_element?(reloaded, "#grants-result option[value='denied'][selected]")
+    assert has_element?(reloaded, "#grants-pagination-page-size option[value='50'][selected]")
   end
 
   test "defaults to newest first and returns there when re-sorted", %{conn: conn, scope: scope} do

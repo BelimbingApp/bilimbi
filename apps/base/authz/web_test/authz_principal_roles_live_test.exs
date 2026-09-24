@@ -84,17 +84,40 @@ defmodule BilimbiWeb.AuthzPrincipalRolesLiveTest do
 
     {:ok, view, _html} = open(conn)
 
-    view |> form("#assignments-filters", %{"search" => "editor"}) |> render_change()
+    view |> form("#assignments-filters", filters: %{"search" => "editor"}) |> render_change()
 
     assert has_element?(view, "#principal-roles", "Local editor")
     refute has_element?(view, "#principal-roles", "Local viewer")
 
-    view |> form("#assignments-filters", %{"search" => "zzz"}) |> render_change()
+    view |> form("#assignments-filters", filters: %{"search" => "zzz"}) |> render_change()
 
     assert has_element?(
              view,
              "#principal-roles-empty",
              "No principal role assignments match these filters"
+           )
+  end
+
+  test "filter state round-trips through URL state", %{conn: conn, scope: scope} do
+    assign_listed_role!(scope, %{name: "Local editor", code: "local_editor"})
+    {:ok, view, _html} = open(conn)
+
+    view
+    |> form("#assignments-filters", filters: %{"search" => "editor"})
+    |> render_change()
+
+    assert %{"search" => "editor", "page" => "1"} = patched_params(view)
+
+    {:ok, reloaded, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/authz/principal-roles?search=editor&per_page=50")
+
+    assert has_element?(reloaded, "#assignments-search[value='editor']")
+
+    assert has_element?(
+             reloaded,
+             "#assignments-pagination-page-size option[value='50'][selected]"
            )
   end
 
@@ -199,7 +222,7 @@ defmodule BilimbiWeb.AuthzPrincipalRolesLiveTest do
 
     # "Lovelace" is in no column of this table; it is only the name the
     # directory resolves for user 91.
-    view |> form("#assignments-filters", %{"search" => "Lovelace"}) |> render_change()
+    view |> form("#assignments-filters", filters: %{"search" => "Lovelace"}) |> render_change()
 
     assert has_element?(view, "#principal-roles td", "Ada Lovelace")
     assert has_element?(view, "#principal-roles td", "Local auditor")

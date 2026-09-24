@@ -21,48 +21,22 @@
       </:subtitle>
     </.header>
 
-    <.form
-      for={%{}}
-      as={:filters}
-      id="grants-filters"
-      phx-change="filter"
-      phx-submit="filter"
-      class="mb-2"
-    >
-      <div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_12rem]">
-        <div class="relative">
-          <.icon
-            name="search"
-            class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-faint"
-          />
-          <.input
-            type="search"
-            id="grants-search"
-            name="search"
-            value={@state.search}
-            placeholder="Search by capability key or principal name"
-            phx-debounce="300"
-            autocomplete="off"
-            label="Search capabilities"
-            label_class="sr-only"
-            wrapper_class="mb-0"
-            class="block w-full rounded-md border border-line bg-surface py-1.5 pl-8 pr-3 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-          />
-        </div>
-        <.input
-          type="select"
-          id="grants-result"
-          name="result"
-          value={@state.result}
-          label="Filter by grant or denial"
-          label_class="sr-only"
-          wrapper_class="mb-0"
-          prompt="Granted and denied"
-          options={[{"Granted", "allowed"}, {"Denied", "denied"}]}
-          class="h-[2.125rem] w-full rounded-md border border-line bg-surface px-2 text-sm text-ink shadow-xs transition focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
-        />
-      </div>
-    </.form>
+    <.filter_toolbar id="grants-filters" form={@filters_form} event="filter">
+      <:control
+        type={:search}
+        field={@filters_form[:search]}
+        id="grants-search"
+        label="Search capabilities"
+        placeholder="Search by capability key or principal name"
+      />
+      <:control
+        type={:select}
+        field={@filters_form[:result]}
+        id="grants-result"
+        label="Filter by grant or denial"
+        options={[{"Granted and denied", ""}, {"Granted", "allowed"}, {"Denied", "denied"}]}
+      />
+    </.filter_toolbar>
 
     <%!-- A caption, not a banner: the widening is a standing property of the
          rows, so it reads as a quiet caution in the warning tokens. --%>

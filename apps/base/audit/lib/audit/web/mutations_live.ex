@@ -36,13 +36,13 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
   # resetting to the default.
   def handle_event("filter", params, socket) do
     current = socket.assigns.state
-    per_page = get_in(params, ["filters", "perPage"])
+    filters = Map.get(params, "filters", params)
 
     state = %{
       current
-      | search: Map.get(params, "search", current.search),
-        event: filter_event(Map.get(params, "event", current.event)),
-        page_size: to_page_size(per_page, current.page_size),
+      | search: Map.get(filters, "search", current.search),
+        event: filter_event(Map.get(filters, "event", current.event)),
+        page_size: to_page_size(Map.get(filters, "perPage"), current.page_size),
         page: 1
     }
 
@@ -107,7 +107,14 @@ defmodule Bilimbi.Base.Audit.Web.MutationsLive do
   # `<.pagination>` reads its rows-per-page value from `filters[:perPage]`; the
   # URL keeps this screen's own `page_size` key.
   defp page_size_form(state) do
-    to_form(%{"perPage" => Integer.to_string(state.page_size)}, as: :filters)
+    to_form(
+      %{
+        "search" => state.search,
+        "event" => state.event,
+        "perPage" => Integer.to_string(state.page_size)
+      },
+      as: :filters
+    )
   end
 
   defp state_from_params(params) do

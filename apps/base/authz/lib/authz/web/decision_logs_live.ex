@@ -48,13 +48,13 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
   # select posts under `filters[perPage]`. Both funnel through this event.
   def handle_event("filter", params, socket) do
     current = socket.assigns.state
-    per_page = get_in(params, ["filters", "perPage"]) || Map.get(params, "perPage")
+    filters = Map.get(params, "filters", params)
 
     state = %{
       current
-      | search: Map.get(params, "search", current.search),
-        result: result_from(Map.get(params, "result", current.result)),
-        page_size: page_size_from(per_page, current.page_size),
+      | search: Map.get(filters, "search", current.search),
+        result: result_from(Map.get(filters, "result", current.result)),
+        page_size: page_size_from(Map.get(filters, "perPage"), current.page_size),
         page: 1
     }
 
@@ -116,10 +116,7 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
       socket
       |> assign(:state, state)
       |> assign(:page, page)
-      |> assign(
-        :filters_form,
-        to_form(%{"perPage" => Integer.to_string(state.page_size)}, as: :filters)
-      )
+      |> assign(:filters_form, filters_form(state))
       |> stream(:logs, page.entries, reset: true)
     end
   end
@@ -151,6 +148,17 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
       "page" => state.page,
       "per_page" => state.page_size
     }
+  end
+
+  defp filters_form(state) do
+    to_form(
+      %{
+        "search" => state.search,
+        "result" => state.result,
+        "perPage" => Integer.to_string(state.page_size)
+      },
+      as: :filters
+    )
   end
 
   defp page_size_from(value, fallback) do

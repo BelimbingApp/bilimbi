@@ -81,7 +81,7 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     assert has_element?(view, "#decision-logs", "no.such.capability")
     assert has_element?(view, "#decision-logs", "admin.authz.role.list")
 
-    view |> form("#logs-filters", %{"result" => "denied"}) |> render_change()
+    view |> form("#logs-filters", filters: %{"result" => "denied"}) |> render_change()
 
     assert has_element?(view, "#decision-logs", "no.such.capability")
     refute has_element?(view, "#decision-logs", "admin.authz.role.list")
@@ -130,13 +130,33 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
 
     {:ok, view, _html} = open(conn)
 
-    view |> form("#logs-filters", %{"search" => "company"}) |> render_change()
+    view |> form("#logs-filters", filters: %{"search" => "company"}) |> render_change()
 
     assert has_element?(view, "#decision-logs", "admin.company.list")
     refute has_element?(view, "#decision-logs", "admin.user.list")
 
-    view |> form("#logs-filters", %{"search" => "zzz"}) |> render_change()
+    view |> form("#logs-filters", filters: %{"search" => "zzz"}) |> render_change()
     assert render(view) =~ "No decisions match these filters."
+  end
+
+  test "filter state round-trips through URL state", %{conn: conn, scope: scope} do
+    record_decision(scope, "admin.company.list")
+    {:ok, view, _html} = open(conn)
+
+    view
+    |> form("#logs-filters", filters: %{"search" => "company", "result" => "denied"})
+    |> render_change()
+
+    assert %{"search" => "company", "result" => "denied", "page" => "1"} = patched_params(view)
+
+    {:ok, reloaded, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/authz/decision-logs?search=company&result=denied&per_page=50")
+
+    assert has_element?(reloaded, "#logs-search[value='company']")
+    assert has_element?(reloaded, "#logs-result option[value='denied'][selected]")
+    assert has_element?(reloaded, "#logs-pagination-page-size option[value='50'][selected]")
   end
 
   test "defaults to newest first and keeps that when re-sorting time", %{
@@ -177,7 +197,9 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     # The unfiltered table is never empty here: opening the screen authorizes
     # it, and that authorization writes a decision log of its own. The filtered
     # case is the only reachable empty state, so it is the one worth asserting.
-    view |> form("#logs-filters", %{"search" => "zzz-no-such-capability"}) |> render_change()
+    view
+    |> form("#logs-filters", filters: %{"search" => "zzz-no-such-capability"})
+    |> render_change()
 
     assert has_element?(view, "#decision-logs-empty", "No decisions match these filters")
   end
