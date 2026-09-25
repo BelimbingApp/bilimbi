@@ -12,8 +12,8 @@
 - [Pull request 800](https://github.com/BelimbingApp/bilimbi/pull/800)
 - [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
 
-**Agents:** codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6 (Factory boundary revision),
-claude/claude-opus-5.5 (no-mistakes review agent), codex/gpt-6-sol-medium
+**Agents:** codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6-sol-medium (Factory boundary revision),
+claude/claude-opus-5.5 (earlier review)
 
 ## Problem Essence
 
@@ -47,7 +47,7 @@ Inventory is one Factory module with these related responsibilities:
   “Material Ledger” is reserved for future valuation; the operational record is the Material Transaction ledger.
 - **Material units and Lot/Unit Genealogy** — identify lots or individual units and link inputs to outputs when a material transformation occurs.
 - **Posting and query contract** — let other modules record and read material facts without using Inventory's tables or private queries.
-- **Posting-authority registry** — records which Factory module may post production or transform context. Inventory does not depend on Production Execution's internals.
+- **Posting-authority registry** — records which module in Inventory's Domain container may post production or transform context. Inventory names no registrant and does not depend on Production Execution.
 
 Production Execution supplies optional execution, order or batch, and Work Centre/Resource references when it posts. Inventory stores those references as opaque context; it does not resolve or interpret them. Production Execution registers as Inventory's posting authority. See [`0000-factory-domain.md`](0000-factory-domain.md) for the Domain map.
 
@@ -59,7 +59,7 @@ Production Execution owns configured production rules, but Inventory records the
 
 - **Option A — trust callers and rely on review:** no new seam, but an Extension can post production usage straight to Inventory and nothing refuses it.
 - **Option B — gate production postings behind a Base Authz capability:** reuses authorization, but capabilities belong to people, so any caller acting for a privileged user still bypasses Production Execution.
-- **Option C — an Inventory-owned posting-authority registry:** Inventory refuses production or transform context unless the posting comes from a registered Factory module. Production Execution registers itself at boot; Extensions cannot register.
+- **Option C — an Inventory-owned posting-authority registry:** Inventory refuses production or transform context unless the posting comes from a registered module in its Domain container, as declared by composition metadata. Production Execution registers first; Extensions cannot register.
 - **Recommendation — Option C:** Inventory enforces the boundary while Production Execution owns production validation.
 
 ## Public Contract
@@ -69,9 +69,9 @@ The public contract makes each quantity and its history explainable.
 - A Material Transaction is append-only, attributable, and balanced across its source and destination effects. A correction adds a new transaction with a reason and a reference to the original; it never edits or deletes the old record.
 - Every entry retains its native quantity and unit, whether it was measured, declared, counted, or derived, and both the effective and recorded times.
 - A converted quantity identifies the conversion basis and version; the original measured value is never replaced by a converted value.
-- The posting contract accepts optional opaque references to an operation execution, order or batch, and Work Centre/Resource. Inventory stores them without interpreting their business meaning.
+- The posting contract accepts optional opaque references to an operation execution, order or batch, Work Centre/Resource, shipment, and destination. Inventory stores them without interpreting their business meaning.
 - Warehouse receipts, ordinary warehouse movements, and adjustments are open to any caller. A posting that carries production or transform context, including consumption against a production order, production output, and any transform, is accepted only from a registered posting authority.
-- Only Factory's Production Execution module may register as the production authority; an Extension's registration is refused, so Extensions submit production commands and imports through its execution/import contract. With no authority registered, production and transform postings are refused and warehouse use continues.
+- Only a module in Inventory's own Domain container, as declared by composition metadata, may register as a production posting authority; Production Execution is the initial registrant. Inventory names no registrant and depends on none. An Extension's registration is refused, so it submits production commands and imports through Production Execution's public contract. With no authority registered, production and transform postings are refused and warehouse use continues.
 - Production Execution validates production work and commits execution, Inventory effects, and any required override evidence atomically.
 - A retry with the same request does not create a duplicate. Two users cannot consume the same available quantity at once. Late entry preserves both effective and recorded times.
 - A transform atomically commits all input effects, output creation, and
@@ -100,7 +100,7 @@ Validation: a stock position can be read by item and location without invoking P
 - [ ] Retain actor, source evidence, native quantity, timestamps, and any conversion basis.
 - [ ] Make retries safe, prevent two users from consuming the same quantity, preserve late-entry times, and record corrections as new transactions.
 - [ ] Accept and retain optional opaque context references through the posting contract.
-- [ ] Add the posting-authority registry; refuse production or transform context from an unregistered caller and refuse registration from an Extension.
+- [ ] Add the posting-authority registry; refuse production or transform context from an unregistered caller and refuse registration outside Inventory's Domain container.
 - [ ] Commit each transform's input effects, outputs, and genealogy atomically;
   retain observations unchanged and require a provenance-backed variance for
   every difference.
@@ -125,7 +125,6 @@ Validation: a transformed output traces to its source receipt, and a receipt tra
 - [ ] Prove that catalog, ledger, stock-position, and genealogy operations work without invoking Production Execution.
 - [ ] Prove that Production Execution's contract posts actual inputs and outputs to Inventory with optional opaque context and atomic execution evidence.
 - [ ] Add architecture tests proving that Inventory does not depend on Production Execution, that production and transform postings are refused with no authority registered, that a registered Production Execution posting is accepted, and that an Extension cannot register or post production context.
-- [ ] Validate the reusable contract against Mr Packaging Sdn Bhd in the first Factory build, without putting its process rules in Inventory.
-- [ ] Validate the same contract against SBG in the second Factory build, without adding SBG source mappings or rules to Inventory.
+- [ ] Validate the reusable contract against distinct factory workflows without putting customer process rules or source mappings in Inventory.
 
-Validation: Mr Packaging first, then SBG, reconciles from Inventory transactions; neither customer's rules change Inventory's durable history.
+Validation: distinct factory workflows reconcile from Inventory transactions without changing Inventory's durable history. The customer sequence is in the [rollout plan](../domain-extension-layer-rollout.md).

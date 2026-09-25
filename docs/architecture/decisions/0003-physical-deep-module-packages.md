@@ -2,7 +2,7 @@
 
 **Document Type:** Architecture Decision Record
 **Status:** Accepted
-**Agents:** codex/sol-high
+**Agents:** codex/sol-high, codex/gpt-6-sol-medium (nested-root amendment)
 **Scope:** Deep-module filesystem boundaries, descriptor-driven Mix
 composition, nested Git distribution, tests, documentation, assets, and
 migration ownership
@@ -70,7 +70,7 @@ project_root/
 │   │   └── sales/                    # Optional Domain repository/bundle
 │   │       ├── mix.exs
 │   │       ├── bilimbi.container.exs
-│   │       └── order/                # sales/order module/Git mount
+│   │       └── order/                # sales/order module
 │   │           ├── mix.exs
 │   │           ├── bilimbi.module.exs
 │   │           ├── lib/
@@ -84,7 +84,7 @@ project_root/
 │       └── sb_group/                 # Optional Extension repository/bundle
 │           ├── mix.exs
 │           ├── bilimbi.container.exs
-│           └── qac/                  # sb_group/qac module/Git mount
+│           └── qac/                  # sb_group/qac module
 │               ├── mix.exs
 │               ├── bilimbi.module.exs
 │               ├── lib/
@@ -129,8 +129,9 @@ and never enumerates Database, Tenancy, Company, Address, Compatibility, or any
 other child. Discovery treats each immediate non-hidden child directory as an
 installed module and requires `bilimbi.module.exs` at that child's root. Thus
 mounting `apps/base/mailer/` changes source composition today. Once nested
-container discovery is implemented, mounting `apps/domains/sales/order/` will
-also change source composition through Mix dependency resolution.
+container discovery is implemented, mounting the `apps/domains/sales/`
+repository will also change source composition through Mix dependency
+resolution.
 
 Base ModuleRegistry physically owns the source-loadable helper at
 `apps/base/module_registry/mix/module_discovery.exs`. Containers locate that

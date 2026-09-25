@@ -13,7 +13,7 @@
 
 **Agents:** claude/claude-opus-5 (earlier work),
 amp/medium-sol (architecture review only), codex/gpt-5 (earlier work),
-codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6 (Factory boundary revision),
+codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6-sol-medium (Factory boundary revision),
 claude/claude-opus-5.5 (no-mistakes review agent)
 
 ## Problem Essence
@@ -33,7 +33,7 @@ Mr Packaging Sdn Bhd can reconcile a representative month from supplier receipt 
 - An operator labels each foam roll and can find its location and cure age.
 - Each production step records its input, output, product, trim, waste, and measurement source.
 - A monthly view explains material balance and variance by supplier, run, operation, resource, location, and period.
-- No customer-specific Extension is required by the current scope. Plant-specific products, process values, resources, labels, and permissions are configured through Factory's public contracts; create an Extension only for a confirmed gap.
+- The current scope is expected to use Factory without a customer-specific Extension. Plant-specific products, process values, resources, labels, and permissions use Factory's public contracts; create an Extension only for a confirmed gap.
 
 ## Top-Level Components
 
@@ -41,7 +41,7 @@ This plan records what the Muar operation needs from [Factory](0000-factory-doma
 
 - **Inventory module** — records item and location, native quantity and unit, declared or measured evidence, roll identity, warehouse movements, production effects, and ancestry. Warehouse receipts and ordinary warehouse movements post directly through Inventory.
 - **Product Definition and Production Execution modules** — Product Definition defines the foam products, routings, and cure minimum. Production Execution records actual extrusion and conversion work, enforces the cure hold, and presents production trace over Inventory genealogy. Production commands and history imports use its contract; it posts Inventory effects atomically with execution and any required override evidence.
-- **Mr Packaging configuration and validation** — supplies the plant's confirmed products, process values, locations, resources, labels, and permissions to Factory. No Extension is currently required; add one only for a proven customer-specific gap.
+- **Mr Packaging configuration and validation** — supplies the plant's confirmed products, process values, locations, resources, labels, and permissions to Factory. An Extension is expected to be unnecessary; add one only for a proven customer-specific gap.
 
 ## Customer Requirements
 
@@ -78,8 +78,8 @@ Conversion records need to account for both saleable output and the material tha
 
 - Link input rolls to lamination and cutting work, including the demand source and target width.
 - Record actual product, trim or offcut, waste, operator, and yield.
-- Keep monthly forecast as the current demand source; confirm it before building order matching or backlog assumptions.
-- Record finished-pack identity, quantity and unit, destination, shipment identity, and terminal movement.
+- Keep monthly forecast as an opaque demand-source reference on the production order; confirm it before building order matching or backlog assumptions.
+- Record finished-pack identity, quantity and unit, with destination and shipment as opaque references on the terminal Inventory movement.
 - A known 1200 mm input cut to 800 mm should show product, trim, waste, and attributable yield.
 
 ### Reconciliation and trace
@@ -111,8 +111,8 @@ Mr Packaging Sdn Bhd needs Factory to support these customer-facing results.
 - Receiving captures supplier, vehicle, material, location, actor, date, declared weight, measured gross/tare/net, and variance.
 - Production captures blend, colour, extruder, run, time, and each roll's measured dimensions.
 - Roll handling shows identity, location, age, configured cure minimum, and any authorised override.
-- Conversion captures input rolls, demand source, target width, product, trim, waste, operator, and yield.
-- Despatch captures pack identity, quantity, unit, destination, shipment, and material movement.
+- Conversion captures input rolls, an opaque demand-source reference, target width, product, trim, waste, operator, and yield.
+- Despatch captures pack identity, quantity, unit, and material movement with opaque destination and shipment references.
 - Warehouse receipts and ordinary warehouse movements post through Inventory; extrusion and other production commands or production-history imports use Production Execution's contract so the execution and Inventory effects commit together.
 - A transform preserves measured input and output values, and records any difference as a provenance-backed variance rather than altering observations.
 - Reconciliation reports by operation, execution, supplier, resource, location, period, and order or batch when one exists.

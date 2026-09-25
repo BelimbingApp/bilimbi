@@ -19,7 +19,7 @@
 - [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
 
 **Agents:** codex/gpt-5.6-luna (earlier work),
-codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6 (Factory boundary revision),
+codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6-sol-medium (Factory boundary revision),
 claude/claude-opus-5.5 (no-mistakes review agent)
 
 ## Problem Essence
@@ -54,9 +54,10 @@ The `SbGroup` Extension should give SBG a source-aware adhesive-tape operation w
   procurement commitments, and conversion assumptions.
 - Inventory Value publishes immutable, reviewable month-end revisions with
   quantity, value, unit, adjustment, and provenance evidence.
-- Factory's future Quality module owns QAC cases, evidence, timelines, supplier
-  requests, and corrective actions; `SbGroup` supplies SBG policy, AX mapping
-  and integration, and presentation through its public contracts.
+- A shared Quality capability should own QAC cases, evidence, timelines,
+  supplier requests, and corrective actions. Its placement is decided when the
+  workflow is built; `SbGroup` supplies SBG policy, AX mapping, integration,
+  and presentation through its public contract.
 - Every dashboard identifies source, freshness, unit, calculation basis, and
   permissions; no unsupported yield, wastage, energy, labour, or quality value
   is presented as measured fact.
@@ -90,11 +91,11 @@ These components describe what SBG needs and where the behaviour belongs.
 - **Inventory Value** — `SbGroup` owns month-end physical and financial
   quantity/value reports, immutable revisions, published/reviewed status,
   adjustments, and provenance. It does not replace Inventory's operational ledger.
-- **Factory Quality module (future)** — owns the shared QAC case, evidence, supplier-request, review, and corrective-action model. SBG connects through its public contract.
+- **Quality capability (future)** — owns the shared QAC case, evidence, supplier-request, review, and corrective-action model. Its placement as a Factory module or separate Domain waits for the confirmed workflow, including the Supplier Quality overlap.
 - **`SbGroup` Extension boundary** — contains SBG's AX mapping and integration,
   planning, procurement, inventory-value needs, SBG policy, and presentation.
   For Quality, it supplies only SBG policy, AX mapping and integration, and
-  presentation through Factory Quality's public contract; it owns no
+  presentation through Quality's public contract; it owns no
   QAC case, evidence, or corrective-action model. It does not reach into
   private Domain tables or queries.
 
@@ -180,7 +181,8 @@ private AX or recipe implementation details.
   quantity/value, UOM, adjustments, provenance, reviewer, publication status,
   and immutable prior versions. A failed refresh cannot replace a complete
   published version.
-- Quality records QAC case type, policy state, evidence, timeline, supplier or
+- The chosen Quality owner records QAC case type, policy state, evidence, timeline,
+  supplier or
   customer request, corrective action, reviewer, and any AI assistance as
   attributable, reviewable, and reversible support. `SbGroup` adds SBG policy,
   AX mapping/integration, and presentation through the Quality API; it does
@@ -256,18 +258,20 @@ and open-PO value back to its source and freshness.
 ### Phase 4 — Inventory Value and Quality integration
 
 This phase closes the month-end value loop and connects SBG to the future
-Factory Quality module without changing the operational ledger or duplicating its
-case model.
+Quality capability without changing the operational ledger or duplicating its
+case model. QAC and supplier requests wait for the Quality placement decision.
 
 - **SBG receives:** immutable published/reviewed inventory-value revisions and
-  QAC case workflows owned by Factory Quality, with SBG-specific policy
-  and presentation through its public contracts.
+  QAC case workflows owned by the chosen Quality capability, with SBG-specific
+  policy and presentation through its public contract.
 - [ ] Produce month-end physical and financial quantity/value snapshots with
   UOM, adjustments, reviewer, publication state, and provenance.
 - [ ] Refuse replacement of a complete published revision when a refresh fails;
   create a new candidate or revision instead.
-- [ ] Integrate Factory Quality's QAC evidence timelines, supplier requests,
-  corrective actions, review gates, and attributable/reversible AI assistance
+- [ ] Decide Quality's placement and Supplier Quality overlap before building
+  QAC and supplier-request integration.
+- [ ] Integrate QAC evidence timelines, supplier requests, corrective actions,
+  review gates, and attributable/reversible AI assistance
   through its public API; keep SBG-specific policy and presentation in
   `SbGroup`.
 - [ ] Connect relevant production, procurement, and source facts by public
@@ -282,12 +286,12 @@ model owned by Quality rather than `SbGroup`.
 This phase makes the SBG operation useful at scale while preserving source and
 confidentiality boundaries.
 
-- **SBG receives:** production, IBP, procurement, inventory-value, AX health, and QAC views from Factory's Quality module, with explicit permissions and freshness indicators.
+- **SBG receives:** production, IBP, procurement, inventory-value, AX health, and QAC views from the chosen Quality capability, with explicit permissions and freshness indicators.
 - [ ] Add monthly/yearly/reactor/glue and coating-line views only over validated
   facts and clearly label unavailable fields.
 - [ ] Add source-health, candidate/active batch, freshness, schema, and
   reconciliation monitoring for the AX Connector.
-- [ ] Prove recipe, lot, supplier, customer, and Factory Quality QAC access
+- [ ] Prove recipe, lot, supplier, customer, and Quality QAC access
   policies with reviewable audit evidence; `SbGroup` owns only its policy,
   integration, and presentation through the approved seam.
 - [ ] Use an approved AX AIF or staging contract for any future write; do not

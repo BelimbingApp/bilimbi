@@ -21,8 +21,6 @@ fills that budget.
 - `apps/base/audit/AGENTS.md` — what an audit row records
 - `apps/base/database/AGENTS.md` — silencing capture, and a boundary the database enforces
 - `apps/core/AGENTS.md` — an archived company freezes its accounts for good
-- `apps/domains/AGENTS.md` — optional Domain repository placement and ownership
-- `apps/extensions/AGENTS.md` — optional Extension repository placement and ownership
 
 `docs/architecture/database.md` is the normative source of truth for database
 ownership, dependency categories, migrations, schema contracts, verification,

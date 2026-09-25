@@ -18,7 +18,7 @@
 
 **Agents:** claude/claude-opus-5 (earlier work),
 amp/medium-sol (architecture review only), codex/gpt-5 (earlier work),
-codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6 (Factory boundary revision),
+codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6-sol-medium (Factory boundary revision),
 claude/claude-opus-5.5 (no-mistakes review agent)
 
 ## Problem Essence
@@ -71,9 +71,7 @@ are outside this plan.
 
 ### Select repositories by mounting them
 
-**Mounted independent repositories** are recommended because they satisfy the
-current requirement with the existing workspace topology. Git submodules need
-a company-owned parent; published packages add a package lifecycle; runtime
+**Mounted independent repositories** are recommended because repository presence selects source without a second registry. The nested role roots still need Mix and discovery changes. Git submodules need a company-owned parent; published packages add a package lifecycle; runtime
 flags ship unselected code. Those alternatives remain deferred unless the
 nested-repository proof fails.
 
@@ -120,15 +118,22 @@ Goal: prove or reject the complete model before production implementation.
   and at least one module.
 - [ ] Prove Mix includes both nested roots in builds and releases while Base,
   Core, and Web remain direct umbrella children. Update discovery, graph
-  fingerprint inputs, and route and boundary scans for the two nested roots
-  without a list of optional capability names. Verify that the Git ignore
-  rules prevent accidental tracking of mounted repositories.
+  fingerprint inputs, root formatter subdirectories, route and boundary scans,
+  and every fixed-depth `apps/*/*` guard glob for the two nested roots without
+  a list of optional capability names. Include Domain templates in Tailwind
+  sources and mounted modules in precommit and strict compilation. Prove Web
+  includes mounted container dependencies without hard-coded capability names.
+  Verify that Git ignore rules prevent accidental tracking of repositories.
 - [ ] Prove a declared cross-repository Domain dependency and a declared
   Extension-to-Extension dependency, with cycle rejection for both.
 - [ ] Treat those synthetic edges only as mechanism fixtures; every production
   same-layer dependency must separately pass 0010's business-necessity test.
 - [ ] Confirm the parent Bilimbi repository neither owns nor records the nested
   repositories.
+- [ ] Decide and prove lockfile ownership when a mounted repository adds a Hex
+  dependency; unmounting it must not silently rewrite another owner's lockfile.
+- [ ] Prove a Domain repository's CI can check out a pinned Platform revision,
+  mount itself, and run its build checks without an unpublished local workspace.
 - [ ] Prove discovery includes every mounted module without a central list and
   rejects a missing dependency, duplicate identity, forbidden direction, and
   cross-repository cycle.
@@ -160,7 +165,8 @@ Goal: turn the successful proof into the smallest maintained implementation.
   and build-time graph validation using the mechanism proven in Phase 1.
 - [ ] Permit declared cross-container Domain dependencies and declared
   Extension-to-Extension dependencies while retaining cycle and upward-edge
-  rejection.
+  rejection. No production cross-container Domain edge exists yet; this
+  mechanism must pass 0010's proof before a real dependency needs it.
 - [ ] Include every graph application and its resources in the release.
 - [ ] Make migrations and runtime contributions consume the approved graph
   without reconstructing it or creating upward dependencies.
@@ -178,8 +184,8 @@ Goal: Factory mounts as one repository and its first three modules support Mr Pa
 - [ ] Implement Inventory's public material contract following `docs/plans/factory/0010-inventory-module.md`; Production Execution depends on that API and registers as its production posting authority.
 - [ ] Prove Factory can be absent when no mounted dependent requires it, and prove a missing Factory dependency fails composition.
 - [ ] Prove Inventory owns the only material ledger and genealogy while Production Execution adds run, step, and resource context through its public contract.
-- [ ] Keep Quality, Planning, Maintenance, and Costing as later Factory modules until an owner confirms each workflow.
-- [ ] Validate the initial modules against Mr Packaging Sdn Bhd's receipt-to-despatch workflow in `docs/plans/factory/mr-packaging-requirements.md`; its current requirements use Factory configuration and need no Extension.
+- [ ] Keep Planning, Maintenance, and Costing as later Factory modules until an owner confirms each workflow. Decide Quality's module or Domain placement when its own workflow is built.
+- [ ] Validate the initial modules against Mr Packaging Sdn Bhd's receipt-to-despatch workflow in `docs/plans/factory/mr-packaging-requirements.md`; its current requirements are expected to use Factory configuration without an Extension.
 
 ### Phase 4 — Second Factory build and first Extension
 
@@ -187,7 +193,7 @@ Goal: SBG validates the same Factory modules through glue, coating, and slitting
 
 - [ ] Validate Factory's contracts against SBG's glue, coating, and slitting workflows in `docs/plans/factory/sbg-requirements.md`.
 - [ ] Mount the `SbGroup` AX Connector for confirmed source mapping and submit production history through Production Execution's import contract. Keep process configuration in Factory and SBG-specific integration in `SbGroup`.
-- [ ] Keep warehouse receipts and ordinary movements on Inventory's public contract; no Extension owns a material ledger, genealogy, or production posting authority.
+- [ ] Keep warehouse receipts and ordinary movements on Inventory's public contract; no Extension owns the common material ledger, genealogy, units of measure, production posting authority, or execution semantics.
 - [ ] Mount a `MrPackaging` Extension only if plant validation finds a specific gap in Factory's public contracts or configuration.
 - [ ] Keep each Extension's ownership, visibility, and licensing independent of its architectural role.
 - [ ] Prove the application remains complete with the Extension absent and

@@ -3,7 +3,7 @@
 **Document Type:** Normative architecture standard
 **Status:** Current — implementation pending realization proof
 **Architecture ID:** 0010 (reserved; do not reuse for an ADR)
-**Agents:** claude/claude-opus-5, amp/medium-sol, codex/gpt-6
+**Agents:** claude/claude-opus-5, amp/medium-sol, codex/gpt-6-sol-medium
 **Scope:** Platform, Domain, Extension, composition, and nested-Git rules
 **Last Updated:** 2026-09-25
 
@@ -130,8 +130,10 @@ business-application/
 └── mix.lock
 ```
 
-The role folders follow Belimbing's Domain and Extension source grouping. The
-mounted repositories follow Bilimbi's Mix and descriptor contracts.
+The role folders make a repository's architectural role visible from its path
+and keep the Platform-owned `apps/*` allowlist fixed. They follow Belimbing's
+Domain and Extension source grouping; mounted repositories still follow
+Bilimbi's Mix and descriptor contracts.
 
 Each mounted repository is a container Mix project and descriptor boundary;
 each immediate child module is also a Mix project and descriptor boundary:
