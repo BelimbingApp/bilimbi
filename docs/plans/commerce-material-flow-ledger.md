@@ -11,7 +11,10 @@
 - [Pull request 800](https://github.com/BelimbingApp/bilimbi/pull/800)
 - [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
 
-**Agents:** codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna (this revision)
+**Agents:** claude/claude-opus-5 (earlier work),
+amp/medium-sol (architecture review only), codex/gpt-5 (earlier work),
+codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (this revision),
+claude/claude-opus-5.5 (no-mistakes review agent)
 
 ## Problem Essence
 
@@ -36,8 +39,8 @@ Mr Packaging Sdn Bhd can reconcile a representative month from supplier receipt 
 
 This is the customer requirements plan for Mr Packaging Sdn Bhd. Shared design is defined once in [`inventory-domain.md`](inventory/inventory-domain.md) for Inventory/Stock and [`manufacturing-domain.md`](manufacturing/manufacturing-domain.md) for Manufacturing; this plan records what the Muar operation needs from those Domains.
 
-- **Inventory/Stock module** — records item and location, native quantity and unit, declared or measured evidence, roll identity, material movements, and ancestry for the Muar operation.
-- **Manufacturing Production module** — defines the foam products and routes, records actual extrusion and conversion work, applies configured cure rules, and presents production trace over Stock genealogy.
+- **Inventory/Stock module** — records item and location, native quantity and unit, declared or measured evidence, roll identity, warehouse movements, production effects, and ancestry for the Muar operation. Warehouse receipts and ordinary warehouse movements post directly through Stock.
+- **Manufacturing Production module** — defines the foam products and routes, records actual extrusion and conversion work, applies configured cure rules, and presents production trace over Stock genealogy. Production commands and production-history imports use Manufacturing's execution/import contract, which posts Stock effects atomically with execution and any required override evidence.
 - **`MrPackaging` Extension** — owns a confirmed customer integration or workflow only when the public contracts and Manufacturing configuration cannot express it.
 
 ## Customer Requirements
@@ -85,6 +88,7 @@ Monthly reports need to explain the material balance without replacing the share
 
 - Compare expected and actual input, output, product, trim, waste, and stock by supplier, operation, run, resource, location, and period.
 - Separate measured, declared, counted, and derived quantities; show the conversion basis used for any normalised mass.
+- Preserve every observed quantity. When a transformation's measured and derived quantities differ, record a mandatory variance with its source evidence and reconciliation basis; a balanced ledger does not imply that measurements agree.
 - Show the affected receipt, roll, run, or finished pack for each unexplained variance.
 - Trace a shipped pack backward to its roll, production run, and supplier receipt; trace a receipt forward to its descendants.
 - Retain original records. A correction is a new compensating movement with a reason, not an edit or delete.
@@ -118,6 +122,8 @@ Mr Packaging Sdn Bhd needs the shared Domains to support these customer-facing r
 - Roll handling shows identity, location, age, configured cure minimum, and any authorised override.
 - Conversion captures input rolls, demand source, target width, product, trim, waste, operator, and yield.
 - Despatch captures pack identity, quantity, unit, destination, shipment, and material movement.
+- Warehouse receipts and ordinary warehouse movements post through Stock; extrusion and other production commands or production-history imports use Manufacturing's execution/import contract so the execution and Stock effects commit together.
+- A transform preserves measured input and output values, and records any difference as a provenance-backed variance rather than altering observations.
 - Reconciliation reports by operation, execution, supplier, resource, location, period, and order or batch when one exists.
 - A retry does not duplicate a movement, two users cannot consume the same available quantity, late entry preserves effective and recorded times, and correction adds a new transaction with a reason.
 - Missing measurements stay visibly unknown; the application does not present a derived value as measured evidence.

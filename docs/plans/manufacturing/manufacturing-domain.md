@@ -10,8 +10,11 @@
 - [`docs/architecture/0010_composition-model.md`](../../architecture/0010_composition-model.md)
 - [`AGENTS.md`](../../../AGENTS.md) §§4–6
 - [Pull request 800](https://github.com/BelimbingApp/bilimbi/pull/800)
+- [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
 
-**Agents:** codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna (this revision)
+**Agents:** codex/gpt-5.6-luna (earlier work),
+codex/gpt-6-luna-xhigh (this revision),
+claude/claude-opus-5.5 (no-mistakes review agent)
 
 ## Problem Essence
 
@@ -47,9 +50,9 @@ Manufacturing is a single Domain. The first module is Production; its four named
 
 Process families, route templates, tolerances, output roles, process gates, and process-specific conversion bases are configuration data owned by Manufacturing. Inventory/Stock owns item-level units and conversions. Configuration extends a Domain's behaviour as data; it is not a third code layer.
 
-### Later capability modules
+### Later capability Domains
 
-Quality, Document/Change Control, Metrology/Calibration, Controlled Records, Supplier Quality, and EHS are separate later modules, not internal parts of Production. Confirm each module’s owner and public contract before it joins a Domain.
+Quality, Document/Change Control, Metrology/Calibration, Controlled Records, Supplier Quality, and EHS are separate future capability Domains, not modules under Manufacturing. Quality owns the shared QAC case, evidence, and corrective-action model; Production can link to Quality records through public contracts.
 
 ## Design Decisions
 
@@ -87,7 +90,8 @@ The Production module gives other modules and Extensions a stable way to define 
 - Product Definition and Process Definition are versioned. A production order or batch selects the versions used for its execution.
 - An **Operation** is a logical step in a process. A **Work Centre/Resource** is the physical machine, line, station, or capacity used for that step.
 - Execution records actual inputs, outputs, quantities, location, time, operator, resource, selected definitions, and variance.
-- Execution posts actual material effects through Inventory/Stock's public contract and may supply opaque execution, order or batch, and Work Centre/Resource context references.
+- Warehouse receipts and ordinary warehouse movements post directly to Inventory/Stock. Production commands and production or AX-history imports enter Manufacturing's public execution/import contract, which validates the operation and posts Stock effects through Stock's public posting contract with opaque context references.
+- Execution completion, Stock effects, and any required override evidence succeed or fail together. A caller cannot post production material effects directly to Stock and bypass Manufacturing's validation.
 - Production trace reads Stock's Lot/Unit Genealogy. It may add production context to a trace result but does not keep parent/child material ancestry of its own.
 - Common process families and their rules are Domain-owned configuration. Customer Extensions use public contracts and may add behaviour only where configuration cannot express a confirmed need.
 - Extensions do not read private Domain queries or tables. The Production module remains complete when any customer Extension is absent.
@@ -109,7 +113,11 @@ Validation: an order or batch can select a specific product and route revision w
 
 - [ ] Record a production order or batch and its actual operation executions.
 - [ ] Capture actual input, output, quantity, time, operator, resource, and variance.
-- [ ] Post material effects through Inventory/Stock with optional opaque execution, order or batch, and resource references.
+- [ ] Accept live production commands and production or AX-history imports
+  through the same execution/import contract; post material effects through
+  Stock's public contract with optional opaque execution, order or batch, and
+  resource references.
+- [ ] Commit execution completion, Stock effects, and any required override evidence as one all-or-nothing operation.
 - [ ] Preserve which definition versions governed the recorded work.
 
 Validation: repeated submission cannot duplicate material use, and each execution's material effects appear in the same Stock ledger as warehouse movements.
@@ -122,9 +130,9 @@ Validation: repeated submission cannot duplicate material use, and each executio
 
 Validation: trace reads Stock's ancestry and stores no second parent/child ledger.
 
-### Later capability modules
+### Later capability Domains
 
-- [ ] Define Quality only after an owner approves the inspection, result, nonconformance, or corrective-action scope.
+- [ ] Define the Quality capability, including QAC cases, evidence, nonconformance, and corrective actions, only after an owner approves its public contract.
 - [ ] Define Document/Change Control only after an owner approves the controlled instruction and revision needs.
 - [ ] Define Metrology/Calibration only after an owner approves the equipment and calibration evidence needs.
 - [ ] Define Controlled Records only after an owner approves the retention and retrieval requirements.

@@ -10,8 +10,9 @@
 - [`AGENTS.md`](../../../AGENTS.md) §§4–6
 - Belimbing `app/Domains/Commerce/Inventory` item master and models
 - [Pull request 800](https://github.com/BelimbingApp/bilimbi/pull/800)
+- [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
 
-**Agents:** codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna (this revision)
+**Agents:** codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (this revision)
 
 ## Problem Essence
 
@@ -84,8 +85,13 @@ The public contract makes each quantity and its history explainable.
 - Every entry retains its native quantity and unit, whether it was measured, declared, counted, or derived, and both the effective and recorded times.
 - A converted quantity identifies the conversion basis and version; the original measured value is never replaced by a converted value.
 - The posting contract accepts optional opaque references to an operation execution, order or batch, and Work Centre/Resource. Stock stores them without needing those modules to be installed.
+- Warehouse receipts and ordinary warehouse movements post directly through Stock. Production commands and production or AX-history imports go through Manufacturing's public execution/import contract; Manufacturing validates them and commits execution, Stock effects, and any required override evidence atomically.
 - A retry with the same request does not create a duplicate. Two users cannot consume the same available quantity at once. Late entry preserves both effective and recorded times.
-- A transform records input and output identities and any measured or configured variance. It does not hide loss by forcing quantities to match.
+- A transform atomically commits all input effects, output creation, and
+  genealogy. It preserves observed quantities and their provenance;
+  accounting balance does not mean measurements agree. Any difference creates
+  a mandatory variance record with its provenance and reconciliation basis.
+  The system never changes an observed quantity to force agreement.
 - Genealogy queries follow a lot or unit backward to its receipt and forward to descendant outputs. No caller stores a competing parent/child history.
 - Tenant and company boundaries follow the platform's established scope rules; callers use the public API rather than passing raw ownership identifiers or writing Stock tables.
 
@@ -107,8 +113,15 @@ Validation: a stock position can be read by item and location without a Manufact
 - [ ] Retain actor, source evidence, native quantity, timestamps, and any conversion basis.
 - [ ] Make retries safe, prevent two users from consuming the same quantity, preserve late-entry times, and record corrections as new transactions.
 - [ ] Accept and retain optional opaque context references through the posting contract.
+- [ ] Commit each transform's input effects, outputs, and genealogy atomically;
+  retain observations unchanged and require a provenance-backed variance for
+  every difference.
 
-Validation: retries do not duplicate a movement, and each displayed position can be traced to its transactions.
+Validation: a measured 100 kg input can produce 78 kg of measured finished
+material, 17 kg of derived trim, and 2 kg of measured waste, with the remaining
+3 kg recorded as a variance and its evidence and reconciliation basis. The
+accounting transaction balances without changing any observed quantity or
+claiming measurement agreement.
 
 #### Phase 3 — Material units and Lot/Unit Genealogy
 
@@ -121,7 +134,7 @@ Validation: a transformed output traces to its source receipt, and a receipt tra
 #### Phase 4 — Standalone and cross-Domain proof
 
 - [ ] Prove that catalog, ledger, stock-position, and genealogy operations work with Manufacturing absent.
-- [ ] Prove that Production can post actual inputs and outputs with optional opaque context through the same contract.
+- [ ] Prove that Manufacturing's execution/import contract can post actual production inputs and outputs to Stock with optional opaque context and atomic execution evidence.
 - [ ] Validate the reusable contract against Mr Packaging Sdn Bhd and SBG as different examples, without putting their customer rules in Stock.
 
 Validation: both examples reconcile from Stock transactions, and removing a caller does not change Stock's durable history.

@@ -16,8 +16,10 @@
 - SBG `docs/qac/1-qac-domain-model.md`
 - SBG `docs/ax-connector/ax-connector-extraction-plan.md`
 - SBG transition capability and access-gap notes
+- [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
 
-**Agents:** codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna (this revision),
+**Agents:** codex/gpt-5.6-luna (earlier work),
+codex/gpt-6-luna-xhigh (this revision),
 claude/claude-opus-5.5 (no-mistakes review agent)
 
 ## Problem Essence
@@ -53,8 +55,9 @@ while reusing the common Inventory/Stock and Manufacturing contracts.
   procurement commitments, and conversion assumptions.
 - Inventory Value publishes immutable, reviewable month-end revisions with
   quantity, value, unit, adjustment, and provenance evidence.
-- QAC provides policy-driven internal, customer, and supplier case workflows
-  with evidence, timelines, requests, and corrective actions.
+- The future Quality capability owns QAC cases, evidence, timelines, supplier
+  requests, and corrective actions; `SbGroup` supplies SBG policy, AX mapping
+  and integration, and presentation through its public contracts.
 - Every dashboard identifies source, freshness, unit, calculation basis, and
   permissions; no unsupported yield, wastage, energy, labour, or quality value
   is presented as measured fact.
@@ -67,15 +70,18 @@ These components describe what SBG needs and where the behaviour belongs.
   material units, append-only Material Transaction ledger, and Lot/Unit
   Genealogy. It remains usable without `SbGroup`.
 - **AX Connector** — `SbGroup` owns the single AX boundary: typed source facts,
-  schema checks, source snapshots, candidate and active batches,
-  provenance, freshness, and tenant/company mapping. It does not issue raw SQL
-  writes to AX application tables; any future write uses an approved AX AIF or
-  staging path.
+  schema checks, source snapshots, candidate and active batches, provenance,
+  freshness, and tenant/company mapping. It submits production history to
+  Manufacturing's execution/import contract; it does not post production
+  effects directly to Stock or issue raw SQL writes to AX application tables.
+  Any future AX write uses an approved AIF or staging path.
 - **Production** — glue batches, reactors, operators, helpers, wet/dry output,
-  material usage and lots, quality results, coating, and slitting are process
-  families configured in the generic Manufacturing Domain. `SbGroup` maps AX
-  production-source facts into them; its production dashboards can expose
-  monthly, yearly, reactor, glue, and coating-line views.
+  material usage and lots, coating, and slitting are process families
+  configured in the generic Manufacturing Domain. Its execution/import
+  contract validates production commands and historical facts, then commits
+  execution and Stock effects atomically. `SbGroup` maps AX facts into that
+  contract; its dashboards can expose monthly, yearly, reactor, glue, and
+  coating-line views.
 - **IBP** — `SbGroup` owns BA/BOPP planning, forecasts, weekly planning,
   safety-stock alerts, container planning, pricing and cost sensitivities, and
   the evidence linking planning values to AX facts.
@@ -85,13 +91,15 @@ These components describe what SBG needs and where the behaviour belongs.
 - **Inventory Value** — `SbGroup` owns month-end physical and financial
   quantity/value reports, immutable revisions, published/reviewed status,
   adjustments, and provenance. It does not replace Stock's operational ledger.
-- **QAC** — `SbGroup` owns policy-driven internal, customer, and supplier cases,
-  evidence timelines, corrective actions, supplier requests, and reviewable
-  AI assistance. It does not turn an AI suggestion into an unreviewed fact.
-- **`SbGroup` Extension boundary** — contains SBG's AX integration, planning,
-  production-source adapters, inventory-value and procurement workflows, QAC,
-  private dashboards, and confidentiality rules. It consumes public Domain
-  contracts and does not reach into their private tables or queries.
+- **Quality capability (future)** — owns the shared QAC case, evidence,
+  supplier-request, review, and corrective-action model. It is separate from
+  Manufacturing. SBG connects through this capability's public contracts.
+- **`SbGroup` Extension boundary** — contains SBG's AX mapping and integration,
+  planning, procurement, inventory-value needs, SBG policy, and presentation.
+  For Quality, it supplies only SBG policy, AX mapping and integration, and
+  presentation through the Quality capability's public contracts; it owns no
+  QAC case, evidence, or corrective-action model. It does not reach into
+  private Domain tables or queries.
 
 ## Design Decisions
 
@@ -112,9 +120,9 @@ SBG's source and workflow behaviour belongs in its Extension.
 - **Option C — common Domain plus `SbGroup` adapters and workflows:** keeps
   shared contracts small while allowing SBG-specific source and evidence rules.
 - **Recommendation — Option C:** Stock and Manufacturing own the reusable
-  ledger, genealogy, definitions, execution, and trace contract; `SbGroup`
-  owns AX, IBP, production-source adapters, procurement, inventory value, QAC,
-  and private presentation.
+  ledger, genealogy, definitions, execution, and trace contract. `SbGroup`
+  owns its AX integration, planning, procurement, inventory-value needs, and
+  presentation; the future Quality capability owns QAC records and workflow.
 
 ### AX source boundary
 
@@ -185,16 +193,20 @@ details require tighter access.
 The SBG contract must make every operational number explainable without exposing
 private AX or recipe implementation details.
 
-- `SbGroup` consumes Stock's append-only, balanced Material Transaction and
-  genealogy APIs for receiving, consumption, production output, adjustment,
-  and reconciliation.
+- Warehouse receipts and ordinary warehouse movements post directly through
+  Stock's Material Transaction contract. Production commands and production
+  or AX-history imports pass through Manufacturing's execution/import
+  contract; `SbGroup` cannot post production effects directly to Stock.
+- Manufacturing commits execution completion, Stock effects, and any required
+  override evidence together, or commits none of them. A failed or retried
+  import cannot leave a partial production record or duplicate material effect.
 - AX facts expose source identity, extraction time, effective period, freshness,
   schema/version checks, candidate or active status, tenant/company mapping,
   and the approved fact type.
 - Glue production records batch/job number, production date/month, reactor,
   glue item/type, capacity, revision, wet and dry quantities, operator/helper,
-  previous batch, cleaning sequence, material usage, material lot, and quality
-  result references where available.
+  previous batch, cleaning sequence, material usage, material lot, and
+  references to Quality results where available.
 - Coating and slitting records production-order and coating-line facts, input
   consumption, good output, and yield basis. A known transition report may
   compare 422,089 coating consumption lines in 2026 with good output, but the
@@ -209,9 +221,11 @@ private AX or recipe implementation details.
   quantity/value, UOM, adjustments, provenance, reviewer, publication status,
   and immutable prior versions. A failed refresh cannot replace a complete
   published version.
-- QAC records case type, policy state, evidence, timeline, supplier or
+- Quality records QAC case type, policy state, evidence, timeline, supplier or
   customer request, corrective action, reviewer, and any AI assistance as
-  attributable, reviewable, and reversible support.
+  attributable, reviewable, and reversible support. `SbGroup` adds SBG policy,
+  AX mapping/integration, and presentation through the Quality API; it does
+  not own this record model.
 - Every result identifies source, freshness, unit, owner, formula or conversion
   basis, and access policy. Missing energy, labour, GSM, wastage-reason, or
   discontinued COA data remains explicitly unavailable.
@@ -234,7 +248,7 @@ boundary before planning or dashboards depend on it.
   source batches, provenance, freshness, and tenant/company mapping.
 - [ ] Confirm which AX production, item, inventory, purchase-order, and value
   facts are available for the first source slice.
-- [ ] Keep all AX writes and raw AX SQL out of Stock and the generic Domain.
+- [ ] Send AX production-history imports through Manufacturing's execution/import contract; keep all AX writes and raw AX SQL out of Stock and the generic Domains.
 
 Validation: an SBG material receipt and its AX source evidence reconcile by
 quantity, UOM, lot, period, source, and freshness without a second ledger.
@@ -246,9 +260,12 @@ Production execution contract.
 
 - **SBG receives:** traceable glue batches and coating/slitting runs with
   material usage, lots, operators/resources, output, and source readiness.
-- [ ] Configure glue batch, reactor, wet/dry output, material usage, quality
+- [ ] Configure glue batch, reactor, wet/dry output, material usage, Quality
   result references, previous batch, cleaning sequence, and production
   date/month as Domain data; `SbGroup` supplies only the AX source mapping.
+- [ ] Submit live production facts and historical AX actuals through
+  Manufacturing's execution/import contract so validation, Stock effects, and
+  any required override evidence commit together.
 - [ ] Link coating and slitting production-order facts, line, consumption,
   good output, and yield to Stock transactions and Manufacturing trace.
 - [ ] Mark unavailable wastage reasons, energy, labour hours, GSM, and stopped
@@ -278,24 +295,29 @@ supply decisions.
 Validation: a reviewed weekly plan explains each demand, stock, conversion,
 and open-PO value back to its source and freshness.
 
-### Phase 4 — Inventory Value and QAC
+### Phase 4 — Inventory Value and Quality integration
 
-This phase closes the month-end and quality evidence loops without changing the
-operational ledger.
+This phase closes the month-end value loop and connects SBG to the future
+Quality capability without changing the operational ledger or duplicating its
+case model.
 
 - **SBG receives:** immutable published/reviewed inventory-value revisions and
-  a policy-driven case workflow for internal, customer, and supplier issues.
+  QAC case workflows owned by the Quality capability, with SBG-specific policy
+  and presentation through its public contracts.
 - [ ] Produce month-end physical and financial quantity/value snapshots with
   UOM, adjustments, reviewer, publication state, and provenance.
 - [ ] Refuse replacement of a complete published revision when a refresh fails;
   create a new candidate or revision instead.
-- [ ] Add QAC evidence timelines, supplier requests, corrective actions,
-  review gates, and attributable/reversible AI assistance.
+- [ ] Integrate Quality's QAC evidence timelines, supplier requests,
+  corrective actions, review gates, and attributable/reversible AI assistance
+  through its public API; keep SBG-specific policy and presentation in
+  `SbGroup`.
 - [ ] Connect relevant production, procurement, and source facts by public
   references rather than private table reads.
 
 Validation: one month-end revision and one QAC case can be reviewed from
-published output to its source evidence and responsible owner.
+published output to its source evidence and responsible owner, with the case
+model owned by Quality rather than `SbGroup`.
 
 ### Phase 5 — Dashboards, controls, and approved integrations
 
@@ -303,13 +325,14 @@ This phase makes the SBG operation useful at scale while preserving source and
 confidentiality boundaries.
 
 - **SBG receives:** production, IBP, procurement, inventory-value, AX health,
-  and QAC views with explicit permissions and freshness indicators.
+  and Quality-owned QAC views with explicit permissions and freshness indicators.
 - [ ] Add monthly/yearly/reactor/glue and coating-line views only over validated
   facts and clearly label unavailable fields.
 - [ ] Add source-health, candidate/active batch, freshness, schema, and
   reconciliation monitoring for the AX Connector.
-- [ ] Prove recipe, lot, supplier, customer, and QAC access policies with
-  reviewable audit evidence.
+- [ ] Prove recipe, lot, supplier, customer, and Quality-owned QAC access
+  policies with reviewable audit evidence; `SbGroup` owns only its policy,
+  integration, and presentation through the approved seam.
 - [ ] Use an approved AX AIF or staging contract for any future write; do not
   add direct raw SQL writes to AX application tables.
 - [ ] Record the public seam before adding any `SbGroup` behaviour that the
@@ -330,6 +353,7 @@ committed.
 - Transition notes identify gaps in wastage reason, energy, labour, GSM, and
   current COA data; those gaps must remain visible until a source exists.
 - SBG must confirm which production, planning, procurement, inventory-value,
-  and QAC roles may view or change each evidence class.
+  and Quality/QAC roles may view or change each evidence class; Quality owns
+  the common case permissions and evidence model.
 - No recipe, supplier, customer, or AX fact is assumed public merely because it
   is present in an internal dashboard or workbook.

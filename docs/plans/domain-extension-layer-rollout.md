@@ -10,12 +10,16 @@
 - `docs/PORTING_STAGES.md` (S5, S6, stage-change rule)
 - `AGENTS.md` §4
 - `apps/base/module_registry/`
+- [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
 - Sibling plan `docs/plans/inventory/inventory-domain.md`
 - Sibling plan `docs/plans/manufacturing/manufacturing-domain.md`
 - Customer plan `docs/plans/commerce-material-flow-ledger.md`
 - Customer plan `docs/plans/manufacturing/sbg-requirements.md`
 
-**Agents:** codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna (this revision)
+**Agents:** claude/claude-opus-5 (earlier work),
+amp/medium-sol (architecture review only), codex/gpt-5 (earlier work),
+codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (this revision),
+claude/claude-opus-5.5 (no-mistakes review agent)
 
 ## Problem Essence
 
@@ -202,9 +206,13 @@ real requirements exist.
   ordinary process configuration in the generic Manufacturing Domain.
   `MrPackaging` holds only confirmed Mr Packaging Sdn Bhd behaviour that
   common configuration and public contracts cannot express. `SbGroup` holds
-  SBG's AX integration, adhesive-tape planning, AX production-source adapters,
-  procurement, inventory value, and QAC. Neither Extension owns the common
-  ledger, genealogy, units of measure, or execution semantics.
+  SBG-specific planning, procurement, inventory-value needs, and AX integration.
+  For QAC, the future Quality capability owns cases, evidence, and corrective
+  actions; `SbGroup` supplies only SBG policy, AX mapping and integration, and
+  presentation through Quality's public contract. Neither Extension owns the
+  common ledger, genealogy, units of measure, or execution semantics. AX
+  production history passes through Manufacturing's execution/import contract;
+  warehouse receipts and ordinary movements may post directly to Stock.
 - [ ] Keep its ownership, visibility, and licensing independent of its
   architectural role.
 - [ ] Prove the application remains complete with the Extension absent and
