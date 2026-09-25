@@ -16,9 +16,8 @@
 - SBG `docs/ax-connector/ax-connector-extraction-plan.md`
 - SBG transition capability and access-gap notes
 
-**Agents:** claude/claude-opus-5, amp/medium-sol, codex/gpt-5,
-codex/gpt-5.6-luna (Luna-6, dispatched by firstmate; reviewed by the
-no-mistakes pipeline)
+**Agents:** codex/gpt-5.6-luna (Luna-6, written via firstmate),
+claude/claude-opus-5.5 (no-mistakes review agent)
 
 ## Problem Essence
 

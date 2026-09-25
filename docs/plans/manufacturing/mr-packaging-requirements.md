@@ -18,8 +18,9 @@ no-mistakes pipeline)
 
 ## Problem Essence
 
-Mr Packaging's problem comes from the requirements of Mr Packaging Sdn Bhd, a
-company that manufactures LDPE foam in Muar, Johor.
+Manual records never close the mass balance, so loss, theft, short-weighting,
+and cutting waste cannot be told apart. Mr Packaging Sdn Bhd manufactures LDPE
+foam in Muar, Johor.
 
 - Manual records do not connect supplier receipts, extrusion, cure, lamination,
   cutting, packing, and despatch.
@@ -172,27 +173,29 @@ known evidence.
 
 ## Phases
 
-### Phase 1 — Site validation and receiving
+### Phase 1 — Stock ledger and receiving
 
-This phase proves the physical workflow and delivers the first useful evidence.
+This phase proves the physical workflow and records the first receipts in the
+generic Stock ledger.
 
 - [ ] Confirm where weighing occurs, label survivability, network coverage,
   demand source, and applicable certification requirements.
 - [ ] Confirm receiving fields and units with the clerk and supplier process.
-- [ ] Record a representative lorry with declared and measured weight.
+- [ ] Mount Inventory/Stock and prove its migration and public posting path.
+- [ ] Add receiving and warehouse locations and material units.
+- [ ] Record a representative lorry as one balanced receipt with declared and
+  measured weight, native measurement, provenance, and normalised mass.
 - [ ] Show supplier variance over time and retain known discrepancy examples.
 
-Validation: a Mr Packaging Sdn Bhd clerk completes one lorry in one capture flow
-and the resulting variance is attributable.
+Validation: a Mr Packaging Sdn Bhd clerk completes one lorry in one capture flow,
+the receipt posts through Stock, and the resulting variance is attributable.
 
-### Phase 2 — Stock ledger and roll identity
+### Phase 2 — Roll identity and genealogy
 
-This phase makes the generic Stock contract useful without adding manufacturing
-semantics to Stock.
+This phase makes the generic Stock contract carry roll identity without adding
+manufacturing semantics to Stock.
 
-- [ ] Mount Inventory/Stock and prove its migration and public posting path.
-- [ ] Add receiving and warehouse locations, material units, and genealogy.
-- [ ] Record balanced receipts and transforms with native measurement,
+- [ ] Record balanced transforms and genealogy with native measurement,
   provenance, conversion basis, and normalised mass.
 - [ ] Create one labelled roll per extrusion output with measured dimensions and
   production date.
@@ -213,8 +216,8 @@ Production configuration.
   duration, and conversion bases as Domain data.
 - [ ] Record selected definition, route, operation, execution, inputs, outputs,
   resource, and opaque context references.
-- [ ] Refuse under-cured consumption by default and record an authorised
-  override as an immutable operational record.
+- [ ] Configure the Domain's cure hold for Muar rolls and verify that
+  under-cured consumption is refused and an authorised override is recorded.
 - [ ] Add `MrPackaging` only if site validation identifies behaviour that common
   configuration and public contracts cannot express.
 

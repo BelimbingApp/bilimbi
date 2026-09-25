@@ -7,7 +7,8 @@
 - `docs/plans/domain-extension-layer-rollout.md`
 - `docs/plans/manufacturing/mr-packaging-requirements.md`
 - `docs/plans/manufacturing/sbg-requirements.md`
-- `AGENTS.md` §4 and §6
+- `AGENTS.md` §4, §5, and §6
+- Belimbing `app/Domains/Commerce/Inventory` (item master, 3 models)
 - Material-flow scout report (2026-09-25)
 - [https://github.com/BelimbingApp/bilimbi/pull/800](https://github.com/BelimbingApp/bilimbi/pull/800)
 - Mr Packaging Sdn Bhd requirements and SBG extension source review
@@ -207,8 +208,10 @@ production-specific screens are built.
 - **SB Group receives:** a common stock position and source-aware material
   movement foundation for BA, BOPP, glue, coating, and other mapped materials;
   no SBG-specific planning logic is put into Stock.
-- [ ] Implement Stock items, locations, units of measure, material units, and
-  tenant-scoped public operations.
+- [ ] Port Belimbing's canonical item master (`app/Domains/Commerce/Inventory`)
+  into Stock, preserving its schema under `AGENTS.md` §5.
+- [ ] Add Stock locations, units of measure, material units, and tenant-scoped
+  public operations around that item master.
 - [ ] Record receiving as one balanced transaction and retain declared versus
   measured evidence.
 - [ ] Add idempotency, concurrent-consumption protection, backdating, reversal,
@@ -235,6 +238,9 @@ Stock boundary.
 - [ ] Post each execution's inputs and outputs through Stock with opaque
   execution, order or batch, and resource references.
 - [ ] Implement Manufacturing trace as views over Stock genealogy.
+- [ ] Add a configurable consumption hold that refuses under-cured input by
+  default, and an override that requires an explicit Base Authz capability and
+  a mandatory reason and is kept as an immutable operational record.
 - [ ] Configure Mr Packaging cure gates and foam process data without changing
   common execution code.
 - [ ] Configure SBG glue, coating, and slitting process families without
