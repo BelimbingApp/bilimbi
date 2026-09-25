@@ -3,6 +3,7 @@
 **Status:** Proposed customer requirements
 **Last Updated:** 2026-09-25
 **Sources:**
+- [`docs/plans/inventory/inventory-domain.md`](../inventory/inventory-domain.md)
 - [`docs/plans/manufacturing/manufacturing-domain.md`](manufacturing-domain.md)
 - [`docs/plans/domain-extension-layer-rollout.md`](../domain-extension-layer-rollout.md)
 - SBG `README.md`
@@ -16,7 +17,7 @@
 - SBG `docs/ax-connector/ax-connector-extraction-plan.md`
 - SBG transition capability and access-gap notes
 
-**Agents:** codex/gpt-5.6-luna (Luna-6, written via firstmate),
+**Agents:** codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna (this revision),
 claude/claude-opus-5.5 (no-mistakes review agent)
 
 ## Problem Essence

@@ -10,13 +10,12 @@
 - `docs/PORTING_STAGES.md` (S5, S6, stage-change rule)
 - `AGENTS.md` §4
 - `apps/base/module_registry/`
+- Sibling plan `docs/plans/inventory/inventory-domain.md`
 - Sibling plan `docs/plans/manufacturing/manufacturing-domain.md`
-- Customer plan `docs/plans/manufacturing/mr-packaging-requirements.md`
+- Customer plan `docs/plans/commerce-material-flow-ledger.md`
 - Customer plan `docs/plans/manufacturing/sbg-requirements.md`
 
-**Agents:** claude/claude-opus-5, amp/medium-sol, codex/gpt-5,
-codex/gpt-5.6-luna (Luna-6, dispatched by firstmate; reviewed by the
-no-mistakes pipeline)
+**Agents:** codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna (this revision)
 
 ## Problem Essence
 
@@ -164,11 +163,12 @@ Goal: turn the successful proof into the smallest maintained implementation.
 Goal: Inventory/Stock and the Manufacturing / Production Operations Domain
 behave exactly like the disposable Domain proved in Phase 1.
 
-- [ ] Create Inventory/Stock as an independent repository with one cohesive
-  initial module.
+- [ ] Create Inventory/Stock as an independent repository with its initial
+  module, following `docs/plans/inventory/inventory-domain.md`.
 - [ ] Create the Manufacturing / Production Operations Domain as an
   independent repository with its first Production module and a declared
-  dependency on Inventory/Stock's public contract. Keep
+  dependency on Inventory/Stock's public contract, following
+  `docs/plans/manufacturing/manufacturing-domain.md`. Keep
   `product_definition`, `process_definition`, `execution`, and `trace` as
   internal boundaries until real module-level selection is needed. `trace`
   holds only Manufacturing-side trace views, such as which run, step, and
@@ -176,11 +176,14 @@ behave exactly like the disposable Domain proved in Phase 1.
   ancestry/genealogy contract and stores no genealogy of its own.
 - [ ] Prove either repository can be absent when no mounted dependent requires
   it, and prove a missing Inventory/Stock dependency fails composition.
-- [ ] Begin the generic Domain slices in
-  `docs/plans/manufacturing/manufacturing-domain.md` only after the repository
-  and migration path works end to end.
+- [ ] Begin Inventory/Stock module work in
+  `docs/plans/inventory/inventory-domain.md` when its repository and migration
+  path work end to end.
+- [ ] Begin Production module work in
+  `docs/plans/manufacturing/manufacturing-domain.md` when its repository and
+  Stock dependency work end to end.
 - [ ] Begin Mr Packaging Sdn Bhd's customer requirements in
-  `docs/plans/manufacturing/mr-packaging-requirements.md` only after the
+  `docs/plans/commerce-material-flow-ledger.md` only after the
   generic Domain slice is available; mount the `MrPackaging` Extension only
   for a confirmed public-contract adaptation.
 - [ ] Begin SBG's adhesive-tape requirements in
