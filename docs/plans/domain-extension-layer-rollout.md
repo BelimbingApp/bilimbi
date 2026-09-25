@@ -170,20 +170,21 @@ behave exactly like the disposable Domain proved in Phase 1.
 - [ ] Create Inventory/Stock as an independent repository with its initial
   module, following `docs/plans/inventory/inventory-domain.md`.
 - [ ] Create the Manufacturing / Production Operations Domain as an
-  independent repository with its first Production module and a declared
-  dependency on Inventory/Stock's public contract, following
-  `docs/plans/manufacturing/manufacturing-domain.md`. Keep
-  `product_definition`, `process_definition`, `execution`, and `trace` as
-  internal boundaries until real module-level selection is needed. `trace`
-  holds only Manufacturing-side trace views, such as which run, step, and
-  resource produced or consumed a lot; it reads Inventory/Stock's public
-  ancestry/genealogy contract and stores no genealogy of its own.
+  independent repository with its first Product Definition and Production
+  Execution modules and a declared dependency on Inventory/Stock's public
+  contract, following `docs/plans/manufacturing/manufacturing-domain.md`.
+  Planning, Maintenance, and Costing stay later modules until an owner
+  confirms them. Production Execution registers as Stock's production
+  posting authority, and its trace read model holds only Manufacturing-side
+  views, such as which run, step, and resource produced or consumed a lot; it
+  reads Inventory/Stock's public ancestry/genealogy contract and stores no
+  genealogy of its own.
 - [ ] Prove either repository can be absent when no mounted dependent requires
   it, and prove a missing Inventory/Stock dependency fails composition.
 - [ ] Begin Inventory/Stock module work in
   `docs/plans/inventory/inventory-domain.md` when its repository and migration
   path work end to end.
-- [ ] Begin Production module work in
+- [ ] Begin Product Definition and Production Execution module work in
   `docs/plans/manufacturing/manufacturing-domain.md` when its repository and
   Stock dependency work end to end.
 - [ ] Begin Mr Packaging Sdn Bhd's customer requirements in

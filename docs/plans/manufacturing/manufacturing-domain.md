@@ -27,32 +27,34 @@ A factory cannot explain what happened when product definitions, production step
 
 ## Desired Outcome
 
-Manufacturing is one Domain, separate from Inventory/Stock. It begins with the Production module. Production defines products and processes, records actual work, and presents trace views over Stock genealogy.
+Manufacturing is one Domain, separate from Inventory/Stock, organised as the modules a manufacturing ERP would expect. It starts with the two modules every factory needs to define and run work; planning, maintenance, and costing join when a real need proves them.
 
 - Product and process definitions stay distinct from records of actual work.
-- Actual production inputs and outputs post through Inventory/Stock's public contract.
+- Actual production inputs and outputs post through Inventory/Stock's public contract as its registered production posting authority.
+- Under-cured or otherwise held material cannot be consumed without an authorised, recorded override.
 - Production trace adds run, step, and resource context to Stock ancestry without storing a second genealogy.
 - Common process choices live as configuration data owned by Manufacturing.
 - The Domain holds reusable logic; Extensions hold only customer-specific behaviour that the public contracts and Domain configuration cannot express.
 
 ## Top-Level Components
 
-Manufacturing is a single Domain. The first module is Production; its four named capabilities below are internal boundaries, not separate selectable modules.
+Manufacturing is a single Domain made of selectable modules. It knows nothing about any one customer.
 
-### Production module — first
+### Modules
 
-- **Product Definition** (`product_definition`, internal) — describes what is made, referring to its Stock item and recording its formula or bill of materials and applicable revisions.
-- **Process Definition** (`process_definition`, internal) — describes how it may be made through routes, logical operations, required inputs and outputs, and allowed resources.
-- **Execution** (`execution`, internal) — records a production order or batch, the actual steps performed, inputs and outputs, quantities, times, people, resources, and variance.
-- **Trace** (`trace`, internal read model) — answers which run, step, or resource consumed or produced a material lot by reading Inventory/Stock genealogy.
+- **Product Definition** (`product_definition`) — **first.** Says what is made and how: links to Stock items, versioned BOM/recipe, routings with their operations, and work-centre definitions. It also holds process configuration such as process families, tolerances, output roles, and hold rules like a cure minimum.
+- **Production Execution** (`production_execution`) — **first.** Runs production orders and their operations, and posts consumption and output through Stock's registered posting-authority seam. It enforces the cure hold and owns the trace read model over Stock genealogy.
+- **Planning** (`planning`) — **later.** Master production schedule, material requirements planning (MRP), and capacity. It waits until a customer needs a shared schedule or MRP; customer-specific planning stays in that customer's Extension until then.
+- **Maintenance** (`maintenance`) — **later.** Equipment records and preventive maintenance for work centres. It waits until an owner confirms the equipment and downtime workflow.
+- **Costing** (`costing`) — **later.** Standard and actual production cost and their variance, read from Stock transactions and execution records. It waits until an owner confirms valuation rules; Stock reserves "Material Ledger" for that valuation.
 
-### Manufacturing-owned configuration
+### Neighbouring Domains
 
-Process families, route templates, tolerances, output roles, process gates, and process-specific conversion bases are configuration data owned by Manufacturing. Inventory/Stock owns item-level units and conversions. Configuration extends a Domain's behaviour as data; it is not a third code layer.
+- **Inventory/Stock** — owns items, units, the Material Transaction ledger, and Lot/Unit Genealogy. See [`inventory-domain.md`](../inventory/inventory-domain.md).
+- **Quality** — owns inspection, nonconformance, corrective action, and is the future home of QAC. It is a separate capability Domain because its lifecycle is industry-wide and it works without Manufacturing. Manufacturing links to Quality records through Quality's public contract.
+- **Other later capability Domains** — Document/Change Control, Metrology/Calibration, Controlled Records, Supplier Quality, and EHS sit beside Manufacturing, not inside it.
 
-### Later capability Domains
-
-Quality, Document/Change Control, Metrology/Calibration, Controlled Records, Supplier Quality, and EHS are separate future capability Domains, not modules under Manufacturing. Quality owns the shared QAC case, evidence, and corrective-action model; Production can link to Quality records through public contracts.
+Configuration extends a module's behaviour as data; it is not a third code layer. Inventory/Stock owns item-level units and conversions; Product Definition owns process-specific conversion bases.
 
 ## Design Decisions
 
@@ -62,17 +64,17 @@ Each Domain has a different reason to change and a clear public contract.
 
 - **Option A — one Commerce Domain for stock and production:** fewer boundaries at first, but warehouse use depends on production concepts and both areas share one change cycle.
 - **Option B — one Manufacturing Domain with its own ledger:** production can work locally, but inventory and production develop competing balances and ancestry.
-- **Option C — standalone Inventory/Stock and a separate Manufacturing Domain:** Stock owns material facts; Production calls its public contract.
+- **Option C — standalone Inventory/Stock and a separate Manufacturing Domain:** Stock owns material facts; Production Execution posts through its public contract.
 - **Recommendation — Option C:** each Domain remains useful on its own and all workflows share the same material history.
 
-### Start with one cohesive Production module
+### Map the Domain top-down, build two modules first
 
-Production needs clear internal boundaries without requiring separate module releases before they solve a real problem.
+Readers and later agents need the whole Manufacturing map, but only proven modules should be built.
 
-- **Option A — one undivided Production implementation:** initially small, but definitions, execution, and trace become difficult to change independently.
-- **Option B — make Product Definition, Process Definition, Execution, and Trace separate modules now:** ownership is explicit, but the packages and release graph are premature while one production workflow owns them together.
-- **Option C — one Production module with those four internal boundaries:** keeps responsibilities clear and leaves later extraction possible if a real independent lifecycle appears.
-- **Recommendation — Option C:** it gives the first module a compact boundary without turning internal names into a module registry.
+- **Option A — one Production module with internal boundaries:** compact at first, but hides where planning, maintenance, and costing belong.
+- **Option B — build every ERP module now:** complete on paper, but invents planning, maintenance, and costing rules no customer has confirmed.
+- **Option C — name every module now, build Product Definition and Production Execution first:** the map is clear, and later modules arrive with a real owner and contract.
+- **Recommendation — Option C:** it answers where each capability lives without building speculative modules.
 
 ### Separate definitions from actual work
 
@@ -81,38 +83,43 @@ A definition says what may happen. An execution records what actually happened.
 - **Option A — edit definitions in place:** simple to manage, but old runs can appear to have followed today's instructions.
 - **Option B — store a separate definition copy for every run:** preserves history, but duplicates the full product and route model.
 - **Option C — version definitions and have each execution refer to the selected version:** preserves the instructions used and avoids copying the whole model.
-- **Recommendation — Option C:** a run stays explainable when a product, formula, route, or process gate changes.
+- **Recommendation — Option C:** a run stays explainable when a product, formula, route, or hold rule changes.
 
 ## Public Contract
 
-The Production module gives other modules and Extensions a stable way to define and run production.
+Product Definition and Production Execution give other modules and Extensions a stable way to define and run production.
 
-- Product Definition and Process Definition are versioned. A production order or batch selects the versions used for its execution.
-- An **Operation** is a logical step in a process. A **Work Centre/Resource** is the physical machine, line, station, or capacity used for that step.
+- Product Definition is versioned. A production order selects the BOM/recipe and routing versions used for its execution.
+- An **Operation** is a logical step in a routing. A **Work Centre/Resource** is the physical machine, line, station, or capacity used for that step.
 - Execution records actual inputs, outputs, quantities, location, time, operator, resource, selected definitions, and variance.
-- Warehouse receipts and ordinary warehouse movements post directly to Inventory/Stock. Production commands and production or AX-history imports enter Manufacturing's public execution/import contract, which validates the operation and posts Stock effects through Stock's public posting contract with opaque context references.
-- Execution completion, Stock effects, and any required override evidence succeed or fail together. A caller cannot post production material effects directly to Stock and bypass Manufacturing's validation.
+- Warehouse receipts and ordinary warehouse movements post directly to Inventory/Stock. Production commands and production or AX-history imports enter Production Execution's public execution/import contract, which validates the operation and posts Stock effects with opaque context references.
+- Production Execution registers itself at boot as Stock's production posting authority. Stock refuses production or transform postings from anyone else, so an Extension cannot bypass Manufacturing's validation.
+- Execution completion, Stock effects, and any required override evidence succeed or fail together.
+- Consumption of material under a configured hold, such as a cure minimum, is refused by default. An override needs an explicit Base Authz capability and a mandatory reason, and records actor, time, reason, and affected unit as an immutable record.
 - Production trace reads Stock's Lot/Unit Genealogy. It may add production context to a trace result but does not keep parent/child material ancestry of its own.
 - Common process families and their rules are Domain-owned configuration. Customer Extensions use public contracts and may add behaviour only where configuration cannot express a confirmed need.
-- Extensions do not read private Domain queries or tables. The Production module remains complete when any customer Extension is absent.
-- Canonical names are Product Definition, Formula/BOM, Process Definition, Routing, Operation, Work Centre/Resource, Production Order, Batch, Execution, and Trace. Optional screen labels such as Flow, Make, Blueprint, Route, Run, and Trace do not change API or stored names.
+- Extensions do not read private Domain queries or tables. Each module remains complete when any customer Extension is absent.
+- Canonical names are Product Definition, Formula/BOM, Routing, Operation, Work Centre/Resource, Production Order, Batch, Execution, and Trace. Optional screen labels such as Flow, Make, Blueprint, Route, Run, and Trace do not change API or stored names.
 
 ## Phases
 
-### Production module
+### Product Definition module
 
-#### Phase 1 — Product and process definitions
+#### Phase 1 — Products, BOMs, and routings
 
-- [ ] Define versioned Product Definition and Formula/BOM contracts.
-- [ ] Define versioned process routes, logical operations, inputs, outputs, and allowed resources.
-- [ ] Keep process families, tolerances, output roles, and process gates as Manufacturing-owned configuration data.
+- [ ] Link product definitions to Stock items and define versioned Formula/BOM contracts.
+- [ ] Define versioned routings, logical operations, inputs, outputs, and allowed work centres/resources.
+- [ ] Keep process families, tolerances, output roles, and hold rules such as a cure minimum as configuration data.
 
-Validation: an order or batch can select a specific product and route revision without relying on a customer Extension.
+Validation: an order can select a specific product and routing revision without relying on a customer Extension.
 
-#### Phase 2 — Execution and Stock posting
+### Production Execution module
+
+#### Phase 1 — Orders, execution, and Stock posting
 
 - [ ] Record a production order or batch and its actual operation executions.
 - [ ] Capture actual input, output, quantity, time, operator, resource, and variance.
+- [ ] Register as Stock's production posting authority at boot.
 - [ ] Accept live production commands and production or AX-history imports
   through the same execution/import contract; post material effects through
   Stock's public contract with optional opaque execution, order or batch, and
@@ -122,6 +129,14 @@ Validation: an order or batch can select a specific product and route revision w
 
 Validation: repeated submission cannot duplicate material use, and each execution's material effects appear in the same Stock ledger as warehouse movements.
 
+#### Phase 2 — Cure hold and override
+
+- [ ] Refuse consumption of material that has not met its configured hold, such as a cure minimum, by default.
+- [ ] Allow an override only with an explicit Base Authz capability and a mandatory reason.
+- [ ] Record the override's actor, time, reason, and affected unit immutably, in the same transaction as the consumption.
+
+Validation: an under-cured unit is refused without the capability, and an authorised override leaves one immutable record beside its Stock effect.
+
 #### Phase 3 — Production trace
 
 - [ ] Build trace as a read model over Inventory/Stock genealogy.
@@ -130,15 +145,19 @@ Validation: repeated submission cannot duplicate material use, and each executio
 
 Validation: trace reads Stock's ancestry and stores no second parent/child ledger.
 
-### Later capability Domains
+### Planning, Maintenance, and Costing modules
 
-- [ ] Define the Quality capability, including QAC cases, evidence, nonconformance, and corrective actions, only after an owner approves its public contract.
-- [ ] Define Document/Change Control only after an owner approves the controlled instruction and revision needs.
-- [ ] Define Metrology/Calibration only after an owner approves the equipment and calibration evidence needs.
-- [ ] Define Controlled Records only after an owner approves the retention and retrieval requirements.
-- [ ] Define Supplier Quality only after an owner approves the supplier evidence and follow-up workflow.
-- [ ] Define EHS only after an owner approves the safety and environmental workflow.
+- [ ] Define Planning (MPS, MRP, capacity) only after an owner confirms a shared scheduling or material-requirements need.
+- [ ] Define Maintenance (equipment, preventive maintenance) only after an owner confirms the equipment and downtime workflow.
+- [ ] Define Costing (standard and actual cost, variance) only after an owner confirms valuation rules.
 
 Validation: each later module has an explicit owner, public contract, and dependency direction before it joins a release.
+
+### Neighbouring capability Domains
+
+- [ ] Define the Quality Domain, including inspection, nonconformance, corrective action, and QAC, only after an owner approves its public contract.
+- [ ] Define Document/Change Control, Metrology/Calibration, Controlled Records, Supplier Quality, and EHS only after an owner approves each workflow.
+
+Validation: Manufacturing links to each neighbour only through that Domain's public contract.
 
 The generic contracts should be checked against Mr Packaging Sdn Bhd and SBG as different factory examples; their plant rules remain in their customer requirements and Extensions.

@@ -196,7 +196,9 @@ private AX or recipe implementation details.
 - Warehouse receipts and ordinary warehouse movements post directly through
   Stock's Material Transaction contract. Production commands and production
   or AX-history imports pass through Manufacturing's execution/import
-  contract; `SbGroup` cannot post production effects directly to Stock.
+  contract; `SbGroup` cannot post production effects directly to Stock,
+  because Stock accepts production context only from its registered
+  Manufacturing posting authority and refuses Extension registration.
 - Manufacturing commits execution completion, Stock effects, and any required
   override evidence together, or commits none of them. A failed or retried
   import cannot leave a partial production record or duplicate material effect.

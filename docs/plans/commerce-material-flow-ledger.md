@@ -40,7 +40,7 @@ Mr Packaging Sdn Bhd can reconcile a representative month from supplier receipt 
 This is the customer requirements plan for Mr Packaging Sdn Bhd. Shared design is defined once in [`inventory-domain.md`](inventory/inventory-domain.md) for Inventory/Stock and [`manufacturing-domain.md`](manufacturing/manufacturing-domain.md) for Manufacturing; this plan records what the Muar operation needs from those Domains.
 
 - **Inventory/Stock module** — records item and location, native quantity and unit, declared or measured evidence, roll identity, warehouse movements, production effects, and ancestry for the Muar operation. Warehouse receipts and ordinary warehouse movements post directly through Stock.
-- **Manufacturing Production module** — defines the foam products and routes, records actual extrusion and conversion work, applies configured cure rules, and presents production trace over Stock genealogy. Production commands and production-history imports use Manufacturing's execution/import contract, which posts Stock effects atomically with execution and any required override evidence.
+- **Manufacturing Product Definition and Production Execution modules** — Product Definition defines the foam products, routings, and cure minimum. Production Execution records actual extrusion and conversion work, enforces the cure hold, and presents production trace over Stock genealogy. Production commands and production-history imports use its execution/import contract; as Stock's registered posting authority, it posts Stock effects atomically with execution and any required override evidence.
 - **`MrPackaging` Extension** — owns a confirmed customer integration or workflow only when the public contracts and Manufacturing configuration cannot express it.
 
 ## Customer Requirements
@@ -59,7 +59,7 @@ The receiving flow needs to show what the supplier declared and what the plant m
 The extrusion record needs to identify the blend and each resulting roll.
 
 - Virgin resin and roughly 30% recycled material, subject to confirmation at the plant.
-- Three fixed foam colours, the extruder, production run, date and time, and the selected recipe or process definition.
+- Three fixed foam colours, the extruder, production run, date and time, and the selected recipe and routing.
 - One identity for each roll, with measured width, thickness, and length.
 - Inputs, output quantities, and any measured or reported variance.
 
@@ -69,7 +69,7 @@ A roll's production time must remain available while it waits for the next step.
 
 - Record where each roll is stored and when it was produced.
 - Show elapsed cure age against the configured minimum, which is expected to be within a 7–10 day window and must be confirmed by product.
-- Refuse under-cured consumption by default. An authorised override needs the required capability, actor, reason, time, and affected roll.
+- Refuse under-cured consumption by default. An authorised override needs an explicit Base Authz capability and a mandatory reason, and keeps actor, time, reason, and affected roll as an immutable record.
 - Keep cure duration and process gates as Manufacturing configuration; add `MrPackaging` only for a proven behaviour that configuration cannot express.
 
 ### Lamination, cutting, packing, and despatch
@@ -149,7 +149,7 @@ Validation: a clerk records a lorry in one flow and can explain the source of ev
 
 Validation: a receipt, roll, and later output can be traced through Stock without a second ledger.
 
-### Manufacturing Production module
+### Manufacturing Product Definition and Production Execution modules
 
 #### Phase 3 — Blend, extrusion, and cure
 
