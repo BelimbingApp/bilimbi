@@ -9,5 +9,9 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryGraphicLive do
   def mount(_params, _session, socket), do: DesignLibraryLive.mount_area(:graphic, socket)
 
   @impl true
+  def handle_event(event, params, socket),
+    do: DesignLibraryLive.handle_event(event, params, socket)
+
+  @impl true
   def render(assigns), do: DesignLibraryLive.render(assigns)
 end

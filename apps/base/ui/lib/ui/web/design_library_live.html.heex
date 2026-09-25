@@ -2145,6 +2145,116 @@
               </div>
             </div>
           </section>
+
+          <section id="graphic-icon-catalog" class="space-y-4">
+            <div>
+              <h2 class="text-base font-semibold text-ink-strong">Icon catalogue</h2><p class="text-sm text-ink-muted">
+                Every name the icon registry resolves. Select a tile to copy the name a screen passes to the icon component. Any other Heroicon is reached by its own
+                <code>hero-</code>
+                name.
+              </p>
+            </div>
+            <div class="space-y-3 rounded-xl border border-line bg-surface p-4 shadow-xs">
+              <.filter_toolbar
+                id="icon-catalog-filters"
+                form={@icon_filter_form}
+                event="icon-filter"
+              >
+                <:control
+                  type={:search}
+                  field={@icon_filter_form[:search]}
+                  id="icon-catalog-search"
+                  label="Filter icons"
+                  placeholder="Filter by name or Heroicon…"
+                />
+              </.filter_toolbar>
+              <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-xs">
+                <p id="icon-catalog-count" class="text-ink-muted">
+                  {if @icon_query == "",
+                    do: "#{@icon_total} icons",
+                    else: "#{@icon_shown} of #{@icon_total} icons"}
+                </p>
+                <p id="icon-catalog-status" role="status" class="text-success-ink">
+                  <%= case @icon_copy do %>
+                    <% {:copied, name} -> %>
+                      Copied “{name}” to the clipboard.
+                    <% _ -> %>
+                  <% end %>
+                </p>
+              </div>
+              <p
+                :if={match?({:failed, _}, @icon_copy)}
+                id="icon-catalog-copy-failed"
+                role="alert"
+                class="rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-sm text-danger-ink"
+              >
+                The browser did not allow copying “{elem(@icon_copy, 1)}”. Select the name on the tile and copy it by hand.
+              </p>
+              <div
+                id="icon-catalog"
+                phx-hook="ClipboardCopy"
+                data-copy-event="icon-copied"
+                class="space-y-5"
+              >
+                <div :for={group <- @icon_groups} id={"icon-catalog-#{group.id}"}>
+                  <div class="mb-2 flex items-baseline justify-between gap-3">
+                    <h3 class="text-sm font-semibold text-ink">{group.label}</h3>
+                    <span class="text-xs text-ink-muted">{length(group.icons)}</span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                    <button
+                      :for={icon <- group.icons}
+                      type="button"
+                      id={"icon-tile-#{icon.name}"}
+                      data-copy-text={icon.name}
+                      title={"Copy “#{icon.name}”"}
+                      class={[
+                        "group relative flex min-w-0 flex-col items-center gap-1 rounded-lg border bg-canvas px-2 pb-2 pt-3 text-center hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-strong/40",
+                        if(@icon_copy == {:copied, icon.name},
+                          do: "border-success-line",
+                          else: "border-line hover:border-high-contrast-line"
+                        )
+                      ]}
+                    >
+                      <.icon
+                        name={icon.name}
+                        class="size-5 text-ink group-hover:text-action"
+                      />
+                      <span class="w-full truncate font-mono text-xs text-ink">
+                        <span class="sr-only">Copy </span>{icon.name}
+                      </span>
+                      <span
+                        :if={icon.heroicon}
+                        class="w-full truncate text-[0.6875rem] text-ink-muted"
+                      >
+                        {icon.heroicon}
+                      </span>
+                      <span
+                        :if={@icon_copy == {:copied, icon.name}}
+                        id={"icon-tile-#{icon.name}-copied"}
+                        class="absolute right-1.5 top-1 text-[0.6875rem] font-medium text-success-ink"
+                      >
+                        Copied
+                      </span>
+                    </button>
+                  </div>
+                </div>
+                <.empty_state
+                  :if={@icon_groups == []}
+                  id="icon-catalog-empty"
+                  class="py-6"
+                  title={"No icons match “#{@icon_query}”"}
+                  reason="Clear the filter to see every registered icon."
+                >
+                  <:action>
+                    <.button id="icon-catalog-clear" phx-click="icon-clear-filter">
+                      Clear filter
+                    </.button>
+                  </:action>
+                </.empty_state>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
     <% end %>

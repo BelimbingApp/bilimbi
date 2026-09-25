@@ -14,6 +14,8 @@ Rendered text carries no catalog identifier. A Design Spec number may be the ele
 
 A specimen calls the real component. Do not fake behaviour to make an example look finished: a simulated 1.2-second wait was removed from the confirmation specimen. Do not mount a second live copy of something the layout already renders: the connection banners. Anchor, state, and catalog rules are `Bilimbi.Base.UI.DesignLibrarySource`. Its two guards, `design_library_coverage_test.exs` and `design_library_imitation_test.exs`, run in every `mix test`. When one fails, fix the specimen or the component, never the guard.
 
+Each area page (`DesignLibraryComponentsLive`, `DesignLibraryGraphicLive`, …) is a thin wrapper over `DesignLibraryLive`. A wrapper that serves an interactive specimen delegates `handle_event/3` too; without it the first event raises `UndefinedFunctionError` and the view crashes.
+
 ## Confirmation
 
 An action that cannot be undone uses `<.confirm_dialog>`. A native `data-confirm` is a defect. The caller holds the record and stops rendering the dialog whatever the outcome. See `DESIGN.md` "Confirmation dialogs" and the comment on `confirm_dialog/1`.
@@ -27,6 +29,8 @@ grep -rnE '\b(bg|text|border|ring|shadow|divide|accent)-(slate|gray|zinc|neutral
 ```
 
 Do not use `@apply`. Do not add an external script or stylesheet URL. Do not write a raw `<script>` in HEEx. A colocated hook uses `:type={Phoenix.LiveView.ColocatedHook}` and a name that starts with `.`. An external hook lives in `assets/js/`, has a DOM id, and `phx-update="ignore"` when it owns its DOM. Rebind the socket `push_event/3` returns.
+
+Copy to the clipboard through the `ClipboardCopy` hook (`apps/web/assets/js/clipboard_copy.js`), not a click handler that shows "Copied" on its own. The hook reports whether the browser accepted the write, and the server shows the outcome, so a refused copy is never announced as done. The Graphic page's icon catalogue is the caller.
 
 `phx.gen.live`, `phx.gen.html`, and `phx.gen.schema` use `Bilimbi.Base.UI.Components`. `phx.gen.auth` emits daisyUI classes; convert them to semantic roles in the same change. Base UI components are hand-written Tailwind, and no third-party component library, daisyUI included, becomes the design system. Name an action through `Bilimbi.Base.UI.IconRegistry`. Logout stays `hero-arrow-right-on-rectangle`.
 
