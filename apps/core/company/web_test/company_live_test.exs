@@ -434,7 +434,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
              )
 
       refute has_element?(view, "#company-status-form")
-      refute has_element?(view, "#metadata-form")
+      refute has_element?(view, "#company-metadata-editor-input")
 
       stored = Repo.get!(Bilimbi.Core.Company.Schema, 73)
       assert stored.name == "Bilimbi Industries"
@@ -659,7 +659,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#company-details-card", "Cloud Infrastructure")
 
       # Metadata
-      assert has_element?(view, "#company-metadata-display", "employees_count")
+      assert has_element?(view, "#company-metadata-editor-display", "employees_count")
 
       # Subsidiaries
       assert has_element?(view, "#company-subsidiaries-card")
@@ -777,7 +777,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       assert has_element?(view, "#detail-website a[href='https://bilimbi.test']")
       assert has_element?(view, "#detail-parent", "None")
       assert has_element?(view, "#scope-activities-section", "Software Development")
-      assert has_element?(view, "#company-metadata-display", "employees_count")
+      assert has_element?(view, "#company-metadata-editor", "employees_count")
       assert has_element?(view, "#detail-timezone", "Asia/Kuala_Lumpur")
 
       # ...and nothing edits it: no in-place text control, no choice trigger,
@@ -792,7 +792,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
         refute has_element?(view, "##{card} textarea")
       end
 
-      refute has_element?(view, "#edit-metadata-btn")
+      refute has_element?(view, "#company-metadata-editor-display")
       refute has_element?(view, "#company-new-activity")
       refute has_element?(view, "#remove-activity-0")
     end
@@ -1357,59 +1357,57 @@ defmodule BilimbiWeb.CompanyLiveTest do
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 
-      # The document opens from the demoted pencil beside the value, never a
-      # text button, into an editor with an explicit Apply.
+      # The read state opens the shared textarea editor in place.
       assert has_element?(
                view,
-               "button#edit-metadata-btn[aria-label='Edit metadata'] .hero-pencil"
+               "#company-metadata-editor-display[aria-label='Company metadata JSON']"
              )
 
-      refute has_element?(view, "#edit-metadata-btn", "Edit Metadata")
-      refute has_element?(view, "#metadata-form")
+      refute has_element?(view, "#company-metadata-editor-input")
 
-      view |> element("#edit-metadata-btn") |> render_click()
+      view |> element("#company-metadata-editor-display") |> render_click()
 
-      assert has_element?(
-               view,
-               "dd#company-metadata form#metadata-form textarea#company-metadata-json"
-             )
+      assert has_element?(view, "dd#company-metadata #company-metadata-editor-input[rows='5']")
 
-      assert has_element?(view, "#metadata-form #company-metadata-apply", "Apply")
-
-      # A refusal reports on the fact, not in a flash, and keeps the editor
-      # open so the operator corrects it where they typed it.
-      view |> form("#metadata-form", %{"metadata" => "invalid-json-text"}) |> render_submit()
+      # A refusal reports beside the fact and leaves its submitted text open
+      # for correction.
+      render_hook(view, "save_metadata", %{"metadata" => "invalid-json-text"})
 
       assert has_element?(
                view,
-               "#company-metadata-status[role='alert']",
+               "#company-metadata-editor-status[role='alert']",
                ~s("invalid-json-text" was not saved: Metadata must be a JSON object.)
              )
 
-      assert has_element?(view, "#metadata-form")
-      assert has_element?(view, "#company-metadata-json", "invalid-json-text")
+      assert has_element?(view, "#company-metadata-editor-input", "invalid-json-text")
       refute has_element?(view, "#flash-error")
 
-      view
-      |> form("#metadata-form", %{"metadata" => ~s({"founded": 2020, "tier": "enterprise"})})
-      |> render_submit()
+      render_hook(view, "save_metadata", %{
+        "metadata" => ~s({"founded": 2020, "tier": "enterprise"})
+      })
 
-      refute has_element?(view, "#metadata-form")
-      assert has_element?(view, "dd#company-metadata #company-metadata-display", "enterprise")
-      assert has_element?(view, "#company-metadata-status[role='status']", "Saved")
+      refute has_element?(view, "#company-metadata-editor-input")
+
+      assert has_element?(
+               view,
+               "dd#company-metadata #company-metadata-editor-display",
+               "enterprise"
+             )
+
+      assert has_element?(view, "#company-metadata-editor-status[role='status']", "Saved")
       refute has_element?(view, "#flash-info")
 
       # Cancel restores the read state without writing.
-      view |> element("#edit-metadata-btn") |> render_click()
-      view |> element("#company-metadata-cancel") |> render_click()
-      refute has_element?(view, "#metadata-form")
-      assert has_element?(view, "#company-metadata-display", "enterprise")
+      view |> element("#company-metadata-editor-display") |> render_click()
+      render_hook(view, "cancel_edit_metadata", %{})
+      refute has_element?(view, "#company-metadata-editor-input")
+      assert has_element?(view, "#company-metadata-editor-display", "enterprise")
 
       # Applying an empty document clears it.
-      view |> element("#edit-metadata-btn") |> render_click()
-      view |> form("#metadata-form", %{"metadata" => ""}) |> render_submit()
-      refute has_element?(view, "#company-metadata-display")
-      assert has_element?(view, "#company-metadata-status", "Saved")
+      view |> element("#company-metadata-editor-display") |> render_click()
+      render_hook(view, "save_metadata", %{"metadata" => ""})
+      assert has_element?(view, "#company-metadata-editor-display", "—")
+      assert has_element?(view, "#company-metadata-editor-status", "Saved")
 
       {:ok, scope} = Tenancy.scope(41)
       assert {:ok, %{metadata: nil}} = Company.get_company(scope, 73)
@@ -1639,7 +1637,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       refute has_element?(view, "#company-details-card [phx-hook='InlineEdit']")
       refute has_element?(view, "#company-status-display")
       refute has_element?(view, "#company-new-activity")
-      refute has_element?(view, "#edit-metadata-btn")
+      refute has_element?(view, "#company-metadata-editor-display")
       refute has_element?(view, "#company-timezone-display")
       refute has_element?(view, "#btn-open-create-address")
       refute has_element?(view, "#btn-open-attach-address")

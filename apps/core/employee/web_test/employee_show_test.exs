@@ -63,6 +63,39 @@ defmodule BilimbiWeb.EmployeeShowTest do
     refute has_element?(view, "main header button:not(#employee-pin)")
   end
 
+  test "edits an agent job description with the shared long-text fact", %{
+    conn: conn,
+    employee: employee
+  } do
+    grant_capabilities!(["admin.employee.view", "admin.employee.update"])
+    {:ok, scope} = Tenancy.scope(41)
+
+    assert {:ok, _employee} =
+             Employee.update_employee(scope, 73, employee.id, %{
+               employee_type: "agent",
+               job_description: "Supports the service desk."
+             })
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+    assert has_element?(view, "#employee-job-description[phx-hook='InlineLongText']")
+    assert has_element?(view, "#employee-job-description-display", "Supports the service desk.")
+
+    view |> element("#employee-job-description-display") |> render_click()
+    assert has_element?(view, "#employee-job-description-input[rows='2']")
+
+    render_hook(view, "save_field", %{
+      "id" => to_string(employee.id),
+      "job_description" => "Supports the regional teams.\nCoordinates on-call work."
+    })
+
+    assert has_element?(view, "#employee-job-description-display", "Coordinates on-call work.")
+    assert has_element?(view, "#employee-job-description-status[role='status']", "Saved")
+
+    assert {:ok, %{job_description: "Supports the regional teams.\nCoordinates on-call work."}} =
+             Employee.get_employee(scope, 73, employee.id)
+  end
+
   test "presents the facts as the shared list and the subordinates as the shared table", %{
     conn: conn,
     employee: employee
