@@ -121,7 +121,9 @@ defmodule Bilimbi.Base.UI.ComponentsInlineChoiceTest do
             status={@status}
           >
             <:display>Active</:display>
-            <:editor><form id="status-form" phx-change="save_status"><select id="status-select" /></form></:editor>
+            <:editor>
+              <form id="status-form" phx-change="save_status"><select id="status-select" /></form>
+            </:editor>
           </.inline_choice>
           """
         end,
@@ -139,7 +141,9 @@ defmodule Bilimbi.Base.UI.ComponentsInlineChoiceTest do
           ~H"""
           <.inline_choice id="status" field="status" label="Edit status" editing editable? status={@status}>
             <:display>Active</:display>
-            <:editor><form id="status-form" phx-change="save_status"><select id="status-select" /></form></:editor>
+            <:editor>
+              <form id="status-form" phx-change="save_status"><select id="status-select" /></form>
+            </:editor>
           </.inline_choice>
           """
         end,
