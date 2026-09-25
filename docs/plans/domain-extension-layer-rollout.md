@@ -195,9 +195,12 @@ real requirements exist.
 
 - [ ] Mount an Extension only when an actual Platform or Domain adaptation is
   identified; do not invent one merely to populate the layer.
-- [ ] Keep Mr Packaging Sdn Bhd's foam requirements in `MrPackaging` and SBG's
-  AX, adhesive-tape planning, production adapters, procurement, inventory
-  value, and QAC requirements in `SbGroup`; neither Extension owns the common
+- [ ] Keep foam, glue, coating, and slitting process families, cure data, and
+  ordinary process configuration in the generic Manufacturing Domain.
+  `MrPackaging` holds only confirmed Mr Packaging Sdn Bhd behaviour that
+  common configuration and public contracts cannot express. `SbGroup` holds
+  SBG's AX integration, adhesive-tape planning, AX production-source adapters,
+  procurement, inventory value, and QAC. Neither Extension owns the common
   ledger, genealogy, units of measure, or execution semantics.
 - [ ] Keep its ownership, visibility, and licensing independent of its
   architectural role.

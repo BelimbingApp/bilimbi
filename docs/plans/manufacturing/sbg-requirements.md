@@ -111,8 +111,8 @@ SBG's source and workflow behaviour belongs in its Extension.
   shared contracts small while allowing SBG-specific source and evidence rules.
 - **Recommendation — Option C:** Stock and Manufacturing own the reusable
   ledger, genealogy, definitions, execution, and trace contract; `SbGroup`
-  owns AX, IBP, production adapters, procurement, inventory value, QAC, and
-  private presentation.
+  owns AX, IBP, production-source adapters, procurement, inventory value, QAC,
+  and private presentation.
 
 ### AX source boundary
 
