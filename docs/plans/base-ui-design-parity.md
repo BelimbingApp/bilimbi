@@ -1174,7 +1174,11 @@ Not delivered by this slice, reported as follow-up:
 - **`/employees/:id`** still carries an "Edit employee" primary button and
   reports in-place edits through a flash (delivered by the employee detail
   slice below); **`/companies/:id`** still keeps its
-  facts behind edit modes (CMP-03 stays partial).
+  facts behind edit modes (CMP-03 stays partial). **Superseded 2026-09-23:**
+  both are read-first now. The employee detail slice below removed the "Edit
+  employee" button and the flash, and the company detail slice below removed
+  the page-wide edit mode; neither page retains its header edit button. CMP-03
+  is no longer partial on these two pages.
 - **INT-02 stays without a shared primitive.** The user's company is the
   second page-local inline select on the same rule; extracting one shared
   `<.inline_select>` waits for its underlying control to be accepted.
@@ -1257,7 +1261,9 @@ Not delivered by this slice, reported as follow-up:
 
 - **`/companies/:id`** is filed separately; the employee list and its edit
   link, the addresses panel on this page and the native `data-confirm` on the
-  subordinate and delete actions are out of scope here.
+  subordinate and delete actions are out of scope here. **Superseded
+  2026-09-23:** the subordinate and delete actions confirm through
+  `<.confirm_dialog>`; no `data-confirm` remains anywhere in the product.
 - **`/employees/:id/edit` still exists** as a route and form; nothing on the
   detail page reaches it. Retired by the records-whose-only-page-is-a-form
   slice below.
@@ -1361,6 +1367,9 @@ Not delivered by this slice, reported as follow-up:
   list**, keep their own affordances.
 - **The chip removal's native `data-confirm`** stays as it was; whether that
   confirmation belongs on a read-first page is a separate decision.
+  **Superseded 2026-09-23:** it confirms through `<.confirm_dialog>` like
+  every other destructive control. Whether a read-first page should confirm a
+  chip removal at all is still the open question, unchanged.
 - **A shared choice-fact component.** `/addresses/:id`, `/users/:id`,
   `/employees/:id` and now `/companies/:id` each carry a private
   read-state-trigger select in the same shape; that repetition is the case for
@@ -1447,5 +1456,7 @@ Not delivered by this slice, reported as follow-up:
 - **The company type lists** (department types, legal entity types) already
   edit inline and were not touched.
 - **The native `data-confirm`** on the list delete actions stays as it was.
+  **Superseded 2026-09-23:** those deletes confirm through
+  `<.confirm_dialog>`; no `data-confirm` remains anywhere in the product.
 - **`FormLive`'s unrouted edit branch** is the documented drift to prune
   once the employee create form is looked at on its own.
