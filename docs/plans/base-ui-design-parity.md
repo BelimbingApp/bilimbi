@@ -247,9 +247,10 @@ products were read and the plan forbids treating existence as acceptance.
   hand-writes a Previous/Next pager instead of `<.pagination>` (Lane A), a Phase 5
   migration, not a pattern to copy.
 - **DAT-05** — "Missing" is wrong. Five stat cards ship on `/dashboard`, duplicated
-  into ten markup blocks with 65 arbitrary-value classes. The Companies, Users and
-  Sessions cards now render through the shared `<.stat_strip>`, with a Data display
-  specimen; the recent-audit and performance cards keep their own markup.
+  into ten markup blocks with 65 arbitrary-value classes. The Companies, Users,
+  Sessions and Performance cards now render through the shared `<.stat_strip>`, with
+  a Data display specimen, as Belimbing's Performance widget does. The recent-audit
+  card keeps its own markup: it is a feed of entries, not label and value pairs.
 - **DAT-04** — relative time already ships in notifications, in a bare `<span>` with
   no `<time>`, no `datetime` and no `title`, frozen at render. It has since been
   replaced: `/notifications` and the `/users` Created column render through

@@ -106,6 +106,15 @@ defmodule BilimbiWeb.PerfLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/dashboard")
 
     assert has_element?(view, "#stat-performance[href='/system/performance']", "Available")
+    assert has_element?(view, "#stat-performance-item-0", "Health")
+    assert has_element?(view, "#stat-performance-item-0", "Available")
+    assert has_element?(view, "#stat-performance-item-1", "Samples")
+    refute has_element?(view, "#stat-performance-item-2")
+
+    view |> element("#customize-layout") |> render_click()
+
+    assert has_element?(view, "div#stat-performance", "Available")
+    refute has_element?(view, "#stat-performance[href]")
   end
 
   test "dashboard widget reports recorder degradation", %{conn: conn} do

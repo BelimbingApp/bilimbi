@@ -48,6 +48,10 @@ An operational list keeps its page, search, filters, sort and page size in URL s
 
 Those filters are `<.filter_toolbar>` and that pager is `<.pagination>`. A local form or Previous/Next pair is the pair those two replaced. The comments on `filter_toolbar/1` and `pagination/1` own the framing.
 
+## Summaries
+
+A dashboard card of labelled values is `<.stat_strip>`; a hand-written card with the same title-and-cells anatomy is what it replaced. A feed of entries is not a stat strip and keeps its own markup, commented as such. An icon-only link is `<.icon_button navigate>`, which carries the accessible name a bare `<.link>` around an icon lacks.
+
 ## Maintaining this file
 
 Keep this note short. Point at the component, its comment, or DESIGN.md; do not copy them.
