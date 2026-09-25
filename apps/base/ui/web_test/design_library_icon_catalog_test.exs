@@ -53,7 +53,7 @@ defmodule BilimbiWeb.DesignLibraryIconCatalogTest do
     refute has_element?(view, "#icon-catalog-empty")
   end
 
-  test "the filter narrows the tiles by name or by the Heroicon they resolve to", %{view: view} do
+  test "the filter narrows the tiles by name only", %{view: view} do
     filter(view, "  ARCHIVE ")
 
     assert has_element?(view, "#icon-tile-archive")
@@ -64,9 +64,13 @@ defmodule BilimbiWeb.DesignLibraryIconCatalogTest do
 
     filter(view, "hero-clock")
 
-    assert has_element?(view, "#icon-tile-clock")
-    assert has_element?(view, "#icon-tile-history")
-    refute has_element?(view, "#icon-tile-archive")
+    refute has_element?(view, "#icon-tile-history")
+    assert has_element?(view, "#icon-catalog-empty", "No icons match “hero-clock”")
+
+    filter(view, "hero")
+
+    refute has_element?(view, "#icon-tile-create")
+    refute has_element?(view, "#icon-tile-history")
   end
 
   test "a filter that matches nothing says so and clears back to every icon", %{view: view} do

@@ -364,13 +364,8 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
     )
   end
 
-  # A name matches on itself or on the Heroicon it resolves to, so "clock"
-  # finds every action drawn with `hero-clock`.
   defp icon_matches?(_icon, ""), do: true
-
-  defp icon_matches?(%{name: name, heroicon: heroicon}, query) do
-    String.contains?(name, query) or (is_binary(heroicon) and String.contains?(heroicon, query))
-  end
+  defp icon_matches?(%{name: name}, query), do: String.contains?(name, query)
 
   defp assign_sample_search(socket, search) do
     socket
