@@ -70,10 +70,11 @@ These components describe what SBG needs and where the behaviour belongs.
   provenance, freshness, and tenant/company mapping. It does not issue raw SQL
   writes to AX application tables; any future write uses an approved AX AIF or
   staging path.
-- **Production** — `SbGroup` adapts glue batches, reactors, operators,
-  helpers, wet/dry output, material usage and lots, quality results, coating,
-  and slitting to the generic Production module. Production dashboards can
-  expose monthly, yearly, reactor, glue, and coating-line views.
+- **Production** — glue batches, reactors, operators, helpers, wet/dry output,
+  material usage and lots, quality results, coating, and slitting are process
+  families configured in the generic Manufacturing Domain. `SbGroup` maps AX
+  production-source facts into them; its production dashboards can expose
+  monthly, yearly, reactor, glue, and coating-line views.
 - **IBP** — `SbGroup` owns BA/BOPP planning, forecasts, weekly planning,
   safety-stock alerts, container planning, pricing and cost sensitivities, and
   the evidence linking planning values to AX facts.
@@ -87,7 +88,7 @@ These components describe what SBG needs and where the behaviour belongs.
   evidence timelines, corrective actions, supplier requests, and reviewable
   AI assistance. It does not turn an AI suggestion into an unreviewed fact.
 - **`SbGroup` Extension boundary** — contains SBG's AX integration, planning,
-  production/source adapters, inventory-value and procurement workflows, QAC,
+  production-source adapters, inventory-value and procurement workflows, QAC,
   private dashboards, and confidentiality rules. It consumes public Domain
   contracts and does not reach into their private tables or queries.
 
@@ -246,7 +247,7 @@ Production execution contract.
   material usage, lots, operators/resources, output, and source readiness.
 - [ ] Configure glue batch, reactor, wet/dry output, material usage, quality
   result references, previous batch, cleaning sequence, and production
-  date/month as Domain data or approved `SbGroup` adapters.
+  date/month as Domain data; `SbGroup` supplies only the AX source mapping.
 - [ ] Link coating and slitting production-order facts, line, consumption,
   good output, and yield to Stock transactions and Manufacturing trace.
 - [ ] Mark unavailable wastage reasons, energy, labour hours, GSM, and stopped
