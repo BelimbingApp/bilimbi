@@ -244,13 +244,14 @@ boundary before planning or dashboards depend on it.
 - **SBG receives:** BA, BOPP, glue, coating, and other mapped material facts
   with native UOM, location, lot, source, freshness, and provenance.
 - [ ] Mount Inventory/Stock and prove receiving, balanced posting, idempotent
-  retry, concurrent-consumption protection, reversal, and genealogy through
-  its public contract.
+  retry, concurrent-consumption protection, reversal, and receipt lot identity
+  through its public contract.
 - [ ] Mount the `SbGroup` AX Connector with schema checks, candidate/active
   source batches, provenance, freshness, and tenant/company mapping.
 - [ ] Confirm which AX production, item, inventory, purchase-order, and value
   facts are available for the first source slice.
-- [ ] Send AX production-history imports through Manufacturing's execution/import contract; keep all AX writes and raw AX SQL out of Stock and the generic Domains.
+- [ ] Keep all AX writes and raw AX SQL out of Stock and the generic Domains;
+  AX production history waits for Phase 2's execution/import contract.
 
 Validation: an SBG material receipt and its AX source evidence reconcile by
 quantity, UOM, lot, period, source, and freshness without a second ledger.

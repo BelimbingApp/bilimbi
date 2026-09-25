@@ -141,13 +141,13 @@ Mr Packaging Sdn Bhd needs the shared Domains to support these customer-facing r
 
 Validation: a clerk records a lorry in one flow and can explain the source of every recorded weight.
 
-#### Phase 2 — Roll identity and genealogy
+#### Phase 2 — Roll labels and storage locations
 
 - [ ] Confirm label material, placement, survivability, and network coverage at the plant.
-- [ ] Label each extrusion roll with its identity, production time, dimensions, and current location.
-- [ ] Prove that each roll traces to its input receipt and can be located after the physical cure delay.
+- [ ] Set up the cure-storage locations and the unit identity that roll labels will carry.
+- [ ] Prove a test label can be scanned and moved between locations as an ordinary warehouse movement.
 
-Validation: a receipt, roll, and later output can be traced through Stock without a second ledger.
+Validation: a labelled unit can be located through Stock after a physical move, without any production posting.
 
 ### Manufacturing Product Definition and Production Execution modules
 
@@ -155,11 +155,12 @@ Validation: a receipt, roll, and later output can be traced through Stock withou
 
 - [ ] Confirm blend proportions, colours, measured dimensions, and applicable cure minimum with plant staff.
 - [ ] Configure foam process families, routes, output roles, conversion bases, and cure gates as Manufacturing data.
-- [ ] Record an extrusion execution and post its input and roll output through Inventory/Stock.
+- [ ] Record an extrusion execution that consumes the received material and creates each labelled roll with its identity, production time, and dimensions.
+- [ ] Prove that each roll traces to its input receipt through Stock genealogy and can be located after the physical cure delay.
 - [ ] Verify the default hold for under-cured material and the authorised override evidence.
 - [ ] Add `MrPackaging` only if on-site proof identifies behaviour beyond the generic configuration and public contracts.
 
-Validation: an operator can identify each roll, see its cure age, and explain any consumed under-cured roll.
+Validation: an operator can identify each roll, trace it to its receipt, see its cure age, and explain any consumed under-cured roll.
 
 #### Phase 4 — Lamination, cutting, packing, and despatch
 
