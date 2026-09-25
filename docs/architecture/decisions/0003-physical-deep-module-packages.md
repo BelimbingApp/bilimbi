@@ -6,11 +6,15 @@
 **Scope:** Deep-module filesystem boundaries, descriptor-driven Mix
 composition, nested Git distribution, tests, documentation, assets, and
 migration ownership
-**Last Updated:** 2026-08-24
+**Last Updated:** 2026-09-25
 
 > This ADR records the physical packaging decision. Current database ownership,
 > dependency categories, migration, contract, and ledger rules are centralized
 > in [Bilimbi Database Architecture](../database.md).
+> Optional Domain and Extension placement was amended by the normative
+> [composition model](../0010_composition-model.md): repositories mount under
+> `apps/domains/` and `apps/extensions/`. The Mix realization remains subject to
+> the disposable composition proof.
 
 ## Context
 
@@ -62,29 +66,31 @@ project_root/
 │   │   ├── user/                     # core/user module
 │   │   └── compatibility/            # core/compatibility module
 │   ├── web/                          # Phoenix host and shared shell
-│   ├── sales/                        # Optional Domain composition/bundle
-│   │   ├── mix.exs
-│   │   ├── bilimbi.container.exs
-│   │   └── order/                    # sales/order module/Git mount
+│   ├── domains/
+│   │   └── sales/                    # Optional Domain repository/bundle
 │   │       ├── mix.exs
-│   │       ├── bilimbi.module.exs
-│   │       ├── lib/
-│   │       │   ├── order.ex
-│   │       │   └── order/
-│   │       ├── priv/repo/migrations/
-│   │       ├── test/
-│   │       ├── docs/
-│   │       └── assets/               # Optional
-│   └── sb_group/                     # Optional Extension composition/bundle
-│       ├── mix.exs
-│       ├── bilimbi.container.exs
-│       └── qac/                      # sb_group/qac module/Git mount
+│   │       ├── bilimbi.container.exs
+│   │       └── order/                # sales/order module/Git mount
+│   │           ├── mix.exs
+│   │           ├── bilimbi.module.exs
+│   │           ├── lib/
+│   │           │   ├── order.ex
+│   │           │   └── order/
+│   │           ├── priv/repo/migrations/
+│   │           ├── test/
+│   │           ├── docs/
+│   │           └── assets/           # Optional
+│   └── extensions/
+│       └── sb_group/                 # Optional Extension repository/bundle
 │           ├── mix.exs
-│           ├── bilimbi.module.exs
-│           ├── lib/
-│           ├── priv/repo/migrations/ # Optional
-│           ├── test/
-│           └── docs/
+│           ├── bilimbi.container.exs
+│           └── qac/                  # sb_group/qac module/Git mount
+│               ├── mix.exs
+│               ├── bilimbi.module.exs
+│               ├── lib/
+│               ├── priv/repo/migrations/ # Optional
+│               ├── test/
+│               └── docs/
 ```
 
 The module directory already supplies platform, layer, and module context.
@@ -95,7 +101,7 @@ context below `lib/`:
 |---|---|---|
 | `apps/base/tenancy/` | `lib/tenancy.ex` | `Bilimbi.Base.Tenancy` |
 | `apps/core/company/` | `lib/company.ex` | `Bilimbi.Core.Company` |
-| `apps/sales/order/` | `lib/order.ex` | `Bilimbi.Sales.Order` |
+| `apps/domains/sales/order/` | `lib/order.ex` | `Bilimbi.Sales.Order` |
 
 Elixir namespaces remain globally qualified. Mix compiles source recursively
 from `lib/`; it does not derive a module name from the filesystem path.
@@ -122,8 +128,9 @@ stable container ID and layer. Its `mix.exs` calls the shared discovery helper
 and never enumerates Database, Tenancy, Company, Address, Compatibility, or any
 other child. Discovery treats each immediate non-hidden child directory as an
 installed module and requires `bilimbi.module.exs` at that child's root. Thus
-mounting `apps/base/mailer/` or `apps/sales/order/` is sufficient to change
-source composition; Mix dependency resolution and compilation incorporate it.
+mounting `apps/base/mailer/` changes source composition today. Once nested
+container discovery is implemented, mounting `apps/domains/sales/order/` will
+also change source composition through Mix dependency resolution.
 
 Base ModuleRegistry physically owns the source-loadable helper at
 `apps/base/module_registry/mix/module_discovery.exs`. Containers locate that
@@ -155,9 +162,10 @@ external package dependencies it actually owns, but obtains Bilimbi module
 path dependencies and runtime descriptor metadata generically. Composition
 containers own no speculative library dependencies.
 
-The umbrella remains conventional: Mix sees Base, Core, Web, and any installed
-Domain or Extension composition applications as direct children below
-`apps/`, while each container discovers its nested module packages.
+Mix sees Base, Core, and Web as direct umbrella children below `apps/`.
+Discovery must also include mounted Domain and Extension containers under
+their respective roots and bring them into the build. The mechanism for that
+nested Mix composition is subject to the disposable proof in the rollout plan.
 
 Discovery validates the complete installed graph during Mix dependency
 resolution. It rejects malformed and missing descriptors, duplicate stable
