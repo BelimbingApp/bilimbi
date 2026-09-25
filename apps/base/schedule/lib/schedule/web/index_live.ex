@@ -57,6 +57,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
       |> assign(:run_page, empty_run_page())
       |> assign(:pending_command, nil)
       |> assign(:browser_timezone, nil)
+      |> assign(:page_sizes, @page_sizes)
       |> stream_configure(:tasks, dom_id: &task_dom_id/1)
       |> stream_configure(:runs, dom_id: &run_dom_id/1)
       |> stream(:tasks, [])
@@ -99,14 +100,20 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
 
   def handle_event("filter_tasks", _params, socket), do: {:noreply, socket}
 
+  # The toolbar posts search, status, and dates. `<.pagination>` posts only
+  # `perPage` on the same event. A key the posting form did not carry keeps
+  # its current value. The URL keeps `page_size`.
   def handle_event("filter_runs", %{"run" => params}, socket) do
+    current = socket.assigns.state
+
     state = %{
-      socket.assigns.state
-      | run_search: Map.get(params, "search", ""),
-        run_status: run_status(Map.get(params, "status")),
-        start_date: date_param(Map.get(params, "start_date")),
-        end_date: date_param(Map.get(params, "end_date")),
-        page_size: page_size(Map.get(params, "page_size"), socket.assigns.state.page_size),
+      current
+      | run_search: Map.get(params, "search", current.run_search),
+        run_status: run_status(Map.get(params, "status", current.run_status)),
+        start_date: date_from_params(params, "start_date", current.start_date),
+        end_date: date_from_params(params, "end_date", current.end_date),
+        page_size:
+          page_size(Map.get(params, "perPage") || Map.get(params, "page_size"), current.page_size),
         page: 1
     }
 
@@ -448,7 +455,7 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
         "status" => state.run_status,
         "start_date" => date_string(state.start_date),
         "end_date" => date_string(state.end_date),
-        "page_size" => state.page_size
+        "perPage" => Integer.to_string(state.page_size)
       },
       as: :run
     )
@@ -532,6 +539,10 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
   defp page_size(value, default) do
     parsed = positive_integer(value, default)
     if parsed in @page_sizes, do: parsed, else: default
+  end
+
+  defp date_from_params(params, key, current) do
+    if Map.has_key?(params, key), do: date_param(Map.get(params, key)), else: current
   end
 
   defp date_param(nil), do: nil
@@ -636,9 +647,6 @@ defmodule Bilimbi.Base.Schedule.Web.IndexLive do
 
   defp run_result(%{exit_code: exit_code}) when is_integer(exit_code), do: "Exit #{exit_code}"
   defp run_result(run), do: status_label(run.status)
-
-  defp run_noun(1), do: "run"
-  defp run_noun(_count), do: "runs"
 
   defp due_label(:none_due), do: "No work currently due"
   defp due_label(:due), do: "Work is due"

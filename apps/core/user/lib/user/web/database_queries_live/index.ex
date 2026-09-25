@@ -12,54 +12,49 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
   alias Bilimbi.Core.User
 
   @sortable ~w(name description created_at updated_at)
+  @page_sizes [25, 50, 100, 300]
+  @default_page_size 25
 
   @impl true
   def mount(_params, _session, socket) do
+    state = default_state()
+
     {:ok,
      socket
      |> assign(:page_title, "Database Queries")
      |> assign(:active_nav, "admin.system.database-query")
-     |> assign(:search, "")
-     |> assign(:sort_by, "updated_at")
-     |> assign(:sort_dir, :desc)
-     |> assign(:page, 1)
-     |> assign(:per_page, 25)
+     |> assign(:page_sizes, @page_sizes)
      |> assign(:pending_delete, nil)
-     |> load_queries()}
+     |> assign(:state, state)
+     |> assign(:queries, [])
+     |> assign(:queries_page, empty_page())
+     |> assign(:filters_form, filters_form(state))
+     |> assign_list_fields(state)}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
-    search = Map.get(params, "search", socket.assigns.search)
-
-    sort_by =
-      if Map.get(params, "sort_by") in @sortable,
-        do: params["sort_by"],
-        else: socket.assigns.sort_by
-
-    sort_dir =
-      if Map.get(params, "sort_dir") in ["asc", "desc"],
-        do: String.to_existing_atom(params["sort_dir"]),
-        else: socket.assigns.sort_dir
-
-    page = to_integer(Map.get(params, "page"), socket.assigns.page)
-
-    {:noreply,
-     socket
-     |> assign(:search, search)
-     |> assign(:sort_by, sort_by)
-     |> assign(:sort_dir, sort_dir)
-     |> assign(:page, page)
-     |> load_queries()}
+    requested = state_from_params(params)
+    socket = socket |> assign(:state, requested) |> load_queries()
+    {:noreply, maybe_clamp_patch(socket, requested.page)}
   end
 
   @impl true
-  def handle_event("search", %{"search" => search}, socket) do
-    {:noreply,
-     socket
-     |> assign(:search, search)
-     |> assign(:page, 1)
-     |> load_queries()}
+  # The toolbar posts `search`. `<.pagination>` posts only `perPage` on this
+  # same event. A key the posting form did not carry keeps its current value.
+  # The URL keeps `page_size`.
+  def handle_event("search", params, socket) do
+    filters = Map.get(params, "filters", %{})
+    state = socket.assigns.state
+
+    state = %{
+      state
+      | search: Map.get(filters, "search", state.search),
+        page_size: page_size(Map.get(filters, "perPage"), state.page_size),
+        page: 1
+    }
+
+    {:noreply, push_patch(socket, to: index_path(state))}
   end
 
   @impl true
@@ -75,10 +70,8 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
 
   @impl true
   def handle_event("page", %{"page" => page}, socket) do
-    {:noreply,
-     socket
-     |> assign(:page, to_integer(page, 1))
-     |> load_queries()}
+    state = %{socket.assigns.state | page: to_integer(page, 1)}
+    {:noreply, push_patch(socket, to: index_path(state))}
   end
 
   @impl true
@@ -142,10 +135,13 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
 
         case User.delete_database_query(scope, user_id, query.id) do
           {:ok, _deleted} ->
+            previous_page = socket.assigns.state.page
+
             {:noreply,
              socket
-             |> put_flash(:success, "Query “#{query.name}” was deleted.")
-             |> load_queries()}
+             |> load_queries()
+             |> maybe_clamp_patch(previous_page)
+             |> put_flash(:success, "Query “#{query.name}” was deleted.")}
 
           {:error, :not_found} ->
             {:noreply,
@@ -185,29 +181,28 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
   end
 
   defp sort_queries(socket, column) do
+    state = socket.assigns.state
+
     sort_dir =
-      if socket.assigns.sort_by == column do
-        if socket.assigns.sort_dir == :asc, do: :desc, else: :asc
+      if state.sort_by == column do
+        if state.sort_dir == :asc, do: :desc, else: :asc
       else
         default_sort_dir(column)
       end
 
-    {:noreply,
-     socket
-     |> assign(:sort_by, column)
-     |> assign(:sort_dir, sort_dir)
-     |> assign(:page, 1)
-     |> load_queries()}
+    state = %{state | sort_by: column, sort_dir: sort_dir, page: 1}
+    {:noreply, push_patch(socket, to: index_path(state))}
   end
 
   defp load_queries(socket) do
+    state = socket.assigns.state
     scope = socket.assigns.current_scope.scope
     user_id = current_user_id(socket.assigns.current_scope)
 
     opts = [
-      search: socket.assigns.search,
-      sort_by: socket.assigns.sort_by,
-      sort_dir: socket.assigns.sort_dir
+      search: state.search,
+      sort_by: state.sort_by,
+      sort_dir: state.sort_dir
     ]
 
     all_queries =
@@ -217,26 +212,118 @@ defmodule Bilimbi.Core.User.Web.DatabaseQueriesLive.Index do
       end
 
     total_count = length(all_queries)
-    per_page = socket.assigns.per_page
-    total_pages = max(ceil(total_count / per_page), 1)
-    page = min(socket.assigns.page, total_pages)
-    offset = (page - 1) * per_page
-    paginated_queries = Enum.slice(all_queries, offset, per_page)
+    total_pages = total_pages(total_count, state.page_size)
+
+    page =
+      cond do
+        total_pages == 0 -> 1
+        state.page > total_pages -> total_pages
+        true -> state.page
+      end
+
+    state = %{state | page: page}
+    offset = (page - 1) * state.page_size
 
     socket
-    |> assign(:queries, paginated_queries)
+    |> assign(:state, state)
+    |> assign_list_fields(state)
+    |> assign(:queries, Enum.slice(all_queries, offset, state.page_size))
     |> assign(:total_count, total_count)
-    |> assign(:total_pages, total_pages)
-    |> assign(:page, page)
+    |> assign(:queries_page, %{
+      page: page,
+      page_size: state.page_size,
+      total_entries: total_count,
+      total_pages: total_pages
+    })
+    |> assign(:filters_form, filters_form(state))
+  end
+
+  defp assign_list_fields(socket, state) do
+    socket
+    |> assign(:search, state.search)
+    |> assign(:sort_by, state.sort_by)
+    |> assign(:sort_dir, state.sort_dir)
+    |> assign(:page, state.page)
+    |> assign(:per_page, state.page_size)
+  end
+
+  defp maybe_clamp_patch(socket, requested_page) do
+    if socket.assigns.state.page == requested_page do
+      socket
+    else
+      push_patch(socket, to: index_path(socket.assigns.state))
+    end
+  end
+
+  defp default_state do
+    %{
+      search: "",
+      sort_by: "updated_at",
+      sort_dir: :desc,
+      page: 1,
+      page_size: @default_page_size
+    }
+  end
+
+  defp empty_page do
+    %{page: 1, page_size: @default_page_size, total_entries: 0, total_pages: 0}
+  end
+
+  defp state_from_params(params) do
+    %{
+      search: Map.get(params, "search", ""),
+      sort_by: sort_by_from(Map.get(params, "sort_by")),
+      sort_dir: sort_dir_from(Map.get(params, "sort_dir")),
+      page: to_integer(Map.get(params, "page"), 1),
+      page_size: page_size(Map.get(params, "page_size") || Map.get(params, "perPage"))
+    }
+  end
+
+  defp index_path(state) do
+    query =
+      %{
+        "search" => state.search,
+        "sort_by" => state.sort_by,
+        "sort_dir" => Atom.to_string(state.sort_dir),
+        "page" => state.page,
+        "page_size" => state.page_size
+      }
+      |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
+      |> Map.new()
+
+    ~p"/admin/system/database-queries?#{query}"
+  end
+
+  defp filters_form(state) do
+    to_form(
+      %{"search" => state.search, "perPage" => Integer.to_string(state.page_size)},
+      as: :filters
+    )
+  end
+
+  defp sort_by_from(value) when value in @sortable, do: value
+  defp sort_by_from(_value), do: "updated_at"
+
+  defp sort_dir_from("asc"), do: :asc
+  defp sort_dir_from("desc"), do: :desc
+  defp sort_dir_from(_value), do: :desc
+
+  defp total_pages(0, _page_size), do: 0
+  defp total_pages(total, page_size), do: ceil(total / page_size)
+
+  defp page_size(value, default \\ @default_page_size) do
+    parsed = to_integer(value, default)
+    if parsed in @page_sizes, do: parsed, else: default
   end
 
   defp to_integer(nil, default), do: default
-  defp to_integer(val, _default) when is_integer(val), do: val
+  defp to_integer(val, _default) when is_integer(val) and val > 0, do: val
+  defp to_integer(val, default) when is_integer(val), do: default
 
   defp to_integer(val, default) when is_binary(val) do
     case Integer.parse(val) do
-      {int, _} -> int
-      :error -> default
+      {int, _} when int > 0 -> int
+      _invalid -> default
     end
   end
 end

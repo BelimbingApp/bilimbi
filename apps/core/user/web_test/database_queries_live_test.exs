@@ -104,9 +104,113 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
                "You are not authorized to modify queries."
 
       # Test search
-      search_html = view |> form("form", %{search: "Directory"}) |> render_change()
+      search_html =
+        view
+        |> form("#database-queries-filters", %{"filters" => %{"search" => "Directory"}})
+        |> render_change()
+
       assert search_html =~ "Company Directory"
       refute search_html =~ "Active Users"
+
+      patched = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+      assert patched["search"] == "Directory"
+      assert patched["page"] == "1"
+      assert patched["page_size"] == "25"
+    end
+
+    test "search and page size round-trip through the URL", %{conn: conn, scope: scope} do
+      grant_capabilities!("admin.system.database-table.list")
+
+      for index <- 1..26 do
+        {:ok, _query} =
+          User.create_database_query(scope, 91, %{
+            name: "Query #{String.pad_leading(Integer.to_string(index), 2, "0")}",
+            sql_query: "SELECT #{index};"
+          })
+      end
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_as()
+        |> live(
+          ~p"/admin/system/database-queries?search=Query&sort_by=name&sort_dir=asc&page_size=25"
+        )
+
+      assert has_element?(
+               view,
+               "#database-queries-pagination-summary",
+               "Showing 1 to 25 of 26 results"
+             )
+
+      assert has_element?(view, "#search-input[value='Query']")
+
+      assert has_element?(
+               view,
+               "#database-queries-pagination-page-size option[value='25'][selected]"
+             )
+
+      assert has_element?(view, "#database-queries-table", "Query 01")
+      refute has_element?(view, "#database-queries-table", "Query 26")
+
+      view |> element("#database-queries-pagination-next") |> render_click()
+
+      page_two = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+      assert page_two["search"] == "Query"
+      assert page_two["sort_by"] == "name"
+      assert page_two["page"] == "2"
+      assert page_two["page_size"] == "25"
+      assert has_element?(view, "#database-queries-table", "Query 26")
+      refute has_element?(view, "#database-queries-table", "Query 01")
+
+      {:ok, reloaded, _html} =
+        conn
+        |> log_in_as()
+        |> live(
+          ~p"/admin/system/database-queries?search=Query&sort_by=name&sort_dir=asc&page=2&page_size=25"
+        )
+
+      assert has_element?(
+               reloaded,
+               "#database-queries-pagination-summary",
+               "Showing 26 to 26 of 26 results"
+             )
+
+      assert has_element?(reloaded, "#search-input[value='Query']")
+      assert has_element?(reloaded, "#database-queries-table", "Query 26")
+      refute has_element?(reloaded, "#database-queries-table", "Query 01")
+
+      reloaded
+      |> form("#database-queries-pagination-page-size-form", %{
+        "filters" => %{"perPage" => "50"}
+      })
+      |> render_change()
+
+      sized = assert_patch(reloaded) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+      assert sized["search"] == "Query"
+      assert sized["sort_by"] == "name"
+      assert sized["page"] == "1"
+      assert sized["page_size"] == "50"
+
+      {:ok, widened, _html} =
+        conn
+        |> log_in_as()
+        |> live(
+          ~p"/admin/system/database-queries?search=Query&sort_by=name&sort_dir=asc&page=1&page_size=50"
+        )
+
+      assert has_element?(
+               widened,
+               "#database-queries-pagination-summary",
+               "Showing 1 to 26 of 26 results"
+             )
+
+      assert has_element?(
+               widened,
+               "#database-queries-pagination-page-size option[value='50'][selected]"
+             )
+
+      assert has_element?(widened, "#database-queries-table", "Query 01")
+      assert has_element?(widened, "#database-queries-table", "Query 26")
     end
 
     test "allows duplicate and delete on index when user has edit capability", %{
@@ -497,6 +601,125 @@ defmodule BilimbiWeb.DatabaseQueriesLiveTest do
       render_click(view, "page_results", %{"page" => "1"})
       assert [_sorted, paged] = console_actions(scope) -- mounted
       assert paged.payload["result"] == "succeeded"
+    end
+
+    test "result page and page size round-trip through the URL without dropping unsaved SQL", %{
+      conn: conn,
+      scope: scope
+    } do
+      grant_capabilities!("admin.system.database-table.list")
+
+      {:ok, query} =
+        User.create_database_query(scope, 91, %{
+          name: "Series",
+          sql_query: "SELECT * FROM generate_series(1, 30)"
+        })
+
+      {:ok, view, _html} =
+        conn
+        |> log_in_as()
+        |> live(~p"/admin/system/database-queries/#{query.slug}?page=2&page_size=25")
+
+      assert has_element?(
+               view,
+               "#query-results-pagination-summary",
+               "Showing 26 to 30 of 30 results"
+             )
+
+      assert has_element?(view, "#query-results-pagination-page-2[aria-current='page']")
+      assert has_element?(view, "#result-row-0", "26")
+
+      # An unsaved edit stays on the process when the pager patches the URL.
+      # The saved statement still returns 30 rows; this one returns 5.
+      view
+      |> form("#query-sql-form", %{sql_query: "SELECT * FROM generate_series(1, 5)"})
+      |> render_change()
+
+      view |> element("#query-results-pagination-previous") |> render_click()
+
+      patched = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+      assert patched["page"] == "1"
+      assert patched["page_size"] == "25"
+      assert has_element?(view, "#query-sql-form textarea", "generate_series(1, 5)")
+
+      assert has_element?(
+               view,
+               "#query-results-pagination-summary",
+               "Showing 1 to 5 of 5 results"
+             )
+
+      view
+      |> form("#query-results-pagination-page-size-form", %{"results" => %{"perPage" => "50"}})
+      |> render_change()
+
+      sized = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+      assert sized["page"] == "1"
+      assert sized["page_size"] == "50"
+      assert has_element?(view, "#query-sql-form textarea", "generate_series(1, 5)")
+
+      assert has_element?(
+               view,
+               "#query-results-pagination-summary",
+               "Showing 1 to 5 of 5 results"
+             )
+
+      {:ok, reloaded, _html} =
+        conn
+        |> log_in_as()
+        |> live(~p"/admin/system/database-queries/#{query.slug}?page=1&page_size=50")
+
+      assert has_element?(
+               reloaded,
+               "#query-results-pagination-page-size option[value='50'][selected]"
+             )
+
+      assert has_element?(
+               reloaded,
+               "#query-results-pagination-summary",
+               "Showing 1 to 30 of 30 results"
+             )
+    end
+
+    test "a result page past the last page lands on the last page, and Run returns the URL to page one",
+         %{conn: conn, scope: scope} do
+      grant_capabilities!("admin.system.database-table.list")
+
+      {:ok, query} =
+        User.create_database_query(scope, 91, %{
+          name: "Series",
+          sql_query: "SELECT * FROM generate_series(1, 30)"
+        })
+
+      conn = log_in_as(conn)
+
+      assert {:error, {:live_redirect, %{to: clamped_path}}} =
+               live(conn, ~p"/admin/system/database-queries/#{query.slug}?page=9&page_size=25")
+
+      clamped = clamped_path |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+      assert clamped["page"] == "2"
+
+      {:ok, view, _html} = live(conn, clamped_path)
+
+      assert has_element?(
+               view,
+               "#query-results-pagination-summary",
+               "Showing 26 to 30 of 30 results"
+             )
+
+      view
+      |> form("#query-sql-form", %{sql_query: "SELECT * FROM generate_series(1, 5)"})
+      |> render_change()
+
+      view |> element("#btn-run-query") |> render_click()
+
+      ran = assert_patch(view) |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+      assert ran["page"] == "1"
+
+      assert has_element?(
+               view,
+               "#query-results-pagination-summary",
+               "Showing 1 to 5 of 5 results"
+             )
     end
 
     test "renders the result set through the shared table, one sort button per column", %{

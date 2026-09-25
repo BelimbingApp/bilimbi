@@ -54,25 +54,18 @@
       </.table>
     </.card>
 
-    <.form
-      for={@filters_form}
-      id="performance-filters"
-      phx-change="filter"
-      phx-submit="filter"
-      class="mb-2 grid gap-2 sm:grid-cols-3"
-    >
-      <.input
-        type="search"
-        id="performance-identity"
+    <.filter_toolbar id="performance-filters" form={@filters_form} event="filter">
+      <:control
+        type={:search}
         field={@filters_form[:identity]}
+        id="performance-identity"
         label="Route or worker"
         placeholder="Exact identity"
-        phx-debounce="300"
       />
-      <.input
-        type="select"
-        id="performance-kind"
+      <:control
+        type={:select}
         field={@filters_form[:kind]}
+        id="performance-kind"
         label="Kind"
         options={[
           {"All", ""},
@@ -82,10 +75,10 @@
           {"Runtime", "runtime"}
         ]}
       />
-      <.input
-        type="select"
-        id="performance-outcome"
+      <:control
+        type={:select}
         field={@filters_form[:outcome]}
+        id="performance-outcome"
         label="Outcome"
         options={[
           {"All", ""},
@@ -95,7 +88,7 @@
           {"Discarded", "discarded"}
         ]}
       />
-    </.form>
+    </.filter_toolbar>
 
     <.card id="performance-history" inner_class="p-0">
       <.table

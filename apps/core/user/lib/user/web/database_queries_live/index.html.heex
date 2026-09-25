@@ -18,18 +18,15 @@
       </:actions>
     </.header>
 
-    <form id="database-queries-search-form" phx-change="search" phx-submit="search" class="mb-2">
-      <.input
-        type="search"
-        name="search"
+    <.filter_toolbar id="database-queries-filters" form={@filters_form} event="search">
+      <:control
+        type={:search}
+        field={@filters_form[:search]}
         id="search-input"
-        value={@search}
         label="Search database queries"
-        label_class="sr-only"
         placeholder="Search by name or description..."
-        wrapper_class="mb-0"
       />
-    </form>
+    </.filter_toolbar>
 
     <.card id="database-queries-card" inner_class="p-0">
       <.table
@@ -92,32 +89,13 @@
         </:empty>
       </.table>
 
-      <%= if @total_pages > 1 do %>
-        <div class="mt-4 flex items-center justify-between text-sm text-ink-subtle">
-          <span>
-            Showing {@queries |> length()} of {@total_count} queries
-          </span>
-          <div class="inline-flex items-center gap-2">
-            <.button
-              :if={@page > 1}
-              phx-click="page"
-              phx-value-page={@page - 1}
-              class="px-2.5 py-1 text-xs"
-            >
-              Previous
-            </.button>
-            <span class="px-2 font-medium text-ink">Page {@page} of {@total_pages}</span>
-            <.button
-              :if={@page < @total_pages}
-              phx-click="page"
-              phx-value-page={@page + 1}
-              class="px-2.5 py-1 text-xs"
-            >
-              Next
-            </.button>
-          </div>
-        </div>
-      <% end %>
+      <.pagination
+        id="database-queries-pagination"
+        page={@queries_page}
+        page_sizes={@page_sizes}
+        filters_form={@filters_form}
+        filters_event="search"
+      />
     </.card>
 
     <.confirm_dialog

@@ -15,7 +15,8 @@ that enforces the rule. Open the file: a harness that stops at 32KiB of
 project instructions will not append it, because this root file already
 fills that budget.
 
-- `apps/AGENTS.md` — LiveView bindings, messages, withheld controls, clocks, read-first pages, tests
+- `apps/AGENTS.md` — LiveView bindings, messages, withheld controls, clocks, read-first pages, list
+  filters and pagination, tests
 - `apps/base/ui/AGENTS.md` — shared components, the Design Library, assets, hook tests
 - `apps/base/audit/AGENTS.md` — what an audit row records
 - `apps/base/database/AGENTS.md` — silencing capture, and a boundary the database enforces
