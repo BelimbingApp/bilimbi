@@ -643,6 +643,95 @@
                 </p>
               </div>
             </.card>
+            <.card
+              id="component-inline-choice"
+              title="Inline choice fact"
+              inner_class="space-y-4 p-4"
+            >
+              <p class="text-xs text-ink-muted">
+                The read state is the trigger. Choose a value to commit, or press Escape or leave the control to cancel.
+              </p>
+              <div class="grid gap-4 sm:grid-cols-3">
+                <div>
+                  <p class="mb-2 text-xs text-ink-muted">Read state</p>
+                  <.inline_choice
+                    id="design-library-inline-choice-read"
+                    field="status"
+                    label="Edit status"
+                    editing={false}
+                    editable?
+                    status={nil}
+                  >
+                    <:display><span class="text-ink">Active</span></:display>
+                    <:display><span class="text-xs text-ink-muted">since March</span></:display>
+                    <:editor>
+                      <.input
+                        type="select"
+                        id="design-library-inline-choice-read-select"
+                        name="status"
+                        value="Active"
+                        options={["Active"]}
+                        aria-label="Status"
+                        wrapper_class="mb-0"
+                      />
+                    </:editor>
+                  </.inline_choice>
+                </div>
+                <div>
+                  <p class="mb-2 text-xs text-ink-muted">Editing and cancel</p>
+                  <.inline_choice
+                    id="design-library-inline-choice-edit"
+                    field="status"
+                    label="Edit status"
+                    editing
+                    editable?
+                    status={nil}
+                  >
+                    <:display><span class="text-ink">Active</span></:display>
+                    <:editor>
+                      <.input
+                        type="select"
+                        id="design-library-inline-choice-edit-select"
+                        name="status"
+                        value="Active"
+                        options={["Active", "Pending"]}
+                        aria-label="Status"
+                        phx-blur="cancel_edit_field"
+                        wrapper_class="mb-0"
+                      />
+                    </:editor>
+                    <:editor>
+                      <span class="text-xs text-ink-muted">Saves on selection.</span>
+                    </:editor>
+                  </.inline_choice>
+                </div>
+                <div>
+                  <p class="mb-2 text-xs text-ink-muted">Commit refused</p>
+                  <.inline_choice
+                    id="design-library-inline-choice-error"
+                    field="status"
+                    label="Edit status"
+                    editing={false}
+                    editable?
+                    status={{:error, "Pending is not allowed."}}
+                    status_id="design-library-inline-choice-error-message"
+                  >
+                    <:display><span class="text-ink">Active</span></:display>
+                    <:editor>
+                      <.input
+                        type="select"
+                        id="design-library-inline-choice-error-select"
+                        name="status"
+                        value="Active"
+                        options={["Active"]}
+                        aria-label="Status"
+                        wrapper_class="mb-0"
+                      />
+                    </:editor>
+                  </.inline_choice>
+                </div>
+              </div>
+            </.card>
           </section>
 
           <section id="component-navigation-links" class="scroll-mt-4 space-y-4">

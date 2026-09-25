@@ -99,3 +99,60 @@ defmodule Bilimbi.Base.UI.ComponentsInlineEditTest do
     end
   end
 end
+
+defmodule Bilimbi.Base.UI.ComponentsInlineChoiceTest do
+  use ExUnit.Case, async: true
+
+  import Phoenix.Component
+  import Phoenix.LiveViewTest
+  import Bilimbi.Base.UI.Components
+
+  test "renders the shared read, edit, and commit-status states" do
+    html =
+      render_component(
+        fn assigns ->
+          ~H"""
+          <.inline_choice
+            id="status"
+            field="status"
+            label="Edit status"
+            editing={@editing}
+            editable?={@editable?}
+            status={@status}
+          >
+            <:display>Active</:display>
+            <:editor>
+              <form id="status-form" phx-change="save_status"><select id="status-select" /></form>
+            </:editor>
+          </.inline_choice>
+          """
+        end,
+        %{editing: false, editable?: true, status: :saved}
+      )
+
+    assert html =~ ~s(id="status-display")
+    assert html =~ ~s(phx-click="edit_field")
+    assert html =~ ~s(role="status")
+    refute html =~ ~s(id="status-form")
+
+    editing_html =
+      render_component(
+        fn assigns ->
+          ~H"""
+          <.inline_choice id="status" field="status" label="Edit status" editing editable? status={@status}>
+            <:display>Active</:display>
+            <:editor>
+              <form id="status-form" phx-change="save_status"><select id="status-select" /></form>
+            </:editor>
+          </.inline_choice>
+          """
+        end,
+        %{status: {:error, "Rejected"}}
+      )
+
+    assert editing_html =~ ~s(phx-window-keydown="cancel_edit_field")
+    assert editing_html =~ ~s(phx-key="Escape")
+    assert editing_html =~ ~s(id="status-form")
+    assert editing_html =~ ~s(role="alert")
+  end
+end

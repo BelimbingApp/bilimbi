@@ -824,4 +824,15 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#design-library-inline-edit", "Reviewed preview")
     assert render(view) =~ "Preview value updated."
   end
+
+  test "inline choice specimens accept their edit and cancel events", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    view |> element("#design-library-inline-choice-read-display") |> render_click()
+    view |> element("#design-library-inline-choice-edit-select") |> render_blur()
+    render_keydown(view, "cancel_edit_field", %{"key" => "Escape"})
+
+    assert has_element?(view, "#design-library-inline-choice-read-display")
+    assert has_element?(view, "#design-library-inline-choice-edit-select")
+  end
 end

@@ -753,7 +753,7 @@ defmodule BilimbiWeb.AddressLiveTest do
 
     assert has_element?(
              view,
-             "#address-verification-status-form select#address-verification-status"
+             "#address-verification-status-form select#address-verification-status-select"
            )
 
     view

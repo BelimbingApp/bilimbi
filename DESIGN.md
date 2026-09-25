@@ -243,8 +243,8 @@ page:
   says what committing it does instead of reading as an empty value. The
   fact reports adding and removing on that one control; removal stays on the
   chip.
-- **Choice facts** show the read state (a badge, a name) as the trigger; the
-  select appears on click, commits on change, and Escape or leaving it
+- **Choice facts** use `<.inline_choice>`: the read state (a badge, a name)
+  is the trigger; the select appears on click, commits on change, and Escape or leaving it
   cancels. A permanently visible `<select>` beside read-only facts is a
   defect: the address verification status, the user's company, the
   employee's department, supervisor, employee type and status, and the

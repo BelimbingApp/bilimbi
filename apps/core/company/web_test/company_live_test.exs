@@ -1104,6 +1104,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       # A choice fact: the badge is the trigger, the select appears on click,
       # commits on change and gives way to the read state.
       refute has_element?(view, "#company-status-form")
+      assert has_element?(view, "#company-status-display[aria-label='Edit status']")
       view |> element("#company-status-display") |> render_click()
 
       assert has_element?(
