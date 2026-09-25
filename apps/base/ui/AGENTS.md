@@ -34,6 +34,8 @@ Do not use `@apply`. Do not add an external script or stylesheet URL. Do not wri
 
 Keep the `source(none)` and `@source` lines in `app.css`; the comment above them says why.
 
+The page-loading bar is the vendored canvas `apps/web/assets/vendor/topbar.js`, not CSS. The global reduced-motion rule cannot slow it; the marked `prefers-reduced-motion` check in that file is what keeps the bar still. A new canvas or timer animation has to make the same check.
+
 ## Hook tests
 
 A hook in `apps/web/assets/js` is tested beside it in `apps/web/assets/test/<hook>.test.mjs`, with Node's own test runner and happy-dom. `mix precommit` runs them through `mix assets.test`; `npm test` in `apps/web/assets` runs them alone. Mount the hook with `test/support/hook.mjs` on the markup its component renders, carrying the JS commands the server really renders, and assert what a person meets: attributes, focus, events pushed. Compare focus by id with `focused()`, because a failed assertion on two DOM nodes never finishes printing.

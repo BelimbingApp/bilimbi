@@ -32,6 +32,16 @@
       shadowColor: "rgba(0,   0,   0,   .6)",
       className: null,
     },
+    // Bilimbi: this canvas is not CSS, so the prefers-reduced-motion rule in
+    // css/app.css cannot reach the trickle or the fade. When the query matches,
+    // show() paints one static full-width bar and hide() removes it without
+    // requestAnimationFrame. Marked so a vendor refresh keeps the check.
+    reducedMotion = function () {
+      return (
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      );
+    },
     repaint = function () {
       canvas.width = window.innerWidth;
       canvas.height = options.barThickness * 5; // need space for shadow
@@ -80,14 +90,18 @@
           if (!canvas.parentElement) document.body.appendChild(canvas);
           canvas.style.opacity = 1;
           canvas.style.display = "block";
-          topbar.progress(0);
-          if (options.autoRun) {
-            (function loop() {
-              progressTimerId = window.requestAnimationFrame(loop);
-              topbar.progress(
-                "+" + 0.05 * Math.pow(1 - Math.sqrt(currentProgress), 2)
-              );
-            })();
+          if (reducedMotion()) {
+            topbar.progress(1);
+          } else {
+            topbar.progress(0);
+            if (options.autoRun) {
+              (function loop() {
+                progressTimerId = window.requestAnimationFrame(loop);
+                topbar.progress(
+                  "+" + 0.05 * Math.pow(1 - Math.sqrt(currentProgress), 2)
+                );
+              })();
+            }
           }
         }
       },
@@ -111,6 +125,11 @@
         if (progressTimerId != null) {
           window.cancelAnimationFrame(progressTimerId);
           progressTimerId = null;
+        }
+        if (reducedMotion()) {
+          canvas.style.opacity = 0;
+          canvas.style.display = "none";
+          return;
         }
         (function loop() {
           if (topbar.progress("+.1") >= 1) {
