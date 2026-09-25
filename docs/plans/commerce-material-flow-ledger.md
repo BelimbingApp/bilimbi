@@ -1,187 +1,190 @@
 # docs/plans/commerce-material-flow-ledger.md
 
-**Status:** Proposed
-**Last Updated:** 2026-08-16
-**Sources:** Client meeting notes, LDPE foam plant (2026-08-15);
-`docs/architecture/0010_composition-model.md`;
-`docs/plans/domain-extension-layer-rollout.md`;
-`docs/PORTING_STAGES.md` (S5); `AGENTS.md` §"Future Domains and
-Extensions", §5 schema compatibility; Belimbing
-`app/Domains/Commerce/Inventory` (item master, 3 models)
-**Agents:** claude/claude-opus-5, amp/medium-sol
+**Status:** Proposed customer requirements
+**Last Updated:** 2026-09-25
+**Sources:**
+- Client meeting notes, Mr Packaging Sdn Bhd, Muar LDPE foam plant (2026-08-15)
+- [`docs/plans/inventory/inventory-domain.md`](inventory/inventory-domain.md)
+- [`docs/plans/manufacturing/manufacturing-domain.md`](manufacturing/manufacturing-domain.md)
+- [`docs/plans/domain-extension-layer-rollout.md`](domain-extension-layer-rollout.md)
+- [`docs/architecture/0010_composition-model.md`](../architecture/0010_composition-model.md)
+- [Pull request 800](https://github.com/BelimbingApp/bilimbi/pull/800)
+- [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
+
+**Agents:** claude/claude-opus-5 (earlier work),
+amp/medium-sol (architecture review only), codex/gpt-5 (earlier work),
+codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (this revision),
+claude/claude-opus-5.5 (no-mistakes review agent)
 
 ## Problem Essence
 
-An LDPE foam plant runs its entire material flow on manual records, so no step records what came in against what went out and the mass balance never closes. Loss, theft, supplier short-weighting, and cutting waste are all invisible in the same way: there is no pair of numbers to compare.
+Manual material records do not let Mr Packaging Sdn Bhd explain the gap between what arrived, what production used, and what shipped. Mr Packaging Sdn Bhd manufactures LDPE foam in Muar, Johor.
+
+- Supplier receipts, extrusion, cure, lamination, cutting, packing, and despatch are not connected by reliable material identity.
+- Current records cannot separate short-weighted receipts, material loss, theft, trim, and waste using measured evidence.
+- Foam rolls wait 7–10 days to cure, but their identity, location, and cure age are hard to confirm after the wait.
+- Monthly production forecasts are not consistently tied to cut yield and finished stock.
 
 ## Desired Outcome
 
-Every material step records observed input and output in its native unit with provenance, plus a normalised mass equivalent for reconciliation, so discrepancies surface as attributable numbers rather than suspicions. The plant can answer what arrived from each supplier, what entered and left each production step, how much became product or trim, and what is physically in stock. Append-only, attributable records support audit evidence without claiming that this plan alone satisfies any certification.
+Mr Packaging Sdn Bhd can reconcile a representative month from supplier receipt to shipped pack with clear measurements and a light data-entry flow.
 
-## Context that shapes the design
-
-The plant extrudes LDPE foam for packaging in three fixed colours, blending roughly 30% recycled material with virgin resin. Material passes through extrusion, a 7–10 day cure, lamination, cutting to width, packing, and shipping. Two extruders run 24 hours, typically five days at a stretch, then stop when finished goods have nowhere to go. Production runs to a monthly forecast rather than to order.
-
-Three facts constrain the design more than any feature request:
-
-- **Units change shape at every step.** Material arrives as weight, becomes geometry as rolls, and leaves as counted pieces. Reconciliation is impossible without a recorded conversion basis; this is the central modelling problem, not the scanning.
-- **Labour is the binding constraint.** The plant cannot reach higher certification because it lacks people, and one new hire is the entire capacity for driving this. Any capture step that is not one scan plus at most one number will be abandoned.
-- **Identity must survive ten days of cure.** A roll sits for 7–10 days between production and its next step, so its label is a physical object in a dusty plant, and cure age is itself a production rule.
+- A clerk records each lorry's declared and measured weight, including gross, tare, and net.
+- An operator labels each foam roll and can find its location and cure age.
+- Each production step records its input, output, product, trim, waste, and measurement source.
+- A monthly view explains material balance and variance by supplier, run, operation, resource, location, and period.
+- `MrPackaging` contains only confirmed customer behaviour that the common Domains cannot express through their public contracts and configuration.
 
 ## Top-Level Components
 
-- **Stock ledger** — append-only movements over identified material units, with locations and quantities. Generic; no manufacturing knowledge. Owned by the stock module.
-- **Lot and unit identity** — durable identity for a bag, a roll, or a pack, with parent/child links across transforms so a finished pack traces back to an extruder run and to a recycle receipt.
-- **Receiving and weigh tickets** — supplier, vehicle, gross/tare/net, tied to the movement that creates the lot.
-- **Production steps** — extrusion runs with blend composition and measured roll output; cure ageing with a minimum-age gate; lamination; cutting against a plan. Owned by the process module and scoped honestly to sheet-goods manufacturing.
-- **Cut planning and trim accounting** — matching measured roll widths to widths from the confirmed demand source, with offcut recorded as an explicit output.
-- **Capture surface** — printed labels and scanning, plus the small number of manual measurements that cannot be automated.
-- **Reconciliation reporting** — expected against actual per step, per supplier, per run.
+This is the customer requirements plan for Mr Packaging Sdn Bhd. Shared design is defined once in [`inventory-domain.md`](inventory/inventory-domain.md) for Inventory/Stock and [`manufacturing-domain.md`](manufacturing/manufacturing-domain.md) for Manufacturing; this plan records what the Muar operation needs from those Domains.
+
+- **Inventory/Stock module** — records item and location, native quantity and unit, declared or measured evidence, roll identity, warehouse movements, production effects, and ancestry for the Muar operation. Warehouse receipts and ordinary warehouse movements post directly through Stock.
+- **Manufacturing Product Definition and Production Execution modules** — Product Definition defines the foam products, routings, and cure minimum. Production Execution records actual extrusion and conversion work, enforces the cure hold, and presents production trace over Stock genealogy. Production commands and production-history imports use its execution/import contract; as Stock's registered posting authority, it posts Stock effects atomically with execution and any required override evidence.
+- **`MrPackaging` Extension** — owns a confirmed customer integration or workflow only when the public contracts and Manufacturing configuration cannot express it.
+
+## Customer Requirements
+
+### Receiving and weighing
+
+The receiving flow needs to show what the supplier declared and what the plant measured.
+
+- Supplier, lorry or vehicle, material, receiving location, date, and clerk.
+- Supplier-declared weight and measured gross, tare, and net weight.
+- Native weight unit, source of each value, and the difference between declared and measured quantity.
+- A receipt remains identifiable when material moves from receiving to storage or production.
+
+### Blend and extrusion
+
+The extrusion record needs to identify the blend and each resulting roll.
+
+- Virgin resin and roughly 30% recycled material, subject to confirmation at the plant.
+- Three fixed foam colours, the extruder, production run, date and time, and the selected recipe and routing.
+- One identity for each roll, with measured width, thickness, and length.
+- Inputs, output quantities, and any measured or reported variance.
+
+### Cure and roll handling
+
+A roll's production time must remain available while it waits for the next step.
+
+- Record where each roll is stored and when it was produced.
+- Show elapsed cure age against the configured minimum, which is expected to be within a 7–10 day window and must be confirmed by product.
+- Refuse under-cured consumption by default. An authorised override needs an explicit Base Authz capability and a mandatory reason, and keeps actor, time, reason, and affected roll as an immutable record.
+- Keep cure duration and process gates as Manufacturing configuration; add `MrPackaging` only for a proven behaviour that configuration cannot express.
+
+### Lamination, cutting, packing, and despatch
+
+Conversion records need to account for both saleable output and the material that did not become product.
+
+- Link input rolls to lamination and cutting work, including the demand source and target width.
+- Record actual product, trim or offcut, waste, operator, and yield.
+- Keep monthly forecast as the current demand source; confirm it before building order matching or backlog assumptions.
+- Record finished-pack identity, quantity and unit, destination, shipment identity, and terminal movement.
+- A known 1200 mm input cut to 800 mm should show product, trim, waste, and attributable yield.
+
+### Reconciliation and trace
+
+Monthly reports need to explain the material balance without replacing the shared Stock account.
+
+- Compare expected and actual input, output, product, trim, waste, and stock by supplier, operation, run, resource, location, and period.
+- Separate measured, declared, counted, and derived quantities; show the conversion basis used for any normalised mass.
+- Preserve every observed quantity. When a transformation's measured and derived quantities differ, record a mandatory variance with its source evidence and reconciliation basis; a balanced ledger does not imply that measurements agree.
+- Show the affected receipt, roll, run, or finished pack for each unexplained variance.
+- Trace a shipped pack backward to its roll, production run, and supplier receipt; trace a receipt forward to its descendants.
+- Retain original records. A correction is a new compensating movement with a reason, not an edit or delete.
 
 ## Design Decisions
 
-### Quantity model
+### Identify every roll
 
-**Option A — mass only.** Every movement is recorded in kilograms; geometry (width, thickness, length) is an attribute of the unit, and area or piece counts derive from a recorded density per formulation. Reconciliation is arithmetic on a single unit end to end, but inferred mass becomes indistinguishable from observed mass.
+Cure age and cut yield attach to individual rolls, not just to an extrusion run.
 
-**Option B — geometry only.** Movements are recorded in area or linear metres, with mass as an attribute. This matches rolls and cuts but makes weight-based receiving and blending depend on reverse conversions.
+- **Option A — identify only the production run:** fewer labels, but staff cannot distinguish rolls with different locations, cure times, or yields.
+- **Option B — give every roll a durable label:** adds a scan at roll handling, but supports storage, cure, and conversion trace.
+- **Option C — automate identification with RFID or line sensors:** reduces scanning, but requires equipment and plant coverage before the workflow is proven.
+- **Recommendation — Option B:** use a replaceable barcode label first; validate that it survives the 7–10 day cure and normal handling.
 
-**Option C — native observations plus normalised mass.** Record the observed quantity in its native unit, how it was obtained, the versioned conversion basis, and a normalised mass equivalent. This preserves measurement truth while providing one reconciliation basis.
+### Roll out the workflow in stages
 
-**Recommended: C.** Mass remains the reconciliation basis but never appears as an observed fact when it was derived. A roll captured as width, thickness, and length has an inferred mass; its variance therefore reflects density assumptions and measurement error as well as possible material loss.
+The plant should prove the material record before replacing every paper or spreadsheet workflow.
 
-Every quantity therefore records four things: the **native observed quantity and unit**, how it was obtained — **measured, declared, counted, or derived** — the **conversion basis and its version** where one was applied, and a **normalised mass equivalent** for reconciliation. Mass stays the basis on which the plant's books balance; provenance is what makes a variance report worth reading, because a discrepancy traceable to derived quantities is a measurement problem and a discrepancy between two measured quantities is a material problem.
-
-This also makes the plant's selling unit largely irrelevant to the ledger, which removes the dependency that previously blocked Phase 1.
-
-### Module ownership
-
-The composition model settles the classification before the options are weighed. Stock is a standalone business capability, as is the sheet-goods process covering extrusion runs, cure ageing, lamination, and cutting to width, so both are Domains. An Extension would instead adapt an existing capability; it may be public or private, reusable or bespoke, and owned by anyone. Nothing currently identified requires one.
-
-**Option A — two cohesive Domains.** A stock repository owns items, lots, locations, and movements; a sheet-goods process repository owns runs, transforms, cure ageing, and cut planning and depends on the stock Domain's public capability. Each can currently contain one principal module. A company needing only warehouse stock mounts only the stock repository; a sheet-goods application mounts both. Every valid module in each mounted repository participates.
-
-**Option B — one combined Domain.** Ledger and process ship together. Fewer boundaries and a simpler dependency graph, but every company that only warehouses and sells acquires extrusion and cure concepts to get a stock position, and a second manufacturer wanting a different process gets the first one's steps regardless.
-
-**Option C — stock Domain, process Extension.** The shape of an earlier draft of this plan. Rejected because sheet-goods processing has standalone business meaning rather than adapting stock. Visibility, reuse, ownership, and licensing do not determine the layer.
-
-**Recommended: A.** Optional selection occurs by mounting the two cohesive Domain repositories as ordinary independent nested Git repositories under `apps/`. The split preserves stock as a standalone capability without introducing finer module-level selection. The sheet-goods Domain declares its dependency on stock, and composition validates all participating modules and their dependency graph.
-
-No Extension is invented for Phases 1–6. If a later requirement adapts stock or sheet-goods behavior through a supported contract, it can become an Extension regardless of whether it is public or private.
-
-### Capture mechanism
-
-**Option A — barcode labels and handheld scanners.** Cheap, printable on site, replaceable when damaged, and every touchpoint here already has a person handling one unit at a time.
-
-**Option B — RFID.** Earns its cost with bulk or no-line-of-sight reads. Neither applies: material moves unit by unit through human hands. Tag cost per roll is material given the volumes, and the plant environment is flammable-rated, which complicates reader placement.
-
-**Option C — infrared width scanning at the extruder.** Removes one manual measurement, and was raised in the meeting. It is a capital purchase solving the smallest part of the width problem; the loss comes from cutting the wrong widths, not from mis-measuring them.
-
-**Recommended: A, with C explicitly deferred.** Barcode plus a typed measured width at extruder output captures nearly all the available value at nearly no capital cost. Automatic width measurement becomes worthwhile only once the cut planning it feeds is proven to work.
-
-### Roll identity granularity
-
-Label each roll individually rather than labelling the run. Per-roll identity is what makes cutting yield computable, since yield is a property of a roll's measured width against what was cut from it, and it is the only way a ten-day cure gate can be enforced per unit. A run-level label would collapse exactly the distinction the plant is losing money on.
+- **Option A — launch receiving, production, cutting, and despatch together:** gives broad coverage quickly, but makes gaps hard to isolate.
+- **Option B — start with receipt and weighing, then add roll/cure, production, conversion, and reconciliation:** exposes measurement and label issues before later steps depend on them.
+- **Option C — replace all paper records before source and measurement checks:** simplifies training later, but risks losing a useful bridge before the new flow is trusted.
+- **Recommendation — Option B:** keep paper or spreadsheet examples during transition until the measured workflow reconciles.
 
 ## Public Contract
 
-- Movements are append-only. Corrections are compensating movements carrying a reason and a reference to what they correct; nothing is deleted or edited in place. This supports audit evidence; whether it satisfies a particular certification depends on controls this plan does not yet cover — authorisation, timestamp integrity, correction procedure, retention, backup, calibration, and record review — so no claim is made that append-only records alone are ISO evidence.
-- **The transaction, not the movement, is the unit of record.** A transaction is immutable and contains balanced entries naming both source and destination; a movement that names one location cannot establish conservation or a stock position. Nothing is written as a lone half-entry.
-- Every entry names its step, its material unit, its native quantity and unit, its provenance, its location, its actor, and its tenant.
-- A transform consumes input units and produces output units in one transaction, linking parent to child. A transform that does not balance within a configured tolerance is recorded together with its variance rather than rejected — the plant must be able to record reality, and an unexplained variance is the product, not an error to suppress.
-- The ledger states its behaviour for **idempotent submission** (a re-sent capture does not double-post), **concurrent consumption** (the same quantity cannot be consumed twice), **backdating** (an entry recorded late carries both its effective and recorded times), and **reversal** (a compensating transaction, never a delete). These are contract, not implementation detail.
-- Trim and waste are output units with their own identity, not an unrecorded difference between input and output.
-- Lot ancestry is queryable in both directions: from a shipped pack back to its recycle receipts, and from a supplier receipt forward to everything it became.
-- The stock module exposes no manufacturing concepts. It knows units, quantities, locations, and transforms; it does not know what an extruder or a cure is. The process module reaches it only through its public API, under a dependency declared in its descriptor.
-- The process module is named for the industry it actually serves — sheet goods — rather than presented as a general manufacturing engine. Cure duration, tolerance, and cut rules are configuration rather than hardcoded foam values, but generalisation beyond sheet goods waits for a second real variation. A configurable engine designed from one example is a guess with extra surface area.
-- The stock Domain installs and runs with the sheet-goods Domain absent. A company that only warehouses and sells never acquires a cure step.
-- Cure gating refuses under-aged consumption by default. An override requires an explicit Base Authz capability and a mandatory reason, and records the actor, time, reason, and affected unit as an immutable nonconformance.
+Mr Packaging Sdn Bhd needs the shared Domains to support these customer-facing results.
+
+- Receiving captures supplier, vehicle, material, location, actor, date, declared weight, measured gross/tare/net, and variance.
+- Production captures blend, colour, extruder, run, time, and each roll's measured dimensions.
+- Roll handling shows identity, location, age, configured cure minimum, and any authorised override.
+- Conversion captures input rolls, demand source, target width, product, trim, waste, operator, and yield.
+- Despatch captures pack identity, quantity, unit, destination, shipment, and material movement.
+- Warehouse receipts and ordinary warehouse movements post through Stock; extrusion and other production commands or production-history imports use Manufacturing's execution/import contract so the execution and Stock effects commit together.
+- A transform preserves measured input and output values, and records any difference as a provenance-backed variance rather than altering observations.
+- Reconciliation reports by operation, execution, supplier, resource, location, period, and order or batch when one exists.
+- A retry does not duplicate a movement, two users cannot consume the same available quantity, late entry preserves effective and recorded times, and correction adds a new transaction with a reason.
+- Missing measurements stay visibly unknown; the application does not present a derived value as measured evidence.
 
 ## Phases
 
-Phase 1 is a vertical slice deliberately narrower than the substrate beneath it. An earlier draft built a general transform ledger with bidirectional ancestry before the plant saw anything, which risks constructing a manufacturing substrate before adoption is validated. Receiving is the highest-value, lowest-dependency workflow: it needs nothing upstream of itself and it addresses the loss the plant can measure today.
+### Inventory/Stock module
 
-### Phase 1 — Receiving, end to end
+#### Phase 1 — Receiving and weighing
 
-Goal: a receiving clerk records an arriving lorry in one screen, and a supplier's history of declared against measured weight is visible without further work.
+- [ ] Confirm where weighing happens and which clerk records supplier, vehicle, material, and location.
+- [ ] Confirm weight units and capture declared weight plus measured gross, tare, and net.
+- [ ] Post one representative lorry receipt through Inventory/Stock and show the supplier variance.
+- [ ] Keep the receipt traceable as it moves into storage or production.
 
-- [ ] Port Belimbing's canonical item master into the stock module, preserving
-  its schema under `AGENTS.md` §5.
-- [ ] Establish durable receiving and warehouse locations used by receipts and stock positions.
-- [ ] Record weigh tickets with supplier, vehicle, gross, tare, and net.
-- [ ] Capture declared weight alongside measured weight so the difference is a stored fact, each carrying its provenance.
-- [ ] Post receipts as balanced immutable transactions, in the shape Phase 2 generalises rather than a shape it will replace.
-- [ ] Show a received stock position by material and location.
-- [ ] Report per-supplier declared-versus-measured variance over time.
+Validation: a clerk records a lorry in one flow and can explain the source of every recorded weight.
 
-Assumptions: the stock Domain is mounted as an independent repository under `apps/` and discovered through the composition model before this slice is built.
-Validation: variance report over seeded receipts with known discrepancies; a clerk completing a real lorry in one screen.
+#### Phase 2 — Roll labels and storage locations
 
-Deferred from this phase: landed recycle cost against virgin resin. It needs purchase price, currency, freight, and possibly duty — none of which any module owns yet. Valuable, but it is a costing feature wearing a receiving disguise.
+- [ ] Confirm label material, placement, survivability, and network coverage at the plant.
+- [ ] Set up the cure-storage locations and the unit identity that roll labels will carry.
+- [ ] Prove a test label can be scanned and moved between locations as an ordinary warehouse movement.
 
-### Phase 2 — Ledger foundation
+Validation: a labelled unit can be located through Stock after a physical move, without any production posting.
 
-Goal: any step's input and output can be recorded as one balanced transaction, and a stock position or lot ancestry can be read back, with no manufacturing concept present in the module.
+### Manufacturing Product Definition and Production Execution modules
 
-- [ ] Add material unit identity with parent/child ancestry across transforms.
-- [ ] Extend locations from receiving and warehouse into WIP, cure, and finished goods.
-- [ ] Generalise Phase 1's receipts into transactions of balanced entries carrying native quantity, unit, and provenance.
-- [ ] Add the transform operation consuming inputs and producing outputs in one transaction, recording variance.
-- [ ] Implement the contract's idempotency, concurrent-consumption, backdating, and reversal behaviour.
-- [ ] Expose stock position and lot ancestry as public read models.
+#### Phase 3 — Blend, extrusion, and cure
 
-Validation: tenant boundary, append-only enforcement, ancestry traversal, and double-consumption tests; `mix precommit` green.
+- [ ] Confirm blend proportions, colours, measured dimensions, and applicable cure minimum with plant staff.
+- [ ] Configure foam process families, routes, output roles, conversion bases, and cure gates as Manufacturing data.
+- [ ] Record an extrusion execution that consumes the received material and creates each labelled roll with its identity, production time, and dimensions.
+- [ ] Prove that each roll traces to its input receipt through Stock genealogy and can be located after the physical cure delay.
+- [ ] Verify the default hold for under-cured material and the authorised override evidence.
+- [ ] Add `MrPackaging` only if on-site proof identifies behaviour beyond the generic configuration and public contracts.
 
-### Phase 3 — Roll identity, extrusion, and the process module
+Validation: an operator can identify each roll, trace it to its receipt, see its cure age, and explain any consumed under-cured roll.
 
-Goal: every roll leaving an extruder carries a scannable label recording its measured width, thickness, and production date, and that label still resolves after ten days in cure.
+#### Phase 4 — Lamination, cutting, packing, and despatch
 
-- [ ] Mount the cohesive sheet-goods Domain repository under `apps/` with its principal process module and declared dependency on the stock Domain. Extrusion output and blend composition belong here, not in stock.
-- [ ] Create roll units at extrusion output with measured width, thickness, and length, each recorded as measured rather than derived.
-- [ ] Generate and print barcode labels carrying the durable unit identity and production date.
-- [ ] Scan-to-locate: resolve a scanned label to its unit, location, and cure age.
-- [ ] Record blend composition per extruder run, including recycle proportion.
+- [ ] Confirm the demand source before building matching; do not assume sales-order backlog.
+- [ ] Configure lamination, cutting, packing, and despatch routes and resources.
+- [ ] Record product, trim/offcut, and waste as identified outputs and report yield per roll and run.
+- [ ] Trace a finished pack to its roll and receipt, then trace the receipt forward.
 
-Risks: label survivability over a 7–10 day cure in plant conditions is a physical unknown; trial on a small run before the process depends on it.
+Validation: the known 1200 mm to 800 mm cut and a representative shipment reconcile to identified material.
 
-### Phase 4 — Demand source, then cut planning
+#### Phase 5 — Monthly reconciliation and customer acceptance
 
-Goal: a cutting operator is shown which demand a given roll should serve, and every millimetre of that roll is accounted for as product or as trim.
+- [ ] Report expected and actual quantities by supplier, operation, resource, location, and period.
+- [ ] Separate measured differences from derived-measurement uncertainty and show each unexplained discrepancy.
+- [ ] Verify duplicate-safe retries, concurrent consumption, late entry, reversal, tenant scope, and append-only correction.
+- [ ] Record any `MrPackaging` behaviour as a specific public-contract gap before adding Extension code.
+- [ ] Confirm a representative month with the customer and retain the source evidence for each reported total.
 
-- [ ] Establish where demand comes from before building any matching: sales orders, monthly forecast lines, manual cutting batches, or finished-goods replenishment targets. The plant runs to monthly forecast rather than to order, so "outstanding ordered widths" is not a source that exists — an earlier draft assumed it did.
-- [ ] Record cut output units and trim units as explicit outputs of one transaction.
-- [ ] Report yield per roll, per run, and per operator.
-- [ ] Propose a cut plan against the demand source established above.
-- [ ] Flag rolls cut materially below their achievable yield.
-
-Goal note: the meeting's example — a 1200mm roll cut to 800mm, losing a third — should appear as a specific, attributable number. Yield reporting is useful before planning exists, so it is ordered first.
-
-### Phase 5 — Cure gating, lamination, and despatch
-
-Goal: an under-cured roll cannot be consumed by accident, and can be consumed deliberately with the reason recorded.
-
-- [ ] Warn and refuse by default when a roll is below the configured minimum cure age.
-- [ ] Allow an authorised override carrying a mandatory reason, retained as a nonconformance record. A hard block invites bypass: if production physically proceeds anyway, an absolute refusal teaches operators to work around the system and the records stop describing reality.
-- [ ] Record lamination as a transform combining rolls into a laminated unit.
-- [ ] Record packing into finished-goods units with their sales identity.
-- [ ] Record despatch as the terminal transaction.
-
-### Phase 6 — Reconciliation
-
-Goal: a monthly reconciliation shows input, output, and accounted loss per step, separating material loss from measurement error.
-
-- [ ] Per-step expected-against-actual reconciliation across a date range.
-- [ ] Split variance by provenance, so a discrepancy between measured quantities reads differently from one involving derived quantities.
-- [ ] Unexplained variance report ranked by magnitude.
-- [ ] Lot traceability report from despatch back to receipts.
-- [ ] Density per formulation maintained as reference data with change history and versioned conversion bases.
+Validation: Mr Packaging Sdn Bhd can reconcile a representative month and carry each unresolved difference as an open investigation.
 
 ## Open Assumptions
 
-Work proceeds on these unless corrected; each is recorded because being wrong about it changes the design rather than the schedule.
-
-- **Selling unit is unconfirmed, and no longer blocking.** Recording native quantity plus provenance, with mass as the reconciliation basis, means the plant's pricing unit does not decide the ledger's shape. It still needs confirming for pricing and packing.
-- **Site validation is outstanding.** Label survivability, where weighing actually happens on the floor, network coverage at each capture point, the real demand source, and the applicable certification requirements all need checking on site before Phases 3 to 6 are committed to.
-- **No adaptation is identified**, so no Extension is named here. Domain classification follows standalone business meaning, not whether a capability is public, private, reusable, bespoke, or client-owned. If later work adapts stock or sheet-goods behavior, that adaptation may live in its own public or private Extension repository mounted under `apps/`.
-- **Domain and module names are unsettled.** `commerce` currently echoes Belimbing's arrangement for the stock capability, but a ledger serving manufacturers may deserve a name closer to what it owns; the sheet-goods Domain and its principal process module also need durable names. Repository selection does not remove the cost of renaming stable module and OTP application identities later.
-- **AutoCard is assumed to be replaced, not integrated.** No import or synchronisation work is planned. If it must survive, an integration phase is added and Phase 2 changes shape.
-- **Interim manual process.** The plant has no system until the composition proof passes and the stock Domain's receiving slice is available. A paper or spreadsheet weigh-ticket and cut-yield discipline started now would both deliver value immediately and produce a data shape to validate Phases 2 and 4 against. This is a client-side decision recorded here so it is not lost.
+- Selling and packing units remain unconfirmed for pricing; they do not block native measurements in the ledger.
+- Label survivability, weighing locations, network coverage, demand source, and certification scope need on-site validation.
+- AutoCard is assumed replaced rather than integrated; confirm this before any import or synchronization work.
+- Paper or spreadsheet weigh tickets and cut-yield records may provide known examples during rollout.
+- This plan supports evidence and traceability; it does not claim ISO 9001, ISO 14001, ISO 45001, or customer certification.

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-A plan is the **whiteboard** of a live discussion: capture what's agreed and why so future readers see it. `docs/plans/` is the in-repo single source of truth, the **status surface** (no parallel observability doc). Early on it holds intent; as the *how* firms up it **becomes the task list** (Phases checklists) in place. Plans should let a capable agent work autonomously after the user says to build: record contracts, invariants, coordination state, and proof of done rather than line-by-line instructions. **Prose only** for design — no code/patches/full-file dumps. Recommendation-driven copy, stable section names, a preamble for quick orientation.
+A plan is the **whiteboard** of a live discussion: capture what's agreed and why so future readers see it. `docs/plans/` is the in-repo single source of truth, the **status surface** (no parallel observability doc), and the coordination sheet when work spans agents or sessions. Early on it holds intent; as the *how* firms up it **becomes the task list** (Phases checklists) in place. Plans should let a capable agent work autonomously after the user says to build: record contracts, invariants, coordination state, and proof of done rather than line-by-line instructions. **Prose only** for design — no code/patches/full-file dumps. Recommendation-driven copy, stable section names, a preamble for quick orientation.
 
 ## Problem first
 
@@ -16,7 +16,8 @@ In **Design Decisions**: name 2–3 real options, weigh trade-offs plainly, then
 2. When asked, the agent records a coherent plan on an md file — recommendations and tradeoffs stated plainly, not questionnaires or "Decision Needed" dumps.
 3. On user reaction, describe the proposed revision in the md file (short prose, naming affected sections + follow-on edits). Exempt: trivial mechanical fixes the user already specified.
 4. **HALT** — wait for explicit approval before implementing.
-5. A plan is the parent record; the active task queue is one or more GitHub issues. Each issue is a logical grouping of phases and is the operative work item for an agent. Plans are not the execution unit unless no issue exists.
+5. **Never commit/push unless asked.** When asked, treat that approval as single-use and limited to the already-implemented changes currently under discussion; later work needs a fresh explicit commit/push instruction. Add the agent as co-author with the model used.
+6. A plan is the parent record; the active task queue is one or more GitHub issues. Each issue is a logical grouping of phases and is the operative work item for an agent. Plans are not the execution unit unless no issue exists.
 
 Session/tool-only plans are fine as scratch **only** if mirrored here. Anyone opening the plan should see design, current phase, done vs open (checkboxes), and what changed.
 
@@ -39,13 +40,13 @@ Because plans may be implemented by different agents, leave an accurate handoff:
 
 **Title:** the filename/path (optional lone `#` matching it). No filler "Plan"/"Notes" sections.
 
-**Preamble** (substantive plans): **Status**, **Last Updated** (`YYYY-MM-DD`), **Sources** (issue numbers/URLs/ADRs/parent plans/paths, or `None`), **Agents** (`{agent}/{model}` contributors, kept current).
+**Preamble** (substantive plans): **Status**, **Last Updated** (`YYYY-MM-DD`), **Sources** (issue numbers/URLs/ADRs/parent plans/paths, or `None`; one bullet per source when there are more than two), **Agents** (`{agent}/{model}` contributors, kept current).
 
 Status describes current reality; it is not a permission gate. Keep it short and action-oriented, for example `Proposed`, `In progress`, `Complete`, or `Superseded`. When GitHub issues exist, include the issue numbers in **Sources** so the plan remains traceable to the executing work items.
 
 **Body** — use a section only when it has real content; flow intent → system → why → contract → execution; never open with low-level tasks:
-1. **Problem Essence** (required) — 1–2 sentences.
-2. **Desired Outcome** (required) — what "done" achieves.
+1. **Problem Essence** (required) — open with a plain 1–2 sentence verdict that says why it is a problem (for example "A runtime that updates itself is a bad idea."), then list the concrete problems as bullets. No hedged framing; state the claim, then the evidence.
+2. **Desired Outcome** (required) — open with a plain 1–2 sentence statement of what changes and why that is better, then list what "done" achieves as bullets.
 3. **Top-Level Components** — nameable responsibilities.
 4. **Design Decisions** — 2–3 real options, trade-offs, recommended direction, and why it wins under root `AGENTS.md`.
 5. **Public Contract** — surface/promises once clear.
@@ -77,6 +78,8 @@ Write tasks as observable outcomes. Use stable anchors such as classes, methods,
 - No solution-first or feature-first plans before **Problem Essence** and **Desired Outcome**.
 - No observability-only sections duplicating this doc.
 - No plan kept only in session state unless explicitly asked.
+- No autopush/autocommit.
+- No treating a prior commit request as standing permission for later work.
 - No stale or contradictory content.
 - No prose-only **Phases** when steps are concrete — use checkboxes.
 - No code in the plan.

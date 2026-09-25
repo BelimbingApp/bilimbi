@@ -1,13 +1,25 @@
 # docs/plans/domain-extension-layer-rollout.md
 
 **Status:** Proposed — Phase 1 must prove the composition model
-**Last Updated:** 2026-08-16
-**Sources:** `docs/architecture/0010_composition-model.md`; review by sol
-(2026-08-16); ADR 0003 physical deep-module packages; ADR 0004 module
-contribution contract; `docs/PORTING_STAGES.md` (S5, S6,
-stage-change rule); `AGENTS.md` §4; `apps/base/module_registry/`; sibling
-plan `docs/plans/commerce-material-flow-ledger.md`
-**Agents:** claude/claude-opus-5, amp/medium-sol
+**Last Updated:** 2026-09-25
+**Sources:**
+- `docs/architecture/0010_composition-model.md`
+- Review by sol (2026-08-16)
+- ADR 0003 physical deep-module packages
+- ADR 0004 module contribution contract
+- `docs/PORTING_STAGES.md` (S5, S6, stage-change rule)
+- `AGENTS.md` §4
+- `apps/base/module_registry/`
+- [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
+- Sibling plan `docs/plans/inventory/inventory-domain.md`
+- Sibling plan `docs/plans/manufacturing/manufacturing-domain.md`
+- Customer plan `docs/plans/commerce-material-flow-ledger.md`
+- Customer plan `docs/plans/manufacturing/sbg-requirements.md`
+
+**Agents:** claude/claude-opus-5 (earlier work),
+amp/medium-sol (architecture review only), codex/gpt-5 (earlier work),
+codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (this revision),
+claude/claude-opus-5.5 (no-mistakes review agent)
 
 ## Problem Essence
 
@@ -152,26 +164,56 @@ Goal: turn the successful proof into the smallest maintained implementation.
 
 ### Phase 3 — First real Domains
 
-Goal: stock and sheet-goods repositories behave exactly like the disposable
-Domain proved in Phase 1.
+Goal: Inventory/Stock and the Manufacturing / Production Operations Domain
+behave exactly like the disposable Domain proved in Phase 1.
 
-- [ ] Create the stock Domain as an independent repository with one cohesive
-  initial module.
-- [ ] Create the sheet-goods Domain as an independent repository with a
-  declared dependency on stock's public contract.
+- [ ] Create Inventory/Stock as an independent repository with its initial
+  module, following `docs/plans/inventory/inventory-domain.md`.
+- [ ] Create the Manufacturing / Production Operations Domain as an
+  independent repository with its first Product Definition and Production
+  Execution modules and a declared dependency on Inventory/Stock's public
+  contract, following `docs/plans/manufacturing/manufacturing-domain.md`.
+  Planning, Maintenance, and Costing stay later modules until an owner
+  confirms them. Production Execution registers as Stock's production
+  posting authority, and its trace read model holds only Manufacturing-side
+  views, such as which run, step, and resource produced or consumed a lot; it
+  reads Inventory/Stock's public ancestry/genealogy contract and stores no
+  genealogy of its own.
 - [ ] Prove either repository can be absent when no mounted dependent requires
-  it, and prove a missing stock dependency fails composition.
-- [ ] Begin the vertical slices in
-  `docs/plans/commerce-material-flow-ledger.md` only after the repository and
-  migration path works end to end.
+  it, and prove a missing Inventory/Stock dependency fails composition.
+- [ ] Begin Inventory/Stock module work in
+  `docs/plans/inventory/inventory-domain.md` when its repository and migration
+  path work end to end.
+- [ ] Begin Product Definition and Production Execution module work in
+  `docs/plans/manufacturing/manufacturing-domain.md` when its repository and
+  Stock dependency work end to end.
+- [ ] Begin Mr Packaging Sdn Bhd's customer requirements in
+  `docs/plans/commerce-material-flow-ledger.md` only after the
+  generic Domain slice is available; mount the `MrPackaging` Extension only
+  for a confirmed public-contract adaptation.
+- [ ] Begin SBG's adhesive-tape requirements in
+  `docs/plans/manufacturing/sbg-requirements.md` only after the generic Domain
+  slice is available; mount the `SbGroup` Extension only for a confirmed
+  public-contract adaptation.
 
 ### Phase 4 — First real Extension
 
-Goal: prove adaptation through a supported contract when a real requirement
-exists.
+Goal: prove `MrPackaging` and `SbGroup` adapt through supported contracts when
+real requirements exist.
 
 - [ ] Mount an Extension only when an actual Platform or Domain adaptation is
   identified; do not invent one merely to populate the layer.
+- [ ] Keep foam, glue, coating, and slitting process families, cure data, and
+  ordinary process configuration in the generic Manufacturing Domain.
+  `MrPackaging` holds only confirmed Mr Packaging Sdn Bhd behaviour that
+  common configuration and public contracts cannot express. `SbGroup` holds
+  SBG-specific planning, procurement, inventory-value needs, and AX integration.
+  For QAC, the future Quality capability owns cases, evidence, and corrective
+  actions; `SbGroup` supplies only SBG policy, AX mapping and integration, and
+  presentation through Quality's public contract. Neither Extension owns the
+  common ledger, genealogy, units of measure, or execution semantics. AX
+  production history passes through Manufacturing's execution/import contract;
+  warehouse receipts and ordinary movements may post directly to Stock.
 - [ ] Keep its ownership, visibility, and licensing independent of its
   architectural role.
 - [ ] Prove the application remains complete with the Extension absent and
