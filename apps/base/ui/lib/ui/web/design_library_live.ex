@@ -233,6 +233,10 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> put_flash(:info, gettext("Preview value updated."))}
   end
 
+  def handle_event("save_description", %{"description" => _description}, socket) do
+    {:noreply, put_flash(socket, :info, gettext("Preview value updated."))}
+  end
+
   def handle_event("preview-combobox-cancel", _params, socket) do
     {:noreply, put_flash(socket, :info, gettext("Inline edit cancelled."))}
   end

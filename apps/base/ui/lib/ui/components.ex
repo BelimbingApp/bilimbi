@@ -3027,6 +3027,7 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:cancel_event, :string, default: "cancel_edit_field")
   attr(:allow_empty, :boolean, default: false)
   attr(:rows, :integer, default: 4)
+  attr(:autofocus, :boolean, default: true)
   attr(:status, :any, required: true)
   attr(:class, :any, default: nil)
   attr(:input_class, :any, default: nil)
@@ -3082,7 +3083,7 @@ defmodule Bilimbi.Base.UI.Components do
           aria-label={@label}
           aria-describedby={@status && "#{@id}-status"}
           aria-invalid={match?({:error, _}, @status) && "true"}
-          phx-mounted={Phoenix.LiveView.JS.focus()}
+          phx-mounted={@autofocus && Phoenix.LiveView.JS.focus()}
           class={[
             "w-full min-w-0 rounded-md border border-brand-strong bg-surface px-1.5 py-1 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-brand-strong/30",
             @input_class

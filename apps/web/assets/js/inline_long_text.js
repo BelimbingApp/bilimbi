@@ -65,10 +65,10 @@ const InlineLongText = {
   commit() {
     const value = this.inputEl.value
     const allowEmpty = this.el.hasAttribute("data-allow-empty")
-    const field = this.el.dataset.field || "value"
+    const field = this.el.dataset.field
 
     if (value === this.originalValue || (value.trim() === "" && !allowEmpty)) {
-      this.pushEventTo(this.el, this.el.dataset.cancelEvent || "cancel_edit_field", {})
+      this.pushEventTo(this.el, this.el.dataset.cancelEvent, {})
       return
     }
 
@@ -76,7 +76,7 @@ const InlineLongText = {
     this.markSaving()
     this.pushEventTo(
       this.el,
-      this.el.dataset.saveEvent || "save_long_text",
+      this.el.dataset.saveEvent,
       {id: this.el.dataset.id, [field]: value},
       () => this.settle()
     )
@@ -84,7 +84,7 @@ const InlineLongText = {
 
   cancel() {
     this.canceling = true
-    this.pushEventTo(this.el, this.el.dataset.cancelEvent || "cancel_edit_field", {})
+    this.pushEventTo(this.el, this.el.dataset.cancelEvent, {})
     this.settle()
     this.triggerEl?.focus()
   },

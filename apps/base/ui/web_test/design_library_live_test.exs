@@ -835,4 +835,20 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
     assert has_element?(view, "#design-library-inline-choice-read-display")
     assert has_element?(view, "#design-library-inline-choice-edit-select")
   end
+
+  test "inline long-text specimens accept their commit without taking focus on mount", %{
+    conn: conn
+  } do
+    {:ok, view, _html} = open(conn, "/system/design-library/components")
+
+    refute has_element?(view, "#design-library-inline-long-text-edit-input[phx-mounted]")
+    refute has_element?(view, "#design-library-inline-long-text-error-input[phx-mounted]")
+
+    view
+    |> element("#design-library-inline-long-text-edit")
+    |> render_hook("save_description", %{"id" => "x", "description" => "Reviewed preview"})
+
+    assert render(view) =~ "Preview value updated."
+    assert has_element?(view, "#design-library-inline-long-text-edit-input")
+  end
 end
