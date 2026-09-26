@@ -32,6 +32,8 @@ Assert what the running system does. Do not add a test that reads or pattern-mat
 
 For source guard scans and container checks, use `Bilimbi.Base.ModuleRegistry.MixDiscovery`'s validated module and container paths. A fixed `apps/*/*` glob misses mounted Domain and Extension packages. See `module_source_files/2`, `module_route_files/1`, and `container_paths/1` in `apps/base/module_registry/mix/module_discovery.exs`.
 
+A test that runs host tasks such as `bilimbi.migrate` from the umbrella root takes its expected migrations from the root runtime, not from `Compatibility.migration_entries()` in the package VM. The package loads only its own closure, so a mounted Domain's migrations are missing there and the expectations stop matching. `workspace_migration_entries/1` and `MountedDomainFixture` in `apps/core/compatibility/test/` show the pattern.
+
 ## Routes
 
 Let `BilimbiWeb.RouteOverlap` check the compiled router for route conflicts. A route manifest alone misses direct host routes; injected routes carry their descriptor owner and layer in Phoenix route metadata. See `apps/web/lib/bilimbi_web/discovered_routes.ex`.
