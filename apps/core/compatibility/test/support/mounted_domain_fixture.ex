@@ -9,8 +9,10 @@ defmodule Bilimbi.Core.Compatibility.MountedDomainFixture do
 
   Git ignores everything below `apps/domains/`, so the fixture never reaches a
   commit. A marker file tells a stale fixture from a real mounted repository:
-  `mount!/0` removes a fixture a killed run left behind and refuses to touch a
-  directory without the marker.
+  `unmount!/0` removes a fixture a killed run left behind and refuses to touch
+  a directory without the marker. `mount!/0` registers an `on_exit` callback
+  that unmounts the fixture and removes a composition lock overlay the run
+  created, so the checkout returns to its prior state even when a test fails.
   """
 
   @container "e2e_fixture"
@@ -26,7 +28,13 @@ defmodule Bilimbi.Core.Compatibility.MountedDomainFixture do
   def table, do: "e2e_fixture_ledger_rows"
 
   def mount! do
-    unmount!()
+    overlay = Path.join(@workspace_root, ".scratchpad/composition-lock")
+    overlay_existed? = File.exists?(overlay)
+
+    ExUnit.Callbacks.on_exit(fn ->
+      unmount!()
+      unless overlay_existed?, do: File.rm_rf!(overlay)
+    end)
 
     root = container_root()
     module_root = Path.join(root, "ledger")
@@ -102,9 +110,8 @@ defmodule Bilimbi.Core.Compatibility.MountedDomainFixture do
       File.rm_rf!(root)
     end
 
-    for build <- Path.wildcard(Path.join(@workspace_root, "_build/*/lib")),
-        app <- [@container, Atom.to_string(@otp_app)] do
-      File.rm_rf!(Path.join(build, app))
+    for app <- [@container, Atom.to_string(@otp_app)] do
+      File.rm_rf!(Path.join([@workspace_root, "_build/test/lib", app]))
     end
 
     :ok

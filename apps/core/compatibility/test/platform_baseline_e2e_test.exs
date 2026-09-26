@@ -37,10 +37,8 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
     # fixture is not one of them.
     env = if mounted_domain, do: [{"BILIMBI_COMPOSITION_PINNED", nil}], else: []
 
-    if mounted_domain do
-      MountedDomainFixture.mount!()
-      on_exit(&MountedDomainFixture.unmount!/0)
-    end
+    MountedDomainFixture.unmount!()
+    if mounted_domain, do: MountedDomainFixture.mount!()
 
     entries = workspace_migration_entries(env)
 
