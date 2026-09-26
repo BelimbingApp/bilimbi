@@ -170,6 +170,9 @@ Goal: turn the successful proof into the smallest maintained implementation.
 - [x] Include every graph application and its resources in the release.
 - [x] Make migrations and runtime contributions consume the approved graph
   without reconstructing it or creating upward dependencies.
+- [x] Keep an unmounted capability's applied migrations valid: durable
+  migration provenance explains its ledger rows after removal, unexplained
+  versions still fail, and a remount must match what was applied.
 - [ ] Compile Web routes from the same graph and fail collisions before the
   release is produced.
 - [ ] Add boundary tests for absent repositories, invalid graphs, removal, and

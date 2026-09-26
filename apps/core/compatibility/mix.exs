@@ -28,7 +28,7 @@ defmodule Bilimbi.Core.Compatibility.MixProject do
 
   def application do
     application = [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :crypto],
       env: Bilimbi.Base.ModuleRegistry.MixDiscovery.application_env(__DIR__)
     ]
 
