@@ -1368,6 +1368,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
       view |> element("#company-metadata-editor-display") |> render_click()
 
       assert has_element?(view, "dd#company-metadata #company-metadata-editor-input[rows='5']")
+      assert has_element?(view, "#company-metadata-editor-input[phx-mounted]")
 
       # A refusal reports beside the fact and leaves its submitted text open
       # for correction.

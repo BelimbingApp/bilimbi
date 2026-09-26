@@ -83,6 +83,7 @@ defmodule BilimbiWeb.EmployeeShowTest do
 
     view |> element("#employee-job-description-display") |> render_click()
     assert has_element?(view, "#employee-job-description-input[rows='2']")
+    assert has_element?(view, "#employee-job-description-input[phx-mounted]")
 
     render_hook(view, "save_field", %{
       "id" => to_string(employee.id),
