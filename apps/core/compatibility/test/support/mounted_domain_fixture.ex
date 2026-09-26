@@ -1,8 +1,11 @@
 defmodule Bilimbi.Core.Compatibility.MountedDomainFixture do
   @moduledoc """
-  Mounts a throwaway Domain with one Bilimbi-only migration in the real
-  checkout, so a nested `mix` run from the umbrella root compiles and loads it
+  Mounts a throwaway Domain in the real checkout, so a nested `mix` run from the umbrella root compiles and loads it
   as it would a cloned Domain repository.
+
+  Like Factory, the Domain ships a compatible baseline its schema contract
+  requires, numbered after every Platform Bilimbi-only migration, and a
+  Bilimbi-only migration after that.
 
   Git ignores everything below `apps/domains/`, so the fixture never reaches a
   commit. A marker file tells a stale fixture from a real mounted repository:
@@ -12,10 +15,13 @@ defmodule Bilimbi.Core.Compatibility.MountedDomainFixture do
 
   @container "e2e_fixture"
   @otp_app :bilimbi_e2e_fixture_ledger
+  @baseline_version 20_991_231_000_000
   @version 20_991_231_000_001
   @marker ".bilimbi-e2e-fixture"
   @workspace_root Path.expand("../../../../..", __DIR__)
 
+  def baseline_version, do: @baseline_version
+  def baseline_table, do: "e2e_fixture_ledger_entries"
   def version, do: @version
   def table, do: "e2e_fixture_ledger_rows"
 
@@ -46,6 +52,23 @@ defmodule Bilimbi.Core.Compatibility.MountedDomainFixture do
     File.write!(
       Path.join(module_root, "lib/ledger.ex"),
       "defmodule Bilimbi.E2eFixture.Ledger do\nend\n"
+    )
+
+    File.write!(Path.join(module_root, "lib/schema_contract.ex"), schema_contract())
+
+    File.write!(
+      Path.join(migrations, "#{@baseline_version}_create_e2e_fixture_ledger_entries.exs"),
+      """
+      defmodule Bilimbi.E2eFixture.Ledger.Migrations.CreateEntries do
+        use Ecto.Migration
+
+        def change do
+          create table(:#{baseline_table()}) do
+            add :label, :string, null: false
+          end
+        end
+      end
+      """
     )
 
     File.write!(
@@ -99,12 +122,44 @@ defmodule Bilimbi.Core.Compatibility.MountedDomainFixture do
       namespace: Bilimbi.E2eFixture.Ledger,
       dependencies: ["base/database"],
       migrations: "priv/repo/migrations",
-      migration_dispositions: %{@version => :bilimbi_only},
+      migration_dispositions: %{
+        @baseline_version => :compatible_baseline,
+        @version => :bilimbi_only
+      },
       web: nil,
-      schema_contract: nil,
+      schema_contract: Bilimbi.E2eFixture.Ledger.SchemaContract,
       contribution_provider: nil,
       dev_seed: nil
     ]
+  end
+
+  defp schema_contract do
+    """
+    defmodule Bilimbi.E2eFixture.Ledger.SchemaContract do
+      @behaviour Bilimbi.Base.Database.SchemaContract
+
+      @impl true
+      def tables do
+        [
+          %{
+            name: "#{baseline_table()}",
+            columns: %{
+              "id" => %{
+                type: :bigint,
+                nullable: false,
+                default: {:sequence, "#{baseline_table()}_id_seq"}
+              },
+              "label" => %{type: {:varchar, 255}, nullable: false, default: nil}
+            },
+            indexes: %{
+              "#{baseline_table()}_pkey" => %{columns: ["id"], unique: true, where: nil}
+            },
+            foreign_keys: %{}
+          }
+        ]
+      end
+    end
+    """
   end
 
   defp container_mix do
