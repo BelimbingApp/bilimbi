@@ -28,18 +28,7 @@ defmodule Bilimbi.CompositionLock do
     |> Enum.sort()
   end
 
-  def artifact_dir(root) do
-    dir =
-      case System.get_env("BILIMBI_COMPOSITION_LOCK_DIR") do
-        nil -> Path.join(root, ".scratchpad/composition-lock")
-        path -> Path.expand(path, root)
-      end
-
-    if Path.expand(dir) == Path.expand(root),
-      do: Mix.raise("composition lock directory cannot be the Platform root")
-
-    dir
-  end
+  def artifact_dir(root), do: Path.join(root, ".scratchpad/composition-lock")
 
   def pin!(root) do
     root = Path.expand(root)
@@ -168,9 +157,8 @@ defmodule Bilimbi.CompositionLock do
   end
 
   defp revision!(path) do
-    with {top, 0} <-
-           System.cmd("git", ["rev-parse", "--show-toplevel"], cd: path, stderr_to_stdout: true),
-         true <- Path.expand(String.trim(top)) == Path.expand(path),
+    with {"\n", 0} <-
+           System.cmd("git", ["rev-parse", "--show-prefix"], cd: path, stderr_to_stdout: true),
          {revision, 0} <-
            System.cmd("git", ["rev-parse", "HEAD"], cd: path, stderr_to_stdout: true),
          {"", 0} <-
@@ -200,3 +188,4 @@ defmodule Mix.Tasks.Bilimbi.Composition.Lock do
   def run(["--check"]), do: Bilimbi.CompositionLock.check!(File.cwd!())
   def run(_), do: Mix.raise("usage: mix bilimbi.composition.lock --pin | --check")
 end
+

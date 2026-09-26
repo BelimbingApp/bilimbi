@@ -186,9 +186,7 @@ A dependency from another repository must already be mounted.
 The Platform's tracked `mix.lock` is authoritative only when no optional
 repository is mounted. Once any Domain or Extension is mounted, every Mix
 project uses the same ignored `.scratchpad/composition-lock/mix.lock` overlay,
-selected by `mix/composition_lock.exs`. An operator may place this artifact
-elsewhere with `BILIMBI_COMPOSITION_LOCK_DIR`. The Platform lock is the initial
-input for a new overlay; mounted dependency resolution and
+selected by `mix/composition_lock.exs`. The Platform lock is the initial input for a new overlay; mounted dependency resolution and
 `deps.unlock --unused` write only the overlay. The manifest beside the overlay
 records the Platform lock SHA-256 the overlay was derived from. When the
 checked-out Platform lock differs, the next Mix project load re-derives the
