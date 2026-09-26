@@ -372,4 +372,3 @@ defmodule Bilimbi.Base.ModuleRegistry.CompositionLockTest do
     "defmodule Fixture.#{app |> Atom.to_string() |> Macro.camelize()}MixProject do\n  use Mix.Project\n  def project, do: [app: #{inspect(app)}, version: #{inspect(version)}, deps: #{deps}]\nend\n"
   end
 end
-

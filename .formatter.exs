@@ -12,6 +12,6 @@ subdirectories =
 
 [
   plugins: [Phoenix.LiveView.HTMLFormatter],
-  inputs: ["mix.exs", "config/*.exs"],
+  inputs: ["mix.exs", "mix/*.exs", "config/*.exs"],
   subdirectories: subdirectories
 ]
