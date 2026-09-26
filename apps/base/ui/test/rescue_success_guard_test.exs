@@ -31,6 +31,7 @@ defmodule Bilimbi.Base.UI.RescueSuccessGuardTest do
   """
 
   use ExUnit.Case, async: true
+  alias Bilimbi.Base.ModuleRegistry.MixDiscovery
 
   @workspace_root Path.expand("../../../..", __DIR__)
 
@@ -42,9 +43,7 @@ defmodule Bilimbi.Base.UI.RescueSuccessGuardTest do
 
   test "no rescue clause reports a failure as a success" do
     offenders =
-      @workspace_root
-      |> Path.join("apps/*/*/lib/**/*.ex")
-      |> Path.wildcard()
+      MixDiscovery.module_source_files(@workspace_root, "lib/**/*.ex")
       |> Enum.flat_map(&success_returning_rescues/1)
       |> Enum.sort()
 

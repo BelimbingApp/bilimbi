@@ -73,6 +73,36 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     |> Kernel.++([:web])
   end
 
+  @doc "Returns files below every validated module package matching a package-relative glob."
+  @spec module_source_files(String.t(), String.t()) :: [String.t()]
+  def module_source_files(workspace_root, relative_glob) do
+    workspace_root
+    |> discover_workspace!()
+    |> Enum.flat_map(&Path.wildcard(Path.join(&1.path, relative_glob)))
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  @doc "Returns validated module-owned route files, including mounted packages."
+  @spec module_route_files(String.t()) :: [String.t()]
+  def module_route_files(workspace_root) do
+    workspace_root
+    |> discover_workspace!()
+    |> Enum.flat_map(fn
+      %{web: path} = descriptor when is_binary(path) -> [Path.join(descriptor.path, path)]
+      _descriptor -> []
+    end)
+  end
+
+  @doc "Returns installed container roots in graph order, without a mount list."
+  @spec container_paths(String.t()) :: [String.t()]
+  def container_paths(workspace_root) do
+    workspace_root
+    |> discover_workspace!()
+    |> Enum.map(& &1.container_path)
+    |> Enum.uniq()
+  end
+
   @doc """
   Returns module-owned web integration test directories for the Web host.
 

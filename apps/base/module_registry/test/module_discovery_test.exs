@@ -40,6 +40,78 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
            ]
   end
 
+  test "source and container traversal includes mounted repository counterexamples", %{root: root} do
+    for {container, layer} <- [{"factory", :domain}, {"customer", :extension}] do
+      container_root = put_container!(root, container, layer)
+      {_, 0} = System.cmd("git", ["init", "-q", container_root])
+      module_root = put_module!(root, container, "widget", web: "priv/web_routes.exs")
+
+      for {relative, body} <- [
+            {"lib/widget/web/show_live.ex", "rescue\n  _ -> :ok\n"},
+            {"lib/widget/web/write_live.ex",
+             "def handle_event(\"delete\", _, socket), do: socket\n"},
+            {"lib/widget/web/show_live.html.heex",
+             "<div class=\"mx-auto max-w-7xl\">x in scope.capabilities</div>\n"},
+            {"lib/widget/contributions.ex", "# database-incubation capability\n"},
+            {"priv/web_routes.exs", "[%{capability: \"admin.factory.typo\"}]\n"}
+          ] do
+        path = Path.join(module_root, relative)
+        File.mkdir_p!(Path.dirname(path))
+        File.write!(path, body)
+      end
+    end
+
+    modules = MixDiscovery.discover_workspace!(root)
+    assert Enum.map(modules, & &1.id) == ["factory/widget", "customer/widget"]
+
+    for relative <- [
+          "lib/**/web/**/*.ex",
+          "lib/**/*.ex",
+          "lib/**/*.{ex,heex}",
+          "lib/**/contributions.ex",
+          "priv/**/*.exs"
+        ] do
+      paths = MixDiscovery.module_source_files(root, relative)
+      assert Enum.any?(paths, &String.contains?(&1, "/apps/domains/factory/"))
+      assert Enum.any?(paths, &String.contains?(&1, "/apps/extensions/customer/"))
+    end
+
+    assert length(MixDiscovery.module_route_files(root)) == 2
+    assert length(MixDiscovery.container_paths(root)) == 2
+  end
+
+  test "root formatter subdirectories include both mounted repository layers", %{root: root} do
+    for {container, layer} <- [{"factory", :domain}, {"customer", :extension}] do
+      container_root = put_container!(root, container, layer)
+      {_, 0} = System.cmd("git", ["init", "-q", container_root])
+      put_module!(root, container, "widget")
+    end
+
+    fixture_mix = Path.join(root, "apps/base/module_registry/mix")
+    File.mkdir_p!(fixture_mix)
+
+    for source <- Path.wildcard(Path.expand("../mix/*.exs", __DIR__)) do
+      File.cp!(source, Path.join(fixture_mix, Path.basename(source)))
+    end
+
+    File.cp!(Path.join(root_of_project(), ".formatter.exs"), Path.join(root, ".formatter.exs"))
+
+    script =
+      "config = Code.eval_file(\".formatter.exs\") |> elem(0); " <>
+        "IO.inspect(Keyword.fetch!(config, :subdirectories))"
+
+    {output, 0} = System.cmd("elixir", ["-e", script], cd: root, stderr_to_stdout: true)
+
+    for path <- [
+          "apps/domains/factory",
+          "apps/domains/factory/widget",
+          "apps/extensions/customer",
+          "apps/extensions/customer/widget"
+        ] do
+      assert output =~ path
+    end
+  end
+
   test "dependency order wins before stable ID tie-breaking", %{root: root} do
     put_container!(root, "base", :base)
     put_module!(root, "base", "mid")
@@ -735,4 +807,6 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
       &File.regular?(Path.join(&1, "bilimbi.container.exs"))
     ) || raise "no container #{container} in #{root}"
   end
+
+  defp root_of_project, do: Path.expand("../../../..", __DIR__)
 end

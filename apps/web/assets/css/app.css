@@ -10,6 +10,8 @@
 @source "../../../../apps/base";
 @source "../../../../apps/base/ui/lib/ui";
 @source "../../../../apps/core";
+@source "../../../../apps/domains";
+@source "../../../../apps/extensions";
 @source "../../../../_build/dev/phoenix-colocated/web/*/";
 /* Menu contributions provide bare icon names at runtime. Keep the generated
  * Heroicon utilities available for their rail-only rendering. */

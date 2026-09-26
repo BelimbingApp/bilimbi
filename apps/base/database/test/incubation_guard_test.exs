@@ -24,14 +24,13 @@ defmodule Bilimbi.Base.Database.IncubationGuardTest do
   """
 
   use ExUnit.Case, async: true
+  alias Bilimbi.Base.ModuleRegistry.MixDiscovery
 
   @workspace_root Path.expand("../../../..", __DIR__)
 
   test "no module declares an incubation capability" do
     offenders =
-      @workspace_root
-      |> Path.join("apps/*/*/lib/**/contributions.ex")
-      |> Path.wildcard()
+      MixDiscovery.module_source_files(@workspace_root, "lib/**/contributions.ex")
       |> Enum.flat_map(&incubation_lines/1)
       |> Enum.sort()
 

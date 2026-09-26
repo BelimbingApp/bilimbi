@@ -17,6 +17,7 @@ defmodule Bilimbi.Base.UI.PageContainerGuardTest do
   """
 
   use ExUnit.Case, async: true
+  alias Bilimbi.Base.ModuleRegistry.MixDiscovery
 
   @workspace_root Path.expand("../../../..", __DIR__)
 
@@ -30,9 +31,7 @@ defmodule Bilimbi.Base.UI.PageContainerGuardTest do
 
   test "no screen hand-writes its own page width" do
     offenders =
-      @workspace_root
-      |> Path.join("apps/*/*/lib/**/*.{ex,heex}")
-      |> Path.wildcard()
+      MixDiscovery.module_source_files(@workspace_root, "lib/**/*.{ex,heex}")
       |> Enum.reject(&exempt?/1)
       |> Enum.flat_map(&hand_written_containers/1)
       |> Enum.sort()

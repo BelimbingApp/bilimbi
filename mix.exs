@@ -1,7 +1,8 @@
+[discovery_file] = Path.wildcard(Path.expand("apps/base/*/mix/module_discovery.exs", __DIR__))
+Code.require_file(discovery_file)
+
 defmodule Bilimbi.Umbrella.MixProject do
   use Mix.Project
-
-  @precommit_test_containers ["apps/core", "apps/base", "apps/web"]
 
   def project do
     [
@@ -69,6 +70,7 @@ defmodule Bilimbi.Umbrella.MixProject do
         "bilimbi.contributions.verify"
       ],
       "precommit.test": &precommit_test/1,
+      "compile.strict": &compile_strict/1,
       "assets.test": &assets_test/1
     ]
   end
@@ -80,9 +82,9 @@ defmodule Bilimbi.Umbrella.MixProject do
 
   defp precommit_test(_args) do
     mix = System.find_executable("mix") || Mix.raise("could not find mix executable")
+    containers = ["apps/core", "apps/base", "apps/web"] ++ mounted_containers()
 
-    Enum.reduce_while(@precommit_test_containers, @precommit_test_containers, fn container,
-                                                                                 remaining ->
+    Enum.reduce_while(containers, containers, fn container, remaining ->
       Mix.shell().info("==> #{container}")
 
       case System.cmd(mix, ["test"],
@@ -100,6 +102,30 @@ defmodule Bilimbi.Umbrella.MixProject do
     end)
 
     :ok
+  end
+
+  defp compile_strict(_args) do
+    mix = System.find_executable("mix") || Mix.raise("could not find mix executable")
+
+    for container <- ["apps/base", "apps/core"] ++ mounted_containers() do
+      Mix.shell().info("==> #{container}")
+
+      case System.cmd(mix, ["compile.strict"],
+             cd: Path.expand(container, __DIR__),
+             into: IO.stream(:stdio, :line),
+             stderr_to_stdout: true
+           ) do
+        {_output, 0} -> :ok
+        {_output, status} -> exit({:shutdown, status})
+      end
+    end
+  end
+
+  defp mounted_containers do
+    __DIR__
+    |> Bilimbi.Base.ModuleRegistry.MixDiscovery.container_paths()
+    |> Enum.reject(&(&1 in [Path.join(__DIR__, "apps/base"), Path.join(__DIR__, "apps/core")]))
+    |> Enum.map(&Path.relative_to(&1, __DIR__))
   end
 
   # The LiveView hooks in apps/web/assets/js are tested in Node, with the test

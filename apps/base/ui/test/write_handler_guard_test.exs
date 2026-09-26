@@ -88,6 +88,7 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
   """
 
   use ExUnit.Case, async: true
+  alias Bilimbi.Base.ModuleRegistry.MixDiscovery
 
   @workspace_root Path.expand("../../../..", __DIR__)
 
@@ -176,8 +177,8 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
   ## Scanning
 
   defp scanned_files(root) do
-    ["apps/*/*/lib/**/web/**/*.ex", "apps/web/lib/**/*.ex"]
-    |> Enum.flat_map(&Path.wildcard(Path.join(root, &1)))
+    (MixDiscovery.module_source_files(root, "lib/**/web/**/*.ex") ++
+       Path.wildcard(Path.join(root, "apps/web/lib/**/*.ex")))
     |> Enum.uniq()
     |> Enum.flat_map(fn path ->
       with {:ok, source} <- File.read(path),
@@ -377,9 +378,7 @@ defmodule Bilimbi.Base.UI.WriteHandlerGuardTest do
   # gates the route — not from a hand-written list.
   defp route_write_modules do
     route_modules =
-      @workspace_root
-      |> Path.join("apps/*/*/priv/web_routes.exs")
-      |> Path.wildcard()
+      MixDiscovery.module_route_files(@workspace_root)
       |> Enum.flat_map(fn path ->
         with {:ok, source} <- File.read(path),
              {:ok, ast} <- Code.string_to_quoted(source) do
