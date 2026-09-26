@@ -84,22 +84,23 @@ defmodule Bilimbi.Umbrella.MixProject do
     mix = System.find_executable("mix") || Mix.raise("could not find mix executable")
     containers = ["apps/core", "apps/base", "apps/web"] ++ module_paths([:domain, :extension])
 
-    Enum.reduce_while(containers, containers, fn container, remaining ->
-      Mix.shell().info("==> #{container}")
+    _ =
+      Enum.reduce_while(containers, containers, fn container, remaining ->
+        Mix.shell().info("==> #{container}")
 
-      case System.cmd(mix, ["test"],
-             cd: Path.expand(container, __DIR__),
-             into: IO.stream(:stdio, :line),
-             stderr_to_stdout: true
-           ) do
-        {_output, 0} ->
-          {:cont, tl(remaining)}
+        case System.cmd(mix, ["test"],
+               cd: Path.expand(container, __DIR__),
+               into: IO.stream(:stdio, :line),
+               stderr_to_stdout: true
+             ) do
+          {_output, 0} ->
+            {:cont, tl(remaining)}
 
-        {_output, status} ->
-          report_skipped_precommit_tests(tl(remaining))
-          exit({:shutdown, status})
-      end
-    end)
+          {_output, status} ->
+            report_skipped_precommit_tests(tl(remaining))
+            exit({:shutdown, status})
+        end
+      end)
 
     :ok
   end
