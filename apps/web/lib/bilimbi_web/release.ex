@@ -30,14 +30,17 @@ defmodule BilimbiWeb.Release do
   end
 
   @doc """
-  Starts the host's dependencies, not the host itself, and runs every pending
-  installed production seed. The endpoint stays down, so it can run beside a
-  live node.
+  Starts the module applications, without the endpoint and with job
+  processing and the scheduler disabled, and runs every pending installed
+  production seed, so it can run beside a live node.
   """
   @spec seed() :: :ok
   def seed do
     load_closure!(@app)
     ModuleRegistry.complete_modules!()
+    Application.put_env(:bilimbi_base_queue, :queues, false)
+    Application.put_env(:bilimbi_base_queue, :plugins, false)
+    Application.put_env(:bilimbi_base_schedule, :scheduler_enabled, false)
     {:ok, _started} = Application.ensure_all_started(dependencies(@app))
     ContributionRegistry.install!()
 
