@@ -24,7 +24,7 @@ Render a timestamp with `<.datetime>`, which follows the reader's saved clock, s
 
 ## Read-first pages
 
-A record's page reads first and edits in place. There is no separate Edit button, including a record whose only page was a form. Facts commit through `<.inline_edit>`; the outcome bookkeeping is `Bilimbi.Base.UI.CommitStatus`, passed back as `status`. See `DESIGN.md` "Read-first detail pages".
+A record's page reads first and edits in place. There is no separate Edit button, including a record whose only page was a form. Short facts commit through `<.inline_edit>`, multi-line facts through `<.inline_long_text>`, and the outcome bookkeeping is `Bilimbi.Base.UI.CommitStatus`, passed back as `status`. See `DESIGN.md` "Read-first detail pages" and "Inline editing".
 
 ## Tests
 

@@ -46,6 +46,8 @@ A hook in `apps/web/assets/js` is tested beside it in `apps/web/assets/test/<hoo
 
 happy-dom has no top layer, makes nothing inert, and does not blur an element that becomes hidden. Check those in a browser. A new hook test goes in Node, not in an ExUnit test that shells out to `node`. Shell out only for what this runner cannot give: another host locale, the shipped LiveView bundle, or markup the server renders in the same test.
 
+Use `<.inline_long_text>` for an in-place multi-line fact; its hook owns focus, Escape cancellation, blur commit and the saving wait, while the record owner keeps validation and persistence. Do not rebuild the textarea lifecycle in a LiveView. See its component comment and `DESIGN.md` "Inline editing".
+
 ## Lists
 
 An operational list keeps its page, search, filters, sort and page size in URL state. See `DESIGN.md` "Pagination controls".
