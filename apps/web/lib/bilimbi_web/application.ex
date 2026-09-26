@@ -5,6 +5,7 @@ defmodule BilimbiWeb.Application do
 
   @impl true
   def start(_type, _args) do
+    Bilimbi.Base.ModuleRegistry.complete_modules!()
     Bilimbi.Base.ModuleRegistry.ContributionRegistry.install!()
 
     children = [

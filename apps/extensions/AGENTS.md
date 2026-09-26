@@ -8,6 +8,10 @@ Each immediate child is one independently sourced Extension repository and insta
 
 An Extension adapts installed capabilities through declared public contracts and supported contributions. It may depend on Base, Core, or installed Domains; another Extension dependency needs a concrete business invariant. It must not read private tables or queries, take ownership of another module's durable records, or make that module fail when the Extension is absent. Repository ownership, visibility, and licensing do not determine whether a capability is an Extension.
 
+## Mounting
+
+Name the mounted directory after its container `id`, and give the container `mix.exs` that same `app:`. Discovery rejects a mismatched name or a container in the wrong role folder; the rules are in `apps/base/module_registry/docs/README.md`. Run `mix bilimbi.migrate` and the other database tasks from the umbrella root, not from inside the Extension: that runtime cannot see the whole graph, so `ModuleRegistry.complete_modules!/0` refuses it.
+
 ## Maintaining this file
 
 Record only placement mistakes that recur across Extensions. Put customer-specific rules with the owning Extension, and keep composition rules in the normative architecture document.

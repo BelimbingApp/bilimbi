@@ -10,6 +10,59 @@ defmodule Bilimbi.Base.Database.ProductionSeeds do
   @interrupted_error "Seed execution was interrupted before completion and will be retried."
   @status_constraint_definition "CHECK (status::text = ANY (ARRAY['pending'::character varying, 'running'::character varying, 'completed'::character varying, 'failed'::character varying, 'skipped'::character varying]::text[]))"
 
+  @provider_key :bilimbi_production_seed_provider
+
+  @spec installed!([module()]) :: [ProductionSeed.t()]
+  def installed!(extra_providers) do
+    modules = ModuleRegistry.installed_modules!()
+
+    modules
+    |> Enum.flat_map(fn descriptor ->
+      descriptor.otp_app
+      |> Application.get_env(@provider_key, [])
+      |> List.wrap()
+    end)
+    |> Kernel.++(extra_providers)
+    |> Enum.uniq()
+    |> Enum.flat_map(&provider_seeds!(&1, modules))
+  end
+
+  defp provider_seeds!(provider, modules) do
+    unless Code.ensure_loaded?(provider) and function_exported?(provider, :production_seeds, 0) do
+      raise ArgumentError, "#{inspect(provider)} is not a production seed provider"
+    end
+
+    behaviours =
+      provider.module_info(:attributes)
+      |> Keyword.get_values(:behaviour)
+      |> List.flatten()
+
+    unless Bilimbi.Base.Database.ProductionSeedProvider in behaviours do
+      raise ArgumentError,
+            "#{inspect(provider)} must implement Bilimbi.Base.Database.ProductionSeedProvider"
+    end
+
+    otp_app =
+      Application.get_application(provider) ||
+        raise ArgumentError, "#{inspect(provider)} is not loaded from an OTP application"
+
+    descriptor =
+      Enum.find(modules, &(&1.otp_app == otp_app)) ||
+        raise ArgumentError, "#{inspect(otp_app)} has no installed Bilimbi module metadata"
+
+    seeds = provider.production_seeds()
+
+    Enum.each(seeds, fn seed ->
+      unless seed.module_id == descriptor.id do
+        raise ArgumentError,
+              "production seed #{seed.id} belongs to #{seed.module_id}, but provider " <>
+                "#{inspect(provider)} is installed as #{descriptor.id}"
+      end
+    end)
+
+    seeds
+  end
+
   @spec run(Ecto.Repo.t(), [ProductionSeed.t()], keyword()) ::
           {:ok, [map()]} | {:error, map()}
   def run(repo, seeds, opts \\ []) do

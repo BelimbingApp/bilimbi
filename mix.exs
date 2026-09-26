@@ -11,6 +11,7 @@ defmodule Bilimbi.Umbrella.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
+      releases: releases(),
       # CI runs `mix dialyzer` from this umbrella root, so the PLT is built here.
       # `mix bilimbi.screenshot` (apps/web) is the first shipped Mix task, and its
       # `Mix.*` surface needs the Mix application in the PLT to type-check. PLT-only
@@ -23,6 +24,18 @@ defmodule Bilimbi.Umbrella.MixProject do
   def cli do
     [
       preferred_envs: [precommit: :test]
+    ]
+  end
+
+  # One release around the Web host. Web depends on Base, Core, and every
+  # mounted Domain and Extension container, so the release carries the whole
+  # discovered graph without naming a module. Migrate and seed it with
+  # `bin/bilimbi eval "BilimbiWeb.Release.migrate()"` and `.seed()`.
+  defp releases do
+    [
+      bilimbi: [
+        applications: [web: :permanent]
+      ]
     ]
   end
 

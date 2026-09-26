@@ -32,6 +32,20 @@ defmodule Bilimbi.Base.Database do
     ProductionSeeds.run(repo, seeds, opts)
   end
 
+  @doc """
+  Collects the production seeds of every installed module's provider.
+
+  A module registers its provider under `:bilimbi_production_seed_provider` in
+  its application environment. `extra_providers` adds explicitly named
+  providers. Each provider must implement
+  `Bilimbi.Base.Database.ProductionSeedProvider`, ship in an installed module,
+  and return only that module's seeds. Raises `ArgumentError` otherwise.
+  """
+  @spec installed_production_seeds!([module()]) :: [ProductionSeed.t()]
+  def installed_production_seeds!(extra_providers \\ []) do
+    ProductionSeeds.installed!(extra_providers)
+  end
+
   @doc "Lists the persisted production-seed execution state."
   @spec list_production_seed_runs(keyword()) :: [map()]
   def list_production_seed_runs(opts \\ []) do

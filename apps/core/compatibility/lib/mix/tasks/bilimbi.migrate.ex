@@ -8,6 +8,7 @@ defmodule Mix.Tasks.Bilimbi.Migrate do
 
   @impl Mix.Task
   def run(args) do
+    Bilimbi.Base.ModuleRegistry.complete_modules!()
     with_repo!(Bilimbi.Base.Repo, &run(args, &1))
   end
 

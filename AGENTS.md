@@ -264,7 +264,7 @@ apps/core/employee/priv/repo/migrations/
 apps/core/user/priv/repo/migrations/
 ```
 
-Run the required baseline through `mix bilimbi.migrate`, which discovers every
+Run the required baseline from the umbrella root through `mix bilimbi.migrate`, which discovers every
 installed descriptor that contributes migrations and merges those paths with
 strict Base → Core → Domain → Extension ordering. Do not use broad `create_if_not_exists`
 operations to make a migration appear safe on an existing database. Verify an

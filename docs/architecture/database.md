@@ -197,6 +197,15 @@ The installed graph is validated before migration paths are exposed;
 `mix bilimbi.migrate` additionally validates dispositions and the ledger before
 execution.
 
+Run them from the umbrella root, never from a package directory. A package's
+runtime loads only its own dependency closure, which can omit modules such as
+a mounted Domain's; `migrate`, `rollback`, `schema.verify`, `schema.adopt`,
+and `seeds.run` therefore call `ModuleRegistry.complete_modules!/0` first and
+refuse to run unless every discovered module is loaded. The `bilimbi` release
+runs the same work without Mix through
+`bin/bilimbi eval "BilimbiWeb.Release.migrate()"` and
+`bin/bilimbi eval "BilimbiWeb.Release.seed()"`.
+
 ## Compatibility lifecycle
 
 Compatibility is a one-direction replacement contract. Bilimbi must be able

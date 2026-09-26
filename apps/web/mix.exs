@@ -42,7 +42,15 @@ defmodule Bilimbi.Web.MixProject do
 
   defp test_paths(_env), do: ["test"]
 
+  # The host's OTP closure is the whole discovered graph: Base and Core as
+  # umbrella siblings, and every mounted Domain and Extension container through
+  # discovery. `ModuleRegistry.complete_modules!/0` checks it at boot.
   defp deps do
+    platform_deps() ++
+      Bilimbi.Base.ModuleRegistry.MixDiscovery.optional_container_dependencies(__DIR__)
+  end
+
+  defp platform_deps do
     [
       {:phoenix, "~> 1.8.9"},
       {:phoenix_ecto, "~> 4.7"},

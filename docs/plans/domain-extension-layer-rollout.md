@@ -44,19 +44,19 @@ binary.
 The following facts have already been verified:
 
 - Domain and Extension are accepted descriptor layers.
-- The existing source scan finds containers only as direct children of `apps/`.
-  The target `apps/domains/{domain}` and `apps/extensions/{extension}` roots
-  require discovery and Mix composition changes before they can be mounted.
+- Discovery finds Base and Core containers as direct children of `apps/` and
+  mounted containers under `apps/domains/{domain}` and
+  `apps/extensions/{extension}`, as described in
+  `apps/base/module_registry/docs/README.md`. Formatter, Tailwind, guard-glob,
+  precommit, and strict-compile traversal of the nested roots remain open.
 - The graph validator already rejects missing dependencies, duplicate
   identities, and cycles within the graph it sees.
-- The current dependency validator permits Domain-to-Domain dependencies only
-  inside one container and rejects every Extension-to-Extension dependency.
-  Both rules must change to implement 0010's declared, acyclic same-layer
-  contract across mounted repositories.
-- Runtime migration discovery sees only applications in
-  `core/compatibility`'s dependency closure. An optional Domain cannot enter
-  that closure through an upward Core dependency, so its migrations currently
-  remain invisible.
+- The dependency validator permits declared same-layer edges across mounted
+  repositories (Domain to Domain, Extension to Extension) and still rejects
+  cycles and upward edges.
+- Runtime consumers see mounted modules through Web's host closure, and
+  `ModuleRegistry.complete_modules!/0` refuses a runtime missing any graph
+  module; `docs/architecture/database.md` owns the database-task consequence.
 - Web's route manifest is generated from descriptors on disk. That matches
   repository-presence selection, but a release still must prove that every
   routed application is included and that conflicts fail before compilation.
@@ -161,14 +161,14 @@ Contract without a hard-coded Domain or Extension name.
 
 Goal: turn the successful proof into the smallest maintained implementation.
 
-- [ ] Implement generic mounted-container discovery from the two nested roots
+- [x] Implement generic mounted-container discovery from the two nested roots
   and build-time graph validation using the mechanism proven in Phase 1.
-- [ ] Permit declared cross-container Domain dependencies and declared
+- [x] Permit declared cross-container Domain dependencies and declared
   Extension-to-Extension dependencies while retaining cycle and upward-edge
   rejection. No production cross-container Domain edge exists yet; this
   mechanism must pass 0010's proof before a real dependency needs it.
-- [ ] Include every graph application and its resources in the release.
-- [ ] Make migrations and runtime contributions consume the approved graph
+- [x] Include every graph application and its resources in the release.
+- [x] Make migrations and runtime contributions consume the approved graph
   without reconstructing it or creating upward dependencies.
 - [ ] Compile Web routes from the same graph and fail collisions before the
   release is produced.

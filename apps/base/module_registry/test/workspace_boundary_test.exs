@@ -54,31 +54,26 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
     end
   end
 
-  test "Compatibility's runtime closure includes every migration or schema-contract contributor" do
+  # The host's OTP closure must be the whole graph: Web depends on the Base
+  # and Core umbrella siblings and on every mounted container, and each
+  # container depends on its own modules. `ModuleRegistry.complete_modules!/0`
+  # enforces the same at host boot.
+  test "the Web host's container closure reaches every discovered module" do
     modules = MixDiscovery.discover_workspace!(@workspace_root)
-    missing = MixDiscovery.missing_compatibility_contributors(modules)
+    web_root = Path.join(@workspace_root, "apps/web")
 
-    assert missing == [],
-           "Compatibility runtime closure is missing contributor#{plural(missing)} #{Enum.join(missing, ", ")}"
-  end
+    mounted_roots =
+      web_root
+      |> MixDiscovery.optional_container_dependencies()
+      |> Enum.map(fn {_app, path: path} -> Path.expand(path, web_root) end)
 
-  test "removing core/user from Compatibility's dependencies fails naming core/user" do
-    modules = MixDiscovery.discover_workspace!(@workspace_root)
-    user = Enum.find(modules, &(&1.id == "core/user"))
+    host_apps =
+      [@base_root, @core_root | mounted_roots]
+      |> Enum.flat_map(&MixDiscovery.container_dependencies/1)
+      |> Enum.map(&elem(&1, 0))
+      |> Enum.sort()
 
-    assert contributor_fixture?(user),
-           "core/user must still declare migrations or a schema_contract"
-
-    compatibility = Enum.find(modules, &(&1.id == "core/compatibility"))
-    omitted = List.delete(compatibility.dependencies, "core/user")
-    missing = MixDiscovery.missing_compatibility_contributors(modules, omitted)
-
-    assert "core/user" in missing
-
-    message =
-      "Compatibility runtime closure is missing contributor#{plural(missing)} #{Enum.join(missing, ", ")}"
-
-    assert message =~ "core/user"
+    assert host_apps == modules |> Enum.map(& &1.otp_app) |> Enum.sort()
   end
 
   test "Base and Core compose immediate child modules without naming them" do
@@ -116,10 +111,11 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
     end
   end
 
+  # Base and Core containers sit directly under apps/; mounted Domain and
+  # Extension repositories sit one level deeper.
   defp module_roots_on_disk do
-    @workspace_root
-    |> Path.join("apps/*/bilimbi.container.exs")
-    |> Path.wildcard()
+    ["apps/*/bilimbi.container.exs", "apps/{domains,extensions}/*/bilimbi.container.exs"]
+    |> Enum.flat_map(&Path.wildcard(Path.join(@workspace_root, &1)))
     |> Enum.map(&Path.dirname/1)
     |> Enum.flat_map(&Path.wildcard(Path.join(&1, "*/bilimbi.module.exs")))
     |> Enum.map(&Path.dirname/1)
@@ -166,13 +162,4 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
 
     root
   end
-
-  defp contributor_fixture?(nil), do: false
-
-  defp contributor_fixture?(module) do
-    is_binary(module.migrations) or not is_nil(module.schema_contract)
-  end
-
-  defp plural([_]), do: ""
-  defp plural(_missing), do: "s"
 end

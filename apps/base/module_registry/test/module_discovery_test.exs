@@ -454,48 +454,6 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
                  end
   end
 
-  test "Compatibility-closure check names a contributor missing from the coordinator", %{
-    root: root
-  } do
-    put_container!(root, "base", :base)
-    put_container!(root, "core", :core)
-    put_module!(root, "base", "database")
-
-    user_root =
-      put_module!(root, "core", "user",
-        dependencies: ["base/database"],
-        migrations: "priv/repo/migrations",
-        migration_dispositions: %{20_260_814_120_000 => :compatible_baseline}
-      )
-
-    migration_dir = Path.join(user_root, "priv/repo/migrations")
-    File.mkdir_p!(migration_dir)
-    File.write!(Path.join(migration_dir, "20260814120000_create_user.exs"), "[]\n")
-
-    put_module!(root, "core", "compatibility", dependencies: ["base/database"])
-
-    modules = MixDiscovery.discover_workspace!(root)
-
-    assert MixDiscovery.missing_compatibility_contributors(modules) == ["core/user"]
-
-    assert MixDiscovery.missing_compatibility_contributors(modules, [
-             "base/database",
-             "core/user"
-           ]) == []
-  end
-
-  test "Compatibility-closure check ignores modules that contribute neither migrations nor a contract",
-       %{root: root} do
-    put_container!(root, "base", :base)
-    put_container!(root, "core", :core)
-    put_module!(root, "base", "database")
-    put_module!(root, "base", "module_registry")
-    put_module!(root, "core", "compatibility", dependencies: ["base/database"])
-
-    modules = MixDiscovery.discover_workspace!(root)
-    assert MixDiscovery.missing_compatibility_contributors(modules) == []
-  end
-
   test "rejects a descriptor missing the web key", %{root: root} do
     put_container!(root, "base", :base)
     path = Path.join([root, "apps", "base", "broken"])
@@ -699,8 +657,10 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
     refute MixDiscovery.workspace_fingerprint(root) == first
   end
 
+  # Base and Core containers sit directly under apps/; a Domain or Extension
+  # mounts under its layer's root.
   defp put_container!(root, id, layer) do
-    path = Path.join([root, "apps", id])
+    path = Path.join([root, "apps", mount_root(layer), id])
     File.mkdir_p!(path)
 
     File.write!(
@@ -712,7 +672,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
   end
 
   defp put_module!(root, container, name, overrides \\ []) do
-    path = Path.join([root, "apps", container, name])
+    path = Path.join(container_dir(root, container), name)
     File.mkdir_p!(Path.join(path, "test"))
     File.mkdir_p!(Path.join(path, "docs"))
     File.write!(Path.join(path, "mix.exs"), "[]\n")
@@ -756,8 +716,23 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
 
   defp container_layer(root, container) do
     {descriptor, _binding} =
-      Code.eval_file(Path.join([root, "apps", container, "bilimbi.container.exs"]))
+      Code.eval_file(Path.join(container_dir(root, container), "bilimbi.container.exs"))
 
     Keyword.fetch!(descriptor, :layer)
+  end
+
+  defp mount_root(:domain), do: "domains"
+  defp mount_root(:extension), do: "extensions"
+  defp mount_root(_platform_layer), do: ""
+
+  defp container_dir(root, container) do
+    Enum.find(
+      [
+        Path.join([root, "apps", container]),
+        Path.join([root, "apps", "domains", container]),
+        Path.join([root, "apps", "extensions", container])
+      ],
+      &File.regular?(Path.join(&1, "bilimbi.container.exs"))
+    ) || raise "no container #{container} in #{root}"
   end
 end

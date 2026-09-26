@@ -8,6 +8,8 @@ defmodule Mix.Tasks.Bilimbi.Rollback do
 
   @impl Mix.Task
   def run(args) do
+    Bilimbi.Base.ModuleRegistry.complete_modules!()
+
     Mix.Task.run(
       "ecto.rollback",
       ["-r", "Bilimbi.Base.Repo"] ++ migration_args() ++ args

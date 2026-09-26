@@ -23,6 +23,7 @@ defmodule Mix.Tasks.Bilimbi.Schema.Verify do
       Mix.raise("unexpected arguments: #{Enum.join(remaining, " ")}")
     end
 
+    Bilimbi.Base.ModuleRegistry.complete_modules!()
     with_repo!(Bilimbi.Base.Repo, fn repo -> verify!(repo, opts) end)
   end
 
