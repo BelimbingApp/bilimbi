@@ -39,8 +39,8 @@ Base and Core containers are direct children of `apps/`. Optional Domain and
 Extension repositories mount one level deeper, under `apps/domains/<id>/` and
 `apps/extensions/<id>/`, and discovery finds them with no list naming them. A
 mounted directory must hold a `bilimbi.container.exs` whose `id` equals the
-directory name and whose layer matches its root; it cannot be a symbolic link
-or reuse `base`, `core`, or `web`. The ID is the container's OTP application
+directory name and whose layer matches its root; it cannot reuse `base`,
+`core`, or `web`. The ID is the container's OTP application
 name, so its `mix.exs` declares that `app:`. Declared same-layer dependencies
 may cross repositories (Domain to Domain, Extension to Extension); upward
 edges and cycles are rejected.

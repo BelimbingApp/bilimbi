@@ -10,7 +10,7 @@ An Extension adapts installed capabilities through declared public contracts and
 
 ## Mounting
 
-Name the mounted directory after its container `id`, and give the container `mix.exs` that same `app:`. Discovery rejects a mismatched name, a link, or a container in the wrong role folder; the rules are in `apps/base/module_registry/docs/README.md`. Run `mix bilimbi.migrate` and the other database tasks from the umbrella root, not from inside the Extension: that runtime cannot see the whole graph, so `ModuleRegistry.complete_modules!/0` refuses it.
+Name the mounted directory after its container `id`, and give the container `mix.exs` that same `app:`. Discovery rejects a mismatched name or a container in the wrong role folder; the rules are in `apps/base/module_registry/docs/README.md`. Run `mix bilimbi.migrate` and the other database tasks from the umbrella root, not from inside the Extension: that runtime cannot see the whole graph, so `ModuleRegistry.complete_modules!/0` refuses it.
 
 ## Maintaining this file
 

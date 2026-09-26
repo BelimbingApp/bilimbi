@@ -456,11 +456,6 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   defp read_mounted_container!(container_path, layer) do
     name = Path.basename(container_path)
 
-    unless File.lstat!(container_path).type == :directory do
-      raise ArgumentError,
-            "mounted container #{container_path} must be a directory inside the workspace, not a link"
-    end
-
     # The ID becomes the container's OTP application name.
     unless Regex.match?(~r/^[a-z][a-z0-9_]*$/, name) do
       raise ArgumentError,
@@ -849,28 +844,12 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
         remaining
         |> Enum.filter(fn {_id, degree} -> degree > 0 end)
         |> Enum.map(fn {id, _degree} -> id end)
-        |> MapSet.new()
-        |> prune_downstream(by_id)
         |> Enum.sort()
 
       raise ArgumentError, "module dependency cycle detected: #{Enum.join(cycle_ids, ", ")}"
     end
 
     ordered
-  end
-
-  # Unordered modules include those that merely depend on a cycle. Drop, until
-  # none is left, every module no other unordered module depends on, so the
-  # error names the cycle rather than everything downstream of it.
-  defp prune_downstream(ids, by_id) do
-    depended_on =
-      ids
-      |> Enum.flat_map(&Map.fetch!(by_id, &1).dependencies)
-      |> MapSet.new()
-
-    pruned = MapSet.intersection(ids, depended_on)
-
-    if MapSet.equal?(pruned, ids), do: ids, else: prune_downstream(pruned, by_id)
   end
 
   defp sort_queue([], ordered, indegrees, _dependents, _by_id) do

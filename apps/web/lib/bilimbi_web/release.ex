@@ -12,6 +12,7 @@ defmodule BilimbiWeb.Release do
 
   alias Bilimbi.Base.Database
   alias Bilimbi.Base.ModuleRegistry
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
 
   @app :web
@@ -28,12 +29,17 @@ defmodule BilimbiWeb.Release do
     :ok
   end
 
-  @doc "Starts the host and runs every pending installed production seed."
+  @doc """
+  Starts the host's dependencies, not the host itself, and runs every pending
+  installed production seed. The endpoint stays down, so it can run beside a
+  live node.
+  """
   @spec seed() :: :ok
   def seed do
     load_closure!(@app)
     ModuleRegistry.complete_modules!()
-    {:ok, _started} = Application.ensure_all_started(@app)
+    {:ok, _started} = Application.ensure_all_started(dependencies(@app))
+    ContributionRegistry.install!()
 
     case Database.run_production_seeds(Database.installed_production_seeds!()) do
       {:ok, results} ->
@@ -52,13 +58,18 @@ defmodule BilimbiWeb.Release do
     else
       load!(app)
 
-      optional = Application.spec(app, :optional_applications) || []
-
-      (List.wrap(Application.spec(app, :applications)) ++
-         List.wrap(Application.spec(app, :included_applications)))
-      |> Enum.reject(&(&1 in optional and not loadable?(&1)))
+      app
+      |> dependencies()
       |> Enum.reduce(MapSet.put(loaded, app), &load_closure!/2)
     end
+  end
+
+  defp dependencies(app) do
+    optional = Application.spec(app, :optional_applications) || []
+
+    (List.wrap(Application.spec(app, :applications)) ++
+       List.wrap(Application.spec(app, :included_applications)))
+    |> Enum.reject(&(&1 in optional and not loadable?(&1)))
   end
 
   defp load!(app) do
