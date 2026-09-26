@@ -188,4 +188,3 @@ defmodule Mix.Tasks.Bilimbi.Composition.Lock do
   def run(["--check"]), do: Bilimbi.CompositionLock.check!(File.cwd!())
   def run(_), do: Mix.raise("usage: mix bilimbi.composition.lock --pin | --check")
 end
-

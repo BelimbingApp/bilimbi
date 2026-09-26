@@ -186,14 +186,15 @@ A dependency from another repository must already be mounted.
 The Platform's tracked `mix.lock` is authoritative only when no optional
 repository is mounted. Once any Domain or Extension is mounted, every Mix
 project uses the same ignored `.scratchpad/composition-lock/mix.lock` overlay,
-selected by `mix/composition_lock.exs`. The Platform lock is the initial input for a new overlay; mounted dependency resolution and
+selected by `mix/composition_lock.exs`. The Platform lock is the initial
+input for a new overlay; mounted dependency resolution and
 `deps.unlock --unused` write only the overlay. The manifest beside the overlay
 records the Platform lock SHA-256 the overlay was derived from. When the
 checked-out Platform lock differs, the next Mix project load re-derives the
 overlay: every package the Platform lock contains takes the Platform's locked
 entry, mounted-only packages are kept, and `mix deps.get` resolves the rest.
-Pinned CI refuses that mismatch instead of re-deriving. Unmounting the last repository
-selects the Platform lock again without deleting or rewriting either lock.
+Pinned CI refuses that mismatch instead of re-deriving. Unmounting the last
+repository selects the Platform lock again without deleting or rewriting either lock.
 Mounted container and module `mix.exs` files must require that helper from the
 Platform root and set `lockfile: Bilimbi.CompositionLock.lockfile!(workspace_root)`;
 they must not point at a repository-local or Platform lock.
