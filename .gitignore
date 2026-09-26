@@ -55,14 +55,20 @@ npm-debug.log
 /.scratchpad
 
 # Base, Core, and Web belong to the Platform repository. Domains and Extensions
-# mount as independent nested repositories directly below `apps/`, so ignore
-# unknown containers by default and re-include the Platform-owned ones. This
-# prevents accidental tracking; ignore rules are not a security boundary. Add
-# any future Platform-owned container to the allowlist below before committing it.
+# mount as independent nested repositories below `apps/domains/` and
+# `apps/extensions/`. Ignore mounted repositories by default; ignore rules are
+# not a security boundary. Add any future Platform-owned container to the
+# allowlist below before committing it.
 /apps/*
 !/apps/base/
 !/apps/core/
 !/apps/web/
+!/apps/domains/
+!/apps/extensions/
+/apps/domains/*
+/apps/extensions/*
+!/apps/domains/AGENTS.md
+!/apps/extensions/AGENTS.md
 # Folder guides sit beside those containers. `/apps/*` would hide them, and a
 # guide git ignores is a guide the harnesses skip.
 !/apps/AGENTS.md

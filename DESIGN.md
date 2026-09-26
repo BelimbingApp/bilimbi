@@ -458,10 +458,11 @@ every CSS transition and animation to one frame, so anyone whose operating
 system asks for reduced motion gets a still product wherever the motion is CSS.
 Components and templates do not carry their own `motion-reduce` variants.
 
-One known exception is outstanding: the vendored `topbar` navigation progress
-bar paints itself onto a canvas from JavaScript, so no CSS duration reaches it
-and it still slides and fades under reduce. Teaching it the preference without
-losing an honest loading signal is open parity work under FND-05.
+The vendored `topbar` navigation progress bar paints on a canvas, so this CSS
+rule cannot reach it. `apps/web/assets/vendor/topbar.js` checks the same
+preference: while a page loads it shows one static full-width bar, and it
+removes that bar without the trickle or the fade. The loading signal stays;
+the motion does not.
 
 Use Phoenix and LiveView loading states honestly. Users should know when work is
 in flight, waiting, blocked, or complete.

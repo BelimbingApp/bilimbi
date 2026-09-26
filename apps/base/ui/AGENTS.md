@@ -38,6 +38,8 @@ Copy to the clipboard through the `ClipboardCopy` hook (`apps/web/assets/js/clip
 
 Keep the `source(none)` and `@source` lines in `app.css`; the comment above them says why.
 
+The page-loading bar is the vendored canvas `apps/web/assets/vendor/topbar.js`, not CSS. The global reduced-motion rule cannot slow it; the marked `prefers-reduced-motion` check in that file is what keeps the bar still. A new canvas or timer animation has to make the same check.
+
 ## Hook tests
 
 A hook in `apps/web/assets/js` is tested beside it in `apps/web/assets/test/<hook>.test.mjs`, with Node's own test runner and happy-dom. `mix precommit` runs them through `mix assets.test`; `npm test` in `apps/web/assets` runs them alone. Mount the hook with `test/support/hook.mjs` on the markup its component renders, carrying the JS commands the server really renders, and assert what a person meets: attributes, focus, events pushed. Compare focus by id with `focused()`, because a failed assertion on two DOM nodes never finishes printing.
@@ -49,6 +51,10 @@ happy-dom has no top layer, makes nothing inert, and does not blur an element th
 An operational list keeps its page, search, filters, sort and page size in URL state. See `DESIGN.md` "Pagination controls".
 
 Those filters are `<.filter_toolbar>` and that pager is `<.pagination>`. A local form or Previous/Next pair is the pair those two replaced. The comments on `filter_toolbar/1` and `pagination/1` own the framing.
+
+## Summaries
+
+A dashboard card of labelled values is `<.stat_strip>`; a hand-written card with the same title-and-cells anatomy is what it replaced. A feed of entries is not a stat strip and keeps its own markup, commented as such. An icon-only link is `<.icon_button navigate>`, which carries the accessible name a bare `<.link>` around an icon lacks.
 
 ## Maintaining this file
 

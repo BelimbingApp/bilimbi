@@ -247,9 +247,10 @@ products were read and the plan forbids treating existence as acceptance.
   hand-writes a Previous/Next pager instead of `<.pagination>` (Lane A), a Phase 5
   migration, not a pattern to copy.
 - **DAT-05** — "Missing" is wrong. Five stat cards ship on `/dashboard`, duplicated
-  into ten markup blocks with 65 arbitrary-value classes. The Companies, Users and
-  Sessions cards now render through the shared `<.stat_strip>`, with a Data display
-  specimen; the recent-audit and performance cards keep their own markup.
+  into ten markup blocks with 65 arbitrary-value classes. The Companies, Users,
+  Sessions and Performance cards now render through the shared `<.stat_strip>`, with
+  a Data display specimen, as Belimbing's Performance widget does. The recent-audit
+  card keeps its own markup: it is a feed of entries, not label and value pairs.
 - **DAT-04** — relative time already ships in notifications, in a bare `<span>` with
   no `<time>`, no `datetime` and no `title`, frozen at render. It has since been
   replaced: `/notifications` and the `/users` Created column render through
@@ -654,7 +655,7 @@ Validation: Every catalog item has evidence, a recommended disposition, dependen
 Goal: Build accepted shared contracts in dependency order.
 
 - [ ] Stabilize identity tokens, focus, field shell, card, icon and action foundations.
-- [ ] FND-05 follow-up — make the vendored `topbar` navigation progress bar honor `prefers-reduced-motion` without losing an honest loading signal; it animates a canvas from JavaScript, so the global CSS rule cannot reach it.
+- [x] FND-05 follow-up — the vendored `topbar` navigation progress bar honors `prefers-reduced-motion` with a static full-width loading bar; the canvas trickle and fade are not CSS, so the global rule cannot reach them. `{fm/parity-topbar-motion}`
 - [ ] Implement accepted navigation, link and action contracts.
 - [ ] Implement accepted native input, choice, feedback and data-display contracts.
 - [x] Implement the accepted modal contract (`OVR-01`, Adopt adapted) as shared `<.modal>`, adopt it in every production workflow overlay and show both widths in the Design Library. `{fm/modal-a11y-dialog-semantics/opus-5}`
