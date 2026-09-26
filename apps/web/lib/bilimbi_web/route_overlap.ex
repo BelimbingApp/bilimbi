@@ -6,9 +6,8 @@ defmodule BilimbiWeb.RouteOverlap do
   # check misses direct declarations and can silently shadow a mounted route.
   # Routes are checked in match order: one owner may place a strictly more
   # specific route before a general one, and every other overlap fails.
-  def __after_compile__(env, bytecode) do
-    {:module, router} = :code.load_binary(env.module, ~c"nofile", bytecode)
-    validate_routes!(router.__routes__())
+  def __after_compile__(env, _bytecode) do
+    validate_routes!(env.module.__routes__())
   end
 
   def validate_routes!(routes) do
