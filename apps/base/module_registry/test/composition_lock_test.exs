@@ -207,7 +207,7 @@ defmodule Bilimbi.Base.ModuleRegistry.CompositionLockTest do
                  end
   end
 
-  test "two mounted repositories with incompatible transitive requirements fail resolution", %{
+  test "two mounted repositories with divergent dependency sources are rejected", %{
     root: root
   } do
     a = mount!(root, "domains", "a")
@@ -259,6 +259,86 @@ defmodule Bilimbi.Base.ModuleRegistry.CompositionLockTest do
     assert status != 0
     assert output =~ "different specs were given for the shared app"
     assert File.regular?(Path.join(root, ".scratchpad/composition-lock/mix.lock"))
+    assert File.read!(Path.join(root, "mix.lock")) == "%{}\n"
+  end
+
+  test "two mounted repositories with incompatible transitive version requirements fail", %{
+    root: root
+  } do
+    a = mount!(root, "domains", "a")
+    b = mount!(root, "extensions", "b")
+    shared = Path.join(root, "packages/shared")
+    File.mkdir_p!(shared)
+    git!(shared, ["init", "-q"])
+
+    revisions =
+      for version <- ["1.4.0", "1.5.0"], into: %{} do
+        File.write!(Path.join(shared, "mix.exs"), mix_project(:shared, version, "[]"))
+        git!(shared, ["add", "mix.exs"])
+
+        git!(shared, [
+          "-c",
+          "user.name=Test",
+          "-c",
+          "user.email=test@example.com",
+          "commit",
+          "-q",
+          "-m",
+          version
+        ])
+
+        git!(shared, ["tag", "v#{version}"])
+        {version, shared |> git!(["rev-parse", "HEAD"]) |> String.trim()}
+      end
+
+    File.write!(
+      Path.join(a, "mix.exs"),
+      mix_project(:a, "0.1.0", "[{:shared, \"~> 1.5\", git: #{inspect(shared)}}]")
+    )
+
+    File.write!(
+      Path.join(b, "mix.exs"),
+      mix_project(:b, "0.1.0", "[{:shared, \"~> 1.4.0\", git: #{inspect(shared)}}]")
+    )
+
+    overlay = Bilimbi.CompositionLock.lockfile!(root)
+
+    resolve = fn deps, version ->
+      File.write!(
+        Path.join(root, "mix.exs"),
+        "Code.require_file(#{inspect(@helper)})\n" <>
+          String.replace(
+            mix_project(:composition, "0.1.0", deps),
+            "version: \"0.1.0\",",
+            "version: \"0.1.0\", lockfile: Bilimbi.CompositionLock.lockfile!(__DIR__),"
+          )
+      )
+
+      File.rm_rf!(Path.join(root, "deps"))
+      File.rm_rf!(Path.join(root, "_build"))
+
+      File.write!(
+        overlay,
+        inspect(%{shared: {:git, shared, Map.fetch!(revisions, version), []}})
+      )
+
+      mix = System.find_executable("mix")
+      {output, 0} = System.cmd(mix, ["deps.get"], cd: root, stderr_to_stdout: true)
+      assert Mix.Dep.Lock.read(overlay).shared == {:git, shared, revisions[version], []}, output
+      System.cmd(mix, ["deps.loadpaths"], cd: root, stderr_to_stdout: true)
+    end
+
+    both = "[{:a, path: \"apps/domains/a\"}, {:b, path: \"apps/extensions/b\"}]"
+
+    assert {_, 0} = resolve.("[{:a, path: \"apps/domains/a\"}]", "1.5.0")
+    assert {_, 0} = resolve.("[{:b, path: \"apps/extensions/b\"}]", "1.4.0")
+
+    for version <- ["1.4.0", "1.5.0"] do
+      {output, status} = resolve.(both, version)
+      assert status != 0
+      assert output =~ "does not match the requirement"
+    end
+
     assert File.read!(Path.join(root, "mix.lock")) == "%{}\n"
   end
 

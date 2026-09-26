@@ -202,15 +202,17 @@ they must not point at a repository-local or Platform lock.
 
 One composition build resolves **all** selected Domain and Extension
 dependencies together with `mix deps.get`, then checks the complete graph with
-`mix deps.loadpaths`. Individual repository lockfiles are not merged: conflicting
-constraints must fail resolution or dependency checking, rather than selecting
-one repository's transitive version. After the sources and lock are settled,
+`mix deps.loadpaths`. Individual repository lockfiles are not merged: one lock
+entry serves every repository, so transitive version requirements that entry
+cannot satisfy together fail dependency checking, and a dependency given from
+divergent sources is rejected, rather than selecting one repository's
+transitive version. After the sources and lock are settled,
 run `mix bilimbi.composition.lock --pin` at the Platform root. It writes
 `manifest.txt` beside the overlay with the exact Platform and mounted Git HEAD
 revisions plus the Platform and overlay lock SHA-256s. The repositories must
 be independent Git checkouts with clean tracked files. The company owns and
-publishes the overlay and manifest together as one build artifact; neither belongs in Platform Git or
-any mounted repository's Git history.
+publishes the overlay and manifest together as one build artifact; neither
+belongs in Platform Git or any mounted repository's Git history.
 
 Pinned CI checks out the manifest's Platform revision, mounts **every** listed
 repository at its listed revision, and restores both artifact files to the
