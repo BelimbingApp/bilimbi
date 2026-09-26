@@ -260,7 +260,9 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
  * single frame rather than `none` so `transitionend` and `animationend`
  * listeners still fire and state still settles. `!important` is deliberate:
  * the drawer and any id-specific rule would otherwise outrank the universal
- * selector. */
+ * selector. The page-loading bar is a canvas, so this block cannot reach it;
+ * apps/web/assets/vendor/topbar.js checks the same query and paints a static
+ * bar instead of trickling. */
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,
