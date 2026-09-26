@@ -1,4 +1,4 @@
-defmodule Bilimbi.Core.CapabilityReferenceIntegrityTest do
+defmodule BilimbiWeb.CapabilityReferenceIntegrityTest do
   @moduledoc """
   Proves that literal production capability references name installed Authz
   capabilities.

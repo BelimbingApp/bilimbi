@@ -69,6 +69,8 @@ npm-debug.log
 /apps/extensions/*
 !/apps/domains/AGENTS.md
 !/apps/extensions/AGENTS.md
+!/apps/domains/.ignore
+!/apps/extensions/.ignore
 # Folder guides sit beside those containers. `/apps/*` would hide them, and a
 # guide git ignores is a guide the harnesses skip.
 !/apps/AGENTS.md

@@ -66,11 +66,8 @@ jobs:
       # applies to the current project, and every module compiles as a dependency
       # of the root. A missing required attr warned and exited 0 (#176). Compiling
       # each module in its own project context is what makes those warnings fatal.
-      # The root alias derives mounted containers from the validated graph.
+      # The root alias compiles every discovered module, mounted ones included.
       - name: Compile each module strictly
-        # Plain `cd`, not `mix cmd --cd`: the root project recurses into its
-        # children, so `--cd apps/base` resolves relative to each child and
-        # fails with "Could not cd to apps/base".
         run: mix compile.strict
 
       - name: Run Credo
@@ -180,6 +177,10 @@ jobs:
 
       - name: Install dependencies
         run: mix deps.get
+
+      # The mounted Tailwind source test builds CSS with the pinned binary.
+      - name: Install Tailwind
+        run: (cd apps/web && mix tailwind.install --if-missing)
 
       # `mix precommit` runs the LiveView hook tests in Node (`mix assets.test`).
       - name: Install Node.js

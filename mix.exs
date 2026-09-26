@@ -82,7 +82,7 @@ defmodule Bilimbi.Umbrella.MixProject do
 
   defp precommit_test(_args) do
     mix = System.find_executable("mix") || Mix.raise("could not find mix executable")
-    containers = ["apps/core", "apps/base", "apps/web"] ++ mounted_containers()
+    containers = ["apps/core", "apps/base", "apps/web"] ++ module_paths([:domain, :extension])
 
     Enum.reduce_while(containers, containers, fn container, remaining ->
       Mix.shell().info("==> #{container}")
@@ -107,11 +107,11 @@ defmodule Bilimbi.Umbrella.MixProject do
   defp compile_strict(_args) do
     mix = System.find_executable("mix") || Mix.raise("could not find mix executable")
 
-    for container <- ["apps/base", "apps/core"] ++ mounted_containers() do
-      Mix.shell().info("==> #{container}")
+    for module <- module_paths([:base, :core, :domain, :extension]) do
+      Mix.shell().info("==> #{module}")
 
-      case System.cmd(mix, ["compile.strict"],
-             cd: Path.expand(container, __DIR__),
+      case System.cmd(mix, ["compile", "--warnings-as-errors"],
+             cd: Path.expand(module, __DIR__),
              into: IO.stream(:stdio, :line),
              stderr_to_stdout: true
            ) do
@@ -121,11 +121,13 @@ defmodule Bilimbi.Umbrella.MixProject do
     end
   end
 
-  defp mounted_containers do
+  # Mounted containers need no aliases: each module runs in its own project,
+  # as the Base and Core container aliases do.
+  defp module_paths(layers) do
     __DIR__
-    |> Bilimbi.Base.ModuleRegistry.MixDiscovery.container_paths()
-    |> Enum.reject(&(&1 in [Path.join(__DIR__, "apps/base"), Path.join(__DIR__, "apps/core")]))
-    |> Enum.map(&Path.relative_to(&1, __DIR__))
+    |> Bilimbi.Base.ModuleRegistry.MixDiscovery.discover_workspace!()
+    |> Enum.filter(&(&1.layer in layers))
+    |> Enum.map(&Path.relative_to(&1.path, __DIR__))
   end
 
   # The LiveView hooks in apps/web/assets/js are tested in Node, with the test

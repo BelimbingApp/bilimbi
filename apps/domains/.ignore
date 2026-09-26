@@ -1,0 +1,3 @@
+# Git ignores mounted repositories here; Git does not read this file.
+# Tailwind does, so its @source scan still reaches mounted templates.
+!/*
