@@ -644,6 +644,59 @@
               </div>
             </.card>
             <.card
+              id="component-inline-long-text"
+              title="Inline long text"
+              inner_class="space-y-4 p-4"
+            >
+              <p class="text-xs text-ink-muted">
+                Multi-line facts open in a textarea, save when focus leaves, and cancel with Escape. The stored value stays visible until the owner confirms the commit.
+              </p>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <p class="mb-2 text-xs text-ink-muted">Read state</p>
+                  <.inline_long_text
+                    id="design-library-inline-long-text-read"
+                    field="description"
+                    label="Description"
+                    value="Supports the regional service teams."
+                    editing={false}
+                    editable?
+                    save_event="preview-long-text"
+                    status={nil}
+                  />
+                </div>
+                <div>
+                  <p class="mb-2 text-xs text-ink-muted">Editing</p>
+                  <.inline_long_text
+                    id="design-library-inline-long-text-edit"
+                    field="description"
+                    label="Description"
+                    value="Supports the regional service teams."
+                    editing
+                    autofocus={false}
+                    editable?
+                    save_event="preview-long-text"
+                    allow_empty
+                    status={:saved}
+                  />
+                </div>
+                <div>
+                  <p class="mb-2 text-xs text-ink-muted">Commit refused</p>
+                  <.inline_long_text
+                    id="design-library-inline-long-text-error"
+                    field="description"
+                    label="Description"
+                    value="Supports the regional service teams."
+                    editing
+                    autofocus={false}
+                    editable?
+                    save_event="preview-long-text"
+                    status={{:error, "The description could not be saved."}}
+                  />
+                </div>
+              </div>
+            </.card>
+            <.card
               id="component-inline-choice"
               title="Inline choice fact"
               inner_class="space-y-4 p-4"

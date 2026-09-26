@@ -156,6 +156,11 @@ surface they are read on — a table row or a detail page fact:
   `role="status"` line, `{:error, message}` as a `role="alert"` naming the
   rejected value and the validation error. A refused commit is never a
   silent revert, and a validation error never lands only in a flash.
+- **Long text:** Multi-line facts use `<.inline_long_text>`. Its textarea saves
+  on blur and cancels on Escape; an unchanged or disallowed blank value
+  cancels without writing. The owner still validates and persists the value,
+  and a refused commit leaves the textarea open with the typed value and its
+  field-level status. It is a textarea, not a rich-text editor.
 
 ## Detail sections and facts
 

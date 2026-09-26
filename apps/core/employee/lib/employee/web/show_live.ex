@@ -8,9 +8,10 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   `/addresses/:id` and `/users/:id` and as Belimbing's `admin/employees/show`
   presents the same record:
 
-  - the text facts (full name, short name, employee number, designation,
-    email, mobile number, and the job description of an agent) commit on
-    Enter or on leaving the field, through `<.inline_edit>`; Escape cancels.
+  - the short text facts (full name, short name, employee number, designation,
+    email, and mobile number) commit on Enter or on leaving the field, through
+    `<.inline_edit>`; Escape cancels. An agent's multi-line job description
+    uses `<.inline_long_text>` and commits on leaving its textarea.
     Every nullable column passes `allow_empty`, so clearing a short name or
     an email is a real edit; the full name and employee number are required,
     so an emptied input commits nothing;
@@ -134,6 +135,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   defp init_ui_state(socket) do
     socket
     |> assign(:editing_field, nil)
+    |> assign(:job_description_input, nil)
     |> assign(:adding_subordinate, false)
     |> assign(:selected_subordinate_id, "")
     |> assign(:subordinates_sort_by, "full_name")
@@ -243,7 +245,17 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
     if can_manage?(socket) do
       case CommitStatus.inline_field(params, @inline_fields) do
         {:ok, name, field, value} ->
-          {:noreply, save_fact(socket, name, %{field => normalize_param(value)}, value)}
+          socket = save_fact(socket, name, %{field => normalize_param(value)}, value)
+
+          socket =
+            if name == "job_description" and
+                 match?({:error, _}, socket.assigns.field_status[name]) do
+              assign(socket, :job_description_input, value)
+            else
+              socket
+            end
+
+          {:noreply, socket}
 
         :error ->
           {:noreply, socket}
@@ -254,6 +266,17 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   end
 
   # --- Event Handlers: Choice Facts ---
+
+  def handle_event("edit_field", %{"field" => "job_description"}, socket) do
+    if can_manage?(socket) do
+      {:noreply,
+       socket
+       |> assign(:editing_field, "job_description")
+       |> assign(:job_description_input, socket.assigns.employee.job_description || "")}
+    else
+      {:noreply, write_forbidden(socket)}
+    end
+  end
 
   def handle_event("edit_field", %{"field" => field}, socket)
       when is_map_key(@choice_fields, field) do
@@ -267,7 +290,10 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   def handle_event("edit_field", _params, socket), do: {:noreply, socket}
 
   def handle_event("cancel_edit_field", _params, socket) do
-    {:noreply, assign(socket, :editing_field, nil)}
+    {:noreply,
+     socket
+     |> assign(:editing_field, nil)
+     |> assign(:job_description_input, nil)}
   end
 
   def handle_event("save_status", params, socket) do
@@ -681,6 +707,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   attr(:employee, :map, required: true)
   attr(:can_manage?, :boolean, required: true)
   attr(:field_status, :map, required: true)
+  attr(:editing_field, :string, default: nil)
+  attr(:job_description_input, :string, default: nil)
   attr(:class, :any, default: nil)
 
   defp text_fact(assigns) do
@@ -689,11 +717,35 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       |> assign(:label, fact_label(assigns.name))
       |> assign(:value, Map.fetch!(assigns.employee, Map.fetch!(@inline_fields, assigns.name)))
       |> assign(:allow_empty?, assigns.name in @nullable_fields)
+      |> assign(:editing?, assigns.editing_field == assigns.name)
       |> assign(:dom_id, fact_dom_id(assigns.name))
+      |> assign(
+        :long_text_value,
+        if(
+          assigns.editing_field == "job_description" and is_binary(assigns.job_description_input),
+          do: assigns.job_description_input,
+          else: Map.fetch!(assigns.employee, Map.fetch!(@inline_fields, assigns.name)) || ""
+        )
+      )
 
     ~H"""
+    <.inline_long_text
+      :if={@name == "job_description"}
+      id={@dom_id}
+      field={@name}
+      label={@label}
+      value={@long_text_value}
+      id_value={@employee.id}
+      editing={@editing?}
+      editable?={@can_manage?}
+      save_event="save_field"
+      allow_empty={@allow_empty?}
+      rows={2}
+      status={@field_status[@name]}
+      class={@class}
+    />
     <.inline_edit
-      :if={@can_manage?}
+      :if={@can_manage? and @name != "job_description"}
       id={@dom_id}
       name={@name}
       label={@label}
@@ -704,7 +756,10 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       status={@field_status[@name]}
       class={@class}
     />
-    <span :if={not @can_manage?} class={[is_nil(@value) && "text-ink-muted", @class]}>
+    <span
+      :if={not @can_manage? and @name != "job_description"}
+      class={[is_nil(@value) && "text-ink-muted", @class]}
+    >
       {@value || "—"}
     </span>
     """
@@ -843,6 +898,8 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
                   employee={@employee}
                   can_manage?={@can_manage?}
                   field_status={@field_status}
+                  editing_field={@editing_field}
+                  job_description_input={@job_description_input}
                 />
               </:item>
               <:item title={fact_label("designation")} id="employee-view-designation">
