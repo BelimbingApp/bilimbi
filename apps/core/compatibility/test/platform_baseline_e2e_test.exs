@@ -1,13 +1,19 @@
 defmodule Bilimbi.Core.PlatformBaselineE2ETest do
-  use ExUnit.Case, async: false
+  # Each test runs twice: on the Platform alone, and with a throwaway Domain
+  # mounted beside it. A mounted Domain's migrations join every host task, so
+  # the expected migrations come from the umbrella root's runtime, as the
+  # host tasks see them, never from this package's partial closure.
+  use ExUnit.Case,
+    async: false,
+    parameterize: [%{mounted_domain: false}, %{mounted_domain: true}]
 
   @moduletag timeout: 180_000
 
   alias Bilimbi.Base.Database
   alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.Repo
-  alias Bilimbi.Core.Compatibility
   alias Bilimbi.Core.Compatibility.MigrationTestRepo
+  alias Bilimbi.Core.Compatibility.MountedDomainFixture
   alias Bilimbi.Core.Compatibility.PlatformBaselineFailureDiagnostics
   alias Bilimbi.Core.Compatibility.PlatformBaselineTestRepo
   alias Ecto.Adapters.SQL
@@ -20,7 +26,33 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
   @workspace_root Path.expand("../../../..", __DIR__)
   @host_tasks ~w(bilimbi.migrate bilimbi.rollback bilimbi.schema.verify bilimbi.schema.adopt bilimbi.seeds.run)
 
-  setup context do
+  setup_all %{mounted_domain: mounted_domain} do
+    # A root build recompiles this package as a dependency, without
+    # test/support, and deletes those beams. Load them before the first
+    # nested run.
+    {:ok, modules} = :application.get_key(:bilimbi_core_compatibility, :modules)
+    Enum.each(modules, &Code.ensure_loaded!/1)
+
+    # A pinned composition lock names the mounted repositories, and the
+    # fixture is not one of them.
+    env = if mounted_domain, do: [{"BILIMBI_COMPOSITION_PINNED", nil}], else: []
+
+    MountedDomainFixture.unmount!()
+    if mounted_domain, do: MountedDomainFixture.mount!()
+
+    entries = workspace_migration_entries(env)
+
+    for {version, disposition} <- [
+          {MountedDomainFixture.baseline_version(), :compatible_baseline},
+          {MountedDomainFixture.version(), :bilimbi_only}
+        ] do
+      assert Enum.any?(entries, &match?({^version, _, ^disposition}, &1)) == mounted_domain
+    end
+
+    %{base_env: env, migration_entries: entries}
+  end
+
+  setup %{base_env: base_env} = context do
     PlatformBaselineFailureDiagnostics.capture(context, :setup, fn ->
       repo_options =
         Repo.config()
@@ -77,16 +109,17 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       assert PlatformBaselineTestRepo.config()[:pool_size] == 1
 
       %{
-        env: [
-          {"MIX_TEST_PARTITION", "_#{partition}"},
-          {"BILIMBI_RUNTIME_SCHEMA_FIXTURE", "enabled"}
-        ]
+        env:
+          [
+            {"MIX_TEST_PARTITION", "_#{partition}"},
+            {"BILIMBI_RUNTIME_SCHEMA_FIXTURE", "enabled"}
+          ] ++ base_env
       }
     end)
   end
 
   test "the operational fresh install verifies and supports the public identity APIs",
-       %{env: env} = context do
+       %{env: env, migration_entries: entries} = context do
     PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->
       assert_runtime_start_fails!(env, :queue)
       assert run_mix!("bilimbi.migrations", [], env) =~ "down"
@@ -100,10 +133,14 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       assert run_mix!("bilimbi.schema.verify", [], env) =~
                "Bilimbi compatibility schema verified."
 
-      assert recorded_versions() == Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
+      assert recorded_versions() == Enum.map(entries, &elem(&1, 0))
+
+      if context.mounted_domain do
+        assert relation(MountedDomainFixture.table()) == MountedDomainFixture.table()
+      end
 
       recovery_entries =
-        Compatibility.migration_entries()
+        entries
         |> Enum.drop_while(fn {_version, module, _disposition} ->
           module != Bilimbi.Core.Employee.Migrations.BroadenGlobalIndexAndAddSystemCompanyCheck
         end)
@@ -138,19 +175,16 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
   end
 
   test "operational commands adopt compatible structure before pending Bilimbi-only work",
-       %{env: env} = context do
+       %{env: env, migration_entries: entries} = context do
     PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->
-      latest_baseline_version = List.last(Compatibility.baseline_versions())
+      baseline_versions = for {version, _module, :compatible_baseline} <- entries, do: version
 
-      run_mix!("bilimbi.migrate", ["--quiet"], env)
-
-      run_mix!(
-        "bilimbi.rollback",
-        ["--to-exclusive", Integer.to_string(latest_baseline_version), "--quiet"],
-        env
-      )
-
+      # An existing Belimbing database holds every installed baseline and no
+      # Bilimbi-only work. A mounted Domain's baseline can follow Platform
+      # Bilimbi-only migrations, so no single rollback reaches that state.
+      migrate_baselines_only!(env)
       SQL.query!(PlatformBaselineTestRepo, "DROP TABLE bilimbi_schema_migrations", [])
+      SQL.query!(PlatformBaselineTestRepo, "DROP TABLE bilimbi_migration_provenance", [])
       install_legacy_queue_sentinels!()
       assert_runtime_start_fails!(env, :queue)
       assert relation("oban_jobs") == nil
@@ -161,12 +195,19 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       assert run_mix!("bilimbi.schema.adopt", [], env) =~
                "Existing Belimbing schema verified and adopted by Bilimbi."
 
-      assert recorded_versions() == Compatibility.baseline_versions()
+      assert recorded_versions() == baseline_versions
+
+      if context.mounted_domain do
+        assert relation(MountedDomainFixture.baseline_table()) ==
+                 MountedDomainFixture.baseline_table()
+
+        assert relation(MountedDomainFixture.table()) == nil
+      end
 
       assert run_mix!("bilimbi.migrations", [], env) =~ "down"
       run_mix!("bilimbi.migrate", ["--quiet"], env)
 
-      assert recorded_versions() == Enum.map(Compatibility.migration_entries(), &elem(&1, 0))
+      assert recorded_versions() == Enum.map(entries, &elem(&1, 0))
       assert relation("oban_jobs") == "oban_jobs"
       assert oban_migrated_version() == 14
       assert_legacy_queue_sentinels_unchanged!()
@@ -174,7 +215,8 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
     end)
   end
 
-  test "rollback refuses to discard active postcode override provenance", %{env: env} = context do
+  test "rollback refuses to discard active postcode override provenance",
+       %{env: env, migration_entries: entries} = context do
     PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->
       run_mix!("bilimbi.migrate", ["--quiet"], env)
 
@@ -206,7 +248,7 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
         []
       )
 
-      step = rollback_step_to(Bilimbi.Core.Geonames.Migrations.CreatePostcodeOverrides)
+      step = rollback_step_to(entries, Bilimbi.Core.Geonames.Migrations.CreatePostcodeOverrides)
       {output, status} = run_mix("bilimbi.rollback", ["--step", to_string(step), "--quiet"], env)
 
       assert status != 0
@@ -216,7 +258,8 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
     end)
   end
 
-  test "rollback refuses to discard retained performance history", %{env: env} = context do
+  test "rollback refuses to discard retained performance history",
+       %{env: env, migration_entries: entries} = context do
     PlatformBaselineFailureDiagnostics.capture(context, :test, fn ->
       run_mix!("bilimbi.migrate", ["--quiet"], env)
 
@@ -230,7 +273,7 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
         []
       )
 
-      step = rollback_step_to(Bilimbi.Base.Perf.Migrations.CreateSamples)
+      step = rollback_step_to(entries, Bilimbi.Base.Perf.Migrations.CreateSamples)
       {output, status} = run_mix("bilimbi.rollback", ["--step", to_string(step), "--quiet"], env)
 
       assert status != 0
@@ -296,6 +339,56 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
     end)
   end
 
+  # Every installed migration as the umbrella root's runtime, the one the
+  # host tasks run in, discovers it.
+  defp workspace_migration_entries(env) do
+    {output, status} =
+      System.cmd(
+        System.find_executable("mix"),
+        [
+          "run",
+          "--no-start",
+          "-e",
+          ~s[IO.puts("migration_entries:" <> Base.encode64(:erlang.term_to_binary(] <>
+            ~s[Bilimbi.Core.Compatibility.migration_entries())))]
+        ],
+        cd: @workspace_root,
+        env: [{"MIX_ENV", "test"} | env],
+        stderr_to_stdout: true
+      )
+
+    assert status == 0, "mix run failed with status #{status}:\n#{output}"
+    [encoded] = Regex.run(~r/^migration_entries:(\S+)$/m, output, capture: :all_but_first)
+    encoded |> Base.decode64!() |> :erlang.binary_to_term()
+  end
+
+  defp migrate_baselines_only!(env) do
+    {output, status} =
+      System.cmd(
+        System.find_executable("mix"),
+        [
+          "run",
+          "--no-start",
+          "-e",
+          "Bilimbi.Base.ModuleRegistry.complete_modules!(); " <>
+            "{:ok, _, _} = Ecto.Migrator.with_repo(Bilimbi.Base.Repo, " <>
+            "&Bilimbi.Core.Compatibility.migrate_baseline(&1, log: false))"
+        ],
+        cd: @workspace_root,
+        env: [{"MIX_ENV", "test"} | env],
+        stderr_to_stdout: true
+      )
+
+    PlatformBaselineFailureDiagnostics.record_nested_mix(
+      "run",
+      ["migrate_baseline"],
+      status,
+      output
+    )
+
+    assert status == 0, "baseline-only migrate failed with status #{status}:\n#{output}"
+  end
+
   defp run_mix!(task, args, env) do
     case run_mix(task, args, env) do
       {output, 0} ->
@@ -343,8 +436,8 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
     |> Enum.map(fn [version] -> version end)
   end
 
-  defp rollback_step_to(module) do
-    Compatibility.migration_entries()
+  defp rollback_step_to(entries, module) do
+    entries
     |> Enum.reverse()
     |> Enum.find_index(fn {_version, migration_module, _disposition} ->
       migration_module == module
