@@ -58,9 +58,18 @@ defmodule Mix.Tasks.Bilimbi.ServerTest do
   end
 
   test "reenables compilation after cleaning dependency builds" do
+    # A removed graph marker stands in for the cleaned build: only a compile
+    # that actually runs again can restore it.
+    markers =
+      Path.wildcard(Path.join(Mix.Project.compile_path(), ".bilimbi_graph_*"), match_dot: true)
+
+    assert [_marker] = markers
+    Enum.each(markers, &File.rm!/1)
+
     Mix.Task.Compiler.reenable()
 
     assert {:ok, _warnings} = Mix.Task.run("compile")
+    assert Enum.all?(markers, &File.regular?/1)
   end
 
   defp copy_compiled_app_files(workspace_root) do
