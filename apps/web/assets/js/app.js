@@ -34,12 +34,13 @@ import Combobox from "./combobox"
 import SecretReveal from "./secret_reveal"
 import Modal from "./modal"
 import FlashAutoDismiss from "./flash_auto_dismiss"
+import ClipboardCopy from "./clipboard_copy"
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, DashboardSort, DisclosureDismiss, Combobox, SecretReveal, Modal, FlashAutoDismiss},
+  hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, DashboardSort, DisclosureDismiss, Combobox, SecretReveal, Modal, FlashAutoDismiss, ClipboardCopy},
 })
 
 // Show progress bar on live navigation and form submits

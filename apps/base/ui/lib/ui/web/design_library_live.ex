@@ -9,6 +9,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Menu.Item
+  alias Bilimbi.Base.UI.IconRegistry
 
   # The Navigation entry renders `Layouts.nav_menu/1` -- the shell's own menu
   # -- over a fixed tree, so the card cannot drift from what the sidebar does.
@@ -98,6 +99,11 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
     %{id: "llc", name: "Limited Liability Company", used_by: 3}
   ]
 
+  # The Graphic page's icon catalogue. A copy report names a tile by the text
+  # the hook read from it; anything else is not a name this page offered.
+  @icon_catalog IconRegistry.catalog()
+  @icon_names for group <- @icon_catalog, icon <- group.icons, do: icon.name
+
   @impl true
   def mount(_params, _session, socket) do
     mount_area(:theme, socket)
@@ -182,7 +188,10 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
          as: :toolbar_full
        )
      )
-     |> assign(:filter_toolbar_search_form, to_form(%{"search" => ""}, as: :toolbar_search))}
+     |> assign(:filter_toolbar_search_form, to_form(%{"search" => ""}, as: :toolbar_search))
+     |> assign(:icon_total, length(@icon_names))
+     |> assign(:icon_copy, nil)
+     |> assign_icon_filter("")}
   end
 
   @impl true
@@ -280,6 +289,24 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> assign_preview_page(:pattern, 1, socket.assigns.pattern_page.page_size)}
   end
 
+  def handle_event("icon-filter", %{"icon_filters" => %{"search" => search}}, socket) do
+    {:noreply, assign_icon_filter(socket, search)}
+  end
+
+  def handle_event("icon-clear-filter", _params, socket) do
+    {:noreply, assign_icon_filter(socket, "")}
+  end
+
+  # The ClipboardCopy hook reports whether the browser accepted the write, so
+  # the catalogue says "Copied" only when the name is on the clipboard, and
+  # says so plainly when the browser refused.
+  def handle_event("icon-copied", %{"text" => name, "copied" => copied}, socket)
+      when name in @icon_names and is_boolean(copied) do
+    {:noreply, assign(socket, :icon_copy, {if(copied, do: :copied, else: :failed), name})}
+  end
+
+  def handle_event("icon-copied", _params, socket), do: {:noreply, socket}
+
   # The confirmation flow: a request opens the dialog for one example row,
   # confirming acts on that held row, and the outcome reports inside the
   # card, where a production screen would raise its flash or panel notice.
@@ -319,6 +346,26 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
            "Change those companies' legal entity type first."}
     )
   end
+
+  defp assign_icon_filter(socket, search) do
+    query = search |> String.trim() |> String.downcase()
+
+    groups =
+      for group <- @icon_catalog,
+          icons = Enum.filter(group.icons, &icon_matches?(&1, query)),
+          icons != [],
+          do: %{group | icons: icons}
+
+    assign(socket,
+      icon_filter_form: to_form(%{"search" => search}, as: :icon_filters),
+      icon_query: String.trim(search),
+      icon_groups: groups,
+      icon_shown: groups |> Enum.map(&length(&1.icons)) |> Enum.sum()
+    )
+  end
+
+  defp icon_matches?(_icon, ""), do: true
+  defp icon_matches?(%{name: name}, query), do: String.contains?(name, query)
 
   defp assign_sample_search(socket, search) do
     socket

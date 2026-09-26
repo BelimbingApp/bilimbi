@@ -21,7 +21,7 @@ The campaign is structured so audits and production adoption can run in parallel
 
 The foundation at https://github.com/BelimbingApp/bilimbi/pull/696 merged on 2026-09-14 at 07:02:16 UTC with all seven checks passing. It integrates `main` through `d93feb1`, including #694's status-first company actions and 24px icon hit targets. Its accepted decisions retain compact `rounded-md` fields, brand focus, open filter toolbars and calm destructive actions. Inline icon controls retain their small glyphs within 24px targets; table and toolbar controls remain 28px. Pagination uses content-sized `w-auto`, `h-7`, `pl-2 pr-6` geometry so three-digit options clear the dropdown arrow, preserving the intentional #304 correction in both root guidance and `DESIGN.md`.
 
-The foundation completed specimen interactions, browser review and `mix precommit`; its closeout evidence is recorded in the Design Library plan. The account menu and top-bar utilities shipped in the application shell slice (#711) and the named icon vocabulary in #715; the searchable icon review and the wider catalog are subsequent slices whose recorded design contract does not claim they already ship. No agent should treat accidental branch state, a Belimbing value or an isolated production screen as design authority.
+The foundation completed specimen interactions, browser review and `mix precommit`; its closeout evidence is recorded in the Design Library plan. The account menu and top-bar utilities shipped in the application shell slice (#711) and the named icon vocabulary in #715; the searchable icon catalogue later shipped on the Design Library's Graphic page, and the wider catalog is a subsequent slice whose recorded design contract does not claim it already ships. No agent should treat accidental branch state, a Belimbing value or an isolated production screen as design authority.
 
 ## Top-Level Components
 
@@ -54,7 +54,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | FND-03 | Spacing and density rhythm | Partly standardized | Define one compact rhythm across primitives and page assemblies. |
 | FND-04 | Shape, lines and elevation | Strong identity with local drift | Keep Bilimbi geometry; remove unexplained variations. |
 | FND-05 | Focus, motion and reduced motion | Partial | Define consistent focus visibility, transition purpose and reduced-motion behavior. |
-| FND-06 | Icon language and catalog | Registry exists; review is limited | Use Belimbing's established icon choices for equivalent actions, except logout, while rendering them through Bilimbi's icon component and registry. Add searchable visual review, empty result, copy and copied feedback. |
+| FND-06 | Icon language and catalog | Registry exists; the Design Library's Graphic page presents it as a searchable visual catalogue grouped by family, with an empty result and copy and copied feedback | Use Belimbing's established icon choices for equivalent actions, except logout, while rendering them through Bilimbi's icon component and registry. Add searchable visual review, empty result, copy and copied feedback. |
 | LAY-01 | Authentication shell | Exists | Compare first impression, responsive behavior, errors and recovery. |
 | LAY-02 [(contradicted)](#targets-the-evidence-contradicts) | Application shell and account footer | Exists | Remove persistent company and tenant repetition. Put the current timezone and light/dark theme selectors in the top bar. Keep the user circle at the bottom left as the account and scope entry point; show an always-visible warning only for unusual or safety-critical scope. Match the best collapse, drawer and navigation-continuity behavior. |
 | LAY-03 | Page width and page header | Shared primitives exist | Cover title, subtitle, action, pin, contextual help and narrow states. |
@@ -104,7 +104,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | CMP-05 | Authentication and first arrival | Login, recovery and dashboard arrival ship and were audited live against Belimbing (Lanes A and D); the sign-in handoff is a busy submit with readonly fields | Treat login, recovery and dashboard arrival as first-impression acceptance surfaces. |
 | CMP-06 | Responsive and theme coverage | The `/companies` index and the shell were verified live at narrow width and in dark theme (Lane D); narrow detail, narrow form and a full keyboard pass remain | Review representative assemblies at desktop/narrow widths and in light/dark themes. |
 | GFX-01 | Mark and wordmark | Present | Keep Bilimbi identity and verify size, surface and contrast uses. |
-| GFX-02 | Product and interface icons | Registry and Heroicons exist | Make the approved FND-06 icon set searchable and verify size, alignment and meaning without copying Belimbing assets or framework markup. |
+| GFX-02 | Product and interface icons | Registry and Heroicons exist; the registry is searchable on the Design Library's Graphic page | Make the approved FND-06 icon set searchable and verify size, alignment and meaning without copying Belimbing assets or framework markup. |
 | GFX-03 | Placeholder and empty-state graphics | Limited | Add only when graphics improve comprehension rather than decorate empty space. |
 
 ### Disposition Ledger
@@ -781,7 +781,7 @@ Goal: Give familiar actions named entries in the icon registry so call sites nam
 
 The slice added the named action vocabulary beside the 3 Bilimbi glyph entries and 9 shell names the registry already had, and left the glyph count unchanged. Later slices keep naming actions in it — `history` landed with the read-first detail page — so `IconRegistry.actions/0` is what counts them.
 
-Not delivered by this slice, and still open under FND-06 and GFX-02: the searchable visual icon review with empty-result, copy and copied feedback. The registry holds the vocabulary; no review surface presents it yet.
+Not delivered by this slice: the searchable visual icon review with empty-result, copy and copied feedback. A later slice added it as the icon catalogue on the Design Library's Graphic page, over `IconRegistry.catalog/0`.
 
 The deferred gap is closed, after this slice and outside #715: registry names are now checked against the icons the build can emit, not against a second copy of the map. `BilimbiWeb.HeroiconsManifest` derives the accepted `hero-` names from the Tailwind plugin's own icon directory and suffix table, and `apps/web/test/bilimbi_web/icon_name_validity_test.exs` holds both halves of the named vocabulary to them through `IconRegistry.actions/0` and `IconRegistry.shell_actions/0`; `menu_icon_safelist_test.exs` holds contributed menu Heroicons and the `app.css` safelist to the same names. A misspelled or upstream-removed glyph now fails the suite instead of rendering an empty span. Call sites that bypass the registry and pass a `hero-` name straight through remain unchecked.
 

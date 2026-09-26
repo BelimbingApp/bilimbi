@@ -25,6 +25,19 @@ defmodule Bilimbi.Base.UI.IconRegistryTest do
     assert hero_icon == icon
   end
 
+  test "the catalogue lists every custom glyph and action name once, each resolving" do
+    [glyphs, actions] = IconRegistry.catalog()
+
+    assert Enum.map(glyphs.icons, & &1.name) ==
+             Enum.sort(["bilimbi-pin", "bilimbi-impersonate", "hero-impersonate"])
+
+    assert Map.new(actions.icons, &{&1.name, &1.heroicon}) == IconRegistry.actions()
+
+    for group <- [glyphs, actions], icon <- group.icons do
+      assert IconRegistry.renderable?(icon.name)
+    end
+  end
+
   test "maps each familiar action meaning to one Heroicon" do
     assert IconRegistry.actions() == %{
              "create" => "hero-plus",

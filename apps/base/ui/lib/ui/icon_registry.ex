@@ -215,4 +215,30 @@ defmodule Bilimbi.Base.UI.IconRegistry do
 
   @spec actions() :: %{String.t() => String.t()}
   def actions, do: @actions
+
+  @typedoc "One catalogue entry: the name a call site passes to `<.icon>`, and the Heroicon it resolves to, if any."
+  @type catalog_entry :: %{name: String.t(), heroicon: String.t() | nil}
+
+  @doc """
+  Every name this registry resolves, grouped the way a call site reaches it.
+
+  Custom glyphs come first, then the action names with the Heroicon each one
+  chooses. Raw `hero-*` passthrough names are not listed: they are the
+  Heroicons set itself, not this registry's vocabulary.
+  """
+  @spec catalog() :: [%{id: atom(), label: String.t(), icons: [catalog_entry()]}]
+  def catalog do
+    [
+      %{
+        id: :glyphs,
+        label: "Custom glyphs",
+        icons: for(name <- Enum.sort(Map.keys(@icons)), do: %{name: name, heroicon: nil})
+      },
+      %{
+        id: :actions,
+        label: "Actions",
+        icons: for({name, hero} <- Enum.sort(@actions), do: %{name: name, heroicon: hero})
+      }
+    ]
+  end
 end
