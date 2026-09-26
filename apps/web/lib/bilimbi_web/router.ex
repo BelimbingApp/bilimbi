@@ -1,5 +1,6 @@
 defmodule BilimbiWeb.Router do
   use BilimbiWeb, :router
+  @after_compile BilimbiWeb.RouteOverlap
 
   import BilimbiWeb.UserAuth,
     only: [

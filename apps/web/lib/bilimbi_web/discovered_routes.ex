@@ -19,7 +19,16 @@ defmodule BilimbiWeb.DiscoveredRoutes do
         []
       end
 
-    routes = [%{path: "/dashboard", live: BilimbiWeb.DashboardLive, session: :auth} | routes]
+    routes = [
+      %{
+        path: "/dashboard",
+        live: BilimbiWeb.DashboardLive,
+        session: :auth,
+        source: "web",
+        layer: :web
+      }
+      | routes
+    ]
 
     groups =
       routes
@@ -41,7 +50,8 @@ defmodule BilimbiWeb.DiscoveredRoutes do
             action = :"bilimbi:#{route.path}"
 
             quote do
-              live unquote(route.path), unquote(route.live), unquote(action)
+              live unquote(route.path), unquote(route.live), unquote(action),
+                metadata: %{bilimbi_route_owner: unquote({route.layer, route.source})}
             end
           end
 
@@ -84,7 +94,8 @@ defmodule BilimbiWeb.DiscoveredRoutes do
             match unquote(verb),
                   unquote(route.path),
                   unquote(route.controller),
-                  unquote(route.action)
+                  unquote(route.action),
+                  metadata: %{bilimbi_route_owner: unquote({route.layer, route.source})}
           end
         end
 
@@ -102,7 +113,8 @@ defmodule BilimbiWeb.DiscoveredRoutes do
             match unquote(verb),
                   unquote(route.path),
                   unquote(route.controller),
-                  unquote(route.action)
+                  unquote(route.action),
+                  metadata: %{bilimbi_route_owner: unquote({route.layer, route.source})}
           end
         end
     end
