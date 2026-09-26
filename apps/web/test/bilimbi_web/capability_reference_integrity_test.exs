@@ -1,4 +1,4 @@
-defmodule Bilimbi.Core.CapabilityReferenceIntegrityTest do
+defmodule BilimbiWeb.CapabilityReferenceIntegrityTest do
   @moduledoc """
   Proves that literal production capability references name installed Authz
   capabilities.
@@ -14,16 +14,11 @@ defmodule Bilimbi.Core.CapabilityReferenceIntegrityTest do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Authz.CapabilityKey
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
+  alias Bilimbi.Base.ModuleRegistry.MixDiscovery
 
   @workspace_root Path.expand("../../../..", __DIR__)
   @segment ~S"[a-z][a-z0-9]*(?:-[a-z0-9]+)*"
   @capability "#{@segment}(?:\\.#{@segment}){2,}"
-  @source_globs [
-    "apps/*/lib/**/*.{ex,heex}",
-    "apps/*/priv/**/*.exs",
-    "apps/*/*/lib/**/*.{ex,heex}",
-    "apps/*/*/priv/**/*.exs"
-  ]
   @source_patterns [
     Regex.compile!(~S'\bcapability:\s*"(?<capability>' <> @capability <> ~S')"'),
     Regex.compile!(
@@ -79,8 +74,10 @@ defmodule Bilimbi.Core.CapabilityReferenceIntegrityTest do
   end
 
   defp source_paths do
-    @source_globs
-    |> Enum.flat_map(&Path.wildcard(Path.join(@workspace_root, &1)))
+    (MixDiscovery.module_source_files(@workspace_root, "lib/**/*.{ex,heex}") ++
+       MixDiscovery.module_source_files(@workspace_root, "priv/**/*.exs") ++
+       Path.wildcard(Path.join(@workspace_root, "apps/web/lib/**/*.{ex,heex}")) ++
+       Path.wildcard(Path.join(@workspace_root, "apps/web/priv/**/*.exs")))
     |> Enum.sort()
     |> Enum.uniq()
     |> Enum.map(&Path.relative_to(&1, @workspace_root))

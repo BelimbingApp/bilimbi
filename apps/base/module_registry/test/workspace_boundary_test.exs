@@ -8,10 +8,15 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
   @core_root Path.join(@workspace_root, "apps/core")
 
   test "composition containers contain no module implementation or resources" do
-    for container_root <- [@base_root, @core_root] do
-      refute File.dir?(Path.join(container_root, "lib"))
-      refute File.dir?(Path.join(container_root, "priv"))
-      refute File.dir?(Path.join(container_root, "test"))
+    assert container_resources(@workspace_root) == []
+  end
+
+  test "a mounted container carrying its own lib/ fails the container check" do
+    root = mounted_container_lib_workspace!()
+    on_exit(fn -> File.rm_rf!(root) end)
+
+    assert_raise ArgumentError, ~r{apps/domains/factory/lib is missing bilimbi.module.exs}, fn ->
+      container_resources(root)
     end
   end
 
@@ -120,6 +125,56 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
     |> Enum.flat_map(&Path.wildcard(Path.join(&1, "*/bilimbi.module.exs")))
     |> Enum.map(&Path.dirname/1)
     |> Enum.sort()
+  end
+
+  defp container_resources(workspace_root) do
+    for container_root <- MixDiscovery.container_paths(workspace_root),
+        directory <- ~w(lib priv test),
+        path = Path.join(container_root, directory),
+        File.dir?(path),
+        do: path
+  end
+
+  defp mounted_container_lib_workspace! do
+    root =
+      Path.join(
+        System.tmp_dir!(),
+        "bilimbi-workspace-boundary-#{System.unique_integer([:positive, :monotonic])}"
+      )
+
+    container = Path.join([root, "apps", "domains", "factory"])
+    module = Path.join(container, "widget")
+
+    File.mkdir_p!(module)
+    File.mkdir_p!(Path.join(container, "lib"))
+    {_, 0} = System.cmd("git", ["init", "-q", container])
+
+    File.write!(
+      Path.join(container, "bilimbi.container.exs"),
+      inspect([id: "factory", kind: :container, layer: :domain], pretty: true) <> "\n"
+    )
+
+    descriptor = [
+      id: "factory/widget",
+      kind: :module,
+      layer: :domain,
+      required: false,
+      otp_app: :test_boundary_factory_widget,
+      namespace: Test.Boundary.Factory.Widget,
+      dependencies: [],
+      migrations: nil,
+      web: nil,
+      schema_contract: nil,
+      contribution_provider: nil,
+      dev_seed: nil
+    ]
+
+    File.write!(
+      Path.join(module, "bilimbi.module.exs"),
+      inspect(descriptor, pretty: true, limit: :infinity) <> "\n"
+    )
+
+    root
   end
 
   defp missing_migration_workspace! do

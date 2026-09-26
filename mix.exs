@@ -1,7 +1,8 @@
+[discovery_file] = Path.wildcard(Path.expand("apps/base/*/mix/module_discovery.exs", __DIR__))
+Code.require_file(discovery_file)
+
 defmodule Bilimbi.Umbrella.MixProject do
   use Mix.Project
-
-  @precommit_test_containers ["apps/core", "apps/base", "apps/web"]
 
   def project do
     [
@@ -69,6 +70,7 @@ defmodule Bilimbi.Umbrella.MixProject do
         "bilimbi.contributions.verify"
       ],
       "precommit.test": &precommit_test/1,
+      "compile.strict": &compile_strict/1,
       "assets.test": &assets_test/1
     ]
   end
@@ -80,26 +82,53 @@ defmodule Bilimbi.Umbrella.MixProject do
 
   defp precommit_test(_args) do
     mix = System.find_executable("mix") || Mix.raise("could not find mix executable")
+    containers = ["apps/core", "apps/base", "apps/web"] ++ module_paths([:domain, :extension])
 
-    Enum.reduce_while(@precommit_test_containers, @precommit_test_containers, fn container,
-                                                                                 remaining ->
-      Mix.shell().info("==> #{container}")
+    _ =
+      Enum.reduce_while(containers, containers, fn container, remaining ->
+        Mix.shell().info("==> #{container}")
 
-      case System.cmd(mix, ["test"],
-             cd: Path.expand(container, __DIR__),
+        case System.cmd(mix, ["test"],
+               cd: Path.expand(container, __DIR__),
+               into: IO.stream(:stdio, :line),
+               stderr_to_stdout: true
+             ) do
+          {_output, 0} ->
+            {:cont, tl(remaining)}
+
+          {_output, status} ->
+            report_skipped_precommit_tests(tl(remaining))
+            exit({:shutdown, status})
+        end
+      end)
+
+    :ok
+  end
+
+  defp compile_strict(_args) do
+    mix = System.find_executable("mix") || Mix.raise("could not find mix executable")
+
+    for module <- module_paths([:base, :core, :domain, :extension]) do
+      Mix.shell().info("==> #{module}")
+
+      case System.cmd(mix, ["compile", "--warnings-as-errors"],
+             cd: Path.expand(module, __DIR__),
              into: IO.stream(:stdio, :line),
              stderr_to_stdout: true
            ) do
-        {_output, 0} ->
-          {:cont, tl(remaining)}
-
-        {_output, status} ->
-          report_skipped_precommit_tests(tl(remaining))
-          exit({:shutdown, status})
+        {_output, 0} -> :ok
+        {_output, status} -> exit({:shutdown, status})
       end
-    end)
+    end
+  end
 
-    :ok
+  # Mounted containers need no aliases: each module runs in its own project,
+  # as the Base and Core container aliases do.
+  defp module_paths(layers) do
+    __DIR__
+    |> Bilimbi.Base.ModuleRegistry.MixDiscovery.discover_workspace!()
+    |> Enum.filter(&(&1.layer in layers))
+    |> Enum.map(&Path.relative_to(&1.path, __DIR__))
   end
 
   # The LiveView hooks in apps/web/assets/js are tested in Node, with the test

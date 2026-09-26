@@ -30,6 +30,8 @@ A record's page reads first and edits in place. There is no separate Edit button
 
 Assert what the running system does. Do not add a test that reads or pattern-matches a source file to prove a bug is gone: two did that and passed while the problem they claimed to catch was still in the tree. A security or database boundary makes PostgreSQL do the refusing; for the SQL console that is `QueryExecutor`'s `READ ONLY` transaction. See `apps/base/database/AGENTS.md`.
 
+For source guard scans and container checks, use `Bilimbi.Base.ModuleRegistry.MixDiscovery`'s validated module and container paths. A fixed `apps/*/*` glob misses mounted Domain and Extension packages. See `module_source_files/2`, `module_route_files/1`, and `container_paths/1` in `apps/base/module_registry/mix/module_discovery.exs`.
+
 ## Routes
 
 Let `BilimbiWeb.RouteOverlap` check the compiled router for route conflicts. A route manifest alone misses direct host routes; injected routes carry their descriptor owner and layer in Phoenix route metadata. See `apps/web/lib/bilimbi_web/discovered_routes.ex`.

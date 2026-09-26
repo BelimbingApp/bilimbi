@@ -14,6 +14,7 @@ defmodule Bilimbi.Base.UI.CapabilityCheckSpellingTest do
   """
 
   use ExUnit.Case, async: true
+  alias Bilimbi.Base.ModuleRegistry.MixDiscovery
 
   @workspace_root Path.expand("../../../..", __DIR__)
 
@@ -23,9 +24,7 @@ defmodule Bilimbi.Base.UI.CapabilityCheckSpellingTest do
 
   test "no screen hand-rolls a capability check" do
     offenders =
-      @workspace_root
-      |> Path.join("apps/*/*/lib/**/*.{ex,heex}")
-      |> Path.wildcard()
+      MixDiscovery.module_source_files(@workspace_root, "lib/**/*.{ex,heex}")
       |> Enum.reject(&exempt?/1)
       |> Enum.flat_map(&inline_checks/1)
       |> Enum.sort()
