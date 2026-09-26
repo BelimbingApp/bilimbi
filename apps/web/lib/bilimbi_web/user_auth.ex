@@ -803,10 +803,13 @@ defmodule BilimbiWeb.UserAuth do
 
       # Every fact above is proven, so this edge is where the scope learns who
       # is signed in. Module code reads that from `Scope.actor/1` and cannot
-      # assert it; this is one of the seam's two allowlisted callers.
+      # assert it; this is one of the seam's two callers.
       scope =
-        Authentication.sign_in(tenant_scope, user.id, company_id,
-          impersonator_id: impersonator && impersonator.id
+        Authentication.sign_in(
+          tenant_scope,
+          user.id,
+          company_id,
+          impersonation_opts(impersonator, session_id)
         )
 
       {:ok, actor} = Authz.scope_actor(scope)
@@ -852,6 +855,11 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   defp extract_impersonator(_), do: nil
+
+  defp impersonation_opts(nil, _session_id), do: []
+
+  defp impersonation_opts(%{id: impersonator_id}, session_id),
+    do: [impersonator_id: impersonator_id, impersonation_session_id: session_id]
 
   defp presentation_user(%Summary{} = user, %Scope{} = scope) do
     %{

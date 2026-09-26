@@ -4,7 +4,7 @@ defmodule Bilimbi.Base.Queue.Execution do
 
   `scope` is the signed-in user's scope for a job enqueued with
   `Bilimbi.Base.Queue.enqueue_for/3`, rebuilt when the job runs with its
-  tenant re-proven live. It is `nil` for ordinary system work; such a worker
+  tenant and user re-proven live. It is `nil` for ordinary system work; such a worker
   builds a system scope with `Bilimbi.Base.Tenancy.scope/1` when it needs one.
   """
 

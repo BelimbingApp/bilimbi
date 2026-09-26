@@ -28,7 +28,7 @@ A record's page reads first and edits in place. There is no separate Edit button
 
 ## Who performed it
 
-Take the person who performed an operation (an approver, an overrider, a requester) from `Bilimbi.Base.Tenancy.Scope.actor/1`, and ask whether they may do it with `Bilimbi.Base.Authz.can(scope, capability)`. Do not accept an actor or approver ID as an argument, and do not build one with `Authz.actor/5`, which checks whoever the caller names. A system actor names nobody, so refuse it. Under impersonation the actor carries `impersonator_id`; record it or refuse. Never call `Bilimbi.Base.Tenancy.Authentication` from module code: `apps/web/test/bilimbi_web/scope_actor_boundary_test.exs` fails the build. A job that acts for a user is enqueued with `Queue.enqueue_for/3` and reads `execution.scope`.
+Take the person who performed an operation (an approver, an overrider, a requester) from `Bilimbi.Base.Tenancy.Scope.actor/1`, and ask whether they may do it with `Bilimbi.Base.Authz.can(scope, capability)`. Do not accept an actor or approver ID as an argument, and do not build one with `Authz.actor/5`, which checks whoever the caller names. A system actor names nobody, so refuse it. Under impersonation the actor carries `impersonator_id`; record it or refuse. Never call `Bilimbi.Base.Tenancy.Authentication` from module code: it is the authentication edge, and an actor it did not seal fails `Scope.actor/1`. A job that acts for a user is enqueued with `Queue.enqueue_for/3` and reads `execution.scope`; it runs only while Core User still proves the user (and any impersonation it was queued under).
 
 ## Tests
 

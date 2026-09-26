@@ -1,6 +1,7 @@
 defmodule Bilimbi.Base.Tenancy.ScopeActorTest do
-  use Bilimbi.Base.Database.DataCase, async: true
+  use Bilimbi.Base.Database.DataCase, async: false
 
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Actor
   alias Bilimbi.Base.Tenancy.Authentication
@@ -16,7 +17,21 @@ defmodule Bilimbi.Base.Tenancy.ScopeActorTest do
     insert_tenant!(%{id: 42, name: "Customer", is_platform_operator: false})
     {:ok, operator} = Tenancy.scope(41)
     {:ok, customer} = Tenancy.scope(42)
+
+    install_verifier!(__MODULE__.Verifier)
+    on_exit(&ContributionRegistry.clear_for_test!/0)
+
     %{operator: operator, customer: customer}
+  end
+
+  defmodule Verifier do
+    @behaviour Bilimbi.Base.Tenancy.ActorVerifier
+
+    @impl true
+    def verify_actor(scope) do
+      send(self(), {:verified, Scope.actor(scope)})
+      Process.get(:actor_verifier_answer, :ok)
+    end
   end
 
   describe "a tenant-only scope" do
@@ -50,9 +65,21 @@ defmodule Bilimbi.Base.Tenancy.ScopeActorTest do
 
       assert Scope.tenant_id(signed_in) == 41
 
-      impersonated = Authentication.sign_in(scope, 8, 10, impersonator_id: 7)
+      impersonated =
+        Authentication.sign_in(scope, 8, 10, impersonator_id: 7, impersonation_session_id: "s1")
 
-      assert %Actor{type: :user, user_id: 8, impersonator_id: 7} = Scope.actor(impersonated)
+      assert %Actor{type: :user, user_id: 8, impersonator_id: 7, impersonation_session_id: "s1"} =
+               Scope.actor(impersonated)
+    end
+
+    test "an impersonation names both the operator and the borrowed session", %{operator: scope} do
+      assert_raise FunctionClauseError, fn ->
+        Authentication.sign_in(scope, 8, 10, impersonator_id: 7)
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        Authentication.sign_in(scope, 8, 10, impersonation_session_id: "s1")
+      end
     end
 
     test "sets the actor once and never changes it", %{operator: scope} do
@@ -82,6 +109,7 @@ defmodule Bilimbi.Base.Tenancy.ScopeActorTest do
             %{actor | user_id: 99},
             %{actor | company_id: 99},
             %{actor | impersonator_id: 99},
+            %{actor | impersonation_session_id: "borrowed"},
             %{actor | type: :system}
           ] do
         assert_raise ForgedActorError, fn -> Scope.actor(%{signed_in | actor: forged_actor}) end
@@ -116,13 +144,31 @@ defmodule Bilimbi.Base.Tenancy.ScopeActorTest do
 
   describe "delegation to a background job" do
     test "resumes the same user on a freshly proven tenant", %{operator: scope} do
-      signed_in = Authentication.sign_in(scope, 8, 10, impersonator_id: 7)
+      signed_in =
+        Authentication.sign_in(scope, 8, 10, impersonator_id: 7, impersonation_session_id: "s1")
 
       assert {:ok, token} = Authentication.delegate(signed_in)
       assert {:ok, resumed} = Authentication.resume(token)
 
       assert Scope.tenant_id(resumed) == 41
       assert Scope.actor(resumed) == Scope.actor(signed_in)
+      assert_received {:verified, %Actor{user_id: 8, impersonation_session_id: "s1"}}
+    end
+
+    test "refuses a user the installed verifier no longer proves", %{operator: scope} do
+      {:ok, token} = scope |> Authentication.sign_in(7, 10) |> Authentication.delegate()
+
+      Process.put(:actor_verifier_answer, {:error, :user_not_found})
+
+      assert {:error, :actor_refused} = Authentication.resume(token)
+    end
+
+    test "refuses every delegated user when no verifier is installed", %{operator: scope} do
+      {:ok, token} = scope |> Authentication.sign_in(7, 10) |> Authentication.delegate()
+
+      install_verifier!(nil)
+
+      assert {:error, :no_actor_verifier} = Authentication.resume(token)
     end
 
     test "refuses a tampered, foreign, or expired token", %{operator: scope} do
@@ -148,5 +194,12 @@ defmodule Bilimbi.Base.Tenancy.ScopeActorTest do
 
       assert {:error, :soft_deleted} = Authentication.resume(token)
     end
+  end
+
+  defp install_verifier!(verifier) do
+    ContributionRegistry.put_snapshot_for_test!(%{
+      graph_fingerprint: nil,
+      consumers: %{actor_verifier: verifier}
+    })
   end
 end

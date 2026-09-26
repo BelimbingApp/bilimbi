@@ -8,10 +8,9 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
   # secret signs delegation tokens, the only form in which an actor leaves the
   # VM: a queued job acting for a user.
   #
-  # Only `Scope` and `Authentication` call this module. The boundary test in
-  # the Web host (`scope_actor_boundary_test.exs`) fails the build for any
-  # other caller, because in one VM a function is callable by anyone and the
-  # fence has to be checked rather than assumed.
+  # Only `Scope` and `Authentication` call this module. The seal, not a caller
+  # list, is the enforcement: code that calls it anyway gains nothing it could
+  # not already get from `Authentication`, whose own callers are the edge.
 
   alias Bilimbi.Base.Tenancy.Actor
   alias Bilimbi.Base.Tenancy.ForgedActorError
@@ -23,19 +22,23 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
 
   @spec system(Identity.t()) :: Actor.t()
   def system(%Identity{id: tenant_id}) do
-    %Actor{type: :system, seal: seal(tenant_id, :system, nil, nil, nil)}
+    %Actor{type: :system, seal: seal(tenant_id, :system, nil, nil, nil, nil)}
   end
 
-  @spec user(Identity.t(), pos_integer(), pos_integer(), pos_integer() | nil) :: Actor.t()
-  def user(%Identity{id: tenant_id}, user_id, company_id, impersonator_id)
+  @spec user(Identity.t(), pos_integer(), pos_integer(), pos_integer() | nil, String.t() | nil) ::
+          Actor.t()
+  def user(%Identity{id: tenant_id}, user_id, company_id, impersonator_id, session_id)
       when is_integer(user_id) and user_id > 0 and is_integer(company_id) and company_id > 0 and
-             (is_nil(impersonator_id) or (is_integer(impersonator_id) and impersonator_id > 0)) do
+             ((is_nil(impersonator_id) and is_nil(session_id)) or
+                (is_integer(impersonator_id) and impersonator_id > 0 and is_binary(session_id) and
+                   session_id != "")) do
     %Actor{
       type: :user,
       user_id: user_id,
       company_id: company_id,
       impersonator_id: impersonator_id,
-      seal: seal(tenant_id, :user, user_id, company_id, impersonator_id)
+      impersonation_session_id: session_id,
+      seal: seal(tenant_id, :user, user_id, company_id, impersonator_id, session_id)
     }
   end
 
@@ -46,12 +49,13 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
           user_id: user_id,
           company_id: company_id,
           impersonator_id: impersonator_id,
+          impersonation_session_id: session_id,
           seal: supplied
         } = actor,
         tenant_id
       )
       when type in [:user, :system] and is_binary(supplied) do
-    expected = seal(tenant_id, type, user_id, company_id, impersonator_id)
+    expected = seal(tenant_id, type, user_id, company_id, impersonator_id, session_id)
 
     # hash_equals/2 compares in constant time but only equal-length binaries.
     if byte_size(expected) == byte_size(supplied) and :crypto.hash_equals(expected, supplied) and
@@ -69,18 +73,21 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
     Plug.Crypto.sign(
       secret!(),
       @delegation_salt,
-      {tenant_id, actor.user_id, actor.company_id, actor.impersonator_id}
+      {tenant_id, actor.user_id, actor.company_id, actor.impersonator_id,
+       actor.impersonation_session_id}
     )
   end
 
   @spec verify_delegation(binary(), pos_integer()) ::
-          {:ok, {pos_integer(), pos_integer(), pos_integer(), pos_integer() | nil}}
+          {:ok,
+           {pos_integer(), pos_integer(), pos_integer(), pos_integer() | nil, String.t() | nil}}
           | {:error, :invalid | :expired}
   def verify_delegation(token, max_age) when is_binary(token) do
     case Plug.Crypto.verify(secret!(), @delegation_salt, token, max_age: max_age) do
-      {:ok, {tenant_id, user_id, company_id, impersonator_id} = claims}
+      {:ok, {tenant_id, user_id, company_id, impersonator_id, session_id} = claims}
       when is_integer(tenant_id) and is_integer(user_id) and is_integer(company_id) and
-             (is_nil(impersonator_id) or is_integer(impersonator_id)) ->
+             (is_nil(impersonator_id) or is_integer(impersonator_id)) and
+             (is_nil(session_id) or is_binary(session_id)) ->
         {:ok, claims}
 
       {:ok, _other} ->
@@ -94,20 +101,34 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
     end
   end
 
-  defp well_formed?(%Actor{type: :system, user_id: nil, company_id: nil, impersonator_id: nil}),
-    do: true
+  defp well_formed?(%Actor{
+         type: :system,
+         user_id: nil,
+         company_id: nil,
+         impersonator_id: nil,
+         impersonation_session_id: nil
+       }),
+       do: true
 
-  defp well_formed?(%Actor{type: :user, user_id: user_id, company_id: company_id})
-       when is_integer(user_id) and user_id > 0 and is_integer(company_id) and company_id > 0,
+  defp well_formed?(%Actor{
+         type: :user,
+         user_id: user_id,
+         company_id: company_id,
+         impersonator_id: impersonator_id,
+         impersonation_session_id: session_id
+       })
+       when is_integer(user_id) and user_id > 0 and is_integer(company_id) and company_id > 0 and
+              is_nil(impersonator_id) == is_nil(session_id),
        do: true
 
   defp well_formed?(_actor), do: false
 
-  defp seal(tenant_id, type, user_id, company_id, impersonator_id) do
+  defp seal(tenant_id, type, user_id, company_id, impersonator_id, session_id) do
     payload =
-      :erlang.term_to_binary({tenant_id, type, user_id, company_id, impersonator_id}, [
-        :deterministic
-      ])
+      :erlang.term_to_binary(
+        {tenant_id, type, user_id, company_id, impersonator_id, session_id},
+        [:deterministic]
+      )
 
     :crypto.mac(:hmac, :sha256, seal_key(), payload)
   end

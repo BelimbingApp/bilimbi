@@ -45,20 +45,39 @@ approve as anyone. Workflow approvals, a later port, need the same guarantee.
    secret from `SECRET_KEY_BASE`, so no new deployment variable is needed, and
    scopes verify across clustered nodes.
 
-4. **The fence is tested.** Elixir cannot restrict a public function to one
-   caller. `apps/web/test/bilimbi_web/scope_actor_boundary_test.exs` reads the
-   BEAM import table of every loaded Bilimbi module, including mounted Domains
-   and Extensions, and fails for any caller of `sign_in`, `resume`, or the seal
-   outside its allowlist. Reading compiled calls rather than source means
-   aliases and macro expansion cannot hide a caller.
+4. **The seal is the enforcement.** Elixir cannot restrict a public function
+   to one caller, and a scan of compiled calls cannot either: `apply/3` or a
+   module held in a variable hides a caller from it. So no test claims to
+   fence `Authentication`. What holds is the seal: an actor that
+   `Authentication` did not issue fails `Scope.actor/1`, which the tenancy
+   seal tests prove by forging one every way data can. Calling `sign_in/4`
+   from module code is asserting an identity nobody proved; review rejects
+   it, and adding a caller is a change to this ADR.
 
-5. **Jobs act for a user through Base Queue.** `Queue.enqueue_for/3` stores a
-   token signed from the enqueuing scope in job metadata, not in the
-   caller-shaped arguments. `Queue.Worker` is the one caller of
-   `Authentication.resume/2`, which verifies the token (one-week lifetime) and
-   re-proves the tenant. The worker then receives the user's scope in
-   `execution.scope`. A token that fails verification cancels the job before
-   the worker runs.
+5. **Jobs act for a user through Base Queue, and re-prove the user.**
+   `Queue.enqueue_for/3` stores a token signed from the enqueuing scope in job
+   metadata, not in the caller-shaped arguments. `Queue.Worker` is the one
+   caller of `Authentication.resume/2`, which verifies the token (one-week
+   lifetime), re-proves the tenant, and then asks the installed
+   `Bilimbi.Base.Tenancy.ActorVerifier` to re-prove the user. The worker then
+   receives the user's scope in `execution.scope`. A token that fails
+   verification cancels the job as `:delegated_actor_unavailable`; a user the
+   verifier refuses cancels it as `:delegated_actor_refused`; no installed
+   verifier cancels it as `:no_actor_verifier`. The worker never runs.
+
+   Base cannot read accounts or sessions, so Tenancy owns the behaviour and a
+   new contribution key, `:actor_verifier`, beside those of ADR 0004, 0009,
+   0011, and 0012. Its validator accepts at most one verifier. Core User
+   contributes `Bilimbi.Core.User.ActorVerifier`: the user must still exist in
+   the actor's company, as at the request edge, and a job queued under
+   impersonation also needs the borrowed durable session to still belong to
+   the impersonated account. The actor therefore carries that session's ID
+   (`impersonation_session_id`) under impersonation. A user's own sign-out
+   does not cancel work they queued.
+
+   `enqueue_for/3` refuses workers that declare `unique_period`. Oban's
+   uniqueness compares arguments, not metadata, so a duplicate would be
+   absorbed by a job carrying another actor, or none.
 
 6. **Authz asks the scope.** `Authz.can/4` and `authorize!/4` accept a scope
    and judge its actor. A system scope is denied as
@@ -74,9 +93,11 @@ approve as anyone. Workflow approvals, a later port, need the same guarantee.
 - An operation that must be a person's own act decides what impersonation
   means for it: record `impersonator_id` alongside the actor, or refuse.
 - Base Queue now depends on Base Tenancy.
-- A delegated job's capability checks run against live grants when it runs.
-  Base cannot see Core User, so a worker that must also re-prove the account
-  (for example, that it is still active) does so through Core User's API.
+- A delegated job's capability checks run against live grants when it runs,
+  and its user is re-proven through the `:actor_verifier` contribution before
+  that.
+- A deployment without Core User has no verifier, so its delegated jobs are
+  refused rather than trusted.
 - Rotating `SECRET_KEY_BASE` signs everyone out, as before, and now also
   cancels queued jobs that act for a user.
 - Captured audit rows from a delegated job still use the guest default unless

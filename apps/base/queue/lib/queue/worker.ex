@@ -100,6 +100,14 @@ defmodule Bilimbi.Base.Queue.Worker do
           scope: scope
         })
 
+      # A user who no longer proves out, or a deployment with no verifier,
+      # is refused; the cancel reason on the job is the record of it.
+      {:error, :actor_refused} ->
+        {:cancel, :delegated_actor_refused}
+
+      {:error, :no_actor_verifier} ->
+        {:cancel, :no_actor_verifier}
+
       # A tampered or expired token, or a tenant gone since enqueue, will not
       # heal on retry. The job never runs as anyone else.
       {:error, _reason} ->
@@ -108,8 +116,9 @@ defmodule Bilimbi.Base.Queue.Worker do
   end
 
   # `Queue.enqueue_for/3` wrote this token from a scope that already held the
-  # user; Base Tenancy verifies it and re-proves the tenant. This module is
-  # the one allowlisted caller of `Authentication.resume/2`.
+  # user; Base Tenancy verifies it, re-proves the tenant, and asks the
+  # installed actor verifier to re-prove the user. This module is the one
+  # caller of `Authentication.resume/2`.
   defp delegated_scope(%{@delegated_actor_key => token}) when is_binary(token),
     do: Authentication.resume(token)
 

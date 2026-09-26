@@ -14,15 +14,17 @@ defmodule Bilimbi.Base.Tenancy.Authentication do
       proof.
     * `resume/2` — `Bilimbi.Base.Queue.Worker`, when a job enqueued with
       `Bilimbi.Base.Queue.enqueue_for/3` runs. The job carries a token that
-      `delegate/1` signed from a scope that already held the actor.
+      `delegate/1` signed from a scope that already held the actor, and the
+      installed `Bilimbi.Base.Tenancy.ActorVerifier` re-proves the user.
 
-  Elixir cannot make a public function private to one caller, so the fence is
-  checked instead: `apps/web/test/bilimbi_web/scope_actor_boundary_test.exs`
-  reads every compiled Bilimbi module's remote calls and fails on any other
-  caller. Adding one is an architecture change: say why in the test's
-  allowlist and in review.
+  Elixir cannot make a public function private to one caller. The seal is the
+  enforcement: an actor that did not come from here fails `Scope.actor/1`, and
+  a module that called `sign_in/4` itself would be asserting an identity it
+  had not proven. Adding a caller is an architecture change that review must
+  justify against ADR 0016.
   """
 
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Actor
   alias Bilimbi.Base.Tenancy.ActorSeal
@@ -35,10 +37,12 @@ defmodule Bilimbi.Base.Tenancy.Authentication do
   @doc """
   Attaches the signed-in user to a freshly proven system scope.
 
-  Options:
+  Options, given together or not at all:
 
     * `:impersonator_id` — the operator behind an impersonated session. The
       user is the account acted as; the impersonator is who acted.
+    * `:impersonation_session_id` — the borrowed durable session, so work
+      queued during it stops acting for the user once it ends.
 
   Raises `ArgumentError` when the scope already names a user: an actor is set
   once, at the edge, and never changed.
@@ -48,7 +52,15 @@ defmodule Bilimbi.Base.Tenancy.Authentication do
       when is_list(opts) do
     case Scope.actor(scope) do
       %Actor{type: :system} ->
-        actor = ActorSeal.user(tenant, user_id, company_id, Keyword.get(opts, :impersonator_id))
+        actor =
+          ActorSeal.user(
+            tenant,
+            user_id,
+            company_id,
+            Keyword.get(opts, :impersonator_id),
+            Keyword.get(opts, :impersonation_session_id)
+          )
+
         %Scope{tenant: tenant, actor: actor}
 
       %Actor{type: :user} ->
@@ -74,22 +86,48 @@ defmodule Bilimbi.Base.Tenancy.Authentication do
   end
 
   @doc """
-  Rebuilds the delegated scope from a `delegate/1` token, re-proving the tenant.
+  Rebuilds the delegated scope from a `delegate/1` token and re-proves it.
 
   A tampered token is `:invalid`; one older than `:max_age` seconds (default
   one week) is `:expired`; a tenant that is gone or soft-deleted fails as
-  `Bilimbi.Base.Tenancy.scope/1` does. Whether the user may still perform the
-  job's operation is decided when it runs, by Base Authz against live grants.
+  `Bilimbi.Base.Tenancy.scope/1` does. The installed
+  `Bilimbi.Base.Tenancy.ActorVerifier` then re-proves the user:
+  `:actor_refused` when it does not, `:no_actor_verifier` when no installed
+  module contributes one. Whether the user may still perform the job's
+  operation is decided when it runs, by Base Authz against live grants.
   """
   @spec resume(binary(), keyword()) ::
-          {:ok, Scope.t()} | {:error, :invalid | :expired | :not_found | :soft_deleted}
+          {:ok, Scope.t()}
+          | {:error,
+             :invalid
+             | :expired
+             | :not_found
+             | :soft_deleted
+             | :actor_refused
+             | :no_actor_verifier}
   def resume(token, opts \\ []) when is_binary(token) and is_list(opts) do
     max_age = Keyword.get(opts, :max_age, @default_delegation_max_age)
 
-    with {:ok, {tenant_id, user_id, company_id, impersonator_id}} <-
+    with {:ok, {tenant_id, user_id, company_id, impersonator_id, session_id}} <-
            ActorSeal.verify_delegation(token, max_age),
-         {:ok, scope} <- Tenancy.scope(tenant_id) do
-      {:ok, sign_in(scope, user_id, company_id, impersonator_id: impersonator_id)}
+         {:ok, tenant_scope} <- Tenancy.scope(tenant_id),
+         scope =
+           sign_in(tenant_scope, user_id, company_id,
+             impersonator_id: impersonator_id,
+             impersonation_session_id: session_id
+           ),
+         :ok <- verify_actor(scope) do
+      {:ok, scope}
+    end
+  end
+
+  defp verify_actor(scope) do
+    case ContributionRegistry.consumer!(:actor_verifier) do
+      nil ->
+        {:error, :no_actor_verifier}
+
+      verifier ->
+        if verifier.verify_actor(scope) == :ok, do: :ok, else: {:error, :actor_refused}
     end
   end
 end

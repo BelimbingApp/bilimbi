@@ -356,8 +356,9 @@ module contributes no routes, otherwise point it at the module-owned plain-data
 route file. Every descriptor also carries `contribution_provider`; use `nil`
 when the module contributes nothing. A non-nil provider implements the
 ModuleRegistry behavior and returns immutable plain terms below only
-`:settings`, `:authz`, `:menu`, `:dashboard`, `:principal_directory`, and
-`:schedule`, as decided by ADR 0004, ADR 0009, ADR 0011, and ADR 0012. Its
+`:settings`, `:authz`, `:menu`, `:dashboard`, `:principal_directory`,
+`:schedule`, and `:actor_verifier`, as decided by ADR 0004, ADR 0009, ADR
+0011, ADR 0012, and ADR 0016. Its
 `mix.exs` derives local module path dependencies and application metadata from
 that descriptor; do not repeat module dependency names manually.
 

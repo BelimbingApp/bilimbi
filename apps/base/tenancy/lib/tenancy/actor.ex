@@ -12,6 +12,8 @@ defmodule Bilimbi.Base.Tenancy.Actor do
       background job acting for one (`Bilimbi.Base.Queue.enqueue_for/3`).
       `user_id` and `company_id` name the account; `impersonator_id` names the
       operator behind an impersonated session and is `nil` otherwise.
+      `impersonation_session_id` is that borrowed session, so a job queued
+      during it can prove the impersonation is still in progress when it runs.
     * `:system` — work nobody signed in for: a scheduled job, a seed, a mix
       task, a scope built with `Bilimbi.Base.Tenancy.scope/1`. It carries no
       user, no company, and no authority. An operation that must name the
@@ -22,8 +24,8 @@ defmodule Bilimbi.Base.Tenancy.Actor do
   """
 
   @enforce_keys [:type, :seal]
-  @derive {Inspect, except: [:seal]}
-  defstruct [:type, :user_id, :company_id, :impersonator_id, :seal]
+  @derive {Inspect, except: [:seal, :impersonation_session_id]}
+  defstruct [:type, :user_id, :company_id, :impersonator_id, :impersonation_session_id, :seal]
 
   @type t ::
           %__MODULE__{
@@ -31,6 +33,7 @@ defmodule Bilimbi.Base.Tenancy.Actor do
             user_id: pos_integer(),
             company_id: pos_integer(),
             impersonator_id: pos_integer() | nil,
+            impersonation_session_id: String.t() | nil,
             seal: binary()
           }
           | %__MODULE__{
@@ -38,6 +41,7 @@ defmodule Bilimbi.Base.Tenancy.Actor do
               user_id: nil,
               company_id: nil,
               impersonator_id: nil,
+              impersonation_session_id: nil,
               seal: binary()
             }
 

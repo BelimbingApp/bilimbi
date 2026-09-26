@@ -69,6 +69,10 @@ defmodule Bilimbi.Base.Queue do
   from this scope, in job metadata a caller cannot write — never in the
   arguments, which any caller shapes. A system scope has nobody to act for:
   use `enqueue/2`.
+
+  A worker that declares `unique_period` is refused with `:unique_worker`.
+  Oban compares arguments, not metadata, so a duplicate would be absorbed by
+  a job that carries another user, or none, and run as them.
   """
   @spec enqueue_for(Scope.t(), module(), term()) :: {:ok, JobRef.t()} | {:error, atom()}
   def enqueue_for(%Scope{} = scope, worker, args) do
@@ -79,6 +83,7 @@ defmodule Bilimbi.Base.Queue do
 
   defp enqueue_job(worker, args, meta) do
     with {:ok, worker_info} <- worker_info(worker),
+         :ok <- ensure_delegable(worker_info, meta),
          {:ok, safe_args} <- Arguments.validate(args),
          {:ok, normalized_args} <- Worker.normalize_args(worker, safe_args),
          {:ok, normalized_args} <- Arguments.validate(normalized_args) do
@@ -258,6 +263,13 @@ defmodule Bilimbi.Base.Queue do
   end
 
   defp worker_info(_worker), do: {:error, :unsupported_worker}
+
+  defp ensure_delegable(worker_info, meta) do
+    if Map.has_key?(meta, Worker.delegated_actor_key()) and
+         worker_info.adapter.__opts__()[:unique] != nil,
+       do: {:error, :unique_worker},
+       else: :ok
+  end
 
   defp validate_list_options(options) do
     allowed_keys = [:page, :page_size, :queue, :state]

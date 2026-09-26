@@ -109,3 +109,14 @@ defmodule Bilimbi.Base.Queue.TestWorkers.ActingFor do
     :ok
   end
 end
+
+defmodule Bilimbi.Base.Queue.TestActorVerifier do
+  @moduledoc false
+
+  @behaviour Bilimbi.Base.Tenancy.ActorVerifier
+
+  # Jobs in these tests are performed in the test process, which sets the
+  # answer Core User would give.
+  @impl true
+  def verify_actor(_scope), do: Process.get(:actor_verifier_answer, :ok)
+end

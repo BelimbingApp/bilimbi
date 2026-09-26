@@ -3,8 +3,8 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionProvider do
   Provider contract for descriptor-owned installed-module contributions.
 
   ADR 0004 established `:settings`, `:authz`, and `:menu`. ADRs 0009, 0011,
-  and 0012 add the peer `:dashboard`, `:principal_directory`, and `:schedule`
-  consumers. Every consumer follows the same eager, provenance-carrying,
+  0012, and 0016 add the peer `:dashboard`, `:principal_directory`,
+  `:schedule`, and `:actor_verifier` consumers. Every consumer follows the same eager, provenance-carrying,
   validator-owned snapshot lifecycle.
 
   Providers run once when the deployment contribution snapshot is built. They
@@ -13,7 +13,13 @@ defmodule Bilimbi.Base.ModuleRegistry.ContributionProvider do
   """
 
   @type consumer ::
-          :settings | :authz | :menu | :dashboard | :principal_directory | :schedule
+          :settings
+          | :authz
+          | :menu
+          | :dashboard
+          | :principal_directory
+          | :schedule
+          | :actor_verifier
 
   @callback contributions() :: %{optional(consumer()) => term()}
 end

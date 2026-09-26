@@ -8,10 +8,13 @@ defmodule Bilimbi.Base.Queue.ActingForTest do
 
   use Bilimbi.Base.Database.DataCase, async: false
 
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Queue
   alias Bilimbi.Base.Queue.Execution
   alias Bilimbi.Base.Queue.JobRef
+  alias Bilimbi.Base.Queue.TestActorVerifier
   alias Bilimbi.Base.Queue.TestWorkers.ActingFor
+  alias Bilimbi.Base.Queue.TestWorkers.Unique
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tenancy.Actor
@@ -24,6 +27,9 @@ defmodule Bilimbi.Base.Queue.ActingForTest do
     create_tenants_table!()
     insert_tenant!(%{id: 41})
     {:ok, system_scope} = Tenancy.scope(41)
+
+    install_verifier!(TestActorVerifier)
+    on_exit(&ContributionRegistry.clear_for_test!/0)
 
     %{system_scope: system_scope, user_scope: Authentication.sign_in(system_scope, 7, 10)}
   end
@@ -96,5 +102,54 @@ defmodule Bilimbi.Base.Queue.ActingForTest do
     refute_received {:performed, _execution}
   end
 
+  test "a user the verifier no longer proves is refused before the job runs", %{
+    user_scope: user_scope
+  } do
+    {:ok, %JobRef{id: id}} = Queue.enqueue_for(user_scope, ActingFor, %{"value" => 1})
+
+    Process.put(:actor_verifier_answer, {:error, :user_not_found})
+
+    assert {:cancel, :delegated_actor_refused} =
+             id |> then(&Repo.get!(Oban.Job, &1)) |> perform()
+
+    refute_received {:performed, _execution}
+  end
+
+  test "with no verifier installed, no job runs as a user", %{user_scope: user_scope} do
+    {:ok, %JobRef{id: id}} = Queue.enqueue_for(user_scope, ActingFor, %{"value" => 1})
+
+    install_verifier!(nil)
+
+    assert {:cancel, :no_actor_verifier} = id |> then(&Repo.get!(Oban.Job, &1)) |> perform()
+    refute_received {:performed, _execution}
+  end
+
+  test "a unique worker cannot act for a user, so no duplicate runs as someone else", %{
+    system_scope: system_scope,
+    user_scope: user_scope
+  } do
+    other_scope = Authentication.sign_in(system_scope, 8, 10)
+
+    assert {:error, :unique_worker} =
+             Queue.enqueue_for(user_scope, Unique, %{"business_id" => 1})
+
+    assert {:error, :unique_worker} =
+             Queue.enqueue_for(other_scope, Unique, %{"business_id" => 1})
+
+    assert {:ok, %JobRef{conflict?: false}} = Queue.enqueue(Unique, %{"business_id" => 1})
+
+    assert {:error, :unique_worker} =
+             Queue.enqueue_for(user_scope, Unique, %{"business_id" => 1})
+
+    assert Repo.aggregate(Oban.Job, :count) == 1
+  end
+
   defp perform(job), do: ActingFor.__queue_worker__().adapter.perform(job)
+
+  defp install_verifier!(verifier) do
+    ContributionRegistry.put_snapshot_for_test!(%{
+      graph_fingerprint: nil,
+      consumers: %{actor_verifier: verifier}
+    })
+  end
 end

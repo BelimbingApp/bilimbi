@@ -71,6 +71,7 @@ defmodule Bilimbi.Core.User.Contributions do
       ],
       settings: %{definitions: @settings, runtime_claims: []},
       principal_directory: Bilimbi.Core.User.PrincipalDirectoryProvider,
+      actor_verifier: Bilimbi.Core.User.ActorVerifier,
       authz: %{
         capabilities: @read_capabilities ++ @write_capabilities ++ @unaffiliated_capabilities,
         roles: %{
