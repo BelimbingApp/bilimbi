@@ -28,6 +28,7 @@ import AppShell from "./app_shell"
 import DateTime from "./date_time"
 import BrowserTimeZone from "./browser_time_zone"
 import InlineEdit from "./inline_edit"
+import InlineLongText from "./inline_long_text"
 import DashboardSort from "./dashboard_sort"
 import DisclosureDismiss from "./disclosure_dismiss"
 import Combobox from "./combobox"
@@ -40,7 +41,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, DashboardSort, DisclosureDismiss, Combobox, SecretReveal, Modal, FlashAutoDismiss, ClipboardCopy},
+  hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, InlineLongText, DashboardSort, DisclosureDismiss, Combobox, SecretReveal, Modal, FlashAutoDismiss, ClipboardCopy},
 })
 
 // Show progress bar on live navigation and form submits

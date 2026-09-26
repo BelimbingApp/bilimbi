@@ -3008,6 +3008,103 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Renders a read-first long-text fact with a shared edit-in-place lifecycle.
+
+  The stored value remains visible until the owner confirms a commit. The
+  textarea commits on blur, cancels on Escape, and leaves field validation and
+  persistence to its owning LiveView. Use it for multi-line facts, not as a
+  document or rich-text editor.
+  """
+  attr(:id, :string, required: true)
+  attr(:field, :string, required: true)
+  attr(:label, :string, required: true)
+  attr(:value, :string, required: true)
+  attr(:id_value, :any, default: nil)
+  attr(:editing, :boolean, required: true)
+  attr(:editable?, :boolean, required: true)
+  attr(:save_event, :string, required: true)
+  attr(:edit_event, :string, default: "edit_field")
+  attr(:cancel_event, :string, default: "cancel_edit_field")
+  attr(:allow_empty, :boolean, default: false)
+  attr(:rows, :integer, default: 4)
+  attr(:autofocus, :boolean, default: true)
+  attr(:status, :any, required: true)
+  attr(:class, :any, default: nil)
+  attr(:input_class, :any, default: nil)
+
+  def inline_long_text(assigns) do
+    assigns = assign(assigns, :status, normalize_commit_status(assigns.status))
+
+    ~H"""
+    <div
+      id={@id}
+      phx-hook="InlineLongText"
+      data-id={@id_value || @id}
+      data-value={@value}
+      data-field={@field}
+      data-save-event={@save_event}
+      data-cancel-event={@cancel_event}
+      data-allow-empty={@allow_empty && ""}
+      class={["relative min-w-0 max-w-full text-sm text-ink", @class]}
+    >
+      <button
+        :if={@editable? and not @editing}
+        id={"#{@id}-display"}
+        type="button"
+        data-role="trigger"
+        phx-click={@edit_event}
+        phx-value-field={@field}
+        aria-label={@label}
+        aria-describedby={@status && "#{@id}-status"}
+        class="group -mx-1.5 flex min-h-8 max-w-full min-w-0 cursor-pointer items-start gap-1.5 rounded px-1.5 py-0.5 text-left transition-colors hover:bg-surface-sunken focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong"
+      >
+        <span
+          data-role="text"
+          class={["min-w-0 whitespace-pre-wrap", @value == "" && "text-ink-muted"]}
+        >
+          {(@value == "" && "—") || @value}
+        </span>
+        <.icon
+          name="edit"
+          class="mt-0.5 size-3.5 shrink-0 text-ink-muted opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+        />
+      </button>
+
+      <div
+        :if={@editable? and @editing}
+        phx-window-keydown={@cancel_event}
+        phx-key="Escape"
+      >
+        <textarea
+          id={"#{@id}-input"}
+          data-role="input"
+          name={@field}
+          rows={@rows}
+          aria-label={@label}
+          aria-describedby={@status && "#{@id}-status"}
+          aria-invalid={match?({:error, _}, @status) && "true"}
+          phx-mounted={@autofocus && Phoenix.LiveView.JS.focus()}
+          class={[
+            "w-full min-w-0 rounded-md border border-brand-strong bg-surface px-1.5 py-1 text-sm text-ink focus:outline-none focus:ring-1 focus:ring-brand-strong/30",
+            @input_class
+          ]}
+        >{@value}</textarea>
+      </div>
+
+      <span :if={not @editable?} class={["whitespace-pre-wrap", @value == "" && "text-ink-muted"]}>
+        {(@value == "" && "—") || @value}
+      </span>
+
+      <span data-role="saving" class="mt-0.5 hidden flex items-center gap-1 text-xs text-ink-muted">
+        <.icon name="refresh" class="size-3 motion-safe:animate-spin" /> Saving…
+      </span>
+
+      <.commit_status id={"#{@id}-status"} status={@status} />
+    </div>
+    """
+  end
+
+  @doc """
   Renders the outcome of one commit beside the fact that made it.
 
   This is the single voice every in-place write reports in, whether the fact

@@ -534,7 +534,8 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
                live: Test.WidgetLive,
                session: :auth,
                capability: nil,
-               source: "base/ui"
+               source: "base/ui",
+               layer: :base
              }
            ] = routes
   end

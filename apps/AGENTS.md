@@ -24,11 +24,15 @@ Render a timestamp with `<.datetime>`, which follows the reader's saved clock, s
 
 ## Read-first pages
 
-A record's page reads first and edits in place. There is no separate Edit button, including a record whose only page was a form. Facts commit through `<.inline_edit>`; the outcome bookkeeping is `Bilimbi.Base.UI.CommitStatus`, passed back as `status`. See `DESIGN.md` "Read-first detail pages".
+A record's page reads first and edits in place. There is no separate Edit button, including a record whose only page was a form. Short facts commit through `<.inline_edit>`, multi-line facts through `<.inline_long_text>`, and the outcome bookkeeping is `Bilimbi.Base.UI.CommitStatus`, passed back as `status`. See `DESIGN.md` "Read-first detail pages" and "Inline editing".
 
 ## Tests
 
 Assert what the running system does. Do not add a test that reads or pattern-matches a source file to prove a bug is gone: two did that and passed while the problem they claimed to catch was still in the tree. A security or database boundary makes PostgreSQL do the refusing; for the SQL console that is `QueryExecutor`'s `READ ONLY` transaction. See `apps/base/database/AGENTS.md`.
+
+## Routes
+
+Let `BilimbiWeb.RouteOverlap` check the compiled router for route conflicts. A route manifest alone misses direct host routes; injected routes carry their descriptor owner and layer in Phoenix route metadata. See `apps/web/lib/bilimbi_web/discovered_routes.ex`.
 
 ## Follow-up
 

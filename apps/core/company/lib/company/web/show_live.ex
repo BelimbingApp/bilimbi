@@ -26,9 +26,9 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
     its "Add activity" trigger opens an input that commits on Enter or on
     leaving it, as Belimbing's "+ Add" chip does, and an activity is removed
     from its chip;
-  - the metadata JSON is a multi-line document, which Enter cannot commit, so
-    it is the one fact with an explicit Apply: the demoted pencil beside the
-    value opens a textarea with Apply and Cancel, and Escape cancels.
+  - the metadata JSON is a multi-line document, so the shared
+    `<.inline_long_text>` opens its textarea on the read value, commits on
+    blur and cancels on Escape.
 
   Each fact reports its own outcome through the shared commit status that
   `Bilimbi.Base.UI.CommitStatus` keeps: "Saving…" while the round trip is in
@@ -1175,69 +1175,22 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
             </:item>
 
             <:item title={fact_label("metadata")} id="company-metadata">
-              <div :if={not @editing_metadata?} class="flex items-start gap-2">
-                <%= if @company.metadata do %>
-                  <pre
-                    id="company-metadata-display"
-                    class="min-w-0 flex-1 overflow-x-auto rounded-xl bg-surface-sunken p-3 text-xs font-mono text-ink"
-                  >{format_metadata(@company.metadata)}</pre>
-                <% else %>
-                  <span class="text-ink-muted">—</span>
-                <% end %>
-                <%!-- A JSON document is the one fact Enter cannot commit, so
-                     it keeps an explicit Apply. Belimbing opens its textarea
-                     from a pencil beside the label; here the demoted icon
-                     action sits beside the value, where the edit lands. --%>
-                <.icon_button
-                  :if={@can_update?}
-                  id="edit-metadata-btn"
-                  icon="edit"
-                  label="Edit metadata"
-                  context={:inline}
-                  phx-click="edit_metadata"
-                />
-              </div>
-
-              <%!-- Window-scoped, as the choice editors are: Escape cancels
-                   wherever focus is. --%>
-              <div
-                :if={@can_update? and @editing_metadata?}
-                phx-window-keydown="cancel_edit_metadata"
-                phx-key="Escape"
-              >
-                <form id="metadata-form" phx-submit="save_metadata" class="space-y-2">
-                  <textarea
-                    name="metadata"
-                    id="company-metadata-json"
-                    rows="5"
-                    aria-label="Company metadata JSON"
-                    phx-mounted={JS.focus()}
-                    class="w-full rounded-md border border-line bg-surface p-3 text-xs font-mono text-ink focus:border-brand-strong focus:outline-none focus:ring-1 focus:ring-brand-strong/30"
-                    placeholder='{"employee_count": 120, "founded_year": 2014}'
-                  >{@metadata_input}</textarea>
-                  <div class="flex items-center gap-2">
-                    <.button
-                      id="company-metadata-apply"
-                      type="submit"
-                      variant="primary"
-                      class="text-xs"
-                      phx-disable-with="Applying…"
-                    >
-                      Apply
-                    </.button>
-                    <.button
-                      id="company-metadata-cancel"
-                      type="button"
-                      phx-click="cancel_edit_metadata"
-                      class="text-xs"
-                    >
-                      Cancel
-                    </.button>
-                  </div>
-                </form>
-              </div>
-
-              <.commit_status id="company-metadata-status" status={@field_status["metadata"]} />
+              <.inline_long_text
+                id="company-metadata-editor"
+                field="metadata"
+                label="Company metadata JSON"
+                value={@metadata_input}
+                editing={@editing_metadata?}
+                editable?={@can_update?}
+                edit_event="edit_metadata"
+                cancel_event="cancel_edit_metadata"
+                save_event="save_metadata"
+                allow_empty
+                rows={5}
+                status={@field_status["metadata"]}
+                class="font-mono text-xs"
+                input_class="font-mono text-xs"
+              />
             </:item>
           </.list>
         </.card>
