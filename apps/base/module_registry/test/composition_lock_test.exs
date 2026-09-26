@@ -254,7 +254,7 @@ defmodule Bilimbi.Base.ModuleRegistry.CompositionLockTest do
     assert {_, 0} = resolve.("[{:b, path: \"apps/extensions/b\"}]")
 
     {output, status} =
-      resolve.("[{:a, path: \"apps/domains/a\"}, {:b, path: \"apps/extensions/b\"}]")
+      resolve.(~s([{:a, path: "apps/domains/a"}, {:b, path: "apps/extensions/b"}]))
 
     assert status != 0
     assert output =~ "different specs were given for the shared app"
@@ -328,7 +328,7 @@ defmodule Bilimbi.Base.ModuleRegistry.CompositionLockTest do
       System.cmd(mix, ["deps.loadpaths"], cd: root, stderr_to_stdout: true)
     end
 
-    both = "[{:a, path: \"apps/domains/a\"}, {:b, path: \"apps/extensions/b\"}]"
+    both = ~s([{:a, path: "apps/domains/a"}, {:b, path: "apps/extensions/b"}])
 
     assert {_, 0} = resolve.("[{:a, path: \"apps/domains/a\"}]", "1.5.0")
     assert {_, 0} = resolve.("[{:b, path: \"apps/extensions/b\"}]", "1.4.0")
