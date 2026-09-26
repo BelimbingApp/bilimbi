@@ -730,14 +730,14 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
 
     ~H"""
     <.inline_long_text
-      :if={@can_manage? and @name == "job_description"}
+      :if={@name == "job_description"}
       id={@dom_id}
       field={@name}
       label={@label}
       value={@long_text_value}
       id_value={@employee.id}
       editing={@editing?}
-      editable?
+      editable?={@can_manage?}
       save_event="save_field"
       allow_empty={@allow_empty?}
       rows={2}
@@ -756,7 +756,10 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
       status={@field_status[@name]}
       class={@class}
     />
-    <span :if={not @can_manage?} class={[is_nil(@value) && "text-ink-muted", @class]}>
+    <span
+      :if={not @can_manage? and @name != "job_description"}
+      class={[is_nil(@value) && "text-ink-muted", @class]}
+    >
       {@value || "—"}
     </span>
     """

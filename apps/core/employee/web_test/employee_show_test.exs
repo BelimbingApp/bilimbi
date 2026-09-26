@@ -961,4 +961,27 @@ defmodule BilimbiWeb.EmployeeShowTest do
     assert {:ok, %{full_name: "John Doe", status: "active", department_id: nil}} =
              Employee.get_employee(scope, 73, employee.id)
   end
+
+  test "a viewer without admin.employee.update keeps an agent job description's line breaks",
+       %{conn: conn, employee: employee} do
+    grant_capabilities!("admin.employee.view")
+    {:ok, scope} = Tenancy.scope(41)
+
+    assert {:ok, _employee} =
+             Employee.update_employee(scope, 73, employee.id, %{
+               employee_type: "agent",
+               job_description: "Supports the regional teams.\nCoordinates on-call work."
+             })
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
+
+    refute has_element?(view, "#employee-job-description-display")
+    refute has_element?(view, "#employee-job-description-input")
+
+    assert has_element?(
+             view,
+             "#employee-job-description .whitespace-pre-wrap",
+             "Coordinates on-call work."
+           )
+  end
 end
