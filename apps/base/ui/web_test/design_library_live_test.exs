@@ -846,7 +846,7 @@ defmodule BilimbiWeb.DesignLibraryLiveTest do
 
     view
     |> element("#design-library-inline-long-text-edit")
-    |> render_hook("save_description", %{"id" => "x", "description" => "Reviewed preview"})
+    |> render_hook("preview-long-text", %{"id" => "x", "description" => "Reviewed preview"})
 
     assert render(view) =~ "Preview value updated."
     assert has_element?(view, "#design-library-inline-long-text-edit-input")

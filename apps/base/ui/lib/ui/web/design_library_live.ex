@@ -233,7 +233,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
      |> put_flash(:info, gettext("Preview value updated."))}
   end
 
-  def handle_event("save_description", %{"description" => _description}, socket) do
+  def handle_event("preview-long-text", %{"description" => _description}, socket) do
     {:noreply, put_flash(socket, :info, gettext("Preview value updated."))}
   end
 
