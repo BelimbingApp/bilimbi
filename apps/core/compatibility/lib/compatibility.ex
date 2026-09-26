@@ -78,14 +78,15 @@ defmodule Bilimbi.Core.Compatibility do
 
   defp run_and_record(repo, schema, installed, opts) do
     migrations = Enum.map(installed, &{&1.version, &1.module})
-    applied = Ecto.Migrator.run(repo, migrations, :up, opts)
 
-    case ledger_versions(repo, schema) do
-      :missing -> :ok
-      versions -> MigrationProvenance.record!(repo, schema, installed, versions)
+    try do
+      Ecto.Migrator.run(repo, migrations, :up, opts)
+    after
+      case ledger_versions(repo, schema) do
+        :missing -> :ok
+        versions -> MigrationProvenance.record!(repo, schema, installed, versions)
+      end
     end
-
-    applied
   end
 
   @spec migrate_baseline(Ecto.Repo.t(), keyword()) :: [integer()]

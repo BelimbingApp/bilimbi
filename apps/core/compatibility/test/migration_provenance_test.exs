@@ -131,6 +131,23 @@ defmodule Bilimbi.Core.Compatibility.MigrationProvenanceTest do
                  fn -> Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) end
   end
 
+  test "a migration that committed before a later one failed keeps its provenance", context do
+    %{schema: schema} = context
+
+    mount!(context, failing: true)
+
+    assert_raise RuntimeError, ~r/proof factory migration failed/, fn ->
+      Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false)
+    end
+
+    assert @version in recorded_versions(schema)
+    refute (@version + 1) in recorded_versions(schema)
+    assert provenance_owner(schema, @version) == ["proof_factory/widget"]
+
+    unmount!(context.root)
+    assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) == []
+  end
+
   # Mounts the fixture Domain as its own Git repository and loads its
   # module application the way a host build would: the build directory
   # carries the application, and its priv is the checkout's.
@@ -157,6 +174,20 @@ defmodule Bilimbi.Core.Compatibility.MigrationProvenanceTest do
       """
     )
 
+    if Keyword.get(opts, :failing, false) do
+      File.write!(
+        Path.join(migrations, "#{@version + 1}_fail_proof_factory.exs"),
+        """
+        defmodule Bilimbi.ProofFactory.Widget.Migrations.Fail#{suffix} do
+          use Ecto.Migration
+
+          def up, do: raise("proof factory migration failed")
+          def down, do: :ok
+        end
+        """
+      )
+    end
+
     {_output, 0} = System.cmd("git", ["init", "--quiet", checkout])
 
     build = Path.join(root, "_build/lib/#{@otp_app}")
@@ -176,7 +207,11 @@ defmodule Bilimbi.Core.Compatibility.MigrationProvenanceTest do
       namespace: Bilimbi.ProofFactory.Widget,
       dependencies: ["base/database"],
       migrations: "priv/repo/migrations",
-      migration_dispositions: %{@version => :bilimbi_only},
+      migration_dispositions:
+        if(Keyword.get(opts, :failing, false),
+          do: %{@version => :bilimbi_only, (@version + 1) => :bilimbi_only},
+          else: %{@version => :bilimbi_only}
+        ),
       web: nil,
       schema_contract: nil,
       contribution_provider: nil,
@@ -215,6 +250,15 @@ defmodule Bilimbi.Core.Compatibility.MigrationProvenanceTest do
       "DELETE FROM #{quote!(schema)}.bilimbi_migration_provenance WHERE version = $1",
       [@version]
     )
+  end
+
+  defp provenance_owner(schema, version) do
+    SQL.query!(
+      MigrationTestRepo,
+      "SELECT owner_id FROM #{quote!(schema)}.bilimbi_migration_provenance WHERE version = $1",
+      [version]
+    ).rows
+    |> List.flatten()
   end
 
   defp rows(schema) do
