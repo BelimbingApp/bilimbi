@@ -27,6 +27,28 @@ Returning the input map unchanged persists every structurally valid field in
 password hashes, schemas, PIDs, functions, unexpected fields, and other
 process-local values must be rejected or removed before persistence.
 
+## Work that acts for a user
+
+`Queue.enqueue_for(scope, worker, args)` enqueues work on behalf of the scope's
+signed-in user. The actor travels as a token Base Tenancy signs, stored in job
+metadata that callers cannot write; it is never an argument. When the job runs,
+`execution.scope` is that user's scope with the tenant re-proven live, and the
+worker passes it to module APIs as a request would. A tampered or expired
+token (one week), or a tenant gone since enqueue, cancels the job with
+`:delegated_actor_unavailable` before the worker runs. The installed actor
+verifier (Core User) then re-proves the user; a user who is gone, has left the
+company, or whose impersonation has ended cancels the job with
+`:delegated_actor_refused`, and a deployment with no verifier cancels it with
+`:no_actor_verifier`. Whether the user may still perform the operation is
+decided when it runs, by Base Authz against live grants. A system scope has no
+one to act for; `enqueue_for/3` refuses it and ordinary work uses `enqueue/2`,
+whose `execution.scope` is `nil`.
+
+`enqueue_for/3` refuses a worker that declares `unique_period` with
+`:unique_worker`. Oban's uniqueness compares arguments, not job metadata, so a
+duplicate would be absorbed by a job carrying another user, or no user, and
+the caller's request would run as them.
+
 ## Delivery semantics
 
 Queue delivery is at least once. Oban uniqueness reduces duplicate insertion;

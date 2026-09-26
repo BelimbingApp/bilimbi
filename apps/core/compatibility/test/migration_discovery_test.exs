@@ -20,12 +20,18 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
     # inherited the tier. Safe for the same reason, checked rather than assumed:
     # session's one migration declares no foreign key, and no other module's
     # migration references its table.
+    #
+    # base/queue followed base/tenancy into a later tier when it took that
+    # dependency to carry a delegated actor for jobs that act for a user
+    # (ADR 0016). Safe for the same reason: the Oban runtime migration declares
+    # no foreign key into any other module's table, and entries still execute
+    # in version order below.
     assert Enum.map(migration_modules, & &1.id) == [
-             "base/queue",
              "base/settings",
              "base/tenancy",
              "base/audit",
              "base/authz",
+             "base/queue",
              "base/schedule",
              "base/perf",
              "base/session",

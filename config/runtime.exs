@@ -61,4 +61,9 @@ if config_env() == :prod do
     url: [host: host, port: 443, scheme: "https"],
     http: [ip: {0, 0, 0, 0, 0, 0, 0, 0}],
     secret_key_base: secret_key_base
+
+  # Base Tenancy derives its own keys from this secret with distinct salts:
+  # one seals the actor on every tenant scope, one signs queued jobs that act
+  # for a user. Rotating SECRET_KEY_BASE invalidates those queued jobs.
+  config :bilimbi_base_tenancy, :actor_secret, secret_key_base
 end

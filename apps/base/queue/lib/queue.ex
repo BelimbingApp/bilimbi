@@ -15,6 +15,8 @@ defmodule Bilimbi.Base.Queue do
   alias Bilimbi.Base.Queue.JobSummary
   alias Bilimbi.Base.Queue.Worker
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Tenancy.Authentication
+  alias Bilimbi.Base.Tenancy.Scope
   alias Ecto.Multi
   alias Oban.Job
 
@@ -56,12 +58,36 @@ defmodule Bilimbi.Base.Queue do
 
   @doc "Enqueues validated plain-data arguments for a Queue worker."
   @spec enqueue(module(), term()) :: {:ok, JobRef.t()} | {:error, atom()}
-  def enqueue(worker, args) do
+  def enqueue(worker, args), do: enqueue_job(worker, args, %{})
+
+  @doc """
+  Enqueues work that acts for the scope's signed-in user.
+
+  When the job runs, its `Bilimbi.Base.Queue.Execution` carries that user's
+  scope in `:scope`, so the worker passes an actor to module APIs exactly as a
+  signed-in request does. The actor travels as a token Base Tenancy signed
+  from this scope, in job metadata a caller cannot write — never in the
+  arguments, which any caller shapes. A system scope has nobody to act for:
+  use `enqueue/2`.
+
+  A worker that declares `unique_period` is refused with `:unique_worker`.
+  Oban compares arguments, not metadata, so a duplicate would be absorbed by
+  a job that carries another user, or none, and run as them.
+  """
+  @spec enqueue_for(Scope.t(), module(), term()) :: {:ok, JobRef.t()} | {:error, atom()}
+  def enqueue_for(%Scope{} = scope, worker, args) do
+    with {:ok, token} <- Authentication.delegate(scope) do
+      enqueue_job(worker, args, %{Worker.delegated_actor_key() => token})
+    end
+  end
+
+  defp enqueue_job(worker, args, meta) do
     with {:ok, worker_info} <- worker_info(worker),
+         :ok <- ensure_delegable(worker_info, meta),
          {:ok, safe_args} <- Arguments.validate(args),
          {:ok, normalized_args} <- Worker.normalize_args(worker, safe_args),
          {:ok, normalized_args} <- Arguments.validate(normalized_args) do
-      insert_job(worker_info, normalized_args)
+      insert_job(worker_info, normalized_args, meta)
     end
   end
 
@@ -206,10 +232,10 @@ defmodule Bilimbi.Base.Queue do
     end
   end
 
-  defp insert_job(worker_info, args) do
+  defp insert_job(worker_info, args, meta) do
     changeset =
       worker_info.adapter.new(args,
-        meta: %{"bilimbi_worker_id" => worker_info.id}
+        meta: Map.put(meta, "bilimbi_worker_id", worker_info.id)
       )
 
     case Oban.insert(oban_name(), changeset) do
@@ -237,6 +263,13 @@ defmodule Bilimbi.Base.Queue do
   end
 
   defp worker_info(_worker), do: {:error, :unsupported_worker}
+
+  defp ensure_delegable(worker_info, meta) do
+    if Map.has_key?(meta, Worker.delegated_actor_key()) and
+         worker_info.adapter.__opts__()[:unique] != nil,
+       do: {:error, :unique_worker},
+       else: :ok
+  end
 
   defp validate_list_options(options) do
     allowed_keys = [:page, :page_size, :queue, :state]

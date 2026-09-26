@@ -32,8 +32,8 @@ defmodule GraphEdges do
   # that one file; any other undeclared reference there still fails. Extending
   # this map is a review decision made in the change that needs it.
   #
-  # - contribution_registry.ex names the six consumer validators the ADRs fixed
-  #   (AGENTS.md §6; ADR 0004/0009/0011/0012). The consumers depend on the
+  # - contribution_registry.ex names the seven consumer validators the ADRs fixed
+  #   (AGENTS.md §6; ADR 0004/0009/0011/0012/0016). The consumers depend on the
   #   registry, so these are deliberate reverse edges of the decided seam,
   #   invoked behind Code.ensure_loaded?; declaring them would cycle.
   @file_exceptions %{
@@ -43,7 +43,8 @@ defmodule GraphEdges do
       [:Bilimbi, :Base, :Menu],
       [:Bilimbi, :Base, :Dashboard],
       [:Bilimbi, :Base, :PrincipalDirectory],
-      [:Bilimbi, :Base, :Schedule]
+      [:Bilimbi, :Base, :Schedule],
+      [:Bilimbi, :Base, :Tenancy]
     ]
   }
 

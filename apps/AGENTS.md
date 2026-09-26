@@ -26,6 +26,10 @@ Render a timestamp with `<.datetime>`, which follows the reader's saved clock, s
 
 A record's page reads first and edits in place. There is no separate Edit button, including a record whose only page was a form. Short facts commit through `<.inline_edit>`, multi-line facts through `<.inline_long_text>`, and the outcome bookkeeping is `Bilimbi.Base.UI.CommitStatus`, passed back as `status`. See `DESIGN.md` "Read-first detail pages" and "Inline editing".
 
+## Who performed it
+
+Take the person who performed an operation (an approver, an overrider, a requester) from `Bilimbi.Base.Tenancy.Scope.actor/1`, and ask whether they may do it with `Bilimbi.Base.Authz.can(scope, capability)`. Do not accept an actor or approver ID as an argument, and do not build one with `Authz.actor/5`, which checks whoever the caller names. A system actor names nobody, so refuse it. Under impersonation the actor carries `impersonator_id`; record it or refuse. Never call `Bilimbi.Base.Tenancy.Authentication` from module code: it is the authentication edge, and an actor it did not seal fails `Scope.actor/1`. A job that acts for a user is enqueued with `Queue.enqueue_for/3` and reads `execution.scope`; it runs only while Core User still proves the user (and any impersonation it was queued under).
+
 ## Tests
 
 Assert what the running system does. Do not add a test that reads or pattern-matches a source file to prove a bug is gone: two did that and passed while the problem they claimed to catch was still in the tree. A security or database boundary makes PostgreSQL do the refusing; for the SQL console that is `QueryExecutor`'s `READ ONLY` transaction. See `apps/base/database/AGENTS.md`.

@@ -60,6 +60,11 @@ config :web, BilimbiWeb.Endpoint,
 # base/ui never reaches across the application boundary for a display string.
 config :bilimbi_base_ui, :listen_address, "127.0.0.1"
 
+# Seals the actor on every tenant scope and signs jobs that act for a user
+# (Bilimbi.Base.Tenancy.Authentication). Production derives it from
+# SECRET_KEY_BASE in runtime.exs.
+config :bilimbi_base_tenancy, :actor_secret, "dev-actor-secret-4hWq8Tn2Ks6Ym0Rb3Vc7Xe1Pz5Lg9Jd"
+
 config :web, dev_routes: true
 config :web, BilimbiWeb.Mailer, adapter: Swoosh.Adapters.Local
 config :web, :mailer_sender, {"Bilimbi Development", "no-reply@bilimbi.local"}

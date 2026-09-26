@@ -89,3 +89,34 @@ defmodule Bilimbi.Base.Queue.TestWorkers.Blocking do
     end
   end
 end
+
+defmodule Bilimbi.Base.Queue.TestWorkers.ActingFor do
+  @moduledoc false
+
+  use Bilimbi.Base.Queue.Worker,
+    id: "test/acting-for",
+    max_attempts: 3
+
+  @impl true
+  def validate_args(%{"value" => value}) when is_integer(value), do: {:ok, %{"value" => value}}
+  def validate_args(_args), do: {:error, :invalid_value}
+
+  # The test performs the job in its own process, so the execution it saw
+  # comes back as a message.
+  @impl true
+  def handle_job(_args, execution) do
+    send(self(), {:performed, execution})
+    :ok
+  end
+end
+
+defmodule Bilimbi.Base.Queue.TestActorVerifier do
+  @moduledoc false
+
+  @behaviour Bilimbi.Base.Tenancy.ActorVerifier
+
+  # Jobs in these tests are performed in the test process, which sets the
+  # answer Core User would give.
+  @impl true
+  def verify_actor(_scope), do: Process.get(:actor_verifier_answer, :ok)
+end

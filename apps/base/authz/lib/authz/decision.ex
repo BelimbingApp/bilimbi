@@ -5,6 +5,7 @@ defmodule Bilimbi.Base.Authz.Decision do
           :allowed
           | :denied_unknown_capability
           | :denied_invalid_actor_context
+          | :denied_no_authenticated_actor
           | :denied_tenant_scope
           | :denied_company_scope
           | :denied_missing_capability

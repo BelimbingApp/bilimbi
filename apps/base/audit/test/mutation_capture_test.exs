@@ -350,14 +350,12 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
 
   defp fake_scope(tenant_id) do
     {:ok,
-     %Bilimbi.Base.Tenancy.Scope{
-       tenant: %Bilimbi.Base.Tenancy.Identity{
-         id: tenant_id,
-         name: "T",
-         status: "active",
-         is_platform_operator: false
-       }
-     }}
+     Bilimbi.Base.Tenancy.Scope.for_tenant(%Bilimbi.Base.Tenancy.Identity{
+       id: tenant_id,
+       name: "T",
+       status: "active",
+       is_platform_operator: false
+     })}
   end
 
   defp explicit_attributes do

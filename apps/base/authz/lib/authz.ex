@@ -25,11 +25,38 @@ defmodule Bilimbi.Base.Authz do
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Tenancy.Actor, as: TenancyActor
   alias Bilimbi.Base.Tenancy.Scope
 
+  @doc """
+  Builds an authorization principal from IDs the caller names.
+
+  Use this to evaluate a principal other than the one performing the work,
+  such as an administration screen previewing another account's access. To
+  decide whether the person performing the work may do something, pass the
+  scope to `can/4` or `authorize!/4`, or take the principal from
+  `scope_actor/1`: those read the actor Bilimbi's authentication edge sealed
+  onto the scope, which no caller can assert.
+  """
   @spec actor(:user | :agent, pos_integer(), Scope.t(), pos_integer(), keyword()) :: Actor.t()
   def actor(type, id, %Scope{} = scope, company_id, opts \\ []) do
     Actor.new!(type, id, scope, company_id, opts)
+  end
+
+  @doc """
+  The authorization principal for the user who performs the scope's work.
+
+  A system scope names nobody, so it has no principal.
+  """
+  @spec scope_actor(Scope.t()) :: {:ok, Actor.t()} | {:error, :no_authenticated_actor}
+  def scope_actor(%Scope{} = scope) do
+    case Scope.actor(scope) do
+      %TenancyActor{type: :user, user_id: user_id, company_id: company_id} ->
+        {:ok, Actor.new!(:user, user_id, scope, company_id)}
+
+      %TenancyActor{type: :system} ->
+        {:error, :no_authenticated_actor}
+    end
   end
 
   @spec resource(String.t(), String.t() | integer() | nil, keyword()) :: Resource.t()
@@ -58,17 +85,40 @@ defmodule Bilimbi.Base.Authz do
   @spec system_role_definitions() :: %{required(String.t()) => map()}
   def system_role_definitions, do: registry!().roles
 
-  @spec can(Actor.t(), String.t(), Resource.t() | nil, map()) :: Decision.t()
-  def can(%Actor{} = actor, capability, resource \\ nil, context \\ %{})
+  @doc """
+  Decides whether a principal holds `capability`.
+
+  Given a `Bilimbi.Base.Tenancy.Scope`, the principal is the scope's
+  authenticated user (see `scope_actor/1`). That is the form for "may the
+  person performing this do it": the answer cannot be steered by naming
+  somebody else. A system scope names nobody and is denied with
+  `:denied_no_authenticated_actor`; there is no principal to log.
+  """
+  @spec can(Actor.t() | Scope.t(), String.t(), Resource.t() | nil, map()) :: Decision.t()
+  def can(principal, capability, resource \\ nil, context \\ %{})
+
+  def can(%Scope{} = scope, capability, resource, context)
+      when is_binary(capability) and is_map(context) do
+    case scope_actor(scope) do
+      {:ok, actor} -> can(actor, capability, resource, context)
+      {:error, :no_authenticated_actor} -> Decision.deny(:denied_no_authenticated_actor)
+    end
+  end
+
+  def can(%Actor{} = actor, capability, resource, context)
       when is_binary(capability) and is_map(context) do
     decision = Evaluator.can(actor, capability, resource, context, registry!())
     :ok = DatabaseDecisionLogger.log(actor, capability, resource, decision, context)
     decision
   end
 
-  @spec authorize!(Actor.t(), String.t(), Resource.t() | nil, map()) :: :ok
-  def authorize!(%Actor{} = actor, capability, resource \\ nil, context \\ %{}) do
-    case can(actor, capability, resource, context) do
+  @doc "Like `can/4`, but raises `AuthorizationDeniedError` unless allowed."
+  @spec authorize!(Actor.t() | Scope.t(), String.t(), Resource.t() | nil, map()) :: :ok
+  def authorize!(principal, capability, resource \\ nil, context \\ %{})
+
+  def authorize!(principal, capability, resource, context)
+      when is_struct(principal, Actor) or is_struct(principal, Scope) do
+    case can(principal, capability, resource, context) do
       %Decision{allowed: true} -> :ok
       %Decision{} = decision -> raise AuthorizationDeniedError, decision: decision
     end
