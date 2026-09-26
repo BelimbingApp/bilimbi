@@ -26,6 +26,7 @@ database ledger. Those facts have machine-readable owners:
 | Executable schema evolution | The owning Ecto migration source |
 | Expected owned structure and live-data invariants | The owning module's `SchemaContract` |
 | Applied Bilimbi migration state | `bilimbi_schema_migrations` in the target database |
+| Owner, disposition, and checksum of each applied migration | `bilimbi_migration_provenance` in the target database |
 | Production seed completion state | `bilimbi_production_seeds` in the target database |
 | Historical design rationale | Accepted architecture decision records |
 
@@ -199,10 +200,11 @@ execution.
 
 Beside the ledger, `bilimbi_migration_provenance` records, for every applied
 version, the stable ID and layer of the module that shipped it, its
-disposition, and the file's SHA-256 checksum. `migrate`, the release migrate command, and `schema.adopt`
-write it after they run. It is what lets a mounted Domain or Extension leave
-the composition: unmounting never reverses a migration or deletes its data,
-and a recorded version no installed module ships is accepted only when its
+disposition, and the file's SHA-256 checksum. `migrate`, the release migrate
+command, and `schema.adopt` write it after they run; a migrate that fails
+partway still records it for every version already committed. It is what lets
+a mounted Domain or Extension leave the composition: unmounting never reverses
+a migration or deletes its data, and a recorded version no installed module ships is accepted only when its
 provenance names a Domain or Extension owner that is no longer installed. Any
 other unexplained version still fails closed. When an installed module ships a
 recorded version, the owner and disposition must match the provenance, and a
