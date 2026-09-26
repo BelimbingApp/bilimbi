@@ -38,8 +38,8 @@ defmodule BilimbiWeb.Release do
   def seed do
     load_closure!(@app)
     ModuleRegistry.complete_modules!()
-    Application.put_env(:bilimbi_base_queue, :queues, false)
-    Application.put_env(:bilimbi_base_queue, :plugins, false)
+    Application.put_env(:bilimbi_base_queue, :queues, [])
+    Application.put_env(:bilimbi_base_queue, :plugins, [])
     Application.put_env(:bilimbi_base_schedule, :scheduler_enabled, false)
     {:ok, _started} = Application.ensure_all_started(dependencies(@app))
     ContributionRegistry.install!()
