@@ -266,7 +266,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
             descriptor.path
             |> Path.join(path)
             |> eval_routes!()
-            |> Enum.map(&normalize_route!(&1, descriptor.id))
+            |> Enum.map(&normalize_route!(&1, descriptor.id, descriptor.layer))
 
           nil ->
             []
@@ -279,7 +279,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
       if File.regular?(host_file) do
         host_file
         |> eval_routes!()
-        |> Enum.map(&normalize_route!(&1, "web"))
+        |> Enum.map(&normalize_route!(&1, "web", :web))
       else
         []
       end
@@ -838,7 +838,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   # module's page renders by string key, never by module name (#570; ADR 0006
   # second amendment). Strict from day one: exactly these keys, no route keys
   # mixed in, and only installed modules — not the host — may contribute one.
-  defp normalize_route!(%{embed: _} = entry, source) do
+  defp normalize_route!(%{embed: _} = entry, source, _layer) do
     if source == "web" do
       raise ArgumentError, "embed entries are module contributions; the host cannot declare one"
     end
@@ -887,7 +887,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     end
   end
 
-  defp normalize_route!(route, source) when is_map(route) do
+  defp normalize_route!(route, source, layer) when is_map(route) do
     path = Map.get(route, :path)
 
     unless is_binary(path) and String.starts_with?(path, "/") do
@@ -932,10 +932,10 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
       end
     end
 
-    Map.put(route, :source, source)
+    route |> Map.put(:source, source) |> Map.put(:layer, layer)
   end
 
-  defp normalize_route!(_route, _source) do
+  defp normalize_route!(_route, _source, _layer) do
     raise ArgumentError, "each route must be a map"
   end
 
