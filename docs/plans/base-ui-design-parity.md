@@ -1,9 +1,9 @@
 # Base UI Design Parity
 
-**Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families (#724). Merged to `main` through 2026-09-15: application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display. Since then the library has been stripped of catalog IDs (#728), and the shared layer has taken much of the accepted action and feedback contract — destructive confirmation (#733), reduced motion with 4.5:1 contrast (#738), stacked flash messages (#741), busy controls and a login screen that reports its progress (#743), the empty and permission region pattern (#740), real dialog semantics on modal overlays (#731), one shared filter toolbar (#745), field shell states (#744), secret reveal and multi-select corrections (#746) and a released shell observer (#747) — alongside icon-name validity (#727, #734), Schedule timestamps and UTC day labels through the datetime component (#735, #737), impersonation reader coverage (#729), corrected catalog rows (#730), drift-guard documentation folded into this plan (#726) and the Belimbing cutover value remap (#725); the drift guards stay excluded from the default run — the Design Library state-coverage slice of 2026-09-18 corrected all but two of the uncovered names and axes the coverage guard reports and records those two as accepted rather than pending, and the anchor-hygiene slice of 2026-09-23 cleared the imitation guard's anchor failures, leaving one hand-written control-markup failure (the example `<nav>` rail) open
-**Last Updated:** 2026-09-23
+**Status:** In progress — Phase 0 is complete: all 57 catalog rows carry a disposition and dependency in the ledger below, and the Design Library's secondary menu is aligned with the eleven catalog families (#724). Merged to `main` through 2026-09-15: application shell, impersonation audit actor, the named icon vocabulary, Design Library specimen separation, state coverage, drift guards and live timestamp display. Since then the library has been stripped of catalog IDs (#728), and the shared layer has taken much of the accepted action and feedback contract — destructive confirmation (#733), reduced motion with 4.5:1 contrast (#738), stacked flash messages (#741), busy controls and a login screen that reports its progress (#743), the empty and permission region pattern (#740), real dialog semantics on modal overlays (#731), one shared filter toolbar (#745), field shell states (#744), secret reveal and multi-select corrections (#746) and a released shell observer (#747) — alongside icon-name validity (#727, #734), Schedule timestamps and UTC day labels through the datetime component (#735, #737), impersonation reader coverage (#729), corrected catalog rows (#730), drift-guard documentation folded into this plan (#726) and the Belimbing cutover value remap (#725). The Design Library state-coverage slice of 2026-09-18 corrected all but two of the uncovered names and axes the coverage guard reports and records those two as accepted rather than pending, and the anchor-hygiene slice of 2026-09-23 cleared the imitation guard's anchor failures. Since 2026-09-24 both drift guards run in every `mix test` and `mix precommit`, and the example navigation rail is a shared component. Checklist bookkeeping on 2026-09-26 records the slices that landed through the searchable icon catalogue (#809), the inline long-text editor (#810) and the dashboard Performance stat strip (#808). Remaining checklist rows are partial adoption and campaign evidence
+**Last Updated:** 2026-09-26
 **Sources:** `docs/plans/base-ui-design-library.md`; `DESIGN.md`; root `AGENTS.md`; Issue #691; https://github.com/BelimbingApp/bilimbi/pull/696 (merged); [campaign #709](https://github.com/BelimbingApp/bilimbi/issues/709); [shell #710](https://github.com/BelimbingApp/bilimbi/issues/710) (closed by #711); [audit actor #712](https://github.com/BelimbingApp/bilimbi/issues/712) (closed by #714); [icon registry #713](https://github.com/BelimbingApp/bilimbi/issues/713) (closed by #715); [drift guards #718](https://github.com/BelimbingApp/bilimbi/issues/718) (closed by #722); [specimen separation #719](https://github.com/BelimbingApp/bilimbi/issues/719) (closed by #723); [state coverage #720](https://github.com/BelimbingApp/bilimbi/issues/720) (closed by #716); [display controls #721](https://github.com/BelimbingApp/bilimbi/issues/721) (closed by #717); `apps/base/ui/`; `apps/web/assets/css/app.css`; Belimbing `UiReferenceSection`, UI Reference partials, shared UI components, `tokens.css`, and `components.css`
-**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1); `fm/parity-plan-checklist-reconcile/muse-spark` (checklist reconciliation on 2026-09-18, not audit authorship); `fm/icon-registry-name-validity/opus-5`; `fm/designlib-state-coverage-gaps/opus-5` (Design Library state coverage on 2026-09-18); `fm/addresses-detail-read-first/opus-5` (read-first detail page, shared commit status and demoted back link on 2026-09-20); `fm/companies-detail-belimbing-parity/claude-fable-5-1` (company detail header settled against Belimbing on 2026-09-20: the history icon, demoted Manage links and no header buttons); `fm/companies-detail-read-first/claude-fable-5-1` (company detail facts read-first on 2026-09-23); `fm/records-whose-only-page-is-a-form/claude-fable-5-1` (employee type record page read-first and the employee and employee-type edit routes retired on 2026-09-23); `fm/designspec-codes-off-the-ui/claude-fable-5-1` (Design Spec numbers dropped from the rendered card headings on 2026-09-23); `crewmate scout` (firstmate scout tasks that record no model — the FND-06 icon inventory and the four Phase 2 lane audits of 2026-09-16; separate sessions from the `crewmate/gpt-6` entry above, which is why these rows carry no model)
+**Agents:** `crewmate/gpt-6` (`agent:kiatng-sol-medium`); `astra_pr_gate/gpt-6-astra` (autonomous design steward, through 2026-09-15); `claude-fable-steward-1/claude-fable-5-1` (autonomous design steward, from 2026-09-16); `claude-fable-audit-1/claude-fable-5-1`; `codex-terra-icons-1/gpt-5.6-terra`; `claude-fable-guards-1/claude-fable-5-1`; `codex-sol-specimens-1/gpt-5.6-sol`; `codex-luna-states-1/gpt-5.6-luna`; `claude-opus-datetime-1/claude-opus-5`; `claude-opus-families-1/claude-opus-5`; `claude-opus-motion-contrast-1/claude-opus-5`; `fm/modal-a11y-dialog-semantics/opus-5`; `fm/empty-and-permission-states/claude-fable-5-1` (Claude Code running Claude Fable 5.1); `fm/parity-plan-checklist-reconcile/muse-spark` (checklist reconciliation on 2026-09-18, not audit authorship); `fm/icon-registry-name-validity/opus-5`; `fm/designlib-state-coverage-gaps/opus-5` (Design Library state coverage on 2026-09-18); `fm/addresses-detail-read-first/opus-5` (read-first detail page, shared commit status and demoted back link on 2026-09-20); `fm/companies-detail-belimbing-parity/claude-fable-5-1` (company detail header settled against Belimbing on 2026-09-20: the history icon, demoted Manage links and no header buttons); `fm/companies-detail-read-first/claude-fable-5-1` (company detail facts read-first on 2026-09-23); `fm/records-whose-only-page-is-a-form/claude-fable-5-1` (employee type record page read-first and the employee and employee-type edit routes retired on 2026-09-23); `fm/designspec-codes-off-the-ui/claude-fable-5-1` (Design Spec numbers dropped from the rendered card headings on 2026-09-23); `crewmate scout` (firstmate scout tasks that record no model — the FND-06 icon inventory and the four Phase 2 lane audits of 2026-09-16; separate sessions from the `crewmate/gpt-6` entry above, which is why these rows carry no model); `fm/parity-plan-bookkeeping/composer` (checklist bookkeeping on 2026-09-26 against current main, not slice authorship)
 
 ## Problem Essence
 
@@ -243,9 +243,9 @@ products were read and the plan forbids treating existence as acceptance.
   (Lane D), so the remaining work is one shared composition, not capability. Moving
   toward Belimbing would also be a regression. Belimbing keeps only
   `page` in the URL and offers 10/20/50/100 page sizes; Bilimbi already mandates
-  25/50/100/300 with full URL state. One shipped exception: `/audit/mutations`
-  hand-writes a Previous/Next pager instead of `<.pagination>` (Lane A), a Phase 5
-  migration, not a pattern to copy.
+  25/50/100/300 with full URL state. `/audit/mutations` now uses `<.pagination>`
+  with the shared filter toolbar (#797); the hand-written Previous/Next pager
+  Lane A recorded is gone.
 - **DAT-05** — "Missing" is wrong. Five stat cards ship on `/dashboard`, duplicated
   into ten markup blocks with 65 arbitrary-value classes. The Companies, Users,
   Sessions and Performance cards now render through the shared `<.stat_strip>`, with
@@ -629,8 +629,8 @@ Goal: Let the design steward or a product reviewer inspect one family at a time 
     the full one. The timestamp card adds a to-the-second instant. The
     `:design_library_drift` tag and its exclusion are gone, so both guards
     run in every `mix test` and in `mix precommit`.
-- [ ] Record dispositions in the ledger as steward review closes; the accepted choices already live in the Design Spec cards and this plan's ledger. **Rewritten 2026-09-23:** the in-library alternatives surface with catalog IDs is dropped — only one row (INP-09) is still at steward review, catalog IDs are ruled out of the rendered library, and building a surface for a one-row queue is speculative.
-- [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough.
+- [x] Record dispositions in the ledger as steward review closes; the accepted choices already live in the Design Spec cards and this plan's ledger. Every catalog row, including INP-09 (Adopt adapted), has one disposition below. The in-library alternatives surface was dropped on 2026-09-23: catalog IDs stay out of the rendered library, and no row remains at steward review. `{fm/parity-plan-bookkeeping/composer}`
+- [ ] Add focused coverage for variants, states and interactions; component-name presence alone is not enough. Current: focused UI and hook coverage exists, and the Design Library drift guards run by default, but not every declared state or interaction has evidence.
 
 Affected pages: `/system/design-library`, `/system/design-library/components`, `/system/design-library/graphic`, `/system/design-library/design-spec`
 
@@ -644,9 +644,9 @@ Goal: Complete evidence and recommended dispositions without changing production
 - [x] Lane B — audit ACT, FBK and OVR, including loading, dismissal, confirmation and recovery. `{crewmate scout, unsigned, model unrecorded}`
 - [x] Lane C — audit INP and INT, including field shell, keyboard behavior, editing and rich choices. `{crewmate scout, unsigned, model unrecorded}`
 - [x] Lane D — audit DAT, CMP and GFX, including actual index, form, detail, authentication and dashboard flows. `{crewmate scout, model unrecorded}`
-- [ ] Integration owner consolidates reports into this ledger and removes duplicate or speculative targets.
+- [x] Integration owner consolidates reports into this ledger and removes duplicate or speculative targets. The four lane reports stay outside the repository. What they changed here is the paragraph below, and the duplicate and speculative targets they named are gone. `{fm/parity-plan-bookkeeping/composer}`
 
-The four lane audits ran on 2026-09-16 and produced evidence only; their reports are held outside the repository. What landed on 2026-09-17: seven understated rows — LAY-05, ACT-02, DAT-01, CMP-02, CMP-03, CMP-05 and CMP-06 — were restated in the catalog table above; the NAV-01, ACT-01 and OVR-02 corrections and the OVR-01 and CMP-01 additions were recorded under Targets the evidence contradicts; and the two captain rulings were recorded under Design Decisions. Nothing else from the four reports is claimed to be on file: consolidating them into this ledger remains open.
+The four lane audits ran on 2026-09-16 and produced evidence only; their reports are held outside the repository. What landed on 2026-09-17: seven understated rows — LAY-05, ACT-02, DAT-01, CMP-02, CMP-03, CMP-05 and CMP-06 — were restated in the catalog table above; the NAV-01, ACT-01 and OVR-02 corrections and the OVR-01 and CMP-01 additions were recorded under Targets the evidence contradicts; and the two captain rulings were recorded under Design Decisions. Duplicate and speculative targets from those reports are gone. Nothing else from the four reports is claimed to be on file.
 
 Validation: Every catalog item has evidence, a recommended disposition, dependencies and at least one real Bilimbi use case or a reason to omit it.
 
@@ -654,14 +654,14 @@ Validation: Every catalog item has evidence, a recommended disposition, dependen
 
 Goal: Build accepted shared contracts in dependency order.
 
-- [ ] Stabilize identity tokens, focus, field shell, card, icon and action foundations.
+- [ ] Stabilize identity tokens, focus, field shell, card, icon and action foundations. Current: shared identity, field shell, card, icon and action foundations exist; local outliers remain.
 - [x] FND-05 follow-up — the vendored `topbar` navigation progress bar honors `prefers-reduced-motion` with a static full-width loading bar; the canvas trickle and fade are not CSS, so the global rule cannot reach them. `{fm/parity-topbar-motion}`
-- [ ] Implement accepted navigation, link and action contracts.
-- [ ] Implement accepted native input, choice, feedback and data-display contracts.
+- [ ] Implement accepted navigation, link and action contracts. Current: pins, navigation links, actions, the filter toolbar and pagination have landed; no whole-product contract review is closed.
+- [ ] Implement accepted native input, choice, feedback and data-display contracts. Current: shared inputs, combobox, datetime, stat strip and feedback exist. Address, Employee, Geonames and the company-scoped user and employee panels still use local filters, and some specialist data displays remain.
 - [x] Implement the accepted modal contract (`OVR-01`, Adopt adapted) as shared `<.modal>`, adopt it in every production workflow overlay and show both widths in the Design Library. `{fm/modal-a11y-dialog-semantics/opus-5}`
-- [ ] Implement accepted combobox, edit-in-place, disclosure and confirmation contracts only after their foundations are stable.
-- [ ] Add each real component and its state/interaction evidence to the Design Library in the same change.
-- [ ] Keep shared edits under one integration owner; parallel agents prepare independent evidence, tests and module-local adoption work.
+- [ ] Implement accepted combobox, edit-in-place, disclosure and confirmation contracts only after their foundations are stable. Current: combobox, inline text, inline choice, inline long text, disclosure and confirmation have shipped; async and free-text combobox have not.
+- [ ] Add each real component and its state/interaction evidence to the Design Library in the same change. Current: real specimens and the default drift guards exist, including the icon catalogue; not every adopter and state has browser evidence.
+- [ ] Keep shared edits under one integration owner; parallel agents prepare independent evidence, tests and module-local adoption work. Current: process constraint only; not a product blocker.
 
 Validation: Each accepted shared primitive has an intentional API, live specimen, interaction tests and no unexplained local palette or geometry override.
 
@@ -669,11 +669,11 @@ Validation: Each accepted shared primitive has an intentional API, live specimen
 
 Goal: Prove the primitives work together before broad migration.
 
-- [ ] Apply accepted patterns to one real operational index page.
-- [ ] Apply accepted patterns to one real create/edit form.
-- [ ] Apply accepted patterns to one real detail or settings page.
-- [ ] Review all three at desktop and narrow widths, light and dark themes, keyboard only, loading, error and permission states.
-- [ ] Correct composition problems in the shared layer before starting broad rollout.
+- [x] Apply accepted patterns to one real operational index page. `/companies` uses the shared filter toolbar, table and pagination. `{fm/parity-plan-bookkeeping/composer}`
+- [x] Apply accepted patterns to one real create/edit form. `/companies/create` uses shared form inputs and the country combobox. `{fm/parity-plan-bookkeeping/composer}`
+- [x] Apply accepted patterns to one real detail or settings page. `/companies/1` uses the shared list, section, table and inline-edit anatomy, including inline choice and long text. `{fm/parity-plan-bookkeeping/composer}`
+- [ ] Review all three at desktop and narrow widths, light and dark themes, keyboard only, loading, error and permission states. Current: the three routes have not all had a recorded pass of those states.
+- [ ] Correct composition problems in the shared layer before starting broad rollout. Current: acceptance guard only; no named composition defect is blocking rollout.
 
 Validation: the design steward's browser and interaction review confirms that parity improves real work and still looks and feels like Bilimbi, with recorded evidence for each assembly.
 
@@ -681,12 +681,12 @@ Validation: the design steward's browser and interaction review confirms that pa
 
 Goal: Remove local drift after the shared contracts stabilize.
 
-- [ ] Lane A — Base Authz, Session and Tenancy screens.
-- [ ] Lane B — Base Audit, Schedule, Settings, System and Performance screens.
-- [ ] Lane C — Core Company, Address and Geonames screens.
-- [ ] Lane D — Core Employee, User and User Administration screens.
-- [ ] Each lane edits only its owning module and tests; shared Base UI changes return to the integration owner.
-- [ ] Each migrated archetype is rechecked in the Design Library and on its production route.
+- [ ] Lane A — Base Authz, Session and Tenancy screens. Current: Authz lists and the Sessions list use the shared toolbar and pagination. Tenants uses the shared table and has no filter toolbar.
+- [ ] Lane B — Base Audit, Schedule, Settings, System and Performance screens. Current: Audit, Schedule history, Menu Inspector and Performance use the shared toolbar and pagination. Settings is a form, not an operational list.
+- [ ] Lane C — Core Company, Address and Geonames screens. Current: Company is substantially migrated. Address and Geonames indexes still use local filter forms.
+- [ ] Lane D — Core Employee, User and User Administration screens. Current: Users and User Administration use the shared toolbar, and detail choice facts use `<.inline_choice>`. Employee indexes and the company-scoped user and employee panels still use local filters.
+- [ ] Each lane edits only its owning module and tests; shared Base UI changes return to the integration owner. Current: process rule only; not a user-visible deliverable.
+- [ ] Each migrated archetype is rechecked in the Design Library and on its production route. Current: several adopters were rechecked, not every migrated archetype.
 
 Validation: Production screens use accepted shared patterns, module workflow tests pass, and no lane introduces a new unexplained variant.
 
@@ -694,15 +694,33 @@ Validation: Production screens use accepted shared patterns, module workflow tes
 
 Goal: Close the campaign with evidence that remains useful as Bilimbi evolves.
 
-- [ ] Classify every catalog item as Keep Bilimbi, Equivalent, Adopt adapted or Not applicable; no item remains ambiguous.
-- [ ] Verify applicable default, hover, focus, active/open, disabled, loading, validation, error, empty, dark and narrow states.
-- [ ] Verify keyboard movement, focus containment/return, screen-reader semantics, duplicate-work rejection and truthful recovery.
+- [x] Classify every catalog item as Keep Bilimbi, Equivalent, Adopt adapted or Not applicable; no item remains ambiguous. All 57 ledger rows have one of those dispositions, including INP-09 as Adopt adapted. `{fm/parity-plan-bookkeeping/composer}`
+- [ ] Verify applicable default, hover, focus, active/open, disabled, loading, validation, error, empty, dark and narrow states. Current: component tests and guards cover many states; campaign-wide route and state evidence is open.
+- [ ] Verify keyboard movement, focus containment/return, screen-reader semantics, duplicate-work rejection and truthful recovery. Current: hook tests cover shell behavior; there is no complete keyboard, semantics, duplicate-work and recovery matrix.
 - [x] Build the Design Library drift guards at the start of the campaign instead of at closeout, so later slices land against them rather than accumulating drift: `apps/base/ui/test/design_library_imitation_test.exs` rejects anchors that name no shared component, hand-written control markup and undeclared specimen cards; `design_library_coverage_test.exs` requires a `component-<name>` block per component and variation on the states it declares, showing at least two of an axis's declared states where it declares two or more and the single one where it declares one. Both read the template through `Bilimbi.Base.UI.DesignLibrarySource`, which owns the rules and is covered on fixtures by `design_library_rules_test.exs`. Both landed tagged `:design_library_drift` and out of the default run until the specimens they reported were corrected; since 2026-09-24 they run in every `mix test` and `mix precommit`. `{claude-fable-guards-1/claude-fable-5-1}`
-- [ ] Add guards for raw palette use, local component forks, missing Design Library states and unregistered icons where deterministic checks are useful.
-- [ ] Run component, LiveView, module workflow, asset and full precommit validation.
-- [ ] Record the accepted dispositions in this plan and in HTML comments — catalog IDs stay in the plan, comments, test names and element ids, never in rendered text — and close the execution issues with browser evidence.
+- [ ] Add guards for raw palette use, local component forks, missing Design Library states and unregistered icons where deterministic checks are useful. Current: icon-name validity and the Design Library drift guards exist. Broad raw-palette, local-fork and missing-state guards do not.
+- [ ] Run component, LiveView, module workflow, asset and full precommit validation. Current: campaign closeout has not run that validation as one acceptance pass.
+- [ ] Record the accepted dispositions in this plan and in HTML comments — catalog IDs stay in the plan, comments, test names and element ids, never in rendered text — and close the execution issues with browser evidence. Current: the ledger and the HTML-comment rule exist, and this checklist matches main. Browser evidence for closeout is still incomplete, and the execution issues are not closed on that evidence.
 
 Validation: Bilimbi matches or exceeds the useful design capability of Belimbing, preserves its own identity, and makes later drift visible before it reaches users.
+
+### Landed slices recorded 2026-09-26
+
+These shipped on `main` and were absent as checklist rows. The reduced-motion page-loading bar is the ticked FND-05 follow-up in Phase 3 (#806), not a second row. Each line records the observable result; the catalog and the contradiction notes above carry the design detail.
+
+- [x] Durable account-backed pins. The shell loads pins from `GET /api/pins` and writes through `/api/pins/toggle|reorder` (#791). `{fm/parity-plan-bookkeeping/composer}`
+- [x] Country and jurisdiction combobox. `/companies/create`, the Company jurisdiction fact and Address country fields use `<.combobox>` (#793). `{fm/parity-plan-bookkeeping/composer}`
+- [x] Users filter toolbar. `/users` renders its filters through `<.filter_toolbar>` (#792). `{fm/parity-plan-bookkeeping/composer}`
+- [x] Shared notification and User datetime. `/notifications` and the Users Created column render through `<.datetime>` (#795). `{fm/parity-plan-bookkeeping/composer}`
+- [x] Authz and Audit list toolbar and pagination. Capabilities, roles, decision logs, principal capabilities, principal roles, mutations and actions use `<.filter_toolbar>` and `<.pagination>` (#797). `{fm/parity-plan-bookkeeping/composer}`
+- [x] Record-history disclosure. History is a button with `aria-expanded` and focus return (#796). `{fm/parity-plan-bookkeeping/composer}`
+- [x] Company sub-page section anatomy. Departments, relationships and role detail use the shared section anatomy (#798). `{fm/parity-plan-bookkeeping/composer}`
+- [x] Dashboard stat strip. Companies, Users and Sessions render through `<.stat_strip>` (#799). The Performance card followed (#808): Health is a text cell and Samples is a number cell. The recent-audit card stays a feed of entries. `{fm/parity-plan-bookkeeping/composer}`
+- [x] Sessions list toolbar. The Sessions search form is `<.filter_toolbar>`, beside the existing shared pagination (#801). `{fm/parity-plan-bookkeeping/composer}`
+- [x] Operational list toolbar and pagination. Performance, Menu Inspector, Schedule history and Database Queries use the shared toolbar and pagination (#802). `{fm/parity-plan-bookkeeping/composer}`
+- [x] Shared inline choice. `<.inline_choice>` is the read-state choice fact on Address, User, Employee and Company detail (#803). `{fm/parity-plan-bookkeeping/composer}`
+- [x] Searchable icon catalogue. The Design Library Graphic page filters registry names, shows an empty result and copies a name only when the clipboard write succeeds (#809). `{fm/parity-plan-bookkeeping/composer}`
+- [x] Shared inline long text. `<.inline_long_text>` edits Company metadata and the Employee agent job description; blur commits, Escape cancels, and there is no rich-text editor (#810). `{fm/parity-plan-bookkeeping/composer}`
 
 ### Application shell slice — Issue #710
 
@@ -756,7 +774,7 @@ Live timestamp display — deferred in this slice, delivered by the follow-up on
 
 Audit attribution while impersonating (a preference or mutation recorded the viewed account as actor) was tracked separately and was not changed by this slice; the shell simply refuses the durable display write. That gap is now closed — see the impersonation audit actor slice below.
 
-Delivery: https://github.com/BelimbingApp/bilimbi/pull/711 merged on 2026-09-15, closing #710, after independent review and the no-mistakes shipping gate. Later catalog families, broad production-screen migration, searchable icon parity and drift guards remain open in the campaign phases above.
+Delivery: https://github.com/BelimbingApp/bilimbi/pull/711 merged on 2026-09-15, closing #710, after independent review and the no-mistakes shipping gate. At delivery, later catalog families, broad production-screen migration, searchable icon parity and drift guards were still open. Searchable icon parity (#809) and the drift guards (default since 2026-09-24) have since landed; broad production-screen migration remains open in the phases above.
 
 ### Impersonation audit actor slice — Issue #712
 
@@ -817,7 +835,7 @@ one of them is a dead end.
 
 - [x] Add one shared `<.empty_state>` in `Bilimbi.Base.UI.Components`: a caller's `title` and `reason` with an optional recovery action, or the one permission wording the component owns (`forbidden`), never both. `apps/base/ui/test/components_empty_state_test.exs` holds the two modes, the different first-run and no-match sentences, and the raise on a call that says both or neither. `{fm/empty-and-permission-states/claude-fable-5-1}`
 - [x] Reach the same pattern from `<.table>`'s `<:empty>` slot through `title`/`reason`/`forbidden` attrs, so a table says what is missing without a second component and plain slot content still renders as given. `{fm/empty-and-permission-states/claude-fable-5-1}`
-- [x] Adopt it on `/companies`, the operational index page this slice canaries for Phase 4 — one accepted pattern on it, not yet the whole Phase 4 row: a search or status filter that matched nothing names what was narrowed and offers the way back, keeping sort and page size; an empty tenant says so and offers the first create only to an actor holding `admin.company.create`. Covered in `apps/core/company/web_test/company_live_test.exs`. `{fm/empty-and-permission-states/claude-fable-5-1}`
+- [x] Adopt it on `/companies`, the operational index page this slice canaries for Phase 4 — one accepted pattern on it, not yet the whole Phase 4 row at the time: a search or status filter that matched nothing names what was narrowed and offers the way back, keeping sort and page size; an empty tenant says so and offers the first create only to an actor holding `admin.company.create`. Covered in `apps/core/company/web_test/company_live_test.exs`. **Superseded 2026-09-26:** the Phase 4 index row is ticked for the shared toolbar, table and pagination. `{fm/empty-and-permission-states/claude-fable-5-1}`
 - [x] Present the three states in the Design Library's Feedback and states family as one `component-empty-state` block, retiring the hand-written `Empty workspace` and `Permission denied` specimen cards and their `DesignLibrarySource` declarations. `{fm/empty-and-permission-states/claude-fable-5-1}`
 
 Not delivered by this slice, and still open under FBK-04: the remaining index and
@@ -871,7 +889,9 @@ Not delivered by this slice:
 
 - **INT-02 stays missing.** The verification-status choice is a page-local
   select, not a shared inline-select primitive; inline combobox and textarea
-  editing are untouched.
+  editing are untouched. **Superseded 2026-09-26:** `<.inline_choice>` (#803)
+  and `<.inline_long_text>` (#810) are the shared primitives. Async and
+  free-text combobox are still absent.
 - **The other inline-edit screens are unmigrated.** `/employees/:id`,
   `/users/:id` and the Geonames lists still pass no `status` and no
   `allow_empty`, so they keep reporting through a flash.
@@ -879,7 +899,9 @@ Not delivered by this slice:
   focus drop recorded under Defects found while verifying.
 - **The Phase 4 detail row stays open.** This is one accepted pattern on one
   detail page, not the recorded narrow-width, dark-theme and keyboard review
-  that row asks for.
+  that row asks for. **Superseded 2026-09-26:** the detail canary is ticked
+  for `/companies/1`. The review row — desktop and narrow, light and dark,
+  keyboard, loading, error and permission — stays open.
 
 ### Demoted related-workflow link slice — NAV-03 and CMP-03, partial
 
@@ -1183,6 +1205,7 @@ Not delivered by this slice, reported as follow-up:
 - **INT-02 stays without a shared primitive.** The user's company is the
   second page-local inline select on the same rule; extracting one shared
   `<.inline_select>` waits for its underlying control to be accepted.
+  **Superseded 2026-09-26:** `<.inline_choice>` is that primitive (#803).
 - **The `<.header>` change is the narrow-width stacking only** (title first,
   actions below, under `sm`, as Belimbing's page header does; measured on
   `/users/2` at 390px: the title row is one line again and the actions row
@@ -1271,7 +1294,8 @@ Not delivered by this slice, reported as follow-up:
 - **INT-02 stays without a shared primitive.** The four employee choices are
   a page-local `choice_fact` shell on the same rule as the address and user
   pages; extracting one shared `<.inline_select>` waits for its control to be
-  accepted.
+  accepted. **Superseded 2026-09-26:** those choices use `<.inline_choice>`
+  (#803).
 - **The subordinates section** keeps its "Add" button, a hand-written table
   and flashes, as Belimbing's does.
 
@@ -1379,6 +1403,8 @@ Not delivered by this slice, reported as follow-up:
   `/employees/:id` and now `/companies/:id` each carry a private
   read-state-trigger select in the same shape; that repetition is the case for
   extracting it into Base UI, with a Design Library specimen, in its own slice.
+  **Superseded 2026-09-26:** `<.inline_choice>` is that component, with a
+  Design Library specimen (#803).
 
 ### Records whose only page is a form — CMP-03 and NAV-03, partial
 
