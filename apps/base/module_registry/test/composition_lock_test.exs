@@ -160,45 +160,104 @@ defmodule Bilimbi.Base.ModuleRegistry.CompositionLockTest do
     refute File.read!(overlay) =~ "jason"
   end
 
+  test "a Platform lock-only bump re-derives the overlay and keeps mounted-only packages", %{
+    root: root
+  } do
+    platform_lock = Path.join(root, "mix.lock")
+    File.write!(platform_lock, ~s(%{"phoenix": {:hex, :phoenix, "1.8.10"}}\n))
+    mount!(root, "domains", "factory")
+    overlay = Bilimbi.CompositionLock.lockfile!(root)
+
+    File.write!(
+      overlay,
+      ~s(%{"phoenix": {:hex, :phoenix, "1.8.10"}, "factory_only": {:hex, :factory_only, "0.3.0"}}\n)
+    )
+
+    assert Bilimbi.CompositionLock.lockfile!(root) == overlay
+    assert Mix.Dep.Lock.read(overlay).phoenix == {:hex, :phoenix, "1.8.10"}
+
+    File.write!(platform_lock, ~s(%{"phoenix": {:hex, :phoenix, "1.8.11"}}\n))
+
+    output =
+      ExUnit.CaptureIO.capture_io(fn ->
+        assert Bilimbi.CompositionLock.lockfile!(root) == overlay
+      end)
+
+    assert output =~ "Re-derived composition lock overlay"
+
+    assert Mix.Dep.Lock.read(overlay) == %{
+             phoenix: {:hex, :phoenix, "1.8.11"},
+             factory_only: {:hex, :factory_only, "0.3.0"}
+           }
+
+    assert ExUnit.CaptureIO.capture_io(fn -> Bilimbi.CompositionLock.lockfile!(root) end) == ""
+    assert File.read!(platform_lock) == ~s(%{"phoenix": {:hex, :phoenix, "1.8.11"}}\n)
+  end
+
+  test "pinned mode refuses a Platform lock that changed after pinning", %{root: root} do
+    mount!(root, "domains", "factory")
+    Bilimbi.CompositionLock.lockfile!(root)
+    Bilimbi.CompositionLock.pin!(root)
+    File.write!(Path.join(root, "mix.lock"), ~s(%{"phoenix": {:hex, :phoenix, "1.8.11"}}\n))
+
+    assert_raise Mix.Error,
+                 ~r/Platform mix.lock changed since the composition lock was pinned/,
+                 fn ->
+                   Bilimbi.CompositionLock.check!(root)
+                 end
+  end
+
   test "two mounted repositories with incompatible transitive requirements fail resolution", %{
     root: root
   } do
     a = mount!(root, "domains", "a")
     b = mount!(root, "extensions", "b")
-    shared = Path.join(root, "packages/shared")
-    File.mkdir_p!(shared)
-    File.write!(Path.join(shared, "mix.exs"), mix_project(:shared, "1.0.0", "[]"))
+
+    for {dir, version} <- [{"shared-1.5", "1.5.0"}, {"shared-1.4", "1.4.0"}] do
+      path = Path.join([root, "packages", dir])
+      File.mkdir_p!(path)
+      File.write!(Path.join(path, "mix.exs"), mix_project(:shared, version, "[]"))
+    end
 
     File.write!(
       Path.join(a, "mix.exs"),
-      mix_project(:a, "0.1.0", "[{:shared, \"~> 1.0\", path: \"../../../packages/shared\"}]")
+      mix_project(:a, "0.1.0", "[{:shared, \"~> 1.5\", path: \"../../../packages/shared-1.5\"}]")
     )
 
     File.write!(
       Path.join(b, "mix.exs"),
-      mix_project(:b, "0.1.0", "[{:shared, \"~> 2.0\", path: \"../../../packages/shared\"}]")
+      mix_project(
+        :b,
+        "0.1.0",
+        "[{:shared, \"~> 1.4.0\", path: \"../../../packages/shared-1.4\"}]"
+      )
     )
 
-    File.write!(
-      Path.join(root, "mix.exs"),
-      "Code.require_file(#{inspect(@helper)})\n" <>
-        String.replace(
-          mix_project(
-            :composition,
-            "0.1.0",
-            "[{:a, path: \"apps/domains/a\"}, {:b, path: \"apps/extensions/b\"}]"
-          ),
-          "version: \"0.1.0\",",
-          "version: \"0.1.0\", lockfile: Bilimbi.CompositionLock.lockfile!(__DIR__),"
-        )
-    )
+    resolve = fn deps ->
+      File.write!(
+        Path.join(root, "mix.exs"),
+        "Code.require_file(#{inspect(@helper)})\n" <>
+          String.replace(
+            mix_project(:composition, "0.1.0", deps),
+            "version: \"0.1.0\",",
+            "version: \"0.1.0\", lockfile: Bilimbi.CompositionLock.lockfile!(__DIR__),"
+          )
+      )
+
+      System.cmd(System.find_executable("mix"), ["deps.loadpaths", "--no-compile"],
+        cd: root,
+        stderr_to_stdout: true
+      )
+    end
+
+    assert {_, 0} = resolve.("[{:a, path: \"apps/domains/a\"}]")
+    assert {_, 0} = resolve.("[{:b, path: \"apps/extensions/b\"}]")
 
     {output, status} =
-      System.cmd(System.find_executable("mix"), ["deps.check"], cd: root, stderr_to_stdout: true)
+      resolve.("[{:a, path: \"apps/domains/a\"}, {:b, path: \"apps/extensions/b\"}]")
 
     assert status != 0
-    assert output =~ "shared"
-    assert output =~ "~> 2.0"
+    assert output =~ "different specs were given for the shared app"
     assert File.regular?(Path.join(root, ".scratchpad/composition-lock/mix.lock"))
     assert File.read!(Path.join(root, "mix.lock")) == "%{}\n"
   end
@@ -233,3 +292,4 @@ defmodule Bilimbi.Base.ModuleRegistry.CompositionLockTest do
     "defmodule Fixture.#{app |> Atom.to_string() |> Macro.camelize()}MixProject do\n  use Mix.Project\n  def project, do: [app: #{inspect(app)}, version: #{inspect(version)}, deps: #{deps}]\nend\n"
   end
 end
+

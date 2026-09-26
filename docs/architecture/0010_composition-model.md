@@ -189,7 +189,12 @@ project uses the same ignored `.scratchpad/composition-lock/mix.lock` overlay,
 selected by `mix/composition_lock.exs`. An operator may place this artifact
 elsewhere with `BILIMBI_COMPOSITION_LOCK_DIR`. The Platform lock is the initial
 input for a new overlay; mounted dependency resolution and
-`deps.unlock --unused` write only the overlay. Unmounting the last repository
+`deps.unlock --unused` write only the overlay. The manifest beside the overlay
+records the Platform lock SHA-256 the overlay was derived from. When the
+checked-out Platform lock differs, the next Mix project load re-derives the
+overlay: every package the Platform lock contains takes the Platform's locked
+entry, mounted-only packages are kept, and `mix deps.get` resolves the rest.
+Pinned CI refuses that mismatch instead of re-deriving. Unmounting the last repository
 selects the Platform lock again without deleting or rewriting either lock.
 Mounted container and module `mix.exs` files must require that helper from the
 Platform root and set `lockfile: Bilimbi.CompositionLock.lockfile!(workspace_root)`;
@@ -197,20 +202,20 @@ they must not point at a repository-local or Platform lock.
 
 One composition build resolves **all** selected Domain and Extension
 dependencies together with `mix deps.get`, then checks the complete graph with
-`mix deps.check`. Individual repository lockfiles are not merged: conflicting
+`mix deps.loadpaths`. Individual repository lockfiles are not merged: conflicting
 constraints must fail resolution or dependency checking, rather than selecting
 one repository's transitive version. After the sources and lock are settled,
 run `mix bilimbi.composition.lock --pin` at the Platform root. It writes
 `manifest.txt` beside the overlay with the exact Platform and mounted Git HEAD
-revisions plus the lock SHA-256. The repositories must be independent Git
-checkouts with clean tracked files. The company owns and publishes the overlay
-and manifest together as one build artifact; neither belongs in Platform Git or
+revisions plus the Platform and overlay lock SHA-256s. The repositories must
+be independent Git checkouts with clean tracked files. The company owns and
+publishes the overlay and manifest together as one build artifact; neither belongs in Platform Git or
 any mounted repository's Git history.
 
 Pinned CI checks out the manifest's Platform revision, mounts **every** listed
 repository at its listed revision, and restores both artifact files to the
 composition lock directory. It sets `BILIMBI_COMPOSITION_PINNED=1` and runs
-`mix deps.get --check-locked`, then `mix deps.check`. Project loading rejects
+`mix deps.get --check-locked`, then `mix deps.loadpaths`. Project loading rejects
 a missing artifact, changed revision, changed mounted set, or changed lock bytes
 before dependency fetching. `--check-locked` refuses dependency resolution that
 would change the pinned lock. A new selection or dependency constraint requires

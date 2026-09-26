@@ -50,7 +50,7 @@ defmodule Bilimbi.CompositionLock do
     lockfile = lockfile!(root)
     revisions = Enum.map(["." | repositories], &{&1, revision!(Path.join(root, &1))})
 
-    manifest = manifest(revisions, digest!(lockfile))
+    manifest = manifest(revisions, digest!(Path.join(root, "mix.lock")), digest!(lockfile))
 
     File.write!(Path.join(artifact_dir(root), "manifest.txt"), manifest)
     manifest
@@ -71,9 +71,19 @@ defmodule Bilimbi.CompositionLock do
         _ -> Mix.raise("missing or invalid composition revision manifest: #{path}")
       end
 
-    expected = Enum.map(["." | repositories], &{&1, revision!(Path.join(root, &1))})
+    platform_digest = digest!(Path.join(root, "mix.lock"))
 
-    unless manifest == manifest(expected, digest!(Path.join(artifact_dir(root), "mix.lock"))) do
+    unless platform_lock_digest(manifest) == platform_digest do
+      Mix.raise(
+        "Platform mix.lock changed since the composition lock was pinned; " <>
+          "re-derive the overlay without BILIMBI_COMPOSITION_PINNED and publish a new pin"
+      )
+    end
+
+    expected = Enum.map(["." | repositories], &{&1, revision!(Path.join(root, &1))})
+    lock_digest = digest!(Path.join(artifact_dir(root), "mix.lock"))
+
+    unless manifest == manifest(expected, platform_digest, lock_digest) do
       Mix.raise("composition lock does not match mounted repository revisions or lock bytes")
     end
 
@@ -81,24 +91,79 @@ defmodule Bilimbi.CompositionLock do
   end
 
   defp mounted_lockfile!(root, _repositories) do
-    dir = artifact_dir(root)
-    lockfile = Path.join(dir, "mix.lock")
+    lockfile = Path.join(artifact_dir(root), "mix.lock")
 
-    unless File.regular?(lockfile) do
-      if System.get_env("BILIMBI_COMPOSITION_PINNED") == "1" do
-        Mix.raise("pinned composition lock is missing: #{lockfile}")
-      end
+    if System.get_env("BILIMBI_COMPOSITION_PINNED") == "1" do
+      unless File.regular?(lockfile),
+        do: Mix.raise("pinned composition lock is missing: #{lockfile}")
 
-      File.mkdir_p!(dir)
-      File.cp!(Path.join(root, "mix.lock"), lockfile)
+      checked!(root)
+    else
+      derive!(root, lockfile)
     end
 
-    if System.get_env("BILIMBI_COMPOSITION_PINNED") == "1", do: check!(root)
     lockfile
   end
 
-  defp manifest(revisions, lock_digest) do
-    "bilimbi-composition-lock-v1\nlock-sha256 #{lock_digest}\n" <>
+  defp checked!(root) do
+    key = {__MODULE__, :checked, root}
+
+    unless :persistent_term.get(key, false) do
+      check!(root)
+      :persistent_term.put(key, true)
+    end
+  end
+
+  defp derive!(root, lockfile) do
+    platform_lock = Path.join(root, "mix.lock")
+    platform_digest = digest!(platform_lock)
+    manifest_path = Path.join(Path.dirname(lockfile), "manifest.txt")
+
+    recorded =
+      case File.read(manifest_path) do
+        {:ok, manifest} -> platform_lock_digest(manifest)
+        {:error, _} -> nil
+      end
+
+    cond do
+      not File.regular?(lockfile) ->
+        File.mkdir_p!(Path.dirname(lockfile))
+        File.cp!(platform_lock, lockfile)
+        File.write!(manifest_path, manifest([], platform_digest, nil))
+
+      recorded != platform_digest ->
+        lockfile
+        |> Mix.Dep.Lock.read()
+        |> Map.merge(Mix.Dep.Lock.read(platform_lock))
+        |> write_lock!(lockfile)
+
+        File.write!(manifest_path, manifest([], platform_digest, nil))
+        Mix.shell().info("Re-derived composition lock overlay from the changed Platform mix.lock")
+
+      true ->
+        :ok
+    end
+  end
+
+  defp write_lock!(lock, path) do
+    lines =
+      for {app, entry} <- Enum.sort(lock), entry != nil do
+        ~s(  "#{app}": #{inspect(entry, limit: :infinity)},\n)
+      end
+
+    File.write!(path, ["%{\n", lines, "}\n"])
+  end
+
+  defp platform_lock_digest(manifest) do
+    case Regex.run(~r/^platform-lock-sha256 (\S+)$/m, manifest) do
+      [_, digest] -> digest
+      nil -> nil
+    end
+  end
+
+  defp manifest(revisions, platform_digest, lock_digest) do
+    "bilimbi-composition-lock-v1\nplatform-lock-sha256 #{platform_digest}\n" <>
+      if(lock_digest, do: "lock-sha256 #{lock_digest}\n", else: "") <>
       Enum.map_join(revisions, "", fn {path, revision} -> "repo #{path} #{revision}\n" end)
   end
 
@@ -135,3 +200,4 @@ defmodule Mix.Tasks.Bilimbi.Composition.Lock do
   def run(["--check"]), do: Bilimbi.CompositionLock.check!(File.cwd!())
   def run(_), do: Mix.raise("usage: mix bilimbi.composition.lock --pin | --check")
 end
+
