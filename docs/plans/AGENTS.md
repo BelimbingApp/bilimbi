@@ -8,7 +8,7 @@ A plan is the **whiteboard** of a live discussion: capture what's agreed and why
 
 Plans are problem-first, not feature-first. State what is broken, missing, or risky before naming solutions. When the user leads with a solution, backfill the problem and check it still fits.
 
-In **Design Decisions**: name 2–3 real options, weigh trade-offs plainly, then recommend one and say why it wins under root `AGENTS.md` (entropy, strategic cost, deep modules, honesty, UX, module boundaries). Prefer solutions that optimize real operational work — not demo breadth, hypothetical configurability, or feature checklists. Do not open with implementation tasks or a preferred stack before **Problem Essence** and **Desired Outcome** exist.
+Use **Design Decisions** only when a real choice and its trade-offs will help a future reader understand or revisit the plan. State the chosen direction in **Desired Outcome** or **Public Contract** when the alternatives add no signal. If a decision section is warranted, compare only genuine options, recommend one, and explain why it wins under root `AGENTS.md` (entropy, strategic cost, deep modules, honesty, UX, module boundaries). Prefer solutions that optimize real operational work — not demo breadth, hypothetical configurability, or feature checklists. Do not open with implementation tasks or a preferred stack before **Problem Essence** and **Desired Outcome** exist.
 
 ## Workflow
 
@@ -27,7 +27,7 @@ Plans may be promoted into GitHub issues and then taken up by different agents. 
 
 Work that implements/fixes something in a plan must **update the plan**, not just the code:
 - Tick/adjust checklists (`- [x]` when truly done; suffix completed lines with `{agent}/{model}`; add/split rows on scope change; delete dropped tasks and dead prose).
-- Refresh narrative in prose when reality diverges from Design Decisions / Desired Outcome (no patches/code).
+- Refresh narrative in prose when reality diverges from the Desired Outcome or a recorded decision (no patches/code).
 - Bump **Last Updated** and set **Status** when story/status meaningfully changes.
 - If a plan is linked to one or more GitHub issues, include the issue numbers in the relevant source references and mark which phase(s) belong to which issue.
 - If a phase is delegated to an issue, record the issue number on that phase so the task boundary is explicit to the next agent.
@@ -48,7 +48,7 @@ Status describes current reality; it is not a permission gate. Keep it short and
 1. **Problem Essence** (required) — open with a plain 1–2 sentence verdict that says why it is a problem (for example "A runtime that updates itself is a bad idea."), then list the concrete problems as bullets. No hedged framing; state the claim, then the evidence.
 2. **Desired Outcome** (required) — open with a plain 1–2 sentence statement of what changes and why that is better, then list what "done" achieves as bullets.
 3. **Top-Level Components** — nameable responsibilities.
-4. **Design Decisions** — 2–3 real options, trade-offs, recommended direction, and why it wins under root `AGENTS.md`.
+4. **Design Decisions** (optional) — preserve a consequential choice when its real alternatives and trade-offs provide context beyond the chosen contract. Omit the section when it would only restate the outcome.
 5. **Public Contract** — surface/promises once clear.
 6. **Phases** — chunked work. (Use `Build Sequence` only to match an external artifact's wording; otherwise always `Phases`.)
 
@@ -74,7 +74,7 @@ Write tasks as observable outcomes. Use stable anchors such as classes, methods,
 ## Hard Rules
 
 - No questionnaire plans or chat prompts.
-- No neutral option-padding when a recommendation exists.
+- No Design Decisions section for its own sake; do not invent options or repeat settled structure to fill it.
 - No solution-first or feature-first plans before **Problem Essence** and **Desired Outcome**.
 - No observability-only sections duplicating this doc.
 - No plan kept only in session state unless explicitly asked.

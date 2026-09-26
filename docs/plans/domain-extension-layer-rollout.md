@@ -11,21 +11,22 @@
 - `AGENTS.md` §4
 - `apps/base/module_registry/`
 - [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
-- Sibling plan `docs/plans/inventory/inventory-domain.md`
-- Sibling plan `docs/plans/manufacturing/manufacturing-domain.md`
-- Customer plan `docs/plans/commerce-material-flow-ledger.md`
-- Customer plan `docs/plans/manufacturing/sbg-requirements.md`
+- Factory plan `docs/plans/factory/0000-factory-domain.md`
+- Inventory module plan `docs/plans/factory/0010-inventory-module.md`
+- Customer plan `docs/plans/factory/mr-packaging-requirements.md`
+- Customer plan `docs/plans/factory/sbg-requirements.md`
 
 **Agents:** claude/claude-opus-5 (earlier work),
 amp/medium-sol (architecture review only), codex/gpt-5 (earlier work),
-codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (this revision),
+codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6-sol-medium (Factory boundary revision),
 claude/claude-opus-5.5 (no-mistakes review agent)
 
 ## Problem Essence
 
 Bilimbi discovers its current Base and Core modules, but it has not proved that
-independent Domain and Extension repositories mounted under `apps/` can become
-one valid release without Platform code naming or depending on them.
+independent Domain and Extension repositories mounted under `apps/domains/` and
+`apps/extensions/` can become one valid release without Platform code naming
+or depending on them.
 
 ## Desired Outcome
 
@@ -43,8 +44,9 @@ binary.
 The following facts have already been verified:
 
 - Domain and Extension are accepted descriptor layers.
-- A valid container mounted as a direct child of `apps/` is visible to the
-  existing source scan without central registration.
+- The existing source scan finds containers only as direct children of `apps/`.
+  The target `apps/domains/{domain}` and `apps/extensions/{extension}` roots
+  require discovery and Mix composition changes before they can be mounted.
 - The graph validator already rejects missing dependencies, duplicate
   identities, and cycles within the graph it sees.
 - The current dependency validator permits Domain-to-Domain dependencies only
@@ -69,9 +71,7 @@ are outside this plan.
 
 ### Select repositories by mounting them
 
-**Mounted independent repositories** are recommended because they satisfy the
-current requirement with the existing workspace topology. Git submodules need
-a company-owned parent; published packages add a package lifecycle; runtime
+**Mounted independent repositories** are recommended because repository presence selects source without a second registry. The nested role roots still need Mix and discovery changes. Git submodules need a company-owned parent; published packages add a package lifecycle; runtime
 flags ship unselected code. Those alternatives remain deferred unless the
 nested-repository proof fails.
 
@@ -113,14 +113,27 @@ runtime scan, or release-loading design.
 
 Goal: prove or reject the complete model before production implementation.
 
-- [ ] Mount two throwaway Domain repositories and two Extension repositories
-  beneath `apps/`, each with a valid container and at least one module.
+- [ ] Mount two throwaway Domain repositories under `apps/domains/` and two
+  Extension repositories under `apps/extensions/`, each with a valid container
+  and at least one module.
+- [ ] Prove Mix includes both nested roots in builds and releases while Base,
+  Core, and Web remain direct umbrella children. Update discovery, graph
+  fingerprint inputs, root formatter subdirectories, route and boundary scans,
+  and every fixed-depth `apps/*/*` guard glob for the two nested roots without
+  a list of optional capability names. Include Domain templates in Tailwind
+  sources and mounted modules in precommit and strict compilation. Prove Web
+  includes mounted container dependencies without hard-coded capability names.
+  Verify that Git ignore rules prevent accidental tracking of repositories.
 - [ ] Prove a declared cross-repository Domain dependency and a declared
   Extension-to-Extension dependency, with cycle rejection for both.
 - [ ] Treat those synthetic edges only as mechanism fixtures; every production
   same-layer dependency must separately pass 0010's business-necessity test.
 - [ ] Confirm the parent Bilimbi repository neither owns nor records the nested
   repositories.
+- [ ] Decide and prove lockfile ownership when a mounted repository adds a Hex
+  dependency; unmounting it must not silently rewrite another owner's lockfile.
+- [ ] Prove a Domain repository's CI can check out a pinned Platform revision,
+  mount itself, and run its build checks without an unpublished local workspace.
 - [ ] Prove discovery includes every mounted module without a central list and
   rejects a missing dependency, duplicate identity, forbidden direction, and
   cross-repository cycle.
@@ -148,11 +161,12 @@ Contract without a hard-coded Domain or Extension name.
 
 Goal: turn the successful proof into the smallest maintained implementation.
 
-- [ ] Implement generic mounted-container discovery and build-time graph
-  validation using the mechanism proven in Phase 1.
+- [ ] Implement generic mounted-container discovery from the two nested roots
+  and build-time graph validation using the mechanism proven in Phase 1.
 - [ ] Permit declared cross-container Domain dependencies and declared
   Extension-to-Extension dependencies while retaining cycle and upward-edge
-  rejection.
+  rejection. No production cross-container Domain edge exists yet; this
+  mechanism must pass 0010's proof before a real dependency needs it.
 - [ ] Include every graph application and its resources in the release.
 - [ ] Make migrations and runtime contributions consume the approved graph
   without reconstructing it or creating upward dependencies.
@@ -162,60 +176,26 @@ Goal: turn the successful proof into the smallest maintained implementation.
   release contents.
 - [ ] Run focused tests and `mix precommit`.
 
-### Phase 3 — First real Domains
+### Phase 3 — First Factory build
 
-Goal: Inventory/Stock and the Manufacturing / Production Operations Domain
-behave exactly like the disposable Domain proved in Phase 1.
+Goal: Factory mounts as one repository and its first three modules support Mr Packaging's receipt-to-despatch workflow.
 
-- [ ] Create Inventory/Stock as an independent repository with its initial
-  module, following `docs/plans/inventory/inventory-domain.md`.
-- [ ] Create the Manufacturing / Production Operations Domain as an
-  independent repository with its first Product Definition and Production
-  Execution modules and a declared dependency on Inventory/Stock's public
-  contract, following `docs/plans/manufacturing/manufacturing-domain.md`.
-  Planning, Maintenance, and Costing stay later modules until an owner
-  confirms them. Production Execution registers as Stock's production
-  posting authority, and its trace read model holds only Manufacturing-side
-  views, such as which run, step, and resource produced or consumed a lot; it
-  reads Inventory/Stock's public ancestry/genealogy contract and stores no
-  genealogy of its own.
-- [ ] Prove either repository can be absent when no mounted dependent requires
-  it, and prove a missing Inventory/Stock dependency fails composition.
-- [ ] Begin Inventory/Stock module work in
-  `docs/plans/inventory/inventory-domain.md` when its repository and migration
-  path work end to end.
-- [ ] Begin Product Definition and Production Execution module work in
-  `docs/plans/manufacturing/manufacturing-domain.md` when its repository and
-  Stock dependency work end to end.
-- [ ] Begin Mr Packaging Sdn Bhd's customer requirements in
-  `docs/plans/commerce-material-flow-ledger.md` only after the
-  generic Domain slice is available; mount the `MrPackaging` Extension only
-  for a confirmed public-contract adaptation.
-- [ ] Begin SBG's adhesive-tape requirements in
-  `docs/plans/manufacturing/sbg-requirements.md` only after the generic Domain
-  slice is available; mount the `SbGroup` Extension only for a confirmed
-  public-contract adaptation.
+- [ ] Create Factory as one independent repository with Inventory, Product Definition, and Production Execution modules, following `docs/plans/factory/0000-factory-domain.md`.
+- [ ] Implement Inventory's public material contract following `docs/plans/factory/0010-inventory-module.md`; Production Execution depends on that API and registers as its production posting authority.
+- [ ] Prove Factory can be absent when no mounted dependent requires it, and prove a missing Factory dependency fails composition.
+- [ ] Prove Inventory owns the only material ledger and genealogy while Production Execution adds run, step, and resource context through its public contract.
+- [ ] Keep Planning, Maintenance, and Costing as later Factory modules until an owner confirms each workflow. Decide Quality's module or Domain placement when its own workflow is built.
+- [ ] Validate the initial modules against Mr Packaging Sdn Bhd's receipt-to-despatch workflow in `docs/plans/factory/mr-packaging-requirements.md`; its current requirements are expected to use Factory configuration without an Extension.
 
-### Phase 4 — First real Extension
+### Phase 4 — Second Factory build and first Extension
 
-Goal: prove `MrPackaging` and `SbGroup` adapt through supported contracts when
-real requirements exist.
+Goal: SBG validates the same Factory modules through glue, coating, and slitting work, with AX facts entering through the `SbGroup` Extension.
 
-- [ ] Mount an Extension only when an actual Platform or Domain adaptation is
-  identified; do not invent one merely to populate the layer.
-- [ ] Keep foam, glue, coating, and slitting process families, cure data, and
-  ordinary process configuration in the generic Manufacturing Domain.
-  `MrPackaging` holds only confirmed Mr Packaging Sdn Bhd behaviour that
-  common configuration and public contracts cannot express. `SbGroup` holds
-  SBG-specific planning, procurement, inventory-value needs, and AX integration.
-  For QAC, the future Quality capability owns cases, evidence, and corrective
-  actions; `SbGroup` supplies only SBG policy, AX mapping and integration, and
-  presentation through Quality's public contract. Neither Extension owns the
-  common ledger, genealogy, units of measure, or execution semantics. AX
-  production history passes through Manufacturing's execution/import contract;
-  warehouse receipts and ordinary movements may post directly to Stock.
-- [ ] Keep its ownership, visibility, and licensing independent of its
-  architectural role.
+- [ ] Validate Factory's contracts against SBG's glue, coating, and slitting workflows in `docs/plans/factory/sbg-requirements.md`.
+- [ ] Mount the `SbGroup` AX Connector for confirmed source mapping and submit production history through Production Execution's import contract. Keep process configuration in Factory and SBG-specific integration in `SbGroup`.
+- [ ] Keep warehouse receipts and ordinary movements on Inventory's public contract; no Extension owns the common material ledger, genealogy, units of measure, production posting authority, or execution semantics.
+- [ ] Mount a `MrPackaging` Extension only if plant validation finds a specific gap in Factory's public contracts or configuration.
+- [ ] Keep each Extension's ownership, visibility, and licensing independent of its architectural role.
 - [ ] Prove the application remains complete with the Extension absent and
   that removing it leaves durable data intact.
 

@@ -3,9 +3,9 @@
 **Document Type:** Normative architecture standard
 **Status:** Current — implementation pending realization proof
 **Architecture ID:** 0010 (reserved; do not reuse for an ADR)
-**Agents:** claude/claude-opus-5, amp/medium-sol
+**Agents:** claude/claude-opus-5, amp/medium-sol, codex/gpt-6-sol-medium
 **Scope:** Platform, Domain, Extension, composition, and nested-Git rules
-**Last Updated:** 2026-08-24
+**Last Updated:** 2026-09-25
 
 ## Purpose
 
@@ -23,7 +23,7 @@ ship. If it fails, revise this standard rather than silently weakening it.
 - **Business application:** The Platform, selected Domains and Extensions, and
   deployment configuration that a company builds and operates.
 - **Domain:** An optional, cohesive business capability with meaning of its own,
-  such as Inventory, Manufacturing, Payroll, Maintenance, or CRM.
+  such as Factory, People, or CRM. A Domain can contain several modules that an adopter installs together.
 - **Extension:** An optional capability whose meaning comes from adding to or
   adapting existing Platform, Domain, or Extension capabilities.
 - **Module:** A deep implementation boundary with a small public API. A module
@@ -110,8 +110,10 @@ durable data.
 
 ## Nested-Git composition
 
-A company starts with the main Bilimbi checkout and mounts selected Domain and
-Extension repositories below `apps/`:
+A company starts with the main Bilimbi checkout and mounts each selected Domain
+under `apps/domains/` and each Extension under `apps/extensions/`. These folders
+group repository roles; each named child, such as `factory/`, is the independent
+repository and composition container:
 
 ```text
 business-application/
@@ -119,23 +121,35 @@ business-application/
 │   ├── base/                    # Platform, main Bilimbi Git
 │   ├── core/                    # Platform, main Bilimbi Git
 │   ├── web/                     # Web host, main Bilimbi Git
-│   ├── commerce/                # Domain, owns commerce/.git
-│   ├── manufacturing/           # Domain, owns manufacturing/.git
-│   ├── tax_adapter/             # Extension, owns tax_adapter/.git
-│   └── acme_operations/         # Extension, owns its own .git
+│   ├── domains/
+│   │   └── factory/             # Domain, owns factory/.git
+│   └── extensions/
+│       ├── tax_adapter/         # Extension, owns tax_adapter/.git
+│       └── acme_operations/     # Extension, owns its own .git
 ├── mix.exs
 └── mix.lock
 ```
 
-Each mounted container and each immediate child module is a Mix project as well
-as a Bilimbi descriptor boundary:
+The role folders make a repository's architectural role visible from its path
+and keep the Platform-owned `apps/*` allowlist fixed. They follow Belimbing's
+Domain and Extension source grouping; mounted repositories still follow
+Bilimbi's Mix and descriptor contracts.
+
+Each mounted repository is a container Mix project and descriptor boundary;
+each immediate child module is also a Mix project and descriptor boundary:
 
 ```text
-commerce/
+factory/
 ├── .git/
 ├── bilimbi.container.exs
 ├── mix.exs
-└── stock/
+├── inventory/
+│   ├── bilimbi.module.exs
+│   └── mix.exs
+├── product_definition/
+│   ├── bilimbi.module.exs
+│   └── mix.exs
+└── production_execution/
     ├── bilimbi.module.exs
     └── mix.exs
 ```

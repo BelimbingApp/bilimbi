@@ -1,24 +1,24 @@
-# docs/plans/commerce-material-flow-ledger.md
+# docs/plans/factory/mr-packaging-requirements.md
 
 **Status:** Proposed customer requirements
 **Last Updated:** 2026-09-25
 **Sources:**
 - Client meeting notes, Mr Packaging Sdn Bhd, Muar LDPE foam plant (2026-08-15)
-- [`docs/plans/inventory/inventory-domain.md`](inventory/inventory-domain.md)
-- [`docs/plans/manufacturing/manufacturing-domain.md`](manufacturing/manufacturing-domain.md)
-- [`docs/plans/domain-extension-layer-rollout.md`](domain-extension-layer-rollout.md)
-- [`docs/architecture/0010_composition-model.md`](../architecture/0010_composition-model.md)
+- [`docs/plans/factory/0000-factory-domain.md`](0000-factory-domain.md)
+- [`docs/plans/factory/0010-inventory-module.md`](0010-inventory-module.md)
+- [`docs/plans/domain-extension-layer-rollout.md`](../domain-extension-layer-rollout.md)
+- [`docs/architecture/0010_composition-model.md`](../../architecture/0010_composition-model.md)
 - [Pull request 800](https://github.com/BelimbingApp/bilimbi/pull/800)
 - [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
 
 **Agents:** claude/claude-opus-5 (earlier work),
 amp/medium-sol (architecture review only), codex/gpt-5 (earlier work),
-codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (this revision),
+codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6-sol-medium (Factory boundary revision),
 claude/claude-opus-5.5 (no-mistakes review agent)
 
 ## Problem Essence
 
-Manual material records do not let Mr Packaging Sdn Bhd explain the gap between what arrived, what production used, and what shipped. Mr Packaging Sdn Bhd manufactures LDPE foam in Muar, Johor.
+Manual material records do not let Mr Packaging Sdn Bhd explain the gap between what arrived, what production used, and what shipped. Mr Packaging Sdn Bhd manufactures LDPE foam in Muar, Johor. The requirements below are treated as candidate generic factory capabilities, with plant-specific values and workflow details confirmed during discovery.
 
 - Supplier receipts, extrusion, cure, lamination, cutting, packing, and despatch are not connected by reliable material identity.
 - Current records cannot separate short-weighted receipts, material loss, theft, trim, and waste using measured evidence.
@@ -27,21 +27,21 @@ Manual material records do not let Mr Packaging Sdn Bhd explain the gap between 
 
 ## Desired Outcome
 
-Mr Packaging Sdn Bhd can reconcile a representative month from supplier receipt to shipped pack with clear measurements and a light data-entry flow.
+Mr Packaging Sdn Bhd can reconcile a representative month from supplier receipt to shipped pack with clear measurements and a light data-entry flow. As the first Factory build's validation case, it proves the shared modules and their configuration against a complete receipt-to-despatch workflow.
 
 - A clerk records each lorry's declared and measured weight, including gross, tare, and net.
 - An operator labels each foam roll and can find its location and cure age.
 - Each production step records its input, output, product, trim, waste, and measurement source.
 - A monthly view explains material balance and variance by supplier, run, operation, resource, location, and period.
-- `MrPackaging` contains only confirmed customer behaviour that the common Domains cannot express through their public contracts and configuration.
+- The current scope is expected to use Factory without a customer-specific Extension. Plant-specific products, process values, resources, labels, and permissions use Factory's public contracts; create an Extension only for a confirmed gap.
 
 ## Top-Level Components
 
-This is the customer requirements plan for Mr Packaging Sdn Bhd. Shared design is defined once in [`inventory-domain.md`](inventory/inventory-domain.md) for Inventory/Stock and [`manufacturing-domain.md`](manufacturing/manufacturing-domain.md) for Manufacturing; this plan records what the Muar operation needs from those Domains.
+This plan records what the Muar operation needs from [Factory](0000-factory-domain.md). Its Inventory module contract is detailed in [`0010-inventory-module.md`](0010-inventory-module.md).
 
-- **Inventory/Stock module** — records item and location, native quantity and unit, declared or measured evidence, roll identity, warehouse movements, production effects, and ancestry for the Muar operation. Warehouse receipts and ordinary warehouse movements post directly through Stock.
-- **Manufacturing Product Definition and Production Execution modules** — Product Definition defines the foam products, routings, and cure minimum. Production Execution records actual extrusion and conversion work, enforces the cure hold, and presents production trace over Stock genealogy. Production commands and production-history imports use its execution/import contract; as Stock's registered posting authority, it posts Stock effects atomically with execution and any required override evidence.
-- **`MrPackaging` Extension** — owns a confirmed customer integration or workflow only when the public contracts and Manufacturing configuration cannot express it.
+- **Inventory module** — records item and location, native quantity and unit, declared or measured evidence, roll identity, warehouse movements, production effects, and ancestry. Warehouse receipts and ordinary warehouse movements post directly through Inventory.
+- **Product Definition and Production Execution modules** — Product Definition defines the foam products, routings, and cure minimum. Production Execution records actual extrusion and conversion work, enforces the cure hold, and presents production trace over Inventory genealogy. Production commands and history imports use its contract; it posts Inventory effects atomically with execution and any required override evidence.
+- **Mr Packaging configuration and validation** — supplies the plant's confirmed products, process values, locations, resources, labels, and permissions to Factory. An Extension is expected to be unnecessary; add one only for a proven customer-specific gap.
 
 ## Customer Requirements
 
@@ -70,7 +70,7 @@ A roll's production time must remain available while it waits for the next step.
 - Record where each roll is stored and when it was produced.
 - Show elapsed cure age against the configured minimum, which is expected to be within a 7–10 day window and must be confirmed by product.
 - Refuse under-cured consumption by default. An authorised override needs an explicit Base Authz capability and a mandatory reason, and keeps actor, time, reason, and affected roll as an immutable record.
-- Keep cure duration and process gates as Manufacturing configuration; add `MrPackaging` only for a proven behaviour that configuration cannot express.
+- Keep cure duration and process gates as Factory configuration; do not create `MrPackaging` code for values or rules the shared configuration can express.
 
 ### Lamination, cutting, packing, and despatch
 
@@ -78,13 +78,13 @@ Conversion records need to account for both saleable output and the material tha
 
 - Link input rolls to lamination and cutting work, including the demand source and target width.
 - Record actual product, trim or offcut, waste, operator, and yield.
-- Keep monthly forecast as the current demand source; confirm it before building order matching or backlog assumptions.
-- Record finished-pack identity, quantity and unit, destination, shipment identity, and terminal movement.
+- Keep monthly forecast as an opaque demand-source reference on the production order; confirm it before building order matching or backlog assumptions.
+- Record finished-pack identity, quantity and unit, with destination and shipment as opaque references on the terminal Inventory movement.
 - A known 1200 mm input cut to 800 mm should show product, trim, waste, and attributable yield.
 
 ### Reconciliation and trace
 
-Monthly reports need to explain the material balance without replacing the shared Stock account.
+Monthly reports need to explain the material balance without replacing Factory Inventory's material account.
 
 - Compare expected and actual input, output, product, trim, waste, and stock by supplier, operation, run, resource, location, and period.
 - Separate measured, declared, counted, and derived quantities; show the conversion basis used for any normalised mass.
@@ -104,25 +104,16 @@ Cure age and cut yield attach to individual rolls, not just to an extrusion run.
 - **Option C — automate identification with RFID or line sensors:** reduces scanning, but requires equipment and plant coverage before the workflow is proven.
 - **Recommendation — Option B:** use a replaceable barcode label first; validate that it survives the 7–10 day cure and normal handling.
 
-### Roll out the workflow in stages
-
-The plant should prove the material record before replacing every paper or spreadsheet workflow.
-
-- **Option A — launch receiving, production, cutting, and despatch together:** gives broad coverage quickly, but makes gaps hard to isolate.
-- **Option B — start with receipt and weighing, then add roll/cure, production, conversion, and reconciliation:** exposes measurement and label issues before later steps depend on them.
-- **Option C — replace all paper records before source and measurement checks:** simplifies training later, but risks losing a useful bridge before the new flow is trusted.
-- **Recommendation — Option B:** keep paper or spreadsheet examples during transition until the measured workflow reconciles.
-
 ## Public Contract
 
-Mr Packaging Sdn Bhd needs the shared Domains to support these customer-facing results.
+Mr Packaging Sdn Bhd needs Factory to support these customer-facing results.
 
 - Receiving captures supplier, vehicle, material, location, actor, date, declared weight, measured gross/tare/net, and variance.
 - Production captures blend, colour, extruder, run, time, and each roll's measured dimensions.
 - Roll handling shows identity, location, age, configured cure minimum, and any authorised override.
-- Conversion captures input rolls, demand source, target width, product, trim, waste, operator, and yield.
-- Despatch captures pack identity, quantity, unit, destination, shipment, and material movement.
-- Warehouse receipts and ordinary warehouse movements post through Stock; extrusion and other production commands or production-history imports use Manufacturing's execution/import contract so the execution and Stock effects commit together.
+- Conversion captures input rolls, an opaque demand-source reference, target width, product, trim, waste, operator, and yield.
+- Despatch captures pack identity, quantity, unit, and material movement with opaque destination and shipment references.
+- Warehouse receipts and ordinary warehouse movements post through Inventory; extrusion and other production commands or production-history imports use Production Execution's contract so the execution and Inventory effects commit together.
 - A transform preserves measured input and output values, and records any difference as a provenance-backed variance rather than altering observations.
 - Reconciliation reports by operation, execution, supplier, resource, location, period, and order or batch when one exists.
 - A retry does not duplicate a movement, two users cannot consume the same available quantity, late entry preserves effective and recorded times, and correction adds a new transaction with a reason.
@@ -130,13 +121,13 @@ Mr Packaging Sdn Bhd needs the shared Domains to support these customer-facing r
 
 ## Phases
 
-### Inventory/Stock module
+### Inventory module
 
 #### Phase 1 — Receiving and weighing
 
 - [ ] Confirm where weighing happens and which clerk records supplier, vehicle, material, and location.
 - [ ] Confirm weight units and capture declared weight plus measured gross, tare, and net.
-- [ ] Post one representative lorry receipt through Inventory/Stock and show the supplier variance.
+- [ ] Post one representative lorry receipt through Inventory and show the supplier variance.
 - [ ] Keep the receipt traceable as it moves into storage or production.
 
 Validation: a clerk records a lorry in one flow and can explain the source of every recorded weight.
@@ -147,18 +138,18 @@ Validation: a clerk records a lorry in one flow and can explain the source of ev
 - [ ] Set up the cure-storage locations and the unit identity that roll labels will carry.
 - [ ] Prove a test label can be scanned and moved between locations as an ordinary warehouse movement.
 
-Validation: a labelled unit can be located through Stock after a physical move, without any production posting.
+Validation: a labelled unit can be located through Inventory after a physical move, without any production posting.
 
-### Manufacturing Product Definition and Production Execution modules
+### Product Definition and Production Execution modules
 
 #### Phase 3 — Blend, extrusion, and cure
 
 - [ ] Confirm blend proportions, colours, measured dimensions, and applicable cure minimum with plant staff.
-- [ ] Configure foam process families, routes, output roles, conversion bases, and cure gates as Manufacturing data.
+- [ ] Configure foam process families, routes, output roles, conversion bases, and cure gates as Factory data.
 - [ ] Record an extrusion execution that consumes the received material and creates each labelled roll with its identity, production time, and dimensions.
-- [ ] Prove that each roll traces to its input receipt through Stock genealogy and can be located after the physical cure delay.
+- [ ] Prove that each roll traces to its input receipt through Inventory genealogy and can be located after the physical cure delay.
 - [ ] Verify the default hold for under-cured material and the authorised override evidence.
-- [ ] Add `MrPackaging` only if on-site proof identifies behaviour beyond the generic configuration and public contracts.
+- [ ] Keep this workflow in Factory when the confirmed process fits its public contracts and configuration; document a concrete gap before proposing an Extension.
 
 Validation: an operator can identify each roll, trace it to its receipt, see its cure age, and explain any consumed under-cured roll.
 
@@ -176,7 +167,7 @@ Validation: the known 1200 mm to 800 mm cut and a representative shipment reconc
 - [ ] Report expected and actual quantities by supplier, operation, resource, location, and period.
 - [ ] Separate measured differences from derived-measurement uncertainty and show each unexplained discrepancy.
 - [ ] Verify duplicate-safe retries, concurrent consumption, late entry, reversal, tenant scope, and append-only correction.
-- [ ] Record any `MrPackaging` behaviour as a specific public-contract gap before adding Extension code.
+- [ ] Confirm the requirements against Factory's contracts and configuration; document a specific gap before proposing any Extension code.
 - [ ] Confirm a representative month with the customer and retain the source evidence for each reported total.
 
 Validation: Mr Packaging Sdn Bhd can reconcile a representative month and carry each unresolved difference as an open investigation.
