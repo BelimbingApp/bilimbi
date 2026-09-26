@@ -38,10 +38,8 @@ defmodule BilimbiWeb.Release do
   def seed do
     load_closure!(@app)
     ModuleRegistry.complete_modules!()
-    Application.put_env(:bilimbi_base_queue, :queues, [])
-    Application.put_env(:bilimbi_base_queue, :plugins, [])
-    Application.put_env(:bilimbi_base_schedule, :scheduler_enabled, false)
-    {:ok, _started} = Application.ensure_all_started(dependencies(@app))
+    disable_workers()
+    {:ok, _started} = Application.ensure_all_started(seed_applications())
     ContributionRegistry.install!()
 
     case Database.run_production_seeds(Database.installed_production_seeds!()) do
@@ -52,6 +50,21 @@ defmodule BilimbiWeb.Release do
         raise "production seed #{failure.seed_id} failed: #{inspect(failure.reason)}"
     end
   end
+
+  @doc false
+  # Oban keeps a configured value only when it is truthy, so empty lists, not
+  # `false`, disable its queues and plugins.
+  @spec disable_workers() :: :ok
+  def disable_workers do
+    Application.put_env(:bilimbi_base_queue, :queues, [])
+    Application.put_env(:bilimbi_base_queue, :plugins, [])
+    Application.put_env(:bilimbi_base_schedule, :scheduler_enabled, false)
+  end
+
+  @doc false
+  # The host's dependencies without the host itself, which owns the endpoint.
+  @spec seed_applications() :: [atom()]
+  def seed_applications, do: dependencies(@app)
 
   # `eval` starts a clean node: loading an application does not load its
   # dependencies, so walk the closure. An optional dependency may be absent.
