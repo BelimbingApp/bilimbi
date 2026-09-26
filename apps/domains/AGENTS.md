@@ -8,6 +8,17 @@ Each immediate child is one independently sourced Domain repository and installa
 
 Use stable logical IDs and declared dependencies. A Domain may depend on Base, Core, and a Domain whose public contract a real business invariant requires. It must not depend on an Extension or reach into another module's private schema or queries. Keep customer-specific integration in an Extension unless a confirmed shared workflow belongs in the Domain.
 
+## Repository names
+
+An optional Domain repository is named `BelimbingApp/b-dom-<id>`, and an Extension repository `BelimbingApp/b-ext-<id>`. Clone it into a folder named after the container ID, with hyphens turned into underscores, because discovery requires the folder name to equal the snake_case container ID.
+
+```bash
+git clone https://github.com/BelimbingApp/b-dom-<id>.git apps/domains/<id_with_underscores>
+git clone https://github.com/BelimbingApp/b-ext-<id>.git apps/extensions/<id_with_underscores>
+```
+
+`b-dom-factory` mounts at `apps/domains/factory`. `b-ext-mr-packaging` mounts at `apps/extensions/mr_packaging`. `b-ext-sb-group` mounts at `apps/extensions/sb_group`.
+
 ## Mounting
 
 Name the mounted directory after its container `id`, and give the container `mix.exs` that same `app:`. Discovery rejects a mismatched name or a container in the wrong role folder; the rules are in `apps/base/module_registry/docs/README.md`. Run `mix bilimbi.migrate` and the other database tasks from the umbrella root, not from inside the Domain: that runtime cannot see the whole graph, so `ModuleRegistry.complete_modules!/0` refuses it.
