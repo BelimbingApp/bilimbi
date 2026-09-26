@@ -317,6 +317,16 @@ defmodule BilimbiWeb.DashboardLiveTest do
       assert has_element?(view, "#stat-users")
       assert has_element?(view, "#stat-recent-audit")
       assert render(view) =~ "No recent activity."
+
+      assert has_element?(
+               view,
+               "#stat-recent-audit-open[href='/audit/mutations'][aria-label='Open audit log']"
+             )
+
+      view |> element("#customize-layout") |> render_click()
+
+      assert has_element?(view, "#stat-recent-audit")
+      refute has_element?(view, "#stat-recent-audit-open")
     end
 
     test "renders live audit mutation entries in recent activity widget", %{

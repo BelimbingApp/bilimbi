@@ -806,11 +806,14 @@ defmodule BilimbiWeb.DashboardLive do
             }
           />
         <% "base-perf-health" -> %>
-          <.performance_stat_card
+          <.stat_strip
             id="stat-performance"
-            diagnostics={@perf_diagnostics}
+            title="Performance"
             navigate={if !@layout_editing, do: "/system/performance"}
-          />
+          >
+            <:item label="Health" kind={:text} value={performance_health(@perf_diagnostics)} />
+            <:item label="Samples" value={performance_samples(@perf_diagnostics)} />
+          </.stat_strip>
         <% other_id -> %>
           <div
             id={"dashboard-widget-#{other_id}"}
@@ -834,70 +837,7 @@ defmodule BilimbiWeb.DashboardLive do
   defp performance_samples(%{samples: samples}) when is_integer(samples), do: samples
   defp performance_samples(_diagnostics), do: "—"
 
-  attr(:id, :string, required: true)
-  attr(:diagnostics, :map, default: nil)
-  attr(:navigate, :string, default: nil)
-
-  defp performance_stat_card(%{navigate: navigate} = assigns) when is_binary(navigate) do
-    ~H"""
-    <.link
-      navigate={@navigate}
-      id={@id}
-      class="group block rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03] transition hover:border-high-contrast-line hover:bg-gradient-to-b hover:from-surface hover:to-brand-surface hover:shadow-sm"
-    >
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
-          Performance
-        </p>
-        <.action_arrow_icon />
-      </div>
-      <div class="mt-2.5 grid grid-cols-2 divide-x divide-line">
-        <div class="pr-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Health</p>
-          <p class="mt-1 text-sm font-semibold text-ink-strong">
-            {performance_health(@diagnostics)}
-          </p>
-        </div>
-        <div class="pl-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Samples</p>
-          <p class="mt-1 text-sm font-semibold tabular-nums text-ink-strong">
-            {performance_samples(@diagnostics)}
-          </p>
-        </div>
-      </div>
-    </.link>
-    """
-  end
-
-  defp performance_stat_card(assigns) do
-    ~H"""
-    <div
-      id={@id}
-      class="rounded-xl border border-line bg-surface px-3.5 py-3 shadow-xs shadow-ink/[0.03]"
-    >
-      <div class="flex items-center justify-between gap-3">
-        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-ink">
-          Performance
-        </p>
-      </div>
-      <div class="mt-2.5 grid grid-cols-2 divide-x divide-line">
-        <div class="pr-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Health</p>
-          <p class="mt-1 text-sm font-semibold text-ink-strong">
-            {performance_health(@diagnostics)}
-          </p>
-        </div>
-        <div class="pl-3">
-          <p class="text-[0.65rem] uppercase tracking-[0.12em] text-ink-faint">Samples</p>
-          <p class="mt-1 text-sm font-semibold tabular-nums text-ink-strong">
-            {performance_samples(@diagnostics)}
-          </p>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
+  # Specialist: a time-ordered feed of audit entries has no label/value pairs, so not `stat_strip`.
   attr(:id, :string, required: true)
   attr(:entries, :list, required: true)
   attr(:navigate, :string, default: nil)
@@ -909,13 +849,14 @@ defmodule BilimbiWeb.DashboardLive do
         <h3 class="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-ink">
           Recent Activity
         </h3>
-        <.link
+        <.icon_button
           :if={@navigate}
+          id={"#{@id}-open"}
+          icon="forward"
+          label="Open audit log"
+          context={:inline}
           navigate={@navigate}
-          class="text-brand-strong transition hover:text-brand"
-        >
-          <.action_arrow_icon />
-        </.link>
+        />
       </div>
       <div :if={Enum.empty?(@entries)} class="px-4 py-5 text-sm text-ink-subtle">
         No recent activity.
@@ -938,19 +879,6 @@ defmodule BilimbiWeb.DashboardLive do
         </div>
       </div>
     </div>
-    """
-  end
-
-  defp action_arrow_icon(assigns) do
-    ~H"""
-    <svg
-      viewBox="0 0 20 20"
-      fill="currentColor"
-      aria-hidden="true"
-      class="size-4 shrink-0 text-brand-strong transition group-hover:translate-x-0.5"
-    >
-      <path d="M3 10a.75.75 0 0 1 .75-.75h10.638L10.23 5.29a.75.75 0 1 1 1.04-1.08l5.5 5.25a.75.75 0 0 1 0 1.08l-5.5 5.25a.75.75 0 1 1-1.04-1.08l4.158-3.96H3.75A.75.75 0 0 1 3 10Z" />
-    </svg>
     """
   end
 end
