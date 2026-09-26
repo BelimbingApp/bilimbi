@@ -49,7 +49,13 @@ defmodule Mix.Tasks.Compile.BilimbiGraph do
 
     compile_path = Mix.Project.compile_path()
     marker = Path.join(compile_path, @marker_prefix <> fingerprint)
-    existing_markers = Path.wildcard(Path.join(compile_path, @marker_prefix <> "*"))
+
+    # Markers are dotfiles, which Path.wildcard/2 skips without match_dot. A
+    # marker left behind lets a returning fingerprint (edit then revert, or
+    # unmount then remount) rewrite its old file in place: the ebin mtime does
+    # not move, so compile.app keeps the previous graph's .app metadata.
+    existing_markers =
+      Path.wildcard(Path.join(compile_path, @marker_prefix <> "*"), match_dot: true)
 
     if existing_markers == [marker] do
       {:noop, []}
