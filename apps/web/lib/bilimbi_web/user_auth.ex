@@ -20,7 +20,11 @@ defmodule BilimbiWeb.UserAuth do
     3. `Company.fetch_tenant_id_for_company/1` then `Tenancy.scope/1`;
     4. `User.get_user/3` must return that user in that company.
 
-  Any miss fails closed and the request is unauthenticated. Login writes
+  Any miss fails closed and the request is unauthenticated. Once all four
+  hold, `Bilimbi.Base.Tenancy.Authentication.sign_in/4` seals the user (and
+  any impersonating operator) onto the request's `Scope`, so every module
+  call made with `@current_scope.scope` carries an actor it can read with
+  `Scope.actor/1` and no caller can assert. Login writes
   a cryptographically strong session id through `Session.put_session/3`
   with an opaque payload; logout calls `Session.delete_session/1` before
   dropping the cookie.
@@ -57,6 +61,7 @@ defmodule BilimbiWeb.UserAuth do
   alias Bilimbi.Base.Session.Entry
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.UI.DateTimeDisplay
   alias Bilimbi.Core.Address
@@ -792,9 +797,19 @@ defmodule BilimbiWeb.UserAuth do
     with {:ok, %Entry{} = entry} <- Session.fetch_session(session_id),
          true <- entry.user_id == user_id,
          {:ok, tenant_id} <- Company.fetch_tenant_id_for_company(company_id),
-         {:ok, %Scope{} = scope} <- Tenancy.scope(tenant_id),
-         {:ok, %Summary{} = user} <- User.get_user(scope, company_id, user_id) do
-      actor = Authz.actor(:user, user.id, scope, company_id)
+         {:ok, %Scope{} = tenant_scope} <- Tenancy.scope(tenant_id),
+         {:ok, %Summary{} = user} <- User.get_user(tenant_scope, company_id, user_id) do
+      impersonator = extract_impersonator(impersonation)
+
+      # Every fact above is proven, so this edge is where the scope learns who
+      # is signed in. Module code reads that from `Scope.actor/1` and cannot
+      # assert it; this is one of the seam's two allowlisted callers.
+      scope =
+        Authentication.sign_in(tenant_scope, user.id, company_id,
+          impersonator_id: impersonator && impersonator.id
+        )
+
+      {:ok, actor} = Authz.scope_actor(scope)
       %{allowed: allowed} = Authz.effective_capabilities(actor)
 
       %{
@@ -802,7 +817,7 @@ defmodule BilimbiWeb.UserAuth do
         scope: scope,
         actor: actor,
         capabilities: allowed,
-        impersonator: extract_impersonator(impersonation),
+        impersonator: impersonator,
         session_identity: %{
           "session_id" => session_id,
           "user_id" => user_id,

@@ -42,7 +42,8 @@ defmodule Bilimbi.Base.Tenancy.MixProject do
     [
       {:ecto_sql, "~> 3.14"},
       {:phoenix, "~> 1.8.9"},
-      {:phoenix_live_view, "~> 1.2.0"}
+      {:phoenix_live_view, "~> 1.2.0"},
+      {:plug_crypto, "~> 2.2"}
     ] ++ Bilimbi.Base.ModuleRegistry.MixDiscovery.module_dependencies(__DIR__)
   end
 

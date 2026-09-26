@@ -7,7 +7,9 @@ defmodule Bilimbi.Base.Queue.Worker do
   """
 
   alias Bilimbi.Base.Queue.Execution
+  alias Bilimbi.Base.Tenancy.Authentication
 
+  @delegated_actor_key "bilimbi_delegated_actor"
   @failure_code_pattern ~r/^[a-z][a-z0-9_]{0,63}$/
 
   @type failure_code :: atom()
@@ -83,14 +85,38 @@ defmodule Bilimbi.Base.Queue.Worker do
   end
 
   @doc false
-  def perform(worker, %Oban.Job{} = job) do
-    execution = %Execution{
-      job_id: job.id,
-      attempt: job.attempt,
-      max_attempts: job.max_attempts,
-      queue: job.queue
-    }
+  @spec delegated_actor_key() :: String.t()
+  def delegated_actor_key, do: @delegated_actor_key
 
+  @doc false
+  def perform(worker, %Oban.Job{} = job) do
+    case delegated_scope(job.meta) do
+      {:ok, scope} ->
+        run(worker, job, %Execution{
+          job_id: job.id,
+          attempt: job.attempt,
+          max_attempts: job.max_attempts,
+          queue: job.queue,
+          scope: scope
+        })
+
+      # A tampered or expired token, or a tenant gone since enqueue, will not
+      # heal on retry. The job never runs as anyone else.
+      {:error, _reason} ->
+        {:cancel, :delegated_actor_unavailable}
+    end
+  end
+
+  # `Queue.enqueue_for/3` wrote this token from a scope that already held the
+  # user; Base Tenancy verifies it and re-proves the tenant. This module is
+  # the one allowlisted caller of `Authentication.resume/2`.
+  defp delegated_scope(%{@delegated_actor_key => token}) when is_binary(token),
+    do: Authentication.resume(token)
+
+  defp delegated_scope(%{@delegated_actor_key => _malformed}), do: {:error, :invalid}
+  defp delegated_scope(_meta), do: {:ok, nil}
+
+  defp run(worker, job, execution) do
     case worker.validate_args(job.args) do
       {:ok, normalized_args} ->
         case worker.handle_job(normalized_args, execution) do

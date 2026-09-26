@@ -5,7 +5,8 @@
 invariant errors, compatibility contracts, migrations, and tests remain inside
 this directory.
 
-The module depends only on `base/database`. It owns the compatible `tenants`
+The module depends on `base/database`, `base/module_registry`, and `base/ui`
+(for its admin adapter). It owns the compatible `tenants`
 schema and explicit platform-operator identity. Numeric database IDs have no
 runtime role meaning.
 
@@ -38,6 +39,31 @@ It has exactly one clause, so a `nil`, a bare tenant ID, or a forgotten
 argument raises instead of producing an unfiltered query. The first binding is
 named `:scoped`, which correlated subqueries reference with
 `parent_as(:scoped)`.
+
+## The actor on a scope
+
+Every scope carries a `Bilimbi.Base.Tenancy.Actor`, read with `Scope.actor/1`:
+
+- `:system` for a scope from `scope/1` or `Scope.for_tenant/1` — scheduled
+  work, seeds, mix tasks. It names no user and carries no authority.
+- `:user` (with `company_id`, and `impersonator_id` under impersonation) only
+  when Bilimbi's authentication edge attached it: `BilimbiWeb.UserAuth` for
+  requests and LiveViews, and Base Queue for a job enqueued with
+  `Queue.enqueue_for/3`.
+
+A domain operation that records who performed it takes that person from
+`Scope.actor/1`, never from its caller, and refuses a system actor. Whether the
+person may do it is `Bilimbi.Base.Authz.can(scope, capability)`.
+
+The edge seam is `Bilimbi.Base.Tenancy.Authentication`. It is not a domain
+API: `apps/web/test/bilimbi_web/scope_actor_boundary_test.exs` reads every
+compiled module's remote calls and fails for any caller outside its allowlist.
+The actor is sealed to its tenant with an HMAC keyed by
+`config :bilimbi_base_tenancy, :actor_secret` (production derives it from
+`SECRET_KEY_BASE`), so a struct literal, a struct update, or an actor moved to
+another tenant's scope makes `Scope.actor/1` raise `ForgedActorError`. The
+same secret signs the token a delegated job carries; rotating it cancels such
+jobs still queued.
 
 A module that owns a tenant-scoped invariant may still query its own tables
 directly — `Bilimbi.Core.Company.PrimaryCompanyManager` locks rows and

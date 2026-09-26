@@ -16,7 +16,7 @@ project instructions will not append it, because this root file already
 fills that budget.
 
 - `apps/AGENTS.md` — LiveView bindings, messages, withheld controls, clocks, read-first pages, list
-  filters and pagination, tests
+  filters and pagination, who performed an operation, tests
 - `apps/base/ui/AGENTS.md` — shared components, the Design Library, assets, hook tests
 - `apps/base/audit/AGENTS.md` — what an audit row records
 - `apps/base/database/AGENTS.md` — silencing capture, and a boundary the database enforces
