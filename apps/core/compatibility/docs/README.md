@@ -33,6 +33,16 @@ when a later compatible baseline was adopted while an earlier Bilimbi-only
 migration remains pending; arbitrary, foreign, or class-non-prefix ledgers fail
 closed.
 
+A recorded version that no installed migration ships belonged to a Domain or
+Extension that has since been unmounted, or it is unexplained. The private
+`Bilimbi.Core.Compatibility.MigrationProvenance` tells the two apart from
+`bilimbi_migration_provenance`, which every migrate and adoption writes for
+each applied version: owner ID, owner layer, disposition, and file checksum.
+Only a retired Domain or Extension owner explains a missing version; a remount
+must match the retained owner, disposition, and checksum. The contract is in
+[Bilimbi Database Architecture](../../../../docs/architecture/database.md)
+under "Ledger and execution".
+
 ## Cutover value remediation
 
 Adoption proves shape; it cannot prove meaning. Some adopted rows load cleanly

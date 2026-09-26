@@ -10,6 +10,7 @@ defmodule Bilimbi.Core.Compatibility do
   alias Bilimbi.Base.Database.SchemaVerifier
   alias Bilimbi.Base.ModuleRegistry
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Core.Compatibility.MigrationProvenance
   alias Ecto.Adapters.SQL
 
   @compatibility_source "e70b4d33c0b10790e681f4c2b5095d85a53bc918"
@@ -19,56 +20,78 @@ defmodule Bilimbi.Core.Compatibility do
 
   def migration_paths, do: ModuleRegistry.migration_paths!()
 
-  def baseline_versions do
-    migration_entries()
-    |> Enum.filter(&(elem(&1, 2) == :compatible_baseline))
-    |> Enum.map(&elem(&1, 0))
-  end
+  def baseline_versions, do: baseline_versions(installed_migrations())
 
   def migration_entries do
-    dispositions = ModuleRegistry.migration_dispositions!()
+    Enum.map(installed_migrations(), &{&1.version, &1.module, &1.disposition})
+  end
 
-    entries =
-      migration_paths()
-      |> Enum.flat_map(&Path.wildcard(Path.join(&1, "*.exs")))
-      |> Enum.map(fn path ->
-        Code.require_file(path)
-        version = migration_version!(path)
-        {version, migration_module!(path), Map.fetch!(dispositions, version)}
+  # Every installed migration with the descriptor that owns it, in version
+  # order. Provenance needs the owner and the file, not only the version.
+  defp installed_migrations do
+    migrations =
+      ModuleRegistry.migration_modules!()
+      |> Enum.flat_map(fn descriptor ->
+        descriptor.otp_app
+        |> Application.app_dir(descriptor.migrations)
+        |> Path.join("*.exs")
+        |> Path.wildcard()
+        |> Enum.map(fn path ->
+          Code.require_file(path)
+          version = migration_version!(path)
+
+          %{
+            version: version,
+            module: migration_module!(path),
+            disposition: Map.fetch!(descriptor.migration_dispositions, version),
+            owner_id: descriptor.id,
+            owner_layer: descriptor.layer,
+            checksum: MigrationProvenance.checksum(path)
+          }
+        end)
       end)
-      |> Enum.sort_by(&elem(&1, 0))
+      |> Enum.sort_by(& &1.version)
 
-    versions = Enum.map(entries, &elem(&1, 0))
+    versions = Enum.map(migrations, & &1.version)
 
     case versions -- Enum.uniq(versions) do
-      [] -> entries
+      [] -> migrations
       duplicates -> raise ArgumentError, "duplicate migration versions: #{inspect(duplicates)}"
     end
   end
 
   @spec migrate(Ecto.Repo.t(), keyword()) :: [integer()]
   def migrate(repo \\ Repo, opts \\ []) do
-    entries = migration_entries()
+    installed = installed_migrations()
     schema = Keyword.get(opts, :prefix, "public")
     _ = SchemaVerifier.quote_identifier!(schema)
 
-    strict_version_order = strict_version_order?(repo, schema, entries)
+    strict_version_order = strict_version_order?(repo, schema, installed)
 
     opts =
       opts
       |> Keyword.put(:all, true)
       |> Keyword.put(:strict_version_order, strict_version_order)
 
-    migrations = Enum.map(entries, fn {version, module, _disposition} -> {version, module} end)
-    Ecto.Migrator.run(repo, migrations, :up, opts)
+    run_and_record(repo, schema, installed, opts)
+  end
+
+  defp run_and_record(repo, schema, installed, opts) do
+    migrations = Enum.map(installed, &{&1.version, &1.module})
+
+    try do
+      Ecto.Migrator.run(repo, migrations, :up, opts)
+    after
+      case ledger_versions(repo, schema) do
+        :missing -> :ok
+        versions -> MigrationProvenance.record!(repo, schema, installed, versions)
+      end
+    end
   end
 
   @spec migrate_baseline(Ecto.Repo.t(), keyword()) :: [integer()]
   def migrate_baseline(repo \\ Repo, opts \\ []) do
-    entries =
-      migration_entries()
-      |> Enum.filter(&(elem(&1, 2) == :compatible_baseline))
-
+    baselines = Enum.filter(installed_migrations(), &(&1.disposition == :compatible_baseline))
     schema = Keyword.get(opts, :prefix, "public")
     _ = SchemaVerifier.quote_identifier!(schema)
 
@@ -77,8 +100,7 @@ defmodule Bilimbi.Core.Compatibility do
       |> Keyword.put(:all, true)
       |> Keyword.put(:strict_version_order, false)
 
-    migrations = Enum.map(entries, fn {version, module, _disposition} -> {version, module} end)
-    Ecto.Migrator.run(repo, migrations, :up, opts)
+    run_and_record(repo, schema, baselines, opts)
   end
 
   @spec verify(Ecto.Repo.t(), keyword()) :: :ok | {:error, [String.t()]}
@@ -132,74 +154,87 @@ defmodule Bilimbi.Core.Compatibility do
   end
 
   defp adopt_ledger(repo, schema) do
+    installed = installed_migrations()
+
     case ledger_versions(repo, schema) do
       :missing ->
         create_ledger!(repo, schema)
-        record_versions!(repo, schema, baseline_versions())
+        record_baselines!(repo, schema, installed, [])
         {:ok, :adopted}
 
       [] ->
-        record_versions!(repo, schema, baseline_versions())
+        record_baselines!(repo, schema, installed, [])
         {:ok, :adopted}
 
       versions ->
-        adopt_existing_ledger(repo, schema, versions, migration_entries())
-    end
-  end
+        case validate_ledger(repo, schema, installed, versions) do
+          :ok ->
+            if record_baselines!(repo, schema, installed, versions) == [],
+              do: {:ok, :already_adopted},
+              else: {:ok, :advanced}
 
-  defp adopt_existing_ledger(repo, schema, versions, entries) do
-    case validate_ledger(entries, versions) do
-      :ok ->
-        missing_baselines = baseline_versions() -- versions
-
-        if missing_baselines == [] do
-          {:ok, :already_adopted}
-        else
-          record_versions!(repo, schema, missing_baselines)
-          {:ok, :advanced}
+          {:error, _conflicts} ->
+            repo.rollback({:ledger_conflict, versions})
         end
-
-      :error ->
-        repo.rollback({:ledger_conflict, versions})
     end
   end
 
-  defp strict_version_order?(repo, schema, entries) do
+  # Records the compatible baselines the ledger lacks and the provenance of
+  # every applied version, returning the baselines it recorded.
+  defp record_baselines!(repo, schema, installed, versions) do
+    missing = baseline_versions(installed) -- versions
+    if missing != [], do: record_versions!(repo, schema, missing)
+    MigrationProvenance.record!(repo, schema, installed, versions ++ missing)
+    missing
+  end
+
+  defp baseline_versions(installed) do
+    for %{disposition: :compatible_baseline, version: version} <- installed, do: version
+  end
+
+  defp strict_version_order?(repo, schema, installed) do
     case ledger_versions(repo, schema) do
       :missing ->
         true
 
       versions ->
-        case validate_ledger(entries, versions) do
-          :ok -> not class_valid_gap?(entries, versions)
-          :error -> raise ArgumentError, "Bilimbi migration ledger is not class-valid"
+        case validate_ledger(repo, schema, installed, versions) do
+          :ok ->
+            not class_valid_gap?(installed, versions)
+
+          {:error, conflicts} ->
+            raise ArgumentError,
+                  "Bilimbi migration ledger is not class-valid:\n" <>
+                    Enum.map_join(conflicts, "\n", &"  - #{&1}")
         end
     end
   end
 
-  defp validate_ledger(entries, versions) do
-    known_versions = Enum.map(entries, &elem(&1, 0))
+  # Every recorded version must be explained -- by an installed migration or,
+  # for a Domain or Extension that has since been unmounted, by retained
+  # provenance -- and the installed versions recorded in each class must be a
+  # prefix of that class's sequence.
+  defp validate_ledger(repo, schema, installed, versions) do
+    installed_ids = Enum.map(ModuleRegistry.installed_modules!(), & &1.id)
+    provenance = MigrationProvenance.fetch(repo, schema)
 
-    compatible_versions =
-      entries
-      |> Enum.filter(&(elem(&1, 2) == :compatible_baseline))
-      |> Enum.map(&elem(&1, 0))
+    conflicts =
+      MigrationProvenance.conflicts(installed, versions, provenance, installed_ids) ++
+        class_conflicts(installed, versions, :compatible_baseline) ++
+        class_conflicts(installed, versions, :bilimbi_only)
 
-    bilimbi_only_versions =
-      entries
-      |> Enum.filter(&(elem(&1, 2) == :bilimbi_only))
-      |> Enum.map(&elem(&1, 0))
+    if conflicts == [], do: :ok, else: {:error, conflicts}
+  end
 
-    recorded_compatible = Enum.filter(compatible_versions, &(&1 in versions))
-    recorded_bilimbi_only = Enum.filter(bilimbi_only_versions, &(&1 in versions))
+  defp class_conflicts(installed, versions, disposition) do
+    class_versions = for %{disposition: ^disposition, version: v} <- installed, do: v
+    recorded = Enum.filter(class_versions, &(&1 in versions))
 
-    if versions -- known_versions == [] and
-         prefix?(compatible_versions, recorded_compatible) and
-         prefix?(bilimbi_only_versions, recorded_bilimbi_only) do
-      :ok
-    else
-      :error
-    end
+    if prefix?(class_versions, recorded),
+      do: [],
+      else: [
+        "recorded #{disposition} versions #{inspect(recorded)} are not a prefix of #{inspect(class_versions)}"
+      ]
   end
 
   defp prefix?(versions, recorded) do
@@ -208,12 +243,9 @@ defmodule Bilimbi.Core.Compatibility do
 
   defp class_valid_gap?(_entries, []), do: false
 
-  defp class_valid_gap?(entries, versions) do
+  defp class_valid_gap?(installed, versions) do
     latest_recorded = Enum.max(versions)
-
-    Enum.any?(entries, fn {version, _module, _disposition} ->
-      version < latest_recorded and version not in versions
-    end)
+    Enum.any?(installed, &(&1.version < latest_recorded and &1.version not in versions))
   end
 
   defp ledger_versions(repo, schema) do
