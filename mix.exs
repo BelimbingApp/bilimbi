@@ -1,5 +1,6 @@
 [discovery_file] = Path.wildcard(Path.expand("apps/base/*/mix/module_discovery.exs", __DIR__))
 Code.require_file(discovery_file)
+Code.require_file(Path.expand("mix/composition_lock.exs", __DIR__))
 
 defmodule Bilimbi.Umbrella.MixProject do
   use Mix.Project
@@ -7,6 +8,7 @@ defmodule Bilimbi.Umbrella.MixProject do
   def project do
     [
       apps_path: "apps",
+      lockfile: Bilimbi.CompositionLock.lockfile!(__DIR__),
       apps: [:base, :core, :web],
       version: "0.1.0",
       start_permanent: Mix.env() == :prod,
