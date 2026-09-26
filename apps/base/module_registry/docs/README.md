@@ -35,9 +35,23 @@ Mix-time and runtime validation both fail closed on missing, extra, malformed,
 or duplicate versions. Descriptor and migration-file contents participate in
 the workspace fingerprint.
 
-Source composition and runtime visibility stay separate. A coordinator such as
-Core Compatibility can enumerate only OTP applications in its Mix dependency
-closure. Workspace-boundary tests therefore fail when a source-discovered
-module that declares `migrations` or a `schema_contract` is absent from
-`core/compatibility`'s declared dependencies — the defect class that shipped
-Core User inert with green CI.
+Base and Core containers are direct children of `apps/`. Optional Domain and
+Extension repositories mount one level deeper, under `apps/domains/<id>/` and
+`apps/extensions/<id>/`, and discovery finds them with no list naming them. A
+mounted directory must hold a `bilimbi.container.exs` whose `id` equals the
+directory name and whose layer matches its root; it cannot be a symbolic link
+or reuse `base`, `core`, or `web`. The ID is the container's OTP application
+name, so its `mix.exs` declares that `app:`. Declared same-layer dependencies
+may cross repositories (Domain to Domain, Extension to Extension); upward
+edges and cycles are rejected.
+
+Source composition and runtime visibility stay separate. Runtime consumers
+read only OTP applications that are loaded, and a package's runtime loads only
+its own Mix dependency closure. The Web host closes the gap:
+`optional_container_dependencies/1` gives it a path dependency on every mounted
+container, so Web's closure, and the `bilimbi` release built around it, is the
+whole discovered graph. Every module's metadata records the graph's module
+IDs, and `ModuleRegistry.complete_modules!/0` refuses a runtime that has not
+loaded all of them. Host boot, the database Mix tasks, and the release
+commands call it first; package-local tests may still see a subset through
+`installed_modules!/0`.

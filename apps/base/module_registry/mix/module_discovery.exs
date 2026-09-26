@@ -2,14 +2,24 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   @moduledoc """
   Discovers, validates, and orders installed Bilimbi deep modules.
 
-  A composition container is a direct child of `apps/` with a
-  `bilimbi.container.exs` descriptor. Every immediate directory inside that
-  container is an installed module and must contain `bilimbi.module.exs`.
+  A Base or Core composition container is a direct child of `apps/` with a
+  `bilimbi.container.exs` descriptor. Optional Domain and Extension
+  repositories mount one level deeper, as `apps/domains/<id>/` and
+  `apps/extensions/<id>/`; each immediate directory there is one container
+  whose descriptor ID equals its directory name. No list names a mounted
+  container: presence under a mount root is the installation choice. Every
+  immediate directory inside a container is an installed module and must
+  contain `bilimbi.module.exs`.
   """
 
   @container_file "bilimbi.container.exs"
   @module_file "bilimbi.module.exs"
   @layers [:base, :core, :domain, :extension]
+  @platform_layers [:base, :core]
+  @mount_roots [{"domains", :domain}, {"extensions", :extension}]
+  # Container IDs name OTP applications. A mounted container must not take the
+  # name of a Platform umbrella child.
+  @reserved_container_ids ["base", "core", "web"]
   @module_keys [
     :id,
     :kind,
@@ -110,6 +120,31 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     end)
   end
 
+  @doc """
+  Returns a path dependency on every mounted Domain and Extension container.
+
+  The Web host appends these to its own dependencies, so its OTP closure, and
+  a release built around it, is the whole discovered graph. The dependency
+  name is the container's validated descriptor ID, which discovery requires to
+  equal the mounted directory name; the container's `mix.exs` must declare the
+  same `app:`. Paths are relative to `project_root`.
+  """
+  @spec optional_container_dependencies(String.t()) :: [Mix.Project.dependency()]
+  def optional_container_dependencies(project_root) do
+    project_root = Path.expand(project_root)
+    workspace_root = workspace_root!(project_root)
+    # A host must not build against a graph discovery would reject.
+    _modules = discover_workspace!(workspace_root)
+
+    workspace_root
+    |> discover_containers!()
+    |> Enum.reject(&(&1.layer in @platform_layers))
+    |> Enum.map(fn container ->
+      {String.to_atom(container.id),
+       path: Path.relative_to(container.path, project_root, force: true)}
+    end)
+  end
+
   @doc "Returns deterministic module-local test commands for a container."
   @spec container_test_commands(String.t()) :: [String.t()]
   def container_test_commands(container_root) do
@@ -188,6 +223,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
       |> Map.drop([:path, :container_id, :container_layer, :container_path])
       |> Map.put(:order, order)
       |> Map.put(:graph_fingerprint, workspace_fingerprint(workspace_root, modules))
+      |> Map.put(:graph_module_ids, Enum.map(modules, & &1.id))
 
     [bilimbi_module: descriptor]
   end
@@ -205,6 +241,9 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
         Path.join(workspace_root, "apps/*/#{@container_file}"),
         Path.join(workspace_root, "apps/*/*/#{@module_file}"),
         Path.join(workspace_root, "apps/*/*/priv/web_routes.exs"),
+        Path.join(workspace_root, "apps/{domains,extensions}/*/#{@container_file}"),
+        Path.join(workspace_root, "apps/{domains,extensions}/*/*/#{@module_file}"),
+        Path.join(workspace_root, "apps/{domains,extensions}/*/*/priv/web_routes.exs"),
         Path.join(workspace_root, "apps/web/priv/web_routes.exs")
       ]
       |> Enum.flat_map(&Path.wildcard/1)
@@ -225,11 +264,14 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
 
     files = Enum.sort(Enum.uniq(descriptor_files ++ migration_files))
 
+    # The metadata this file writes into every .app is part of the graph too:
+    # hashing its own source makes a change to that shape rewrite every
+    # module's application resource, rather than leave builds on the old one.
     source =
       Enum.map_join(files, "\0", fn file_path ->
         relative_path = Path.relative_to(file_path, workspace_root)
         relative_path <> "\0" <> File.read!(file_path)
-      end)
+      end) <> "\0" <> File.read!(__ENV__.file)
 
     :sha256
     |> :crypto.hash(source)
@@ -298,61 +340,13 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     :ok
   end
 
-  @doc """
-  Contributor IDs Compatibility cannot see at runtime.
-
-  Enumerates from source descriptors, not `Application.loaded_applications/0`.
-  Runtime discovery only sees OTP apps in Compatibility's Mix closure, which
-  Mix builds from `core/compatibility`'s declared `dependencies`. A module
-  with migrations or a `schema_contract` that is missing from that list is
-  inert: its migration never runs and its contract is never verified.
-
-  `compatibility_dependencies` overrides the coordinator's declared list so
-  tests can prove the guard fails without mutating the live descriptor.
-  """
-  @spec missing_compatibility_contributors([descriptor()], [String.t()] | nil) :: [String.t()]
-  def missing_compatibility_contributors(modules, compatibility_dependencies \\ nil)
-      when is_list(modules) do
-    dependencies =
-      compatibility_dependencies || compatibility_dependencies!(modules)
-
-    closure = MapSet.new(dependencies)
-
-    modules
-    |> Enum.filter(&contributor?/1)
-    |> Enum.map(& &1.id)
-    |> Enum.reject(&(&1 == "core/compatibility" or MapSet.member?(closure, &1)))
-    |> Enum.sort()
-  end
-
-  defp compatibility_dependencies!(modules) do
-    case Enum.find(modules, &(&1.id == "core/compatibility")) do
-      nil ->
-        raise ArgumentError, "workspace has no core/compatibility coordinator"
-
-      compatibility ->
-        compatibility.dependencies
-    end
-  end
-
-  defp contributor?(module) do
-    is_binary(module.migrations) or not is_nil(module.schema_contract)
-  end
-
   @doc "Discovers and validates all installed modules in a source workspace."
   @spec discover_workspace!(String.t()) :: [descriptor()]
   def discover_workspace!(workspace_root) do
-    workspace_root = Path.expand(workspace_root)
-    apps_root = Path.join(workspace_root, "apps")
-
-    containers =
-      apps_root
-      |> Path.join("*/#{@container_file}")
-      |> Path.wildcard()
-      |> Enum.sort()
-      |> Enum.map(&read_container!/1)
-
-    modules = Enum.flat_map(containers, &discover_container_modules!/1)
+    modules =
+      workspace_root
+      |> discover_containers!()
+      |> Enum.flat_map(&discover_container_modules!/1)
 
     modules
     |> validate_unique!(:id, "stable module ID")
@@ -401,6 +395,104 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     unless layer in @layers, do: malformed!(descriptor_path, "layer is invalid")
 
     %{id: id, kind: kind, layer: layer, path: Path.dirname(descriptor_path)}
+  end
+
+  # Base and Core containers are direct children of apps/. Domains and
+  # Extensions mount one level deeper, under their layer's root, so the layer
+  # a directory claims must agree with where it sits.
+  defp discover_containers!(workspace_root) do
+    apps_root = Path.join(Path.expand(workspace_root), "apps")
+
+    platform =
+      apps_root
+      |> Path.join("*/#{@container_file}")
+      |> Path.wildcard()
+      |> Enum.sort()
+      |> Enum.map(fn descriptor_path ->
+        container = read_container!(descriptor_path)
+
+        unless container.layer in @platform_layers do
+          raise ArgumentError,
+                "container #{container.id} at #{container.path} declares layer " <>
+                  "#{inspect(container.layer)}; a Domain mounts under apps/domains/ " <>
+                  "and an Extension under apps/extensions/"
+        end
+
+        container
+      end)
+
+    mounted =
+      Enum.flat_map(@mount_roots, fn {root, layer} ->
+        discover_mounted_containers!(Path.join(apps_root, root), layer)
+      end)
+
+    containers = platform ++ mounted
+
+    containers
+    |> Enum.frequencies_by(& &1.id)
+    |> Enum.filter(fn {_id, count} -> count > 1 end)
+    |> Enum.map(&elem(&1, 0))
+    |> Enum.sort()
+    |> case do
+      [] -> containers
+      duplicates -> raise ArgumentError, "duplicate container ID: #{Enum.join(duplicates, ", ")}"
+    end
+  end
+
+  defp discover_mounted_containers!(mount_root, layer) do
+    if File.dir?(mount_root) do
+      mount_root
+      |> File.ls!()
+      |> Enum.sort()
+      |> Enum.reject(&String.starts_with?(&1, "."))
+      |> Enum.map(&Path.join(mount_root, &1))
+      |> Enum.filter(&File.dir?/1)
+      |> Enum.map(&read_mounted_container!(&1, layer))
+    else
+      []
+    end
+  end
+
+  defp read_mounted_container!(container_path, layer) do
+    name = Path.basename(container_path)
+
+    unless File.lstat!(container_path).type == :directory do
+      raise ArgumentError,
+            "mounted container #{container_path} must be a directory inside the workspace, not a link"
+    end
+
+    # The ID becomes the container's OTP application name.
+    unless Regex.match?(~r/^[a-z][a-z0-9_]*$/, name) do
+      raise ArgumentError,
+            "mounted container directory #{container_path} is not a valid container ID " <>
+              "(lowercase letters, digits, and underscores, starting with a letter)"
+    end
+
+    descriptor_path = Path.join(container_path, @container_file)
+
+    unless File.regular?(descriptor_path) do
+      raise ArgumentError, "mounted container #{container_path} is missing #{@container_file}"
+    end
+
+    container = read_container!(descriptor_path)
+
+    unless container.layer == layer do
+      raise ArgumentError,
+            "container #{container.id} at #{container_path} declares layer " <>
+              "#{inspect(container.layer)}; this root accepts #{inspect(layer)}"
+    end
+
+    unless container.id == name do
+      raise ArgumentError,
+            "container #{container.id} at #{container_path} must be mounted in a directory named #{container.id}"
+    end
+
+    if container.id in @reserved_container_ids do
+      raise ArgumentError,
+            "container ID #{container.id} at #{container_path} is reserved for the Platform"
+    end
+
+    container
   end
 
   defp validate_container_root!(container_root) do
@@ -723,13 +815,15 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   defp dependency_allowed?(%{layer: :base}, dependency), do: dependency.layer == :base
   defp dependency_allowed?(%{layer: :core}, dependency), do: dependency.layer in [:base, :core]
 
-  defp dependency_allowed?(%{layer: :domain} = module, dependency) do
-    dependency.layer in [:base, :core] or
-      (dependency.layer == :domain and dependency.container_id == module.container_id)
+  # A declared same-layer edge may cross containers: Domain to Domain, and
+  # Extension to Extension. Upward edges stay forbidden, and topological
+  # ordering rejects any cycle, including one across repositories.
+  defp dependency_allowed?(%{layer: :domain}, dependency) do
+    dependency.layer in [:base, :core, :domain]
   end
 
   defp dependency_allowed?(%{layer: :extension}, dependency) do
-    dependency.layer in [:base, :core, :domain]
+    dependency.layer in [:base, :core, :domain, :extension]
   end
 
   defp topological_sort!(modules) do
@@ -755,12 +849,28 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
         remaining
         |> Enum.filter(fn {_id, degree} -> degree > 0 end)
         |> Enum.map(fn {id, _degree} -> id end)
+        |> MapSet.new()
+        |> prune_downstream(by_id)
         |> Enum.sort()
 
       raise ArgumentError, "module dependency cycle detected: #{Enum.join(cycle_ids, ", ")}"
     end
 
     ordered
+  end
+
+  # Unordered modules include those that merely depend on a cycle. Drop, until
+  # none is left, every module no other unordered module depends on, so the
+  # error names the cycle rather than everything downstream of it.
+  defp prune_downstream(ids, by_id) do
+    depended_on =
+      ids
+      |> Enum.flat_map(&Map.fetch!(by_id, &1).dependencies)
+      |> MapSet.new()
+
+    pruned = MapSet.intersection(ids, depended_on)
+
+    if MapSet.equal?(pruned, ids), do: ids, else: prune_downstream(pruned, by_id)
   end
 
   defp sort_queue([], ordered, indegrees, _dependents, _by_id) do

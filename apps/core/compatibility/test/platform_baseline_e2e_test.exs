@@ -14,6 +14,11 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
   alias Ecto.Adapters.SQL.Sandbox
 
   @package_root Path.expand("..", __DIR__)
+  # Production entry points refuse a runtime that cannot see the whole graph
+  # (`ModuleRegistry.complete_modules!/0`). This package's closure is partial,
+  # so they run from the umbrella root, as an operator runs them.
+  @workspace_root Path.expand("../../../..", __DIR__)
+  @host_tasks ~w(bilimbi.migrate bilimbi.rollback bilimbi.schema.verify bilimbi.schema.adopt bilimbi.seeds.run)
 
   setup context do
     PlatformBaselineFailureDiagnostics.capture(context, :setup, fn ->
@@ -306,7 +311,7 @@ defmodule Bilimbi.Core.PlatformBaselineE2ETest do
       System.cmd(
         System.find_executable("mix"),
         [task | args],
-        cd: @package_root,
+        cd: if(task in @host_tasks, do: @workspace_root, else: @package_root),
         env: [{"MIX_ENV", "test"} | env],
         stderr_to_stdout: true
       )

@@ -11,25 +11,95 @@ defmodule Bilimbi.Base.ModuleRegistry do
   @layers [:base, :core, :domain, :extension]
   @migration_dispositions [:compatible_baseline, :bilimbi_only]
 
+  @doc """
+  Returns the validated metadata of every loaded Bilimbi module.
+
+  This is whatever this runtime loaded. A package-local run sees only that
+  package's dependency closure; production entry points use
+  `complete_modules!/0` instead.
+  """
   @spec installed_modules!() :: [map()]
   def installed_modules! do
-    modules =
-      Application.loaded_applications()
-      |> Enum.flat_map(fn {app, _description, _version} ->
-        case Application.get_env(app, :bilimbi_module) do
-          nil -> []
-          descriptor -> [Map.put(descriptor, :path, Application.app_dir(app))]
-        end
-      end)
+    loaded_descriptors()
+    |> validate_graph_identity!()
+    |> validate_installed!()
+  end
 
+  @doc """
+  Returns the installed modules, refusing a runtime that cannot see the whole
+  discovered graph.
+
+  Mix records every graph module ID in each module's metadata. The host
+  application depends on every container, so from the umbrella root or a
+  release the loaded modules are the whole graph. A package directory loads
+  only its own closure, and optional Domains and Extensions sort last, so a
+  partial runtime would otherwise pass order validation and silently skip
+  their migrations, contracts, and contributions. Every production entry
+  point calls this first: host boot, `bilimbi.migrate`,
+  `bilimbi.schema.verify`, `bilimbi.schema.adopt`, `bilimbi.rollback`,
+  `bilimbi.seeds.run`, and the release migrate and seed commands.
+  """
+  @spec complete_modules!() :: [map()]
+  def complete_modules! do
+    loaded_descriptors()
+    |> validate_graph_identity!()
+    |> validate_complete!()
+    |> validate_installed!()
+  end
+
+  defp loaded_descriptors do
+    Application.loaded_applications()
+    |> Enum.flat_map(fn {app, _description, _version} ->
+      case Application.get_env(app, :bilimbi_module) do
+        nil -> []
+        descriptor -> [Map.put(descriptor, :path, Application.app_dir(app))]
+      end
+    end)
+  end
+
+  defp validate_graph_identity!(modules) do
     modules
     |> validate_unique!(:id, "stable module ID")
     |> validate_unique!(:otp_app, "OTP application ID")
     |> validate_unique_graph_fingerprint!()
+  end
+
+  defp validate_installed!(modules) do
+    modules
     |> validate_unique!(:order, "resolved module order")
     |> Enum.sort_by(& &1.order)
     |> validate_resolved_order!()
     |> validate_migrations!()
+  end
+
+  defp validate_complete!([]) do
+    raise ArgumentError,
+          "this runtime loaded no Bilimbi modules; run from the host application " <>
+            "(the umbrella root or a release)"
+  end
+
+  defp validate_complete!(modules) do
+    graph_ids =
+      case modules |> Enum.map(&Map.get(&1, :graph_module_ids)) |> Enum.uniq() do
+        [ids] when is_list(ids) ->
+          ids
+
+        _other ->
+          raise ArgumentError,
+                "installed module metadata does not record one discovered graph; recompile the workspace"
+      end
+
+    loaded_ids = Enum.map(modules, & &1.id)
+
+    case graph_ids -- loaded_ids do
+      [] ->
+        modules
+
+      missing ->
+        raise ArgumentError,
+              "this runtime cannot see installed modules #{Enum.join(missing, ", ")}; " <>
+                "run from the host application (the umbrella root or a release)"
+    end
   end
 
   defp validate_unique_graph_fingerprint!(modules) do

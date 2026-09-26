@@ -22,6 +22,7 @@ defmodule Mix.Tasks.Bilimbi.Schema.Adopt do
       Mix.raise("unexpected arguments: #{Enum.join(remaining, " ")}")
     end
 
+    Bilimbi.Base.ModuleRegistry.complete_modules!()
     with_repo!(Bilimbi.Base.Repo, fn repo -> adopt!(repo, opts) end)
   end
 
