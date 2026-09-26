@@ -53,6 +53,46 @@ defmodule BilimbiWeb.RouteOverlapTest do
     end
   end
 
+  test "a same-owner general route compiled before a specific one makes a fixture build fail" do
+    assert_build_fails!([
+      route("/users/:id", :get, {:core, "core/user"}),
+      route("/users/new", :get, {:core, "core/user"})
+    ])
+  end
+
+  test "same-owner equivalent patterns with different parameter names overlap" do
+    assert_raise ArgumentError, ~r/route overlap/, fn ->
+      RouteOverlap.validate_routes!([
+        route("/users/:id", :get, {:core, "core/user"}),
+        route("/users/:user_id", :get, {:core, "core/user"})
+      ])
+    end
+  end
+
+  test "a parameter inside a segment overlaps a matching literal" do
+    assert_raise ArgumentError, ~r/route overlap/, fn ->
+      RouteOverlap.validate_routes!([
+        route("/files/report-:id", :get, {:core, "core/files"}),
+        route("/files/report-q3", :get, {:domain, "domain/report"})
+      ])
+    end
+
+    assert :ok =
+             RouteOverlap.validate_routes!([
+               route("/files/report-:id", :get, {:core, "core/files"}),
+               route("/files/summary", :get, {:domain, "domain/report"})
+             ])
+  end
+
+  test "a forward route overlaps every path below its prefix" do
+    assert_raise ArgumentError, ~r/route overlap/, fn ->
+      RouteOverlap.validate_routes!([
+        %{path: "/dev/mailbox", verb: :*, kind: :forward, metadata: %{}},
+        route("/dev/mailbox/inbox", :get, {:extension, "extension/mail"})
+      ])
+    end
+  end
+
   test "compiled host routes carry validated descriptor ownership" do
     routes = BilimbiWeb.Router.__routes__()
 
