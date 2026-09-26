@@ -1,3 +1,4 @@
+Code.require_file(Path.expand("../../mix/composition_lock.exs", __DIR__))
 Code.require_file(Path.expand("../base/module_registry/mix/module_discovery.exs", __DIR__))
 
 defmodule Bilimbi.Web.MixProject do
@@ -10,7 +11,7 @@ defmodule Bilimbi.Web.MixProject do
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
-      lockfile: "../../mix.lock",
+      lockfile: Bilimbi.CompositionLock.lockfile!(Path.expand("../..", __DIR__)),
       elixir: "~> 1.20",
       elixirc_paths: elixirc_paths(Mix.env()),
       test_paths: test_paths(Mix.env()),

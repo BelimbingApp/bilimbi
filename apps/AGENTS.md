@@ -36,6 +36,10 @@ For source guard scans and container checks, use `Bilimbi.Base.ModuleRegistry.Mi
 
 Let `BilimbiWeb.RouteOverlap` check the compiled router for route conflicts. A route manifest alone misses direct host routes; injected routes carry their descriptor owner and layer in Phoenix route metadata. See `apps/web/lib/bilimbi_web/discovered_routes.ex`.
 
+## Composition lock
+
+Use `Bilimbi.CompositionLock.lockfile!/1` from `mix/composition_lock.exs` for every Mix project. A mounted optional repository resolves into the composition overlay; a literal root `mix.lock` path lets `deps.get` or `deps.unlock --unused` rewrite the Platform's tracked lock. The publish and pinned CI sequence is in `docs/architecture/0010_composition-model.md`.
+
 ## Follow-up
 
 A caller can still hide a control with `:if` and no `empty_state`. The component only speaks when it is used. Moving that into something a caller cannot skip is product work, and it is not done here.

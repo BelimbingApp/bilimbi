@@ -1,3 +1,5 @@
+Code.require_file(Path.expand("../../mix/composition_lock.exs", __DIR__))
+
 [discovery_file] =
   Path.wildcard(Path.expand("../../apps/base/*/mix/module_discovery.exs", __DIR__))
 
@@ -13,7 +15,7 @@ defmodule Bilimbi.Core.MixProject do
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
-      lockfile: "../../mix.lock",
+      lockfile: Bilimbi.CompositionLock.lockfile!(Path.expand("../..", __DIR__)),
       elixir: "~> 1.20",
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
