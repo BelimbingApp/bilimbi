@@ -497,11 +497,6 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     assert has_element?(view, "#workspace-picker", "Every tile is a live page")
     view |> element("#workspace-pick-admin-company") |> render_click()
     assert has_element?(view, "#workspace[data-tile-count='9']")
-
-    # Every tile carries the notice that replaces its frame when the tile
-    # is too small for a page, with the way out.
-    assert has_element?(view, "#tile-t1-cramped", "Too small to show /companies.")
-    assert has_element?(view, "#tile-t1-cramped-monocle", "Fill the workspace")
   end
 
   test "the workspace refuses to open inside a tile", %{conn: conn} do

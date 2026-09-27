@@ -22,10 +22,9 @@ screen the control opens the page normally.
 There is no cap on the number of tiles; the operator decides. Each tile is a
 live page: its own LiveView process, socket and database checkouts on the
 server, and its own document in the browser. A wall of twenty tiles costs
-what twenty tabs cost, and a page that polls does so once per tile. A tile
-too small for a page (about 18rem by 10rem) hides its frame behind a notice
-offering monocle, through a CSS container query, so nothing renders broken
-and nothing reloads when the tile grows again.
+what twenty tabs cost, and a page that polls does so once per tile. The
+operator decides tile sizes, so a small tile keeps showing its page; the
+tile menu's monocle fills the workspace with it.
 
 `Bilimbi.Base.Tiling.Layout` is the pure tree: open, close, resize, move,
 swap, flip, directional neighbours, the rectangles every tile and divider

@@ -105,11 +105,8 @@
 
         <%!-- Geometry travels in `data-place`, never a `style` attribute:
         the host's Content-Security-Policy allows no inline style, so the
-        hook writes the position through the CSSOM after every patch.
-        `.workspace-tile` is a size container: `app.css` hides the frame of
-        a tile too small to show a page and reveals the notice in its place,
-        so a page never renders broken in a sliver. A tile being dragged
-        onto this one sets `data-drop-target`. --%>
+        hook writes the position through the CSSOM after every patch. A tile
+        being dragged onto this one sets `data-drop-target`. --%>
         <div
           :for={tile <- @tiles}
           id={"tile-#{tile.id}"}
@@ -151,7 +148,7 @@
                 <div
                   id={"tile-#{tile.id}-frame"}
                   phx-update="ignore"
-                  class="workspace-tile-frame min-h-0 flex-1"
+                  class="min-h-0 flex-1"
                 >
                   <iframe
                     id={"tile-#{tile.id}-page"}
@@ -160,23 +157,6 @@
                     data-tile-frame={tile.id}
                     class="size-full border-0 bg-canvas"
                   ></iframe>
-                </div>
-                <%!-- Not `<.empty_state>`: this notice has to fit a tile a
-                few lines tall, so it is one sentence and one control. --%>
-                <div
-                  id={"tile-#{tile.id}-cramped"}
-                  class="workspace-tile-cramped hidden min-h-0 flex-1 flex-col items-center justify-center gap-1 overflow-hidden p-2 text-center text-xs text-ink-muted"
-                >
-                  <p class="truncate max-w-full">
-                    {gettext("Too small to show %{title}.", title: tile.title)}
-                  </p>
-                  <.button
-                    id={"tile-#{tile.id}-cramped-monocle"}
-                    variant="primary"
-                    phx-click={JS.push("toggle-monocle", value: %{id: tile.id})}
-                  >
-                    {gettext("Fill the workspace")}
-                  </.button>
                 </div>
               <% :forbidden -> %>
                 <div

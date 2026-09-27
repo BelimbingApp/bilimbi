@@ -613,10 +613,8 @@ key. Focus follows a click, never the pointer, and nothing animates.
 There is no cap on tiles: the operator decides, and a control-room wall
 holds more than a laptop. Every tile is a live page with its own connection,
 so the picker says that many tiles cost as much as many tabs, and nothing
-pretends otherwise. A tile too small to show a page (under about 18rem wide
-or 10rem tall) hides its frame behind a notice offering monocle, rather than
-rendering the page broken; the frame stays mounted, so growing the tile
-shows the page again without a reload. A tile whose page the account may
+pretends otherwise. A small tile keeps showing its page; monocle is the way
+out. A tile whose page the account may
 not open shows the permission wording in place of the frame. Below `lg` the
 workspace shows one tile at a time with a strip of tabs, keeping the tree.
 Layouts are saved per account by name, opened at `/workspace/<slug>` or from
