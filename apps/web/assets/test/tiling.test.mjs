@@ -1,7 +1,8 @@
-// tiling.js: the Ctrl+. tiling mode, the focus it moves, the split handles
-// and the size report. Frames are outside happy-dom, so the bridge into a
-// frame's document, the URL and title report, and Back-button behaviour are
-// checked in a browser (apps/base/ui/AGENTS.md "Hook tests").
+// tiling.js: the Ctrl+. tiling mode, the focus it moves, the split handles,
+// dragging a tile onto another, and the size report. Frames are outside
+// happy-dom, so the bridge into a frame's document, the URL and title
+// report, and Back-button behaviour are checked in a browser
+// (apps/base/ui/AGENTS.md "Hook tests").
 import {test, beforeEach, afterEach} from "node:test"
 import assert from "node:assert/strict"
 import Tiling from "../js/tiling.js"
@@ -9,22 +10,28 @@ import {mountHook, render, focused, settle} from "./support/hook.mjs"
 
 let control
 
-function workspace({focusedTile = "t1", count = 2, max = 6} = {}) {
+function workspace({focusedTile = "t1", count = 2} = {}) {
   return render(
     `<div id="app-shell">
        <span id="app-mode" hidden role="status"></span>
        <div id="workspace" phx-hook="Tiling" data-focused="${focusedTile}" data-monocle="false"
-            data-max-tiles="${max}" data-tile-count="${count}">
+            data-tile-count="${count}">
          <p id="workspace-announcement" role="status"></p>
          <div id="workspace-tiles">
            <div id="tile-t1" class="workspace-tile" data-tile="t1" data-focused="${focusedTile === "t1"}">
-             <div id="tile-t1-header"><button type="button" id="tile-t1-header-title">Companies</button></div>
+             <div id="tile-t1-header" data-tile-header>
+               <button type="button" id="tile-t1-header-title">Companies</button>
+               <button type="button" id="tile-t1-header-menu" data-tile-menu aria-expanded="false">Menu</button>
+             </div>
            </div>
            <div id="tile-t2" class="workspace-tile" data-tile="t2" data-focused="${focusedTile === "t2"}">
-             <div id="tile-t2-header"><button type="button" id="tile-t2-header-title">Users</button></div>
+             <div id="tile-t2-header" data-tile-header>
+               <button type="button" id="tile-t2-header-title">Users</button>
+               <button type="button" id="tile-t2-header-menu" data-tile-menu aria-expanded="false">Menu</button>
+             </div>
            </div>
            <div id="split-s3" role="separator" tabindex="0" data-split="s3" data-direction="h"
-                data-rect="0 0 1 1" style="left: 50%; top: 0%; height: 100%"></div>
+                data-rect="0 0 1 1" data-place="left: 50%; top: 0%; height: 100%"></div>
          </div>
        </div>
      </div>`,
@@ -142,24 +149,88 @@ test("Escape leaves an open menu alone", () => {
   assert.equal(control.hook.el.dataset.mode, "tiling")
 })
 
-test("n leaves the mode and opens the picker, unless the workspace is full", () => {
+test("n leaves the mode and opens the picker, however many tiles are open", () => {
   leader()
   press("n")
   assert.deepEqual(events(), [{event: "open-picker", payload: {}}])
   assert.equal(control.hook.el.dataset.mode, "off")
 
   control.hook.destroyed()
-  control = mountHook(Tiling, workspace({count: 6}))
+  control = mountHook(Tiling, workspace({count: 40}))
   control.pushes.length = 0
 
   leader()
   press("n")
+  assert.deepEqual(events(), [{event: "open-picker", payload: {}}])
+})
+
+const pointer = (type, target, init) =>
+  target.dispatchEvent(new PointerEvent(type, {bubbles: true, cancelable: true, button: 0, ...init}))
+
+// happy-dom has no layout, so the tile under the pointer is stood in for.
+function tileUnderPointer(id) {
+  document.elementFromPoint = () => (id ? document.getElementById(`tile-${id}`) : null)
+}
+
+test("dragging a title bar onto another tile marks the target and swaps on release", () => {
+  const title = document.getElementById("tile-t1-header-title")
+  tileUnderPointer("t2")
+
+  pointer("pointerdown", title, {clientX: 10, clientY: 10})
+  window.dispatchEvent(new PointerEvent("pointermove", {clientX: 12, clientY: 10}))
+  assert.equal(control.hook.el.dataset.tileDrag, undefined, "a wobble is not a drag")
+
+  window.dispatchEvent(new PointerEvent("pointermove", {clientX: 300, clientY: 10}))
+  assert.equal(control.hook.el.dataset.tileDrag, "t1")
+  assert.equal(document.getElementById("tile-t1").dataset.dragging, "true")
+  assert.equal(document.getElementById("tile-t2").dataset.dropTarget, "true")
+  assert.equal(document.documentElement.style.cursor, "grabbing")
+
+  window.dispatchEvent(new PointerEvent("pointerup", {clientX: 300, clientY: 10}))
+  assert.deepEqual(events(), [{event: "swap-tile", payload: {id: "t1", with: "t2"}}])
+  assert.equal(document.getElementById("tile-t2").hasAttribute("data-drop-target"), false)
+  assert.equal(document.getElementById("tile-t1").hasAttribute("data-dragging"), false)
+  assert.equal(document.documentElement.style.cursor, "")
+  assert.match(document.getElementById("workspace-announcement").textContent, /Swapped Companies and Users/)
+
+  // The click the release produces is not a focus of the tile under it.
+  const click = new MouseEvent("click", {bubbles: true, cancelable: true})
+  document.getElementById("tile-t2-header-title").dispatchEvent(click)
+  assert.equal(click.defaultPrevented, true)
+})
+
+test("a drag released over its own tile or over nothing swaps nothing", () => {
+  const title = document.getElementById("tile-t1-header-title")
+
+  tileUnderPointer("t1")
+  pointer("pointerdown", title, {clientX: 10, clientY: 10})
+  window.dispatchEvent(new PointerEvent("pointermove", {clientX: 300, clientY: 10}))
+  assert.equal(document.getElementById("tile-t1").hasAttribute("data-drop-target"), false)
+  window.dispatchEvent(new PointerEvent("pointerup", {clientX: 300, clientY: 10}))
+
+  tileUnderPointer(null)
+  pointer("pointerdown", title, {clientX: 10, clientY: 10})
+  window.dispatchEvent(new PointerEvent("pointermove", {clientX: 300, clientY: 10}))
+  window.dispatchEvent(new PointerEvent("pointerup", {clientX: 300, clientY: 10}))
+
   assert.deepEqual(events(), [])
-  assert.equal(control.hook.el.dataset.mode, "tiling")
-  assert.match(
-    document.getElementById("workspace-announcement").textContent,
-    /holds 6 tiles at most/
-  )
+})
+
+test("the tile menu is not a grip, and a plain press stays the title's click", () => {
+  tileUnderPointer("t2")
+
+  pointer("pointerdown", document.getElementById("tile-t1-header-menu"), {clientX: 10, clientY: 10})
+  window.dispatchEvent(new PointerEvent("pointermove", {clientX: 300, clientY: 10}))
+  window.dispatchEvent(new PointerEvent("pointerup", {clientX: 300, clientY: 10}))
+  assert.equal(control.hook.el.dataset.tileDrag, undefined)
+
+  pointer("pointerdown", document.getElementById("tile-t1-header-title"), {clientX: 10, clientY: 10})
+  window.dispatchEvent(new PointerEvent("pointerup", {clientX: 10, clientY: 10}))
+  const click = new MouseEvent("click", {bubbles: true, cancelable: true})
+  document.getElementById("tile-t1-header-title").dispatchEvent(click)
+
+  assert.equal(click.defaultPrevented, false)
+  assert.deepEqual(events(), [])
 })
 
 test("after a keyboard move, focus follows the tile the server focused", () => {
@@ -195,6 +266,8 @@ test("dragging a handle follows the pointer and pushes the ratio once on release
   const tiles = document.getElementById("workspace-tiles")
   tiles.getBoundingClientRect = () => ({left: 100, top: 0, width: 1000, height: 500})
   const handle = document.getElementById("split-s3")
+  assert.equal(handle.style.left, "50%", "placed from data-place on mount")
+  assert.equal(control.hook.el.dataset.placed, "true")
 
   handle.dispatchEvent(new PointerEvent("pointerdown", {button: 0, bubbles: true, cancelable: true}))
   window.dispatchEvent(new PointerEvent("pointermove", {clientX: 800, clientY: 10}))

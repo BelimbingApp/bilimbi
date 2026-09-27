@@ -4,10 +4,14 @@ defmodule Bilimbi.Base.Tiling.Layout do
 
   A layout is a binary space partition: a leaf is one tile showing a page at
   a path, and a split divides its rectangle between two children along one
-  axis at a ratio. Opening a page splits the focused tile, and the split
-  direction follows the shape of the rectangle being split (wider than tall
-  splits side by side), which is what makes the tiling automatic. This is
+  axis at a ratio. Opening a page splits a tile, and the split direction
+  follows the shape of the rectangle being split (wider than tall splits
+  side by side), which is what makes the tiling automatic. This is
   Hyprland's dwindle layout with the browser tab as the monitor.
+
+  There is no cap on the number of tiles: the operator decides, and a
+  control-room screen holds more than a laptop. Each tile is a live page,
+  so the host documents the cost rather than this module bounding it.
 
   Nothing here touches a process, a socket or a page. The host LiveView owns
   focus, monocle and persistence; this module owns the shape and every
@@ -35,7 +39,6 @@ defmodule Bilimbi.Base.Tiling.Layout do
   only keeps the pattern's shape.
   """
 
-  @max_tiles 6
   @min_ratio 0.1
   @max_ratio 0.9
   @resize_step 0.05
@@ -56,10 +59,6 @@ defmodule Bilimbi.Base.Tiling.Layout do
   @type node_t :: leaf() | split()
   @type rect :: %{x: float(), y: float(), w: float(), h: float()}
   @type t :: %__MODULE__{root: node_t() | nil, next_id: pos_integer()}
-
-  @doc "The most tiles one workspace holds; see the design note on database bursts."
-  @spec max_tiles() :: pos_integer()
-  def max_tiles, do: @max_tiles
 
   @doc "A workspace with no tile."
   @spec empty() :: t()
@@ -84,10 +83,6 @@ defmodule Bilimbi.Base.Tiling.Layout do
   @spec count(t()) :: non_neg_integer()
   def count(layout), do: length(leaves(layout))
 
-  @doc "Whether another tile may be opened."
-  @spec full?(t()) :: boolean()
-  def full?(layout), do: count(layout) >= @max_tiles
-
   @doc "The leaf with this id, or nil."
   @spec fetch_leaf(t(), String.t()) :: leaf() | nil
   def fetch_leaf(layout, id), do: Enum.find(leaves(layout), &(&1.id == id))
@@ -95,48 +90,66 @@ defmodule Bilimbi.Base.Tiling.Layout do
   @doc """
   Opens `path` in a new tile.
 
-  With an empty workspace the tile fills it. Otherwise the tile at `:at`
-  (default: the last leaf) is split, and the direction comes from the shape
-  of that tile on a viewport of `:viewport` pixels (default: a landscape
-  screen): wider than tall splits side by side, otherwise top and bottom.
-  The new tile is the second child, so it appears to the right or below.
+  With an empty workspace the tile fills it. Otherwise the tile at `:at` is
+  split, and the direction comes from the shape of that tile on a viewport
+  of `:viewport` pixels (default: a landscape screen): wider than tall
+  splits side by side, otherwise top and bottom. The new tile is the second
+  child, so it appears to the right or below.
 
-  Returns the new layout and the new tile's id, or `{:error, :full}` at the
-  tile cap.
+  `:at` is a tile id, or `:largest` for the tile with the most room, ties
+  going to the later one in tree order. That is the dwindle order a person
+  expects from the sidebar: the second page takes the right half, the third
+  the bottom of that half, the fourth the bottom of the left half, and so
+  on, so the screen stays balanced however many pages are open. The
+  default is the last tile in tree order.
+
+  Returns the new layout and the new tile's id.
   """
-  @spec open(t(), String.t(), keyword()) :: {:ok, t(), String.t()} | {:error, :full}
+  @spec open(t(), String.t(), keyword()) :: {t(), String.t()}
   def open(%__MODULE__{} = layout, path, opts \\ []) when is_binary(path) and path != "" do
-    cond do
-      full?(layout) ->
-        {:error, :full}
+    if is_nil(layout.root) do
+      {leaf, layout} = new_leaf(layout, path)
+      {%{layout | root: leaf}, leaf.id}
+    else
+      {vw, vh} = Keyword.get(opts, :viewport, {1600, 900})
+      rects = leaf_rects(layout)
+      target = target(layout, rects, Keyword.get(opts, :at), {vw, vh})
+      rect = Map.fetch!(rects, target)
+      direction = if rect.w * vw >= rect.h * vh, do: :h, else: :v
 
-      is_nil(layout.root) ->
-        {leaf, layout} = new_leaf(layout, path)
-        {:ok, %{layout | root: leaf}, leaf.id}
+      {leaf, layout} = new_leaf(layout, path)
+      {split_id, layout} = next_id(layout, "s")
 
-      true ->
-        target = Keyword.get(opts, :at) || List.last(leaves(layout)).id
-        {vw, vh} = Keyword.get(opts, :viewport, {1600, 900})
-        rect = Map.fetch!(leaf_rects(layout), target)
-        direction = if rect.w * vw >= rect.h * vh, do: :h, else: :v
+      root =
+        map_node(layout.root, target, fn existing ->
+          %{
+            type: :split,
+            id: split_id,
+            direction: direction,
+            ratio: 0.5,
+            first: existing,
+            second: leaf
+          }
+        end)
 
-        {leaf, layout} = new_leaf(layout, path)
-        {split_id, layout} = next_id(layout, "s")
-
-        root =
-          map_node(layout.root, target, fn existing ->
-            %{
-              type: :split,
-              id: split_id,
-              direction: direction,
-              ratio: 0.5,
-              first: existing,
-              second: leaf
-            }
-          end)
-
-        {:ok, %{layout | root: root}, leaf.id}
+      {%{layout | root: root}, leaf.id}
     end
+  end
+
+  defp target(layout, rects, :largest, {vw, vh}) do
+    layout
+    |> leaves()
+    |> Enum.with_index()
+    |> Enum.max_by(fn {leaf, index} ->
+      rect = Map.fetch!(rects, leaf.id)
+      {Float.round(rect.w * vw * rect.h * vh, 3), index}
+    end)
+    |> elem(0)
+    |> Map.fetch!(:id)
+  end
+
+  defp target(layout, rects, at, _viewport) do
+    if is_binary(at) and Map.has_key?(rects, at), do: at, else: List.last(leaves(layout)).id
   end
 
   @doc """
@@ -425,17 +438,14 @@ defmodule Bilimbi.Base.Tiling.Layout do
 
   @doc """
   Reads the URL form back into a tree with fresh ids. `""` is the empty
-  workspace. Anything else that is not exactly the grammar, or holds more than
-  `max_tiles/0` tiles, is `:error`.
+  workspace. Anything else that is not exactly the grammar is `:error`.
   """
   @spec decode(String.t()) :: {:ok, t()} | :error
   def decode(""), do: {:ok, empty()}
 
   def decode(encoded) when is_binary(encoded) do
-    with {:ok, node, "", layout} <- parse_node(encoded, empty()),
-         true <- count(%{layout | root: node}) <= @max_tiles do
-      {:ok, %{layout | root: node}}
-    else
+    case parse_node(encoded, empty()) do
+      {:ok, node, "", layout} -> {:ok, %{layout | root: node}}
       _ -> :error
     end
   end

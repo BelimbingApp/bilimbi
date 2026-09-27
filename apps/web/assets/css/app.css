@@ -293,6 +293,33 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
   }
 }
 
+/* A workspace tile is a size container. Below the smallest size a page is
+ * still readable in, the tile hides its frame and shows the notice in its
+ * place; the frame stays in the document, so the page is not reloaded when
+ * the tile grows again. There is no cap on tiles, so this is what keeps a
+ * sliver from rendering a broken page. */
+#workspace-tiles .workspace-tile {
+  container-type: size;
+}
+
+/* Until the Tiling hook has placed them (it writes `data-placed`), tiles and
+ * handles have no position, so they stay out of sight rather than stacking
+ * at the origin during the dead render. */
+#workspace:not([data-placed]) .workspace-tile,
+#workspace:not([data-placed]) [data-split] {
+  visibility: hidden;
+}
+
+@container (max-width: 17.99rem), (max-height: 9.99rem) {
+  .workspace-tile-frame {
+    display: none;
+  }
+
+  .workspace-tile-cramped {
+    display: flex;
+  }
+}
+
 /* Menu typography & font colors matching Belimbing */
 .app-nav-rail {
   font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;

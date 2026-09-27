@@ -16,12 +16,20 @@
 //     frames stop receiving pointer events for the length of a drag; the
 //     handle follows the pointer locally and the ratio is pushed once on
 //     release;
+//   * dragging a tile by its title bar onto another tile. The tile under
+//     the pointer is marked as the drop target, and the swap is pushed once
+//     on release; a press that never travels stays the title's own click.
+//     The tile menu and the mode's `s` remain the pointer-free way to swap;
 //   * reporting each frame's URL and title after it loads or navigates, and
 //     the workspace area's size, which decides a split's direction;
 //   * sending a frame to the page the server names in a `tile-navigate`
 //     event, when a record another tile selected is followed here. The
 //     frame's document is replaced, not pushed, so Back still leaves the
-//     workspace.
+//     workspace;
+//   * placing every tile and handle. The server sends each position as
+//     `data-place`, and this hook writes it through the CSSOM after every
+//     patch, because the Content-Security-Policy allows no `style`
+//     attribute: one rendered by the server is ignored by the browser.
 //
 // Focus follows a click, never the pointer. `DESIGN.md` "Application shell"
 // and apps/base/ui/AGENTS.md carry the rest.
@@ -41,6 +49,9 @@ const ARROWS = {ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown
 const MODE_LABELS = {tiling: "Tiling", resize: "Resize"}
 const MIN_RATIO = 0.1
 const MAX_RATIO = 0.9
+// Pointer travel before a press on a title bar becomes a drag rather than
+// a click, in CSS pixels.
+const DRAG_THRESHOLD = 6
 
 const Tiling = {
   mounted() {
@@ -49,6 +60,7 @@ const Tiling = {
     this.pendingFocus = false
     this.appliedFocus = null
     this.drag = null
+    this.tileDrag = null
     this.bound = new WeakSet()
     this.container = this.el.querySelector("#workspace-tiles")
     this.announcement = this.el.querySelector("#workspace-announcement")
@@ -58,6 +70,10 @@ const Tiling = {
     this.onPointerDown = (event) => this.startDrag(event)
     this.onPointerMove = (event) => this.moveDrag(event)
     this.onPointerUp = () => this.endDrag()
+    this.onTilePointerDown = (event) => this.pressTile(event)
+    this.onTilePointerMove = (event) => this.dragTile(event)
+    this.onTilePointerUp = (event) => this.dropTile(event)
+    this.onTileClick = (event) => this.swallowClick(event)
     this.onViewport = () => this.scheduleViewport()
 
     // Capture, so the mode sees a key before the shell's own Escape handling
@@ -65,10 +81,13 @@ const Tiling = {
     window.addEventListener("keydown", this.onKey, true)
     this.el.addEventListener("keydown", this.onHandleKey)
     this.el.addEventListener("pointerdown", this.onPointerDown)
+    this.el.addEventListener("pointerdown", this.onTilePointerDown)
+    this.el.addEventListener("click", this.onTileClick, true)
     window.addEventListener("resize", this.onViewport)
 
     this.handleEvent("tile-navigate", ({id, path}) => this.navigateFrame(id, path))
 
+    this.place()
     this.bindFrames()
     this.reportViewport()
   },
@@ -77,8 +96,30 @@ const Tiling = {
     // A patch morphs this element's attributes back to what the server
     // rendered; the mode is the hook's, so it goes back on.
     this.el.dataset.mode = this.mode
+    this.place()
     this.bindFrames()
     this.applyFocus()
+  },
+
+  // `data-place` is `left: 0%; top: 50%; width: 50%; height: 50%`, the four
+  // properties the server computed. A property a handle leaves out (its
+  // thickness is a class) is cleared, so a split that flipped direction
+  // does not keep the old axis's length. `data-placed` on the workspace
+  // lets `app.css` keep tiles invisible until the first placement, so the
+  // dead render never shows every tile collapsed at the origin.
+  place() {
+    this.el.dataset.placed = "true"
+    for (const el of this.el.querySelectorAll("[data-place]")) {
+      const placed = new Map(
+        (el.dataset.place || "")
+          .split(";")
+          .map((pair) => pair.split(":").map((part) => part.trim()))
+          .filter(([name, value]) => name && value)
+      )
+      for (const name of ["left", "top", "width", "height"]) {
+        el.style.setProperty(name, placed.get(name) ?? "")
+      }
+    }
   },
 
   destroyed() {
@@ -86,9 +127,13 @@ const Tiling = {
     window.removeEventListener("keydown", this.onKey, true)
     this.el.removeEventListener("keydown", this.onHandleKey)
     this.el.removeEventListener("pointerdown", this.onPointerDown)
+    this.el.removeEventListener("pointerdown", this.onTilePointerDown)
+    this.el.removeEventListener("click", this.onTileClick, true)
     window.removeEventListener("resize", this.onViewport)
     window.removeEventListener("pointermove", this.onPointerMove)
     window.removeEventListener("pointerup", this.onPointerUp)
+    window.removeEventListener("pointermove", this.onTilePointerMove)
+    window.removeEventListener("pointerup", this.onTilePointerUp)
     if (this.viewportFrame) cancelAnimationFrame(this.viewportFrame)
   },
 
@@ -291,14 +336,6 @@ const Tiling = {
 
   // The picker is a dialog the person types into, so the mode ends first.
   openPicker() {
-    const count = Number(this.el.dataset.tileCount || 0)
-    const max = Number(this.el.dataset.maxTiles || 0)
-
-    if (max && count >= max) {
-      this.announce(`The workspace holds ${max} tiles at most. Close one to open another page.`)
-      return
-    }
-
     this.setMode("off")
     this.pushEvent("open-picker", {})
   },
@@ -411,6 +448,92 @@ const Tiling = {
     window.removeEventListener("pointerup", this.onPointerUp)
 
     if (ratio !== null) this.pushEvent("resize-split", {id, ratio: Number(ratio.toFixed(3))})
+  },
+
+  // ---------------------------------------------------------------
+  // Dragging a tile onto another
+  // ---------------------------------------------------------------
+
+  pressTile(event) {
+    const header = event.target.closest?.("[data-tile-header]")
+    if (!header || event.button !== 0 || event.target.closest("[data-tile-menu]")) return
+
+    const tile = header.closest("[data-tile]")
+    if (!tile) return
+
+    this.tileDrag = {id: tile.dataset.tile, x: event.clientX, y: event.clientY, active: false, over: null}
+    window.addEventListener("pointermove", this.onTilePointerMove)
+    window.addEventListener("pointerup", this.onTilePointerUp)
+  },
+
+  dragTile(event) {
+    const drag = this.tileDrag
+    if (!drag) return
+
+    if (!drag.active) {
+      if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < DRAG_THRESHOLD) return
+      drag.active = true
+      this.el.dataset.tileDrag = drag.id
+      this.tileElement(drag.id)?.setAttribute("data-dragging", "true")
+      for (const frame of this.frames()) frame.style.pointerEvents = "none"
+      document.documentElement.style.cursor = "grabbing"
+      document.documentElement.style.userSelect = "none"
+    }
+
+    const over = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest?.("[data-tile]")?.dataset.tile
+    this.markDropTarget(over && over !== drag.id ? over : null)
+  },
+
+  dropTile() {
+    const drag = this.tileDrag
+    if (!drag) return
+    this.tileDrag = null
+    window.removeEventListener("pointermove", this.onTilePointerMove)
+    window.removeEventListener("pointerup", this.onTilePointerUp)
+    if (!drag.active) return
+
+    // The click that follows the release would focus the tile the pointer
+    // is over, which after a swap is not the tile that was pressed. A
+    // release outside the workspace sends no click here, so the flag
+    // clears itself once the click had its chance.
+    this.swallowNextClick = true
+    setTimeout(() => (this.swallowNextClick = false), 0)
+    delete this.el.dataset.tileDrag
+    this.tileElement(drag.id)?.removeAttribute("data-dragging")
+    this.markDropTarget(null)
+    for (const frame of this.frames()) frame.style.pointerEvents = ""
+    document.documentElement.style.cursor = ""
+    document.documentElement.style.userSelect = ""
+
+    if (drag.over) {
+      this.pushEvent("swap-tile", {id: drag.id, with: drag.over})
+      this.announce(`Swapped ${this.tileTitle(drag.id)} and ${this.tileTitle(drag.over)}.`)
+    }
+  },
+
+  markDropTarget(id) {
+    if (this.tileDrag) this.tileDrag.over = id
+    for (const tile of this.el.querySelectorAll("[data-tile]")) {
+      if (tile.dataset.tile === id) tile.setAttribute("data-drop-target", "true")
+      else tile.removeAttribute("data-drop-target")
+    }
+  },
+
+  swallowClick(event) {
+    if (!this.swallowNextClick) return
+    this.swallowNextClick = false
+    event.preventDefault()
+    event.stopPropagation()
+  },
+
+  tileElement(id) {
+    return this.el.querySelector(`[data-tile="${id}"]`)
+  },
+
+  tileTitle(id) {
+    return document.getElementById(`tile-${id}-header-title`)?.textContent?.trim() || id
   },
 
   // ---------------------------------------------------------------

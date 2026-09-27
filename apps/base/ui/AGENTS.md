@@ -54,6 +54,8 @@ A page shown inside a workspace tile renders chromeless through the `framed` bra
 
 The one tile contract so far is the follow channel, `Bilimbi.Base.UI.Workspace`. A list row that opens a record is `<.record_link workspace={@workspace} kind="core/company" record_id={id} navigate={...}>`, and a record page calls `Workspace.announce/2` once it has loaded the record; both are inert outside a workspace. Pass `@workspace` to the component; do not branch a page template on it, and do not decide from the followed kinds at render time: rows are streamed and re-render only when re-streamed, so the component decides when the row is clicked. `kind` is the record's owning module id, which for `/users/:id` is `core/user`, not the list's module. The comment on `record_link/1` and the moduledoc of `Workspace` own the rest.
 
+Opening a page in a tile from anywhere is a link to `/workspace?t=<the current address or tree>&open=<the page>`, which the workspace resolves and replaces; the sidebar's control is `nav_tile/1` in `layouts.ex`, retargeted by `AppShell.retargetTileLink`. Do not encode a workspace tree on the client or add a second "open in a tile" control that builds its own address. The tile count has no cap; a tile too small for a page is handled by the `.workspace-tile` container query in `app.css`, not by a per-page check.
+
 ## Lists
 
 An operational list keeps its page, search, filters, sort and page size in URL state. See `DESIGN.md` "Pagination controls".

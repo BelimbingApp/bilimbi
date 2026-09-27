@@ -1,6 +1,6 @@
 // app_shell.js: the authenticated shell's sidebar -- the desktop rail and its
-// width, the mobile drawer, navigation branches and pins. See the comment at
-// the top of the hook.
+// width, the mobile drawer, navigation branches, pins and the "Open in a
+// tile" links. See the comment at the top of the hook.
 import {test, beforeEach, afterEach} from "node:test"
 import assert from "node:assert/strict"
 import AppShell from "../js/app_shell.js"
@@ -45,6 +45,9 @@ const SHELL = `
           <div class="group">
             <a href="/companies" id="nav-companies" data-nav-item="nav-companies" data-nav-label="Companies"
                data-phx-link="redirect" data-phx-link-state="push">Companies</a>
+            <a href="/companies" id="nav-tile-companies" data-nav-tile="/companies"
+               data-phx-link="redirect" data-phx-link-state="push"
+               aria-label="Open Companies in a tile">Tile</a>
             <button type="button" id="nav-pin-companies" data-nav-pin="nav-companies"
                     aria-label="Pin Companies to sidebar" aria-pressed="false">Pin</button>
           </div>
@@ -137,7 +140,12 @@ const key = (name, init = {}) =>
   (document.activeElement ?? document.body).dispatchEvent(new KeyboardEvent("keydown", {key: name, bubbles: true, cancelable: true, ...init}))
 const inert = (id) => $(id).hasAttribute("inert")
 const pinnedLinks = () =>
-  [...$("app-pinned-items").querySelectorAll("a")].map((a) => a.pathname + a.search)
+  [...$("app-pinned-items").querySelectorAll("a.app-pinned-link")].map((a) => a.pathname + a.search)
+const tileLink = (id) => {
+  const link = $(id)
+  return {href: link.getAttribute("href"), type: link.getAttribute("data-phx-link")}
+}
+const visit = (url) => window.happyDOM.setURL(`http://localhost${url}`)
 
 test("on a phone the closed drawer is inert and hidden from assistive technology", () => {
   setViewport(false)
@@ -353,7 +361,62 @@ test("a served pin hydrates while a foreign or unserved pin is hidden", async ()
   await flush()
 
   assert.deepEqual(pinnedLinks(), ["/companies/1?tab=users"])
-  assert.equal($("app-pinned-items").querySelectorAll("a").length, 1)
+  assert.equal($("app-pinned-items").querySelectorAll("a.app-pinned-link").length, 1)
+})
+
+test("on a wide screen the tile link opens the workspace with this page and the clicked one", () => {
+  mount()
+  visit("/users?page=2")
+
+  const click = new MouseEvent("click", {bubbles: true, cancelable: true})
+  $("nav-tile-companies").dispatchEvent(click)
+
+  assert.deepEqual(tileLink("nav-tile-companies"), {
+    href: "/workspace?t=%2Fusers%3Fpage%3D2&open=%2Fcompanies",
+    type: "redirect",
+  })
+  assert.equal(click.defaultPrevented, false, "LiveView's own link handling follows")
+})
+
+test("from the workspace the tile link is a patch that keeps the open tree", () => {
+  mount()
+  visit("/workspace?t=h.5(%2Fusers%2C%2Fcompanies)")
+  $("nav-tile-companies").click()
+  assert.deepEqual(tileLink("nav-tile-companies"), {
+    href: "/workspace?t=h.5%28%2Fusers%2C%2Fcompanies%29&open=%2Fcompanies",
+    type: "patch",
+  })
+
+  visit("/workspace/orders")
+  $("nav-tile-companies").click()
+  assert.deepEqual(tileLink("nav-tile-companies"), {
+    href: "/workspace/orders?open=%2Fcompanies",
+    type: "patch",
+  })
+})
+
+test("on a narrow screen the tile link stays the page itself", () => {
+  setViewport(false)
+  mount()
+  visit("/users")
+  $("nav-tile-companies").click()
+
+  assert.deepEqual(tileLink("nav-tile-companies"), {href: "/companies", type: "redirect"})
+})
+
+test("a pinned row carries its own tile link", async () => {
+  serverPins = [{id: 1, label: "Acme", url: "/companies/1?tab=users"}]
+  mount()
+  await flush()
+  visit("/users")
+
+  const tile = $("app-pinned-items").querySelector("[data-nav-tile]")
+  assert.equal(tile.getAttribute("aria-label"), "Open Acme in a tile")
+  tile.click()
+  assert.equal(
+    tile.getAttribute("href"),
+    "/workspace?t=%2Fusers&open=%2Fcompanies%2F1%3Ftab%3Dusers"
+  )
 })
 
 test("a server patch that resets a pin's pressed state is corrected on update (#685)", async () => {
@@ -369,7 +432,7 @@ test("a server patch that resets a pin's pressed state is corrected on update (#
 
   assert.equal($("company-pin").getAttribute("aria-pressed"), "true")
   assert.equal($("company-pin").title, "Unpin this company to sidebar")
-  assert.equal($("app-pinned-items").querySelectorAll("a").length, 1)
+  assert.equal($("app-pinned-items").querySelectorAll("a.app-pinned-link").length, 1)
 })
 
 test("dragging a pinned row reorders through the durable API", async () => {

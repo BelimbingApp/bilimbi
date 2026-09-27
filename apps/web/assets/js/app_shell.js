@@ -2,11 +2,13 @@ import ShellControls from "./shell_controls.js"
 
 // Authenticated shell chrome. Owns only what the server cannot: the desktop
 // rail choice (localStorage), durable pin hydration/migration, the mobile
-// drawer, Escape/backdrop close, and returning focus to the toggle. The top-bar
-// display controls and account disclosure belong to ShellControls, which this
-// hook drives through the same lifecycle. Navigation, capabilities, and status
-// values stay server-rendered.
+// drawer, Escape/backdrop close, returning focus to the toggle, and pointing
+// each row's "Open in a tile" link at the workspace from wherever the
+// browser is. The top-bar display controls and account disclosure belong to
+// ShellControls, which this hook drives through the same lifecycle.
+// Navigation, capabilities, and status values stay server-rendered.
 const DESKTOP = "(min-width: 1024px)"
+const WORKSPACE = "/workspace"
 const RAIL_WIDTH = 56
 const MIN_WIDTH = 180
 const MAX_WIDTH = 360
@@ -432,6 +434,9 @@ const AppShell = {
       return
     }
 
+    const tile = event.target.closest("[data-nav-tile]")
+    if (tile && this.root?.contains(tile)) this.retargetTileLink(tile)
+
     if (!this.sidebar?.contains(event.target)) return
 
     const toggle = event.target.closest("[data-nav-toggle]")
@@ -444,6 +449,31 @@ const AppShell = {
 
     if (this.desktop() || !event.target.closest("a[href]")) return
     this.closeDrawer()
+  },
+
+  // "Open in a tile". The server renders the control as a plain link to the
+  // page, which is what a narrow screen keeps: there the workspace shows one
+  // tile at a time anyway. On a wide screen the click is retargeted, before
+  // LiveView reads the link, to the workspace with the page the browser is on
+  // (or the tree already open there) in `t` and the clicked page in `open`.
+  // From the workspace it is a patch, so the tiles on screen keep their
+  // frames; from a page it is a live navigation, so the shell stays
+  // connected. The tree itself is never built here: `t` is only ever the
+  // current address, and the server does the splitting.
+  retargetTileLink(link) {
+    const page = link.dataset.navTile
+    if (!page || !this.desktop()) return
+
+    const {pathname, search} = window.location
+    const workspace = pathname === WORKSPACE || pathname.startsWith(`${WORKSPACE}/`)
+    const tree = workspace ? new URLSearchParams(search).get("t") : pathname + search
+    const params = new URLSearchParams()
+    if (tree) params.set("t", tree)
+    params.set("open", page)
+
+    link.setAttribute("href", `${workspace ? pathname : WORKSPACE}?${params}`)
+    link.setAttribute("data-phx-link", workspace ? "patch" : "redirect")
+    link.setAttribute("data-phx-link-state", "push")
   },
 
   toggleNavBranch(branch) {
@@ -768,7 +798,24 @@ const AppShell = {
       const pinIcon = item?.parentElement?.querySelector("[data-nav-pin] svg")?.cloneNode(true)
       if (pinIcon) unpin.append(pinIcon)
 
-      row.append(grip, link, moveUp, moveDown, unpin)
+      // The same "Open in a tile" the row's menu entry carries; the click is
+      // retargeted like any other. Ids are per pin, so two pinned rows to the
+      // same page never share one.
+      const tile = document.createElement("a")
+      tile.href = url
+      tile.id = `pinned-tile-${key.replace(/[^a-z0-9]+/gi, "-")}`
+      tile.dataset.navTile = url
+      tile.setAttribute("data-phx-link", "redirect")
+      tile.setAttribute("data-phx-link-state", "push")
+      tile.title = `Open ${pinLabel} in a tile`
+      tile.setAttribute("aria-label", `Open ${pinLabel} in a tile`)
+      tile.className = unpin.className.replace("app-pinned-unpin", "app-pinned-tile")
+      const tileIcon = document.createElement("span")
+      tileIcon.className = "hero-squares-plus size-3.5"
+      tileIcon.setAttribute("aria-hidden", "true")
+      tile.append(tileIcon)
+
+      row.append(grip, link, tile, moveUp, moveDown, unpin)
       this.pinnedItems.append(row)
     }
 

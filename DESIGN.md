@@ -571,9 +571,9 @@ it.
 ### Tiled workspace
 
 `/workspace` shows several pages side by side in one tab, the way a tiling
-window manager lays out windows: a page opens by splitting the focused tile,
-side by side when that tile is wider than tall and top and bottom otherwise,
-so nothing is laid out by hand. Each tile is a same-origin frame of an
+window manager lays out windows: a page opens by splitting a tile, side by
+side when that tile is wider than tall and top and bottom otherwise, so
+nothing is laid out by hand. Each tile is a same-origin frame of an
 existing page at its own address, so every page also stays reachable alone,
 and the shell renders it chromeless there: content and flash only, no second
 top bar, sidebar or status bar inside the tile. The tree is always in the
@@ -581,9 +581,23 @@ address, so Back and Forward work at the workspace level and a copied address
 reproduces the screen; a navigation inside a tile replaces history instead of
 adding to it.
 
+The usual way in is the sidebar: every navigable row carries "Open in a
+tile" beside its pin, at the pin's weight and visible on hover and focus.
+From any page it puts that page in the left half and the clicked one in the
+right; the next click halves the right tile top and bottom, the one after
+halves the left, and so on, always taking half of the tile with the most
+room, so four pages are quadrants and the screen stays balanced however
+many are open. The workspace page's own picker is the same operation on the
+focused tile. Closing tiles down to one leaves the workspace for that page's
+own address, so tiling in place ends the way it began. On a narrow screen
+the control opens the page normally.
+
 A compact `h-6` bar above each tile carries the page's title and a menu with
 every operation: monocle (one tile fills the workspace, the others stay
-mounted), swap, flip the split, open alone, close. The focused tile shows a
+mounted), swap, flip the split, open alone, close. The bar is also the grip:
+dragging a tile by it onto another tile swaps the two, the target showing a
+`brand-strong` ring while the pointer is over it; the menu's swap and the
+mode's `s` stay the pointer-free way. The focused tile shows a
 `brand-strong` border and its title in `text-brand-strong`, never colour
 alone. Tiles are separated by focusable `role="separator"` handles that
 resize by drag or by the arrow keys. Keyboard control is a mode, as in
@@ -595,8 +609,14 @@ L`), swap (`s`), resize (`r`, then arrows), monocle (`f`), flip the split
 Escape leaves. An open menu takes Escape first. No operation exists only as a
 key. Focus follows a click, never the pointer, and nothing animates.
 
-A workspace holds six tiles at most. A tile whose page the account may not
-open shows the permission wording in place of the frame. Below `lg` the
+There is no cap on tiles: the operator decides, and a control-room wall
+holds more than a laptop. Every tile is a live page with its own connection,
+so the picker says that many tiles cost as much as many tabs, and nothing
+pretends otherwise. A tile too small to show a page (under about 18rem wide
+or 10rem tall) hides its frame behind a notice offering monocle, rather than
+rendering the page broken; the frame stays mounted, so growing the tile
+shows the page again without a reload. A tile whose page the account may
+not open shows the permission wording in place of the frame. Below `lg` the
 workspace shows one tile at a time with a strip of tabs, keeping the tree.
 Layouts are saved per account by name, opened at `/workspace/<slug>` or from
 the saved-layouts dialog, and one may be the default the sidebar entry opens.

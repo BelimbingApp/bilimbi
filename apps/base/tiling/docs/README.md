@@ -2,7 +2,27 @@
 
 Base Tiling owns the tiled workspace at `/workspace`: several Bilimbi pages
 side by side in one browser tab, arranged by a Hyprland-style dwindle tree
-with keyboard control, drag resizing, monocle, and layouts saved per account.
+with keyboard control, drag resizing, drag-to-swap, monocle, and layouts
+saved per account.
+
+The usual entry is the sidebar's "Open in a tile" control beside each row's
+pin. It links to `/workspace?t=<the page the browser is on>&open=<the
+clicked page>`; from the workspace itself, `t` is the tree already open and
+the link is a patch, so the tiles on screen keep their frames. The workspace
+reads `t`, halves the tile with the most room with the page in `open`, and
+replaces the address with the resulting tree, so a refresh or a shared link
+restores the screen. Tiling in place and the `/workspace` picker are one
+feature with one URL form. Closing tiles down to one leaves the workspace
+for that page's own address. On a narrow screen the control opens the page
+normally.
+
+There is no cap on the number of tiles; the operator decides. Each tile is a
+live page: its own LiveView process, socket and database checkouts on the
+server, and its own document in the browser. A wall of twenty tiles costs
+what twenty tabs cost, and a page that polls does so once per tile. A tile
+too small for a page (about 18rem by 10rem) hides its frame behind a notice
+offering monocle, through a CSS container query, so nothing renders broken
+and nothing reloads when the tile grows again.
 
 `Bilimbi.Base.Tiling.Layout` is the pure tree: open, close, resize, move,
 swap, flip, directional neighbours, the rectangles every tile and divider
@@ -11,7 +31,10 @@ occupies, and the compact URL form (`h.5(/companies,v.6(/users,/audit))`).
 default in the `ui.workspace.layouts` and `ui.workspace.default` settings at
 user scope, through the shared Settings API, so every write is audited.
 `Bilimbi.Base.Tiling.Web.WorkspaceLive` is the host page; it holds only the
-tree, the focused tile, monocle, and the titles the tiles report.
+tree, the focused tile, monocle, and the titles the tiles report. The
+sidebar control is `nav_tile/1` in Base UI's `Layouts`, and `AppShell`
+(`apps/web/assets/js/app_shell.js`) retargets its click from the address the
+browser is on.
 
 A tile is a same-origin frame of an existing page at its own URL. The page
 runs as its own root LiveView with its own URL state, patches, flash and

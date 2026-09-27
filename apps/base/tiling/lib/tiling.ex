@@ -12,10 +12,6 @@ defmodule Bilimbi.Base.Tiling do
 
   alias Bilimbi.Base.Tiling.Layout
 
-  @doc "The most tiles one workspace holds."
-  @spec max_tiles() :: pos_integer()
-  defdelegate max_tiles, to: Layout
-
   @doc "Reads a workspace tree from its URL form."
   @spec decode(String.t()) :: {:ok, Layout.t()} | :error
   defdelegate decode(encoded), to: Layout

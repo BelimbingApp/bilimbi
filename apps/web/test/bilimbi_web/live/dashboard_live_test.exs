@@ -168,6 +168,7 @@ defmodule BilimbiWeb.DashboardLiveTest do
     assert has_element?(view, "#nav-children-admin[hidden]")
     assert has_element?(view, "#nav-admin-company[data-nav-item='nav-admin-company']")
     assert has_element?(view, "#nav-pin-admin-company[data-nav-pin='nav-admin-company']")
+    assert has_element?(view, "#nav-tile-admin-company[data-nav-tile='/companies']")
     assert has_element?(view, "#app-pinned[hidden]")
 
     # A LiveView marks itself current by naming its menu item. Nothing else
