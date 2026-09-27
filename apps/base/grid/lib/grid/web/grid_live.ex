@@ -21,17 +21,19 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
   alias Bilimbi.Base.Grid.Result
   alias Bilimbi.Base.Grid.SavedViews
   alias Bilimbi.Base.Grid.View
+  alias Bilimbi.Base.Grid.Table
   alias Bilimbi.Base.Grid.Web.Host
   alias Bilimbi.Base.Grid.Zoom
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.UI.Workspace
 
   # Column, lens, zoom, sort and window operations rearrange what the account
   # reads through its own catalog; nothing is written. Saving or deleting an
   # own view is a self-service write to the actor's own user settings scope,
   # as a workspace layout is; a shared view is guarded by the company
   # settings capability inside the handler.
-  @write_guard_opt_out ~w(grid grid_filters grid_page grid_pick open-save close-save save-view
-                          request-delete-view cancel-delete-view delete-view)
+  @write_guard_opt_out ~w(grid grid_filters grid_page grid_pick grid_follow open-save close-save
+                          save-view request-delete-view cancel-delete-view delete-view)
 
   @share_capability "base.settings.company.manage"
 
@@ -64,7 +66,10 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
      |> assign(:saved_shared, [])
      |> assign(:save_open?, false)
      |> assign(:save_form, to_form(%{"label" => "", "shared" => "false"}, as: :view))
-     |> assign(:pending_delete, nil)}
+     |> assign(:pending_delete, nil)
+     |> assign(:follow_options, [])
+     |> assign(:focus, nil)
+     |> assign(:focus_label, nil)}
   end
 
   defp settings_scope(current_scope) do
@@ -148,6 +153,8 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
     view = %{view | columns: Enum.map(columns, & &1.spec)}
     mode = Zoom.mode(view.zoom)
     sort = Enum.find(columns, &(&1.spec == view.sort))
+    {view, focus, kind} = follow_state(catalog, table, view)
+    socket = Workspace.follow(socket, List.wrap(kind))
 
     result =
       if mode == :full do
@@ -155,7 +162,8 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
           offset: (view.page - 1) * view.page_size,
           limit: view.page_size,
           sort: {sort, view.dir},
-          search: view.search
+          search: view.search,
+          focus: focus
         )
       else
         # The hook asks for the window it can show; this run brings the total,
@@ -164,7 +172,8 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
           offset: 0,
           limit: 1,
           sort: {sort, view.dir},
-          search: view.search
+          search: view.search,
+          focus: focus
         )
       end
 
@@ -179,6 +188,9 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
       |> assign(:mode, mode)
       |> assign(:expanded, %{})
       |> assign(:window, nil)
+      |> assign(:focus, focus)
+      |> assign(:follow_options, Grid.follow_options(catalog, table))
+      |> assign(:focus_label, focus_label(focus, view))
       |> assign(
         :filters_form,
         to_form(%{"search" => view.search, "perPage" => view.page_size}, as: :filters)
@@ -199,6 +211,41 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
 
     clamp_page(socket, result, view)
   end
+
+  # What the view follows, resolved against this catalog: the focus to
+  # query with (nil until a record is selected, or when the follow names
+  # nothing here) and the kind to tell the workspace.
+  defp follow_state(_catalog, _table, %View{follow: nil} = view),
+    do: {%{view | focus: nil}, nil, nil}
+
+  defp follow_state(catalog, table, %View{follow: follow, focus: focus} = view) do
+    case Grid.focus_column(catalog, table, follow) do
+      {:ok, target, key_field, kind} ->
+        case read_key(focus, key_field) do
+          nil -> {%{view | focus: nil}, nil, kind}
+          key -> {view, {target, key}, kind}
+        end
+
+      :error ->
+        {%{view | follow: nil, focus: nil}, nil, nil}
+    end
+  end
+
+  # A selected key arrives as text; an integer key reads as one, and a
+  # value that does not read is no selection at all.
+  defp read_key(nil, _field), do: nil
+
+  defp read_key(text, %{type: :integer}) do
+    case Integer.parse(text) do
+      {integer, ""} -> integer
+      _other -> nil
+    end
+  end
+
+  defp read_key(text, _field), do: text
+
+  defp focus_label(nil, _view), do: nil
+  defp focus_label({_target, key}, %View{focus: focus}), do: focus || to_string(key)
 
   defp clamp_page(socket, %Result{} = result, %View{} = view) do
     page = Result.page(result)
@@ -355,6 +402,13 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
     {:noreply, push_patch(socket, to: path(view))}
   end
 
+  # The follow choice: how this grid narrows to what another tile selects.
+  def handle_event("grid_follow", %{"follow" => %{"follow" => follow}}, socket) do
+    view = socket.assigns.view
+    follow = if follow in Enum.map(socket.assigns.follow_options, & &1.follow), do: follow
+    {:noreply, push_patch(socket, to: path(%{view | follow: follow, focus: nil, page: 1}))}
+  end
+
   def handle_event("grid_page", %{"page" => page}, socket) do
     view = View.from_params(%{"page" => page}, socket.assigns.view.table)
     {:noreply, push_patch(socket, to: path(%{socket.assigns.view | page: view.page}))}
@@ -497,6 +551,25 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
     ~p"/workspace?#{%{t: URI.encode(path, &(&1 not in [?(, ?), ?,, ?%] and URI.char_unescaped?(&1)))}}"
   end
 
+  # A record another tile selected, of the kind this grid follows: the grid
+  # narrows to the rows reaching it. The workspace hook hands the page only
+  # the facts of kinds it follows.
+  @impl true
+  def handle_info({:workspace_fact, %{kind: kind, id: id}}, socket) do
+    view = socket.assigns.view
+
+    with %Table{} = table <- socket.assigns.table,
+         {:ok, _target, _field, ^kind} <-
+           Grid.focus_column(socket.assigns.catalog, table, view.follow) do
+      {:noreply,
+       push_patch(socket, to: path(%{view | focus: to_string(id), page: 1}), replace: true)}
+    else
+      _other -> {:noreply, socket}
+    end
+  end
+
+  def handle_info(_message, socket), do: {:noreply, socket}
+
   # A key arrives as text from the markup; it is matched back to a listed row
   # so the expansion is of a row the page showed, not of any id typed in.
   defp row_key(socket, key) do
@@ -581,6 +654,60 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
               placeholder={gettext("Search %{table}…", table: String.downcase(@table.label))}
             />
           </.filter_toolbar>
+          <%!-- Inside a workspace the grid can follow what another tile selects:
+               the choice is which record it narrows to, and the narrowing is
+               stated beside it with the way back. --%>
+          <div
+            :if={(@workspace && @follow_options != []) || @focus_label}
+            id="grid-follow"
+            class="mb-2 flex flex-wrap items-center gap-2"
+          >
+            <.form
+              :let={f}
+              :if={@workspace && @follow_options != []}
+              for={%{"follow" => @view.follow || ""}}
+              as={:follow}
+              id="grid-follow-form"
+              phx-change="grid_follow"
+            >
+              <.input
+                field={f[:follow]}
+                type="select"
+                id="grid-follow-select"
+                label={gettext("Follow selections")}
+                label_class="sr-only"
+                wrapper_class="mb-0"
+                options={[
+                  {gettext("Not following selections"), ""}
+                  | Enum.map(
+                      @follow_options,
+                      &{gettext("Follow the selected %{what}", what: &1.label), &1.follow}
+                    )
+                ]}
+              />
+            </.form>
+            <p
+              :if={@view.follow && @focus_label}
+              id="grid-focus"
+              class="flex items-center gap-1 text-xs text-ink-muted"
+            >
+              {gettext("Narrowed to the selected record %{key}", key: @focus_label)}
+              <.icon_button
+                icon="close"
+                context={:inline}
+                label={gettext("Show every row again")}
+                id="grid-unfocus"
+                patch={path(%{@view | focus: nil, page: 1})}
+              />
+            </p>
+            <p
+              :if={@workspace && @view.follow && is_nil(@focus_label)}
+              id="grid-follow-waiting"
+              class="text-xs text-ink-muted"
+            >
+              {gettext("Waiting for a selection in another tile.")}
+            </p>
+          </div>
 
           <.card id="grid-card" inner_class="p-0">
             <div class="p-2">

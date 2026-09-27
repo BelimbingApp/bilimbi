@@ -157,4 +157,42 @@ defmodule Bilimbi.Base.Grid.QueryTest do
     assert Enum.map(result.rows, & &1.key) == ["MY", "SG"]
     assert result.stats["population"] == %{min: 6_000_000, max: 34_000_000}
   end
+
+  test "a focus narrows the rows to one selected record, of the root or through a link", ctx do
+    {:ok, columns} = Grid.resolve(ctx.catalog, ctx.orders, ~w(label customer.name))
+
+    assert {:ok, :root, %{id: "id", type: :integer}, "test/order"} =
+             Grid.focus_column(ctx.catalog, ctx.orders, "self")
+
+    result = Grid.query(ctx.catalog, ctx.orders, columns, focus: {:root, 102})
+    assert Enum.map(result.rows, & &1.key) == [102]
+    assert result.total_entries == 1
+
+    assert {:ok, %Bilimbi.Base.Grid.Column{spec: "customer.id"}, %{id: "id"}, "test/customer"} =
+             Grid.focus_column(ctx.catalog, ctx.orders, "customer")
+
+    {:ok, via, _field, _kind} = Grid.focus_column(ctx.catalog, ctx.orders, "customer")
+    result = Grid.query(ctx.catalog, ctx.orders, columns, focus: {via, 1})
+    assert Enum.map(result.rows, & &1.key) == [101]
+    assert result.total_entries == 1
+
+    # The focus column is joined for the filter, never shown.
+    assert Map.keys(hd(result.rows).cells) |> Enum.sort() == ["customer-name", "label"]
+
+    assert :error = Grid.focus_column(ctx.catalog, ctx.orders, "lines")
+    assert :error = Grid.focus_column(ctx.catalog, ctx.orders, "nope")
+
+    {:ok, countries} = Grid.fetch_table(ctx.catalog, "countries")
+    assert :error = Grid.focus_column(ctx.catalog, countries, "self")
+
+    assert Enum.map(Grid.follow_options(ctx.catalog, ctx.orders), & &1.follow) == [
+             "self",
+             "customer"
+           ]
+
+    assert Enum.map(Grid.follow_options(ctx.catalog, ctx.orders), & &1.kind) == [
+             "test/order",
+             "test/customer"
+           ]
+  end
 end

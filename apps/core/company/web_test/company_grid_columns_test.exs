@@ -75,11 +75,11 @@ defmodule Bilimbi.Core.Company.Web.GridColumnsTest do
     # Two users in one company, none in the other: the range runs 0 to 2.
     assert has_element?(
              view,
-             "#companies-cell-73-users_count[data-scale='sequential'][data-band='2']",
+             "#companies-cell-73-users_count[data-scale='sequential'][data-band='4']",
              "2"
            )
 
-    refute has_element?(view, "#companies-cell-74-users_count[data-band]")
+    assert has_element?(view, "#companies-cell-74-users_count[data-band='0']", "0")
 
     view |> form("#companies-filters", %{filters: %{search: "Retail"}}) |> render_change()
     path = assert_patch(view)

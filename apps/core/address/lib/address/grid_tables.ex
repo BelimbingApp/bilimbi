@@ -15,6 +15,7 @@ defmodule Bilimbi.Core.Address.GridTables do
       tables: [
         %{
           id: "addresses",
+          record_kind: "core/address",
           label: "Addresses",
           capability: "admin.address.list",
           source: AddressesSource,

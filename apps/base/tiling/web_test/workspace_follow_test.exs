@@ -192,4 +192,36 @@ defmodule Bilimbi.Base.Tiling.WorkspaceFollowTest do
     refute_receive {:workspace_joined}
     refute_receive {:workspace_fact, _fact}
   end
+
+  test "a page that follows kinds itself counts among the followed kinds while it lives", %{
+    conn: conn
+  } do
+    {:ok, view, _html} = conn |> log_in_as() |> live("/workspace?t=/companies")
+    {_token, topic} = join(view)
+    :ok = Workspace.broadcast(topic, {:workspace_joined})
+    assert_receive {:workspace_follows, []}
+
+    # A page process says it follows companies; the host publishes the union.
+    page =
+      spawn(fn ->
+        receive do
+          :stop -> :ok
+        end
+      end)
+
+    send(view.pid, {:workspace_page_follows, page, ["core/company"]})
+    assert_receive {:workspace_follows, ["core/company"]}
+
+    # Nothing published twice for the same kinds; a second page adds a kind.
+    send(view.pid, {:workspace_page_follows, page, ["core/company"]})
+    refute_receive {:workspace_follows, _kinds}, 200
+    send(view.pid, {:workspace_page_follows, self(), ["core/user"]})
+    assert_receive {:workspace_follows, ["core/company", "core/user"]}
+
+    # A page that stops following, and a page that ends, both drop their kinds.
+    send(view.pid, {:workspace_page_follows, self(), []})
+    assert_receive {:workspace_follows, ["core/company"]}
+    send(page, :stop)
+    assert_receive {:workspace_follows, []}
+  end
 end

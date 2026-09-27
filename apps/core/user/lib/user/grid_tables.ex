@@ -15,6 +15,7 @@ defmodule Bilimbi.Core.User.GridTables do
       tables: [
         %{
           id: "users",
+          record_kind: "core/user",
           label: "Users",
           capability: "admin.user.list",
           source: UsersSource,
