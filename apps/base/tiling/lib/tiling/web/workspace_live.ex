@@ -20,9 +20,11 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   any page links to `/workspace?t=<that page>&open=<the clicked page>`, and
   from this page to `?t=<the tree>&open=…`, so the one URL form serves both
   entries: the tree in `t` is read as usual, the page in `open` takes half of
-  the largest tile, and the URL is replaced by the resulting tree. Closing
-  tiles down to one leaves the workspace for that page's own URL, so tiling
-  in place is reversible the way it was entered.
+  the largest tile, and the URL is replaced by the resulting tree. A
+  workspace entered that way from a page, not at a saved layout, leaves for
+  that page's own URL when closed down to one tile, so tiling in place is
+  reversible the way it was entered; one opened from the picker or a saved
+  layout stays a workspace with one tile.
 
   The `Tiling` hook owns what the server cannot: the keyboard bridge into
   each frame, the `Ctrl+.` tiling mode, drag resizing, and reporting each
@@ -93,6 +95,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
      |> assign(:tree, Layout.empty())
      |> assign(:encoded, nil)
      |> assign(:slug, nil)
+     |> assign(:in_place?, nil)
      |> assign(:focused, nil)
      |> assign(:monocle, false)
      |> assign(:viewport, {1600, 900})
@@ -108,7 +111,11 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    socket = assign(socket, :slug, params["slug"])
+    socket =
+      assign(socket,
+        slug: params["slug"],
+        in_place?: in_place?(socket.assigns.in_place?, params)
+      )
 
     cond do
       socket.assigns.framed? ->
@@ -127,6 +134,13 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
         open_default(socket)
     end
   end
+
+  # Whether this workspace was entered by tiling in place: decided by the
+  # address it mounted at, and dropped once a saved layout is open.
+  defp in_place?(nil, params),
+    do: is_binary(params["open"]) and not is_binary(params["slug"])
+
+  defp in_place?(in_place?, params), do: in_place? and not is_binary(params["slug"])
 
   # The tree an `open` request starts from: the saved layout at the slug, the
   # tree in `t`, or nothing.
@@ -181,10 +195,11 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
   # Tiles `path` in place: it takes half of the largest tile, and the URL is
   # replaced by the tree that results, so `open` is never left in the
-  # address to be replayed by a refresh. A page that is not on this
-  # account's menu is refused the same way the picker refuses it.
+  # address to be replayed by a refresh. It accepts what a tile shows, a
+  # served page this account may open, except the workspace itself.
   defp open_page(%{redirected: nil} = socket, path) do
-    if Enum.any?(socket.assigns.pages, &(&1.route == path)) do
+    if tile_path?(path) and not workspace_page?(path) and
+         access(socket.assigns.current_scope, path) == :ok do
       socket |> tile_page(path, :largest) |> sync_url(replace: true)
     else
       socket
@@ -282,9 +297,10 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     end
   end
 
-  # Closing down to one tile leaves the workspace for that page's own URL:
-  # tiling in place began from a full page, and it ends as one. A page the
-  # account may not open stays in its tile, where the refusal is readable.
+  # Closing down to one tile leaves a workspace entered by tiling in place
+  # for that page's own URL: it began from a full page, and it ends as one.
+  # A page the account may not open stays in its tile, where the refusal is
+  # readable.
   def handle_event("close-tile", %{"id" => id}, socket) do
     layout = Layout.close(socket.assigns.tree, id)
 
@@ -295,8 +311,8 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
       |> put_layout(layout)
       |> keep_focus()
 
-    case socket.assigns.tiles do
-      [%{access: :ok, path: path}] -> {:noreply, push_navigate(socket, to: path)}
+    case {socket.assigns.in_place?, socket.assigns.tiles} do
+      {true, [%{access: :ok, path: path}]} -> {:noreply, push_navigate(socket, to: path)}
       _ -> {:noreply, sync_url(socket)}
     end
   end
@@ -837,6 +853,14 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   # route manifest goes: a relative path this deployment serves, never an
   # absolute URL, so a frame can only ever show a Bilimbi page.
   defp tile_path?(path), do: Layout.page_path?(path) and Nav.served?(URI.parse(path).path)
+
+  defp workspace_page?(path) do
+    case URI.parse(path).path do
+      "/workspace" -> true
+      "/workspace/" <> _ -> true
+      _other -> false
+    end
+  end
 
   defp clean_title(title) when is_binary(title) do
     title = title |> String.replace_suffix(@title_suffix, "") |> String.trim()

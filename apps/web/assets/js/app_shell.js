@@ -18,6 +18,11 @@ const PINNED_STORAGE = "sidebarPinnedItems"
 const FOCUSABLE =
   'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+// One page as a workspace tree: a leaf escapes what the tree grammar reads
+// (`%`, `(`, `)`, `,`), as `Bilimbi.Base.Tiling.Layout.encode/1` does.
+const leaf = (page) =>
+  page.replace(/[%(),]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+
 const AppShell = {
   mounted() {
     this.root = this.el
@@ -466,7 +471,7 @@ const AppShell = {
 
     const {pathname, search} = window.location
     const workspace = pathname === WORKSPACE || pathname.startsWith(`${WORKSPACE}/`)
-    const tree = workspace ? new URLSearchParams(search).get("t") : pathname + search
+    const tree = workspace ? new URLSearchParams(search).get("t") : leaf(pathname + search)
     const params = new URLSearchParams()
     if (tree) params.set("t", tree)
     params.set("open", page)

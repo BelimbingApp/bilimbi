@@ -12,9 +12,10 @@ the link is a patch, so the tiles on screen keep their frames. The workspace
 reads `t`, halves the tile with the most room with the page in `open`, and
 replaces the address with the resulting tree, so a refresh or a shared link
 restores the screen. Tiling in place and the `/workspace` picker are one
-feature with one URL form. Closing tiles down to one leaves the workspace
-for that page's own address. On a narrow screen the control opens the page
-normally.
+feature with one URL form. A workspace entered from a page this way leaves
+for that page's own address when closed down to one tile; one opened from
+the picker or a saved layout stays a workspace with one tile. On a narrow
+screen the control opens the page normally.
 
 There is no cap on the number of tiles; the operator decides. Each tile is a
 live page: its own LiveView process, socket and database checkouts on the

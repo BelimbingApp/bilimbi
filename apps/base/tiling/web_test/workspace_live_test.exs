@@ -161,7 +161,16 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     assert has_element?(view, "#tile-t2-page")
   end
 
-  test "open= refuses a page that is not on this account's menu", %{conn: conn} do
+  test "open= tiles any page a tile may show, such as a pinned record", %{conn: conn} do
+    grant_capabilities!("admin.company.view")
+    {:ok, view, _html} = open(conn, "/workspace?t=/companies")
+
+    render_patch(view, "/workspace?t=/companies&open=/companies/73?tab=users")
+    assert_patch(view, "/workspace?t=h.5%28%2Fcompanies%2C%2Fcompanies%2F73%3Ftab%3Dusers%29")
+    assert has_element?(view, "#tile-t2-page[src='/companies/73?tab=users']")
+  end
+
+  test "open= refuses a page this account may not open, and the workspace", %{conn: conn} do
     {:ok, view, _html} = open(conn, "/workspace?t=/companies")
 
     render_patch(view, "/workspace?t=/companies&open=/users")
@@ -172,6 +181,42 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     render_patch(view, "/workspace?t=/companies&open=/workspace")
     assert_patch(view, "/workspace?t=%2Fcompanies")
     refute has_element?(view, "#tile-t2")
+
+    render_patch(view, "/workspace?t=/companies&open=/workspace/orders")
+    assert_patch(view, "/workspace?t=%2Fcompanies")
+    refute has_element?(view, "#tile-t2")
+  end
+
+  test "a workspace entered by tiling a page in place returns to the page at one tile",
+       %{conn: conn} do
+    {:ok, page, _html} = open(conn, "/companies")
+
+    {:ok, view, _html} =
+      live_redirect(page, to: "/workspace?t=/companies?page=2&open=/companies")
+
+    assert has_element?(view, "#workspace[data-tile-count='2']")
+
+    render_hook(view, "close-tile", %{"id" => "t2"})
+    assert_redirect(view, "/companies?page=2")
+  end
+
+  test "a workspace from the picker or a saved layout keeps its one tile", %{conn: conn} do
+    {:ok, view, _html} = open(conn)
+    render_hook(view, "add-tile", %{"path" => "/companies"})
+    render_hook(view, "add-tile", %{"path" => "/companies"})
+    render_patch(view, "/workspace?t=h.5(/companies,/companies)&open=/companies")
+
+    assert has_element?(view, "#workspace[data-tile-count='3']")
+    for id <- ["t4", "t2"], do: render_hook(view, "close-tile", %{"id" => id})
+    assert_patch(view, "/workspace?t=%2Fcompanies")
+    assert has_element?(view, "#workspace[data-tile-count='1']")
+
+    {:ok, _} = SavedLayouts.save(@settings_scope, "Orders", "h.5(/companies,/companies)")
+    {:ok, view, _html} = open(conn, "/workspace/orders")
+
+    render_hook(view, "close-tile", %{"id" => "t2"})
+    assert_patch(view, "/workspace/orders?t=%2Fcompanies")
+    assert has_element?(view, "#workspace[data-tile-count='1']")
   end
 
   test "the tree in the URL reproduces the screen, and a bad one opens empty", %{conn: conn} do
@@ -327,9 +372,9 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     refute has_element?(view, "#split-s3")
     assert has_element?(view, "#tile-t2-header-monocle", "Show every tile")
 
-    # Closing down to one tile leaves the workspace for that page.
     view |> element("#tile-t2-header-close") |> render_click()
-    assert_redirect(view, "/companies")
+    assert_patch(view, "/workspace?t=%2Fcompanies")
+    assert has_element?(view, "#workspace[data-tile-count='1']")
   end
 
   test "a tile dropped on another swaps the two, and the last of many closes in place",

@@ -378,6 +378,15 @@ test("on a wide screen the tile link opens the workspace with this page and the 
   assert.equal(click.defaultPrevented, false, "LiveView's own link handling follows")
 })
 
+test("the page in the tile link is escaped as a tree leaf, so its query reads back unchanged", () => {
+  mount()
+  visit("/companies?q=R%26D&sort=(name,asc)")
+  $("nav-tile-companies").click()
+
+  const t = new URLSearchParams($("nav-tile-companies").getAttribute("href").split("?")[1]).get("t")
+  assert.equal(t, "/companies?q=R%2526D&sort=%28name%2Casc%29")
+})
+
 test("from the workspace the tile link is a patch that keeps the open tree", () => {
   mount()
   visit("/workspace?t=h.5(%2Fusers%2C%2Fcompanies)")

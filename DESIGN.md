@@ -588,9 +588,10 @@ right; the next click halves the right tile top and bottom, the one after
 halves the left, and so on, always taking half of the tile with the most
 room, so four pages are quadrants and the screen stays balanced however
 many are open. The workspace page's own picker is the same operation on the
-focused tile. Closing tiles down to one leaves the workspace for that page's
-own address, so tiling in place ends the way it began. On a narrow screen
-the control opens the page normally.
+focused tile. Closing tiles down to one leaves a workspace entered from a
+page for that page's own address, so tiling in place ends the way it began;
+a workspace opened from the picker or a saved layout keeps its one tile. On
+a narrow screen the control opens the page normally.
 
 A compact `h-6` bar above each tile carries the page's title and a menu with
 every operation: monocle (one tile fills the workspace, the others stay
