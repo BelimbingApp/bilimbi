@@ -3,6 +3,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -483,5 +484,52 @@ defmodule Bilimbi.Base.Grid.Web.GridLiveTest do
     assert_patch(view)
     refute has_element?(view, "#grid-follow")
     assert has_element?(view, "#grid-row-91")
+  end
+
+  test "a shared view limited to a role opens only for people assigned that role in the company",
+       %{conn: conn} do
+    grant_capabilities!(@all ++ ~w(base.settings.company.manage))
+    {:ok, tenant_scope} = Tenancy.scope(41)
+
+    {:ok, role} =
+      Bilimbi.Base.Authz.create_role(tenant_scope, 73, %{name: "Reviewer", code: "reviewer"})
+
+    {:ok, :assigned} = Bilimbi.Base.Authz.assign_role(tenant_scope, 73, :user, 91, role.id)
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/grid/users?cols=name")
+    view |> element("#grid-save-view") |> render_click()
+    assert has_element?(view, "#grid-save-roles")
+
+    view
+    |> form("#grid-save-form", %{view: %{label: "Review desk", shared: "true"}})
+    |> render_submit(%{"view" => %{"roles" => ["reviewer"]}})
+
+    assert_patch(view, ~p"/grid/users?v=shared%3Areview-desk")
+    assert has_element?(view, "#grid-view-shared-review-desk", "shared: reviewer")
+
+    # A colleague without the role sees neither the entry nor the address.
+    UserFixtures.insert_user!(%{id: 96, company_id: 73, name: "Peer", email: "peer@example.com"})
+    grant_capabilities!(@all, user_id: 96)
+    peer_conn = log_in_as(conn, %{"user_id" => 96, "company_id" => 73})
+    {:ok, peer, _html} = live(peer_conn, ~p"/grid/users")
+    refute has_element?(peer, "#grid-view-shared-review-desk")
+    {:ok, _peer, html} = live(peer_conn, ~p"/grid/users?v=shared%3Areview-desk")
+    assert html =~ "That saved view no longer exists."
+
+    # A colleague with the role opens it.
+    {:ok, :assigned} = Bilimbi.Base.Authz.assign_role(tenant_scope, 73, :user, 96, role.id)
+    {:ok, peer, _html} = live(peer_conn, ~p"/grid/users?v=shared%3Areview-desk")
+    assert has_element?(peer, "#grid-view-shared-review-desk")
+    assert has_element?(peer, "#grid-chip-name")
+    refute has_element?(peer, "#grid-chip-email")
+
+    # A role code outside the company is refused.
+    view |> element("#grid-save-view") |> render_click()
+
+    view
+    |> form("#grid-save-form", %{view: %{label: "Other", shared: "true"}})
+    |> render_submit(%{"view" => %{"roles" => ["not_here"]}})
+
+    assert render(view) =~ "Choose role codes from this company."
   end
 end

@@ -24,6 +24,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
   alias Bilimbi.Base.Grid.Table
   alias Bilimbi.Base.Grid.Web.Host
   alias Bilimbi.Base.Grid.Zoom
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.UI.Workspace
 
@@ -62,10 +63,15 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
      |> assign(:settings_scope, settings_scope(socket.assigns.current_scope))
      |> assign(:company_scope, company_scope(socket.assigns.current_scope))
      |> assign(:can_share?, allowed?(socket.assigns.current_scope, @share_capability))
+     |> assign(:role_codes, role_codes(socket.assigns.current_scope))
+     |> assign(:role_options, role_options(socket.assigns.current_scope))
      |> assign(:saved_own, [])
      |> assign(:saved_shared, [])
      |> assign(:save_open?, false)
-     |> assign(:save_form, to_form(%{"label" => "", "shared" => "false"}, as: :view))
+     |> assign(
+       :save_form,
+       to_form(%{"label" => "", "shared" => "false", "roles" => []}, as: :view)
+     )
      |> assign(:pending_delete, nil)
      |> assign(:follow_options, [])
      |> assign(:focus, nil)
@@ -85,6 +91,45 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
        do: Settings.Scope.company(company_id, scope.tenant.id)
 
   defp company_scope(_current_scope), do: nil
+
+  # The role codes the account holds in its company, the way the workspace
+  # host reads them, so a view limited to a role opens for the same people
+  # a workspace limited to it does.
+  defp role_codes(current_scope) do
+    scope = current_scope.scope
+    user_id = current_user_id(current_scope)
+    first = Authz.list_principal_role_assignments(scope, :user, user_id, page_size: 100)
+
+    entries =
+      if first.total_pages > 1 do
+        first.entries ++
+          Enum.flat_map(2..first.total_pages, fn page ->
+            Authz.list_principal_role_assignments(scope, :user, user_id,
+              page: page,
+              page_size: 100
+            ).entries
+          end)
+      else
+        first.entries
+      end
+
+    entries
+    |> Enum.filter(&(&1.company_id in [nil, current_scope.user["company_id"]]))
+    |> Enum.map(& &1.role_code)
+    |> Enum.uniq()
+  end
+
+  # The roles a shared view may be limited to: the system roles and the
+  # company's own, as the shared workspaces page offers them.
+  defp role_options(%{user: %{"company_id" => company_id}} = current_scope)
+       when is_integer(company_id) do
+    current_scope.scope
+    |> Authz.list_roles()
+    |> Enum.filter(&(&1.company_id in [nil, company_id]))
+    |> Enum.map(&{&1.name, &1.code})
+  end
+
+  defp role_options(_current_scope), do: []
 
   @impl true
   def handle_params(%{"table" => table_id} = params, _uri, socket) do
@@ -121,29 +166,19 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
 
   defp view_from_params(socket, params, table), do: {View.from_params(params, table.id), socket}
 
-  defp fetch_saved(%{assigns: %{settings_scope: own, company_scope: nil}}, table_id, reference) do
-    if String.starts_with?(reference, "shared:"),
-      do: :error,
-      else: SavedViews.fetch(own, Settings.Scope.company(0, 0), table_id, reference)
+  defp fetch_saved(%{assigns: assigns}, table_id, reference) do
+    SavedViews.fetch(
+      assigns.settings_scope,
+      assigns.company_scope,
+      table_id,
+      reference,
+      assigns.role_codes
+    )
   end
 
-  defp fetch_saved(
-         %{assigns: %{settings_scope: own, company_scope: company}},
-         table_id,
-         reference
-       ) do
-    SavedViews.fetch(own, company, table_id, reference)
-  end
-
-  defp load_saved(%{assigns: %{table: table}} = socket) do
-    own = SavedViews.list_own(socket.assigns.settings_scope, table.id)
-
-    shared =
-      case socket.assigns.company_scope do
-        nil -> []
-        company -> SavedViews.list_shared(company, table.id)
-      end
-
+  defp load_saved(%{assigns: %{table: table} = assigns} = socket) do
+    own = SavedViews.list_own(assigns.settings_scope, table.id)
+    shared = SavedViews.visible_shared(assigns.company_scope, table.id, assigns.role_codes)
     socket |> assign(:saved_own, own) |> assign(:saved_shared, shared)
   end
 
@@ -427,7 +462,10 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
     {:noreply,
      socket
      |> assign(:save_open?, true)
-     |> assign(:save_form, to_form(%{"label" => label, "shared" => "false"}, as: :view))}
+     |> assign(
+       :save_form,
+       to_form(%{"label" => label, "shared" => "false", "roles" => []}, as: :view)
+     )}
   end
 
   def handle_event("close-save", _params, socket),
@@ -435,6 +473,8 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
 
   def handle_event("save-view", %{"view" => %{"label" => label} = params}, socket) do
     shared? = Map.get(params, "shared") == "true"
+    roles = params |> Map.get("roles", []) |> List.wrap() |> Enum.reject(&(&1 == ""))
+    known = MapSet.new(socket.assigns.role_options, &elem(&1, 1))
 
     cond do
       shared? and not allowed?(socket.assigns.current_scope, @share_capability) ->
@@ -444,6 +484,9 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
            :error,
            gettext("You do not have permission to share views with the company.")
          )}
+
+      shared? and not Enum.all?(roles, &MapSet.member?(known, &1)) ->
+        {:noreply, put_flash(socket, :error, gettext("Choose role codes from this company."))}
 
       shared? and is_nil(socket.assigns.company_scope) ->
         {:noreply,
@@ -455,7 +498,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
             do: {socket.assigns.company_scope, :shared},
             else: {socket.assigns.settings_scope, :own}
 
-        case SavedViews.save(scope, kind, label, socket.assigns.view) do
+        case SavedViews.save(scope, kind, label, socket.assigns.view, roles) do
           {:ok, entry} ->
             {:noreply,
              socket
@@ -464,6 +507,9 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
              |> push_patch(
                to: ~p"/grid/#{socket.assigns.table.id}?#{%{v: SavedViews.reference(entry, kind)}}"
              )}
+
+          {:error, :roles} ->
+            {:noreply, put_flash(socket, :error, gettext("Choose role codes from this company."))}
 
           {:error, :label} ->
             {:noreply,
@@ -794,7 +840,17 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
                 field={@save_form[:shared]}
                 id="grid-save-shared"
                 type="checkbox"
-                label={gettext("Share with everyone in the company")}
+                label={gettext("Share with the company")}
+              />
+              <.multi_select
+                :if={@can_share? and not is_nil(@company_scope) and @role_options != []}
+                field={@save_form[:roles]}
+                id="grid-save-roles"
+                label={gettext("Limit the shared view to roles")}
+                options={@role_options}
+                placeholder={gettext("Everyone in the company")}
+                selection_label={gettext(":count role selected|:count roles selected")}
+                hint={gettext("Applies to a shared view only.")}
               />
               <div class="flex justify-end gap-2">
                 <.button id="grid-save-cancel" type="button" phx-click="close-save">
@@ -916,7 +972,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
             ]}
           >
             {entry["label"]}
-            <span :if={kind == :shared} class="ml-1 text-ink-faint">{gettext("shared")}</span>
+            <span :if={kind == :shared} class="ml-1 text-ink-faint">{audience_label(entry)}</span>
           </.link>
           <.icon_button
             icon="fullscreen"
@@ -944,5 +1000,12 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
       </div>
     </div>
     """
+  end
+
+  defp audience_label(entry) do
+    case SavedViews.roles(entry) do
+      [] -> gettext("shared")
+      roles -> gettext("shared: %{roles}", roles: Enum.join(roles, ", "))
+    end
   end
 end
