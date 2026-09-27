@@ -49,7 +49,10 @@ defmodule Bilimbi.Base.Authz.Contributions do
     "admin.authz.principal-role.list",
     "admin.authz.capability.list",
     "admin.authz.principal-capability.list",
-    "admin.authz.decision-log.list"
+    "admin.authz.decision-log.list",
+    "admin.authz.system-principal.list",
+    "admin.authz.system-principal.grant",
+    "admin.authz.system-principal.revoke"
   ]
 
   @impl true

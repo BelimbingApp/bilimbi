@@ -2,6 +2,7 @@ defmodule Bilimbi.Base.Schedule.ContributionValidatorTest do
   use ExUnit.Case, async: true
 
   alias Bilimbi.Base.Schedule.ContributionValidator
+  alias Bilimbi.Base.Schedule.SystemPrincipalTestWorker
   alias Bilimbi.Base.Schedule.TestWorker
 
   test "validates and indexes explicit durable definitions" do
@@ -33,6 +34,12 @@ defmodule Bilimbi.Base.Schedule.ContributionValidatorTest do
       ContributionValidator.validate_contributions!([
         %{descriptor: descriptor(), payload: %{definitions: [attributes(), attributes()]}}
       ])
+    end
+  end
+
+  test "rejects a worker that declares a system principal" do
+    assert_raise ArgumentError, ~r/Queue\.enqueue_as_system\/4/, fn ->
+      validate!(Map.put(attributes(), :worker, SystemPrincipalTestWorker))
     end
   end
 

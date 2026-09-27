@@ -81,7 +81,9 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Base.Schedule.Migrations.CreateOccurrenceRuntime,
              Bilimbi.Base.Perf.Migrations.CreateSamples,
              Bilimbi.Core.User.Migrations.AddUserAccountForeignKeyIndexes,
-             Bilimbi.Base.Audit.Migrations.AddImpersonatorToAuditRows
+             Bilimbi.Base.Audit.Migrations.AddImpersonatorToAuditRows,
+             Bilimbi.Base.Audit.Migrations.AddSystemPrincipalToAuditRows,
+             Bilimbi.Base.Authz.Migrations.CreateSystemPrincipalCapabilities
            ]
 
     assert Enum.map(entries, &elem(&1, 2)) == [
@@ -97,6 +99,8 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              :compatible_baseline,
              :compatible_baseline,
              :compatible_baseline,
+             :bilimbi_only,
+             :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,

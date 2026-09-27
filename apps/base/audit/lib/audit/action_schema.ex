@@ -5,8 +5,8 @@ defmodule Bilimbi.Base.Audit.ActionSchema do
 
   import Ecto.Changeset
 
-  @actor_types ~w(user agent guest console scheduler queue)
-  @assigned [:company_id, :actor_type, :actor_id, :impersonator_id]
+  @actor_types ~w(user agent guest console scheduler queue system)
+  @assigned [:company_id, :actor_type, :actor_id, :impersonator_id, :system_principal]
   @cast_fields [
     :actor_role,
     :ip_address,
@@ -29,6 +29,7 @@ defmodule Bilimbi.Base.Audit.ActionSchema do
     field :actor_id, :id
     field :actor_role, :string
     field :impersonator_id, :id
+    field :system_principal, :string
     field :ip_address, Bilimbi.Base.Audit.Inet
     field :url, :string
     field :user_agent, :string
@@ -54,12 +55,15 @@ defmodule Bilimbi.Base.Audit.ActionSchema do
     |> validate_length(:actor_type, max: 40)
     |> validate_length(:actor_role, max: 100)
     |> validate_number(:impersonator_id, greater_than: 0)
+    |> validate_length(:system_principal, max: 100)
+    |> validate_system_principal()
     |> validate_length(:user_agent, max: 80)
     |> validate_length(:event, max: 255)
     |> validate_length(:trace_id, max: 12)
   end
 
-  # Company, actor, and impersonator identity arrive from the recording caller, never from a form cast.
+  # Company, actor, impersonator, and system principal identity arrive from the
+  # recording caller, never from a form cast.
   # Tenant identity is supplied by the public API from a Scope or :unscoped, never the map.
   defp put_assigned(changeset, attributes) do
     Enum.reduce(@assigned, changeset, fn field, acc ->
@@ -73,6 +77,16 @@ defmodule Bilimbi.Base.Audit.ActionSchema do
   defp fetch_attribute(attributes, field) do
     with :error <- Map.fetch(attributes, field) do
       Map.fetch(attributes, Atom.to_string(field))
+    end
+  end
+
+  # A system principal names the actor of a system row, and only of one.
+  defp validate_system_principal(changeset) do
+    case {get_field(changeset, :actor_type), get_field(changeset, :system_principal)} do
+      {"system", name} when is_binary(name) -> changeset
+      {"system", nil} -> add_error(changeset, :system_principal, "is required for a system actor")
+      {_type, nil} -> changeset
+      {_type, _name} -> add_error(changeset, :system_principal, "names only a system actor")
     end
   end
 

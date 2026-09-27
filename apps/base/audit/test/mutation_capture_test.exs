@@ -112,6 +112,38 @@ defmodule Bilimbi.Base.Audit.MutationCaptureTest do
     assert [%{actor_id: 91, impersonator_id: nil}] = mutations()
   end
 
+  test "a job's writes are attributed to the system principal it runs as" do
+    Context.put(%Context{
+      actor_type: "system",
+      actor_id: 0,
+      system_principal: "coating.line_import",
+      company_id: 10,
+      tenant_id: 41
+    })
+
+    Repo.insert!(Widget.changeset(%Widget{}, %{name: "Imported", tenant_id: 41}))
+    Repo.insert_all(Widget, [%{name: "Bulk", tenant_id: 41}])
+
+    rows = mutations()
+    assert length(rows) == 2
+
+    assert Enum.all?(
+             rows,
+             &match?(
+               %{actor_type: "system", actor_id: 0, system_principal: "coating.line_import"},
+               &1
+             )
+           )
+  end
+
+  test "a row written by a person names no system principal" do
+    Context.put(%Context{actor_type: "user", actor_id: 91, tenant_id: 41})
+
+    Repo.insert!(Widget.changeset(%Widget{}, %{name: "Own", tenant_id: 41}))
+
+    assert [%{actor_type: "user", system_principal: nil}] = mutations()
+  end
+
   test "a tenant-less row falls back to the context tenant" do
     Context.put(%Context{actor_type: "user", actor_id: 91, tenant_id: 41})
 

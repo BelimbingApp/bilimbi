@@ -120,3 +120,60 @@ defmodule Bilimbi.Base.Queue.TestActorVerifier do
   @impl true
   def verify_actor(_scope), do: Process.get(:actor_verifier_answer, :ok)
 end
+
+defmodule Bilimbi.Base.Queue.TestWorkers.LineImport do
+  @moduledoc false
+
+  use Bilimbi.Base.Queue.Worker,
+    id: "test/line-import",
+    max_attempts: 3,
+    system_principal: "coating.line_import"
+
+  @impl true
+  def validate_args(%{"value" => value}) when is_integer(value), do: {:ok, %{"value" => value}}
+  def validate_args(_args), do: {:error, :invalid_value}
+
+  # The execution and the audit context the job ran under come back as
+  # messages, because the test performs the job in its own process.
+  @impl true
+  def handle_job(_args, execution) do
+    send(self(), {:performed, execution, Bilimbi.Base.Audit.Context.get()})
+    :ok
+  end
+end
+
+defmodule Bilimbi.Base.Queue.TestWorkers.OtherImport do
+  @moduledoc false
+
+  use Bilimbi.Base.Queue.Worker,
+    id: "test/other-import",
+    max_attempts: 3,
+    system_principal: "coating.other_import"
+
+  @impl true
+  def validate_args(%{"value" => value}) when is_integer(value), do: {:ok, %{"value" => value}}
+  def validate_args(_args), do: {:error, :invalid_value}
+
+  @impl true
+  def handle_job(_args, execution) do
+    send(self(), {:performed, execution, Bilimbi.Base.Audit.Context.get()})
+    :ok
+  end
+end
+
+defmodule Bilimbi.Base.Queue.TestWorkers.UniqueImport do
+  @moduledoc false
+
+  use Bilimbi.Base.Queue.Worker,
+    id: "test/unique-import",
+    max_attempts: 3,
+    unique_period: 60,
+    system_principal: "coating.line_import"
+
+  @impl true
+  def validate_args(%{"value" => value}) when is_integer(value), do: {:ok, %{"value" => value}}
+  def validate_args(_args), do: {:error, :invalid_value}
+
+  @impl true
+  def handle_job(_args, _execution), do: :ok
+end

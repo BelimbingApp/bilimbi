@@ -13,7 +13,7 @@ defmodule Bilimbi.Base.Audit.ConsoleCapture do
   after every command, whatever its outcome. Each call writes exactly one
   `base_audit_actions` row:
 
-    * the actor pair, role, company, tenant, `impersonator_id`,
+    * the actor pair, role, company, tenant, `impersonator_id`, `system_principal`,
       `ip_address`, `url`, `user_agent`, and `trace_id` come from the
       per-process `Bilimbi.Base.Audit.Context`, which the web edge fills
       per request and per LiveView mount. Absent context records the
@@ -50,6 +50,7 @@ defmodule Bilimbi.Base.Audit.ConsoleCapture do
       actor_id: context.actor_id,
       actor_role: context.actor_role,
       impersonator_id: context.impersonator_id,
+      system_principal: context.system_principal,
       ip_address: context.ip_address,
       url: context.url,
       user_agent: bounded(context.user_agent, 80),

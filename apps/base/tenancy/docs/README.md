@@ -51,9 +51,37 @@ Every scope carries a `Bilimbi.Base.Tenancy.Actor`, read with `Scope.actor/1`:
   requests and LiveViews, and Base Queue for a job enqueued with
   `Queue.enqueue_for/3`.
 
+- `:system` with a `system_principal` name and a `company_id` when a job
+  runs as a named system principal (ADR 0017), attached only by Base Queue
+  for a job enqueued with `Queue.enqueue_as_system/4`. It is still never a
+  user: it cannot be signed in over, impersonated, or delegated.
+
 A domain operation that records who performed it takes that person from
 `Scope.actor/1`, never from its caller, and refuses a system actor. Whether the
 person may do it is `Bilimbi.Base.Authz.can(scope, capability)`.
+
+### Named system principals
+
+A module declares the system identities its jobs run as under the
+`:system_principals` contribution key, each with a description and the
+capabilities it may ever be granted:
+
+```elixir
+system_principals: [
+  %{
+    name: "coating.line_import",
+    description: "Imports coating line production records on a schedule.",
+    capabilities: ["factory.material.import"]
+  }
+]
+```
+
+`Bilimbi.Base.Tenancy.SystemPrincipals` reads the validated declarations. A
+name is dot-separated lowercase segments and belongs to one installed module;
+a duplicate or malformed declaration stops boot. `Authentication` signs a
+principal's job token with `delegate_system/3` and resumes it with
+`resume_system/2`; both refuse a name no installed module declares. Declaring
+a principal grants nothing: Base Authz holds the grants.
 
 The edge seam is `Bilimbi.Base.Tenancy.Authentication`. It is not a domain
 API, and the seal is what enforces that: the actor is sealed to its tenant

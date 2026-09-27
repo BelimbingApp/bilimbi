@@ -12,7 +12,10 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
   import Phoenix.LiveViewTest
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Tenancy
+  alias Bilimbi.Base.Tenancy.Authentication
+  alias Bilimbi.Base.Tenancy.SystemPrincipals.ContributionValidator, as: PrincipalValidator
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -111,6 +114,21 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
     # in the faint role the rest of the template reserves for the search icon
     # and its placeholder: that is 2.59:1 light and 2.29:1 dark (finding C3).
     refute has_element?(view, "#decision-logs .text-ink-faint.tabular-nums")
+  end
+
+  test "names the system principal behind a system decision", %{conn: conn, scope: scope} do
+    declare_system_principal!("test.line_import")
+    {:ok, token} = Authentication.delegate_system(scope, "test.line_import", 73)
+    {:ok, job} = Authentication.resume_system(token)
+
+    # Nothing was granted to the principal, so this is a real denial the
+    # platform logs against it.
+    refute Authz.can(job, "admin.user.list").allowed
+
+    {:ok, view, _html} = open(conn)
+
+    assert has_element?(view, "#decision-logs", "System")
+    assert has_element?(view, "#decision-logs", "test.line_import")
   end
 
   test "shows no delegation note when a user acted for themselves", %{
@@ -307,6 +325,25 @@ defmodule BilimbiWeb.AuthzDecisionLogsLiveTest do
       assert has_element?(view, "#decision-logs-index")
       refute has_element?(view, "#decision-logs-reach-caution")
     end
+  end
+
+  # Adds one principal to the installed snapshot, so the rest of the host
+  # (navigation, capabilities) stays as booted, and restores it afterwards.
+  defp declare_system_principal!(name) do
+    installed = ContributionRegistry.snapshot!()
+    on_exit(fn -> ContributionRegistry.put_snapshot_for_test!(installed) end)
+
+    principals =
+      PrincipalValidator.validate_contributions!([
+        %{
+          descriptor: %{id: "test/principals", otp_app: :bilimbi_base_authz},
+          payload: [%{name: name, description: "A test import job.", capabilities: []}]
+        }
+      ])
+
+    ContributionRegistry.put_snapshot_for_test!(
+      put_in(installed, [:consumers, :system_principals], principals)
+    )
   end
 
   defp patched_params(view) do

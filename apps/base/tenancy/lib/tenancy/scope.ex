@@ -23,6 +23,11 @@ defmodule Bilimbi.Base.Tenancy.Scope do
       hooks, and Base Queue when a job enqueued with
       `Bilimbi.Base.Queue.enqueue_for/3` runs. See
       `Bilimbi.Base.Tenancy.Authentication`.
+    * A **named system principal**, such as `coating.line_import`, is attached only
+      by Base Queue, when a job enqueued with
+      `Bilimbi.Base.Queue.enqueue_as_system/4` runs. The name must be one an
+      installed module declares (`Bilimbi.Base.Tenancy.SystemPrincipals`), and
+      the actor is still a system actor: never a user, never impersonated.
 
   So a domain operation that must record who performed it — an approver, an
   override — takes that person from `actor/1`, never from its caller's

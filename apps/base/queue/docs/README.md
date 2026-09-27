@@ -49,6 +49,43 @@ whose `execution.scope` is `nil`.
 duplicate would be absorbed by a job carrying another user, or no user, and
 the caller's request would run as them.
 
+## Work that runs as a system principal
+
+Routine work nobody signed in for, such as a scheduled import, runs as a
+named system principal instead of borrowing a person's account (ADR 0017).
+The worker declares the principal, and the module that owns the worker
+declares the same name under its `:system_principals` contribution:
+
+```elixir
+use Bilimbi.Base.Queue.Worker,
+  id: "coating/line-import",
+  system_principal: "coating.line_import"
+```
+
+`Queue.enqueue_as_system(scope, company_id, worker, args)` is the only way to
+enqueue such a worker; `enqueue/2` and `enqueue_for/3` refuse it with
+`:system_principal_worker`. It refuses a worker that declares no principal
+(`:not_system_principal_worker`), a name no installed module declares or a
+worker that is not the declaring module's code
+(`:undeclared_system_principal`), a company ID that is not positive
+(`:invalid_company`), and a unique worker (`:unique_worker`). Only the
+scope's tenant is used; whoever enqueued the job is not carried into it.
+
+When the job runs, `execution.scope` names the principal in that tenant and
+company, and captured writes record `actor_type` `"system"` with the
+principal's name. A principal nobody declares any more cancels the job with
+`:system_principal_refused`; a tampered, expired, or missing token, or a tenant
+gone since enqueue, cancels it with `:system_principal_unavailable`. The
+principal holds only what an administrator granted it in that company, decided
+by Base Authz when the job asks.
+
+A Schedule worker cannot declare a principal; Base Schedule refuses one at
+boot, because a schedule definition names no tenant or company. To run
+scheduled work as a principal, schedule a plain worker whose job builds the
+tenant scope with `Bilimbi.Base.Tenancy.scope/1` and calls
+`Queue.enqueue_as_system/4` with that scope, the company, and the principal
+worker.
+
 ## Delivery semantics
 
 Queue delivery is at least once. Oban uniqueness reduces duplicate insertion;

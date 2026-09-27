@@ -6,7 +6,7 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
   # `:bilimbi_base_tenancy, :actor_secret`. A struct literal, a struct update,
   # or an actor copied onto another tenant's scope fails `verify!/2`. The same
   # secret signs delegation tokens, the only form in which an actor leaves the
-  # VM: a queued job acting for a user.
+  # VM: a queued job acting for a user, or running as a named system principal.
   #
   # Only `Scope` and `Authentication` call this module. The seal, not a caller
   # list, is the enforcement: code that calls it anyway gains nothing it could
@@ -18,11 +18,23 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
 
   @seal_salt "bilimbi.tenancy.actor.seal.v1"
   @delegation_salt "bilimbi.tenancy.actor.delegation.v1"
+  @system_delegation_salt "bilimbi.tenancy.actor.system_delegation.v1"
   @minimum_secret_bytes 32
 
   @spec system(Identity.t()) :: Actor.t()
   def system(%Identity{id: tenant_id}) do
-    %Actor{type: :system, seal: seal(tenant_id, :system, nil, nil, nil, nil)}
+    %Actor{type: :system, seal: seal(tenant_id, :system, nil, nil, nil, nil, nil)}
+  end
+
+  @spec system_principal(Identity.t(), String.t(), pos_integer()) :: Actor.t()
+  def system_principal(%Identity{id: tenant_id}, name, company_id)
+      when is_binary(name) and name != "" and is_integer(company_id) and company_id > 0 do
+    %Actor{
+      type: :system,
+      company_id: company_id,
+      system_principal: name,
+      seal: seal(tenant_id, :system, nil, company_id, nil, nil, name)
+    }
   end
 
   @spec user(Identity.t(), pos_integer(), pos_integer(), pos_integer() | nil, String.t() | nil) ::
@@ -38,7 +50,7 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
       company_id: company_id,
       impersonator_id: impersonator_id,
       impersonation_session_id: session_id,
-      seal: seal(tenant_id, :user, user_id, company_id, impersonator_id, session_id)
+      seal: seal(tenant_id, :user, user_id, company_id, impersonator_id, session_id, nil)
     }
   end
 
@@ -50,12 +62,14 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
           company_id: company_id,
           impersonator_id: impersonator_id,
           impersonation_session_id: session_id,
+          system_principal: system_principal,
           seal: supplied
         } = actor,
         tenant_id
       )
       when type in [:user, :system] and is_binary(supplied) do
-    expected = seal(tenant_id, type, user_id, company_id, impersonator_id, session_id)
+    expected =
+      seal(tenant_id, type, user_id, company_id, impersonator_id, session_id, system_principal)
 
     # hash_equals/2 compares in constant time but only equal-length binaries.
     if byte_size(expected) == byte_size(supplied) and :crypto.hash_equals(expected, supplied) and
@@ -76,6 +90,14 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
       {tenant_id, actor.user_id, actor.company_id, actor.impersonator_id,
        actor.impersonation_session_id}
     )
+  end
+
+  # A named system principal's token is a separate claim shape under its own
+  # salt, so neither kind of token can be read as the other.
+  @spec sign_system_delegation(pos_integer(), String.t(), pos_integer()) :: binary()
+  def sign_system_delegation(tenant_id, name, company_id)
+      when is_binary(name) and is_integer(company_id) and company_id > 0 do
+    Plug.Crypto.sign(secret!(), @system_delegation_salt, {tenant_id, name, company_id})
   end
 
   @spec verify_delegation(binary(), pos_integer()) ::
@@ -101,13 +123,45 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
     end
   end
 
+  @spec verify_system_delegation(binary(), pos_integer()) ::
+          {:ok, {pos_integer(), String.t(), pos_integer()}} | {:error, :invalid | :expired}
+  def verify_system_delegation(token, max_age) when is_binary(token) do
+    case Plug.Crypto.verify(secret!(), @system_delegation_salt, token, max_age: max_age) do
+      {:ok, {tenant_id, name, company_id} = claims}
+      when is_integer(tenant_id) and is_binary(name) and name != "" and is_integer(company_id) and
+             company_id > 0 ->
+        {:ok, claims}
+
+      {:ok, _other} ->
+        {:error, :invalid}
+
+      {:error, :expired} ->
+        {:error, :expired}
+
+      {:error, _reason} ->
+        {:error, :invalid}
+    end
+  end
+
   defp well_formed?(%Actor{
          type: :system,
          user_id: nil,
          company_id: nil,
          impersonator_id: nil,
-         impersonation_session_id: nil
+         impersonation_session_id: nil,
+         system_principal: nil
        }),
+       do: true
+
+  defp well_formed?(%Actor{
+         type: :system,
+         user_id: nil,
+         company_id: company_id,
+         impersonator_id: nil,
+         impersonation_session_id: nil,
+         system_principal: name
+       })
+       when is_integer(company_id) and company_id > 0 and is_binary(name) and name != "",
        do: true
 
   defp well_formed?(%Actor{
@@ -115,7 +169,8 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
          user_id: user_id,
          company_id: company_id,
          impersonator_id: impersonator_id,
-         impersonation_session_id: session_id
+         impersonation_session_id: session_id,
+         system_principal: nil
        })
        when is_integer(user_id) and user_id > 0 and is_integer(company_id) and company_id > 0 and
               is_nil(impersonator_id) == is_nil(session_id),
@@ -123,10 +178,10 @@ defmodule Bilimbi.Base.Tenancy.ActorSeal do
 
   defp well_formed?(_actor), do: false
 
-  defp seal(tenant_id, type, user_id, company_id, impersonator_id, session_id) do
+  defp seal(tenant_id, type, user_id, company_id, impersonator_id, session_id, system_principal) do
     payload =
       :erlang.term_to_binary(
-        {tenant_id, type, user_id, company_id, impersonator_id, session_id},
+        {tenant_id, type, user_id, company_id, impersonator_id, session_id, system_principal},
         [:deterministic]
       )
 

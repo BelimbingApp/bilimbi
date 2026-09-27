@@ -75,6 +75,20 @@ defmodule Bilimbi.Base.Authz.TestFixtures do
         )
       """,
       """
+      CREATE TEMPORARY TABLE IF NOT EXISTS base_authz_system_principal_capabilities (
+        id bigserial PRIMARY KEY,
+        company_id bigint NOT NULL,
+        principal varchar(100) NOT NULL,
+        capability_key varchar(255) NOT NULL,
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone
+      ) ON COMMIT DROP
+      """,
+      """
+      CREATE UNIQUE INDEX IF NOT EXISTS base_authz_system_principal_caps_unique
+        ON base_authz_system_principal_capabilities (company_id, principal, capability_key)
+      """,
+      """
       CREATE TEMPORARY TABLE IF NOT EXISTS base_authz_decision_logs (
         id bigserial PRIMARY KEY,
         company_id bigint,
