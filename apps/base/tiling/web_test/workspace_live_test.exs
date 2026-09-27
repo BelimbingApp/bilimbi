@@ -106,8 +106,8 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
       |> live("/workspace?t=/companies?page=2&open=/companies")
       |> follow_redirect(conn, "/workspace?t=h.5%28%2Fcompanies%3Fpage%3D2%2C%2Fcompanies%29")
 
-    assert has_element?(view, "#tile-t1 iframe[src='/companies?page=2']")
-    assert has_element?(view, "#tile-t2 iframe[src='/companies']")
+    assert has_element?(view, "#tile-t1 iframe[src^='/companies?page=2&ws=']")
+    assert has_element?(view, "#tile-t2 iframe[src^='/companies?ws=']")
     assert has_element?(view, "#split-s3[aria-orientation='vertical']")
 
     # From the workspace: the same shape as a patch, and the largest tile is
@@ -141,7 +141,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
            )
 
     # The frames already on screen kept their elements through every patch.
-    assert has_element?(view, "#tile-t1-page[src='/companies?page=2']")
+    assert has_element?(view, "#tile-t1-page[src^='/companies?page=2&ws=']")
     assert has_element?(view, "#workspace[data-tile-count='4']")
   end
 
@@ -151,7 +151,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     render_patch(view, "/workspace?open=/companies")
     assert_patch(view, "/workspace?t=%2Fcompanies")
     assert has_element?(view, "#workspace[data-tile-count='1']")
-    assert has_element?(view, "#tile-t2-page[src='/companies'][data-tile-frame='t2']")
+    assert has_element?(view, "#tile-t2-page[src^='/companies?ws='][data-tile-frame='t2']")
     refute has_element?(view, "#workspace-picker")
 
     {:ok, _} = SavedLayouts.save(@settings_scope, "Orders", "/companies")
@@ -167,7 +167,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
 
     render_patch(view, "/workspace?t=/companies&open=/companies/73?tab=users")
     assert_patch(view, "/workspace?t=h.5%28%2Fcompanies%2C%2Fcompanies%2F73%3Ftab%3Dusers%29")
-    assert has_element?(view, "#tile-t2-page[src='/companies/73?tab=users']")
+    assert has_element?(view, "#tile-t2-page[src^='/companies/73?tab=users&ws=']")
   end
 
   test "open= refuses a page this account may not open, and the workspace", %{conn: conn} do
