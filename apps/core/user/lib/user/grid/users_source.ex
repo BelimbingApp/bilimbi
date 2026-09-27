@@ -19,10 +19,8 @@ defmodule Bilimbi.Core.User.Grid.UsersSource do
 
   @impl true
   def query(scope) do
-    {:ok, company_ids} = Company.list_tenant_company_ids(scope)
-
     from(u in Schema,
-      where: u.company_id in ^company_ids,
+      where: u.company_id in subquery(Company.tenant_company_ids_query(scope)),
       select: %{
         id: u.id,
         company_id: u.company_id,
