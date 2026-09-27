@@ -134,6 +134,17 @@ defmodule Bilimbi.Base.Tiling.LayoutTest do
       assert Layout.promote_master(master, "missing") == master
     end
 
+    test "flipping the master orientation keeps every divider ratio and id" do
+      {:ok, layout} = Layout.decode("h.5(/companies,v.7(/users,/employees))")
+      ids = layout |> Layout.rects() |> Map.fetch!(:handles) |> Enum.map(&elem(&1, 0).id)
+
+      flipped = Layout.toggle_master_orientation(layout)
+      assert Layout.encode(flipped) == "v.5(/companies,h.7(/users,/employees))"
+      assert Enum.map(Layout.rects(flipped).handles, &elem(&1, 0).id) == ids
+      assert Layout.leaves(flipped) == Layout.leaves(layout)
+      assert Layout.toggle_master_orientation(flipped) == layout
+    end
+
     test "opening and closing stack tiles redivide it and preserve master width" do
       {layout, a} = open!(Layout.empty(), "/companies")
       {:ok, layout, b} = Layout.master_open(layout, "/users")

@@ -167,12 +167,18 @@ defmodule Bilimbi.Base.Tiling.Layout do
 
   @doc "Turns a side-by-side master into a top-and-bottom master, or back."
   @spec toggle_master_orientation(t()) :: t()
-  def toggle_master_orientation(%__MODULE__{root: %{type: :split} = root} = layout) do
-    direction = other_axis(root.direction)
-    %{layout | root: %{root | direction: direction}} |> master()
-  end
+  def toggle_master_orientation(%__MODULE__{root: root} = layout),
+    do: %{layout | root: flip(root)}
 
-  def toggle_master_orientation(%__MODULE__{} = layout), do: layout
+  defp flip(%{type: :split} = split),
+    do: %{
+      split
+      | direction: other_axis(split.direction),
+        first: flip(split.first),
+        second: flip(split.second)
+    }
+
+  defp flip(node), do: node
 
   @doc "Makes the named tile master by exchanging it with the first tile."
   @spec promote_master(t(), String.t()) :: t()
