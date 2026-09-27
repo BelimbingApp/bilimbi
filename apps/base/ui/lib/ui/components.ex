@@ -2331,7 +2331,7 @@ defmodule Bilimbi.Base.UI.Components do
           </li>
         </ul>
         <form
-          id={"#{@id}-add"}
+          id={"#{@id}-add-column"}
           phx-change={@event}
           phx-submit={JS.push(@event, value: %{op: "add_typed"})}
           phx-target={@target}
@@ -2339,13 +2339,13 @@ defmodule Bilimbi.Base.UI.Components do
           role="search"
         >
           <input type="hidden" name="op" value="suggest" />
-          <label for={"#{@id}-add-input"} class="sr-only">{gettext("Add a column")}</label>
+          <label for={"#{@id}-add-column-input"} class="sr-only">{gettext("Add a column")}</label>
           <.icon
             name="create"
             class="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-ink-faint"
           />
           <input
-            id={"#{@id}-add-input"}
+            id={"#{@id}-add-column-input"}
             name="add"
             type="search"
             value={@add_query}

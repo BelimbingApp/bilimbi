@@ -9,6 +9,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Grid.Web.PageColumns
   alias Bilimbi.Core.User
   alias Bilimbi.Core.UserAdministration
   alias Bilimbi.Core.UserAdministration.Options
@@ -23,6 +24,32 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
   @initial_directions %{"created_at" => "desc"}
   @maximum_search_bytes 255
 
+  # The columns this page draws itself. Anything else a person adds is a
+  # walked catalog column, fetched for the listed rows by PageColumns.
+  @builtins [
+    %{id: "name", label: "Name", type: :string, sort: "name", sort_id: "users-sort-name"},
+    %{id: "email", label: "Email", type: :string, sort: "email", sort_id: "users-sort-email"},
+    %{
+      id: "company_name",
+      label: "Company",
+      type: :string,
+      sort: "company_name",
+      sort_id: "users-sort-company"
+    },
+    %{id: "roles", label: "Roles", type: :string},
+    %{
+      id: "created_at",
+      label: "Created",
+      type: :datetime,
+      sort: "created_at",
+      sort_id: "users-sort-created"
+    }
+  ]
+
+  # Column, lens and zoom operations rearrange the reading of the list; the
+  # page writes nothing through them.
+  @write_guard_opt_out ~w(grid)
+
   embed_templates("index_live/*")
 
   @impl true
@@ -36,12 +63,13 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
      |> assign(:page_sizes, @page_sizes)
      |> assign(:pending_delete, nil)
      |> assign(:role_options, role_options(scope))
-     |> stream_configure(:users, dom_id: &"user-#{&1.id}")}
+     |> assign(:columns, PageColumns.mount(scope, "users", @builtins))}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, load_page(socket, state_from_params(params))}
+    columns = PageColumns.from_params(socket.assigns.columns, params)
+    {:noreply, socket |> assign(:columns, columns) |> load_page(state_from_params(params))}
   end
 
   @impl true
@@ -67,12 +95,40 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
       )
       |> Map.put(:page, 1)
 
-    {:noreply, push_patch(socket, to: users_path(state))}
+    {:noreply, push_patch(socket, to: users_path(state, socket.assigns.columns))}
   end
 
   def handle_event("sort", %{"sort" => requested_sort}, socket) do
     {:noreply,
-     push_patch(socket, to: users_path(next_sort(socket.assigns.index_state, requested_sort)))}
+     push_patch(socket,
+       to:
+         users_path(next_sort(socket.assigns.index_state, requested_sort), socket.assigns.columns)
+     )}
+  end
+
+  # Every gesture on the flexible table arrives here with an `op`; the shared
+  # PageColumns turns it into a URL change, a state update, or a sort this
+  # page already knows how to do.
+  def handle_event("grid", params, socket) do
+    case PageColumns.handle(socket.assigns.columns, params, "users") do
+      {:patch, columns} ->
+        {:noreply, push_patch(socket, to: users_path(socket.assigns.index_state, columns))}
+
+      {:update, columns} ->
+        {:noreply, assign(socket, :columns, columns)}
+
+      {:sort, key} ->
+        handle_event("sort", %{"sort" => key}, socket)
+
+      {:window, event, payload} ->
+        {:noreply, push_event(socket, event, payload)}
+
+      {:reply, text} ->
+        {:reply, %{text: text}, socket}
+
+      :noop ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("page", %{"page" => page}, socket) do
@@ -83,7 +139,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
         bounded_page(page, socket.assigns.users_page)
       )
 
-    {:noreply, push_patch(socket, to: users_path(state))}
+    {:noreply, push_patch(socket, to: users_path(state, socket.assigns.columns))}
   end
 
   # Deleting confirms through the shared dialog: the request holds the listed
@@ -191,11 +247,11 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
     cond do
       page.total_pages > 0 and state.page > page.total_pages ->
         clamped_state = %{state | page: page.total_pages}
-        push_patch(socket, to: users_path(clamped_state))
+        push_patch(socket, to: users_path(clamped_state, socket.assigns.columns))
 
       page.total_pages == 0 and state.page > 1 ->
         clamped_state = %{state | page: 1}
-        push_patch(socket, to: users_path(clamped_state))
+        push_patch(socket, to: users_path(clamped_state, socket.assigns.columns))
 
       true ->
         socket
@@ -212,8 +268,21 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
             as: :filters
           )
         )
-        |> stream(:users, page.entries, reset: true)
+        |> assign(
+          :columns,
+          PageColumns.load(socket.assigns.columns, page.entries, & &1.id, &builtin_cells/1)
+        )
     end
+  end
+
+  defp builtin_cells(user) do
+    %{
+      "name" => user.name,
+      "email" => user.email,
+      "company_name" => user.company_name,
+      "roles" => Enum.map(user.roles, & &1.name),
+      "created_at" => user.created_at
+    }
   end
 
   defp state_from_params(params) do
@@ -244,7 +313,7 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
     }
   end
 
-  defp users_path(state) do
+  defp users_path(state, columns) do
     query = %{
       search: state.search,
       roleIds: state.role_ids,
@@ -253,6 +322,8 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
       sortBy: state.sort_by,
       sortDir: state.sort_dir
     }
+
+    query = if columns, do: Map.merge(query, PageColumns.params(columns)), else: query
 
     ~p"/users?#{query}"
   end
@@ -334,6 +405,10 @@ defmodule Bilimbi.Core.UserAdministration.Web.IndexLive do
   end
 
   defp positive_integer(_value), do: nil
+
+  # The flexible table hands a slot its row key; the listed entry is looked
+  # up from the page so the slot keeps the entry's own fields.
+  defp listed(page, id), do: Enum.find(page.entries, &(&1.id == id))
 
   defp initials(name) when is_binary(name) do
     name

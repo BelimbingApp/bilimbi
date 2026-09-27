@@ -90,7 +90,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLiveTest do
     grant_capabilities!(@all)
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/grid/users")
 
-    view |> form("#grid-add", %{add: "company name"}) |> render_change()
+    view |> form("#grid-add-column", %{add: "company name"}) |> render_change()
     assert has_element?(view, "#grid-suggest-company-name", "Company › Name")
     assert has_element?(view, "#grid-suggest-company-parent-name")
 
@@ -115,7 +115,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLiveTest do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/grid/users?cols=name")
 
     view
-    |> form("#grid-add", %{add: "company.parent.name"})
+    |> form("#grid-add-column", %{add: "company.parent.name"})
     |> render_submit(%{"op" => "add_typed"})
 
     assert_patch(view, ~p"/grid/users?cols=name%2Ccompany.parent.name")

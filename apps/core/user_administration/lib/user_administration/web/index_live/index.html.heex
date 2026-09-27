@@ -47,159 +47,173 @@
     <.card id="users-card" inner_class="p-0">
       <h2 id="users-table-title" class="sr-only">Workspace users</h2>
 
-      <.table
-        id="users"
-        rows={@streams.users}
-        row_id={fn {dom_id, _} -> dom_id end}
-        row_item={fn {_, user} -> user end}
-        sort_by={@index_state.sort_by}
-        sort_dir={@index_state.sort_dir}
-        framed={false}
-      >
-        <:col :let={user} label="Name" sort="name" sort_id="users-sort-name">
-          <div class="flex items-center gap-3">
-            <span class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-sunken text-xs font-semibold text-ink">
-              {initials(user.name)}
-            </span>
-            <.record_link
-              :if={allowed?(@current_scope, "admin.user.view")}
-              id={"user-#{user.id}-show"}
-              workspace={@workspace}
-              kind="core/user"
-              record_id={user.id}
-              navigate={~p"/users/#{user.id}"}
-              class="font-medium text-ink-strong hover:underline"
-            >
-              {user.name}
-            </.record_link>
-            <span
-              :if={not allowed?(@current_scope, "admin.user.view")}
-              class="font-medium text-ink-strong"
-            >
-              {user.name}
-            </span>
-          </div>
-        </:col>
-        <:col :let={user} label="Email" sort="email" sort_id="users-sort-email">
-          <span class="whitespace-nowrap text-ink-muted">{user.email}</span>
-        </:col>
-        <:col :let={user} label="Company" sort="company_name" sort_id="users-sort-company">
-          <div class="flex items-center gap-2">
-            <.link
-              :if={
-                not user.company_archived and
-                  allowed?(@current_scope, "admin.company.view")
-              }
-              id={"user-#{user.id}-company"}
-              navigate={~p"/companies/#{user.company_id}"}
-              class="hover:text-ink hover:underline"
-            >
-              {user.company_name}
-            </.link>
-            <span :if={
-              user.company_archived or
-                not allowed?(@current_scope, "admin.company.view")
-            }>
-              {user.company_name}
-            </span>
-            <.badge :if={user.company_archived} kind={:warning}>archived</.badge>
-          </div>
-        </:col>
-        <:col :let={user} label="Roles">
-          <div class="flex flex-wrap gap-1.5">
-            <.badge
-              :for={role <- user.roles}
-              kind={if role.is_system, do: :success, else: :neutral}
-            >
-              {role.name}
-            </.badge>
-            <span :if={user.roles == []} class="text-ink-faint">—</span>
-          </div>
-        </:col>
-        <:col :let={user} label="Created" sort="created_at" sort_id="users-sort-created">
-          <span class="whitespace-nowrap tabular-nums text-ink-muted">
-            <.datetime id={"user-created-#{user.id}"} value={user.created_at} />
-          </span>
-        </:col>
-        <:action :let={user}>
-          <div class="flex items-center justify-end">
-            <.icon_button
-              :if={
-                allowed?(@current_scope, "admin.user.impersonate") and
+      <div class="p-2">
+        <.flex_table
+          id="users"
+          columns={@columns.column_views}
+          rows={@columns.rows}
+          mode={@columns.mode}
+          zoom={@columns.view.zoom}
+          sort_by={@index_state.sort_by}
+          sort_dir={PageColumns.sort_dir(@index_state.sort_dir)}
+          suggestions={@columns.suggestions}
+          add_query={@columns.add_query}
+          total={@columns.total}
+          expanded={@columns.expanded}
+          row_id={&"user-#{&1}"}
+          caption="Workspace users"
+        >
+          <:col :let={%{key: id}} id="name">
+            <% user = listed(@users_page, id) %>
+            <div class="flex items-center gap-3">
+              <span class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-sunken text-xs font-semibold text-ink">
+                {initials(user.name)}
+              </span>
+              <.record_link
+                :if={allowed?(@current_scope, "admin.user.view")}
+                id={"user-#{user.id}-show"}
+                workspace={@workspace}
+                kind="core/user"
+                record_id={user.id}
+                navigate={~p"/users/#{user.id}"}
+                class="font-medium text-ink-strong hover:underline"
+              >
+                {user.name}
+              </.record_link>
+              <span
+                :if={not allowed?(@current_scope, "admin.user.view")}
+                class="font-medium text-ink-strong"
+              >
+                {user.name}
+              </span>
+            </div>
+          </:col>
+          <:col :let={%{key: id}} id="email">
+            <% user = listed(@users_page, id) %>
+            <span class="whitespace-nowrap text-ink-muted">{user.email}</span>
+          </:col>
+          <:col :let={%{key: id}} id="company_name">
+            <% user = listed(@users_page, id) %>
+            <div class="flex items-center gap-2">
+              <.link
+                :if={
                   not user.company_archived and
-                  user.id != @current_scope.user["user_id"] and
-                  is_nil(@current_scope.impersonator)
-              }
-              icon="bilimbi-impersonate"
-              label={gettext("Impersonate %{name}", name: user.name)}
-              title={gettext("Impersonate this user")}
-              id={"user-#{user.id}-impersonate"}
-              href={~p"/admin/impersonate/#{user.id}"}
-              method="post"
-            />
-            <.icon_button
-              :if={
-                allowed?(@current_scope, "admin.user.impersonate") and
-                  (user.company_archived or
-                     user.id == @current_scope.user["user_id"] or
-                     not is_nil(@current_scope.impersonator))
-              }
-              icon="bilimbi-impersonate"
-              label={gettext("Impersonate %{name}", name: user.name)}
-              id={"user-#{user.id}-impersonate"}
-              disabled
-              title={
-                cond do
-                  user.id == @current_scope.user["user_id"] ->
-                    gettext("You cannot impersonate yourself")
+                    allowed?(@current_scope, "admin.company.view")
+                }
+                id={"user-#{user.id}-company"}
+                navigate={~p"/companies/#{user.company_id}"}
+                class="hover:text-ink hover:underline"
+              >
+                {user.company_name}
+              </.link>
+              <span :if={
+                user.company_archived or
+                  not allowed?(@current_scope, "admin.company.view")
+              }>
+                {user.company_name}
+              </span>
+              <.badge :if={user.company_archived} kind={:warning}>archived</.badge>
+            </div>
+          </:col>
+          <:col :let={%{key: id}} id="roles">
+            <% user = listed(@users_page, id) %>
+            <div class="flex flex-wrap gap-1.5">
+              <.badge
+                :for={role <- user.roles}
+                kind={if role.is_system, do: :success, else: :neutral}
+              >
+                {role.name}
+              </.badge>
+              <span :if={user.roles == []} class="text-ink-faint">—</span>
+            </div>
+          </:col>
+          <:col :let={%{key: id}} id="created_at">
+            <% user = listed(@users_page, id) %>
+            <span class="whitespace-nowrap tabular-nums text-ink-muted">
+              <.datetime id={"user-created-#{user.id}"} value={user.created_at} />
+            </span>
+          </:col>
+          <:action :let={%{key: id}}>
+            <% user = listed(@users_page, id) %>
+            <div class="flex items-center justify-end">
+              <.icon_button
+                :if={
+                  allowed?(@current_scope, "admin.user.impersonate") and
+                    not user.company_archived and
+                    user.id != @current_scope.user["user_id"] and
+                    is_nil(@current_scope.impersonator)
+                }
+                icon="bilimbi-impersonate"
+                label={gettext("Impersonate %{name}", name: user.name)}
+                title={gettext("Impersonate this user")}
+                id={"user-#{user.id}-impersonate"}
+                href={~p"/admin/impersonate/#{user.id}"}
+                method="post"
+              />
+              <.icon_button
+                :if={
+                  allowed?(@current_scope, "admin.user.impersonate") and
+                    (user.company_archived or
+                       user.id == @current_scope.user["user_id"] or
+                       not is_nil(@current_scope.impersonator))
+                }
+                icon="bilimbi-impersonate"
+                label={gettext("Impersonate %{name}", name: user.name)}
+                id={"user-#{user.id}-impersonate"}
+                disabled
+                title={
+                  cond do
+                    user.id == @current_scope.user["user_id"] ->
+                      gettext("You cannot impersonate yourself")
 
-                  @current_scope.impersonator != nil ->
-                    gettext("Cannot impersonate while impersonating")
+                    @current_scope.impersonator != nil ->
+                      gettext("Cannot impersonate while impersonating")
 
-                  user.company_archived ->
-                    gettext("Archived-company users cannot be impersonated")
+                    user.company_archived ->
+                      gettext("Archived-company users cannot be impersonated")
 
-                  true ->
-                    gettext("Impersonate this user")
-                end
-              }
-            />
-            <.icon_button
-              :if={
-                allowed?(@current_scope, "admin.user.delete") and
-                  user.id != @current_scope.user["user_id"] and
-                  not user.company_archived
-              }
-              icon="delete"
-              label={gettext("Delete %{name}", name: user.name)}
-              title={gettext("Delete user")}
-              kind={:danger}
-              id={"user-#{user.id}-delete"}
-              phx-click="request_delete"
-              phx-value-id={user.id}
-            />
-            <.icon_button
-              :if={
-                allowed?(@current_scope, "admin.user.delete") and
-                  (user.id == @current_scope.user["user_id"] or user.company_archived)
-              }
-              icon="delete"
-              label={gettext("Delete %{name}", name: user.name)}
-              kind={:danger}
-              id={"user-#{user.id}-delete"}
-              disabled
-              title={
-                if user.id == @current_scope.user["user_id"],
-                  do: gettext("You cannot delete your own account"),
-                  else: gettext("Archived-company users cannot be deleted from this list")
-              }
-            />
-          </div>
-        </:action>
-        <:empty :if={@users_page.entries == []}>
-          No users found.
-        </:empty>
-      </.table>
+                    true ->
+                      gettext("Impersonate this user")
+                  end
+                }
+              />
+              <.icon_button
+                :if={
+                  allowed?(@current_scope, "admin.user.delete") and
+                    user.id != @current_scope.user["user_id"] and
+                    not user.company_archived
+                }
+                icon="delete"
+                label={gettext("Delete %{name}", name: user.name)}
+                title={gettext("Delete user")}
+                kind={:danger}
+                id={"user-#{user.id}-delete"}
+                phx-click="request_delete"
+                phx-value-id={user.id}
+              />
+              <.icon_button
+                :if={
+                  allowed?(@current_scope, "admin.user.delete") and
+                    (user.id == @current_scope.user["user_id"] or user.company_archived)
+                }
+                icon="delete"
+                label={gettext("Delete %{name}", name: user.name)}
+                kind={:danger}
+                id={"user-#{user.id}-delete"}
+                disabled
+                title={
+                  if user.id == @current_scope.user["user_id"],
+                    do: gettext("You cannot delete your own account"),
+                    else: gettext("Archived-company users cannot be deleted from this list")
+                }
+              />
+            </div>
+          </:action>
+          <:empty :if={@users_page.entries == []}>
+            No users found.
+          </:empty>
+        </.flex_table>
+      </div>
 
       <.pagination
         id="users-pagination"

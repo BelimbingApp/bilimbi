@@ -82,6 +82,18 @@ Opening a page in a tile from anywhere is a link to `/workspace` with `open=<the
 
 Parse an operational list's URL state with `Bilimbi.Base.UI.ListState` and coerce a param with `Bilimbi.Base.UI.Params`. A private `to_int`, `positive_integer`, `nilify`, or `state_from_params` is the copy those replaced. The moduledocs own the contract; `<.filter_toolbar>` and `<.pagination>` in `lib/ui/components/lists.ex` still own the framing.
 
+## Flexible tables
+
+A table whose columns a person adds, removes, reorders or zooms is
+`<.flex_table>`, hosted by the grid page or by a list page through
+`Bilimbi.Base.Grid.Web.PageColumns`. It is presentation only: it never
+touches a catalog or a query, and its one event carries an `op`. Bars and
+bands are painted from `data-bar`, `data-band` and `data-scale` (the CSP
+refuses inline style; the `FlexTable` hook writes the bar width), the
+compact and carpet modes draw on a canvas from pushed windows, and the
+mode is the host's decision from the zoom. See the component comment and
+`Bilimbi.Base.UI.FlexTable`.
+
 ## Summaries
 
 A dashboard card of labelled values is `<.stat_strip>`; a hand-written card with the same title-and-cells anatomy is what it replaced. A feed of entries is not a stat strip: the section uses `<.card>`, `<.section_heading>` and `<.empty_state>`, and the entry rows stay local, commented as such. An icon-only link is `<.icon_button navigate>`, which carries the accessible name a bare `<.link>` around an icon lacks.

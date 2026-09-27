@@ -14,12 +14,21 @@ defmodule Bilimbi.Base.Grid.Contributions do
         definitions: %{
           "ui.grid.views" => %{
             type: :array,
-            scopes: [:user, :company],
+            scopes: [:user],
             default: [],
             label: "Saved grid views",
             help:
-              "The grid views saved for this account or shared with its company, each with a slug, a label, a table and its columns, lenses, zoom, sort and filters.",
+              "The grid views this account saved, each with a slug, a label, a table and its columns, lenses, zoom, sort and filters.",
             capability: "base.settings.user.manage"
+          },
+          "ui.grid.shared_views" => %{
+            type: :array,
+            scopes: [:company],
+            default: [],
+            label: "Shared grid views",
+            help:
+              "The grid views shared with every account of the company, in the same shape as an account's own.",
+            capability: "base.settings.company.manage"
           }
         },
         runtime_claims: []

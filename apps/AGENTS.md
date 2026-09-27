@@ -2,6 +2,19 @@
 
 Read this before editing a LiveView, a template, or a test. The component that can make a mistake impossible owns the rule: its comment is the text to follow, and `DESIGN.md` is the design source. This note holds only what no component owns.
 
+## Flexible columns on a list
+
+A list page that lets people add, remove, reorder or zoom columns renders
+`<.flex_table>` through `Bilimbi.Base.Grid.Web.PageColumns`: declare the
+page's own columns as built-ins, merge `PageColumns.params/1` into every
+path the page patches to, and delegate the `"grid"` event to
+`PageColumns.handle/3`. The users and companies lists are the two
+examples. Do not hand-roll a column picker, a per-page `cols` parser or a
+second table over the same rows; the module doc on `PageColumns` and the
+component comment on `flex_table/1` own the contract. A module puts its
+tables in the catalog through a `:grid` contribution and a
+`Bilimbi.Base.Grid.Source`; see `apps/base/grid/docs/README.md`.
+
 ## List filters and pagination
 
 Use `<.filter_toolbar>` and `<.pagination>` for an operational list, which keeps its page, search, filters, sort and page size in URL state. Parse and patch that URL state with `Bilimbi.Base.UI.ListState`, and coerce a param with `Bilimbi.Base.UI.Params`. A private `to_int`, `positive_integer`, `nilify`, or `state_from_params` is the copy those replaced; their moduledocs own the contract. Two lists on one page use `ListState`'s `param_prefix` and `omit_defaults`, and rows a panel already holds in memory page through `ListState.paginate/2`; a private `build_page` or `normalize_table_state` is the copy those replaced. A country select takes `Geonames.country_options/0`, not a private `"Name (ISO)"` mapper over `list_countries/0`. A hand-written filter form or Previous/Next row is how Performance, Menu Inspector, Schedule history, and Database Queries drifted apart. The comments on `filter_toolbar/1` and `pagination/1` in `apps/base/ui/lib/ui/components/lists.ex` own the framing; the URL contract is `DESIGN.md` "Pagination controls". A pager over unsaved editor state, such as database-query results, still uses `<.pagination>` and must not reload the saved record when the page changes.
