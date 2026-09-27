@@ -169,15 +169,13 @@ defmodule Bilimbi.Base.Grid.Web.Host do
     specs = if specs == [], do: builtin_ids, else: specs
 
     Enum.reduce(specs, {[], []}, fn spec, {kept, dropped} ->
-      cond do
-        spec in builtin_ids ->
-          {kept ++ [spec], dropped}
-
-        true ->
-          case Catalog.resolve(catalog, root, spec) do
-            {:ok, column} -> {kept ++ [column], dropped}
-            {:error, _reason} -> {kept, dropped ++ [spec]}
-          end
+      if spec in builtin_ids do
+        {kept ++ [spec], dropped}
+      else
+        case Catalog.resolve(catalog, root, spec) do
+          {:ok, column} -> {kept ++ [column], dropped}
+          {:error, _reason} -> {kept, dropped ++ [spec]}
+        end
       end
     end)
   end

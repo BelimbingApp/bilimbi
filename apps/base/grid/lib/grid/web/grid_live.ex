@@ -17,16 +17,16 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Grid
-  alias Bilimbi.Base.Grid.Result
-  alias Bilimbi.Base.Grid.SavedViews
-  alias Bilimbi.Base.Grid.View
   alias Bilimbi.Base.Grid.Column
   alias Bilimbi.Base.Grid.Lens
+  alias Bilimbi.Base.Grid.Result
+  alias Bilimbi.Base.Grid.SavedViews
   alias Bilimbi.Base.Grid.Table
+  alias Bilimbi.Base.Grid.View
   alias Bilimbi.Base.Grid.Web.Host
   alias Bilimbi.Base.Grid.Zoom
-  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.UI.Workspace
 

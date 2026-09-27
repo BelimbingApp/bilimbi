@@ -2,7 +2,8 @@ defmodule Bilimbi.Base.Grid.View do
   @moduledoc """
   What a grid currently shows, as one value that round-trips through the
   URL and a saved view: the table, the column specs in order, the lens of
-  each column, the zoom, the sort, the search, the page, and the group.
+  each column, the zoom, the sort, the search, the page, the group and
+  pivot, what it follows, and the date a `delta` lens compares against.
 
   The URL is the state, so a reload or a shared link reopens the same grid
   (`DESIGN.md` "Pagination controls"). Every field parses leniently from
@@ -11,7 +12,7 @@ defmodule Bilimbi.Base.Grid.View do
       cols=name,company.name,employees:count
       lens=employees:count|bar
       z=12  sort=employees:count  dir=desc  q=acme  page=2  per_page=50  group=status
-      follow=company  focus=73
+      pivot=company.name  since=2026-01-01  follow=company  focus=73
 
   `follow` names how the grid follows a workspace selection: `self` for the
   root table's own record, or a one-link whose target records the selected

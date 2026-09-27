@@ -2,8 +2,8 @@ defmodule Bilimbi.Base.Grid.TestFixtures do
   @moduledoc false
 
   alias Bilimbi.Base.Authz
-  alias Bilimbi.Base.Grid.TestCompanyDirectory
   alias Bilimbi.Base.Grid
+  alias Bilimbi.Base.Grid.TestCompanyDirectory
   alias Bilimbi.Base.Grid.TestSources
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
