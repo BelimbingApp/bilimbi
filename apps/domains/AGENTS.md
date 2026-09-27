@@ -8,6 +8,8 @@ Each immediate child is one independently sourced Domain repository and installa
 
 Use stable logical IDs and declared dependencies. A Domain may depend on Base, Core, and a Domain whose public contract a real business invariant requires. It must not depend on an Extension or reach into another module's private schema or queries. Keep customer-specific integration in an Extension unless a confirmed shared workflow belongs in the Domain.
 
+Domain code uses only meta-terms, such as material, material type, resource, resource type, property, operation, and role. Specific industry, material, product, equipment, or line names are configuration data: never code identifiers, schema constants, or fixed inclusion lists. Anything a company might name differently must be configurable. Customer-specific behaviour belongs in a private Extension.
+
 ## Repository names
 
 An optional Domain repository is named `b-dom-<id>` and an Extension repository `b-ext-<id>`, in whichever GitHub organization owns it. Clone it into a folder named after the container ID, with hyphens turned into underscores, because discovery requires the folder name to equal the snake_case container ID.
