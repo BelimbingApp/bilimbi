@@ -128,7 +128,8 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
     values =
       if extras == [] or state.table == nil,
         do: %{},
-        else: Grid.attach(state.catalog, state.table, keys, extras)
+        else:
+          Grid.attach(state.catalog, state.table, keys, extras, Host.lens_options(extras, view))
 
     stats =
       if extras == [] or state.table == nil or
@@ -190,10 +191,19 @@ defmodule Bilimbi.Base.Grid.Web.PageColumns do
     }
   end
 
-  defp plain_cell(nil), do: %{text: "", value: nil, n: nil, band: nil, scale: nil}
+  defp plain_cell(nil),
+    do: %{text: "", value: nil, n: nil, band: nil, scale: nil, series: nil, delta: nil}
 
   defp plain_cell(value) do
-    %{text: plain_text(value), value: value, n: nil, band: nil, scale: nil}
+    %{
+      text: plain_text(value),
+      value: value,
+      n: nil,
+      band: nil,
+      scale: nil,
+      series: nil,
+      delta: nil
+    }
   end
 
   defp plain_text(%NaiveDateTime{} = naive),

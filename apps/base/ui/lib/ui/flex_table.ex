@@ -87,6 +87,7 @@ defmodule Bilimbi.Base.UI.FlexTable do
   def lens_label(:bar), do: "Bar"
   def lens_label(:band), do: "Colour band"
   def lens_label(:trend), do: "Trend"
+  def lens_label(:delta), do: "Change since a date"
 
   @doc """
   Splits rows into runs that share the grouped column's text, in the order

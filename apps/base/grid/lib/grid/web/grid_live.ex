@@ -74,6 +74,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
      )
      |> assign(:pending_delete, nil)
      |> assign(:follow_options, [])
+     |> assign(:delta?, false)
      |> assign(:focus, nil)
      |> assign(:focus_label, nil)}
   end
@@ -198,7 +199,9 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
           limit: view.page_size,
           sort: {sort, view.dir},
           search: view.search,
-          focus: focus
+          focus: focus,
+          trend: Host.with_lens(columns, view, :trend),
+          delta: {Host.with_lens(columns, view, :delta), since_at(view)}
         )
       else
         # The hook asks for the window it can show; this run brings the total,
@@ -208,7 +211,9 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
           limit: 1,
           sort: {sort, view.dir},
           search: view.search,
-          focus: focus
+          focus: focus,
+          trend: Host.with_lens(columns, view, :trend),
+          delta: {Host.with_lens(columns, view, :delta), since_at(view)}
         )
       end
 
@@ -226,9 +231,17 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
       |> assign(:focus, focus)
       |> assign(:follow_options, Grid.follow_options(catalog, table))
       |> assign(:focus_label, focus_label(focus, view))
+      |> assign(:delta?, Host.with_lens(columns, view, :delta) != [])
       |> assign(
         :filters_form,
-        to_form(%{"search" => view.search, "perPage" => view.page_size}, as: :filters)
+        to_form(
+          %{
+            "search" => view.search,
+            "perPage" => view.page_size,
+            "since" => Date.to_iso8601(View.since(view))
+          },
+          as: :filters
+        )
       )
 
     socket =
@@ -281,6 +294,8 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
 
   defp focus_label(nil, _view), do: nil
   defp focus_label({_target, key}, %View{focus: focus}), do: focus || to_string(key)
+
+  defp since_at(%View{} = view), do: NaiveDateTime.new!(View.since(view), ~T[00:00:00])
 
   defp clamp_page(socket, %Result{} = result, %View{} = view) do
     page = Result.page(result)
@@ -392,6 +407,9 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
             limit: limit,
             sort: {sort, view.dir},
             search: view.search,
+            focus: socket.assigns.focus,
+            trend: Host.with_lens(columns, view, :trend),
+            delta: {Host.with_lens(columns, view, :delta), since_at(view)},
             stats: false,
             cost: false,
             count: false,
@@ -423,9 +441,16 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
   def handle_event("grid_filters", %{"filters" => filters}, socket) do
     view = socket.assigns.view
 
+    since =
+      case Map.get(filters, "since") do
+        nil -> view.since
+        text -> View.from_params(%{"since" => text}, view.table).since
+      end
+
     view = %{
       view
-      | search: filters |> Map.get("search", view.search) |> to_string() |> String.slice(0, 255),
+      | since: since,
+        search: filters |> Map.get("search", view.search) |> to_string() |> String.slice(0, 255),
         page_size:
           View.from_params(
             %{"per_page" => Map.get(filters, "perPage", view.page_size)},
@@ -698,6 +723,14 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
               id="grid-search"
               label={gettext("Search %{table}", table: @table.label)}
               placeholder={gettext("Search %{table}…", table: String.downcase(@table.label))}
+            />
+            <:control
+              :if={@delta?}
+              type={:date}
+              field={@filters_form[:since]}
+              id="grid-since"
+              label={gettext("Change since")}
+              hint={gettext("The date a change-since lens compares against.")}
             />
           </.filter_toolbar>
           <%!-- Inside a workspace the grid can follow what another tile selects:

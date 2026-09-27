@@ -4604,6 +4604,7 @@ defmodule Bilimbi.Base.UI.Components do
   defp lens_icon(:bar), do: "hero-chart-bar"
   defp lens_icon(:band), do: "hero-paint-brush"
   defp lens_icon(:trend), do: "hero-arrow-trending-up"
+  defp lens_icon(:delta), do: "hero-calendar-days"
   defp lens_icon(_lens), do: "hero-bars-3-bottom-left"
 
   attr(:rows, :list, required: true)

@@ -416,12 +416,16 @@ const FlexTable = {
           context.fillStyle = this.cellColour(cell, colours)
           context.fillRect(x, y, cellWidth - gap, rowHeight - gap)
         }
+        if (mid && Array.isArray(cell && cell[4]) && cell[4].length > 1) {
+          this.drawSparkline(context, cell[4], x + 3, y + 2, Math.min(cellWidth * 0.45, 60), rowHeight - 4, colours)
+        }
         if (mid && cell && cell[0]) {
           context.fillStyle = lens === "band" && cell[2] >= 3 && cell[3] === "sequential" ? colours.surface : colours.ink
           context.textBaseline = "middle"
           const text = String(cell[0])
-          const maxChars = Math.max(Math.floor((cellWidth - 6) / (rowHeight * 0.36)), 1)
-          context.fillText(text.length > maxChars ? text.slice(0, maxChars - 1) + "…" : text, x + 3, y + rowHeight / 2)
+          const inset = Array.isArray(cell[4]) && cell[4].length > 1 ? Math.min(cellWidth * 0.45, 60) + 6 : 0
+          const maxChars = Math.max(Math.floor((cellWidth - 6 - inset) / (rowHeight * 0.36)), 1)
+          context.fillText(text.length > maxChars ? text.slice(0, maxChars - 1) + "…" : text, x + 3 + inset, y + rowHeight / 2)
         }
       })
     }
@@ -432,6 +436,24 @@ const FlexTable = {
       context.strokeRect(this.rect.x0, this.rect.y0 - top + headerHeight, this.rect.x1 - this.rect.x0, this.rect.y1 - this.rect.y0)
       context.setLineDash([])
     }
+  },
+
+  // A trend cell's twelve values as a small line, left of its text.
+  drawSparkline(context, series, x, y, width, height, colours) {
+    const lo = Math.min(...series)
+    const hi = Math.max(...series)
+    const span = hi === lo ? 1 : hi - lo
+    const step = width / (series.length - 1)
+    context.strokeStyle = colours.scale[3]
+    context.lineWidth = 1
+    context.beginPath()
+    series.forEach((value, index) => {
+      const px = x + index * step
+      const py = y + height - ((value - lo) / span) * height
+      if (index === 0) context.moveTo(px, py)
+      else context.lineTo(px, py)
+    })
+    context.stroke()
   },
 
   drawHeader(context, cellWidth, headerHeight, width, colours) {
