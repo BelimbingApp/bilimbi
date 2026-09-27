@@ -15,7 +15,7 @@
 @source "../../../../_build/dev/phoenix-colocated/web/*/";
 /* Menu contributions provide bare icon names at runtime. Keep the generated
  * Heroicon utilities available for their rail-only rendering. */
-@source inline("hero-{building-library,building-office-2,chart-bar,circle-stack,clipboard-document-list,cog-6-tooth,flag,globe-alt,information-circle,key,map,map-pin,magnifying-glass,paint-brush,puzzle-piece,shield-check,user-circle,user-group,users}");
+@source inline("hero-{building-library,building-office-2,chart-bar,circle-stack,clipboard-document-list,cog-6-tooth,flag,globe-alt,information-circle,key,map,map-pin,magnifying-glass,paint-brush,puzzle-piece,shield-check,squares-2x2,user-circle,user-group,users}");
 
 @plugin "../vendor/heroicons";
 
@@ -272,6 +272,24 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* The tiled workspace below the `lg` breakpoint shows one tile at a time: the
+ * focused tile fills the area and the strip of tabs above it switches. The
+ * tree is kept, not flattened, so widening the window restores the tiling.
+ * `!important` because the server positions each tile by inline style. */
+@media (max-width: 1023px) {
+  #workspace-tiles .workspace-tile:not([data-focused="true"]),
+  #workspace-tiles [data-split] {
+    display: none;
+  }
+
+  #workspace-tiles .workspace-tile[data-focused="true"] {
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
   }
 }
 

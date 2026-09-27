@@ -43,7 +43,10 @@ defmodule BilimbiWeb.DiscoveredRoutes do
         # These atoms come exclusively from trusted, compiled route declarations.
         # The action identifies the destination before its mount can read data.
         policies = Map.new(routes, &{:"bilimbi:#{&1.path}", &1[:capability]})
-        hooks = hooks ++ [{BilimbiWeb.RouteAccess, policies}]
+
+        # The frame flag hook runs after authentication has built the scope it
+        # marks, and before the route check, which does not depend on it.
+        hooks = hooks ++ [{BilimbiWeb.FramedRender, :framed}, {BilimbiWeb.RouteAccess, policies}]
 
         declarations =
           for route <- routes do
@@ -59,7 +62,9 @@ defmodule BilimbiWeb.DiscoveredRoutes do
           scope "/" do
             pipe_through unquote(pipeline)
 
-            live_session unquote(name), on_mount: unquote(Macro.escape(hooks)) do
+            live_session unquote(name),
+              session: {BilimbiWeb.FramedRender, :session, []},
+              on_mount: unquote(Macro.escape(hooks)) do
               (unquote_splicing(declarations))
             end
           end

@@ -1,0 +1,513 @@
+defmodule Bilimbi.Base.Tiling.Layout do
+  @moduledoc """
+  The pure dwindle tree behind a tiled workspace.
+
+  A layout is a binary space partition: a leaf is one tile showing a page at
+  a path, and a split divides its rectangle between two children along one
+  axis at a ratio. Opening a page splits the focused tile, and the split
+  direction follows the shape of the rectangle being split (wider than tall
+  splits side by side), which is what makes the tiling automatic. This is
+  Hyprland's dwindle layout with the browser tab as the monitor.
+
+  Nothing here touches a process, a socket or a page. The host LiveView owns
+  focus, monocle and persistence; this module owns the shape and every
+  operation on it, so each one is a value-in, value-out function that the
+  tests exercise without a browser.
+
+  Every leaf and split carries a stable id. The host renders one DOM element
+  per id, so a tile's frame keeps its element across splits, closes and
+  resizes and is never re-created by a re-render, which would reload the page
+  inside it. `reconcile/2` keeps those ids when a tree arrives from the URL.
+
+  The URL form is compact and readable rather than encoded:
+
+      h.5(/companies,v.6(/employees,/users))
+
+  `h` splits side by side and `v` top and bottom, the number is the first
+  child's share, and a leaf is its path with `(`, `)`, `,` and `%`
+  percent-encoded.
+  """
+
+  @max_tiles 6
+  @min_ratio 0.1
+  @max_ratio 0.9
+  @resize_step 0.05
+
+  defstruct root: nil, next_id: 1
+
+  @type direction :: :h | :v
+  @type side :: :left | :right | :up | :down
+  @type leaf :: %{type: :leaf, id: String.t(), path: String.t()}
+  @type split :: %{
+          type: :split,
+          id: String.t(),
+          direction: direction(),
+          ratio: float(),
+          first: node_t(),
+          second: node_t()
+        }
+  @type node_t :: leaf() | split()
+  @type rect :: %{x: float(), y: float(), w: float(), h: float()}
+  @type t :: %__MODULE__{root: node_t() | nil, next_id: pos_integer()}
+
+  @doc "The most tiles one workspace holds; see the design note on database bursts."
+  @spec max_tiles() :: pos_integer()
+  def max_tiles, do: @max_tiles
+
+  @doc "A workspace with no tile."
+  @spec empty() :: t()
+  def empty, do: %__MODULE__{}
+
+  @doc "Whether the workspace holds no tile."
+  @spec empty?(t()) :: boolean()
+  def empty?(%__MODULE__{root: nil}), do: true
+  def empty?(%__MODULE__{}), do: false
+
+  @doc "The leaves in tree order: left before right, top before bottom."
+  @spec leaves(t()) :: [leaf()]
+  def leaves(%__MODULE__{root: nil}), do: []
+  def leaves(%__MODULE__{root: root}), do: collect_leaves(root)
+
+  defp collect_leaves(%{type: :leaf} = leaf), do: [leaf]
+
+  defp collect_leaves(%{type: :split, first: first, second: second}),
+    do: collect_leaves(first) ++ collect_leaves(second)
+
+  @doc "How many tiles the workspace holds."
+  @spec count(t()) :: non_neg_integer()
+  def count(layout), do: length(leaves(layout))
+
+  @doc "Whether another tile may be opened."
+  @spec full?(t()) :: boolean()
+  def full?(layout), do: count(layout) >= @max_tiles
+
+  @doc "The leaf with this id, or nil."
+  @spec fetch_leaf(t(), String.t()) :: leaf() | nil
+  def fetch_leaf(layout, id), do: Enum.find(leaves(layout), &(&1.id == id))
+
+  @doc """
+  Opens `path` in a new tile.
+
+  With an empty workspace the tile fills it. Otherwise the tile at `:at`
+  (default: the last leaf) is split, and the direction comes from the shape
+  of that tile on a viewport of `:viewport` pixels (default: a landscape
+  screen): wider than tall splits side by side, otherwise top and bottom.
+  The new tile is the second child, so it appears to the right or below.
+
+  Returns the new layout and the new tile's id, or `{:error, :full}` at the
+  tile cap.
+  """
+  @spec open(t(), String.t(), keyword()) :: {:ok, t(), String.t()} | {:error, :full}
+  def open(%__MODULE__{} = layout, path, opts \\ []) when is_binary(path) and path != "" do
+    cond do
+      full?(layout) ->
+        {:error, :full}
+
+      is_nil(layout.root) ->
+        {leaf, layout} = new_leaf(layout, path)
+        {:ok, %{layout | root: leaf}, leaf.id}
+
+      true ->
+        target = Keyword.get(opts, :at) || List.last(leaves(layout)).id
+        {vw, vh} = Keyword.get(opts, :viewport, {1600, 900})
+        rect = Map.fetch!(leaf_rects(layout), target)
+        direction = if rect.w * vw >= rect.h * vh, do: :h, else: :v
+
+        {leaf, layout} = new_leaf(layout, path)
+        {split_id, layout} = next_id(layout, "s")
+
+        root =
+          map_node(layout.root, target, fn existing ->
+            %{
+              type: :split,
+              id: split_id,
+              direction: direction,
+              ratio: 0.5,
+              first: existing,
+              second: leaf
+            }
+          end)
+
+        {:ok, %{layout | root: root}, leaf.id}
+    end
+  end
+
+  @doc """
+  Closes the tile with `id`. Its sibling takes the whole of their parent's
+  rectangle. Closing the only tile empties the workspace; an unknown id
+  changes nothing.
+  """
+  @spec close(t(), String.t()) :: t()
+  def close(%__MODULE__{root: nil} = layout, _id), do: layout
+
+  def close(%__MODULE__{root: %{type: :leaf, id: id}} = layout, id), do: %{layout | root: nil}
+
+  def close(%__MODULE__{root: root} = layout, id), do: %{layout | root: remove_leaf(root, id)}
+
+  defp remove_leaf(%{type: :leaf} = leaf, _id), do: leaf
+
+  defp remove_leaf(%{type: :split, first: %{type: :leaf, id: id}, second: second}, id),
+    do: second
+
+  defp remove_leaf(%{type: :split, first: first, second: %{type: :leaf, id: id}}, id),
+    do: first
+
+  defp remove_leaf(%{type: :split} = split, id) do
+    %{split | first: remove_leaf(split.first, id), second: remove_leaf(split.second, id)}
+  end
+
+  @doc "Changes the path a tile shows, keeping its id and place."
+  @spec update_path(t(), String.t(), String.t()) :: t()
+  def update_path(%__MODULE__{root: nil} = layout, _id, _path), do: layout
+
+  def update_path(%__MODULE__{root: root} = layout, id, path) when is_binary(path) do
+    %{layout | root: map_node(root, id, &%{&1 | path: path})}
+  end
+
+  @doc """
+  Sets a split's ratio, the first child's share, clamped to `0.1..0.9`.
+  """
+  @spec resize(t(), String.t(), number()) :: t()
+  def resize(%__MODULE__{root: nil} = layout, _id, _ratio), do: layout
+
+  def resize(%__MODULE__{root: root} = layout, id, ratio) when is_number(ratio) do
+    %{layout | root: map_node(root, id, &%{&1 | ratio: clamp_ratio(ratio)})}
+  end
+
+  @doc "Moves a split's divider one step towards `side`; the other axis is ignored."
+  @spec nudge(t(), String.t(), side()) :: t()
+  def nudge(%__MODULE__{root: nil} = layout, _id, _side), do: layout
+
+  def nudge(%__MODULE__{root: root} = layout, id, side) do
+    delta = if side in [:right, :down], do: @resize_step, else: -@resize_step
+    axis = if side in [:left, :right], do: :h, else: :v
+
+    case Enum.find(splits(root), &(&1.id == id and &1.direction == axis)) do
+      nil -> layout
+      split -> resize(layout, id, split.ratio + delta)
+    end
+  end
+
+  defp splits(%{type: :leaf}), do: []
+  defp splits(%{type: :split} = split), do: [split | splits(split.first) ++ splits(split.second)]
+
+  @doc """
+  Moves the divider nearest to the tile with `id` one step towards `side`.
+
+  `:left` and `:right` move the closest side-by-side divider above the tile;
+  `:up` and `:down` the closest top-and-bottom one. A tile with no divider on
+  that axis is unchanged.
+  """
+  @spec resize_step(t(), String.t(), side()) :: t()
+  def resize_step(%__MODULE__{root: nil} = layout, _id, _side), do: layout
+
+  def resize_step(%__MODULE__{root: root} = layout, id, side) do
+    axis = if side in [:left, :right], do: :h, else: :v
+    delta = if side in [:right, :down], do: @resize_step, else: -@resize_step
+
+    case ancestors(root, id) |> Enum.reverse() |> Enum.find(&(&1.direction == axis)) do
+      nil -> layout
+      split -> resize(layout, split.id, split.ratio + delta)
+    end
+  end
+
+  @doc "Flips the direction of the split that holds the tile with `id`."
+  @spec toggle_split(t(), String.t()) :: t()
+  def toggle_split(%__MODULE__{root: nil} = layout, _id), do: layout
+
+  def toggle_split(%__MODULE__{root: root} = layout, id) do
+    case ancestors(root, id) |> List.last() do
+      nil ->
+        layout
+
+      split ->
+        flipped = if split.direction == :h, do: :v, else: :h
+        %{layout | root: map_node(root, split.id, &%{&1 | direction: flipped})}
+    end
+  end
+
+  @doc "Swaps the places of two tiles. Unknown or equal ids change nothing."
+  @spec swap(t(), String.t(), String.t()) :: t()
+  def swap(%__MODULE__{} = layout, id, id), do: layout
+  def swap(%__MODULE__{root: nil} = layout, _a, _b), do: layout
+
+  def swap(%__MODULE__{root: root} = layout, a, b) do
+    with %{} = leaf_a <- fetch_leaf(layout, a),
+         %{} = leaf_b <- fetch_leaf(layout, b) do
+      %{layout | root: exchange(root, leaf_a, leaf_b)}
+    else
+      nil -> layout
+    end
+  end
+
+  # One pass, because replacing `a` by `b` and then `b` by `a` would find the
+  # copy just written and replace it back.
+  defp exchange(%{type: :leaf, id: id}, %{id: id}, other), do: other
+  defp exchange(%{type: :leaf, id: id}, other, %{id: id}), do: other
+  defp exchange(%{type: :leaf} = leaf, _a, _b), do: leaf
+
+  defp exchange(%{type: :split} = split, a, b) do
+    %{split | first: exchange(split.first, a, b), second: exchange(split.second, a, b)}
+  end
+
+  @doc """
+  The tile beside the tile with `id` on `side`, judged by the rectangles:
+  the neighbour that shares the longest edge with it. `nil` at the edge of
+  the workspace.
+  """
+  @spec neighbor(t(), String.t(), side()) :: String.t() | nil
+  def neighbor(%__MODULE__{} = layout, id, side) do
+    rects = leaf_rects(layout)
+
+    case Map.fetch(rects, id) do
+      :error ->
+        nil
+
+      {:ok, from} ->
+        rects
+        |> Enum.reject(fn {other, _} -> other == id end)
+        |> Enum.filter(fn {_, rect} -> adjacent?(from, rect, side) end)
+        |> Enum.max_by(fn {_, rect} -> overlap(from, rect, side) end, fn -> nil end)
+        |> case do
+          nil -> nil
+          {other, _} -> other
+        end
+    end
+  end
+
+  defp adjacent?(from, rect, :left), do: close_to?(rect.x + rect.w, from.x)
+  defp adjacent?(from, rect, :right), do: close_to?(rect.x, from.x + from.w)
+  defp adjacent?(from, rect, :up), do: close_to?(rect.y + rect.h, from.y)
+  defp adjacent?(from, rect, :down), do: close_to?(rect.y, from.y + from.h)
+
+  defp close_to?(a, b), do: abs(a - b) < 1.0e-6
+
+  defp overlap(from, rect, side) when side in [:left, :right] do
+    max(0.0, min(from.y + from.h, rect.y + rect.h) - max(from.y, rect.y))
+  end
+
+  defp overlap(from, rect, _side) do
+    max(0.0, min(from.x + from.w, rect.x + rect.w) - max(from.x, rect.x))
+  end
+
+  @doc "Swaps the tile with `id` and its neighbour on `side`; nothing at the edge."
+  @spec move(t(), String.t(), side()) :: t()
+  def move(%__MODULE__{} = layout, id, side) do
+    case neighbor(layout, id, side) do
+      nil -> layout
+      other -> swap(layout, id, other)
+    end
+  end
+
+  @doc """
+  Where every tile and divider sits, as fractions of the workspace.
+
+  `leaves` pairs each leaf with its rectangle in tree order; `handles` pairs
+  each split with the whole rectangle it divides, so the host draws the
+  divider at `ratio` along it and can turn a pointer position back into a
+  ratio while dragging.
+  """
+  @spec rects(t()) :: %{
+          leaves: [{leaf(), rect()}],
+          handles: [{split(), rect()}]
+        }
+  def rects(%__MODULE__{root: nil}), do: %{leaves: [], handles: []}
+
+  def rects(%__MODULE__{root: root}) do
+    {leaves, handles} = walk_rects(root, %{x: 0.0, y: 0.0, w: 1.0, h: 1.0}, {[], []})
+    %{leaves: Enum.reverse(leaves), handles: Enum.reverse(handles)}
+  end
+
+  defp walk_rects(%{type: :leaf} = leaf, rect, {leaves, handles}),
+    do: {[{leaf, rect} | leaves], handles}
+
+  defp walk_rects(%{type: :split} = split, rect, acc) do
+    {first, second} = divide(rect, split.direction, split.ratio)
+    {leaves, handles} = walk_rects(split.first, first, acc)
+    walk_rects(split.second, second, {leaves, [{split, rect} | handles]})
+  end
+
+  defp divide(%{x: x, y: y, w: w, h: h}, :h, ratio) do
+    cut = w * ratio
+    {%{x: x, y: y, w: cut, h: h}, %{x: x + cut, y: y, w: w - cut, h: h}}
+  end
+
+  defp divide(%{x: x, y: y, w: w, h: h}, :v, ratio) do
+    cut = h * ratio
+    {%{x: x, y: y, w: w, h: cut}, %{x: x, y: y + cut, w: w, h: h - cut}}
+  end
+
+  defp leaf_rects(layout) do
+    layout |> rects() |> Map.fetch!(:leaves) |> Map.new(fn {leaf, rect} -> {leaf.id, rect} end)
+  end
+
+  @doc """
+  The URL form of the tree; `""` for an empty workspace.
+  """
+  @spec encode(t()) :: String.t()
+  def encode(%__MODULE__{root: nil}), do: ""
+  def encode(%__MODULE__{root: root}), do: encode_node(root)
+
+  defp encode_node(%{type: :leaf, path: path}) do
+    URI.encode(path, &(&1 not in [?(, ?), ?,, ?%] and URI.char_unescaped?(&1)))
+  end
+
+  defp encode_node(%{type: :split} = split) do
+    direction = if split.direction == :h, do: "h", else: "v"
+
+    "#{direction}#{encode_ratio(split.ratio)}(#{encode_node(split.first)},#{encode_node(split.second)})"
+  end
+
+  # `0.5` is written `.5`: the leading zero says nothing.
+  defp encode_ratio(ratio) do
+    ratio
+    |> Float.round(3)
+    |> :erlang.float_to_binary([:short])
+    |> String.trim_leading("0")
+  end
+
+  @doc """
+  Reads the URL form back into a tree with fresh ids. `""` is the empty
+  workspace. Anything else that is not exactly the grammar, or holds more than
+  `max_tiles/0` tiles, is `:error`.
+  """
+  @spec decode(String.t()) :: {:ok, t()} | :error
+  def decode(""), do: {:ok, empty()}
+
+  def decode(encoded) when is_binary(encoded) do
+    with {:ok, node, "", layout} <- parse_node(encoded, empty()),
+         true <- count(%{layout | root: node}) <= @max_tiles do
+      {:ok, %{layout | root: node}}
+    else
+      _ -> :error
+    end
+  end
+
+  defp parse_node(<<direction, rest::binary>>, layout) when direction in [?h, ?v] do
+    with {ratio, "(" <> rest} <- parse_ratio(rest),
+         {:ok, first, "," <> rest, layout} <- parse_node(rest, layout),
+         {:ok, second, ")" <> rest, layout} <- parse_node(rest, layout) do
+      {id, layout} = next_id(layout, "s")
+
+      {:ok,
+       %{
+         type: :split,
+         id: id,
+         direction: if(direction == ?h, do: :h, else: :v),
+         ratio: clamp_ratio(ratio),
+         first: first,
+         second: second
+       }, rest, layout}
+    else
+      # A leaf whose path starts with h or v, such as `/history`, parses as
+      # a leaf when the split grammar does not fit.
+      _ -> parse_leaf(<<direction, rest::binary>>, layout)
+    end
+  end
+
+  defp parse_node(encoded, layout), do: parse_leaf(encoded, layout)
+
+  defp parse_ratio("." <> rest) do
+    case Float.parse("0." <> rest) do
+      {ratio, rest} when ratio > 0.0 and ratio < 1.0 -> {ratio, rest}
+      _ -> :error
+    end
+  end
+
+  defp parse_ratio(_rest), do: :error
+
+  defp parse_leaf(encoded, layout) do
+    {raw, rest} = take_leaf(encoded, "")
+
+    with false <- raw == "",
+         path when is_binary(path) <- safe_decode(raw),
+         "/" <> _ <- path do
+      {leaf, layout} = new_leaf(layout, path)
+      {:ok, leaf, rest, layout}
+    else
+      _ -> :error
+    end
+  end
+
+  defp take_leaf(<<char, _::binary>> = rest, acc) when char in [?(, ?), ?,], do: {acc, rest}
+  defp take_leaf(<<char, rest::binary>>, acc), do: take_leaf(rest, acc <> <<char>>)
+  defp take_leaf("", acc), do: {acc, ""}
+
+  defp safe_decode(raw) do
+    URI.decode(raw)
+  rescue
+    ArgumentError -> :error
+  end
+
+  @doc """
+  Carries `current`'s ids over to `incoming` where a leaf shows the same path,
+  pairing in tree order, so a tree read back from the URL keeps the frames
+  already on screen. Leaves with no match take fresh ids after `current`'s.
+  """
+  @spec reconcile(t(), t()) :: t()
+  def reconcile(%__MODULE__{} = current, %__MODULE__{root: nil}),
+    do: %{empty() | next_id: current.next_id}
+
+  def reconcile(%__MODULE__{} = current, %__MODULE__{} = incoming) do
+    {root, next, _spare} =
+      relabel(incoming.root, current.next_id, leaves(current))
+
+    %{incoming | root: root, next_id: next}
+  end
+
+  defp relabel(%{type: :leaf, path: path} = leaf, next, spare) do
+    case Enum.split_with(spare, &(&1.path == path)) do
+      {[match | rest_matches], others} ->
+        {%{leaf | id: match.id}, next, rest_matches ++ others}
+
+      {[], _} ->
+        {%{leaf | id: "t#{next}"}, next + 1, spare}
+    end
+  end
+
+  defp relabel(%{type: :split} = split, next, spare) do
+    {first, next, spare} = relabel(split.first, next, spare)
+    {second, next, spare} = relabel(split.second, next, spare)
+    {%{split | id: "s#{next}", first: first, second: second}, next + 1, spare}
+  end
+
+  # ------------------------------------------------------------------
+  # Helpers
+  # ------------------------------------------------------------------
+
+  defp new_leaf(layout, path) do
+    {id, layout} = next_id(layout, "t")
+    {%{type: :leaf, id: id, path: path}, layout}
+  end
+
+  defp next_id(%__MODULE__{next_id: n} = layout, prefix),
+    do: {"#{prefix}#{n}", %{layout | next_id: n + 1}}
+
+  defp clamp_ratio(ratio), do: ratio |> max(@min_ratio) |> min(@max_ratio) |> Float.round(3)
+
+  defp map_node(%{id: id} = node, id, fun), do: fun.(node)
+  defp map_node(%{type: :leaf} = leaf, _id, _fun), do: leaf
+
+  defp map_node(%{type: :split} = split, id, fun) do
+    %{split | first: map_node(split.first, id, fun), second: map_node(split.second, id, fun)}
+  end
+
+  # The splits above the node with `id`, outermost first; `[]` when the node
+  # is the root or absent.
+  defp ancestors(%{id: id}, id), do: []
+  defp ancestors(%{type: :leaf}, _id), do: []
+
+  defp ancestors(%{type: :split} = split, id) do
+    cond do
+      contains?(split.first, id) -> [split | ancestors(split.first, id)]
+      contains?(split.second, id) -> [split | ancestors(split.second, id)]
+      true -> []
+    end
+  end
+
+  defp contains?(%{id: id}, id), do: true
+  defp contains?(%{type: :leaf}, _id), do: false
+
+  defp contains?(%{type: :split} = split, id),
+    do: contains?(split.first, id) or contains?(split.second, id)
+end

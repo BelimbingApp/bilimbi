@@ -22,6 +22,7 @@
     "base/settings",
     "base/system",
     "base/tenancy",
+    "base/tiling",
     "base/audit",
     "core/company",
     "core/geonames",

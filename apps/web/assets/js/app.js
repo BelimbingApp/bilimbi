@@ -36,12 +36,24 @@ import SecretReveal from "./secret_reveal"
 import Modal from "./modal"
 import FlashAutoDismiss from "./flash_auto_dismiss"
 import ClipboardCopy from "./clipboard_copy"
+import Tiling from "./tiling"
+
+// A page framed inside the tiled workspace shares the tab's history with the
+// workspace page around it. LiveView records every live navigation with
+// pushState, so Back would step through each page a tile visited before it
+// left the workspace. Replacing instead keeps the tab's history the
+// workspace's own: Back leaves the workspace, as a person expects. The
+// workspace host learns the tile's URL from `phx:navigate` on the frame
+// window, so nothing here has to report it.
+if (window.parent !== window) {
+  history.pushState = (state, title, url) => history.replaceState(state, title, url)
+}
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, InlineLongText, DashboardSort, DisclosureDismiss, Combobox, SecretReveal, Modal, FlashAutoDismiss, ClipboardCopy},
+  hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, InlineLongText, DashboardSort, DisclosureDismiss, Combobox, SecretReveal, Modal, FlashAutoDismiss, ClipboardCopy, Tiling},
 })
 
 // Show progress bar on live navigation and form submits
