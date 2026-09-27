@@ -194,10 +194,12 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   end
 
   def handle_event("move-tile", %{"id" => id, "side" => side}, socket) do
-    with {:ok, side} <- side(side) do
-      {:noreply, socket |> put_layout(Layout.move(socket.assigns.tree, id, side)) |> sync_url()}
-    else
-      _ -> {:noreply, socket}
+    case side(side) do
+      {:ok, side} ->
+        {:noreply, socket |> put_layout(Layout.move(socket.assigns.tree, id, side)) |> sync_url()}
+
+      :error ->
+        {:noreply, socket}
     end
   end
 
@@ -250,10 +252,13 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   end
 
   def handle_event("nudge-split", %{"id" => id, "side" => side}, socket) do
-    with {:ok, side} <- side(side) do
-      {:noreply, socket |> put_layout(Layout.nudge(socket.assigns.tree, id, side)) |> sync_url()}
-    else
-      _ -> {:noreply, socket}
+    case side(side) do
+      {:ok, side} ->
+        {:noreply,
+         socket |> put_layout(Layout.nudge(socket.assigns.tree, id, side)) |> sync_url()}
+
+      :error ->
+        {:noreply, socket}
     end
   end
 

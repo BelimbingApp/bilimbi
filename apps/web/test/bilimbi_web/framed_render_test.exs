@@ -9,9 +9,9 @@ defmodule BilimbiWeb.FramedRenderTest do
 
   import Phoenix.LiveViewTest
 
-  alias BilimbiWeb.FramedRender
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
+  alias BilimbiWeb.FramedRender
 
   setup do
     UserFixtures.create_user_tables!()
