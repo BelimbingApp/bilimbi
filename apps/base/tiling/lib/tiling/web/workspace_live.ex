@@ -522,7 +522,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
            SavedLayouts.save(
              socket.assigns.settings_scope,
              copy_label(socket.assigns.saved, entry["label"]),
-             entry["tree"]
+             copy_tree(socket, entry)
            ) do
       {:noreply,
        socket
@@ -936,6 +936,11 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
       entry -> entry["label"]
     end
   end
+
+  defp copy_tree(%{assigns: %{shared?: true, slug: slug, tree: tree}}, %{"slug" => slug}),
+    do: Layout.encode(tree)
+
+  defp copy_tree(_socket, entry), do: entry["tree"]
 
   defp copy_label(saved, label) do
     taken = MapSet.new(saved, & &1["label"])

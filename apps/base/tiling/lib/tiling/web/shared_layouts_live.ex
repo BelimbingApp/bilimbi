@@ -92,13 +92,20 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
     slug = socket.assigns.pending_delete
 
     if is_binary(slug) and allowed?(socket.assigns.current_scope, "ui.workspace.publish") do
-      :ok = SharedLayouts.delete(socket.assigns.company_scope, slug)
+      case SharedLayouts.delete(socket.assigns.company_scope, slug) do
+        :ok ->
+          {:noreply,
+           assign(socket,
+             entries: SharedLayouts.list(socket.assigns.company_scope),
+             pending_delete: nil
+           )}
 
-      {:noreply,
-       assign(socket,
-         entries: SharedLayouts.list(socket.assigns.company_scope),
-         pending_delete: nil
-       )}
+        {:error, _changeset} ->
+          {:noreply,
+           socket
+           |> assign(:pending_delete, nil)
+           |> put_flash(:error, gettext("The shared workspace could not be deleted."))}
+      end
     else
       {:noreply, put_flash(socket, :error, gettext("You cannot manage shared workspaces."))}
     end

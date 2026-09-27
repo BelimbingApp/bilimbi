@@ -27,6 +27,7 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
   @layouts_key "ui.workspace.layouts"
   @default_key "ui.workspace.default"
   @max_label 60
+  @reserved_slugs ["shared-layouts"]
 
   @type entry :: %{
           required(String.t()) => String.t()
@@ -144,8 +145,10 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
     end
   end
 
-  defp unique_slug(base, entries) do
-    taken = MapSet.new(entries, & &1["slug"])
+  @doc "The first of `base`, `base-2`, `base-3`, ... that no entry and no workspace route uses."
+  @spec unique_slug(String.t(), [map()]) :: String.t()
+  def unique_slug(base, entries) do
+    taken = MapSet.new(entries, & &1["slug"]) |> MapSet.union(MapSet.new(@reserved_slugs))
 
     Stream.iterate(1, &(&1 + 1))
     |> Stream.map(fn
@@ -155,7 +158,9 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
     |> Enum.find(&(not MapSet.member?(taken, &1)))
   end
 
-  defp clean_label(label) do
+  @doc "A label with whitespace collapsed, when it is one to 60 bytes."
+  @spec clean_label(String.t()) :: {:ok, String.t()} | {:error, :label}
+  def clean_label(label) do
     case label |> String.trim() |> String.replace(~r/\s+/u, " ") do
       "" -> {:error, :label}
       label when byte_size(label) > @max_label -> {:error, :label}
@@ -163,7 +168,9 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
     end
   end
 
-  defp clean_tree(tree) do
+  @doc "The encoded tree, when it decodes to at least one tile."
+  @spec clean_tree(String.t()) :: {:ok, String.t()} | {:error, :tree}
+  def clean_tree(tree) do
     case Layout.decode(tree) do
       {:ok, %Layout{root: nil}} -> {:error, :tree}
       {:ok, _layout} -> {:ok, tree}

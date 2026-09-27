@@ -662,6 +662,20 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
              |> live("/workspace/shared/team-desk")
   end
 
+  test "copying the open shared workspace keeps the viewer's arrangement", %{conn: conn} do
+    {:ok, _} = SharedLayouts.publish(Settings.Scope.company(73), "Team desk", "/companies", [])
+
+    {:ok, view, _html} =
+      open(conn, "/workspace/shared/team-desk?t=h.5(%2Fcompanies,%2Fcompanies)")
+
+    view |> element("#workspace-open-layouts") |> render_click()
+    view |> element("#workspace-shared-copy-team-desk") |> render_click()
+    assert_patch(view, "/workspace/team-desk")
+
+    assert {:ok, %{"tree" => "h.5(/companies,/companies)"}} =
+             SavedLayouts.fetch(@settings_scope, "team-desk")
+  end
+
   test "a shared workspace does not replace the empty workspace", %{conn: conn} do
     {:ok, _} = SharedLayouts.publish(Settings.Scope.company(73), "Team desk", "/companies", [])
 

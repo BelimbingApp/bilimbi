@@ -7,7 +7,6 @@ defmodule Bilimbi.Base.Tiling.SharedLayouts do
 
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope
-  alias Bilimbi.Base.Tiling.Layout
   alias Bilimbi.Base.Tiling.SavedLayouts
 
   @key "ui.workspace.shared_layouts"
@@ -36,31 +35,20 @@ defmodule Bilimbi.Base.Tiling.SharedLayouts do
   end
 
   @spec publish(Scope.t(), String.t(), String.t(), [String.t()]) ::
-          {:ok, map()} | {:error, atom() | Ecto.Changeset.t()}
+          {:ok, map()} | {:error, :label | :tree | :roles | Ecto.Changeset.t()}
   def publish(%Scope{type: :company} = scope, label, tree, roles)
       when is_binary(label) and is_binary(tree) and is_list(roles) do
-    label = label |> String.trim() |> String.replace(~r/\s+/u, " ")
-
-    with true <- label != "" and byte_size(label) <= 60,
-         {:ok, %Layout{root: root}} <- Layout.decode(tree),
-         true <- not is_nil(root),
-         true <- Enum.all?(roles, &valid_role?/1) do
+    with {:ok, label} <- SavedLayouts.clean_label(label),
+         {:ok, tree} <- SavedLayouts.clean_tree(tree),
+         true <- Enum.all?(roles, &valid_role?/1) || {:error, :roles} do
       entries = list(scope)
       roles = Enum.uniq(roles)
 
       entry =
         case Enum.find(entries, &(&1["label"] == label)) do
           nil ->
-            base = SavedLayouts.slug(label)
-            taken = MapSet.new(entries, & &1["slug"])
-
-            slug =
-              Stream.iterate(1, &(&1 + 1))
-              |> Stream.map(&if(&1 == 1, do: base, else: "#{base}-#{&1}"))
-              |> Enum.find(&(not MapSet.member?(taken, &1)))
-
             %{
-              "slug" => slug,
+              "slug" => SavedLayouts.unique_slug(SavedLayouts.slug(label), entries),
               "label" => label,
               "layout" => "dwindle",
               "tree" => tree,
@@ -73,9 +61,6 @@ defmodule Bilimbi.Base.Tiling.SharedLayouts do
 
       entries = Enum.reject(entries, &(&1["slug"] == entry["slug"])) ++ [entry]
       with {:ok, _} <- Settings.put(@key, entries, scope), do: {:ok, entry}
-    else
-      :error -> {:error, :tree}
-      false -> {:error, :invalid}
     end
   end
 
