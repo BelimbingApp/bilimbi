@@ -283,7 +283,7 @@ mounted route overlapping a Core parameter route was served by Core. The
 production mechanism shipped the same day and is exercised by the first two
 real compositions, the public Factory Domain
 (`BelimbingApp/b-dom-factory`, mounted at `apps/domains/factory`) and a
-private Extension (`SB-Tape/b-ext-sbg`, mounted at `apps/extensions/sbg`).
+private customer Extension mounted under `apps/extensions/`.
 The rollout record is `docs/plans/domain-extension-layer-rollout.md`.
 
 The chosen mechanisms, each owned where it is enforced:

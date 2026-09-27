@@ -83,10 +83,10 @@ project_root/
 │   │           ├── docs/
 │   │           └── assets/           # Optional
 │   └── extensions/
-│       └── sb_group/                 # Optional Extension repository/bundle
+│       └── customer/                 # Optional Extension repository/bundle
 │           ├── mix.exs
 │           ├── bilimbi.container.exs
-│           └── qac/                  # sb_group/qac module
+│           └── quality/              # customer/quality module
 │               ├── mix.exs
 │               ├── bilimbi.module.exs
 │               ├── lib/

@@ -1,6 +1,6 @@
 # docs/plans/domain-extension-layer-rollout.md
 
-**Status:** In progress — Phases 1–4 shipped 2026-09-26; Phase 4's AX production-history import and Phase 3's Quality placement stay open
+**Status:** In progress — Phases 1–4 shipped 2026-09-26; Phase 4's source production-history import and Phase 3's Quality placement stay open
 **Last Updated:** 2026-09-27
 **Sources:**
 - `docs/architecture/0010_composition-model.md`
@@ -19,11 +19,9 @@
   [819](https://github.com/BelimbingApp/bilimbi/pull/819) end-to-end with a mounted Domain,
   [820](https://github.com/BelimbingApp/bilimbi/pull/820) authenticated Scope actor
 - Factory Domain repository [BelimbingApp/b-dom-factory](https://github.com/BelimbingApp/b-dom-factory) (public; pull requests 1–16)
-- SBG Extension repository `SB-Tape/b-ext-sbg` (private; pull requests 1–3; only its public contract is recorded here)
 - Factory plan `docs/plans/factory/0000-factory-domain.md`
 - Inventory module plan `docs/plans/factory/0010-inventory-module.md`
-- Customer plan `docs/plans/factory/mr-packaging-requirements.md`
-- Customer plan `docs/plans/factory/sbg-requirements.md`
+- Customer plan `docs/plans/factory/packaging-manufacturer-requirements.md`
 
 **Agents:** claude/claude-opus-5 (earlier work),
 amp/medium-sol (architecture review only), codex/gpt-5 (earlier work),
@@ -229,30 +227,28 @@ Goal: turn the successful proof into the smallest maintained implementation.
 
 ### Phase 3 — First Factory build
 
-Goal: Factory mounts as one repository and its first three modules support Mr Packaging's receipt-to-despatch workflow.
+Goal: Factory mounts as one repository and its first three modules support a packaging manufacturer's receipt-to-despatch workflow.
 
 - [x] Create Factory as one independent repository with Inventory, Product Definition, and Production Execution modules, following `docs/plans/factory/0000-factory-domain.md`. Evidence: [b-dom-factory 1](https://github.com/BelimbingApp/b-dom-factory/pull/1), container `factory` at `apps/domains/factory`, CI against a pinned Platform revision.
 - [x] Implement Inventory's public material contract following `docs/plans/factory/0010-inventory-module.md`; Production Execution depends on that API and registers as its production posting authority. Evidence: [b-dom-factory 2](https://github.com/BelimbingApp/b-dom-factory/pull/2), [4](https://github.com/BelimbingApp/b-dom-factory/pull/4), [5](https://github.com/BelimbingApp/b-dom-factory/pull/5).
 - [x] Prove Factory can be absent when no mounted dependent requires it, and prove a missing Factory dependency fails composition. Evidence: [b-dom-factory 10](https://github.com/BelimbingApp/b-dom-factory/pull/10), the `absent` CI job and `missing_dependency.sh`.
 - [x] Prove Inventory owns the only material ledger and genealogy while Production Execution adds run, step, and resource context through its public contract. Evidence: [b-dom-factory 6](https://github.com/BelimbingApp/b-dom-factory/pull/6), [7](https://github.com/BelimbingApp/b-dom-factory/pull/7), [8](https://github.com/BelimbingApp/b-dom-factory/pull/8).
 - [ ] Keep Planning, Maintenance, and Costing as later Factory modules until an owner confirms each workflow. Decide Quality's module or Domain placement when its own workflow is built. Status: none of the four is built; Quality is an opaque token in Production Execution ([b-dom-factory 13](https://github.com/BelimbingApp/b-dom-factory/pull/13)), and its placement is undecided.
-- [x] Validate the initial modules against Mr Packaging Sdn Bhd's receipt-to-despatch workflow in `docs/plans/factory/mr-packaging-requirements.md`; its current requirements are expected to use Factory configuration without an Extension. Evidence: [b-dom-factory 11](https://github.com/BelimbingApp/b-dom-factory/pull/11), a representative scenario through the public facades with no Extension; the plant values still to confirm are listed in that repository's `docs/mr-packaging-scenario.md`.
+- [x] Validate the initial modules against a packaging manufacturer's receipt-to-despatch workflow in `docs/plans/factory/packaging-manufacturer-requirements.md`; its current requirements are expected to use Factory configuration without an Extension. Evidence: [b-dom-factory 11](https://github.com/BelimbingApp/b-dom-factory/pull/11), a representative scenario through the public facades with no Extension; the plant values still to confirm are listed with that scenario.
 
 ### Phase 4 — Second Factory build and first Extension
 
-Goal: SBG validates the same Factory modules through glue, coating, and slitting work, with AX facts entering through the `SbGroup` Extension.
+Goal: a tape manufacturer validates the same Factory modules through its production work, with source facts entering through a customer Extension.
 
-The Extension shipped as container `sbg` in the private repository
-`SB-Tape/b-ext-sbg`, mounted at `apps/extensions/sbg`; the plans' `SbGroup`
-name refers to it. Only its public contract is recorded in Bilimbi.
+The Extension shipped in a private repository. Only its public contract is recorded in Bilimbi.
 
-- [x] Validate Factory's contracts against SBG's glue, coating, and slitting workflows in `docs/plans/factory/sbg-requirements.md`. Evidence: [b-dom-factory 13](https://github.com/BelimbingApp/b-dom-factory/pull/13), a synthetic scenario through Factory's contracts; the values SBG must confirm and the contract gaps are in that repository's `docs/sbg-scenario.md`.
-- [ ] Mount the `SbGroup` AX Connector for confirmed source mapping and submit production history through Production Execution's import contract. Keep process configuration in Factory and SBG-specific integration in `SbGroup`. Status: `sbg/ax_connector` is mounted with a read-only, contract-checked item capture and health read (b-ext-sbg 1 and 2); the production-history import into Production Execution has not merged.
+- [x] Validate Factory's contracts against a tape manufacturer's production workflows. Evidence: [b-dom-factory 13](https://github.com/BelimbingApp/b-dom-factory/pull/13), a synthetic scenario through Factory's contracts.
+- [ ] Mount the customer Extension's source connector for confirmed source mapping and submit production history through Production Execution's import contract. Keep process configuration in Factory and customer-specific integration in the Extension. Status: the connector is mounted with a read-only, contract-checked item capture and health read; the production-history import into Production Execution has not merged.
 - [x] Keep warehouse receipts and ordinary movements on Inventory's public contract; no Extension owns the common material ledger, genealogy, units of measure, production posting authority, or execution semantics. Evidence: [b-dom-factory 8](https://github.com/BelimbingApp/b-dom-factory/pull/8) proves an Extension cannot register as posting authority or post production context; the connector writes only its own tables.
-- [x] Mount a `MrPackaging` Extension only if plant validation finds a specific gap in Factory's public contracts or configuration. Evidence: [b-dom-factory 11](https://github.com/BelimbingApp/b-dom-factory/pull/11) found no such gap; none is mounted.
-- [x] Keep each Extension's ownership, visibility, and licensing independent of its architectural role. Evidence: Factory is public under MIT in `BelimbingApp`; SBG is private in `SB-Tape`; both mount through the same discovery.
+- [x] Mount a packaging-manufacturer Extension only if plant validation finds a specific gap in Factory's public contracts or configuration. Evidence: [b-dom-factory 11](https://github.com/BelimbingApp/b-dom-factory/pull/11) found no such gap; none is mounted.
+- [x] Keep each Extension's ownership, visibility, and licensing independent of its architectural role. Evidence: Factory is public under MIT in `BelimbingApp`; the customer Extension is private; both mount through the same discovery.
 - [x] Prove the application remains complete with the Extension absent and
-  that removing it leaves durable data intact. Evidence: b-ext-sbg 1 (`absent` CI job) and 3 (`removal` CI job: capture a batch, park SBG, rebuild and migrate, remount, read the same batch).
+  that removing it leaves durable data intact. Evidence: the Extension's absent and removal CI jobs (capture a batch, park the Extension, rebuild and migrate, remount, read the same batch).
 
 ### Phase 5 — Documentation alignment
 

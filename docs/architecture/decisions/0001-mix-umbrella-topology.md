@@ -47,7 +47,7 @@ project_root/
 │   ├── core/                       # Required enterprise Domain
 │   ├── web/                        # Phoenix endpoint and shared UI shell
 │   ├── people/                     # Example optional Domain source
-│   └── sb_group/                   # Example Extension source
+│   └── customer/                   # Example Extension source
 ├── AGENTS.md
 ├── DESIGN.md
 ├── LICENSE
@@ -88,12 +88,12 @@ combining Base and Core into one OTP application.
 Optional sources use the same short-directory rule while declaring their kind,
 stable identity, dependencies, and contributions in a Bilimbi source manifest.
 For example, `apps/people` uses `:people` with namespace
-`Bilimbi.Domains.People`, while `apps/sb_group` uses `:sb_group` with namespace
-`Bilimbi.Extensions.SbGroup`.
+`Bilimbi.Domains.People`, while `apps/customer` uses `:customer` with namespace
+`Bilimbi.Extensions.Customer`.
 
 Directory names are source mount points, not durable business identities.
 Logical Module IDs remain path-independent values such as `core/company`,
-`people/payroll`, and `sb-group/qac`.
+`people/payroll`, and `customer/quality`.
 
 Each optional Domain or Extension source may be an independent nested Git
 repository mounted directly below `apps/`. The parent repository tracks Base,

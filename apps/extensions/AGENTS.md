@@ -17,7 +17,7 @@ git clone https://github.com/<owner>/b-dom-<id>.git apps/domains/<id_with_unders
 git clone https://github.com/<owner>/b-ext-<id>.git apps/extensions/<id_with_underscores>
 ```
 
-`BelimbingApp/b-dom-factory` mounts at `apps/domains/factory`. `SB-Tape/b-ext-sbg` (private) mounts at `apps/extensions/sbg`. A Mr Packaging Extension, if one is ever needed, would be `b-ext-mr-packaging` at `apps/extensions/mr_packaging`.
+`BelimbingApp/b-dom-factory` mounts at `apps/domains/factory`. A customer Extension mounts under `apps/extensions/` from the organization that owns it.
 
 ## Mounting
 
