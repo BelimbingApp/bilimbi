@@ -1,0 +1,225 @@
+// tiling.js: the Ctrl+. tiling mode, the focus it moves, the split handles
+// and the size report. Frames are outside happy-dom, so the bridge into a
+// frame's document, the URL and title report, and Back-button behaviour are
+// checked in a browser (apps/base/ui/AGENTS.md "Hook tests").
+import {test, beforeEach, afterEach} from "node:test"
+import assert from "node:assert/strict"
+import Tiling from "../js/tiling.js"
+import {mountHook, render, focused} from "./support/hook.mjs"
+
+let control
+
+function workspace({focusedTile = "t1", count = 2, max = 6} = {}) {
+  return render(
+    `<div id="app-shell">
+       <span id="app-mode" hidden role="status"></span>
+       <div id="workspace" phx-hook="Tiling" data-focused="${focusedTile}" data-monocle="false"
+            data-max-tiles="${max}" data-tile-count="${count}">
+         <p id="workspace-announcement" role="status"></p>
+         <div id="workspace-tiles">
+           <div id="tile-t1" class="workspace-tile" data-tile="t1" data-focused="${focusedTile === "t1"}">
+             <div id="tile-t1-header"><button type="button" id="tile-t1-header-title">Companies</button></div>
+           </div>
+           <div id="tile-t2" class="workspace-tile" data-tile="t2" data-focused="${focusedTile === "t2"}">
+             <div id="tile-t2-header"><button type="button" id="tile-t2-header-title">Users</button></div>
+           </div>
+           <div id="split-s3" role="separator" tabindex="0" data-split="s3" data-direction="h"
+                data-rect="0 0 1 1" style="left: 50%; top: 0%; height: 100%"></div>
+         </div>
+       </div>
+     </div>`,
+    "workspace"
+  )
+}
+
+function press(key, init = {}) {
+  window.dispatchEvent(new KeyboardEvent("keydown", {key, bubbles: true, cancelable: true, ...init}))
+}
+
+const leader = () => press(".", {ctrlKey: true})
+const mode = () => document.getElementById("app-mode")
+const events = () => control.pushes.map(({event, payload}) => ({event, payload}))
+
+beforeEach(() => {
+  control = mountHook(Tiling, workspace())
+  control.pushes.length = 0 // the size report on mount is not under test here
+})
+
+afterEach(() => control.hook.destroyed())
+
+test("Ctrl+. enters tiling mode, names it in the status bar, and leaves it again", () => {
+  assert.equal(mode().hidden, true)
+
+  leader()
+  assert.equal(control.hook.el.dataset.mode, "tiling")
+  assert.equal(mode().hidden, false)
+  assert.equal(mode().textContent, "Tiling")
+
+  leader()
+  assert.equal(control.hook.el.dataset.mode, "off")
+  assert.equal(mode().hidden, true)
+  assert.equal(mode().textContent, "")
+})
+
+test("outside the mode, the keys are the page's own", () => {
+  press("h")
+  press("q")
+  press("1")
+
+  assert.deepEqual(events(), [])
+})
+
+test("in the mode, directions focus, shifted directions move, and letters run the tile operations", () => {
+  leader()
+  press("l")
+  press("ArrowDown")
+  press("J", {shiftKey: true})
+  press("s")
+  press("f")
+  press("t")
+  press("3")
+  press("q")
+
+  assert.deepEqual(events(), [
+    {event: "focus-direction", payload: {side: "right"}},
+    {event: "focus-direction", payload: {side: "down"}},
+    {event: "move-tile", payload: {id: "t1", side: "down"}},
+    {event: "swap-tile", payload: {id: "t1", side: "down"}},
+    {event: "toggle-monocle", payload: {id: "t1"}},
+    {event: "toggle-split", payload: {id: "t1"}},
+    {event: "open-layout", payload: {n: 3}},
+    {event: "close-tile", payload: {id: "t1"}},
+  ])
+})
+
+test("a mode key is consumed so the page under it never sees it", () => {
+  leader()
+  const event = new KeyboardEvent("keydown", {key: "q", bubbles: true, cancelable: true})
+  window.dispatchEvent(event)
+
+  assert.equal(event.defaultPrevented, true)
+})
+
+test("r enters resize, arrows move the nearest divider, Escape steps back out one level", () => {
+  leader()
+  press("r")
+  assert.equal(mode().textContent, "Resize")
+
+  press("ArrowLeft")
+  press("l")
+  press("q")
+  assert.deepEqual(events(), [
+    {event: "resize-step", payload: {side: "left"}},
+    {event: "resize-step", payload: {side: "right"}},
+  ])
+
+  press("Escape")
+  assert.equal(control.hook.el.dataset.mode, "tiling")
+  press("Escape")
+  assert.equal(control.hook.el.dataset.mode, "off")
+})
+
+test("an expanded sidebar branch does not hold Escape", () => {
+  leader()
+  document.getElementById("app-shell").insertAdjacentHTML(
+    "afterbegin",
+    '<button type="button" id="app-sidebar-toggle" aria-expanded="true">Toggle sidebar</button>' +
+      '<button type="button" data-nav-toggle aria-expanded="true">Administration</button>'
+  )
+
+  press("Escape")
+
+  assert.equal(control.hook.el.dataset.mode, "off")
+})
+
+test("Escape leaves an open menu alone", () => {
+  leader()
+  document.getElementById("tile-t1-header").innerHTML =
+    '<button type="button" id="tile-t1-header-menu" aria-expanded="true">Menu</button>'
+
+  press("Escape")
+
+  assert.equal(control.hook.el.dataset.mode, "tiling")
+})
+
+test("n leaves the mode and opens the picker, unless the workspace is full", () => {
+  leader()
+  press("n")
+  assert.deepEqual(events(), [{event: "open-picker", payload: {}}])
+  assert.equal(control.hook.el.dataset.mode, "off")
+
+  control.hook.destroyed()
+  control = mountHook(Tiling, workspace({count: 6}))
+  control.pushes.length = 0
+
+  leader()
+  press("n")
+  assert.deepEqual(events(), [])
+  assert.equal(control.hook.el.dataset.mode, "tiling")
+  assert.match(
+    document.getElementById("workspace-announcement").textContent,
+    /holds 6 tiles at most/
+  )
+})
+
+test("after a keyboard move, focus follows the tile the server focused", () => {
+  leader()
+  press("l")
+
+  control.hook.el.dataset.focused = "t2"
+  document.getElementById("tile-t2").dataset.focused = "true"
+  control.hook.updated()
+
+  assert.equal(focused(), "tile-t2-header-title")
+})
+
+test("a server patch that did not follow a keyboard move leaves focus alone", () => {
+  document.getElementById("tile-t1-header-title").focus()
+
+  control.hook.el.dataset.focused = "t2"
+  control.hook.updated()
+
+  assert.equal(focused(), "tile-t1-header-title")
+})
+
+test("arrow keys on a focused handle nudge its divider", () => {
+  const handle = document.getElementById("split-s3")
+  handle.focus()
+  handle.dispatchEvent(new KeyboardEvent("keydown", {key: "ArrowRight", bubbles: true, cancelable: true}))
+  handle.dispatchEvent(new KeyboardEvent("keydown", {key: "x", bubbles: true, cancelable: true}))
+
+  assert.deepEqual(events(), [{event: "nudge-split", payload: {id: "s3", side: "right"}}])
+})
+
+test("dragging a handle follows the pointer and pushes the ratio once on release", () => {
+  const tiles = document.getElementById("workspace-tiles")
+  tiles.getBoundingClientRect = () => ({left: 100, top: 0, width: 1000, height: 500})
+  const handle = document.getElementById("split-s3")
+
+  handle.dispatchEvent(new PointerEvent("pointerdown", {button: 0, bubbles: true, cancelable: true}))
+  window.dispatchEvent(new PointerEvent("pointermove", {clientX: 800, clientY: 10}))
+  assert.equal(handle.style.left, "70%")
+  assert.equal(document.documentElement.style.cursor, "col-resize")
+
+  window.dispatchEvent(new PointerEvent("pointermove", {clientX: 100, clientY: 10}))
+  assert.equal(handle.style.left, "10%")
+
+  window.dispatchEvent(new PointerEvent("pointerup", {}))
+  assert.equal(document.documentElement.style.cursor, "")
+  assert.deepEqual(events(), [{event: "resize-split", payload: {id: "s3", ratio: 0.1}}])
+})
+
+test("the workspace reports its size on mount", () => {
+  control.hook.destroyed()
+  const el = workspace()
+  document.getElementById("workspace-tiles").getBoundingClientRect = () => ({
+    left: 0,
+    top: 0,
+    width: 1280.4,
+    height: 720,
+  })
+
+  control = mountHook(Tiling, el)
+
+  assert.deepEqual(events(), [{event: "viewport", payload: {w: 1280, h: 720}}])
+})

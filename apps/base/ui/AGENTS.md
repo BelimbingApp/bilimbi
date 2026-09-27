@@ -48,6 +48,10 @@ happy-dom has no top layer, makes nothing inert, and does not blur an element th
 
 Use `<.inline_long_text>` for an in-place multi-line fact; its hook owns focus, Escape cancellation, blur commit and the saving wait, while the record owner keeps validation and persistence. Do not rebuild the textarea lifecycle in a LiveView. See its component comment and `DESIGN.md` "Inline editing".
 
+## Tiled workspace
+
+A page shown inside a workspace tile renders chromeless through the `framed` branch of `Layouts.app/1`; the flag comes from `BilimbiWeb.FramedRender` through the LiveView session, never from a page. Do not add a tile special case to a page: if a page needs to know it is in a tile beyond that branch, that is the signal to design a tile contract, not a special case. The tile bar is `<.tile_header>` and the divider `<.split_handle>`; the tree, the host page and its hook are `apps/base/tiling` and `apps/web/assets/js/tiling.js`. See `DESIGN.md` "Tiled workspace".
+
 ## Lists
 
 An operational list keeps its page, search, filters, sort and page size in URL state. See `DESIGN.md` "Pagination controls".

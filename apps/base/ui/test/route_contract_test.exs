@@ -28,6 +28,18 @@ defmodule Bilimbi.Base.UI.RouteContractTest do
     assert function_exported?(RouteContract, :verified_route?, 2)
   end
 
+  test "fetch_route answers the mount policy of the route serving a path" do
+    assert {:ok, %{path: "/companies", capability: "admin.company.list", operator: false}} =
+             RouteContract.fetch_route("/companies?page=2&q=acme")
+
+    assert {:ok, %{path: "/users/:id"}} = RouteContract.fetch_route("/users/42")
+    assert {:ok, %{path: "/dashboard", capability: nil}} = RouteContract.fetch_route("/dashboard")
+    assert RouteContract.fetch_route("/nowhere") == :error
+    assert RouteContract.fetch_route("/session") == :error
+    assert RouteContract.fetch_route("//evil.example/") == :error
+    assert RouteContract.fetch_route("https://evil.example/dashboard") == :error
+  end
+
   test "navigable_paths lists the GET route patterns and drops the rest" do
     paths = RouteContract.navigable_paths()
 

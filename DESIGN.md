@@ -568,6 +568,39 @@ restyles it, and a timezone change re-renders every timestamp rendered through
 directly rather than through that component are unaffected until they adopt
 it.
 
+### Tiled workspace
+
+`/workspace` shows several pages side by side in one tab, the way a tiling
+window manager lays out windows: a page opens by splitting the focused tile,
+side by side when that tile is wider than tall and top and bottom otherwise,
+so nothing is laid out by hand. Each tile is a same-origin frame of an
+existing page at its own address, so every page also stays reachable alone,
+and the shell renders it chromeless there: content and flash only, no second
+top bar, sidebar or status bar inside the tile. The tree is always in the
+address, so Back and Forward work at the workspace level and a copied address
+reproduces the screen; a navigation inside a tile replaces history instead of
+adding to it.
+
+A compact `h-6` bar above each tile carries the page's title and a menu with
+every operation: monocle (one tile fills the workspace, the others stay
+mounted), swap, flip the split, open alone, close. The focused tile shows a
+`brand-strong` border and its title in `text-brand-strong`, never colour
+alone. Tiles are separated by focusable `role="separator"` handles that
+resize by drag or by the arrow keys. Keyboard control is a mode, as in
+Hyprland's submaps, because every modifier chord collides with Windows or
+the browser: `Ctrl+.` enters it, the status bar names it (`Tiling`,
+`Resize`), single keys move focus (`h j k l` or arrows), move tiles (`H J K
+L`), swap (`s`), resize (`r`, then arrows), monocle (`f`), flip the split
+(`t`), add (`n`) or close (`q`) a tile, and open a saved layout (`1` to `9`);
+Escape leaves. An open menu takes Escape first. No operation exists only as a
+key. Focus follows a click, never the pointer, and nothing animates.
+
+A workspace holds six tiles at most. A tile whose page the account may not
+open shows the permission wording in place of the frame. Below `lg` the
+workspace shows one tile at a time with a strip of tabs, keeping the tree.
+Layouts are saved per account by name, opened at `/workspace/<slug>` or from
+the saved-layouts dialog, and one may be the default the sidebar entry opens.
+
 ### Navigation menu conventions
 
 - **Typography & Font:** `Instrument Sans`, `0.8125rem` (`13px`), normal/light

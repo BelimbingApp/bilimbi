@@ -42,6 +42,41 @@ defmodule Bilimbi.Base.UI.RouteContract do
     |> Enum.sort()
   end
 
+  @doc """
+  The declared GET route that serves `path`, as `{:ok, route}` with the
+  capability its mount requires (`nil` for any signed-in account) and whether
+  it is operator-only; `:error` when nothing serves it.
+
+  The same policy `RouteAccess` enforces at mount, asked ahead of time: a
+  workspace tile that would only redirect with a refusal can say so in place
+  instead. A query string is ignored; only the path decides the route, and
+  a URL naming a scheme or host is served by nothing.
+  """
+  @spec fetch_route(String.t()) ::
+          {:ok, %{path: String.t(), capability: String.t() | nil, operator: boolean()}} | :error
+  def fetch_route(path) when is_binary(path) do
+    case URI.parse(path) do
+      %URI{scheme: nil, host: nil, path: "/" <> _ = path} -> fetch_served(path)
+      _other -> :error
+    end
+  end
+
+  defp fetch_served(path) do
+    segments = String.split(path, "/", trim: true)
+
+    @routes
+    |> Enum.filter(&(Map.get(&1, :verb, :get) == :get))
+    |> Enum.find(&Bilimbi.Base.UI.RoutePatterns.match_path?(&1.path, segments))
+    |> case do
+      nil ->
+        :error
+
+      route ->
+        {:ok,
+         %{path: route.path, capability: route[:capability], operator: route[:operator] == true}}
+    end
+  end
+
   @impl true
   def formatted_routes(_opts) do
     Enum.map(@routes, fn route ->

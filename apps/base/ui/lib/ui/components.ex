@@ -3592,4 +3592,204 @@ defmodule Bilimbi.Base.UI.Components do
   def translate_errors(errors, field) when is_list(errors) do
     for {^field, {msg, opts}} <- errors, do: translate_error({msg, opts})
   end
+
+  @doc """
+  Renders the compact title bar of one workspace tile: the page's title and
+  a menu of every operation the tiling keyboard mode offers, so no operation
+  exists only as a key. The bar is `h-6`, the status bar's height, and the
+  focused tile's title takes `text-brand-strong` so focus is not shown by
+  colour of the ring alone.
+
+  The title is a button that focuses the tile, so a click on the bar and a
+  click inside the page do the same thing. The menu is a disclosure: its
+  trigger's `aria-expanded` is the one record of open, the list derives its
+  visibility from it, and the `DisclosureDismiss` hook closes it when focus
+  leaves or Escape is pressed, exactly as `<.multi_select>` does. Every
+  entry runs the caller's command and closes the menu. "Open alone" is a
+  plain navigation to the tile's own URL, because a tile is a page that
+  stays reachable by itself.
+
+  Hyprland draws no title bars; this one exists because the mouse and touch
+  path, the screen-reader name of the frame below it, and `DESIGN.md`'s rule
+  against withheld controls all need it.
+
+  ## Examples
+
+      <.tile_header
+        id="tile-t1-header"
+        title="Companies"
+        focused
+        open_alone="/companies"
+        on_focus={JS.push("focus-tile", value: %{id: "t1"})}
+        on_close={JS.push("close-tile", value: %{id: "t1"})}
+        on_monocle={JS.push("toggle-monocle")}
+        on_split={JS.push("toggle-split", value: %{id: "t1"})}
+        on_swap={JS.push("swap-tile", value: %{id: "t1"})}
+      />
+  """
+  attr(:id, :string, required: true)
+  attr(:title, :string, required: true, doc: "the page's own title, read from its document")
+  attr(:focused, :boolean, default: false)
+  attr(:monocle, :boolean, default: false, doc: "whether this tile currently fills the workspace")
+
+  attr(:open_alone, :string,
+    required: true,
+    doc: "the tile's own URL, opened with the full shell"
+  )
+
+  attr(:on_focus, JS, required: true, doc: "focuses the tile; a click on the title runs it")
+  attr(:on_close, JS, required: true)
+  attr(:on_monocle, JS, required: true, doc: "toggles monocle for this tile")
+  attr(:on_split, JS, required: true, doc: "flips the split holding this tile")
+  attr(:on_swap, JS, required: true, doc: "swaps this tile with its neighbour")
+
+  def tile_header(assigns) do
+    menu = "#{assigns.id}-menu"
+    dismiss = JS.set_attribute({"aria-expanded", "false"}, to: "##{menu}")
+
+    assigns =
+      assigns
+      |> assign(:menu, menu)
+      |> assign(:dismiss, dismiss)
+      |> assign(:escape, JS.focus(dismiss, to: "##{menu}"))
+      |> assign(:toggle, JS.toggle_attribute({"aria-expanded", "true", "false"}, to: "##{menu}"))
+      |> assign(
+        :entry_class,
+        "block w-full rounded-sm px-2 py-1 text-left text-xs text-ink hover:bg-surface-muted focus-visible:outline-none focus-visible:bg-surface-muted"
+      )
+
+    ~H"""
+    <div
+      id={@id}
+      phx-hook="DisclosureDismiss"
+      data-dismiss={@dismiss}
+      data-escape={@escape}
+      phx-click-away={@dismiss}
+      data-tile-header
+      class={[
+        "relative flex h-6 shrink-0 items-center gap-1 border-b border-line bg-surface pl-2 pr-0.5 text-xs",
+        @focused && "text-brand-strong",
+        !@focused && "text-ink-muted"
+      ]}
+    >
+      <button
+        type="button"
+        id={"#{@id}-title"}
+        phx-click={@on_focus}
+        title={@title}
+        class="min-w-0 flex-1 truncate text-left font-medium focus-visible:outline-none focus-visible:underline"
+      >
+        {@title}
+      </button>
+      <button
+        id={@menu}
+        type="button"
+        aria-expanded="false"
+        aria-controls={"#{@menu}-items"}
+        aria-label={"Tile menu: " <> @title}
+        title="Tile menu"
+        phx-click={@toggle}
+        class="peer grid size-5 shrink-0 place-items-center rounded-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+      >
+        <.icon name="hero-ellipsis-horizontal" class="size-3.5" />
+      </button>
+      <div
+        id={"#{@menu}-items"}
+        class="hidden peer-aria-expanded:block absolute right-0.5 top-full z-30 mt-0.5 min-w-44 rounded-md border border-line bg-surface p-1 shadow-lg"
+      >
+        <button
+          type="button"
+          id={"#{@id}-monocle"}
+          phx-click={dismiss_after(@on_monocle, @dismiss)}
+          class={@entry_class}
+        >
+          {if @monocle, do: gettext("Show every tile"), else: gettext("Monocle: fill the workspace")}
+        </button>
+        <button
+          type="button"
+          id={"#{@id}-swap"}
+          phx-click={dismiss_after(@on_swap, @dismiss)}
+          class={@entry_class}
+        >
+          {gettext("Swap with neighbour")}
+        </button>
+        <button
+          type="button"
+          id={"#{@id}-split"}
+          phx-click={dismiss_after(@on_split, @dismiss)}
+          class={@entry_class}
+        >
+          {gettext("Flip split direction")}
+        </button>
+        <.link navigate={@open_alone} id={"#{@id}-open-alone"} class={@entry_class}>
+          {gettext("Open alone")}
+        </.link>
+        <button
+          type="button"
+          id={"#{@id}-close"}
+          phx-click={dismiss_after(@on_close, @dismiss)}
+          class={[@entry_class, "text-danger hover:bg-danger-surface hover:text-danger-ink"]}
+        >
+          {gettext("Close tile")}
+        </button>
+      </div>
+    </div>
+    """
+  end
+
+  # Runs the caller's command, then closes the menu; both are one click.
+  defp dismiss_after(%JS{ops: ops}, %JS{ops: close}), do: %JS{ops: ops ++ close}
+
+  @doc """
+  Renders the divider between two workspace tiles, positioned by the caller.
+
+  It is a focusable `role="separator"` with the orientation of the line it
+  draws: a side-by-side split draws a vertical line. The host's hook resizes
+  by dragging it with the mouse, and by the arrow keys while it has focus,
+  so every divider is reachable without a pointer. It carries no colour at
+  rest; the gap between tiles is the canvas, as in Hyprland, and the divider
+  surfaces on hover and focus.
+
+  ## Examples
+
+      <.split_handle
+        id="split-s3"
+        direction={:h}
+        label="Resize Companies and Users"
+        style="left: 50%; top: 0%; height: 100%"
+        data-split="s3"
+      />
+  """
+  attr(:id, :string, required: true)
+
+  attr(:direction, :atom,
+    required: true,
+    values: [:h, :v],
+    doc: "`:h` side by side, `:v` top and bottom"
+  )
+
+  attr(:label, :string, required: true, doc: "names the two tiles the divider separates")
+  attr(:style, :string, default: nil, doc: "the position the layout computed")
+  attr(:rest, :global, doc: "`data-split` carries the split id for the host's hook")
+
+  def split_handle(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      role="separator"
+      tabindex="0"
+      aria-orientation={if @direction == :h, do: "vertical", else: "horizontal"}
+      aria-label={@label}
+      data-direction={@direction}
+      style={@style}
+      class={[
+        "absolute z-10 select-none rounded-sm transition-colors hover:bg-surface-sunken focus-visible:bg-brand-surface focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong",
+        @direction == :h && "w-1.5 -translate-x-1/2 cursor-col-resize",
+        @direction == :v && "h-1.5 -translate-y-1/2 cursor-row-resize"
+      ]}
+      {@rest}
+    >
+    </div>
+    """
+  end
 end

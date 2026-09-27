@@ -549,6 +549,78 @@
                 Use the top-left toggle to compare the full sidebar and compact rail. On a narrow screen it opens a drawer; Escape closes the active menu first, then the drawer.
               </p>
             </section>
+            <.card
+              id="component-tile-header"
+              title="Workspace tile header"
+              inner_class="space-y-4 p-4"
+            >
+              <p class="text-xs text-ink-muted">
+                The compact bar above each tile of the tiled workspace: the page's title and a menu carrying every operation the tiling keyboard mode offers. The focused tile's title takes the brand accent; the menu closes when focus leaves it or Escape is pressed.
+              </p>
+              <div
+                id="design-library-tile-header-focused"
+                class="overflow-hidden rounded-md border border-brand-strong"
+              >
+                <.tile_header
+                  id="design-library-tile-header-a"
+                  title="Companies"
+                  focused
+                  open_alone={~p"/system/design-library/components"}
+                  on_focus={JS.push("test_click")}
+                  on_close={JS.push("test_click")}
+                  on_monocle={JS.push("test_click")}
+                  on_split={JS.push("test_click")}
+                  on_swap={JS.push("test_click")}
+                />
+              </div>
+              <div
+                id="design-library-tile-header-monocle"
+                class="overflow-hidden rounded-md border border-line"
+              >
+                <.tile_header
+                  id="design-library-tile-header-b"
+                  title="Users, filling the workspace"
+                  monocle
+                  open_alone={~p"/system/design-library/components"}
+                  on_focus={JS.push("test_click")}
+                  on_close={JS.push("test_click")}
+                  on_monocle={JS.push("test_click")}
+                  on_split={JS.push("test_click")}
+                  on_swap={JS.push("test_click")}
+                />
+              </div>
+            </.card>
+            <.card
+              id="component-split-handle"
+              title="Workspace split handle"
+              inner_class="space-y-2 p-4"
+            >
+              <p class="text-xs text-ink-muted">
+                The divider between two tiles. It draws nothing at rest, surfaces on hover and focus, and resizes by drag or by the arrow keys while focused. The workspace positions each one from its layout tree.
+              </p>
+              <div
+                id="design-library-split-handles"
+                class="relative h-24 rounded-md border border-dashed border-line"
+              >
+                <.split_handle
+                  id="design-library-split-handle-h"
+                  direction={:h}
+                  label="Resize Companies and Users"
+                  style="left: 50%; top: 0; height: 100%"
+                />
+                <.split_handle
+                  id="design-library-split-handle-v"
+                  direction={:v}
+                  label="Resize Users and Employees"
+                  style="left: 50%; top: 50%; width: 50%"
+                />
+                <.split_handle
+                  id="design-library-split-handle-plain"
+                  direction={:h}
+                  label="A handle the caller has not placed"
+                />
+              </div>
+            </.card>
             <.card id="component-page" title="Page widths" inner_class="space-y-2 p-4">
               <div id="design-library-page-stage" class="overflow-x-auto">
                 <div class="w-[1280px] space-y-3">

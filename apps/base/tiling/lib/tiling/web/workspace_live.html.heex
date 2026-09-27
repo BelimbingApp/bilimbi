@@ -1,0 +1,350 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} active_nav={@active_nav}>
+  <:topbar_actions>
+    <div :if={not @framed?} id="workspace-actions" class="flex items-center gap-1">
+      <.icon_button
+        id="workspace-add-page"
+        icon="create"
+        label={gettext("Add a page")}
+        context={:inline}
+        phx-click="open-picker"
+      />
+      <.icon_button
+        id="workspace-open-layouts"
+        icon="hero-bookmark"
+        label={gettext("Saved layouts")}
+        context={:inline}
+        phx-click="open-layouts"
+      />
+    </div>
+  </:topbar_actions>
+
+  <%= if @framed? do %>
+    <div id="workspace-framed" class="flex h-full items-center justify-center p-6">
+      <.empty_state
+        id="workspace-framed-state"
+        title={gettext("The workspace cannot open inside a tile")}
+        reason={gettext("A tile shows one page. Open the workspace on its own to tile pages.")}
+      >
+        <:action>
+          <%!-- A frame link that must leave the frame: `target="_top"` is the
+          one attribute the shared button does not carry. --%>
+          <.link
+            id="workspace-framed-open"
+            href={~p"/workspace"}
+            target="_top"
+            class="text-sm font-medium text-link underline hover:text-ink"
+          >
+            {gettext("Open the workspace")}
+          </.link>
+        </:action>
+      </.empty_state>
+    </div>
+  <% else %>
+    <%!-- The hook owns the keyboard mode, the drag on each handle and the
+    bridge into every frame. The server owns the tree: `data-focused` is the
+    focused tile after every patch, and the hook reads it rather than
+    tracking its own. Each tile is one element per tile id, positioned by
+    style alone, so a split, close or resize never re-creates a frame. --%>
+    <div
+      id="workspace"
+      phx-hook="Tiling"
+      data-focused={@focused}
+      data-monocle={to_string(@monocle)}
+      data-max-tiles={@max_tiles}
+      data-tile-count={length(@tiles)}
+      class="flex h-full min-h-0 flex-col"
+    >
+      <.tabs
+        :if={@tiles != []}
+        id="workspace-tabs"
+        aria-label={gettext("Tiles")}
+        class="shrink-0 lg:hidden"
+      >
+        <:tab
+          :for={tile <- @tiles}
+          id={"workspace-tab-#{tile.id}"}
+          click="focus-tile"
+          value={tile.id}
+          current={tile.focused?}
+        >
+          {tile.title}
+        </:tab>
+      </.tabs>
+
+      <p
+        id="workspace-announcement"
+        phx-update="ignore"
+        class="sr-only"
+        role="status"
+        aria-live="polite"
+      >
+      </p>
+
+      <div id="workspace-tiles" class="relative min-h-0 flex-1">
+        <div
+          :if={@tiles == []}
+          id="workspace-empty"
+          class="flex h-full items-center justify-center p-6"
+        >
+          <.empty_state
+            id="workspace-empty-state"
+            title={gettext("No pages open")}
+            reason={
+              gettext(
+                "Add a page to start tiling. Each new page takes half of the focused tile, and every tile stays a page with its own address."
+              )
+            }
+          >
+            <:action>
+              <.button id="workspace-empty-add" variant="primary" phx-click="open-picker">
+                {gettext("Add a page")}
+              </.button>
+            </:action>
+          </.empty_state>
+        </div>
+
+        <div
+          :for={tile <- @tiles}
+          id={"tile-#{tile.id}"}
+          class="workspace-tile absolute p-0.5"
+          style={tile.style}
+          data-tile={tile.id}
+          data-focused={to_string(tile.focused?)}
+          hidden={@monocle and not tile.focused?}
+        >
+          <div class={[
+            "flex h-full min-h-0 flex-col overflow-hidden rounded-md border bg-surface",
+            tile.focused? && "border-brand-strong ring-1 ring-brand-strong",
+            !tile.focused? && "border-line"
+          ]}>
+            <.tile_header
+              id={"tile-#{tile.id}-header"}
+              title={tile.title}
+              focused={tile.focused?}
+              monocle={@monocle and tile.focused?}
+              open_alone={tile.path}
+              on_focus={JS.push("focus-tile", value: %{id: tile.id})}
+              on_close={JS.push("close-tile", value: %{id: tile.id})}
+              on_monocle={JS.push("toggle-monocle", value: %{id: tile.id})}
+              on_split={JS.push("toggle-split", value: %{id: tile.id})}
+              on_swap={JS.push("swap-tile", value: %{id: tile.id})}
+            />
+            <%= case tile.access do %>
+              <% :ok -> %>
+                <%!-- `phx-update="ignore"`: the frame's `src` is written once.
+                A frame navigates itself afterwards and reports where it
+                went; rewriting `src` from the server would reload it. --%>
+                <div id={"tile-#{tile.id}-frame"} phx-update="ignore" class="min-h-0 flex-1">
+                  <iframe
+                    id={"tile-#{tile.id}-page"}
+                    src={tile.path}
+                    title={tile.title}
+                    data-tile-frame={tile.id}
+                    class="size-full border-0 bg-canvas"
+                  ></iframe>
+                </div>
+              <% :forbidden -> %>
+                <div
+                  id={"tile-#{tile.id}-forbidden"}
+                  class="flex flex-1 items-center justify-center p-4"
+                >
+                  <.empty_state forbidden={gettext("open %{path}", path: tile.path)} />
+                </div>
+              <% :unserved -> %>
+                <div
+                  id={"tile-#{tile.id}-unserved"}
+                  class="flex flex-1 items-center justify-center p-4"
+                >
+                  <.empty_state
+                    title={gettext("This page is not available")}
+                    reason={
+                      gettext(
+                        "Nothing in this deployment serves %{path}. Close the tile or add another page.",
+                        path: tile.path
+                      )
+                    }
+                  />
+                </div>
+            <% end %>
+          </div>
+        </div>
+
+        <.split_handle
+          :for={handle <- @handles}
+          :if={not @monocle}
+          id={"split-#{handle.id}"}
+          direction={handle.direction}
+          label={handle.label}
+          style={handle.style}
+          data-split={handle.id}
+          data-rect={handle.rect}
+        />
+      </div>
+    </div>
+
+    <.modal
+      :if={@picker_open?}
+      id="workspace-picker"
+      title={gettext("Add a page")}
+      on_cancel={JS.push("close-picker")}
+      flash={@flash}
+    >
+      <:description>
+        {gettext("The page opens in a new tile beside the focused one, up to %{count} tiles.",
+          count: @max_tiles
+        )}
+      </:description>
+      <div id="workspace-picker-pages" class="-mx-1 max-h-96 space-y-0.5 overflow-y-auto">
+        <button
+          :for={page <- @pages}
+          type="button"
+          id={"workspace-pick-" <> String.replace(page.id, ".", "-")}
+          phx-click="add-tile"
+          phx-value-path={page.route}
+          class="block w-full rounded-md px-2 py-1.5 text-left transition hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+        >
+          <span class="block text-sm text-ink">{page.label}</span>
+          <span :if={page.trail != ""} class="block text-xs text-ink-muted">{page.trail}</span>
+        </button>
+        <.empty_state
+          :if={@pages == []}
+          id="workspace-picker-empty"
+          title={gettext("No pages to add")}
+          reason={
+            gettext(
+              "No destinations are available for this account. Ask an operator to assign a role."
+            )
+          }
+        />
+      </div>
+    </.modal>
+
+    <.modal
+      :if={@layouts_open?}
+      id="workspace-layouts"
+      title={gettext("Saved layouts")}
+      on_cancel={JS.push("close-layouts")}
+      flash={@flash}
+      width={:wide}
+    >
+      <:description>
+        {gettext(
+          "Layouts are saved for your account. In tiling mode, the keys 1 to 9 open the first nine."
+        )}
+      </:description>
+
+      <.form
+        for={@save_form}
+        id="workspace-save-form"
+        phx-change="validate-layout"
+        phx-submit="save-layout"
+        class="flex items-end gap-2"
+      >
+        <.input
+          field={@save_form[:label]}
+          label={gettext("Save the current layout as")}
+          placeholder={gettext("Orders desk")}
+          wrapper_class="mb-0 flex-1"
+        />
+        <.button type="submit" id="workspace-save-layout" variant="primary">
+          {gettext("Save")}
+        </.button>
+      </.form>
+
+      <p :if={@slug} class="mt-2 text-xs text-ink-muted">
+        <.button id="workspace-update-layout" phx-click="update-layout">
+          {gettext("Update “%{label}” with the current tiles",
+            label: current_label(@saved, @slug)
+          )}
+        </.button>
+      </p>
+
+      <div class="mt-4">
+        <.table
+          id="workspace-saved-layouts"
+          rows={@saved}
+          row_id={&("workspace-layout-" <> &1["slug"])}
+        >
+          <:col :let={entry} label={gettext("Name")}>
+            <.inline_edit
+              id={"workspace-layout-name-" <> entry["slug"]}
+              id_value={entry["slug"]}
+              value={entry["label"]}
+              name="label"
+              save_event="rename-layout"
+              label={gettext("Rename layout")}
+            />
+          </:col>
+          <:col :let={entry} label={gettext("Opens with the workspace")}>
+            <span
+              :if={entry["slug"] == @default_slug}
+              id={"workspace-layout-default-" <> entry["slug"]}
+            >
+              {gettext("Default")}
+            </span>
+          </:col>
+          <:action :let={entry}>
+            <div class="flex items-center justify-end gap-1">
+              <.icon_button
+                id={"workspace-layout-open-" <> entry["slug"]}
+                icon="view"
+                label={gettext("Open %{label}", label: entry["label"])}
+                navigate={~p"/workspace/#{entry["slug"]}"}
+              />
+              <.icon_button
+                :if={entry["slug"] != @default_slug}
+                id={"workspace-layout-set-default-" <> entry["slug"]}
+                icon="retain"
+                label={gettext("Open the workspace with %{label}", label: entry["label"])}
+                phx-click="set-default-layout"
+                phx-value-id={entry["slug"]}
+              />
+              <.icon_button
+                :if={entry["slug"] == @default_slug}
+                id={"workspace-layout-clear-default-" <> entry["slug"]}
+                icon="retained"
+                label={gettext("Stop opening the workspace with %{label}", label: entry["label"])}
+                phx-click="clear-default-layout"
+              />
+              <.icon_button
+                id={"workspace-layout-delete-" <> entry["slug"]}
+                icon="delete"
+                kind={:danger}
+                label={gettext("Delete %{label}", label: entry["label"])}
+                phx-click="delete-layout"
+                phx-value-id={entry["slug"]}
+              />
+            </div>
+          </:action>
+          <:empty
+            title={gettext("No saved layouts")}
+            reason={
+              gettext(
+                "Save the current tiles under a name to open them again from the sidebar or by address."
+              )
+            }
+          />
+        </.table>
+      </div>
+    </.modal>
+
+    <.confirm_dialog
+      :if={@pending_delete}
+      id="workspace-delete-layout"
+      consequence={
+        gettext("The layout “%{label}” will be deleted.",
+          label: current_label(@saved, @pending_delete)
+        )
+      }
+      detail={
+        gettext(
+          "Its address stops working. The pages it showed are unaffected. This cannot be undone."
+        )
+      }
+      confirm={gettext("Delete")}
+      working={gettext("Deleting…")}
+      on_confirm={JS.push("confirm-delete-layout")}
+      on_cancel={JS.push("cancel-delete-layout")}
+    />
+  <% end %>
+</Layouts.app>

@@ -99,6 +99,34 @@ defmodule Bilimbi.Base.UI.Layouts do
   slot(:topbar_actions)
   slot(:inner_block, required: true)
 
+  # The chromeless render. A page shown inside a workspace tile is a full
+  # document of its own, so it would otherwise draw a second top bar, sidebar
+  # and status bar inside the tile. `BilimbiWeb.FramedRender` sets the flag
+  # from the request's `Sec-Fetch-Dest` header through the signed LiveView
+  # session, which live navigation inside the frame keeps; nothing about the
+  # flag is stored in the cookie every tab shares. The root keeps the
+  # `app-shell` id and `data-display-mode` because `<.datetime>` reads the
+  # live clock from there. No impersonation strip: the workspace page around
+  # the tile already shows it.
+  def app(%{current_scope: %{framed: true}} = assigns) do
+    assigns = assign(assigns, :preferences, assigns.current_scope.shell_preferences)
+
+    ~H"""
+    <div
+      id="app-shell"
+      data-framed="true"
+      data-display-mode={@preferences.mode}
+      class="flex h-screen flex-col overflow-hidden bg-canvas"
+    >
+      <main id="app-content" class="min-h-0 min-w-0 flex-1 overflow-y-auto px-1 py-2 sm:px-3">
+        {render_slot(@inner_block)}
+      </main>
+    </div>
+
+    <.flash_group flash={@flash} />
+    """
+  end
+
   def app(assigns) do
     nav = Bilimbi.Base.UI.Nav.tree(assigns.current_scope)
 
@@ -242,6 +270,20 @@ defmodule Bilimbi.Base.UI.Layouts do
         class="flex h-6 shrink-0 items-center justify-between border-t border-line bg-surface px-4 text-xs text-ink-subtle"
       >
         <div class="flex min-w-0 items-center gap-4 overflow-hidden">
+          <%!-- A page-level keyboard mode, such as the workspace's tiling mode,
+          names itself here. The page's hook fills and reveals it; the shell
+          renders it empty and hidden so the mode has one place on every
+          screen and a polite announcement when it changes. `phx-update="ignore"`
+          because the hook owns its text and visibility: without it the next
+          patch morphs the span back to empty and hidden. --%>
+          <span
+            id="app-mode"
+            phx-update="ignore"
+            hidden
+            role="status"
+            aria-live="polite"
+            class="shrink-0 rounded-sm bg-brand-surface px-1.5 font-medium text-brand-ink"
+          ></span>
           <span
             :if={@shell.dev?}
             id="app-env"

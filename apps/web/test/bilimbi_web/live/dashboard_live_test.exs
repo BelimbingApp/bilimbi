@@ -140,7 +140,10 @@ defmodule BilimbiWeb.DashboardLiveTest do
     assert has_element?(view, "#app-shell[phx-hook='AppShell']")
     assert has_element?(view, "#app-sidebar-drag")
     refute has_element?(view, "#nav-dashboard")
-    assert has_element?(view, "#app-nav-empty")
+    # The workspace needs no capability, so even an account with no role has
+    # that one destination; the "no destinations" sentence is for none at all.
+    assert has_element?(view, "#nav-workspace[href='/workspace']")
+    refute has_element?(view, "#app-nav-empty")
     refute has_element?(view, "#nav-admin-company")
     refute has_element?(view, "#nav-admin-user")
     refute has_element?(view, "#dashboard-company-open")

@@ -113,6 +113,7 @@ apps/
 │   ├── settings/                 # Immutable definitions and scoped values
 │   ├── system/                   # Read-only instance facts (System Info)
 │   ├── tenancy/                  # Tenant scope and operator resolution
+│   ├── tiling/                   # Tiled workspace and saved layouts
 │   └── ui/                       # Shared components, layouts, Design Library
 ├── core/                         # Mandatory composition application
 │   ├── bilimbi.container.exs     # Declares the Core layer
