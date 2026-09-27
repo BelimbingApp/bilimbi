@@ -6,6 +6,7 @@ defmodule Bilimbi.Base.Tiling.SavedLayoutsTest do
   alias Bilimbi.Base.Settings.Scope
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Base.Tiling.SavedLayouts
+  alias Bilimbi.Base.Tiling.SharedLayouts
 
   @scope Scope.user(91, 73, 41)
   @other Scope.user(92, 73, 41)
@@ -90,5 +91,37 @@ defmodule Bilimbi.Base.Tiling.SavedLayoutsTest do
     assert :ok = SavedLayouts.set_default(@scope, "people")
     assert :ok = SavedLayouts.set_default(@scope, nil)
     assert SavedLayouts.default_slug(@scope) == nil
+  end
+
+  test "shared workspaces stay in their company and filter by role code" do
+    company = Scope.company(73)
+    other_company = Scope.company(74)
+
+    assert {:ok, %{"slug" => "company-desk"}} =
+             SharedLayouts.publish(company, "Company desk", "/companies", [])
+
+    assert {:ok, %{"slug" => "review-desk"}} =
+             SharedLayouts.publish(company, "Review desk", "/users", ["reviewer"])
+
+    assert Enum.map(SharedLayouts.visible(company, []), & &1["slug"]) == ["company-desk"]
+    assert length(SharedLayouts.visible(company, ["reviewer"])) == 2
+    assert SharedLayouts.fetch_visible(company, "review-desk", []) == :error
+    assert SharedLayouts.list(other_company) == []
+
+    assert SharedLayouts.publish(company, "Bad roles", "/users", ["Not A Code"]) ==
+             {:error, :roles}
+
+    assert SharedLayouts.publish(company, " ", "/users", []) == {:error, :label}
+  end
+
+  test "an account without a company sees no shared workspaces" do
+    assert {:ok, _} = SharedLayouts.publish(Scope.company(73), "Company desk", "/companies", [])
+    assert SharedLayouts.visible(nil, ["reviewer"]) == []
+    assert SharedLayouts.fetch_visible(nil, "company-desk", []) == :error
+  end
+
+  test "a saved layout never takes the slug of a workspace route" do
+    assert {:ok, %{"slug" => "shared-layouts-2"}} =
+             SavedLayouts.save(@scope, "Shared layouts", "/companies")
   end
 end

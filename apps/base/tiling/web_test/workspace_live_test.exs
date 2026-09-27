@@ -10,8 +10,11 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Tenancy
   alias Bilimbi.Base.Tiling.SavedLayouts
+  alias Bilimbi.Base.Tiling.SharedLayouts
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
 
@@ -619,5 +622,135 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
       assert_patch(view, "/workspace?t=h.5%28%2Fcompanies%2C%2Fcompanies%29")
       assert has_element?(view, "#tile-t1-page")
     end
+  end
+
+  test "shared workspace opens for company viewer while a forbidden tile stays closed", %{
+    conn: conn
+  } do
+    {:ok, entry} =
+      SharedLayouts.publish(
+        Settings.Scope.company(73),
+        "Team desk",
+        "h.5(/companies,/users)",
+        []
+      )
+
+    {:ok, view, _html} = open(conn, "/workspace/shared/#{entry["slug"]}")
+    assert has_element?(view, "#tile-t1-page[src^='/companies?ws=']")
+    assert has_element?(view, "#tile-t2-forbidden")
+    refute has_element?(view, "#tile-t2-page")
+
+    view |> element("#workspace-open-layouts") |> render_click()
+    assert has_element?(view, "#workspace-shared-open-team-desk")
+    view |> element("#workspace-shared-copy-team-desk") |> render_click()
+    assert_patch(view, "/workspace/team-desk")
+    assert {:ok, _} = SavedLayouts.fetch(@settings_scope, "team-desk")
+
+    CompanyFixtures.insert_tenant!(%{id: 52, is_platform_operator: false})
+    CompanyFixtures.insert_company!(%{id: 84, tenant_id: 52, code: "other-company"})
+
+    UserFixtures.insert_user!(%{
+      id: 96,
+      company_id: 84,
+      name: "Other user",
+      email: "other@example.com"
+    })
+
+    assert {:error, {:live_redirect, %{to: "/workspace"}}} =
+             conn
+             |> log_in_as(session_user(%{"user_id" => 96, "company_id" => 84}))
+             |> live("/workspace/shared/team-desk")
+  end
+
+  test "copying the open shared workspace keeps the viewer's arrangement", %{conn: conn} do
+    {:ok, _} = SharedLayouts.publish(Settings.Scope.company(73), "Team desk", "/companies", [])
+
+    {:ok, view, _html} =
+      open(conn, "/workspace/shared/team-desk?t=h.5(%2Fcompanies,%2Fcompanies)")
+
+    view |> element("#workspace-open-layouts") |> render_click()
+    view |> element("#workspace-shared-copy-team-desk") |> render_click()
+    assert_patch(view, "/workspace/team-desk")
+
+    assert {:ok, %{"tree" => "h.5(/companies,/companies)"}} =
+             SavedLayouts.fetch(@settings_scope, "team-desk")
+  end
+
+  test "an account without a company is refused at sign-in before any workspace route mounts",
+       %{conn: conn} do
+    UserFixtures.insert_user!(%{
+      id: 96,
+      company_id: nil,
+      name: "Loner",
+      email: "loner@example.com"
+    })
+
+    grant_capabilities!("ui.workspace.publish", user_id: 96)
+    {:ok, _} = SharedLayouts.publish(Settings.Scope.company(73), "Team desk", "/companies", [])
+    conn = log_in_as(conn, session_user(%{"user_id" => 96, "company_id" => nil}))
+
+    for path <- ["/workspace", "/workspace/shared/team-desk", "/workspace/shared-layouts"] do
+      assert {:error, {:redirect, %{to: "/"}}} = live(conn, path)
+    end
+  end
+
+  test "a shared workspace does not replace the empty workspace", %{conn: conn} do
+    {:ok, _} = SharedLayouts.publish(Settings.Scope.company(73), "Team desk", "/companies", [])
+
+    {:ok, view, _html} = open(conn)
+    assert has_element?(view, "#workspace-empty-state", "No pages open")
+
+    view |> element("#workspace-open-layouts") |> render_click()
+    assert has_element?(view, "#workspace-shared-open-team-desk")
+  end
+
+  test "a role-limited workspace is visible only to assigned people in its company", %{conn: conn} do
+    {:ok, scope} = Tenancy.scope(41)
+    {:ok, role} = Authz.create_role(scope, 73, %{name: "Reviewer", code: "reviewer"})
+    {:ok, :assigned} = Authz.assign_role(scope, 73, :user, 91, role.id)
+
+    {:ok, _} =
+      SharedLayouts.publish(Settings.Scope.company(73), "Review", "/companies", ["reviewer"])
+
+    {:ok, owner, _html} = conn |> log_in_as() |> live("/workspace?t=/companies")
+    owner |> element("#workspace-open-layouts") |> render_click()
+    assert has_element?(owner, "#workspace-shared-review")
+
+    UserFixtures.insert_user!(%{id: 96, company_id: 73, name: "Peer", email: "peer@example.com"})
+
+    {:ok, peer, _html} =
+      conn
+      |> log_in_as(session_user(%{"user_id" => 96, "company_id" => 73}))
+      |> live("/workspace?t=/companies")
+
+    peer |> element("#workspace-open-layouts") |> render_click()
+    refute has_element?(peer, "#workspace-shared-review")
+  end
+
+  test "publishing and the shared workspace list require the publish capability", %{conn: conn} do
+    assert {:error, {:redirect, %{to: "/"}}} = live(conn, "/workspace/shared-layouts")
+
+    assert {:error, {:redirect, %{to: "/dashboard"}}} =
+             conn |> log_in_as() |> live("/workspace/shared-layouts")
+
+    grant_capabilities!("ui.workspace.publish")
+    {:ok, index, _html} = conn |> log_in_as() |> live("/workspace/shared-layouts")
+    assert has_element?(index, "#shared-workspace-start")
+
+    {:ok, view, _html} = conn |> log_in_as() |> live("/workspace/shared-layouts?t=%2Fcompanies")
+
+    view
+    |> form("#shared-workspace-form", %{
+      "layout" => %{"label" => "Control desk"}
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#shared-workspace-control-desk", "Control desk")
+    assert [%{"slug" => "control-desk"}] = SharedLayouts.list(Settings.Scope.company(73))
+
+    view |> element("#shared-workspace-delete-control-desk") |> render_click()
+    assert_modal_dialog(view, "shared-workspace-delete-confirmation", "will be deleted")
+    view |> element("#shared-workspace-delete-confirmation-cancel") |> render_click()
+    assert [%{"slug" => "control-desk"}] = SharedLayouts.list(Settings.Scope.company(73))
   end
 end

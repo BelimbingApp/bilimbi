@@ -1,0 +1,70 @@
+<Layouts.app flash={@flash} current_scope={@current_scope} active_nav="workspace.shared">
+  <.page variant={:list}>
+    <h1 class="text-xl font-semibold text-action">{gettext("Shared workspaces")}</h1>
+    <p class="mt-1 text-sm text-muted">
+      {gettext("Publish a workspace for everyone in this company, or limit it to roles.")}
+    </p>
+
+    <.link
+      :if={@tree == ""}
+      id="shared-workspace-start"
+      navigate={~p"/workspace"}
+      class="mt-3 inline-block text-sm text-link underline"
+    >{gettext("Open a workspace to share its current tiles")}</.link>
+
+    <.form
+      :if={@tree != ""}
+      for={@form}
+      id="shared-workspace-form"
+      phx-submit="publish-layout"
+      class="mt-4 space-y-2"
+    >
+      <.input field={@form[:label]} label={gettext("Name")} required />
+      <input type="hidden" name="layout[tree]" value={@tree} />
+      <.multi_select
+        field={@form[:roles]}
+        id="shared-workspace-roles"
+        label={gettext("Limit to roles")}
+        placeholder={gettext("Everyone in this company")}
+        options={@role_options}
+        selection_label={gettext(":count role selected|:count roles selected")}
+      />
+      <.button id="shared-workspace-publish" type="submit" variant="primary">{gettext("Publish")}</.button>
+    </.form>
+
+    <.table id="shared-workspaces" rows={@entries} row_id={&("shared-workspace-" <> &1["slug"])}>
+      <:col :let={entry} label={gettext("Name")}>{entry["label"]}</:col>
+      <:col :let={entry} label={gettext("Audience")}>
+        {if entry["roles"] == [], do: gettext("Company"), else: Enum.join(entry["roles"], ", ")}
+      </:col>
+      <:action :let={entry}>
+        <.link
+          id={"shared-workspace-open-" <> entry["slug"]}
+          navigate={~p"/workspace/shared/#{entry["slug"]}"}
+          class="text-sm text-link underline"
+        >{gettext("Open")}</.link>
+        <.button
+          id={"shared-workspace-delete-" <> entry["slug"]}
+          phx-click="delete-layout"
+          phx-value-slug={entry["slug"]}
+        >{gettext("Delete")}</.button>
+      </:action>
+      <:empty
+        :if={@entries == []}
+        title={gettext("No shared workspaces")}
+        reason={gettext("Publish a workspace to make it available to this company.")}
+      />
+    </.table>
+
+    <.confirm_dialog
+      :if={@pending_delete}
+      id="shared-workspace-delete-confirmation"
+      consequence={gettext("The shared workspace will be deleted for everyone in this company.")}
+      detail={gettext("Personal copies are unaffected. This cannot be undone.")}
+      confirm={gettext("Delete")}
+      working={gettext("Deleting…")}
+      on_confirm={JS.push("confirm-delete-layout")}
+      on_cancel={JS.push("cancel-delete-layout")}
+    />
+  </.page>
+</Layouts.app>

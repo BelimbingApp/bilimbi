@@ -266,7 +266,7 @@
         </.button>
       </.form>
 
-      <p :if={@slug} class="mt-2 text-xs text-ink-muted">
+      <p :if={@slug && !@shared?} class="mt-2 text-xs text-ink-muted">
         <.button id="workspace-update-layout" phx-click="update-layout">
           {gettext("Update “%{label}” with the current tiles",
             label: current_label(@saved, @slug)
@@ -332,6 +332,7 @@
             </div>
           </:action>
           <:empty
+            :if={@saved == []}
             title={gettext("No saved layouts")}
             reason={
               gettext(
@@ -340,6 +341,51 @@
             }
           />
         </.table>
+      </div>
+
+      <div id="workspace-shared-layouts" class="mt-4">
+        <.section_heading title={gettext("Shared with you")} />
+        <.table
+          id="workspace-shared-table"
+          rows={@shared}
+          row_id={&("workspace-shared-" <> &1["slug"])}
+        >
+          <:col :let={entry} label={gettext("Name")}>{entry["label"]}</:col>
+          <:col :let={entry} label={gettext("Audience")}>
+            {if entry["roles"] == [],
+              do: gettext("Company"),
+              else: Enum.join(entry["roles"], ", ")}
+          </:col>
+          <:action :let={entry}>
+            <.link
+              id={"workspace-shared-open-" <> entry["slug"]}
+              navigate={~p"/workspace/shared/#{entry["slug"]}"}
+              class="text-sm text-link underline"
+            >{gettext("Open")}</.link>
+            <.button
+              id={"workspace-shared-copy-" <> entry["slug"]}
+              phx-click="copy-layout"
+              phx-value-id={entry["slug"]}
+            >{gettext("Copy")}</.button>
+          </:action>
+          <:empty
+            :if={@shared == []}
+            title={gettext("No shared workspaces")}
+            reason={gettext("Workspaces shared with your company or roles appear here.")}
+          />
+        </.table>
+        <.link
+          :if={@company_scope && allowed?(@current_scope, "ui.workspace.publish")}
+          id="workspace-manage-shared"
+          navigate={~p"/workspace/shared-layouts"}
+          class="text-sm text-link underline"
+        >{gettext("Manage shared workspaces")}</.link>
+        <.link
+          :if={@company_scope && allowed?(@current_scope, "ui.workspace.publish") && @tiles != []}
+          id="workspace-publish-current"
+          navigate={~p"/workspace/shared-layouts?t=#{Layout.encode(@tree)}"}
+          class="ml-3 text-sm text-link underline"
+        >{gettext("Share current tiles")}</.link>
       </div>
     </.modal>
 

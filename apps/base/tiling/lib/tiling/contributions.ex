@@ -27,9 +27,22 @@ defmodule Bilimbi.Base.Tiling.Contributions do
             label: "Default workspace layout",
             help: "The slug of the saved layout the workspace opens with.",
             capability: "base.settings.user.manage"
+          },
+          "ui.workspace.shared_layouts" => %{
+            type: :array,
+            scopes: [:company],
+            default: [],
+            label: "Shared workspace layouts",
+            help: "Company workspaces, optionally limited to role codes.",
+            capability: "ui.workspace.publish"
           }
         },
         runtime_claims: []
+      },
+      authz: %{
+        domains: %{"ui" => "Workspace capabilities"},
+        verbs: ["publish"],
+        capabilities: ["ui.workspace.publish"]
       },
       menu: [
         %{
@@ -38,6 +51,14 @@ defmodule Bilimbi.Base.Tiling.Contributions do
           icon: "squares-2x2",
           route: "/workspace",
           order: 100
+        },
+        %{
+          id: "workspace.shared",
+          label: "Shared workspaces",
+          icon: "squares-2x2",
+          route: "/workspace/shared-layouts",
+          capability: "ui.workspace.publish",
+          order: 101
         }
       ]
     }
