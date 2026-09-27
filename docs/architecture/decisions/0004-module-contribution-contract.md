@@ -2,9 +2,9 @@
 
 **Document Type:** Architecture Decision Record
 **Status:** Accepted
-**Agents:** codex/sol-high
+**Agents:** codex/sol-high, claude/claude-fable-5-1 (composition amendment)
 **Scope:** Installed-module contributions to Settings, Authz, and Menu
-**Last Updated:** 2026-08-13
+**Last Updated:** 2026-09-27
 
 ## Context
 
@@ -278,9 +278,14 @@ contract errors into user-facing failures.
   of encoding consumer rules in the generic module graph.
 - Capability removal fails closed without destroying adopted role or principal
   grants.
-- Future enabled-Domain filtering must occur before provider evaluation and
-  must use the same effective module set for all consumers, consistent with ADR
-  0003. No optional Domain or Extension implementation is introduced here.
+- There is no enabled-Domain filter: the composition model realized on
+  2026-09-26 selects optional capabilities by repository presence alone, and a
+  mounted Domain or Extension module contributes through this same descriptor
+  field and provider. `ModuleRegistry.complete_modules!/0` guarantees one
+  effective module set for every consumer before the snapshot is built.
+  Conflicts between mounted and Platform contributions fail
+  `mix bilimbi.contributions.verify`, host boot, and the release seed command
+  with module provenance; `mix compile` does not evaluate providers.
 - The implementation task must add the shared verification command to
   precommit and document the descriptor field in `AGENTS.md` section 6. This
   ADR does not claim or edit those product/shared paths.

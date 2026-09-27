@@ -2,19 +2,21 @@
 
 **Document Type:** Architecture Decision Record
 **Status:** Accepted
-**Agents:** codex/sol-high, codex/gpt-6-sol-medium (nested-root amendment)
+**Agents:** codex/sol-high, codex/gpt-6-sol-medium (nested-root amendment),
+claude/claude-fable-5-1 (realization amendment)
 **Scope:** Deep-module filesystem boundaries, descriptor-driven Mix
 composition, nested Git distribution, tests, documentation, assets, and
 migration ownership
-**Last Updated:** 2026-09-25
+**Last Updated:** 2026-09-27
 
 > This ADR records the physical packaging decision. Current database ownership,
 > dependency categories, migration, contract, and ledger rules are centralized
 > in [Bilimbi Database Architecture](../database.md).
 > Optional Domain and Extension placement was amended by the normative
 > [composition model](../0010_composition-model.md): repositories mount under
-> `apps/domains/` and `apps/extensions/`. The Mix realization remains subject to
-> the disposable composition proof.
+> `apps/domains/` and `apps/extensions/`. Its proof passed on 2026-09-26, and
+> the paragraphs below marked *realized* record what changed in this ADR's
+> accepted contract; 0010's "Realization outcome" holds the mechanism.
 
 ## Context
 
@@ -128,10 +130,8 @@ stable container ID and layer. Its `mix.exs` calls the shared discovery helper
 and never enumerates Database, Tenancy, Company, Address, Compatibility, or any
 other child. Discovery treats each immediate non-hidden child directory as an
 installed module and requires `bilimbi.module.exs` at that child's root. Thus
-mounting `apps/base/mailer/` changes source composition today. Once nested
-container discovery is implemented, mounting the `apps/domains/sales/`
-repository will also change source composition through Mix dependency
-resolution.
+mounting `apps/base/mailer/` changes source composition, and so does mounting
+the `apps/domains/sales/` repository (*realized* 2026-09-26).
 
 Base ModuleRegistry physically owns the source-loadable helper at
 `apps/base/module_registry/mix/module_discovery.exs`. Containers locate that
@@ -164,9 +164,15 @@ path dependencies and runtime descriptor metadata generically. Composition
 containers own no speculative library dependencies.
 
 Mix sees Base, Core, and Web as direct umbrella children below `apps/`.
-Discovery must also include mounted Domain and Extension containers under
-their respective roots and bring them into the build. The mechanism for that
-nested Mix composition is subject to the disposable proof in the rollout plan.
+Discovery also finds mounted Domain and Extension containers one level below
+`apps/domains/` and `apps/extensions/` (*realized*): a container's ID must
+equal its directory name and is its OTP application name, its layer must
+match its root, and `base`, `core`, and `web` are reserved. Web declares a
+path dependency on every discovered container, so the host's dependency
+closure and the `bilimbi` release built around it carry the whole graph
+without naming a capability. When any repository is mounted, every Mix project
+resolves against the composition lock overlay defined in 0010 rather than the
+Platform's tracked `mix.lock`.
 
 Discovery validates the complete installed graph during Mix dependency
 resolution. It rejects malformed and missing descriptors, duplicate stable
@@ -190,13 +196,16 @@ implementation.
 
 Source composition and runtime visibility are distinct. Discovery makes a
 mounted module available as a path package, but ModuleRegistry can enumerate
-only loaded OTP applications in a runtime consumer's dependency closure. A
-runtime coordinator's descriptor must therefore declare stable dependencies
-on every installed contributor it must enumerate. Compatibility depends on
-each current migration or schema-contract contributor while its code continues
-to discover descriptors, paths, and contracts generically; it contains no
-module-specific path list. A workspace-boundary regression must fail if an
-installed contributor is missing from that runtime closure.
+only loaded OTP applications in a runtime consumer's dependency closure. The
+Web host's closure is therefore the runtime graph (*realized*, replacing the
+earlier rule that Compatibility depend on each contributor, which cannot hold
+once optional repositories mount). Each module's metadata records the graph's
+module IDs, and `ModuleRegistry.complete_modules!/0` refuses a runtime that
+has not loaded all of them; host boot, the database Mix tasks, and the release
+migrate and seed commands call it first. Compatibility still discovers
+descriptors, paths, and contracts generically and contains no module-specific
+path list. A workspace-boundary test fails if the host's closure misses a
+discovered module.
 
 The Base and Core containers are deliberately composition-only and have no
 `lib/`, `priv/`, or `test/` directory and no application callback. Runtime
@@ -215,11 +224,14 @@ Base modules → Core modules → optional Domain modules → Extensions
 
 Allowed code dependencies point in the opposite direction: Extensions may
 depend on Domain/Core/Base contracts, Domains may depend on Core/Base and
-declared sibling modules in the same Domain, Core may depend on Base or
-declared Core siblings, and Base may depend only on declared Base siblings.
-Extensions cannot depend on other Extensions. A module may collaborate with a
-sibling only through an explicit public contract and declared dependency; it
-must not query the sibling's private schema merely because both are installed.
+declared sibling modules, Core may depend on Base or declared Core siblings,
+and Base may depend only on declared Base siblings. A declared same-layer
+edge may cross repositories, Domain to Domain or Extension to Extension
+(*realized*, replacing the earlier rule that Extensions cannot depend on other
+Extensions), and is legitimate only under 0010's business-necessity test.
+Cycles and upward edges are rejected. A module may collaborate with a sibling
+only through an explicit public contract and declared dependency; it must not
+query the sibling's private schema merely because both are installed.
 
 Base Database owns the shared Ecto Repo. `Bilimbi.Base.Repo` is an intentional
 platform-level public name and the documented exception to that package's
@@ -293,8 +305,12 @@ ownership remains local.
   migrations, seeds, fixtures, tests, and other contributions.
 - Generators that assume namespace-derived directories require Bilimbi-aware
   destination paths or a deliberate file move.
-- Root formatting, testing, release, and migration commands must include
-  nested module packages and their `priv` directories.
+- Root formatting, testing, strict compilation, release, and migration
+  commands derive their package list from discovery, so nested module
+  packages and their `priv` directories are included without a mount list.
+- An unmounted module's applied migrations stay valid through
+  `bilimbi_migration_provenance`; unmounting never deletes data, and a remount
+  cannot change an applied file (see the database architecture).
 - Independently authored modules must coordinate globally unique migration
   versions and declare dependencies accurately.
 - ADR 0001 remains the history of the repository-root umbrella decision, but
