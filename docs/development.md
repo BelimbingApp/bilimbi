@@ -129,6 +129,7 @@ apps/
 │   ├── dashboard/                # Dashboard page, catalogue and layout
 │   ├── database/                 # The one Repo, audit capture, console
 │   ├── datetime/                 # Time display and clocks
+│   ├── grid/                     # Field-and-link catalog, flexible tables, saved views
 │   ├── locale/                   # Locale and localization
 │   ├── menu/                     # Navigation from module contributions
 │   ├── module_registry/          # Descriptor discovery and installed-module registry
