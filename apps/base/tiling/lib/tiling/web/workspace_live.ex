@@ -17,14 +17,15 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   `/workspace` alone opens the account's default one, else the page picker.
 
   `?open=` is how a page is tiled in place. The sidebar's tile control on
-  any page links to `/workspace?t=<that page>&open=<the clicked page>`, and
-  from this page to `?t=<the tree>&open=…`, so the one URL form serves both
-  entries: the tree in `t` is read as usual, the page in `open` takes half of
-  the largest tile, and the URL is replaced by the resulting tree. A
-  workspace entered that way from a page, not at a saved layout, leaves for
-  that page's own URL when closed down to one tile, so tiling in place is
-  reversible the way it was entered; one opened from the picker or a saved
-  layout stays a workspace with one tile.
+  any page links to `/workspace?t=<that page>&inplace=1&open=<the clicked
+  page>`, and from this page to its own address plus `open=…`, so the one
+  URL form serves both entries: the tree in `t` is read as usual, the page in
+  `open` takes half of the largest tile, and the URL is replaced by the
+  resulting tree. `inplace=1` marks a workspace entered from a page; every
+  address this page writes keeps it, except a saved layout's, so across a
+  refresh or a reconnect such a workspace still leaves for that page's own
+  URL when closed down to one tile, reversible the way it was entered. One
+  opened from the picker or a saved layout stays a workspace with one tile.
 
   The `Tiling` hook owns what the server cannot: the keyboard bridge into
   each frame, the `Ctrl+.` tiling mode, drag resizing, and reporting each
@@ -95,7 +96,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
      |> assign(:tree, Layout.empty())
      |> assign(:encoded, nil)
      |> assign(:slug, nil)
-     |> assign(:in_place?, nil)
+     |> assign(:in_place?, false)
      |> assign(:focused, nil)
      |> assign(:monocle, false)
      |> assign(:viewport, {1600, 900})
@@ -114,7 +115,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     socket =
       assign(socket,
         slug: params["slug"],
-        in_place?: in_place?(socket.assigns.in_place?, params)
+        in_place?: params["inplace"] == "1" and not is_binary(params["slug"])
       )
 
     cond do
@@ -134,13 +135,6 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
         open_default(socket)
     end
   end
-
-  # Whether this workspace was entered by tiling in place: decided by the
-  # address it mounted at, and dropped once a saved layout is open.
-  defp in_place?(nil, params),
-    do: is_binary(params["open"]) and not is_binary(params["slug"])
-
-  defp in_place?(in_place?, params), do: in_place? and not is_binary(params["slug"])
 
   # The tree an `open` request starts from: the saved layout at the slug, the
   # tree in `t`, or nothing.
@@ -699,13 +693,14 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   defp sync_url(socket, opts \\ []) do
     encoded = Layout.encode(socket.assigns.tree)
     socket = assign(socket, :encoded, encoded)
-    to = workspace_path(socket.assigns.slug, encoded)
+    to = workspace_path(socket.assigns.slug, encoded, socket.assigns.in_place?)
     push_patch(socket, to: to, replace: Keyword.get(opts, :replace, false))
   end
 
-  defp workspace_path(nil, ""), do: ~p"/workspace"
-  defp workspace_path(nil, encoded), do: ~p"/workspace?t=#{encoded}"
-  defp workspace_path(slug, encoded), do: ~p"/workspace/#{slug}?t=#{encoded}"
+  defp workspace_path(nil, "", _in_place?), do: ~p"/workspace"
+  defp workspace_path(nil, encoded, true), do: ~p"/workspace?t=#{encoded}&inplace=1"
+  defp workspace_path(nil, encoded, false), do: ~p"/workspace?t=#{encoded}"
+  defp workspace_path(slug, encoded, _in_place?), do: ~p"/workspace/#{slug}?t=#{encoded}"
 
   defp load_saved(socket) do
     scope = socket.assigns.settings_scope

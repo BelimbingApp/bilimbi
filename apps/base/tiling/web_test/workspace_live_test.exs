@@ -192,12 +192,49 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     {:ok, page, _html} = open(conn, "/companies")
 
     {:ok, view, _html} =
-      live_redirect(page, to: "/workspace?t=/companies?page=2&open=/companies")
+      live_redirect(page, to: "/workspace?t=/companies?page=2&inplace=1&open=/companies")
 
     assert has_element?(view, "#workspace[data-tile-count='2']")
 
     render_hook(view, "close-tile", %{"id" => "t2"})
     assert_redirect(view, "/companies?page=2")
+
+    # The marker survives a full load and every patch, so a refresh or a
+    # reconnect still returns to the page.
+    conn = log_in_as(build_conn())
+
+    {:ok, view, _html} =
+      conn
+      |> live("/workspace?t=/companies?page=2&inplace=1&open=/companies")
+      |> follow_redirect(
+        conn,
+        "/workspace?t=h.5%28%2Fcompanies%3Fpage%3D2%2C%2Fcompanies%29&inplace=1"
+      )
+
+    render_hook(view, "resize-split", %{"id" => "s3", "ratio" => 0.3})
+    assert_patch(view, "/workspace?t=h.3%28%2Fcompanies%3Fpage%3D2%2C%2Fcompanies%29&inplace=1")
+
+    {:ok, view, _html} =
+      live(conn, "/workspace?t=h.3%28%2Fcompanies%3Fpage%3D2%2C%2Fcompanies%29&inplace=1")
+
+    render_hook(view, "close-tile", %{"id" => "t1"})
+    assert_redirect(view, "/companies")
+  end
+
+  test "saving an in-place workspace as a layout drops the marker", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/workspace?t=h.5(/companies,/companies)&inplace=1")
+
+    view |> element("#workspace-open-layouts") |> render_click()
+
+    view
+    |> form("#workspace-save-form", %{"layout" => %{"label" => "Orders desk"}})
+    |> render_submit()
+
+    assert_patch(view, "/workspace/orders-desk")
+
+    render_hook(view, "close-tile", %{"id" => "t2"})
+    assert_patch(view, "/workspace/orders-desk?t=%2Fcompanies")
+    assert has_element?(view, "#workspace[data-tile-count='1']")
   end
 
   test "a workspace from the picker or a saved layout keeps its one tile", %{conn: conn} do

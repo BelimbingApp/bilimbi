@@ -6,14 +6,16 @@ with keyboard control, drag resizing, drag-to-swap, monocle, and layouts
 saved per account.
 
 The usual entry is the sidebar's "Open in a tile" control beside each row's
-pin. It links to `/workspace?t=<the page the browser is on>&open=<the
-clicked page>`; from the workspace itself, `t` is the tree already open and
-the link is a patch, so the tiles on screen keep their frames. The workspace
+pin. It links to `/workspace?t=<the page the browser is on>&inplace=1&open=<the
+clicked page>`; from the workspace itself, it is the address already open
+plus `open`, and the link is a patch, so the tiles on screen keep their frames. The workspace
 reads `t`, halves the tile with the most room with the page in `open`, and
 replaces the address with the resulting tree, so a refresh or a shared link
 restores the screen. Tiling in place and the `/workspace` picker are one
-feature with one URL form. A workspace entered from a page this way leaves
-for that page's own address when closed down to one tile; one opened from
+feature with one URL form. A workspace entered from a page this way carries
+`inplace=1` in every address it writes, except a saved layout's, so even
+after a refresh it leaves for that page's own address when closed down to
+one tile; one opened from
 the picker or a saved layout stays a workspace with one tile. On a narrow
 screen the control opens the page normally.
 

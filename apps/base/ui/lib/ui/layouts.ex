@@ -593,7 +593,7 @@ defmodule Bilimbi.Base.UI.Layouts do
 
   # "Open in a tile" beside the pin, at the pin's weight. The server renders
   # it as a plain link to the page; on a wide screen `AppShell` retargets the
-  # click to `/workspace?t=<here>&open=<page>`, which
+  # click to `/workspace?t=<here>&inplace=1&open=<page>`, which
   # `Bilimbi.Base.Tiling.Web.WorkspaceLive` reads as "split the largest tile
   # with this page". On a narrow screen the link is left alone, so the page
   # opens normally. Do not build a workspace tree on the client: `t` is

@@ -372,7 +372,7 @@ test("on a wide screen the tile link opens the workspace with this page and the 
   $("nav-tile-companies").dispatchEvent(click)
 
   assert.deepEqual(tileLink("nav-tile-companies"), {
-    href: "/workspace?t=%2Fusers%3Fpage%3D2&open=%2Fcompanies",
+    href: "/workspace?t=%2Fusers%3Fpage%3D2&inplace=1&open=%2Fcompanies",
     type: "redirect",
   })
   assert.equal(click.defaultPrevented, false, "LiveView's own link handling follows")
@@ -402,6 +402,13 @@ test("from the workspace the tile link is a patch that keeps the open tree", () 
     href: "/workspace/orders?open=%2Fcompanies",
     type: "patch",
   })
+
+  visit("/workspace?t=%2Fusers&inplace=1")
+  $("nav-tile-companies").click()
+  assert.deepEqual(tileLink("nav-tile-companies"), {
+    href: "/workspace?t=%2Fusers&inplace=1&open=%2Fcompanies",
+    type: "patch",
+  })
 })
 
 test("on a narrow screen the tile link stays the page itself", () => {
@@ -424,7 +431,7 @@ test("a pinned row carries its own tile link", async () => {
   tile.click()
   assert.equal(
     tile.getAttribute("href"),
-    "/workspace?t=%2Fusers&open=%2Fcompanies%2F1%3Ftab%3Dusers"
+    "/workspace?t=%2Fusers&inplace=1&open=%2Fcompanies%2F1%3Ftab%3Dusers"
   )
 })
 

@@ -460,10 +460,10 @@ const AppShell = {
   // page, which is what a narrow screen keeps: there the workspace shows one
   // tile at a time anyway. On a wide screen the click is retargeted, before
   // LiveView reads the link, to the workspace with the page the browser is on
-  // (or the tree already open there) in `t` and the clicked page in `open`.
-  // From the workspace it is a patch, so the tiles on screen keep their
-  // frames; from a page it is a live navigation, so the shell stays
-  // connected. The tree itself is never built here: `t` is only ever the
+  // in `t`, marked `inplace=1`, and the clicked page in `open`; from the
+  // workspace, to its own address with `open` added. From the workspace it is
+  // a patch, so the tiles on screen keep their frames; from a page it is a
+  // live navigation, so the shell stays connected. The tree itself is never built here: `t` is only ever the
   // current address, and the server does the splitting.
   retargetTileLink(link) {
     const page = link.dataset.navTile
@@ -471,9 +471,9 @@ const AppShell = {
 
     const {pathname, search} = window.location
     const workspace = pathname === WORKSPACE || pathname.startsWith(`${WORKSPACE}/`)
-    const tree = workspace ? new URLSearchParams(search).get("t") : leaf(pathname + search)
-    const params = new URLSearchParams()
-    if (tree) params.set("t", tree)
+    const params = workspace
+      ? new URLSearchParams(search)
+      : new URLSearchParams({t: leaf(pathname + search), inplace: "1"})
     params.set("open", page)
 
     link.setAttribute("href", `${workspace ? pathname : WORKSPACE}?${params}`)
