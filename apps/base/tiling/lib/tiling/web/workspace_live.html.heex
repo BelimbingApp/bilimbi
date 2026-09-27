@@ -375,13 +375,13 @@
           />
         </.table>
         <.link
-          :if={allowed?(@current_scope, "ui.workspace.publish")}
+          :if={@company_scope && allowed?(@current_scope, "ui.workspace.publish")}
           id="workspace-manage-shared"
           navigate={~p"/workspace/shared-layouts"}
           class="text-sm text-link underline"
         >{gettext("Manage shared workspaces")}</.link>
         <.link
-          :if={allowed?(@current_scope, "ui.workspace.publish") && @tiles != []}
+          :if={@company_scope && allowed?(@current_scope, "ui.workspace.publish") && @tiles != []}
           id="workspace-publish-current"
           navigate={~p"/workspace/shared-layouts?t=#{Layout.encode(@tree)}"}
           class="ml-3 text-sm text-link underline"

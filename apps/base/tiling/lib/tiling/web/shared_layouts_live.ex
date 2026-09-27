@@ -15,8 +15,23 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    case socket.assigns.current_scope.user["company_id"] do
+      nil ->
+        {:ok,
+         socket
+         |> put_flash(
+           :error,
+           gettext("Shared workspaces belong to a company; this account has none.")
+         )
+         |> push_navigate(to: ~p"/workspace")}
+
+      company_id ->
+        {:ok, mount_company(socket, SettingsScope.company(company_id))}
+    end
+  end
+
+  defp mount_company(socket, company_scope) do
     current_scope = socket.assigns.current_scope
-    company_scope = SettingsScope.company(current_scope.user["company_id"])
 
     role_options =
       current_scope.scope
@@ -24,14 +39,13 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
       |> Enum.filter(&(&1.company_id in [nil, company_scope.id]))
       |> Enum.map(&{&1.name, &1.code})
 
-    {:ok,
-     socket
-     |> assign(:page_title, gettext("Shared workspaces"))
-     |> assign(:company_scope, company_scope)
-     |> assign(:role_options, role_options)
-     |> assign(:entries, SharedLayouts.list(company_scope))
-     |> assign(:pending_delete, nil)
-     |> assign(:form, to_form(%{"label" => "", "roles" => []}, as: :layout))}
+    socket
+    |> assign(:page_title, gettext("Shared workspaces"))
+    |> assign(:company_scope, company_scope)
+    |> assign(:role_options, role_options)
+    |> assign(:entries, SharedLayouts.list(company_scope))
+    |> assign(:pending_delete, nil)
+    |> assign(:form, to_form(%{"label" => "", "roles" => []}, as: :layout))
   end
 
   @impl true

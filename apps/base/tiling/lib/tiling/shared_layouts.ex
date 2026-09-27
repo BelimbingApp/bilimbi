@@ -19,14 +19,18 @@ defmodule Bilimbi.Base.Tiling.SharedLayouts do
     end
   end
 
-  @spec visible(Scope.t(), [String.t()]) :: [map()]
+  @spec visible(Scope.t() | nil, [String.t()]) :: [map()]
+  def visible(nil, _role_codes), do: []
+
   def visible(%Scope{type: :company} = scope, role_codes) when is_list(role_codes) do
     Enum.filter(list(scope), fn entry ->
       entry["roles"] == [] or Enum.any?(entry["roles"], &(&1 in role_codes))
     end)
   end
 
-  @spec fetch_visible(Scope.t(), String.t(), [String.t()]) :: {:ok, map()} | :error
+  @spec fetch_visible(Scope.t() | nil, String.t(), [String.t()]) :: {:ok, map()} | :error
+  def fetch_visible(nil, _slug, _role_codes), do: :error
+
   def fetch_visible(%Scope{type: :company} = scope, slug, role_codes) do
     case Enum.find(visible(scope, role_codes), &(&1["slug"] == slug)) do
       nil -> :error

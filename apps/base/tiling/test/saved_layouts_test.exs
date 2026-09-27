@@ -114,6 +114,12 @@ defmodule Bilimbi.Base.Tiling.SavedLayoutsTest do
     assert SharedLayouts.publish(company, " ", "/users", []) == {:error, :label}
   end
 
+  test "an account without a company sees no shared workspaces" do
+    assert {:ok, _} = SharedLayouts.publish(Scope.company(73), "Company desk", "/companies", [])
+    assert SharedLayouts.visible(nil, ["reviewer"]) == []
+    assert SharedLayouts.fetch_visible(nil, "company-desk", []) == :error
+  end
+
   test "a saved layout never takes the slug of a workspace route" do
     assert {:ok, %{"slug" => "shared-layouts-2"}} =
              SavedLayouts.save(@scope, "Shared layouts", "/companies")

@@ -959,7 +959,10 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   end
 
   defp company_scope(current_scope) do
-    Settings.Scope.company(current_scope.user["company_id"])
+    case current_scope.user["company_id"] do
+      nil -> nil
+      company_id -> Settings.Scope.company(company_id)
+    end
   end
 
   defp role_codes(current_scope) do
