@@ -154,7 +154,8 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
           "%2F%2Fevil.example%2Flogin",
           "h.5(/companies,%2F%2Fevil.example%2Flogin)",
           "https%3A%2F%2Fevil.example%2Flogin",
-          "%2F%5Cevil.example%2Flogin"
+          "%2F%5Cevil.example%2Flogin",
+          "%2F%09%2Fevil.example%2Flogin"
         ] do
       {:ok, view, html} = open(conn, "/workspace?t=" <> tree)
 
@@ -165,7 +166,21 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
 
     {:ok, view, _html} = open(conn, "/workspace?t=/companies")
     render_hook(view, "tile-navigated", %{"id" => "t1", "path" => "//evil.example/login"})
+    render_hook(view, "tile-navigated", %{"id" => "t1", "path" => "/\t/evil.example/login"})
     assert has_element?(view, "#tile-t1-page[src='/companies']")
+
+    entry = %{
+      "slug" => "evil",
+      "label" => "Evil",
+      "layout" => "dwindle",
+      "tree" => "%2F%09%2Fevil.example%2Flogin"
+    }
+
+    {:ok, _} = Settings.put("ui.workspace.layouts", [entry], @settings_scope)
+
+    {:ok, view, html} = open(conn, "/workspace/evil")
+    assert html =~ "could not be read"
+    refute has_element?(view, "[data-tile]")
   end
 
   test "the picker opens at a current tile only, however the tree changed", %{conn: conn} do

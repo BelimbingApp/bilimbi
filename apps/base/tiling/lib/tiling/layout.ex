@@ -368,12 +368,14 @@ defmodule Bilimbi.Base.Tiling.Layout do
 
   @doc """
   Whether `path` names a page on this origin: one leading `/`, never `//host`,
-  a scheme, or a backslash a browser would read as `/`. Every tile path holds
-  to it, so a tile can only ever show, or link to, a Bilimbi page.
+  a scheme, a backslash a browser would read as `/`, or a space or control
+  character a browser strips before it parses. Every tile path holds to it,
+  so a tile can only ever show, or link to, a Bilimbi page.
   """
   @spec page_path?(term()) :: boolean()
   def page_path?("/" <> _ = path) do
     not String.starts_with?(path, "//") and not String.contains?(path, "\\") and
+      not String.match?(path, ~r/[\x00-\x20\x7f]/) and
       match?(%URI{scheme: nil, host: nil, path: "/" <> _}, URI.parse(path))
   end
 

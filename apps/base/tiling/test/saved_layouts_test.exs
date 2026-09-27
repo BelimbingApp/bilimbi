@@ -65,6 +65,8 @@ defmodule Bilimbi.Base.Tiling.SavedLayoutsTest do
     assert SavedLayouts.save(@scope, "   ", "/a") == {:error, :label}
     assert SavedLayouts.save(@scope, String.duplicate("x", 61), "/a") == {:error, :label}
     assert SavedLayouts.save(@scope, "Fine", "") == {:error, :tree}
+    assert SavedLayouts.save(@scope, "Fine", "%2F%2Fevil.example%2Flogin") == {:error, :tree}
+    assert SavedLayouts.save(@scope, "Fine", "%2F%09%2Fevil.example%2Flogin") == {:error, :tree}
   end
 
   test "rename keeps the slug, delete forgets the layout and its default" do

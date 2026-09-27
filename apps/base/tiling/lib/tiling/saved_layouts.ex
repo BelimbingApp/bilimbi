@@ -22,6 +22,7 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
 
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope
+  alias Bilimbi.Base.Tiling.Layout
 
   @layouts_key "ui.workspace.layouts"
   @default_key "ui.workspace.default"
@@ -162,8 +163,13 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
     end
   end
 
-  defp clean_tree(""), do: {:error, :tree}
-  defp clean_tree(tree), do: {:ok, tree}
+  defp clean_tree(tree) do
+    case Layout.decode(tree) do
+      {:ok, %Layout{root: nil}} -> {:error, :tree}
+      {:ok, _layout} -> {:ok, tree}
+      :error -> {:error, :tree}
+    end
+  end
 
   defp entry?(%{"slug" => slug, "label" => label, "tree" => tree})
        when is_binary(slug) and is_binary(label) and is_binary(tree),
