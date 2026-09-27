@@ -152,6 +152,10 @@ defmodule Bilimbi.Base.Tiling.LayoutTest do
       layout = Layout.master_close(layout, a)
       assert Enum.map(Layout.leaves(layout), & &1.id) == [c, d]
       assert Layout.encode(layout) == "h.6(/employees,/addresses)"
+
+      layout = layout |> Layout.master_close(c) |> Layout.master_close(d)
+      assert Layout.empty?(layout)
+      assert Layout.encode(layout) == ""
     end
   end
 

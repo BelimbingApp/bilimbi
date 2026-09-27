@@ -124,7 +124,7 @@ defmodule Bilimbi.Base.Tiling.Layout do
   defp master_rebuild(layout, tiles) do
     case tiles do
       [] ->
-        layout
+        %{layout | root: nil}
 
       [leaf] ->
         %{layout | root: leaf}

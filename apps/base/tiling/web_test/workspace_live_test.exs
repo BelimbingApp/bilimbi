@@ -604,6 +604,16 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
       assert has_element?(view, "[data-split][style*='top: 55.0%']")
     end
 
+    test "closing the last tile of a master layout empties the workspace", %{conn: conn} do
+      {:ok, _} = SavedLayouts.save(@settings_scope, "Records", "/companies", "master")
+
+      {:ok, view, _html} = open(conn, "/workspace/records")
+      view |> element("#tile-t1-header-close") |> render_click()
+      assert_patch(view, "/workspace/records?t=")
+      assert has_element?(view, "#workspace[data-layout='master'][data-tile-count='0']")
+      refute has_element?(view, "#tile-t1")
+    end
+
     test "changing the mode of the open layout leaves its unsaved tiles unsaved", %{conn: conn} do
       {:ok, _} = SavedLayouts.save(@settings_scope, "Records", "h.5(/companies,/companies)")
 
