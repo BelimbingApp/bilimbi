@@ -30,8 +30,9 @@ tile menu's monocle fills the workspace with it.
 swap, flip, directional neighbours, the rectangles every tile and divider
 occupies, and the compact URL form (`h.5(/companies,v.6(/users,/audit))`).
 Master mode keeps the first tile as master and divides the remaining column
-evenly. A stack tile can be promoted without reloading its frame, and the
-master direction can be flipped; mode and tree are saved together per layout.
+evenly when a tile opens or closes; a dragged stack ratio is kept. A stack
+tile can be promoted without reloading its frame, and the master direction
+can be flipped; mode and tree are saved together per layout.
 `Bilimbi.Base.Tiling.SavedLayouts` keeps an account's saved layouts and its
 default in the `ui.workspace.layouts` and `ui.workspace.default` settings at
 user scope, through the shared Settings API, so every write is audited.
