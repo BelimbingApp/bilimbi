@@ -11,14 +11,36 @@ first installation. Run `mix bilimbi.authz.reconcile` after later contribution
 changes; application boot never mutates grants. Both paths serialize the same
 explicit reconciliation, and neither deletes principal grants.
 
-Base owns the five `base_authz_*` tables. `base_authz_roles.company_id` remains
+Base owns the six `base_authz_*` tables: the five compatible ones and the
+Bilimbi-only `base_authz_system_principal_capabilities`. `base_authz_roles.company_id` remains
 a bare nullable column in the Base migration. Core Company contributes the
 named restricted foreign key and exact system/custom ownership check in its
 own later migration, so Base never depends upward on Core.
 
+## System principals
+
+A named system principal (ADR 0017) is the identity a routine job runs as,
+such as `coating.line_import`, declared by its module under the `:system_principals`
+contribution with the capabilities it may be granted. On a principal's scope,
+`can/4` allows a capability only when an administrator granted it to that
+principal in the job's company, the module still declares it, and the
+resource checks pass. There are no roles, deny rows, or `grant_all` for a
+principal, and `scope_actor/1` never returns one: a principal is not a user.
+
+Grants live in the Bilimbi-only `base_authz_system_principal_capabilities`
+table, one row per company, principal, and capability; revocation deletes the
+row. `grant_system_capability/4`, `revoke_system_capability/4`, and
+`list_system_capabilities/2` require the scope's user to hold
+`admin.authz.system-principal.grant`, `.revoke`, or `.list`; a system scope is
+refused. `mix bilimbi.authz.system_principal` (`declared`, `grants`, `grant`,
+`revoke`) is the operator's shell path and records `console`. Each grant and
+revocation commits with a retained `authz.system_principal.granted` or
+`.revoked` audit action naming who made it. Decisions log `actor_type`
+`"system"`, `actor_id` `0`, and the principal's name in the context.
+
 ## Administration facade
 
-Administration adapters use `Bilimbi.Base.Authz`; they never query these five
+Administration adapters use `Bilimbi.Base.Authz`; they never query these
 tables directly. The facade provides bounded, tenant-scoped pages for roles,
 decision logs, and direct principal capabilities. Page results expose stable
 read models and accept only documented search, filter, and sort options. System

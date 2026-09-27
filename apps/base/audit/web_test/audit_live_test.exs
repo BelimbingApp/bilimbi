@@ -416,6 +416,39 @@ defmodule BilimbiWeb.AuditLiveTest do
       refute has_element?(view, "#action-retain-#{action.id} .hero-bookmark-solid")
     end
 
+    test "names a system principal and filters to system actors", %{conn: conn, scope: scope} do
+      grant_capabilities!("admin.audit.log.list")
+
+      {:ok, system} =
+        Audit.record_action(scope, %{
+          company_id: 73,
+          actor_type: "system",
+          actor_id: 0,
+          system_principal: "test.line_import",
+          event: "import.completed",
+          occurred_at: ~N[2026-08-18 10:16:00]
+        })
+
+      {:ok, ordinary} =
+        Audit.record_action(scope, %{
+          company_id: 73,
+          actor_type: "user",
+          actor_id: 91,
+          event: "employee.updated",
+          occurred_at: ~N[2026-08-18 10:15:00]
+        })
+
+      {:ok, view, _html} = conn |> log_in_as() |> live(~p"/audit/actions")
+
+      assert has_element?(view, "#actions-#{system.id}", "System · test.line_import")
+      assert has_element?(view, "#actions-actor-type option[value='system']", "System")
+
+      view |> form("#actions-filters", filters: %{"actor_type" => "system"}) |> render_change()
+
+      assert has_element?(view, "#actions-#{system.id}")
+      refute has_element?(view, "#actions-#{ordinary.id}")
+    end
+
     test "shows impersonation attribution only on impersonated actions", %{
       conn: conn,
       scope: scope

@@ -17,6 +17,7 @@ defmodule Bilimbi.Base.Queue do
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Tenancy.Authentication
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.Tenancy.SystemPrincipals
   alias Ecto.Multi
   alias Oban.Job
 
@@ -56,7 +57,12 @@ defmodule Bilimbi.Base.Queue do
     Keyword.merge(defaults, overrides)
   end
 
-  @doc "Enqueues validated plain-data arguments for a Queue worker."
+  @doc """
+  Enqueues validated plain-data arguments for a Queue worker.
+
+  A worker that declares a system principal is refused with
+  `:system_principal_worker`: it runs only through `enqueue_as_system/4`.
+  """
   @spec enqueue(module(), term()) :: {:ok, JobRef.t()} | {:error, atom()}
   def enqueue(worker, args), do: enqueue_job(worker, args, %{})
 
@@ -81,8 +87,43 @@ defmodule Bilimbi.Base.Queue do
     end
   end
 
+  @doc """
+  Enqueues work that runs as the worker's named system principal.
+
+  Routine system work, such as a scheduled import, is not tied to whoever
+  signed in to start it. The worker declares its principal
+  (`use Bilimbi.Base.Queue.Worker, system_principal: "coating.line_import"`), and
+  the module that owns the worker must declare that name under its
+  `:system_principals` contribution (ADR 0017). When the job runs,
+  `execution.scope` is the scope's tenant with that principal as its actor,
+  working in `company_id`, and captured writes are attributed to it. Only the
+  tenant is taken from `scope`; its actor is not carried into the job.
+
+  Refusals: `:not_system_principal_worker` for a worker that declares none,
+  `:undeclared_system_principal` when no installed module declares its name
+  or the worker is not that module's code, `:invalid_company` for a company
+  ID that is not a positive integer, and `:unique_worker` for a worker that
+  declares `unique_period`. The principal holds only the capabilities an
+  administrator granted it in that company, decided by Base Authz when the
+  job runs.
+  """
+  @spec enqueue_as_system(Scope.t(), pos_integer(), module(), term()) ::
+          {:ok, JobRef.t()} | {:error, atom()}
+  def enqueue_as_system(%Scope{} = scope, company_id, worker, args) do
+    with {:ok, %{system_principal: name}} when is_binary(name) <- worker_info(worker),
+         true <- SystemPrincipals.declared_by?(name, worker),
+         {:ok, token} <- Authentication.delegate_system(scope, name, company_id) do
+      enqueue_job(worker, args, %{Worker.system_principal_key() => token})
+    else
+      {:ok, %{}} -> {:error, :not_system_principal_worker}
+      false -> {:error, :undeclared_system_principal}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp enqueue_job(worker, args, meta) do
     with {:ok, worker_info} <- worker_info(worker),
+         :ok <- ensure_principal_matches(worker_info, meta),
          :ok <- ensure_delegable(worker_info, meta),
          {:ok, safe_args} <- Arguments.validate(args),
          {:ok, normalized_args} <- Worker.normalize_args(worker, safe_args),
@@ -251,8 +292,8 @@ defmodule Bilimbi.Base.Queue do
   defp worker_info(worker) when is_atom(worker) do
     if Code.ensure_loaded?(worker) and function_exported?(worker, :__queue_worker__, 0) do
       case worker.__queue_worker__() do
-        %{id: id, adapter: adapter} when is_binary(id) and is_atom(adapter) ->
-          {:ok, %{id: id, adapter: adapter}}
+        %{id: id, adapter: adapter} = info when is_binary(id) and is_atom(adapter) ->
+          {:ok, %{id: id, adapter: adapter, system_principal: Map.get(info, :system_principal)}}
 
         _invalid ->
           {:error, :unsupported_worker}
@@ -264,8 +305,21 @@ defmodule Bilimbi.Base.Queue do
 
   defp worker_info(_worker), do: {:error, :unsupported_worker}
 
+  # A principal's worker runs only as that principal, so it is never enqueued
+  # as ordinary or user work.
+  defp ensure_principal_matches(%{system_principal: nil}, _meta), do: :ok
+
+  defp ensure_principal_matches(_worker_info, meta) do
+    if Map.has_key?(meta, Worker.system_principal_key()),
+      do: :ok,
+      else: {:error, :system_principal_worker}
+  end
+
+  # Oban's uniqueness compares arguments, not metadata, so a duplicate would
+  # be absorbed by a job carrying another actor, tenant, or company.
   defp ensure_delegable(worker_info, meta) do
-    if Map.has_key?(meta, Worker.delegated_actor_key()) and
+    if (Map.has_key?(meta, Worker.delegated_actor_key()) or
+          Map.has_key?(meta, Worker.system_principal_key())) and
          worker_info.adapter.__opts__()[:unique] != nil,
        do: {:error, :unique_worker},
        else: :ok

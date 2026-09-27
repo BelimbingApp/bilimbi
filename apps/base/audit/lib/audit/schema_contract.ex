@@ -7,6 +7,10 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
   are declared as an optional group: an adopted Belimbing database verifies
   without them, a migrated Bilimbi database verifies with them, and a table
   carrying only half of the pair is drift.
+
+  The `system_principal` column and its partial index are the Bilimbi-only
+  system principal contribution (migration `20260927090000`, ADR 0017),
+  declared the same way as a second optional group.
   """
 
   @behaviour Bilimbi.Base.Database.SchemaContract
@@ -66,12 +70,20 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
             "subject_nameisnotnull"
           )
       },
-      optional_columns: %{"impersonator_id" => column(:bigint)},
+      optional_columns: %{
+        "impersonator_id" => column(:bigint),
+        "system_principal" => column({:varchar, 100})
+      },
       optional_indexes: %{
         "base_audit_mutations_impersonator_id_index" =>
-          index(["impersonator_id"], false, "impersonator_idisnotnull")
+          index(["impersonator_id"], false, "impersonator_idisnotnull"),
+        "base_audit_mutations_system_principal_index" =>
+          index(["system_principal"], false, "system_principalisnotnull")
       },
-      optional_groups: [impersonation_group("base_audit_mutations")],
+      optional_groups: [
+        impersonation_group("base_audit_mutations"),
+        system_principal_group("base_audit_mutations")
+      ],
       foreign_keys: %{}
     }
   end
@@ -108,12 +120,20 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
         "base_audit_actions_actor_type_actor_id_occurred_at_index" =>
           index(["actor_type", "actor_id", "occurred_at"])
       },
-      optional_columns: %{"impersonator_id" => column(:bigint)},
+      optional_columns: %{
+        "impersonator_id" => column(:bigint),
+        "system_principal" => column({:varchar, 100})
+      },
       optional_indexes: %{
         "base_audit_actions_impersonator_id_index" =>
-          index(["impersonator_id"], false, "impersonator_idisnotnull")
+          index(["impersonator_id"], false, "impersonator_idisnotnull"),
+        "base_audit_actions_system_principal_index" =>
+          index(["system_principal"], false, "system_principalisnotnull")
       },
-      optional_groups: [impersonation_group("base_audit_actions")],
+      optional_groups: [
+        impersonation_group("base_audit_actions"),
+        system_principal_group("base_audit_actions")
+      ],
       foreign_keys: %{}
     }
   end
@@ -123,6 +143,14 @@ defmodule Bilimbi.Base.Audit.SchemaContract do
       name: "base/audit impersonation operator",
       columns: ["impersonator_id"],
       indexes: ["#{table}_impersonator_id_index"]
+    }
+  end
+
+  defp system_principal_group(table) do
+    %{
+      name: "base/audit system principal",
+      columns: ["system_principal"],
+      indexes: ["#{table}_system_principal_index"]
     }
   end
 

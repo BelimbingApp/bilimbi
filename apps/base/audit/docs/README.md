@@ -41,6 +41,17 @@ or schema-contract contributor. That descriptor edit is shared and must be
 called out on issue #43; this package still does not hard-code coordinator
 internals.
 
+## System principals
+
+A job that runs as a named system principal (ADR 0017) records `actor_type`
+`"system"`, `actor_id` `0`, and the principal's name in the Bilimbi-only
+`system_principal` column on both tables. Base Queue sets that context for the
+job; captured mutations take it from `Bilimbi.Base.Audit.Context`, and explicit
+records inherit it unless they name the key. A row with a principal must be a
+`"system"` row, and a `"system"` row must name one. The column and its partial
+index are a second optional group in the schema contract, added by the
+Bilimbi-only migration `20260927090000`.
+
 ## Database console commands
 
 `Bilimbi.Base.Audit.ConsoleCapture` implements Base Database's

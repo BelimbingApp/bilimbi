@@ -139,6 +139,16 @@ defmodule Bilimbi.Base.Schedule.ContributionValidator do
         "worker #{inspect(worker)} must be a Schedule worker owned by #{descriptor.otp_app}"
       )
     end
+
+    if worker.__queue_worker__().system_principal do
+      invalid!(
+        descriptor.id,
+        "worker #{inspect(worker)} declares a system principal; a Schedule worker cannot " <>
+          "run as one. Schedule a plain worker that builds the tenant scope with " <>
+          "Bilimbi.Base.Tenancy.scope/1 and calls Bilimbi.Base.Queue.enqueue_as_system/4 " <>
+          "with that scope and the company"
+      )
+    end
   end
 
   defp validate_worker!(descriptor, worker),

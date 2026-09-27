@@ -38,6 +38,20 @@ defmodule Bilimbi.Base.AuditTest do
     assert "base_audit_actions: incomplete optional contribution base/audit impersonation operator" in errors
   end
 
+  test "the system principal contribution is all-or-nothing: a column without its index is drift" do
+    prefix = temporary_schema!()
+
+    SQL.query!(
+      Repo,
+      "DROP INDEX \"#{prefix}\".base_audit_mutations_system_principal_index",
+      []
+    )
+
+    assert {:error, errors} = SchemaVerifier.verify(Repo, SchemaContract.tables(), prefix: prefix)
+
+    assert "base_audit_mutations: incomplete optional contribution base/audit system principal" in errors
+  end
+
   test "records a mutation with jsonb payloads, inet, and an unscoped tenant" do
     assert {:ok, %Mutation{} = mutation} =
              Audit.record_mutation(
@@ -188,6 +202,56 @@ defmodule Bilimbi.Base.AuditTest do
     assert Enum.map(entries, & &1.id) == [newer.id, older.id]
   end
 
+  describe "system principals" do
+    setup do
+      on_exit(fn -> Context.put(nil) end)
+      :ok
+    end
+
+    test "a system row names its principal and reads it back" do
+      insert_tenant!(%{id: 41})
+      {:ok, scope} = Tenancy.scope(41)
+      system = %{actor_type: "system", actor_id: 0, system_principal: "coating.line_import"}
+
+      assert {:ok, %Mutation{actor_type: "system", system_principal: "coating.line_import"}} =
+               Audit.record_mutation(scope, mutation_attrs(system))
+
+      assert {:ok, %Action{actor_type: "system", system_principal: "coating.line_import"}} =
+               Audit.record_action(scope, action_attrs(system))
+
+      assert {:ok, [%Mutation{system_principal: "coating.line_import"}]} =
+               Audit.list_mutations(scope)
+
+      assert {:ok, [%Action{system_principal: "coating.line_import"}]} = Audit.list_actions(scope)
+    end
+
+    test "explicit records inherit the principal from the job's context" do
+      Context.put(%Context{
+        actor_type: "system",
+        actor_id: 0,
+        system_principal: "coating.line_import"
+      })
+
+      assert {:ok, %Action{system_principal: "coating.line_import"}} =
+               Audit.record_action(:unscoped, action_attrs(%{actor_type: "system", actor_id: 0}))
+    end
+
+    test "a principal names only a system actor, and a system actor needs one" do
+      assert {:error, changeset} =
+               Audit.record_action(
+                 :unscoped,
+                 action_attrs(%{actor_type: "user", system_principal: "coating.line_import"})
+               )
+
+      assert %{system_principal: ["names only a system actor"]} = errors_on(changeset)
+
+      assert {:error, changeset} =
+               Audit.record_mutation(:unscoped, mutation_attrs(%{actor_type: "system"}))
+
+      assert %{system_principal: ["is required for a system actor"]} = errors_on(changeset)
+    end
+  end
+
   describe "impersonation" do
     setup do
       on_exit(fn -> Context.put(nil) end)
@@ -249,7 +313,7 @@ defmodule Bilimbi.Base.AuditTest do
 
   test "rejects unknown actor_type, missing required fields, and explicit nil defaults" do
     assert {:error, unknown_actor} =
-             Audit.record_mutation(:unscoped, mutation_attrs(%{actor_type: "system"}))
+             Audit.record_mutation(:unscoped, mutation_attrs(%{actor_type: "robot"}))
 
     assert %{actor_type: ["is invalid"]} = errors_on(unknown_actor)
 

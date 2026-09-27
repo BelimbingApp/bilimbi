@@ -212,6 +212,9 @@ defmodule Bilimbi.Base.Audit.Web.RecordHistory do
   defp actor_label(%{actor_type: "scheduler"}), do: "Scheduler"
   defp actor_label(%{actor_type: "queue"}), do: "Queue"
 
+  defp actor_label(%{actor_type: "system", system_principal: name}) when is_binary(name),
+    do: "System · #{name}"
+
   defp actor_label(%{actor_type: type, actor_id: id}) when is_integer(id) and id > 0,
     do: "#{String.capitalize(type)} ##{id}"
 

@@ -14,11 +14,50 @@ defmodule Bilimbi.Base.Authz.DatabaseDecisionLogger do
   @impl true
   def log(%Actor{} = actor, capability, resource, %Decision{} = decision, context)
       when is_binary(capability) and is_map(context) do
+    persist(
+      %{
+        company_id: actor.company_id,
+        actor_type: Actor.principal_type(actor),
+        actor_id: actor.id,
+        acting_for_user_id: actor.acting_for_user_id
+      },
+      capability,
+      resource,
+      decision,
+      context
+    )
+  end
+
+  # A named system principal has no numeric ID. Its row carries the system
+  # actor pair and names the principal in the logged context, which no
+  # caller-supplied context key can override.
+  @spec log_system_principal(
+          String.t(),
+          pos_integer(),
+          String.t(),
+          Resource.t() | nil,
+          Decision.t(),
+          map()
+        ) :: :ok
+  def log_system_principal(principal, company_id, capability, resource, decision, context)
+      when is_binary(principal) and is_binary(capability) and is_map(context) do
+    persist(
+      %{company_id: company_id, actor_type: "system", actor_id: 0, acting_for_user_id: nil},
+      capability,
+      resource,
+      decision,
+      context
+      |> Map.drop([:system_principal])
+      |> Map.put("system_principal", principal)
+    )
+  end
+
+  defp persist(actor_attributes, capability, resource, %Decision{} = decision, context) do
     attributes = %{
-      company_id: actor.company_id,
-      actor_type: Actor.principal_type(actor),
-      actor_id: actor.id,
-      acting_for_user_id: actor.acting_for_user_id,
+      company_id: actor_attributes.company_id,
+      actor_type: actor_attributes.actor_type,
+      actor_id: actor_attributes.actor_id,
+      acting_for_user_id: actor_attributes.acting_for_user_id,
       capability: String.downcase(capability),
       resource_type: resource && resource.type,
       resource_id: resource_id(resource),

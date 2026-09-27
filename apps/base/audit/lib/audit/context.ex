@@ -13,6 +13,11 @@ defmodule Bilimbi.Base.Audit.Context do
   actor pair keeps naming the account acted as; the impersonator is the
   person who actually acted. Nil outside impersonation.
 
+  `system_principal` names the declared system identity a job runs as, such
+  as `coating.line_import`, with `actor_type` `"system"` and `actor_id` `0`: the
+  work is attributed to that identity, never to a user (ADR 0017). Base Queue
+  sets it for a job enqueued with `Bilimbi.Base.Queue.enqueue_as_system/4`.
+
   This is presentation-of-actor state, not authorization: nothing reads it
   to decide anything, only to record who did what.
   """
@@ -23,6 +28,7 @@ defmodule Bilimbi.Base.Audit.Context do
             actor_id: 0,
             actor_role: nil,
             impersonator_id: nil,
+            system_principal: nil,
             company_id: nil,
             tenant_id: nil,
             ip_address: nil,
@@ -35,6 +41,7 @@ defmodule Bilimbi.Base.Audit.Context do
           actor_id: non_neg_integer(),
           actor_role: String.t() | nil,
           impersonator_id: pos_integer() | nil,
+          system_principal: String.t() | nil,
           company_id: pos_integer() | nil,
           tenant_id: pos_integer() | nil,
           ip_address: String.t() | nil,

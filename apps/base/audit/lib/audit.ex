@@ -18,6 +18,14 @@ defmodule Bilimbi.Base.Audit do
   and `record_action/2` calls inherit it from that same context unless the
   attributes carry an `impersonator_id` key themselves (an explicit nil
   records the actor acting as themselves).
+
+  ## System principals
+
+  Work a job does as a named system principal (ADR 0017) records
+  `actor_type` `"system"`, `actor_id` `0`, and the principal's name in
+  `system_principal`. Captured mutations and explicit records inherit it from
+  the context Base Queue sets, exactly as they inherit `impersonator_id`. A
+  `system_principal` is recorded only with a `"system"` actor.
   """
 
   import Ecto.Query
@@ -52,42 +60,51 @@ defmodule Bilimbi.Base.Audit do
   @spec record_mutation(Scope.t() | :unscoped, map()) ::
           {:ok, Mutation.t()} | {:error, Ecto.Changeset.t()}
   def record_mutation(%Scope{} = scope, attributes) when is_map(attributes) do
-    persist_mutation(with_context_impersonator(attributes), Scope.tenant_id(scope))
+    persist_mutation(with_context_identity(attributes), Scope.tenant_id(scope))
   end
 
   def record_mutation(:unscoped, attributes) when is_map(attributes) do
-    persist_mutation(with_context_impersonator(attributes), nil)
+    persist_mutation(with_context_identity(attributes), nil)
   end
 
   @spec record_action(Scope.t() | :unscoped, map()) ::
           {:ok, Action.t()} | {:error, Ecto.Changeset.t()}
   def record_action(%Scope{} = scope, attributes) when is_map(attributes) do
-    persist_action(with_context_impersonator(attributes), Scope.tenant_id(scope))
+    persist_action(with_context_identity(attributes), Scope.tenant_id(scope))
   end
 
   def record_action(:unscoped, attributes) when is_map(attributes) do
-    persist_action(with_context_impersonator(attributes), nil)
+    persist_action(with_context_identity(attributes), nil)
   end
 
   # The impersonator is a property of the session, not of the caller's actor
   # knowledge: a domain module recording an explicit row knows who it acts
-  # as, not who is behind the session. The process context does. A caller
-  # that names the key (even as nil) is believed; an absent key inherits.
-  # The key follows the attributes' own key style so a string-keyed map
-  # never reaches `cast/3` mixed.
-  defp with_context_impersonator(attributes) do
+  # as, not who is behind the session. The process context does, and the same
+  # holds for the system principal a queued job runs as. A caller that names
+  # the key (even as nil) is believed; an absent key inherits. The key
+  # follows the attributes' own key style so a string-keyed map never reaches
+  # `cast/3` mixed.
+  defp with_context_identity(attributes) do
+    context = Context.get()
+
+    attributes
+    |> inherit(:impersonator_id, context.impersonator_id)
+    |> inherit(:system_principal, context.system_principal)
+  end
+
+  defp inherit(attributes, key, value) do
     cond do
-      Map.has_key?(attributes, :impersonator_id) or Map.has_key?(attributes, "impersonator_id") ->
+      Map.has_key?(attributes, key) or Map.has_key?(attributes, Atom.to_string(key)) ->
         attributes
 
-      is_nil(Context.get().impersonator_id) ->
+      is_nil(value) ->
         attributes
 
       Enum.any?(Map.keys(attributes), &is_binary/1) ->
-        Map.put(attributes, "impersonator_id", Context.get().impersonator_id)
+        Map.put(attributes, Atom.to_string(key), value)
 
       true ->
-        Map.put(attributes, :impersonator_id, Context.get().impersonator_id)
+        Map.put(attributes, key, value)
     end
   end
 
