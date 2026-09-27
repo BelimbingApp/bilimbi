@@ -910,7 +910,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
           >
             <.icon name="warning" class="size-3.5" />
             {gettext(
-              "The pivot shows its first rows only; there are too many values to count at once. A filter would narrow it."
+              "The pivot shows only the rows it could count in full; there are too many values to count at once. A filter would narrow it."
             )}
           </p>
           <.card id="grid-card" inner_class="p-0">
