@@ -66,21 +66,7 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
       known = MapSet.new(socket.assigns.role_options, &elem(&1, 1))
 
       if Enum.all?(roles, &MapSet.member?(known, &1)) do
-        case SharedLayouts.publish(
-               socket.assigns.company_scope,
-               Map.get(params, "label", ""),
-               Map.get(params, "tree", ""),
-               roles
-             ) do
-          {:ok, _entry} ->
-            {:noreply,
-             socket
-             |> assign(:entries, SharedLayouts.list(socket.assigns.company_scope))
-             |> put_flash(:success, gettext("Shared the workspace."))}
-
-          {:error, _reason} ->
-            {:noreply, put_flash(socket, :error, gettext("The workspace could not be shared."))}
-        end
+        publish(socket, params, roles)
       else
         {:noreply, put_flash(socket, :error, gettext("Choose role codes from this company."))}
       end
@@ -120,6 +106,24 @@ defmodule Bilimbi.Base.Tiling.Web.SharedLayoutsLive do
       end
     else
       {:noreply, put_flash(socket, :error, gettext("You cannot manage shared workspaces."))}
+    end
+  end
+
+  defp publish(socket, params, roles) do
+    case SharedLayouts.publish(
+           socket.assigns.company_scope,
+           Map.get(params, "label", ""),
+           Map.get(params, "tree", ""),
+           roles
+         ) do
+      {:ok, _entry} ->
+        {:noreply,
+         socket
+         |> assign(:entries, SharedLayouts.list(socket.assigns.company_scope))
+         |> put_flash(:success, gettext("Shared the workspace."))}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, gettext("The workspace could not be shared."))}
     end
   end
 end
