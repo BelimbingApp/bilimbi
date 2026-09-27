@@ -45,8 +45,15 @@ defmodule BilimbiWeb.DiscoveredRoutes do
         policies = Map.new(routes, &{:"bilimbi:#{&1.path}", &1[:capability]})
 
         # The frame flag hook runs after authentication has built the scope it
-        # marks, and before the route check, which does not depend on it.
-        hooks = hooks ++ [{BilimbiWeb.FramedRender, :framed}, {BilimbiWeb.RouteAccess, policies}]
+        # marks, and before the route check, which does not depend on it. The
+        # workspace channel joins last, so a refused page never joins.
+        hooks =
+          hooks ++
+            [
+              {BilimbiWeb.FramedRender, :framed},
+              {BilimbiWeb.RouteAccess, policies},
+              {Bilimbi.Base.UI.Workspace, :attach}
+            ]
 
         declarations =
           for route <- routes do

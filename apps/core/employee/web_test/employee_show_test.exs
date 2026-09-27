@@ -43,6 +43,25 @@ defmodule BilimbiWeb.EmployeeShowTest do
              conn |> log_in_as() |> live(~p"/employees/#{employee.id}")
   end
 
+  test "inside a workspace tile the page announces the employee it shows", %{
+    conn: conn,
+    employee: employee
+  } do
+    grant_capabilities!("admin.employee.view")
+    token = Bilimbi.Base.UI.Workspace.host_token("phx-a-host")
+    :ok = Bilimbi.Base.UI.Workspace.subscribe(Bilimbi.Base.UI.Workspace.topic(41, 91, token))
+
+    {:ok, _view, _html} =
+      conn
+      |> log_in_as()
+      |> put_req_header("sec-fetch-dest", "iframe")
+      |> live(~p"/employees/#{employee.id}?ws=#{token}")
+
+    assert_receive {:workspace_joined}
+    assert_receive {:workspace_fact, %{kind: "core/employee", id: id}}
+    assert id == employee.id
+  end
+
   test "shows the employee", %{conn: conn, employee: employee} do
     grant_capabilities!("admin.employee.view")
 

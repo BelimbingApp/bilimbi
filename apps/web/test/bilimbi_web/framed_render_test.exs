@@ -51,6 +51,27 @@ defmodule BilimbiWeb.FramedRenderTest do
     assert FramedRender.session(build_conn()) == %{"bilimbi_framed" => false}
   end
 
+  test "a frame's workspace token rides in the same session; a bare page's is ignored", %{
+    conn: conn
+  } do
+    token = "abcdefghijklmnop"
+
+    framed_conn = conn |> log_in_as() |> framed() |> get(~p"/dashboard?ws=#{token}")
+
+    assert FramedRender.session(framed_conn) == %{
+             "bilimbi_framed" => true,
+             "bilimbi_workspace" => token
+           }
+
+    refute Map.has_key?(get_session(framed_conn), "bilimbi_workspace")
+
+    bare_conn = conn |> log_in_as() |> get(~p"/dashboard?ws=#{token}")
+    assert FramedRender.session(bare_conn) == %{"bilimbi_framed" => false}
+
+    bad_conn = conn |> log_in_as() |> framed() |> get(~p"/dashboard?ws=nope")
+    assert FramedRender.session(bad_conn) == %{"bilimbi_framed" => true}
+  end
+
   test "the mount hook marks a scope only when the session carries the flag" do
     socket = %Phoenix.LiveView.Socket{assigns: %{__changed__: %{}, current_scope: %{user: %{}}}}
 

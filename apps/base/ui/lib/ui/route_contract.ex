@@ -52,8 +52,7 @@ defmodule Bilimbi.Base.UI.RouteContract do
   instead. A query string is ignored; only the path decides the route, and
   a URL naming a scheme or host is served by nothing.
   """
-  @spec fetch_route(String.t()) ::
-          {:ok, %{path: String.t(), capability: String.t() | nil, operator: boolean()}} | :error
+  @spec fetch_route(String.t()) :: {:ok, route()} | :error
   def fetch_route(path) when is_binary(path) do
     case URI.parse(path) do
       %URI{scheme: nil, host: nil, path: "/" <> _ = path} -> fetch_served(path)
@@ -72,9 +71,46 @@ defmodule Bilimbi.Base.UI.RouteContract do
         :error
 
       route ->
-        {:ok,
-         %{path: route.path, capability: route[:capability], operator: route[:operator] == true}}
+        {:ok, describe(route)}
     end
+  end
+
+  @typedoc """
+  A declared GET route: its path pattern, the capability its mount
+  requires (`nil` for any signed-in account), whether it is operator-only,
+  and the stable id of the module that declared it (`"core/company"`).
+  """
+  @type route :: %{
+          path: String.t(),
+          capability: String.t() | nil,
+          operator: boolean(),
+          source: String.t() | nil
+        }
+
+  @doc """
+  The declared GET route whose path pattern is exactly `pattern`, such as
+  `/companies/:id`; `:error` for anything else. A workspace tile that
+  follows a kind of record keeps this pattern, and the id of a selected
+  record fills its one `:param` segment.
+  """
+  @spec fetch_pattern(String.t()) :: {:ok, route()} | :error
+  def fetch_pattern(pattern) when is_binary(pattern) do
+    @routes
+    |> Enum.filter(&(Map.get(&1, :verb, :get) == :get))
+    |> Enum.find(&(&1.path == pattern))
+    |> case do
+      nil -> :error
+      route -> {:ok, describe(route)}
+    end
+  end
+
+  defp describe(route) do
+    %{
+      path: route.path,
+      capability: route[:capability],
+      operator: route[:operator] == true,
+      source: route[:source]
+    }
   end
 
   @impl true

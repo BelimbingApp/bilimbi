@@ -472,12 +472,15 @@ defmodule Bilimbi.Core.Employee.Web.IndexLive do
             framed={false}
           >
             <:col :let={employee} label="Name" sort="full_name" sort_id="employees-sort-name">
-              <.link
+              <.record_link
+                workspace={@workspace}
+                kind="core/employee"
+                record_id={employee.id}
                 navigate={~p"/employees/#{employee.id}"}
                 class="font-medium text-ink-strong hover:underline"
               >
                 {employee.full_name}
-              </.link>
+              </.record_link>
 
               <span :if={employee.designation} class="block text-xs text-ink-subtle">
                 {employee.designation}

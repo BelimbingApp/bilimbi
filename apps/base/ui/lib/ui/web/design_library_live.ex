@@ -210,6 +210,12 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryLive do
     {:noreply, update(socket, :click_count, &(&1 + 1))}
   end
 
+  # The record-link specimen selects as it would in a workspace; this page
+  # is in none, so the selection counts as a click and goes nowhere.
+  def handle_event("workspace:select", _params, socket) do
+    {:noreply, update(socket, :click_count, &(&1 + 1))}
+  end
+
   @impl true
   def handle_event("sample_change", %{"sample" => sample_data}, socket) do
     {:noreply, assign(socket, :sample_form, to_form(sample_data, as: :sample))}

@@ -65,6 +65,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
   alias Bilimbi.Base.UI.CommitStatus
+  alias Bilimbi.Base.UI.Workspace
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Geonames
 
@@ -220,6 +221,7 @@ defmodule Bilimbi.Core.Company.Web.ShowLive do
          |> assign(:page_title, Company.Summary.display_name(company))
          |> assign(:active_nav, "admin.company")
          |> assign(:company, company)
+         |> Workspace.announce(%{kind: "core/company", id: company.id})
          |> assign(:is_primary, is_primary)
          |> assign(:can_update?, allowed?(socket.assigns.current_scope, @update_capability))
          |> assign(:legal_entity_types, legal_entity_types)

@@ -59,6 +59,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.UI.CommitStatus
   alias Bilimbi.Base.UI.DiscoveredPanels
+  alias Bilimbi.Base.UI.Workspace
   alias Phoenix.LiveView.JS
 
   @manage_capability "admin.employee.update"
@@ -125,6 +126,7 @@ defmodule Bilimbi.Core.Employee.Web.ShowLive do
         |> CommitStatus.init()
         |> init_ui_state()
         |> load_data(employee)
+        |> Workspace.announce(%{kind: "core/employee", id: employee.id})
 
       {:ok, socket}
     else

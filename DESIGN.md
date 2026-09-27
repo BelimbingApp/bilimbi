@@ -601,6 +601,17 @@ workspace shows one tile at a time with a strip of tabs, keeping the tree.
 Layouts are saved per account by name, opened at `/workspace/<slug>` or from
 the saved-layouts dialog, and one may be the default the sidebar entry opens.
 
+Tiles follow each other. A tile showing one record offers "Follow
+selections" on its menu; a following tile carries a link icon before its
+title and opens whichever record of that kind another tile selects. Inside a
+workspace a list row is a selection rather than a link: it opens the record
+in the following tile and the list stays, or, when nothing follows that
+kind, opens the record in its own tile as the link would. A record page
+announces the record it shows when it mounts, so a navigation inside one
+tile steers the tiles that follow. The follow is kept in the address and in
+saved layouts. Nothing follows unless the person asks, and a followed tile
+never moves for a record of another kind.
+
 ### Navigation menu conventions
 
 - **Typography & Font:** `Instrument Sans`, `0.8125rem` (`13px`), normal/light

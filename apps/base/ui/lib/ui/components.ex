@@ -3609,6 +3609,13 @@ defmodule Bilimbi.Base.UI.Components do
   plain navigation to the tile's own URL, because a tile is a page that
   stays reachable by itself.
 
+  A tile showing a record's page can follow selections: `on_follow` adds
+  the menu entry that marks it, and `following` shows the link icon before
+  the title and turns the entry into "Stop following". Pass no `on_follow`
+  for a page with no record to follow, and the entry is absent, as
+  `DESIGN.md` "Withheld controls" allows for an operation that does not
+  apply. The channel is `Bilimbi.Base.UI.Workspace`.
+
   Hyprland draws no title bars; this one exists because the mouse and touch
   path, the screen-reader name of the frame below it, and `DESIGN.md`'s rule
   against withheld controls all need it.
@@ -3643,6 +3650,16 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:on_split, JS, required: true, doc: "flips the split holding this tile")
   attr(:on_swap, JS, required: true, doc: "swaps this tile with its neighbour")
 
+  attr(:following, :boolean,
+    default: false,
+    doc: "whether this tile opens the records other tiles select"
+  )
+
+  attr(:on_follow, JS,
+    default: nil,
+    doc: "marks or unmarks the tile as following; nil when its page has no record to follow"
+  )
+
   def tile_header(assigns) do
     menu = "#{assigns.id}-menu"
     dismiss = JS.set_attribute({"aria-expanded", "false"}, to: "##{menu}")
@@ -3672,6 +3689,10 @@ defmodule Bilimbi.Base.UI.Components do
         !@focused && "text-ink-muted"
       ]}
     >
+      <span :if={@following} id={"#{@id}-following"} title={gettext("Follows selections")}>
+        <.icon name="hero-link" class="size-3" />
+        <span class="sr-only">{gettext("Follows selections")}</span>
+      </span>
       <button
         type="button"
         id={"#{@id}-title"}
@@ -3720,6 +3741,15 @@ defmodule Bilimbi.Base.UI.Components do
           class={@entry_class}
         >
           {gettext("Flip split direction")}
+        </button>
+        <button
+          :if={@on_follow}
+          type="button"
+          id={"#{@id}-follow"}
+          phx-click={dismiss_after(@on_follow, @dismiss)}
+          class={@entry_class}
+        >
+          {if @following, do: gettext("Stop following"), else: gettext("Follow selections")}
         </button>
         <.link navigate={@open_alone} id={"#{@id}-open-alone"} class={@entry_class}>
           {gettext("Open alone")}
@@ -3791,5 +3821,68 @@ defmodule Bilimbi.Base.UI.Components do
     >
     </div>
     """
+  end
+
+  @doc """
+  Renders the link from a list row to a record's page, and inside a tiled
+  workspace a button that selects the record instead.
+
+  The selection is answered by the hook `Bilimbi.Base.UI.Workspace.on_mount/4`
+  attaches, so the page declares no handler: when another tile follows that
+  kind of record, the hook announces the selection on the workspace channel
+  and the following tile opens the record while the list stays where it is,
+  which is the point of two tiles; when nothing follows it, the hook
+  navigates to the record's page as the link would have. Outside a workspace
+  (`workspace={nil}`) this is `<.link navigate>` and nothing else, so one
+  template serves the page alone and in a tile. Rows are usually streamed
+  and re-render only when re-streamed, which is why the decision is made
+  when the row is clicked rather than when it is rendered.
+
+  `kind` is the stable module id that owns the record, `"core/company"`,
+  and `record_id` its record id. Pass the page's `@workspace` assign.
+
+  ## Examples
+
+      <.record_link
+        workspace={@workspace}
+        kind="core/company"
+        record_id={company.id}
+        navigate={~p"/companies/\#{company.id}"}
+        class="font-medium text-ink-strong hover:underline"
+      >
+        {company.name}
+      </.record_link>
+  """
+  attr(:workspace, :any, required: true, doc: "the page's `@workspace` assign; `nil` alone")
+  attr(:kind, :string, required: true, doc: "the module id that owns the record")
+  attr(:record_id, :any, required: true, doc: "the record's id")
+  attr(:navigate, :string, required: true, doc: "the record's own page")
+  attr(:class, :any, default: nil)
+  attr(:rest, :global, include: ~w(title))
+  slot(:inner_block, required: true)
+
+  def record_link(assigns) do
+    if assigns.workspace do
+      ~H"""
+      <button
+        type="button"
+        phx-click="workspace:select"
+        phx-value-kind={@kind}
+        phx-value-id={@record_id}
+        phx-value-path={@navigate}
+        data-record-select
+        class={[@class, "text-left"]}
+        {@rest}
+      >
+        {render_slot(@inner_block)}
+      </button>
+      """
+    else
+      ~H"""
+      <.link navigate={@navigate} class={@class} {@rest}>
+        {render_slot(@inner_block)}
+      </.link>
+      """
+    end
   end
 end

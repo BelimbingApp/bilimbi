@@ -52,6 +52,8 @@ Use `<.inline_long_text>` for an in-place multi-line fact; its hook owns focus, 
 
 A page shown inside a workspace tile renders chromeless through the `framed` branch of `Layouts.app/1`; the flag comes from `BilimbiWeb.FramedRender` through the LiveView session, never from a page. Do not add a tile special case to a page: if a page needs to know it is in a tile beyond that branch, that is the signal to design a tile contract, not a special case. The tile bar is `<.tile_header>` and the divider `<.split_handle>`; the tree, the host page and its hook are `apps/base/tiling` and `apps/web/assets/js/tiling.js`. See `DESIGN.md` "Tiled workspace".
 
+The one tile contract so far is the follow channel, `Bilimbi.Base.UI.Workspace`. A list row that opens a record is `<.record_link workspace={@workspace} kind="core/company" record_id={id} navigate={...}>`, and a record page calls `Workspace.announce/2` once it has loaded the record; both are inert outside a workspace. Pass `@workspace` to the component; do not branch a page template on it, and do not decide from the followed kinds at render time: rows are streamed and re-render only when re-streamed, so the component decides when the row is clicked. `kind` is the record's owning module id, which for `/users/:id` is `core/user`, not the list's module. The comment on `record_link/1` and the moduledoc of `Workspace` own the rest.
+
 ## Lists
 
 An operational list keeps its page, search, filters, sort and page size in URL state. See `DESIGN.md` "Pagination controls".
