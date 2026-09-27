@@ -563,30 +563,45 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
         SavedLayouts.save(
           @settings_scope,
           "Records",
-          "h.5(/companies,v.5(/companies,/companies))",
+          "h.5(/companies,v.7(/companies,/companies))",
           "master"
         )
 
+      {:ok, _} = SavedLayouts.save(@settings_scope, "Lookups", "/companies")
+
       {:ok, view, _html} = open(conn, "/workspace/records")
-      assert has_element?(view, "#split-s6[aria-orientation='horizontal']")
+      assert has_element?(view, "#split-s4[aria-orientation='horizontal'][style*='top: 70.0%']")
 
-      render_hook(view, "resize-split", %{"id" => "s6", "ratio" => 0.7})
+      render_hook(view, "resize-split", %{"id" => "s4", "ratio" => 0.6})
 
-      stacked =
-        "/workspace/records?t=h.5%28%2Fcompanies%2Cv.7%28%2Fcompanies%2C%2Fcompanies%29%29"
+      assert_patch(
+        view,
+        "/workspace/records?t=h.5%28%2Fcompanies%2Cv.6%28%2Fcompanies%2C%2Fcompanies%29%29"
+      )
 
-      assert_patch(view, stacked)
-      assert has_element?(view, "#split-s6[style*='top: 70.0%']")
+      assert has_element?(view, "#split-s4[style*='top: 60.0%']")
 
       render_hook(view, "focus-tile", %{"id" => "t3"})
       render_hook(view, "resize-step", %{"side" => "up"})
 
       assert_patch(
         view,
-        "/workspace/records?t=h.5%28%2Fcompanies%2Cv.65%28%2Fcompanies%2C%2Fcompanies%29%29"
+        "/workspace/records?t=h.5%28%2Fcompanies%2Cv.55%28%2Fcompanies%2C%2Fcompanies%29%29"
       )
 
-      assert has_element?(view, "#split-s6[style*='top: 65.0%']")
+      assert has_element?(view, "#split-s4[style*='top: 55.0%']")
+
+      render_hook(view, "open-layout", %{"n" => 2})
+      assert_patch(view, "/workspace/lookups")
+      render_hook(view, "open-layout", %{"n" => 1})
+      assert_patch(view, "/workspace/records")
+      assert has_element?(view, "#workspace[data-layout='master']")
+      assert has_element?(view, "[data-split][style*='top: 70.0%']")
+
+      {:ok, view, _html} =
+        open(conn, "/workspace/records?t=h.5(/companies,v.55(/companies,/companies))")
+
+      assert has_element?(view, "[data-split][style*='top: 55.0%']")
     end
 
     test "changing the mode of the open layout leaves its unsaved tiles unsaved", %{conn: conn} do

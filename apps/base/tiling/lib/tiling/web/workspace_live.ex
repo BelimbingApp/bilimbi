@@ -160,23 +160,23 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   defp load_tree(socket, params), do: apply_encoded(socket, "dwindle", params["t"] || "")
 
   # A patch this page pushed already holds the tree and stable divider ids.
-  # Only entering master mode rearranges the tree, so a stack divider the
-  # user moved keeps its ratio.
+  # Only a tree that is not yet master-shaped is rearranged, so a stack
+  # divider the user moved keeps its ratio.
   defp apply_encoded(%{assigns: %{encoded: encoded, layout_mode: mode}} = socket, mode, encoded),
     do: socket
 
-  defp apply_encoded(socket, mode, encoded) do
-    from = socket.assigns.layout_mode
-    decode_encoded(assign(socket, :layout_mode, mode), encoded, from)
-  end
+  defp apply_encoded(socket, mode, encoded),
+    do: decode_encoded(assign(socket, :layout_mode, mode), encoded)
 
-  defp decode_encoded(socket, encoded, from) do
+  defp decode_encoded(socket, encoded) do
     case Layout.decode(encoded) do
       {:ok, incoming} ->
+        layout = Layout.reconcile(socket.assigns.tree, incoming)
+
         layout =
-          socket.assigns.tree
-          |> Layout.reconcile(incoming)
-          |> to_mode(from, socket.assigns.layout_mode)
+          if socket.assigns.layout_mode == "master" and not Layout.master?(layout),
+            do: Layout.master(layout),
+            else: layout
 
         socket = socket |> put_layout(layout) |> assign(:encoded, encoded) |> keep_focus()
 

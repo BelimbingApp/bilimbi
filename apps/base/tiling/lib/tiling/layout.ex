@@ -93,6 +93,34 @@ defmodule Bilimbi.Base.Tiling.Layout do
   @spec master(t()) :: t()
   def master(%__MODULE__{} = layout), do: master_rebuild(layout, leaves(layout))
 
+  @doc "Whether the tree is already one master beside a single-axis stack."
+  @spec master?(t()) :: boolean()
+  def master?(%__MODULE__{root: root}) do
+    case root do
+      nil ->
+        true
+
+      %{type: :leaf} ->
+        true
+
+      %{type: :split, first: %{type: :leaf}} = split ->
+        stack?(split.second, other_axis(split.direction))
+
+      _other ->
+        false
+    end
+  end
+
+  defp stack?(%{type: :leaf}, _direction), do: true
+
+  defp stack?(
+         %{type: :split, direction: direction, first: %{type: :leaf}, second: second},
+         direction
+       ),
+       do: stack?(second, direction)
+
+  defp stack?(_node, _direction), do: false
+
   defp master_rebuild(layout, tiles) do
     case tiles do
       [] ->
