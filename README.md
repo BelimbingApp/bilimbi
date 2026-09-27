@@ -76,7 +76,7 @@ their own repositories.
   company's needs. Repository `BelimbingApp/b-ext-<id>`, mounted at
   `apps/extensions/<id>`.
 - The mount folder is the container ID with hyphens turned into underscores,
-  so `b-ext-mr-packaging` mounts at `apps/extensions/mr_packaging`.
+  so `b-ext-company-a` mounts at `apps/extensions/company_a`.
 - Bilimbi discovers a mounted repository from its `bilimbi.container.exs`.
   Removing the folder removes the code from the next build and keeps its data.
 

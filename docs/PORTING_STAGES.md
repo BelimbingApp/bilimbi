@@ -183,8 +183,8 @@ licensing are independent of their architectural role.
   provenance are documented and tested; a production-profile release boot in
   CI and an upgrade workflow are open).
 
-**State:** First Extension, SBG's AX Connector (`SB-Tape/b-ext-sbg`,
-private), shipped 2026-09-26 with mounted, absent, and removal CI jobs; see
+**State:** First Extension, a customer Extension's source connector,
+shipped 2026-09-26 with mounted, absent, and removal CI jobs; see
 the rollout plan, Phase 4. The open gate items above remain.
 
 ## Stage-change rule

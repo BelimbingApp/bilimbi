@@ -4,8 +4,7 @@
 **Last Updated:** 2026-09-27
 **Sources:**
 - [`docs/plans/factory/0010-inventory-module.md`](0010-inventory-module.md)
-- [`docs/plans/factory/mr-packaging-requirements.md`](mr-packaging-requirements.md)
-- [`docs/plans/factory/sbg-requirements.md`](sbg-requirements.md)
+- [`docs/plans/factory/packaging-manufacturer-requirements.md`](packaging-manufacturer-requirements.md)
 - [`docs/plans/domain-extension-layer-rollout.md`](../domain-extension-layer-rollout.md)
 - [`docs/architecture/0010_composition-model.md`](../../architecture/0010_composition-model.md)
 - [`AGENTS.md`](../../../AGENTS.md) §§4–6
