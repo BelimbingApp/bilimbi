@@ -676,6 +676,24 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
              SavedLayouts.fetch(@settings_scope, "team-desk")
   end
 
+  test "an account without a company is refused at sign-in before any workspace route mounts",
+       %{conn: conn} do
+    UserFixtures.insert_user!(%{
+      id: 96,
+      company_id: nil,
+      name: "Loner",
+      email: "loner@example.com"
+    })
+
+    grant_capabilities!("ui.workspace.publish", user_id: 96)
+    {:ok, _} = SharedLayouts.publish(Settings.Scope.company(73), "Team desk", "/companies", [])
+    conn = log_in_as(conn, session_user(%{"user_id" => 96, "company_id" => nil}))
+
+    for path <- ["/workspace", "/workspace/shared/team-desk", "/workspace/shared-layouts"] do
+      assert {:error, {:redirect, %{to: "/"}}} = live(conn, path)
+    end
+  end
+
   test "a shared workspace does not replace the empty workspace", %{conn: conn} do
     {:ok, _} = SharedLayouts.publish(Settings.Scope.company(73), "Team desk", "/companies", [])
 
