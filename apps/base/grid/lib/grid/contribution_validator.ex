@@ -14,9 +14,12 @@ defmodule Bilimbi.Base.Grid.ContributionValidator do
 
   @behaviour Bilimbi.Base.ModuleRegistry.ContributionConsumer
 
+  alias Bilimbi.Base.Grid.Field
   alias Bilimbi.Base.Grid.Link
   alias Bilimbi.Base.Grid.Source
   alias Bilimbi.Base.Grid.Table
+  alias Bilimbi.Base.Tenancy.Identity
+  alias Bilimbi.Base.Tenancy.Scope
 
   @type catalog :: %{tables: %{String.t() => Table.t()}}
 
@@ -54,6 +57,7 @@ defmodule Bilimbi.Base.Grid.ContributionValidator do
 
       {table, table_links} = Table.new!(attrs, descriptor.id)
       validate_source!(table, descriptor)
+      table = resolve_columns!(table, descriptor)
       Enum.each(table_links, &validate_edge!(&1, descriptor))
 
       {tables ++ [table], links ++ Enum.map(table_links, &{&1, descriptor.id})}
@@ -82,6 +86,66 @@ defmodule Bilimbi.Base.Grid.ContributionValidator do
       )
     end
   end
+
+  # A field that declares no column is exposed under the source key its id
+  # names. The id is compared with each key as a string, so contribution
+  # data never creates an atom, and a field no key answers to fails here, at
+  # boot, rather than at its first query.
+  defp resolve_columns!(%Table{} = table, descriptor) do
+    keys = source_keys(table.source)
+
+    fields =
+      Map.new(table.fields, fn
+        {id, %Field{column: nil} = field} ->
+          case Enum.find(keys, &(Atom.to_string(&1) == id)) do
+            nil ->
+              invalid!(
+                descriptor.id,
+                "field #{id} of table #{table.id} names no key its source " <>
+                  "#{inspect(table.source)} selects; it selects #{inspect(keys)}"
+              )
+
+            column ->
+              {id, %{field | column: column}}
+          end
+
+        entry ->
+          entry
+      end)
+
+    %{table | fields: fields}
+  end
+
+  # The keys a source's query exposes, read from the query it builds. The
+  # scope is a shape probe: the tenant it names is not real, and the query
+  # is never executed. Only a where clause depends on the scope.
+  defp source_keys(source) do
+    probe =
+      Scope.for_tenant(%Identity{
+        id: 1,
+        name: "grid shape probe",
+        status: "active",
+        is_platform_operator: false
+      })
+
+    query = Ecto.Queryable.to_query(source.query(probe))
+
+    case query.select do
+      %{expr: {:%{}, _meta, pairs}} ->
+        Keyword.keys(pairs)
+
+      %{expr: {:&, _meta, [0]}, take: %{0 => {_kind, fields}}} ->
+        fields
+
+      _struct ->
+        schema_fields(query.from.source)
+    end
+  end
+
+  defp schema_fields({_table, schema}) when is_atom(schema) and not is_nil(schema),
+    do: schema.__schema__(:fields)
+
+  defp schema_fields(_source), do: []
 
   defp validate_edge!(%Link{via: nil}, _descriptor), do: :ok
 

@@ -2,8 +2,9 @@ defmodule Bilimbi.Base.Grid.Field do
   @moduledoc """
   One field of a catalog table: a value a column can show, sort or search.
 
-  `column` is the key the owner's source query exposes it under; it defaults
-  to the field id. `hidden` fields exist for links to join on and never
+  `column` is the key the owner's source query exposes it under. A field
+  that declares none is resolved at boot to the source key its id names
+  (`Bilimbi.Base.Grid.ContributionValidator`); until then it is `nil`. `hidden` fields exist for links to join on and never
   appear as columns or suggestions. `values` names the closed set an `:enum`
   field takes, which the band lens colours categorically.
   """
@@ -80,9 +81,9 @@ defmodule Bilimbi.Base.Grid.Field do
       invalid!(owner, attrs, "field #{id} is not an enum and takes no values")
     end
 
-    column = Map.get(attrs, :column, String.to_atom(id))
+    column = Map.get(attrs, :column)
 
-    unless is_atom(column) and not is_nil(column) do
+    unless is_atom(column) do
       invalid!(owner, attrs, "field #{id} column must be an atom")
     end
 
