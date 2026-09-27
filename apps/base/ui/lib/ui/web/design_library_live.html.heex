@@ -1960,6 +1960,70 @@
                   </:col>
                 </.table>
               </div>
+              <div id="component-flex-table" class="space-y-3">
+                <div>
+                  <h3 class="text-sm font-semibold text-ink">Flexible table</h3>
+                  <p class="text-xs text-ink-muted">
+                    Four hundred example companies with columns walked to their people
+                    and orders. Add a column from the bar, drag a chip or a heading to
+                    reorder, switch a column's lens, expand a rollup, and zoom: the
+                    table is the full mode; the second specimen opens as the carpet,
+                    where every cell is a square coloured by its value and a hover
+                    reads it. Changes stay in this preview.
+                  </p>
+                </div>
+                <.flex_table
+                  id="sample-flex-table"
+                  columns={@flex_sample.columns}
+                  rows={@flex_rows}
+                  mode={:full}
+                  zoom={28}
+                  event="sample-flex"
+                  sort_by={@flex_sample.sort_by}
+                  sort_dir={:asc}
+                  suggestions={@flex_sample.suggestions}
+                  add_query={@flex_sample.add_query}
+                  total={12}
+                  cost={%{estimate: 32_000.0, heavy?: true}}
+                  expanded={@flex_sample.expanded}
+                  group="region"
+                  caption="Example companies as a flexible table"
+                >
+                  <:col :let={row} id="name">
+                    <span class="font-medium text-ink-strong">{row.cells["name"].text}</span>
+                  </:col>
+                  <:action :let={row}>
+                    <.icon_button
+                      icon="view"
+                      id={"sample-flex-preview-#{row.key}"}
+                      label={"Preview #{row.cells["name"].text}"}
+                      phx-click="preview-company"
+                      phx-value-id={row.key}
+                    />
+                  </:action>
+                  <:empty title="No example companies" reason="The example set is empty." />
+                </.flex_table>
+                <.flex_table
+                  id="sample-flex-mid"
+                  columns={@flex_sample.columns}
+                  rows={[]}
+                  mode={:mid}
+                  zoom={12}
+                  event="sample-flex"
+                  total={400}
+                />
+                <.flex_table
+                  id="sample-flex-carpet"
+                  columns={@flex_sample.columns}
+                  rows={[]}
+                  mode={:carpet}
+                  zoom={3}
+                  event="sample-flex"
+                  sort_by="code"
+                  sort_dir={:desc}
+                  total={400}
+                />
+              </div>
             </div>
             <div class="grid gap-3 lg:grid-cols-2">
               <.card id="component-card" title="Card" inner_class="space-y-4 p-4">

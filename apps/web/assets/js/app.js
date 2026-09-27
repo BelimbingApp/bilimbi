@@ -37,6 +37,7 @@ import Modal from "./modal"
 import FlashAutoDismiss from "./flash_auto_dismiss"
 import ClipboardCopy from "./clipboard_copy"
 import Tiling from "./tiling"
+import FlexTable from "./flex_table"
 
 // A page framed inside the tiled workspace shares the tab's history with the
 // workspace page around it. LiveView records every live navigation with
@@ -53,7 +54,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, InlineLongText, DashboardSort, DisclosureDismiss, Combobox, SecretReveal, Modal, FlashAutoDismiss, ClipboardCopy, Tiling},
+  hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, InlineLongText, DashboardSort, DisclosureDismiss, Combobox, SecretReveal, Modal, FlashAutoDismiss, ClipboardCopy, Tiling, FlexTable},
 })
 
 // Show progress bar on live navigation and form submits
