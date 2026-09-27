@@ -4153,10 +4153,10 @@ defmodule Bilimbi.Base.UI.Components do
           />
           <span
             id={"#{@id}-zoom-level"}
-            class="min-w-14 text-center text-xs tabular-nums text-ink-muted"
-            title={gettext("Row height %{px} px", px: @zoom)}
+            class="min-w-12 text-center text-xs tabular-nums text-ink-muted"
+            title={gettext("%{mode} view, rows %{px} px tall", mode: @mode_label, px: @zoom)}
           >
-            {@mode_label}
+            {@zoom} px
           </span>
           <.icon_button
             icon="zoom-in"

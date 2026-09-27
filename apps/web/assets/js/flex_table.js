@@ -275,6 +275,12 @@ const FlexTable = {
     return this.zoom * 6
   },
 
+  // The compact view keeps a heading band above the rows; the carpet has
+  // no room for one and reads through the chips and the hover.
+  headerHeight() {
+    return this.mode === "mid" ? this.zoom + 6 : 0
+  },
+
   // The scroll height is the whole set's; the canvas is only as tall as the
   // viewport and is redrawn from the scroll position.
   layout() {
@@ -283,7 +289,7 @@ const FlexTable = {
     if (!host || !this.canvas || !viewport) return
     const rowHeight = this.zoom
     const width = Math.max(this.columns.length * this.cellWidth(), 1)
-    host.style.height = `${Math.max(this.total * rowHeight, rowHeight)}px`
+    host.style.height = `${Math.max(this.total * rowHeight, rowHeight) + this.headerHeight()}px`
     host.style.width = `${width}px`
     const viewHeight = Math.min(viewport.clientHeight || 600, 4000)
     const viewWidth = Math.min(Math.max(viewport.clientWidth, width), 8000)
@@ -381,10 +387,11 @@ const FlexTable = {
     const top = viewport.scrollTop
     const gap = rowHeight >= 4 ? 1 : 0
     const mid = this.mode === "mid"
+    const headerHeight = this.headerHeight()
     if (mid) context.font = `${Math.max(Math.floor(rowHeight * 0.62), 8)}px ${getComputedStyle(this.el).fontFamily}`
     for (let index = first; index < last; index++) {
       const row = this.rows.get(index)
-      const y = index * rowHeight - top
+      const y = index * rowHeight - top + headerHeight
       this.columns.forEach((column, c) => {
         const x = c * cellWidth
         const cell = row ? row[1][c] : null
@@ -418,12 +425,28 @@ const FlexTable = {
         }
       })
     }
+    if (headerHeight > 0) this.drawHeader(context, cellWidth, headerHeight, width, colours)
     if (this.rect) {
       context.strokeStyle = colours.ink
       context.setLineDash([4, 2])
-      context.strokeRect(this.rect.x0, this.rect.y0 - top, this.rect.x1 - this.rect.x0, this.rect.y1 - this.rect.y0)
+      context.strokeRect(this.rect.x0, this.rect.y0 - top + headerHeight, this.rect.x1 - this.rect.x0, this.rect.y1 - this.rect.y0)
       context.setLineDash([])
     }
+  },
+
+  drawHeader(context, cellWidth, headerHeight, width, colours) {
+    context.fillStyle = colours.empty
+    context.fillRect(0, 0, width, headerHeight)
+    context.fillStyle = colours.line
+    context.fillRect(0, headerHeight - 1, width, 1)
+    context.fillStyle = colours.ink
+    context.font = `600 ${Math.max(Math.floor(this.zoom * 0.62), 8)}px ${getComputedStyle(this.el).fontFamily}`
+    context.textBaseline = "middle"
+    const maxChars = Math.max(Math.floor((cellWidth - 6) / (this.zoom * 0.36)), 1)
+    this.columns.forEach((column, c) => {
+      const text = column.short || column.label
+      context.fillText(text.length > maxChars ? text.slice(0, maxChars - 1) + "…" : text, c * cellWidth + 3, headerHeight / 2)
+    })
   },
 
   // --- hover -----------------------------------------------------------
@@ -432,7 +455,7 @@ const FlexTable = {
     const box = this.canvas.getBoundingClientRect()
     const viewport = this.viewport()
     const x = event.clientX - box.left
-    const y = event.clientY - box.top + viewport.scrollTop
+    const y = event.clientY - box.top + viewport.scrollTop - this.headerHeight()
     const row = Math.floor(y / this.zoom)
     const col = Math.floor(x / this.cellWidth())
     if (row < 0 || row >= this.total || col < 0 || col >= this.columns.length) return null
