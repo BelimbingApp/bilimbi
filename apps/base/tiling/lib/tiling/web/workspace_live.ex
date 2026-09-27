@@ -118,6 +118,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   @impl true
   def handle_params(params, uri, socket) do
     shared? = String.starts_with?(URI.parse(uri).path, "/workspace/shared/")
+
     socket =
       assign(socket,
         slug: params["slug"],
@@ -748,6 +749,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   defp sync_url(socket, opts \\ []) do
     encoded = Layout.encode(socket.assigns.tree)
     socket = assign(socket, :encoded, encoded)
+
     address =
       if socket.assigns.shared?, do: {:shared, socket.assigns.slug}, else: socket.assigns.slug
 
