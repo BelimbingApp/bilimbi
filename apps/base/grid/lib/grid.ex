@@ -337,7 +337,13 @@ defmodule Bilimbi.Base.Grid do
           stats: %{String.t() => %{min: term(), max: term()}},
           more: non_neg_integer()
         }
-  def pivot(%Catalog{} = catalog, %Table{} = root, %Column{} = rows_column, %Column{} = across_column, opts \\ []) do
+  def pivot(
+        %Catalog{} = catalog,
+        %Table{} = root,
+        %Column{} = rows_column,
+        %Column{} = across_column,
+        opts \\ []
+      ) do
     focus = Keyword.get(opts, :focus)
     plan = Query.plan(catalog, root, [rows_column, across_column], extra: focus_columns(focus))
 
@@ -361,7 +367,8 @@ defmodule Bilimbi.Base.Grid do
         if(other?, do: [pivot_column("pv-other", "Other", across_column)], else: []) ++
         [pivot_column("pv-total", "Total", across_column)]
 
-    index_of = shown |> Enum.with_index() |> Map.new(fn {value, index} -> {value, "pv-#{index}"} end)
+    index_of =
+      shown |> Enum.with_index() |> Map.new(fn {value, index} -> {value, "pv-#{index}"} end)
 
     rows =
       triples
