@@ -51,9 +51,11 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Authz
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.Tiling.Layout
   alias Bilimbi.Base.Tiling.SavedLayouts
+  alias Bilimbi.Base.Tiling.SharedLayouts
   alias Bilimbi.Base.UI.Nav
   alias Bilimbi.Base.UI.RouteContract
   alias Bilimbi.Base.UI.Workspace
@@ -65,7 +67,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   @write_guard_opt_out ~w(add-tile close-tile move-tile swap-tile toggle-monocle toggle-split
                           resize-split nudge-split resize-step save-layout update-layout
                           rename-layout delete-layout confirm-delete-layout set-default-layout
-                          clear-default-layout)
+                          clear-default-layout copy-layout)
 
   # The root layout's title suffix, stripped from what a frame reports so
   # the tile bar shows the page's own name. Keep in step with
@@ -89,6 +91,8 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
      |> assign(:active_nav, "workspace")
      |> assign(:framed?, current_scope[:framed] == true)
      |> assign(:settings_scope, settings_scope(current_scope))
+     |> assign(:company_scope, company_scope(current_scope))
+     |> assign(:role_codes, role_codes(current_scope))
      |> assign(:pages, pages(current_scope))
      |> assign(:token, token)
      |> assign(:topic, topic)
@@ -97,6 +101,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
      |> assign(:encoded, nil)
      |> assign(:slug, nil)
      |> assign(:in_place?, false)
+     |> assign(:shared?, false)
      |> assign(:focused, nil)
      |> assign(:monocle, false)
      |> assign(:viewport, {1600, 900})
@@ -111,10 +116,12 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   end
 
   @impl true
-  def handle_params(params, _uri, socket) do
+  def handle_params(params, uri, socket) do
+    shared? = String.starts_with?(URI.parse(uri).path, "/workspace/shared/")
     socket =
       assign(socket,
         slug: params["slug"],
+        shared?: shared?,
         in_place?: params["inplace"] == "1" and not is_binary(params["slug"])
       )
 
@@ -124,6 +131,9 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
       is_binary(params["open"]) ->
         {:noreply, socket |> load_tree(params) |> open_page(params["open"])}
+
+      shared? and is_binary(params["slug"]) ->
+        {:noreply, open_shared(socket, params["slug"], params["t"])}
 
       is_binary(params["slug"]) ->
         {:noreply, open_saved(socket, params["slug"], params["t"])}
@@ -138,6 +148,10 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
   # The tree an `open` request starts from: the saved layout at the slug, the
   # tree in `t`, or nothing.
+  defp load_tree(%{assigns: %{shared?: true}} = socket, %{"slug" => slug} = params)
+       when is_binary(slug),
+       do: open_shared(socket, slug, params["t"])
+
   defp load_tree(socket, %{"slug" => slug} = params) when is_binary(slug),
     do: open_saved(socket, slug, params["t"])
 
@@ -176,11 +190,37 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     end
   end
 
+  defp open_shared(socket, slug, encoded) do
+    case SharedLayouts.fetch_visible(
+           socket.assigns.company_scope,
+           slug,
+           socket.assigns.role_codes
+         ) do
+      {:ok, entry} ->
+        apply_encoded(socket, encoded || entry["tree"])
+
+      :error ->
+        socket
+        |> put_flash(:error, gettext("This shared workspace is not available."))
+        |> push_navigate(to: ~p"/workspace")
+    end
+  end
+
   defp open_default(socket) do
     case SavedLayouts.default_slug(socket.assigns.settings_scope) do
       nil ->
-        socket = socket |> put_layout(Layout.empty()) |> assign(:encoded, nil) |> keep_focus()
-        {:noreply, assign(socket, picker_open?: Layout.empty?(socket.assigns.tree))}
+        preferred =
+          Enum.find(socket.assigns.shared, &(&1["roles"] != [])) ||
+            List.first(socket.assigns.shared)
+
+        case preferred do
+          %{"slug" => slug} ->
+            {:noreply, push_navigate(socket, to: ~p"/workspace/shared/#{slug}")}
+
+          nil ->
+            socket = socket |> put_layout(Layout.empty()) |> assign(:encoded, nil) |> keep_focus()
+            {:noreply, assign(socket, picker_open?: Layout.empty?(socket.assigns.tree))}
+        end
 
       slug ->
         {:noreply, push_navigate(socket, to: ~p"/workspace/#{slug}")}
@@ -458,7 +498,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     end
   end
 
-  def handle_event("update-layout", _params, %{assigns: %{slug: slug}} = socket)
+  def handle_event("update-layout", _params, %{assigns: %{slug: slug, shared?: false}} = socket)
       when is_binary(slug) do
     scope = socket.assigns.settings_scope
 
@@ -480,6 +520,31 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   end
 
   def handle_event("update-layout", _params, socket), do: {:noreply, socket}
+
+  def handle_event("copy-layout", %{"id" => slug}, socket) do
+    with {:ok, entry} <-
+           SharedLayouts.fetch_visible(
+             socket.assigns.company_scope,
+             slug,
+             socket.assigns.role_codes
+           ),
+         {:ok, copy} <-
+           SavedLayouts.save(
+             socket.assigns.settings_scope,
+             copy_label(socket.assigns.saved, entry["label"]),
+             entry["tree"]
+           ) do
+      {:noreply,
+       socket
+       |> load_saved()
+       |> put_flash(:success, gettext("Copied the shared workspace to your layouts."))
+       |> push_patch(to: ~p"/workspace/#{copy["slug"]}")}
+    else
+      _ ->
+        {:noreply,
+         put_flash(socket, :error, gettext("The shared workspace could not be copied."))}
+    end
+  end
 
   def handle_event("rename-layout", %{"id" => slug, "label" => label}, socket) do
     case SavedLayouts.rename(socket.assigns.settings_scope, slug, label) do
@@ -693,13 +758,20 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   defp sync_url(socket, opts \\ []) do
     encoded = Layout.encode(socket.assigns.tree)
     socket = assign(socket, :encoded, encoded)
-    to = workspace_path(socket.assigns.slug, encoded, socket.assigns.in_place?)
+    address =
+      if socket.assigns.shared?, do: {:shared, socket.assigns.slug}, else: socket.assigns.slug
+
+    to = workspace_path(address, encoded, socket.assigns.in_place?)
     push_patch(socket, to: to, replace: Keyword.get(opts, :replace, false))
   end
 
   defp workspace_path(nil, "", _in_place?), do: ~p"/workspace"
   defp workspace_path(nil, encoded, true), do: ~p"/workspace?t=#{encoded}&inplace=1"
   defp workspace_path(nil, encoded, false), do: ~p"/workspace?t=#{encoded}"
+
+  defp workspace_path({:shared, slug}, encoded, _in_place?),
+    do: ~p"/workspace/shared/#{slug}?t=#{encoded}"
+
   defp workspace_path(slug, encoded, _in_place?), do: ~p"/workspace/#{slug}?t=#{encoded}"
 
   defp load_saved(socket) do
@@ -707,6 +779,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
     assign(socket,
       saved: SavedLayouts.list(scope),
+      shared: SharedLayouts.visible(socket.assigns.company_scope, socket.assigns.role_codes),
       default_slug: SavedLayouts.default_slug(scope)
     )
   end
@@ -874,11 +947,46 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     end
   end
 
+  defp copy_label(saved, label) do
+    taken = MapSet.new(saved, & &1["label"])
+
+    Stream.iterate(1, &(&1 + 1))
+    |> Stream.map(fn n -> if n == 1, do: label, else: "#{String.slice(label, 0, 50)} #{n}" end)
+    |> Enum.find(&(not MapSet.member?(taken, &1)))
+  end
+
   defp settings_scope(current_scope) do
     Settings.Scope.user(
       current_user_id(current_scope),
       current_scope.user["company_id"],
       current_scope.scope.tenant.id
     )
+  end
+
+  defp company_scope(current_scope) do
+    Settings.Scope.company(current_scope.user["company_id"])
+  end
+
+  defp role_codes(current_scope) do
+    scope = current_scope.scope
+    user_id = current_user_id(current_scope)
+    first = Authz.list_principal_role_assignments(scope, :user, user_id, page_size: 100)
+
+    entries =
+      if first.total_pages > 1 do
+        first.entries ++
+          Enum.flat_map(2..first.total_pages, fn page ->
+            Authz.list_principal_role_assignments(scope, :user, user_id,
+              page: page,
+              page_size: 100
+            ).entries
+          end)
+      else
+        first.entries
+      end
+
+    entries
+    |> Enum.filter(&(&1.company_id in [nil, current_scope.user["company_id"]]))
+    |> Enum.map(& &1.role_code)
   end
 end

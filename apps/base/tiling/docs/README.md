@@ -32,6 +32,11 @@ occupies, and the compact URL form (`h.5(/companies,v.6(/users,/audit))`).
 `Bilimbi.Base.Tiling.SavedLayouts` keeps an account's saved layouts and its
 default in the `ui.workspace.layouts` and `ui.workspace.default` settings at
 user scope, through the shared Settings API, so every write is audited.
+`Bilimbi.Base.Tiling.SharedLayouts` keeps published layouts in the
+`ui.workspace.shared_layouts` setting at company scope. An empty role list
+shares with the company; role codes limit who sees a layout. Publishing and
+administration require `ui.workspace.publish`. A viewer may open or copy a
+shared layout, while every tile still applies that viewer's route access.
 `Bilimbi.Base.Tiling.Web.WorkspaceLive` is the host page; it holds only the
 tree, the focused tile, monocle, and the titles the tiles report. The
 sidebar control is `nav_tile/1` in Base UI's `Layouts`, and `AppShell`
@@ -61,9 +66,9 @@ the hook sends the frame there. A page opts in with `<.record_link>` on its
 rows and `Workspace.announce/2` at mount; the Company, Employee and User
 lists and record pages do.
 
-This module depends on Settings and UI. The host page lives here rather than
+This module depends on Authz, Settings and UI. The host page lives here rather than
 in Base UI because Settings itself depends on Base UI for its own screens,
 so Base UI cannot read saved layouts.
 
-Deferred to later slices: the master layout, layouts shared per role or
-company, Domain-contributed default layouts, and nested-LiveView tiles.
+Deferred to later slices: the master layout, Domain-contributed default
+layouts, and nested-LiveView tiles.
