@@ -373,12 +373,15 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
               <%!-- The name leads every surface; the legal name is formal
                    detail (#614 identity-line ruling). Display now matches
                    the sort field. --%>
-              <.link
+              <.record_link
+                workspace={@workspace}
+                kind="core/company"
+                record_id={company.id}
                 navigate={~p"/companies/#{company.id}"}
                 class="font-medium text-ink-strong hover:underline"
               >
                 {company.name}
-              </.link>
+              </.record_link>
               <span
                 :if={company.legal_name && company.legal_name != company.name}
                 class="block text-xs text-ink-subtle"

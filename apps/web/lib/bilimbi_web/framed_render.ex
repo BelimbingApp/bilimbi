@@ -15,9 +15,16 @@ defmodule BilimbiWeb.FramedRender do
   A browser that does not send the header renders a tile with the full
   shell inside it: ugly, but every page still works. The layout reads the
   flag from `current_scope[:framed]`, so there is nothing for a page to pass.
+
+  A framed request also carries the workspace token of its host in `?ws=`;
+  `session/1` copies that into the same signed session, so the page can
+  join the follow channel (`Bilimbi.Base.UI.Workspace`). A token on a
+  request no frame made is ignored: a page opened alone is in no workspace.
   """
 
   import Phoenix.Component, only: [assign: 3]
+
+  alias Bilimbi.Base.UI.Workspace
 
   @session_key "bilimbi_framed"
 
@@ -27,9 +34,13 @@ defmodule BilimbiWeb.FramedRender do
     Plug.Conn.get_req_header(conn, "sec-fetch-dest") in [["iframe"], ["frame"]]
   end
 
-  @doc "The live session entry carrying the frame flag; the session MFA of every discovered `live_session`."
-  @spec session(Plug.Conn.t()) :: %{String.t() => boolean()}
-  def session(%Plug.Conn{} = conn), do: %{@session_key => framed_request?(conn)}
+  @doc "The live session entries carrying the frame flag and, for a frame, the workspace token; the session MFA of every discovered `live_session`."
+  @spec session(Plug.Conn.t()) :: %{String.t() => boolean() | String.t()}
+  def session(%Plug.Conn{} = conn) do
+    if framed_request?(conn),
+      do: Map.put(Workspace.session(conn), @session_key, true),
+      else: %{@session_key => false}
+  end
 
   @doc "Marks `current_scope` framed when the LiveView session says so. An anonymous page has no scope to mark."
   def on_mount(:framed, _params, session, socket) do

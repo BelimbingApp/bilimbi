@@ -24,8 +24,15 @@ defmodule Bilimbi.Base.Tiling.Layout do
       h.5(/companies,v.6(/employees,/users))
 
   `h` splits side by side and `v` top and bottom, the number is the first
-  child's share, and a leaf is its path with `(`, `)`, `,` and `%`
-  percent-encoded.
+  child's share, and a leaf is its path with `(`, `)`, `,`, `>` and `%`
+  percent-encoded. A leaf that follows selections carries the route
+  pattern it follows after `>`:
+
+      h.5(/companies,/companies/42>/companies/:id)
+
+  The host reads the pattern's owning module from the route manifest and
+  fills its one `:param` with the id another tile announces; this module
+  only keeps the pattern's shape.
   """
 
   @max_tiles 6
@@ -37,7 +44,7 @@ defmodule Bilimbi.Base.Tiling.Layout do
 
   @type direction :: :h | :v
   @type side :: :left | :right | :up | :down
-  @type leaf :: %{type: :leaf, id: String.t(), path: String.t()}
+  @type leaf :: %{type: :leaf, id: String.t(), path: String.t(), follow: String.t() | nil}
   @type split :: %{
           type: :split,
           id: String.t(),
@@ -156,12 +163,42 @@ defmodule Bilimbi.Base.Tiling.Layout do
     %{split | first: remove_leaf(split.first, id), second: remove_leaf(split.second, id)}
   end
 
-  @doc "Changes the path a tile shows, keeping its id and place."
+  @doc "Changes the path a tile shows, keeping its id, place and follow."
   @spec update_path(t(), String.t(), String.t()) :: t()
   def update_path(%__MODULE__{root: nil} = layout, _id, _path), do: layout
 
   def update_path(%__MODULE__{root: root} = layout, id, path) when is_binary(path) do
     %{layout | root: map_node(root, id, &%{&1 | path: path})}
+  end
+
+  @doc """
+  Marks the tile with `id` as following the route `pattern`, such as
+  `/companies/:id`, or clears it with `nil`. A pattern is a page path with
+  exactly one `:param` segment; anything else leaves the tree unchanged.
+  """
+  @spec follow(t(), String.t(), String.t() | nil) :: t()
+  def follow(%__MODULE__{root: nil} = layout, _id, _pattern), do: layout
+
+  def follow(%__MODULE__{root: root} = layout, id, pattern)
+      when is_nil(pattern) or is_binary(pattern) do
+    if is_nil(pattern) or follow_pattern?(pattern),
+      do: %{layout | root: map_node(root, id, &%{&1 | follow: pattern})},
+      else: layout
+  end
+
+  @doc "Whether `pattern` is a page path with exactly one `:param` segment."
+  @spec follow_pattern?(term()) :: boolean()
+  def follow_pattern?(pattern) when is_binary(pattern) do
+    page_path?(pattern) and not String.contains?(pattern, "?") and
+      pattern |> String.split("/", trim: true) |> Enum.count(&String.starts_with?(&1, ":")) == 1
+  end
+
+  def follow_pattern?(_pattern), do: false
+
+  @doc "The route patterns the tiles follow, each once, in tree order."
+  @spec follows(t()) :: [String.t()]
+  def follows(layout) do
+    layout |> leaves() |> Enum.map(& &1.follow) |> Enum.reject(&is_nil/1) |> Enum.uniq()
   end
 
   @doc """
@@ -348,14 +385,19 @@ defmodule Bilimbi.Base.Tiling.Layout do
   def encode(%__MODULE__{root: nil}), do: ""
   def encode(%__MODULE__{root: root}), do: encode_node(root)
 
-  defp encode_node(%{type: :leaf, path: path}) do
-    URI.encode(path, &(&1 not in [?(, ?), ?,, ?%] and URI.char_unescaped?(&1)))
-  end
+  defp encode_node(%{type: :leaf, path: path, follow: nil}), do: encode_leaf(path)
+
+  defp encode_node(%{type: :leaf, path: path, follow: pattern}),
+    do: encode_leaf(path) <> ">" <> encode_leaf(pattern)
 
   defp encode_node(%{type: :split} = split) do
     direction = if split.direction == :h, do: "h", else: "v"
 
     "#{direction}#{encode_ratio(split.ratio)}(#{encode_node(split.first)},#{encode_node(split.second)})"
+  end
+
+  defp encode_leaf(text) do
+    URI.encode(text, &(&1 not in [?(, ?), ?,, ?>, ?%] and URI.char_unescaped?(&1)))
   end
 
   # `0.5` is written `.5`: the leading zero says nothing.
@@ -432,11 +474,24 @@ defmodule Bilimbi.Base.Tiling.Layout do
   defp parse_leaf(encoded, layout) do
     {raw, rest} = take_leaf(encoded, "")
 
-    with false <- raw == "",
-         path when is_binary(path) <- safe_decode(raw),
-         true <- page_path?(path) do
+    with [raw_path | raw_follow] when raw_path != "" and length(raw_follow) <= 1 <-
+           String.split(raw, ">"),
+         path when is_binary(path) <- safe_decode(raw_path),
+         true <- page_path?(path),
+         {:ok, follow} <- parse_follow(raw_follow) do
       {leaf, layout} = new_leaf(layout, path)
-      {:ok, leaf, rest, layout}
+      {:ok, %{leaf | follow: follow}, rest, layout}
+    else
+      _ -> :error
+    end
+  end
+
+  defp parse_follow([]), do: {:ok, nil}
+
+  defp parse_follow([raw]) do
+    with pattern when is_binary(pattern) <- safe_decode(raw),
+         true <- follow_pattern?(pattern) do
+      {:ok, pattern}
     else
       _ -> :error
     end
@@ -490,7 +545,7 @@ defmodule Bilimbi.Base.Tiling.Layout do
 
   defp new_leaf(layout, path) do
     {id, layout} = next_id(layout, "t")
-    {%{type: :leaf, id: id, path: path}, layout}
+    {%{type: :leaf, id: id, path: path, follow: nil}, layout}
   end
 
   defp next_id(%__MODULE__{next_id: n} = layout, prefix),

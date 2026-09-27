@@ -589,6 +589,57 @@
                   on_swap={JS.push("test_click")}
                 />
               </div>
+              <p class="text-xs text-ink-muted">
+                A tile showing one record can follow selections: the menu offers it, and a following tile carries the link icon before its title and opens whichever record of that kind another tile selects.
+              </p>
+              <div
+                id="design-library-tile-header-following"
+                class="overflow-hidden rounded-md border border-line"
+              >
+                <.tile_header
+                  id="design-library-tile-header-c"
+                  title="A company record"
+                  following
+                  open_alone={~p"/system/design-library/components"}
+                  on_focus={JS.push("test_click")}
+                  on_close={JS.push("test_click")}
+                  on_monocle={JS.push("test_click")}
+                  on_split={JS.push("test_click")}
+                  on_swap={JS.push("test_click")}
+                  on_follow={JS.push("test_click")}
+                />
+              </div>
+            </.card>
+            <.card
+              id="component-record-link"
+              title="Record link"
+              inner_class="space-y-3 p-4"
+            >
+              <p class="text-xs text-ink-muted">
+                The link from a list row to its record. Inside a tiled workspace the same call renders a selection button: when another tile follows that kind of record it opens the record there and the list stays put, otherwise it opens the record here as the link would. Alone, it is a plain navigation.
+              </p>
+              <p id="design-library-record-link-alone" class="text-sm">
+                <.record_link
+                  workspace={nil}
+                  kind="core/company"
+                  record_id={1}
+                  navigate={~p"/system/design-library/components"}
+                  class="font-medium text-ink-strong hover:underline"
+                >
+                  A company, opened alone
+                </.record_link>
+              </p>
+              <p id="design-library-record-link-followed" class="text-sm">
+                <.record_link
+                  workspace={%{token: "specimen", topic: "specimen", follows: []}}
+                  kind="core/company"
+                  record_id={1}
+                  navigate={~p"/system/design-library/components"}
+                  class="font-medium text-ink-strong hover:underline"
+                >
+                  A company, selected inside a workspace
+                </.record_link>
+              </p>
             </.card>
             <.card
               id="component-split-handle"

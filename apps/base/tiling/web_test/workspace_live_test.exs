@@ -62,7 +62,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
 
     assert has_element?(
              view,
-             "#tile-t1[data-focused='true'] iframe#tile-t1-page[src='/companies']"
+             "#tile-t1[data-focused='true'] iframe#tile-t1-page[src^='/companies?ws=']"
            )
 
     assert has_element?(view, "#tile-t1-header-title", "/companies")
@@ -167,7 +167,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     {:ok, view, _html} = open(conn, "/workspace?t=/companies")
     render_hook(view, "tile-navigated", %{"id" => "t1", "path" => "//evil.example/login"})
     render_hook(view, "tile-navigated", %{"id" => "t1", "path" => "/\t/evil.example/login"})
-    assert has_element?(view, "#tile-t1-page[src='/companies']")
+    assert has_element?(view, "#tile-t1-page[src^='/companies?ws=']")
 
     entry = %{
       "slug" => "evil",
@@ -379,7 +379,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
                conn |> log_in_as() |> live(~p"/workspace")
 
       {:ok, view, _html} = open(conn, "/workspace/orders")
-      assert has_element?(view, "#tile-t1-page[src='/companies']")
+      assert has_element?(view, "#tile-t1-page[src^='/companies?ws=']")
 
       # The keyboard's 2 opens the second saved layout.
       render_hook(view, "open-layout", %{"n" => 2})

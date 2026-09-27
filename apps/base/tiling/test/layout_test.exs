@@ -217,6 +217,76 @@ defmodule Bilimbi.Base.Tiling.LayoutTest do
 
       assert Layout.decode(encoded) == :error
     end
+
+    test "a followed pattern rides after the path and round-trips" do
+      {layout, a} = open!(Layout.empty(), "/companies")
+      {layout, b} = open!(layout, "/companies/42?tab=x>y", at: a)
+      layout = Layout.follow(layout, b, "/companies/:id")
+
+      encoded = Layout.encode(layout)
+      assert encoded == "h.5(/companies,/companies/42?tab=x%3Ey>/companies/:id)"
+
+      assert {:ok, decoded} = Layout.decode(encoded)
+
+      assert [%{follow: nil}, %{follow: "/companies/:id", path: "/companies/42?tab=x>y"}] =
+               Layout.leaves(decoded)
+
+      assert Layout.encode(decoded) == encoded
+      assert Layout.follows(decoded) == ["/companies/:id"]
+    end
+
+    test "rejects a follow that is not one record's page pattern" do
+      for bad <- [
+            "/companies/42>",
+            "/companies/42>/companies",
+            "/companies/42>/companies/:id/:other",
+            "/companies/42>/companies/:id?x=1",
+            "/companies/42>//evil.example/:id",
+            "/companies/42>/companies/:id>/users/:id"
+          ] do
+        assert Layout.decode(bad) == :error, "expected #{inspect(bad)} to be rejected"
+      end
+    end
+  end
+
+  describe "follow/3" do
+    test "marks a tile, survives a path change, and clears" do
+      {layout, a} = open!(Layout.empty(), "/companies/42")
+
+      followed = Layout.follow(layout, a, "/companies/:id")
+      assert Layout.fetch_leaf(followed, a).follow == "/companies/:id"
+
+      moved = Layout.update_path(followed, a, "/companies/43")
+
+      assert Layout.fetch_leaf(moved, a) == %{
+               type: :leaf,
+               id: a,
+               path: "/companies/43",
+               follow: "/companies/:id"
+             }
+
+      assert Layout.fetch_leaf(Layout.follow(moved, a, nil), a).follow == nil
+      assert Layout.follows(Layout.follow(moved, a, nil)) == []
+    end
+
+    test "refuses a pattern that names no single record, and an unknown tile" do
+      {layout, a} = open!(Layout.empty(), "/companies/42")
+
+      assert Layout.follow(layout, a, "/companies") == layout
+      assert Layout.follow(layout, a, "/companies/:id/departments/:dept") == layout
+      assert Layout.follow(layout, a, "companies/:id") == layout
+      assert Layout.follow(layout, "t9", "/companies/:id") == layout
+      assert Layout.follow(Layout.empty(), a, "/companies/:id") == Layout.empty()
+    end
+
+    test "follow_pattern?/1 names exactly one record" do
+      assert Layout.follow_pattern?("/companies/:id")
+      assert Layout.follow_pattern?("/admin/system/database-queries/:slug")
+      refute Layout.follow_pattern?("/companies")
+      refute Layout.follow_pattern?("/companies/:id?page=2")
+      refute Layout.follow_pattern?("//x/:id")
+      refute Layout.follow_pattern?(nil)
+    end
   end
 
   describe "reconcile/2" do

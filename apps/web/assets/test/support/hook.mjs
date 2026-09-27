@@ -1,8 +1,9 @@
 // Mounts a LiveView hook against real DOM, standing in for the LiveView
-// runtime at the three seams the hooks use: pushing an event, and running a
-// JS command either from the socket (`liveSocket.execJS`) or from the hook
-// (`this.js().exec`). `exec` is returned too, to run a command the markup
-// binds to a click, which LiveView would run.
+// runtime at the four seams the hooks use: pushing an event, receiving one
+// the server pushed (`handleEvent`), and running a JS command either from
+// the socket (`liveSocket.execJS`) or from the hook (`this.js().exec`).
+// `exec` is returned too, to run a command the markup binds to a click,
+// which LiveView would run, and `serverEvent` delivers a `push_event`.
 //
 // A JS command is the JSON the server rendered into the markup. The ops the
 // hooks run are applied to the DOM here the way LiveView applies them, so a
@@ -12,18 +13,26 @@
 
 export function mountHook(Hook, el) {
   const pushes = []
+  const handlers = new Map()
   const run = (encoded) => applyCommands(encoded, pushes)
 
   const hook = Object.create(Hook)
   hook.el = el
   hook.pushEvent = (event, payload, reply) => pushes.push({event, payload, reply})
   hook.pushEventTo = (target, event, payload, reply) => pushes.push({target, event, payload, reply})
+  hook.handleEvent = (event, callback) => handlers.set(event, callback)
   hook.liveSocket = {execJS: (_el, encoded) => run(encoded)}
   hook.js = () => ({exec: run})
 
   hook.mounted()
 
-  return {hook, pushes, exec: run}
+  const serverEvent = (event, payload) => {
+    const callback = handlers.get(event)
+    if (!callback) throw new Error(`the hook handles no "${event}" server event`)
+    callback(payload)
+  }
+
+  return {hook, pushes, exec: run, serverEvent}
 }
 
 function applyCommands(encoded, pushes) {

@@ -61,14 +61,17 @@
             <span class="grid size-8 shrink-0 place-items-center rounded-full bg-surface-sunken text-xs font-semibold text-ink">
               {initials(user.name)}
             </span>
-            <.link
+            <.record_link
               :if={allowed?(@current_scope, "admin.user.view")}
               id={"user-#{user.id}-show"}
+              workspace={@workspace}
+              kind="core/user"
+              record_id={user.id}
               navigate={~p"/users/#{user.id}"}
               class="font-medium text-ink-strong hover:underline"
             >
               {user.name}
-            </.link>
+            </.record_link>
             <span
               :if={not allowed?(@current_scope, "admin.user.view")}
               class="font-medium text-ink-strong"

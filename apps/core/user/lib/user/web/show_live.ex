@@ -75,6 +75,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
 
   alias Bilimbi.Base.Authz
   alias Bilimbi.Base.UI.CommitStatus
+  alias Bilimbi.Base.UI.Workspace
 
   @manage_capability "admin.user.update"
   alias Bilimbi.Core.Company
@@ -93,6 +94,7 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
         |> assign(:user_id, user_id)
         |> init_ui_state()
         |> load_data(user)
+        |> Workspace.announce(%{kind: "core/user", id: user.id})
 
       {:ok, socket}
     else

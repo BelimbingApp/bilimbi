@@ -27,6 +27,11 @@ config :web, BilimbiWeb.Endpoint,
 config :bilimbi_core_user,
   pubsub_server: BilimbiWeb.PubSub
 
+# The follow channel between workspace tiles (Bilimbi.Base.UI.Workspace)
+# rides the host's PubSub, as user notifications do.
+config :bilimbi_base_ui,
+  pubsub_server: BilimbiWeb.PubSub
+
 config :phoenix_live_view,
   root_tag_attribute: "phx-r"
 

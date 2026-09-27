@@ -45,6 +45,34 @@ defmodule BilimbiWeb.UserLiveTest do
     :ok
   end
 
+  test "inside a workspace where a tile follows users, a row selects instead of opening", %{
+    conn: conn
+  } do
+    insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
+    insert_user!(%{id: 92, company_id: 73, name: "Grace Hopper"})
+    grant_capabilities!(["admin.user.list", "admin.user.view"])
+    token = Bilimbi.Base.UI.Workspace.host_token("phx-a-host")
+    topic = Bilimbi.Base.UI.Workspace.topic(41, 91, token)
+    :ok = Bilimbi.Base.UI.Workspace.subscribe(topic)
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_as()
+      |> put_req_header("sec-fetch-dest", "iframe")
+      |> live(~p"/users?ws=#{token}")
+
+    assert_receive {:workspace_joined}
+    assert has_element?(view, "button#user-92-show[data-record-select][phx-value-id='92']")
+    refute has_element?(view, "a#user-92-show")
+
+    :ok = Bilimbi.Base.UI.Workspace.broadcast(topic, {:workspace_follows, ["core/user"]})
+    _ = render(view)
+
+    view |> element("button#user-92-show") |> render_click()
+    assert_receive {:workspace_fact, %{kind: "core/user", id: "92"}}
+    assert has_element?(view, "#users-index")
+  end
+
   test "requires authentication", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/users")
   end

@@ -17,7 +17,11 @@
 //     handle follows the pointer locally and the ratio is pushed once on
 //     release;
 //   * reporting each frame's URL and title after it loads or navigates, and
-//     the workspace area's size, which decides a split's direction.
+//     the workspace area's size, which decides a split's direction;
+//   * sending a frame to the page the server names in a `tile-navigate`
+//     event, when a record another tile selected is followed here. The
+//     frame's document is replaced, not pushed, so Back still leaves the
+//     workspace.
 //
 // Focus follows a click, never the pointer. `DESIGN.md` "Application shell"
 // and apps/base/ui/AGENTS.md carry the rest.
@@ -62,6 +66,8 @@ const Tiling = {
     this.el.addEventListener("keydown", this.onHandleKey)
     this.el.addEventListener("pointerdown", this.onPointerDown)
     window.addEventListener("resize", this.onViewport)
+
+    this.handleEvent("tile-navigate", ({id, path}) => this.navigateFrame(id, path))
 
     this.bindFrames()
     this.reportViewport()
@@ -124,6 +130,16 @@ const Tiling = {
     doc.addEventListener("focusin", () => this.focusTile(id))
     doc.addEventListener("pointerdown", () => this.focusTile(id))
     win.addEventListener("phx:page-loading-stop", () => this.report(frame))
+    // A live navigation inside the frame patches its title after the
+    // loading-stop event, so the title is reported again when it changes.
+    const title = doc.querySelector("title")
+    if (title && typeof MutationObserver !== "undefined") {
+      new MutationObserver(() => this.report(frame)).observe(title, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      })
+    }
     this.report(frame)
   },
 
@@ -142,6 +158,20 @@ const Tiling = {
   focusTile(id) {
     if (this.el.dataset.focused === id) return
     this.pushEvent("focus-tile", {id})
+  },
+
+  // The server has validated the path: a page this deployment serves, with
+  // the workspace token. `replace` keeps the tab's history where it is; a
+  // frame whose window is not reachable takes the plain `src` instead.
+  navigateFrame(id, path) {
+    const frame = this.el.querySelector(`iframe[data-tile-frame="${id}"]`)
+    if (!frame || typeof path !== "string" || !path.startsWith("/") || path.startsWith("//")) return
+
+    try {
+      frame.contentWindow.location.replace(path)
+    } catch {
+      frame.src = path
+    }
   },
 
   // After a keyboard move the server has a new focused tile; put real focus

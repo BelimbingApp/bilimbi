@@ -23,10 +23,22 @@ the `Ctrl+.` tiling mode, drag resizing and the frame reports. The tile bar
 and split handle are shared Base UI components, presented in the Design
 Library.
 
+Tiles talk through the follow channel, `Bilimbi.Base.UI.Workspace`: one
+PubSub topic per workspace, named by the account and a token the host
+derives from its LiveView id and puts in every frame's URL as `?ws=`. The
+Web host copies the token of a framed request into the signed LiveView
+session, and the `Workspace.on_mount/4` hook on every discovered
+`live_session` joins the page to the topic. A tile showing one record can
+follow selections: the tree keeps that page's route pattern
+(`/companies/42>/companies/:id` in the URL form), and when a page announces
+a record of the module that owns the pattern, the host fills the id in and
+the hook sends the frame there. A page opts in with `<.record_link>` on its
+rows and `Workspace.announce/2` at mount; the Company, Employee and User
+lists and record pages do.
+
 This module depends on Settings and UI. The host page lives here rather than
 in Base UI because Settings itself depends on Base UI for its own screens,
 so Base UI cannot read saved layouts.
 
-Deferred to later slices: a follow channel between tiles, the master layout,
-layouts shared per role or company, Domain-contributed default layouts, and
-nested-LiveView tiles.
+Deferred to later slices: the master layout, layouts shared per role or
+company, Domain-contributed default layouts, and nested-LiveView tiles.

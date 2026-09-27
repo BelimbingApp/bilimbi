@@ -25,6 +25,16 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   in place of the frame, judged by the same route policy the page's mount
   applies, so a saved layout that outlives a role change says so plainly
   instead of showing a redirect inside the tile.
+
+  Tiles talk through the follow channel, `Bilimbi.Base.UI.Workspace`. This
+  page derives the workspace token from its own LiveView id, puts it in
+  every frame's URL, and subscribes to the topic. A tile showing a record's
+  page can follow selections: it keeps the route pattern of that page
+  (`/companies/:id`) in the tree, and when a page in another tile announces
+  a record of the module that owns that pattern, this host fills the id in
+  and tells the hook to send the frame there. The kinds the tiles follow
+  are broadcast to every page in the workspace after each change, so a
+  list whose kind is followed selects instead of navigating.
   """
 
   use Bilimbi.Base.UI, :live_view
@@ -35,6 +45,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   alias Bilimbi.Base.Tiling.SavedLayouts
   alias Bilimbi.Base.UI.Nav
   alias Bilimbi.Base.UI.RouteContract
+  alias Bilimbi.Base.UI.Workspace
 
   # Every event here changes the signed-in account's own workspace: the tree
   # it is looking at and the layouts it saved for itself. They are
@@ -56,6 +67,10 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   @impl true
   def mount(_params, _session, socket) do
     current_scope = socket.assigns.current_scope
+    token = Workspace.host_token(socket.id)
+    topic = Workspace.topic_for(current_scope, token)
+
+    if connected?(socket) and is_binary(topic), do: Workspace.subscribe(topic)
 
     {:ok,
      socket
@@ -64,6 +79,9 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
      |> assign(:framed?, current_scope[:framed] == true)
      |> assign(:settings_scope, settings_scope(current_scope))
      |> assign(:pages, pages(current_scope))
+     |> assign(:token, token)
+     |> assign(:topic, topic)
+     |> assign(:follows, [])
      |> assign(:tree, Layout.empty())
      |> assign(:encoded, nil)
      |> assign(:slug, nil)
@@ -158,9 +176,11 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
   def handle_event("viewport", _params, socket), do: {:noreply, socket}
 
-  def handle_event("tile-navigated", %{"id" => id, "path" => path} = params, socket) do
+  def handle_event("tile-navigated", %{"id" => id, "path" => path} = params, socket)
+      when is_binary(path) do
     with %{} <- Layout.fetch_leaf(socket.assigns.tree, id),
-         true <- tile_path?(path) do
+         true <- tile_path?(path),
+         path <- Workspace.strip_token(path) do
       title = params |> Map.get("title") |> clean_title()
 
       socket =
@@ -229,6 +249,22 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
       |> keep_focus()
 
     {:noreply, sync_url(socket)}
+  end
+
+  # The tile follows the pattern of the page it shows now, so the choice is
+  # made on a record the person can see rather than from a list of kinds.
+  def handle_event("follow-tile", %{"id" => id}, socket) do
+    with %{path: path} <- Layout.fetch_leaf(socket.assigns.tree, id),
+         pattern when is_binary(pattern) <- follow_pattern(path) do
+      {:noreply,
+       socket |> put_layout(Layout.follow(socket.assigns.tree, id, pattern)) |> sync_url()}
+    else
+      _ -> {:noreply, socket}
+    end
+  end
+
+  def handle_event("unfollow-tile", %{"id" => id}, socket) do
+    {:noreply, socket |> put_layout(Layout.follow(socket.assigns.tree, id, nil)) |> sync_url()}
   end
 
   def handle_event("toggle-monocle", params, socket) do
@@ -468,10 +504,118 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   end
 
   # ------------------------------------------------------------------
+  # The follow channel
+  # ------------------------------------------------------------------
+
+  @impl true
+  def handle_info({:workspace_joined}, socket) do
+    publish_follows(socket, socket.assigns.follows)
+    {:noreply, socket}
+  end
+
+  # A page announced a record. Every tile following a pattern of the module
+  # that owns the record goes to that record's page, unless it is there.
+  def handle_info({:workspace_fact, %{kind: kind, id: id} = fact}, socket)
+      when is_map_key(fact, :kind) do
+    if Workspace.fact?(fact),
+      do: follow_fact(socket, kind, id),
+      else: {:noreply, socket}
+  end
+
+  # This host's own broadcast, and anything else on the topic.
+  def handle_info(_message, socket), do: {:noreply, socket}
+
+  defp follow_fact(socket, kind, id) do
+    {layout, moved} =
+      socket.assigns.tree
+      |> Layout.leaves()
+      |> Enum.reduce({socket.assigns.tree, []}, fn
+        %{follow: pattern} = leaf, {layout, moved} when is_binary(pattern) ->
+          with {:ok, %{source: ^kind}} <- RouteContract.fetch_pattern(pattern),
+               path when is_binary(path) <- fill_pattern(pattern, id),
+               false <- same_page?(leaf.path, path) do
+            {Layout.update_path(layout, leaf.id, path), [{leaf.id, path} | moved]}
+          else
+            _ -> {layout, moved}
+          end
+
+        _leaf, acc ->
+          acc
+      end)
+
+    case moved do
+      [] ->
+        {:noreply, socket}
+
+      moved ->
+        socket =
+          Enum.reduce(moved, socket, fn {tile_id, path}, socket ->
+            socket
+            |> update(:titles, &Map.delete(&1, tile_id))
+            |> push_event("tile-navigate", %{
+              id: tile_id,
+              path: Workspace.frame_url(path, socket.assigns.token)
+            })
+          end)
+
+        {:noreply, socket |> put_layout(layout) |> sync_url(replace: true)}
+    end
+  end
+
+  # The module ids the tiles follow, told to every page in the workspace
+  # when they change and to a page that joins.
+  defp follow_kinds(layout) do
+    layout
+    |> Layout.follows()
+    |> Enum.flat_map(fn pattern ->
+      case RouteContract.fetch_pattern(pattern) do
+        {:ok, %{source: source}} when is_binary(source) -> [source]
+        _other -> []
+      end
+    end)
+    |> Enum.uniq()
+  end
+
+  defp publish_follows(socket, kinds) do
+    if connected?(socket) and is_binary(socket.assigns.topic),
+      do: Workspace.broadcast(socket.assigns.topic, {:workspace_follows, kinds})
+  end
+
+  # The route pattern a tile at `path` may follow: its page's own pattern
+  # when that names one record, such as `/companies/:id`.
+  defp follow_pattern(path) do
+    with {:ok, %{path: pattern}} <- RouteContract.fetch_route(path),
+         true <- Layout.follow_pattern?(pattern) do
+      pattern
+    else
+      _ -> nil
+    end
+  end
+
+  defp fill_pattern(pattern, id) do
+    segment = URI.encode(to_string(id), &URI.char_unreserved?/1)
+
+    pattern
+    |> String.split("/", trim: true)
+    |> Enum.map_join("/", fn
+      ":" <> _param -> segment
+      literal -> literal
+    end)
+    |> then(&("/" <> &1))
+  end
+
+  defp same_page?(current, path), do: URI.parse(current).path == path
+
+  # ------------------------------------------------------------------
   # State
   # ------------------------------------------------------------------
 
-  defp put_layout(socket, %Layout{} = layout), do: socket |> assign(:tree, layout) |> derive()
+  defp put_layout(socket, %Layout{} = layout) do
+    kinds = follow_kinds(layout)
+    if kinds != socket.assigns.follows, do: publish_follows(socket, kinds)
+
+    socket |> assign(:tree, layout) |> assign(:follows, kinds) |> derive()
+  end
 
   defp current_leaf(layout, id) when is_binary(id) do
     if Layout.fetch_leaf(layout, id), do: id
@@ -545,7 +689,9 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
           title: Map.get(titles, leaf.id) || leaf.path,
           style: if(monocle and focused?, do: @full_style, else: rect_style(rect)),
           focused?: focused?,
-          access: access(current_scope, leaf.path)
+          access: access(current_scope, leaf.path),
+          following?: is_binary(leaf.follow),
+          on_follow: follow_command(leaf)
         }
       end
 
@@ -578,6 +724,15 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
   # Ids are `t<n>` with n increasing, so length-then-text is numeric order.
   defp tile_order(%{id: id}), do: {byte_size(id), id}
+
+  # The menu entry: stop following, follow the page shown, or nothing for a
+  # page that names no record.
+  defp follow_command(%{id: id, follow: pattern}) when is_binary(pattern),
+    do: JS.push("unfollow-tile", value: %{id: id})
+
+  defp follow_command(%{id: id, path: path}) do
+    if follow_pattern(path), do: JS.push("follow-tile", value: %{id: id})
+  end
 
   defp first_label(%{type: :leaf, id: id}, labels), do: Map.get(labels, id, id)
   defp first_label(%{type: :split, first: first}, labels), do: first_label(first, labels)

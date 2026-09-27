@@ -15,6 +15,8 @@ defmodule Bilimbi.Base.UI.ComponentsTileHeaderTest do
   defp tile_bar(assigns) do
     assigns = assign_new(assigns, :focused, fn -> false end)
     assigns = assign_new(assigns, :monocle, fn -> false end)
+    assigns = assign_new(assigns, :following, fn -> false end)
+    assigns = assign_new(assigns, :on_follow, fn -> nil end)
 
     ~H"""
     <.tile_header
@@ -22,6 +24,8 @@ defmodule Bilimbi.Base.UI.ComponentsTileHeaderTest do
       title="Companies"
       focused={@focused}
       monocle={@monocle}
+      following={@following}
+      on_follow={@on_follow}
       open_alone="/companies?page=2"
       on_focus={JS.push("focus-tile", value: %{id: "t1"})}
       on_close={JS.push("close-tile", value: %{id: "t1"})}
@@ -75,6 +79,29 @@ defmodule Bilimbi.Base.UI.ComponentsTileHeaderTest do
     assert focused =~ "Show every tile"
     refute focused =~ "Monocle: fill the workspace"
     assert attribute(focused, "#tile-t1-header-close", "phx-click") =~ "close-tile"
+  end
+
+  test "following is offered only for a page with a record, and shown when on" do
+    plain = render_component(&tile_bar/1, %{})
+    refute plain =~ "tile-t1-header-follow"
+    refute plain =~ "tile-t1-header-following"
+
+    offered =
+      render_component(&tile_bar/1, %{on_follow: JS.push("follow-tile", value: %{id: "t1"})})
+
+    assert attribute(offered, "#tile-t1-header-follow", "phx-click") =~ "follow-tile"
+    assert offered =~ "Follow selections"
+    refute offered =~ "tile-t1-header-following"
+
+    following =
+      render_component(&tile_bar/1, %{
+        following: true,
+        on_follow: JS.push("unfollow-tile", value: %{id: "t1"})
+      })
+
+    assert attribute(following, "#tile-t1-header-follow", "phx-click") =~ "unfollow-tile"
+    assert following =~ "Stop following"
+    assert attribute(following, "#tile-t1-header-following", "title") == "Follows selections"
   end
 
   test "a split handle is a focusable separator oriented like the line it draws" do

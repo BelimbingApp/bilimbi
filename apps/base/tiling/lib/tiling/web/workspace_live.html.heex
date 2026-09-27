@@ -128,16 +128,21 @@
               on_monocle={JS.push("toggle-monocle", value: %{id: tile.id})}
               on_split={JS.push("toggle-split", value: %{id: tile.id})}
               on_swap={JS.push("swap-tile", value: %{id: tile.id})}
+              following={tile.following?}
+              on_follow={tile.on_follow}
             />
             <%= case tile.access do %>
               <% :ok -> %>
                 <%!-- `phx-update="ignore"`: the frame's `src` is written once.
                 A frame navigates itself afterwards and reports where it
-                went; rewriting `src` from the server would reload it. --%>
+                went; rewriting `src` from the server would reload it. The
+                only later move is the hook's, on a `tile-navigate` event
+                when a followed record is selected. The `ws` token joins
+                the page to this workspace's follow channel. --%>
                 <div id={"tile-#{tile.id}-frame"} phx-update="ignore" class="min-h-0 flex-1">
                   <iframe
                     id={"tile-#{tile.id}-page"}
-                    src={tile.path}
+                    src={Workspace.frame_url(tile.path, @token)}
                     title={tile.title}
                     data-tile-frame={tile.id}
                     class="size-full border-0 bg-canvas"

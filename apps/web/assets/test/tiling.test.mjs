@@ -5,7 +5,7 @@
 import {test, beforeEach, afterEach} from "node:test"
 import assert from "node:assert/strict"
 import Tiling from "../js/tiling.js"
-import {mountHook, render, focused} from "./support/hook.mjs"
+import {mountHook, render, focused, settle} from "./support/hook.mjs"
 
 let control
 
@@ -222,4 +222,66 @@ test("the workspace reports its size on mount", () => {
   control = mountHook(Tiling, el)
 
   assert.deepEqual(events(), [{event: "viewport", payload: {w: 1280, h: 720}}])
+})
+
+test("a tile-navigate event sends the named frame to the page, and nothing else", () => {
+  const tile = document.getElementById("tile-t2")
+  tile.insertAdjacentHTML("beforeend", '<iframe id="tile-t2-page" data-tile-frame="t2" src="/users"></iframe>')
+  const frame = document.getElementById("tile-t2-page")
+  const moves = []
+  // happy-dom gives a frame no window; the hook then falls back to `src`.
+  Object.defineProperty(frame, "contentWindow", {
+    value: {location: {replace: (path) => moves.push(path)}},
+  })
+
+  control.serverEvent("tile-navigate", {id: "t2", path: "/users/92?ws=abcdefghijklmnop"})
+  assert.deepEqual(moves, ["/users/92?ws=abcdefghijklmnop"])
+
+  control.serverEvent("tile-navigate", {id: "t1", path: "/users/92"})
+  control.serverEvent("tile-navigate", {id: "t2", path: "https://example.test/x"})
+  control.serverEvent("tile-navigate", {id: "t2", path: "//example.test/x"})
+  assert.equal(moves.length, 1)
+  assert.equal(frame.getAttribute("src"), "/users")
+})
+
+test("a frame whose window is out of reach takes the path as its source", () => {
+  const tile = document.getElementById("tile-t2")
+  tile.insertAdjacentHTML("beforeend", '<iframe id="tile-t2-page" data-tile-frame="t2" src="/users"></iframe>')
+  const frame = document.getElementById("tile-t2-page")
+  Object.defineProperty(frame, "contentWindow", {
+    get() {
+      throw new Error("cross-origin")
+    },
+  })
+
+  control.serverEvent("tile-navigate", {id: "t2", path: "/users/92"})
+  assert.equal(frame.getAttribute("src"), "/users/92")
+})
+
+test("a frame reports its page on load and again when its title is patched", async () => {
+  const tile = document.getElementById("tile-t2")
+  tile.insertAdjacentHTML("beforeend", '<iframe id="tile-t2-page" data-tile-frame="t2"></iframe>')
+  const frame = document.getElementById("tile-t2-page")
+  const doc = document.implementation.createHTMLDocument("")
+  doc.head.appendChild(doc.createElement("title")).textContent = "Users · Business application platform"
+  const win = new EventTarget()
+  win.location = {pathname: "/users", search: "?ws=abcdefghijklmnop"}
+  Object.defineProperty(frame, "contentWindow", {value: win})
+  Object.defineProperty(frame, "contentDocument", {value: doc})
+
+  control.hook.attachFrame(frame)
+  assert.deepEqual(events(), [
+    {event: "tile-navigated", payload: {id: "t2", path: "/users?ws=abcdefghijklmnop", title: "Users · Business application platform"}},
+  ])
+
+  win.location.pathname = "/users/92"
+  win.location.search = ""
+  win.dispatchEvent(new Event("phx:page-loading-stop"))
+  doc.querySelector("title").textContent = "Grace Hopper · Business application platform"
+  await settle()
+
+  assert.deepEqual(events().slice(1), [
+    {event: "tile-navigated", payload: {id: "t2", path: "/users/92", title: "Users · Business application platform"}},
+    {event: "tile-navigated", payload: {id: "t2", path: "/users/92", title: "Grace Hopper · Business application platform"}},
+  ])
 })

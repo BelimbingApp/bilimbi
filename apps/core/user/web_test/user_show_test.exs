@@ -28,6 +28,30 @@ defmodule BilimbiWeb.UserShowTest do
     :ok
   end
 
+  test "inside a workspace tile the page announces the user it shows", %{conn: conn} do
+    UserFixtures.insert_user!(%{id: 91, company_id: 73, name: "Ada Lovelace"})
+
+    UserFixtures.insert_user!(%{
+      id: 92,
+      company_id: 73,
+      name: "Grace Hopper",
+      email: "grace@example.test"
+    })
+
+    grant_capabilities!(["admin.user.view"])
+    token = Bilimbi.Base.UI.Workspace.host_token("phx-a-host")
+    :ok = Bilimbi.Base.UI.Workspace.subscribe(Bilimbi.Base.UI.Workspace.topic(41, 91, token))
+
+    {:ok, _view, _html} =
+      conn
+      |> log_in_as()
+      |> put_req_header("sec-fetch-dest", "iframe")
+      |> live(~p"/users/92?ws=#{token}")
+
+    assert_receive {:workspace_joined}
+    assert_receive {:workspace_fact, %{kind: "core/user", id: 92}}
+  end
+
   test "requires authentication", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/"}}} = live(conn, ~p"/users/91")
   end
