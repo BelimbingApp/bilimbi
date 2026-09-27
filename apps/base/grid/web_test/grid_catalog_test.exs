@@ -188,7 +188,7 @@ defmodule Bilimbi.Base.Grid.CatalogIntegrationTest do
     assert grace["company-users_count"] == 1
     # Employees are bounded to the actor's own company, so another company's
     # employees roll up to nothing rather than to a number the actor may not see.
-    assert grace["company-employees_count"] == nil
+    assert grace["company-employees_count"] == 0
   end
 
   test "companies roll up their people, addresses and attachments", %{catalog: catalog} do
@@ -215,7 +215,7 @@ defmodule Bilimbi.Base.Grid.CatalogIntegrationTest do
     assert hq["children_count"] == 1
 
     retail = row(result, 74)
-    assert retail["addresses_count"] == nil
+    assert retail["addresses_count"] == 0
     assert retail["primary_address-locality"] == nil
   end
 

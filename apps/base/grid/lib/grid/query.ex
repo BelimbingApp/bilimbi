@@ -325,6 +325,14 @@ defmodule Bilimbi.Base.Grid.Query do
     dynamic([{^binding, t}], field(t, ^column.field.column))
   end
 
+  # A parent with no reached rows has no group row, so a LEFT JOIN yields
+  # NULL; a count of nothing is 0, and reads, sorts and colours as one.
+  defp select_expr(%Column{kind: :rollup, agg: :count}, index, _state, rollups) do
+    binding = Map.fetch!(rollups, index)
+    name = :"c#{index}"
+    dynamic([{^binding, r}], coalesce(field(r, ^name), 0))
+  end
+
   defp select_expr(%Column{kind: :rollup}, index, _state, rollups) do
     binding = Map.fetch!(rollups, index)
     name = :"c#{index}"

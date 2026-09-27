@@ -263,23 +263,30 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
             end
         end
 
+      # No listed row matches the key: nothing to open, nothing to read.
       {:expand, spec, key} ->
         column = Enum.find(columns, &(&1.spec == spec))
-        row_key = row_key(socket, key)
-        rows = Host.expansion(catalog, table, row_key, column)
 
-        expanded =
-          Map.update(
-            socket.assigns.expanded,
-            row_key,
-            %{column.id => rows},
-            &Map.put(&1, column.id, rows)
-          )
+        case row_key(socket, key) do
+          nil ->
+            {:noreply, socket}
 
-        {:noreply, assign(socket, :expanded, expanded)}
+          row_key ->
+            rows = Host.expansion(catalog, table, row_key, column)
+
+            expanded =
+              Map.update(
+                socket.assigns.expanded,
+                row_key,
+                %{column.id => rows},
+                &Map.put(&1, column.id, rows)
+              )
+
+            {:noreply, assign(socket, :expanded, expanded)}
+        end
 
       {:collapse, spec, key} ->
-        row_key = row_key(socket, key)
+        row_key = row_key(socket, key) || key
         column = Enum.find(columns, &(&1.spec == spec))
 
         expanded =
@@ -295,6 +302,8 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
       {:window, offset, limit, detail} ->
         sort = Enum.find(columns, &(&1.spec == view.sort))
 
+        # The load already counted the set and scaled every colour to it; a
+        # window only needs its rows.
         result =
           Grid.query(catalog, table, columns,
             offset: offset,
@@ -302,7 +311,9 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
             sort: {sort, view.dir},
             search: view.search,
             stats: false,
-            cost: false
+            cost: false,
+            count: false,
+            total: socket.assigns.result.total_entries
           )
 
         result = %{result | stats: socket.assigns.result.stats}
@@ -493,7 +504,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
       if socket.assigns.window, do: socket.assigns.window.rows, else: socket.assigns.result.rows
 
     case Enum.find(rows, &(to_string(&1.key) == key)) do
-      nil -> key
+      nil -> nil
       row -> row.key
     end
   end

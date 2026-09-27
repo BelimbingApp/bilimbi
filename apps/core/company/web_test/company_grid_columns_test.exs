@@ -60,7 +60,7 @@ defmodule Bilimbi.Core.Company.Web.GridColumnsTest do
     refute has_element?(view, "#companies-chip-code")
     assert has_element?(view, "#companies-cell-73-users_count", "2")
     assert has_element?(view, "#companies-cell-73-departments_count", "1")
-    assert has_element?(view, "#companies-cell-74-users_count", "—")
+    assert has_element?(view, "#companies-cell-74-users_count", "0")
 
     view |> element("#companies-expand-73-users_count") |> render_click()
     assert has_element?(view, "#companies-73-users_count", "grace@example.com")
@@ -72,8 +72,7 @@ defmodule Bilimbi.Core.Company.Web.GridColumnsTest do
       |> log_in_as()
       |> live(~p"/companies?cols=name%2Cusers%3Acount&lens=users%3Acount%7Cband")
 
-    # Both listed users are in one company, so the range is one value wide and
-    # every counted cell sits in the middle band.
+    # Two users in one company, none in the other: the range runs 0 to 2.
     assert has_element?(
              view,
              "#companies-cell-73-users_count[data-scale='sequential'][data-band='2']",
