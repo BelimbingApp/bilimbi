@@ -141,7 +141,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
         {:noreply, open_saved(socket, params["slug"], params["t"])}
 
       is_binary(params["t"]) ->
-        {:noreply, apply_encoded(assign(socket, :layout_mode, "dwindle"), params["t"])}
+        {:noreply, apply_encoded(socket, "dwindle", params["t"])}
 
       true ->
         open_default(socket)
@@ -157,27 +157,26 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   defp load_tree(socket, %{"slug" => slug} = params) when is_binary(slug),
     do: open_saved(socket, slug, params["t"])
 
-  defp load_tree(socket, params), do: apply_encoded(socket, params["t"] || "")
+  defp load_tree(socket, params), do: apply_encoded(socket, "dwindle", params["t"] || "")
 
   # A patch this page pushed already holds the tree and stable divider ids.
-  # A mode change still gets normalized when the same URL names an old shape.
-  defp apply_encoded(%{assigns: %{encoded: encoded}} = socket, encoded) do
-    if socket.assigns.layout_mode == "master" and
-         Layout.encode(Layout.master(socket.assigns.tree)) != encoded do
-      decode_encoded(socket, encoded)
-    else
-      socket
-    end
+  # Only entering master mode rearranges the tree, so a stack divider the
+  # user moved keeps its ratio.
+  defp apply_encoded(%{assigns: %{encoded: encoded, layout_mode: mode}} = socket, mode, encoded),
+    do: socket
+
+  defp apply_encoded(socket, mode, encoded) do
+    from = socket.assigns.layout_mode
+    decode_encoded(assign(socket, :layout_mode, mode), encoded, from)
   end
 
-  defp apply_encoded(socket, encoded), do: decode_encoded(socket, encoded)
-
-  defp decode_encoded(socket, encoded) do
+  defp decode_encoded(socket, encoded, from) do
     case Layout.decode(encoded) do
       {:ok, incoming} ->
-        layout = Layout.reconcile(socket.assigns.tree, incoming)
         layout =
-          if socket.assigns.layout_mode == "master", do: Layout.master(layout), else: layout
+          socket.assigns.tree
+          |> Layout.reconcile(incoming)
+          |> to_mode(from, socket.assigns.layout_mode)
 
         socket = socket |> put_layout(layout) |> assign(:encoded, encoded) |> keep_focus()
 
@@ -201,7 +200,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     case SavedLayouts.fetch(socket.assigns.settings_scope, slug) do
       {:ok, entry} ->
         mode = if entry["layout"] == "master", do: "master", else: "dwindle"
-        apply_encoded(assign(socket, :layout_mode, mode), encoded || entry["tree"])
+        apply_encoded(socket, mode, encoded || entry["tree"])
 
       :error ->
         socket
@@ -217,7 +216,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
            socket.assigns.role_codes
          ) do
       {:ok, entry} ->
-        apply_encoded(socket, encoded || entry["tree"])
+        apply_encoded(socket, "dwindle", encoded || entry["tree"])
 
       :error ->
         socket
@@ -602,16 +601,15 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     with true <- mode in ["dwindle", "master"],
          {:ok, entry} <- SavedLayouts.fetch(scope, slug),
          {:ok, stored} <- Layout.decode(entry["tree"]) do
-      current? = socket.assigns.slug == slug
-      tree = if current?, do: socket.assigns.tree, else: stored
-      tree = if mode == "master", do: Layout.master(tree), else: tree
+      stored = to_mode(stored, entry["layout"], mode)
 
-      case SavedLayouts.set_layout(scope, slug, mode, Layout.encode(tree)) do
+      case SavedLayouts.set_layout(scope, slug, mode, Layout.encode(stored)) do
         {:ok, _} ->
           socket = load_saved(socket)
 
-          if current? do
-            {:noreply, socket |> assign(:layout_mode, mode) |> put_layout(tree) |> sync_url()}
+          if socket.assigns.slug == slug do
+            live = to_mode(socket.assigns.tree, socket.assigns.layout_mode, mode)
+            {:noreply, socket |> assign(:layout_mode, mode) |> put_layout(live) |> sync_url()}
           else
             {:noreply, socket}
           end
@@ -791,6 +789,9 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
     socket |> assign(:tree, layout) |> assign(:follows, kinds) |> derive()
   end
+
+  defp to_mode(layout, from, "master") when from != "master", do: Layout.master(layout)
+  defp to_mode(layout, _from, _to), do: layout
 
   defp open_tile(%{assigns: %{layout_mode: "master"}}, layout, path, _at),
     do: Layout.master_open(layout, path) |> then(fn {:ok, tree, id} -> {tree, id} end)

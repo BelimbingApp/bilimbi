@@ -558,6 +558,53 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
       assert has_element?(view, "#workspace[data-layout='dwindle']")
     end
 
+    test "a stack divider in master mode keeps the ratio it is given", %{conn: conn} do
+      {:ok, _} =
+        SavedLayouts.save(
+          @settings_scope,
+          "Records",
+          "h.5(/companies,v.5(/companies,/companies))",
+          "master"
+        )
+
+      {:ok, view, _html} = open(conn, "/workspace/records")
+      assert has_element?(view, "#split-s6[aria-orientation='horizontal']")
+
+      render_hook(view, "resize-split", %{"id" => "s6", "ratio" => 0.7})
+
+      stacked =
+        "/workspace/records?t=h.5%28%2Fcompanies%2Cv.7%28%2Fcompanies%2C%2Fcompanies%29%29"
+
+      assert_patch(view, stacked)
+      assert has_element?(view, "#split-s6[style*='top: 70.0%']")
+
+      render_hook(view, "focus-tile", %{"id" => "t3"})
+      render_hook(view, "resize-step", %{"side" => "up"})
+
+      assert_patch(
+        view,
+        "/workspace/records?t=h.5%28%2Fcompanies%2Cv.65%28%2Fcompanies%2C%2Fcompanies%29%29"
+      )
+
+      assert has_element?(view, "#split-s6[style*='top: 65.0%']")
+    end
+
+    test "changing the mode of the open layout leaves its unsaved tiles unsaved", %{conn: conn} do
+      {:ok, _} = SavedLayouts.save(@settings_scope, "Records", "h.5(/companies,/companies)")
+
+      {:ok, view, _html} = open(conn, "/workspace/records")
+      view |> element("#tile-t2-header-close") |> render_click()
+      assert_patch(view, "/workspace/records?t=%2Fcompanies")
+
+      view |> element("#workspace-open-layouts") |> render_click()
+      view |> element("#workspace-layout-mode-records") |> render_click()
+      assert_patch(view, "/workspace/records?t=%2Fcompanies")
+      assert has_element?(view, "#workspace[data-layout='master'][data-tile-count='1']")
+
+      assert {:ok, %{"layout" => "master", "tree" => "h.5(/companies,/companies)"}} =
+               SavedLayouts.fetch(@settings_scope, "records")
+    end
+
     test "saving names the layout, gives it an address, and lists it", %{conn: conn} do
       {:ok, view, _html} = open(conn, "/workspace?t=h.5(/companies,/companies)")
 
