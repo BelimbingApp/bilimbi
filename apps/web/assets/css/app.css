@@ -293,6 +293,14 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
   }
 }
 
+/* Until the Tiling hook has placed them (it writes `data-placed`), tiles and
+ * handles have no position, so they stay out of sight rather than stacking
+ * at the origin during the dead render. */
+#workspace:not([data-placed]) .workspace-tile,
+#workspace:not([data-placed]) [data-split] {
+  visibility: hidden;
+}
+
 /* Menu typography & font colors matching Belimbing */
 .app-nav-rail {
   font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;

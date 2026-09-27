@@ -3,10 +3,7 @@ defmodule Bilimbi.Base.Tiling.LayoutTest do
 
   alias Bilimbi.Base.Tiling.Layout
 
-  defp open!(layout, path, opts \\ []) do
-    {:ok, layout, id} = Layout.open(layout, path, opts)
-    {layout, id}
-  end
+  defp open!(layout, path, opts \\ []), do: Layout.open(layout, path, opts)
 
   defp paths(layout), do: layout |> Layout.leaves() |> Enum.map(& &1.path)
 
@@ -50,15 +47,47 @@ defmodule Bilimbi.Base.Tiling.LayoutTest do
       assert Layout.encode(layout) == "h.5(/companies,v.5(/users,/employees))"
     end
 
-    test "refuses a seventh tile" do
+    test "holds as many tiles as are opened" do
       layout =
-        Enum.reduce(1..6, Layout.empty(), fn n, layout ->
+        Enum.reduce(1..40, Layout.empty(), fn n, layout ->
           {layout, _} = open!(layout, "/page/#{n}")
           layout
         end)
 
-      assert Layout.full?(layout)
-      assert Layout.open(layout, "/page/7") == {:error, :full}
+      assert Layout.count(layout) == 40
+      assert {:ok, decoded} = layout |> Layout.encode() |> Layout.decode()
+      assert Layout.encode(decoded) == Layout.encode(layout)
+    end
+
+    test "at: :largest halves the tile with the most room, the later one on a tie" do
+      {layout, _} = open!(Layout.empty(), "/one")
+      {layout, _} = open!(layout, "/two", at: :largest)
+      assert Layout.encode(layout) == "h.5(/one,/two)"
+
+      # Both halves are equal; the later one in tree order, the right half,
+      # is split top and bottom.
+      {layout, _} = open!(layout, "/three", at: :largest)
+      assert Layout.encode(layout) == "h.5(/one,v.5(/two,/three))"
+
+      # The left half is now the largest, so the fourth page makes quadrants.
+      {layout, _} = open!(layout, "/four", at: :largest)
+      assert Layout.encode(layout) == "h.5(v.5(/one,/four),v.5(/two,/three))"
+
+      # Four equal quadrants: the last in tree order is halved.
+      {layout, _} = open!(layout, "/five", at: :largest)
+      assert Layout.encode(layout) == "h.5(v.5(/one,/four),v.5(/two,h.5(/three,/five)))"
+
+      # After a resize the two left quarters have the most room; the later
+      # one in tree order is halved.
+      {layout, _} = open!(Layout.resize(layout, "s3", 0.8), "/six", at: :largest)
+      assert Layout.encode(layout) == "h.8(v.5(/one,h.5(/four,/six)),v.5(/two,h.5(/three,/five)))"
+    end
+
+    test "an unknown :at target splits the last tile" do
+      {layout, _} = open!(Layout.empty(), "/one")
+      {layout, _} = open!(layout, "/two", at: "t99")
+
+      assert Layout.encode(layout) == "h.5(/one,/two)"
     end
   end
 
@@ -211,11 +240,12 @@ defmodule Bilimbi.Base.Tiling.LayoutTest do
       end
     end
 
-    test "rejects more tiles than the cap" do
-      seven = Enum.map_join(1..7, ",", &"/p/#{&1}")
-      encoded = String.duplicate("h.5(", 6) <> seven <> String.duplicate(")", 6)
+    test "reads back any number of tiles" do
+      encoded = Enum.reduce(11..1//-1, "/p/12", fn n, rest -> "h.5(/p/#{n},#{rest})" end)
 
-      assert Layout.decode(encoded) == :error
+      assert {:ok, layout} = Layout.decode(encoded)
+      assert Layout.count(layout) == 12
+      assert Layout.encode(layout) == encoded
     end
 
     test "a followed pattern rides after the path and round-trips" do

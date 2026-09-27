@@ -44,6 +44,7 @@ defmodule Bilimbi.Base.UI.IconRegistryTest do
              "edit" => "hero-pencil",
              "delete" => "hero-trash",
              "view" => "hero-eye",
+             "tile" => "hero-squares-plus",
              "reveal" => "hero-eye",
              "conceal" => "hero-eye-slash",
              "filter" => "hero-funnel",

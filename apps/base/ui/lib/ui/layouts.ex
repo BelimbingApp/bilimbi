@@ -347,6 +347,12 @@ defmodule Bilimbi.Base.UI.Layouts do
         />
         <span class="app-nav-label min-w-0 truncate">{@label}</span>
       </.link>
+      <.nav_tile
+        :if={@pinnable and tileable?(@navigate)}
+        item_id={@id}
+        route={@navigate}
+        label={@label}
+      />
       <.nav_pin
         :if={@pinnable}
         item_id={@id}
@@ -368,8 +374,9 @@ defmodule Bilimbi.Base.UI.Layouts do
   inside `#app-sidebar` and anywhere else it is shown.
 
   `pinnable` is false outside the sidebar, for the reason given on
-  `nav_branch/1`. The inner block renders after the rows; the shell uses it
-  for the sentence shown when an account has no destinations.
+  `nav_branch/1`; it governs the tile control beside the pin too. The inner
+  block renders after the rows; the shell uses it for the sentence shown
+  when an account has no destinations.
   """
   attr(:id, :string, required: true)
   attr(:aria_label, :string, required: true, doc: "names the menu for assistive technology")
@@ -409,7 +416,9 @@ defmodule Bilimbi.Base.UI.Layouts do
   `pinnable` is false outside the sidebar. `AppShell.resolvePinnedItem/1`
   resolves a pinned id only against `#app-sidebar`, so a pin control anywhere
   else stores an entry that the next render prunes — a control that looks
-  live and does nothing.
+  live and does nothing. The tile control beside the pin follows the same
+  flag: `AppShell` turns it into the workspace link only inside the shell,
+  so anywhere else it would be a second plain link to the page.
   """
   attr(:node, :map, required: true)
   attr(:active_nav, :string, default: nil)
@@ -520,6 +529,12 @@ defmodule Bilimbi.Base.UI.Layouts do
           />
           <span class="app-nav-label min-w-0 truncate">{@node.item.label}</span>
         </.link>
+        <.nav_tile
+          :if={@pinnable and tileable?(@node.item.route)}
+          item_id={"nav-" <> @dom_id}
+          route={@node.item.route}
+          label={@node.item.label}
+        />
         <.nav_pin
           :if={@pinnable and @node.item.route}
           item_id={"nav-" <> @dom_id}
@@ -575,6 +590,36 @@ defmodule Bilimbi.Base.UI.Layouts do
     />
     """
   end
+
+  # "Open in a tile" beside the pin, at the pin's weight. The server renders
+  # it as a plain link to the page; on a wide screen `AppShell` retargets the
+  # click to `/workspace?t=<here>&inplace=1&open=<page>`, which
+  # `Bilimbi.Base.Tiling.Web.WorkspaceLive` reads as "split the largest tile
+  # with this page". On a narrow screen the link is left alone, so the page
+  # opens normally. Do not build a workspace tree on the client: `t` is
+  # either the current page or the tree already in the address.
+  attr(:item_id, :string, required: true)
+  attr(:route, :string, required: true)
+  attr(:label, :string, required: true)
+
+  defp nav_tile(assigns) do
+    ~H"""
+    <.icon_button
+      icon="tile"
+      label={"Open " <> @label <> " in a tile"}
+      context={:inline}
+      id={"nav-tile-" <> String.trim_leading(@item_id, "nav-")}
+      navigate={@route}
+      data-nav-tile={@route}
+      class="app-nav-tile opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+    />
+    """
+  end
+
+  # The workspace hosts the tiles; it refuses to open inside one, so its own
+  # row carries no tile control.
+  defp tileable?("/workspace"), do: false
+  defp tileable?(route), do: is_binary(route)
 
   # Menu contributions carry bare Heroicon names so a module never encodes the
   # host's icon-set prefix. A fully qualified name is passed through unchanged.

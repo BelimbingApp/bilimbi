@@ -40,17 +40,17 @@
       </.empty_state>
     </div>
   <% else %>
-    <%!-- The hook owns the keyboard mode, the drag on each handle and the
-    bridge into every frame. The server owns the tree: `data-focused` is the
-    focused tile after every patch, and the hook reads it rather than
-    tracking its own. Each tile is one element per tile id, positioned by
-    style alone, so a split, close or resize never re-creates a frame. --%>
+    <%!-- The hook owns the keyboard mode, the drag on each handle, the drag
+    of a tile onto another, and the bridge into every frame. The server owns
+    the tree: `data-focused` is the focused tile after every patch, and the
+    hook reads it rather than tracking its own. Each tile is one element per
+    tile id, positioned by style alone, so a split, close or resize never
+    re-creates a frame. --%>
     <div
       id="workspace"
       phx-hook="Tiling"
       data-focused={@focused}
       data-monocle={to_string(@monocle)}
-      data-max-tiles={@max_tiles}
       data-tile-count={length(@tiles)}
       class="flex h-full min-h-0 flex-col"
     >
@@ -103,17 +103,23 @@
           </.empty_state>
         </div>
 
+        <%!-- Geometry travels in `data-place`, never a `style` attribute:
+        the host's Content-Security-Policy allows no inline style, so the
+        hook writes the position through the CSSOM after every patch. A tile
+        being dragged onto this one sets `data-drop-target`. --%>
         <div
           :for={tile <- @tiles}
           id={"tile-#{tile.id}"}
-          class="workspace-tile absolute p-0.5"
-          style={tile.style}
+          class="workspace-tile group absolute p-0.5"
+          data-place={tile.place}
           data-tile={tile.id}
           data-focused={to_string(tile.focused?)}
           hidden={@monocle and not tile.focused?}
         >
           <div class={[
             "flex h-full min-h-0 flex-col overflow-hidden rounded-md border bg-surface",
+            "group-data-[drop-target=true]:ring-2 group-data-[drop-target=true]:ring-brand-strong",
+            "group-data-[dragging=true]:opacity-60",
             tile.focused? && "border-brand-strong ring-1 ring-brand-strong",
             !tile.focused? && "border-line"
           ]}>
@@ -139,7 +145,11 @@
                 only later move is the hook's, on a `tile-navigate` event
                 when a followed record is selected. The `ws` token joins
                 the page to this workspace's follow channel. --%>
-                <div id={"tile-#{tile.id}-frame"} phx-update="ignore" class="min-h-0 flex-1">
+                <div
+                  id={"tile-#{tile.id}-frame"}
+                  phx-update="ignore"
+                  class="min-h-0 flex-1"
+                >
                   <iframe
                     id={"tile-#{tile.id}-page"}
                     src={Workspace.frame_url(tile.path, @token)}
@@ -180,7 +190,7 @@
           id={"split-#{handle.id}"}
           direction={handle.direction}
           label={handle.label}
-          style={handle.style}
+          data-place={handle.place}
           data-split={handle.id}
           data-rect={handle.rect}
         />
@@ -195,8 +205,8 @@
       flash={@flash}
     >
       <:description>
-        {gettext("The page opens in a new tile beside the focused one, up to %{count} tiles.",
-          count: @max_tiles
+        {gettext(
+          "The page opens in a new tile beside the focused one. Every tile is a live page, so many tiles cost as much as many tabs."
         )}
       </:description>
       <div id="workspace-picker-pages" class="-mx-1 max-h-96 space-y-0.5 overflow-y-auto">

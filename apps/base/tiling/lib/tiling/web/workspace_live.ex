@@ -16,6 +16,17 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   reproduces the screen. `/workspace/:slug` opens a saved layout, and
   `/workspace` alone opens the account's default one, else the page picker.
 
+  `?open=` is how a page is tiled in place. The sidebar's tile control on
+  any page links to `/workspace?t=<that page>&inplace=1&open=<the clicked
+  page>`, and from this page to its own address plus `open=…`, so the one
+  URL form serves both entries: the tree in `t` is read as usual, the page in
+  `open` takes half of the largest tile, and the URL is replaced by the
+  resulting tree. `inplace=1` marks a workspace entered from a page; every
+  address this page writes keeps it, except a saved layout's, so across a
+  refresh or a reconnect such a workspace still leaves for that page's own
+  URL when closed down to one tile, reversible the way it was entered. One
+  opened from the picker or a saved layout stays a workspace with one tile.
+
   The `Tiling` hook owns what the server cannot: the keyboard bridge into
   each frame, the `Ctrl+.` tiling mode, drag resizing, and reporting each
   frame's URL and title. Every keyboard operation is also on the tile menu
@@ -62,7 +73,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   @title_suffix " · Business application platform"
 
   @sides %{"left" => :left, "right" => :right, "up" => :up, "down" => :down}
-  @full_style "left: 0%; top: 0%; width: 100%; height: 100%"
+  @full_place "left: 0%; top: 0%; width: 100%; height: 100%"
 
   @impl true
   def mount(_params, _session, socket) do
@@ -85,6 +96,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
      |> assign(:tree, Layout.empty())
      |> assign(:encoded, nil)
      |> assign(:slug, nil)
+     |> assign(:in_place?, false)
      |> assign(:focused, nil)
      |> assign(:monocle, false)
      |> assign(:viewport, {1600, 900})
@@ -94,49 +106,61 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
      |> assign(:layouts_open?, false)
      |> assign(:pending_delete, nil)
      |> assign(:save_form, to_form(%{"label" => ""}, as: :layout))
-     |> assign(:max_tiles, Layout.max_tiles())
      |> load_saved()
      |> derive()}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
-    socket = assign(socket, :slug, params["slug"])
+    socket =
+      assign(socket,
+        slug: params["slug"],
+        in_place?: params["inplace"] == "1" and not is_binary(params["slug"])
+      )
 
     cond do
       socket.assigns.framed? ->
         {:noreply, socket}
 
+      is_binary(params["open"]) ->
+        {:noreply, socket |> load_tree(params) |> open_page(params["open"])}
+
       is_binary(params["slug"]) ->
-        open_saved(socket, params["slug"], params["t"])
+        {:noreply, open_saved(socket, params["slug"], params["t"])}
 
       is_binary(params["t"]) ->
-        apply_encoded(socket, params["t"])
+        {:noreply, apply_encoded(socket, params["t"])}
 
       true ->
         open_default(socket)
     end
   end
 
+  # The tree an `open` request starts from: the saved layout at the slug, the
+  # tree in `t`, or nothing.
+  defp load_tree(socket, %{"slug" => slug} = params) when is_binary(slug),
+    do: open_saved(socket, slug, params["t"])
+
+  defp load_tree(socket, params), do: apply_encoded(socket, params["t"] || "")
+
   # A patch this page pushed itself carries the tree it already holds.
-  defp apply_encoded(%{assigns: %{encoded: encoded}} = socket, encoded), do: {:noreply, socket}
+  defp apply_encoded(%{assigns: %{encoded: encoded}} = socket, encoded), do: socket
 
   defp apply_encoded(socket, encoded) do
     case Layout.decode(encoded) do
       {:ok, incoming} ->
         layout = Layout.reconcile(socket.assigns.tree, incoming)
-        {:noreply, socket |> put_layout(layout) |> assign(:encoded, encoded) |> keep_focus()}
+        socket |> put_layout(layout) |> assign(:encoded, encoded) |> keep_focus()
 
       :error ->
-        {:noreply,
-         socket
-         |> put_flash(
-           :error,
-           gettext("The layout in the address could not be read, so the workspace opened empty.")
-         )
-         |> put_layout(Layout.empty())
-         |> assign(:encoded, nil)
-         |> keep_focus()}
+        socket
+        |> put_flash(
+          :error,
+          gettext("The layout in the address could not be read, so the workspace opened empty.")
+        )
+        |> put_layout(Layout.empty())
+        |> assign(:encoded, nil)
+        |> keep_focus()
     end
   end
 
@@ -146,10 +170,9 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
         apply_encoded(socket, encoded || entry["tree"])
 
       :error ->
-        {:noreply,
-         socket
-         |> put_flash(:error, gettext("There is no saved layout called “%{slug}”.", slug: slug))
-         |> push_navigate(to: ~p"/workspace")}
+        socket
+        |> put_flash(:error, gettext("There is no saved layout called “%{slug}”.", slug: slug))
+        |> push_navigate(to: ~p"/workspace")
     end
   end
 
@@ -162,6 +185,33 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
       slug ->
         {:noreply, push_navigate(socket, to: ~p"/workspace/#{slug}")}
     end
+  end
+
+  # Tiles `path` in place: it takes half of the largest tile, and the URL is
+  # replaced by the tree that results, so `open` is never left in the
+  # address to be replayed by a refresh. It accepts what a tile shows, a
+  # served page this account may open, except the workspace itself.
+  defp open_page(%{redirected: nil} = socket, path) do
+    if tile_path?(path) and not workspace_page?(path) and
+         access(socket.assigns.current_scope, path) == :ok do
+      socket |> tile_page(path, :largest) |> sync_url(replace: true)
+    else
+      socket
+      |> put_flash(:error, gettext("%{path} cannot be opened in a tile.", path: path))
+      |> sync_url(replace: true)
+    end
+  end
+
+  defp open_page(socket, _path), do: socket
+
+  defp tile_page(socket, path, at) do
+    {layout, id} =
+      Layout.open(socket.assigns.tree, path, at: at, viewport: socket.assigns.viewport)
+
+    socket
+    |> put_layout(layout)
+    |> assign(picker_open?: false, picker_for: nil, monocle: false)
+    |> focus(id)
   end
 
   # ------------------------------------------------------------------
@@ -223,13 +273,16 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     end
   end
 
+  # `with` names the tile a drag dropped this one on; `side` the neighbour
+  # the keyboard mode chose; neither means the nearest neighbour.
   def handle_event("swap-tile", %{"id" => id} = params, socket) do
     layout = socket.assigns.tree
 
     partner =
-      case side(params["side"]) do
-        {:ok, side} -> Layout.neighbor(layout, id, side)
-        :error -> Enum.find_value([:right, :down, :left, :up], &Layout.neighbor(layout, id, &1))
+      case {params["with"], side(params["side"])} do
+        {other, _} when is_binary(other) -> current_leaf(layout, other)
+        {_, {:ok, side}} -> Layout.neighbor(layout, id, side)
+        _ -> Enum.find_value([:right, :down, :left, :up], &Layout.neighbor(layout, id, &1))
       end
 
     case partner do
@@ -238,6 +291,10 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     end
   end
 
+  # Closing down to one tile leaves a workspace entered by tiling in place
+  # for that page's own URL: it began from a full page, and it ends as one.
+  # A page the account may not open stays in its tile, where the refusal is
+  # readable.
   def handle_event("close-tile", %{"id" => id}, socket) do
     layout = Layout.close(socket.assigns.tree, id)
 
@@ -248,7 +305,10 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
       |> put_layout(layout)
       |> keep_focus()
 
-    {:noreply, sync_url(socket)}
+    case {socket.assigns.in_place?, socket.assigns.tiles} do
+      {true, [%{access: :ok, path: path}]} -> {:noreply, push_navigate(socket, to: path)}
+      _ -> {:noreply, sync_url(socket)}
+    end
   end
 
   # The tile follows the pattern of the page it shows now, so the choice is
@@ -323,15 +383,11 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   # ------------------------------------------------------------------
 
   def handle_event("open-picker", params, socket) do
-    if Layout.full?(socket.assigns.tree) do
-      {:noreply, put_flash(socket, :info, tile_cap_notice())}
-    else
-      {:noreply,
-       assign(socket,
-         picker_open?: true,
-         picker_for: current_leaf(socket.assigns.tree, params["id"])
-       )}
-    end
+    {:noreply,
+     assign(socket,
+       picker_open?: true,
+       picker_for: current_leaf(socket.assigns.tree, params["id"])
+     )}
   end
 
   def handle_event("close-picker", _params, socket) do
@@ -345,21 +401,10 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
       current_leaf(layout, socket.assigns.picker_for) ||
         current_leaf(layout, socket.assigns.focused)
 
-    with true <- Enum.any?(socket.assigns.pages, &(&1.route == path)),
-         {:ok, layout, id} <- Layout.open(layout, path, at: at, viewport: socket.assigns.viewport) do
-      socket =
-        socket
-        |> put_layout(layout)
-        |> assign(picker_open?: false, picker_for: nil, monocle: false)
-        |> focus(id)
-
-      {:noreply, sync_url(socket)}
+    if Enum.any?(socket.assigns.pages, &(&1.route == path)) do
+      {:noreply, socket |> tile_page(path, at) |> sync_url()}
     else
-      {:error, :full} ->
-        {:noreply, socket |> assign(picker_open?: false) |> put_flash(:info, tile_cap_notice())}
-
-      _ ->
-        {:noreply, socket}
+      {:noreply, socket}
     end
   end
 
@@ -648,13 +693,14 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   defp sync_url(socket, opts \\ []) do
     encoded = Layout.encode(socket.assigns.tree)
     socket = assign(socket, :encoded, encoded)
-    to = workspace_path(socket.assigns.slug, encoded)
+    to = workspace_path(socket.assigns.slug, encoded, socket.assigns.in_place?)
     push_patch(socket, to: to, replace: Keyword.get(opts, :replace, false))
   end
 
-  defp workspace_path(nil, ""), do: ~p"/workspace"
-  defp workspace_path(nil, encoded), do: ~p"/workspace?t=#{encoded}"
-  defp workspace_path(slug, encoded), do: ~p"/workspace/#{slug}?t=#{encoded}"
+  defp workspace_path(nil, "", _in_place?), do: ~p"/workspace"
+  defp workspace_path(nil, encoded, true), do: ~p"/workspace?t=#{encoded}&inplace=1"
+  defp workspace_path(nil, encoded, false), do: ~p"/workspace?t=#{encoded}"
+  defp workspace_path(slug, encoded, _in_place?), do: ~p"/workspace/#{slug}?t=#{encoded}"
 
   defp load_saved(socket) do
     scope = socket.assigns.settings_scope
@@ -687,7 +733,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
           id: leaf.id,
           path: leaf.path,
           title: Map.get(titles, leaf.id) || leaf.path,
-          style: if(monocle and focused?, do: @full_style, else: rect_style(rect)),
+          place: if(monocle and focused?, do: @full_place, else: rect_place(rect)),
           focused?: focused?,
           access: access(current_scope, leaf.path),
           following?: is_binary(leaf.follow),
@@ -697,7 +743,9 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
     # Tiles render in creation order, never tree order: a swap or move that
     # reordered the elements would make the browser move a frame in the
-    # DOM, and a moved frame reloads its page. Position is style alone.
+    # DOM, and a moved frame reloads its page. Position is `place` alone,
+    # which the hook applies, because the host's Content-Security-Policy
+    # allows no inline style attribute.
     tiles = Enum.sort_by(tiles, &tile_order/1)
 
     labels = Map.new(tiles, &{&1.id, &1.title})
@@ -707,7 +755,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
         %{
           id: split.id,
           direction: split.direction,
-          style: handle_style(split, rect),
+          place: handle_place(split, rect),
           # The rectangle the split divides, for the hook to turn a pointer
           # position back into a ratio while dragging.
           rect: Enum.map_join([rect.x, rect.y, rect.w, rect.h], " ", &Float.round(&1, 4)),
@@ -737,15 +785,15 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   defp first_label(%{type: :leaf, id: id}, labels), do: Map.get(labels, id, id)
   defp first_label(%{type: :split, first: first}, labels), do: first_label(first, labels)
 
-  defp rect_style(%{x: x, y: y, w: w, h: h}) do
+  defp rect_place(%{x: x, y: y, w: w, h: h}) do
     "left: #{pct(x)}; top: #{pct(y)}; width: #{pct(w)}; height: #{pct(h)}"
   end
 
-  defp handle_style(%{direction: :h, ratio: ratio}, %{x: x, y: y, w: w, h: h}) do
+  defp handle_place(%{direction: :h, ratio: ratio}, %{x: x, y: y, w: w, h: h}) do
     "left: #{pct(x + w * ratio)}; top: #{pct(y)}; height: #{pct(h)}"
   end
 
-  defp handle_style(%{direction: :v, ratio: ratio}, %{x: x, y: y, w: w, h: h}) do
+  defp handle_place(%{direction: :v, ratio: ratio}, %{x: x, y: y, w: w, h: h}) do
     "left: #{pct(x)}; top: #{pct(y + h * ratio)}; width: #{pct(w)}"
   end
 
@@ -801,6 +849,14 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   # absolute URL, so a frame can only ever show a Bilimbi page.
   defp tile_path?(path), do: Layout.page_path?(path) and Nav.served?(URI.parse(path).path)
 
+  defp workspace_page?(path) do
+    case URI.parse(path).path do
+      "/workspace" -> true
+      "/workspace/" <> _ -> true
+      _other -> false
+    end
+  end
+
   defp clean_title(title) when is_binary(title) do
     title = title |> String.replace_suffix(@title_suffix, "") |> String.trim()
     if title == "", do: nil, else: String.slice(title, 0, 80)
@@ -810,12 +866,6 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
   defp side(side) when is_binary(side), do: Map.fetch(@sides, side)
   defp side(_side), do: :error
-
-  defp tile_cap_notice do
-    gettext("The workspace holds %{count} tiles at most. Close one to open another page.",
-      count: Layout.max_tiles()
-    )
-  end
 
   defp current_label(saved, slug) do
     case Enum.find(saved, &(&1["slug"] == slug)) do

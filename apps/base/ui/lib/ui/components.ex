@@ -3601,7 +3601,11 @@ defmodule Bilimbi.Base.UI.Components do
   colour of the ring alone.
 
   The title is a button that focuses the tile, so a click on the bar and a
-  click inside the page do the same thing. The menu is a disclosure: its
+  click inside the page do the same thing. The bar is also the grip for
+  dragging the tile onto another to swap them; the host's hook reads
+  `data-tile-header` for the grip and leaves the parts marked
+  `data-tile-menu` to the menu, and the keyboard mode and the menu's "Swap
+  with neighbour" stay the pointer-free path. The menu is a disclosure: its
   trigger's `aria-expanded` is the one record of open, the list derives its
   visibility from it, and the `DisclosureDismiss` hook closes it when focus
   leaves or Escape is pressed, exactly as `<.multi_select>` does. Every
@@ -3697,8 +3701,8 @@ defmodule Bilimbi.Base.UI.Components do
         type="button"
         id={"#{@id}-title"}
         phx-click={@on_focus}
-        title={@title}
-        class="min-w-0 flex-1 truncate text-left font-medium focus-visible:outline-none focus-visible:underline"
+        title={gettext("%{title}. Drag onto another tile to swap.", title: @title)}
+        class="min-w-0 flex-1 cursor-grab truncate text-left font-medium focus-visible:outline-none focus-visible:underline active:cursor-grabbing"
       >
         {@title}
       </button>
@@ -3709,6 +3713,7 @@ defmodule Bilimbi.Base.UI.Components do
         aria-controls={"#{@menu}-items"}
         aria-label={"Tile menu: " <> @title}
         title="Tile menu"
+        data-tile-menu
         phx-click={@toggle}
         class="peer grid size-5 shrink-0 place-items-center rounded-sm text-ink-muted transition hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
       >
@@ -3716,6 +3721,7 @@ defmodule Bilimbi.Base.UI.Components do
       </button>
       <div
         id={"#{@menu}-items"}
+        data-tile-menu
         class="hidden peer-aria-expanded:block absolute right-0.5 top-full z-30 mt-0.5 min-w-44 rounded-md border border-line bg-surface p-1 shadow-lg"
       >
         <button
@@ -3780,13 +3786,18 @@ defmodule Bilimbi.Base.UI.Components do
   rest; the gap between tiles is the canvas, as in Hyprland, and the divider
   surfaces on hover and focus.
 
+  Its position arrives as `data-place`, applied by the host's hook through
+  the CSSOM: the Content-Security-Policy allows no `style` attribute, so a
+  `style` here would be ignored by the browser and the handle would sit at
+  the origin.
+
   ## Examples
 
       <.split_handle
         id="split-s3"
         direction={:h}
         label="Resize Companies and Users"
-        style="left: 50%; top: 0%; height: 100%"
+        data-place="left: 50%; top: 0%; height: 100%"
         data-split="s3"
       />
   """
@@ -3799,8 +3810,11 @@ defmodule Bilimbi.Base.UI.Components do
   )
 
   attr(:label, :string, required: true, doc: "names the two tiles the divider separates")
-  attr(:style, :string, default: nil, doc: "the position the layout computed")
-  attr(:rest, :global, doc: "`data-split` carries the split id for the host's hook")
+  attr(:class, :any, default: nil, doc: "a placement by utility class, where no hook places it")
+
+  attr(:rest, :global,
+    doc: "`data-split` carries the split id and `data-place` the position for the host's hook"
+  )
 
   def split_handle(assigns) do
     ~H"""
@@ -3811,11 +3825,11 @@ defmodule Bilimbi.Base.UI.Components do
       aria-orientation={if @direction == :h, do: "vertical", else: "horizontal"}
       aria-label={@label}
       data-direction={@direction}
-      style={@style}
       class={[
         "absolute z-10 select-none rounded-sm transition-colors hover:bg-surface-sunken focus-visible:bg-brand-surface focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong",
         @direction == :h && "w-1.5 -translate-x-1/2 cursor-col-resize",
-        @direction == :v && "h-1.5 -translate-y-1/2 cursor-row-resize"
+        @direction == :v && "h-1.5 -translate-y-1/2 cursor-row-resize",
+        @class
       ]}
       {@rest}
     >

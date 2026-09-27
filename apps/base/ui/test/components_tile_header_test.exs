@@ -113,7 +113,7 @@ defmodule Bilimbi.Base.UI.ComponentsTileHeaderTest do
             id="split-s3"
             direction={:h}
             label="Resize Companies and Users"
-            style="left: 50%; top: 0%; height: 100%"
+            data-place="left: 50%; top: 0%; height: 100%"
             data-split="s3"
             data-rect="0 0 1 1"
           />
@@ -129,11 +129,13 @@ defmodule Bilimbi.Base.UI.ComponentsTileHeaderTest do
     assert attribute(html, "#split-s3", "aria-label") == "Resize Companies and Users"
     assert attribute(html, "#split-s3", "data-split") == "s3"
     assert attribute(html, "#split-s3", "data-direction") == "h"
-    assert attribute(html, "#split-s3", "style") == "left: 50%; top: 0%; height: 100%"
+    assert attribute(html, "#split-s3", "data-place") == "left: 50%; top: 0%; height: 100%"
+    # The policy forbids inline style, so the handle never renders one.
+    assert attribute(html, "#split-s3", "style") == nil
     assert attribute(html, "#split-s3", "class") =~ "cursor-col-resize"
 
     assert attribute(html, "#split-s4", "aria-orientation") == "horizontal"
     assert attribute(html, "#split-s4", "class") =~ "cursor-row-resize"
-    assert attribute(html, "#split-s4", "style") in [nil, ""]
+    assert attribute(html, "#split-s4", "style") == nil
   end
 end

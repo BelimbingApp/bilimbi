@@ -53,22 +53,44 @@ defmodule Bilimbi.Base.UI.LayoutsNavBranchTest do
     )
   end
 
-  test "a leaf renders a linked row with its pin control" do
+  test "a leaf renders a linked row with its tile and pin controls" do
     html = render(leaf(), nil)
 
     assert html =~ ~s(id="nav-example-companies")
     assert html =~ ~s(href="/system/design-library/components")
     assert html =~ "Companies"
     assert html =~ ~s(data-nav-pin="nav-example-companies")
+    assert html =~ ~s(id="nav-tile-example-companies")
+    assert html =~ ~s(data-nav-tile="/system/design-library/components")
+    assert html =~ ~s(aria-label="Open Companies in a tile")
     refute html =~ ~s(aria-current="page")
   end
 
-  test "pinnable false drops the pin control from every row in the tree" do
+  test "a branch with a route carries the tile control beside its pin" do
+    branch = %{branch() | item: %{branch().item | route: "/system"}}
+    html = render(branch, nil)
+
+    assert html =~ ~s(data-nav-tile="/system")
+    assert html =~ ~s(aria-label="Open System in a tile")
+    assert html =~ ~s(data-nav-pin="nav-example-system")
+  end
+
+  test "the workspace's own row has a pin but no tile control" do
+    workspace = %{leaf() | item: %{leaf().item | id: "workspace", route: "/workspace"}}
+    html = render(workspace, nil)
+
+    assert html =~ ~s(data-nav-pin="nav-workspace")
+    refute html =~ "data-nav-tile"
+  end
+
+  test "pinnable false drops the pin and tile controls from every row in the tree" do
     leaf_html = render(leaf(), nil, pinnable: false)
     branch_html = render(branch(), "example.system.design-library", pinnable: false)
 
     refute leaf_html =~ "data-nav-pin"
     refute branch_html =~ "data-nav-pin"
+    refute leaf_html =~ "data-nav-tile"
+    refute branch_html =~ "data-nav-tile"
     assert leaf_html =~ "Companies"
     assert branch_html =~ "Design Library"
   end

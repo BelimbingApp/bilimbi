@@ -136,6 +136,7 @@ defmodule Bilimbi.Base.UI.IconRegistry do
     "play" => "hero-play",
     "pause" => "hero-pause",
     "stop" => "hero-stop",
+    "tile" => "hero-squares-plus",
     "fullscreen" => "hero-arrows-pointing-out",
     "fullscreen-exit" => "hero-arrows-pointing-in",
     "inspect" => "hero-document-magnifying-glass",
