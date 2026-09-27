@@ -20,7 +20,6 @@ defmodule Bilimbi.Base.Grid.Column do
   alias Bilimbi.Base.Grid.Table
 
   @aggregates [:count, :sum, :avg, :min, :max, :latest, :list]
-  @numeric_aggregates [:count, :sum, :avg, :min, :max]
   @spec_pattern ~r/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*(:(count|sum|avg|min|max|latest|list))?$/
 
   @enforce_keys [
@@ -273,7 +272,12 @@ defmodule Bilimbi.Base.Grid.Column do
 
   @doc "Whether the column's values order on a number line."
   @spec numeric?(t()) :: boolean()
-  def numeric?(%__MODULE__{kind: :rollup, agg: agg}) when agg in @numeric_aggregates, do: true
+  def numeric?(%__MODULE__{kind: :rollup, agg: agg}) when agg in [:count, :sum, :avg], do: true
+
+  def numeric?(%__MODULE__{kind: :rollup, agg: agg, field: %Field{} = field})
+      when agg in [:min, :max],
+      do: Field.numeric?(field)
+
   def numeric?(%__MODULE__{kind: :rollup}), do: false
   def numeric?(%__MODULE__{type: type}), do: Field.numeric?(type)
 

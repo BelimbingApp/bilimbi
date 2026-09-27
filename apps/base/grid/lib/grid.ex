@@ -60,8 +60,10 @@ defmodule Bilimbi.Base.Grid do
 
   Options: `:offset` and `:limit` (at most #{@max_limit}) choose the window,
   `:sort` a `{column, :asc | :desc}` pair, `:search` text matched against the
-  root's searchable fields, `:stats` (default true) and `:cost` (default
-  true) switch the extra statements off when a caller does not show them.
+  root's searchable fields, and `:stats`, `:cost` and `:count` (each default
+  true) switch the extra statements off when a caller does not show them or
+  already holds the total; with `count: false` the result's `total_entries`
+  is the `:total` option, or 0.
   """
   @spec query(Catalog.t(), Table.t(), [Column.t()], keyword()) :: Result.t()
   def query(%Catalog{} = catalog, %Table{} = root, columns, opts \\ []) when is_list(columns) do
@@ -82,7 +84,11 @@ defmodule Bilimbi.Base.Grid do
     %Result{
       columns: columns,
       rows: rows_query |> Repo.all() |> Query.rows(columns),
-      total_entries: Query.count(base, plan),
+      total_entries:
+        if(Keyword.get(opts, :count, true),
+          do: Query.count(base, plan),
+          else: Keyword.get(opts, :total, 0)
+        ),
       offset: offset,
       limit: limit,
       stats: if(Keyword.get(opts, :stats, true), do: Query.stats(base, plan), else: %{}),

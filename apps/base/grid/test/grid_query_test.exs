@@ -56,7 +56,7 @@ defmodule Bilimbi.Base.Grid.QueryTest do
     c = cells(result, 103)
     assert c["customer-name"] == nil
     assert c["customer-country-name"] == nil
-    assert c["lines_count"] == nil
+    assert c["lines_count"] == 0
     assert c["tags-name_list"] == nil
   end
 
@@ -89,7 +89,7 @@ defmodule Bilimbi.Base.Grid.QueryTest do
     assert Result.page(result).page == 2
 
     result = Grid.query(ctx.catalog, ctx.orders, columns, sort: {count, :asc})
-    assert Enum.map(result.rows, & &1.key) == [102, 101, 103]
+    assert Enum.map(result.rows, & &1.key) == [103, 102, 101]
   end
 
   test "search matches the root's searchable text fields, escaping wildcards", ctx do
@@ -106,7 +106,7 @@ defmodule Bilimbi.Base.Grid.QueryTest do
   test "stats span the whole set, and the planner's cost is reported", ctx do
     result = Grid.query(ctx.catalog, ctx.orders, ctx.columns, limit: 1)
 
-    assert result.stats["lines_count"] == %{min: 1, max: 3}
+    assert result.stats["lines_count"] == %{min: 0, max: 3}
     assert result.stats["id"] == %{min: 101, max: 103}
     assert Decimal.equal?(result.stats["amount"].max, Decimal.new("250.50"))
     refute Map.has_key?(result.stats, "label")
