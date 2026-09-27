@@ -88,6 +88,42 @@ defmodule Bilimbi.Base.UI.FlexTable do
   def lens_label(:band), do: "Colour band"
   def lens_label(:trend), do: "Trend"
 
+  @doc """
+  Splits rows into runs that share the grouped column's text, in the order
+  given: a host sorts by the grouped column, so a run is a group. With no
+  group, or a group no column matches, one run with no label holds every
+  row.
+  """
+  @spec groups([map()], [map()], String.t() | nil) :: [%{label: String.t() | nil, rows: [map()]}]
+  def groups(rows, _columns, nil), do: [%{label: nil, rows: rows}]
+
+  def groups(rows, columns, group) when is_list(rows) and is_binary(group) do
+    case Enum.find(columns, &(&1.spec == group)) do
+      nil ->
+        [%{label: nil, rows: rows}]
+
+      column ->
+        rows
+        |> Enum.chunk_by(&group_text(&1, column.id))
+        |> Enum.map(fn chunk -> %{label: group_label(hd(chunk), column), rows: chunk} end)
+    end
+  end
+
+  defp group_text(row, column_id) do
+    case Map.get(row.cells, column_id) do
+      %{text: text} -> text
+      _cell -> nil
+    end
+  end
+
+  defp group_label(row, column) do
+    case group_text(row, column.id) do
+      nil -> "#{column.short_label}: —"
+      "" -> "#{column.short_label}: —"
+      text -> "#{column.short_label}: #{text}"
+    end
+  end
+
   @doc "A DOM id fragment for a row key, safe for any key type."
   @spec key_id(term()) :: String.t()
   def key_id(key) when is_integer(key), do: Integer.to_string(key)

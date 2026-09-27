@@ -19,7 +19,7 @@ defmodule Bilimbi.Base.Grid.CatalogTest do
     scope = TestFixtures.user_scope(~w(admin.test.order.view admin.test.customer.view))
     catalog = Grid.catalog(scope)
 
-    assert Enum.map(Grid.tables(catalog), & &1.id) == ~w(customers orders)
+    assert Enum.map(Grid.tables(catalog), & &1.id) == ~w(customers metrics orders)
     assert {:ok, _} = Grid.fetch_table(catalog, "orders")
     assert :error = Grid.fetch_table(catalog, "countries")
   end
@@ -96,6 +96,6 @@ defmodule Bilimbi.Base.Grid.CatalogTest do
 
   test "the catalog module itself exposes the installed vocabulary" do
     assert %{tables: tables} = Catalog.installed()
-    assert Map.keys(tables) |> length() == 5
+    assert Map.keys(tables) |> length() == 6
   end
 end

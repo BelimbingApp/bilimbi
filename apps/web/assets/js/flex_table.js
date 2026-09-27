@@ -113,9 +113,9 @@ const FlexTable = {
     return this.el.querySelector("[data-viewport]")
   },
 
-  push(payload) {
-    if (this.target) this.pushEventTo(this.target, this.event, payload)
-    else this.pushEvent(this.event, payload)
+  push(payload, reply) {
+    if (this.target) this.pushEventTo(this.target, this.event, payload, reply)
+    else this.pushEvent(this.event, payload, reply)
   },
 
   // --- bars (CSSOM, because the CSP refuses inline style) ---------------
@@ -507,6 +507,8 @@ const FlexTable = {
       this.draw()
       return
     }
+    // A small set leaves the viewport only as tall as its rows; the fit is
+    // computed for the room the page has, so a rectangle still zooms in.
     const viewport = this.viewport()
     this.push({
       op: "zoom_rect",
@@ -514,8 +516,8 @@ const FlexTable = {
       to_row: Math.ceil(Math.max(rect.y0, rect.y1) / this.zoom),
       from_col: Math.floor(Math.min(rect.x0, rect.x1) / this.cellWidth()),
       to_col: Math.ceil(Math.max(rect.x0, rect.x1) / this.cellWidth()),
-      width: viewport.clientWidth,
-      height: viewport.clientHeight,
+      width: Math.max(viewport.clientWidth, 320),
+      height: Math.max(viewport.clientHeight, Math.floor(window.innerHeight * 0.6)),
     })
   },
 }

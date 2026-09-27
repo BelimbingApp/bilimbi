@@ -4027,6 +4027,13 @@ defmodule Bilimbi.Base.UI.Components do
       |> assign_new(:row_dom_id, fn %{id: id, row_id: row_id} ->
         row_id || fn key -> "#{id}-row-#{Bilimbi.Base.UI.FlexTable.key_id(key)}" end
       end)
+      |> then(fn assigns ->
+        assign(
+          assigns,
+          :groups,
+          Bilimbi.Base.UI.FlexTable.groups(assigns.rows, assigns.columns, assigns.group)
+        )
+      end)
 
     ~H"""
     <div
@@ -4283,8 +4290,23 @@ defmodule Bilimbi.Base.UI.Components do
               </tr>
             </thead>
             <tbody id={"#{@id}-rows"} class="divide-y divide-low-contrast-line">
-              <%= for row <- @rows do %>
-                <tr id={@row_dom_id.(row.key)} class="hover:bg-surface-sunken">
+              <%= for {group, index} <- Enum.with_index(@groups), row <- [{:group, group, index} | group.rows] do %>
+                <tr
+                  :if={match?({:group, _, _}, row) and not is_nil(group.label)}
+                  id={"#{@id}-group-#{index}"}
+                  class="bg-surface-muted"
+                >
+                  <th
+                    scope="rowgroup"
+                    colspan={length(@columns) + if(@action != [], do: 1, else: 0)}
+                    class="px-2 py-1 text-left text-xs font-semibold text-ink-subtle"
+                  >
+                    {group.label}
+                    <span class="ml-1 font-normal tabular-nums text-ink-faint">({length(group.rows)})</span>
+                  </th>
+                </tr>
+                <% row = if match?({:group, _, _}, row), do: nil, else: row %>
+                <tr :if={row} id={@row_dom_id.(row.key)} class="hover:bg-surface-sunken">
                   <.flex_table_cell
                     :for={column <- @columns}
                     table_id={@id}
@@ -4305,7 +4327,9 @@ defmodule Bilimbi.Base.UI.Components do
                   </td>
                 </tr>
                 <tr
-                  :for={{column_id, opened} <- Map.get(@expanded, row.key, %{})}
+                  :for={
+                    {column_id, opened} <- if(row, do: Map.get(@expanded, row.key, %{}), else: %{})
+                  }
                   id={"#{@row_dom_id.(row.key)}-#{column_id}"}
                   class="bg-surface-muted"
                 >

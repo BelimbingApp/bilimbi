@@ -65,7 +65,9 @@ defmodule Bilimbi.Base.Grid.TestFixtures do
             order_id bigint NOT NULL,
             tag_id bigint NOT NULL
           ) ON COMMIT PRESERVE ROWS
-          """
+          """,
+          "CREATE TEMPORARY TABLE grid_test_metrics (order_id bigint PRIMARY KEY, " <>
+            Enum.map_join(1..60, ", ", &"m#{&1} integer") <> ") ON COMMIT PRESERVE ROWS"
         ] do
       SQL.query!(Repo, statement, [])
     end
