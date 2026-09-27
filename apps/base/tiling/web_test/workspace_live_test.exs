@@ -636,7 +636,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
       )
 
     {:ok, view, _html} = open(conn, "/workspace/shared/#{entry["slug"]}")
-    assert has_element?(view, "#tile-t1-page[src='/companies']")
+    assert has_element?(view, "#tile-t1-page[src^='/companies?ws=']")
     assert has_element?(view, "#tile-t2-forbidden")
     refute has_element?(view, "#tile-t2-page")
 

@@ -50,8 +50,8 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
   use Bilimbi.Base.UI, :live_view
 
-  alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Authz
+  alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.Tiling.Layout
   alias Bilimbi.Base.Tiling.SavedLayouts
