@@ -215,14 +215,14 @@ defmodule BilimbiWeb.ThemeContrastTest do
   end
 
   defp dark_blocks(css) do
-    Regex.scan(~r/\{\n((?:\s*--color-[a-z-]+:[^;]+;\n)+)\s*\}/, css)
+    Regex.scan(~r/\{\n((?:\s*--color-[a-z0-9-]+:[^;]+;\n)+)\s*\}/, css)
     |> Enum.map(fn [_, block] -> tokens_in(block) end)
     # The first var block is @theme's light set; the last two are the dark pair.
     |> Enum.take(-2)
   end
 
   defp tokens_in(block) do
-    Regex.scan(~r/--color-([a-z-]+):\s*([^;]+);/, block)
+    Regex.scan(~r/--color-([a-z0-9-]+):\s*([^;]+);/, block)
     |> Map.new(fn [_, role, value] -> {role, String.trim(value)} end)
   end
 
