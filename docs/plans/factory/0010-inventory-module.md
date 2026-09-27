@@ -1,7 +1,7 @@
 # docs/plans/factory/0010-inventory-module.md
 
-**Status:** Proposed
-**Last Updated:** 2026-09-25
+**Status:** Implemented (initial modules), see b-dom-factory; later modules Planned
+**Last Updated:** 2026-09-27
 **Sources:**
 - [`docs/plans/factory/0000-factory-domain.md`](0000-factory-domain.md)
 - [`docs/plans/factory/mr-packaging-requirements.md`](mr-packaging-requirements.md)
@@ -11,9 +11,10 @@
 - Belimbing `app/Domains/Commerce/Inventory` item master and models
 - [Pull request 800](https://github.com/BelimbingApp/bilimbi/pull/800)
 - [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
+- [BelimbingApp/b-dom-factory](https://github.com/BelimbingApp/b-dom-factory) — Factory Domain implementation
 
 **Agents:** codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6-sol-medium (Factory boundary revision),
-claude/claude-opus-5.5 (earlier review)
+claude/claude-opus-5.5 (earlier review, shipped-status update)
 
 ## Problem Essence
 
@@ -88,22 +89,22 @@ The public contract makes each quantity and its history explainable.
 
 #### Phase 1 — Catalog, locations, and units
 
-- [ ] Preserve the existing item master contract in the Inventory module.
-- [ ] Define stock locations, material identity, native units, and versioned item-level conversions.
-- [ ] Expose public, scoped operations for catalog, location, unit, and stock-position reads.
+- [x] Preserve the existing item master contract in the Inventory module. Evidence: [b-dom-factory#2](https://github.com/BelimbingApp/b-dom-factory/pull/2). claude/claude-opus-5.5
+- [x] Define stock locations, material identity, native units, and versioned item-level conversions. Evidence: [b-dom-factory#2](https://github.com/BelimbingApp/b-dom-factory/pull/2). claude/claude-opus-5.5
+- [x] Expose public, scoped operations for catalog, location, unit, and stock-position reads. Evidence: [b-dom-factory#2](https://github.com/BelimbingApp/b-dom-factory/pull/2). claude/claude-opus-5.5
 
 Validation: a stock position can be read by item and location without invoking Production Execution.
 
 #### Phase 2 — Material Transaction ledger
 
-- [ ] Record receipt, transfer, consumption, output, and correction as balanced append-only transactions.
-- [ ] Retain actor, source evidence, native quantity, timestamps, and any conversion basis.
-- [ ] Make retries safe, prevent two users from consuming the same quantity, preserve late-entry times, and record corrections as new transactions.
-- [ ] Accept and retain optional opaque context references through the posting contract.
-- [ ] Add the posting-authority registry; refuse production or transform context from an unregistered caller and refuse registration outside Inventory's Domain container.
-- [ ] Commit each transform's input effects, outputs, and genealogy atomically;
+- [x] Record receipt, transfer, consumption, output, and correction as balanced append-only transactions. Evidence: [b-dom-factory#4](https://github.com/BelimbingApp/b-dom-factory/pull/4). claude/claude-opus-5.5
+- [x] Retain actor, source evidence, native quantity, timestamps, and any conversion basis. Evidence: [b-dom-factory#4](https://github.com/BelimbingApp/b-dom-factory/pull/4). claude/claude-opus-5.5
+- [x] Make retries safe, prevent two users from consuming the same quantity, preserve late-entry times, and record corrections as new transactions. Evidence: [b-dom-factory#4](https://github.com/BelimbingApp/b-dom-factory/pull/4). claude/claude-opus-5.5
+- [x] Accept and retain optional opaque context references through the posting contract. Evidence: [b-dom-factory#4](https://github.com/BelimbingApp/b-dom-factory/pull/4). claude/claude-opus-5.5
+- [x] Add the posting-authority registry; refuse production or transform context from an unregistered caller and refuse registration outside Inventory's Domain container. Evidence: [b-dom-factory#4](https://github.com/BelimbingApp/b-dom-factory/pull/4). claude/claude-opus-5.5
+- [x] Commit each transform's input effects, outputs, and genealogy atomically;
   retain observations unchanged and require a provenance-backed variance for
-  every difference.
+  every difference. Evidence: [b-dom-factory#4](https://github.com/BelimbingApp/b-dom-factory/pull/4). claude/claude-opus-5.5
 
 Validation: a measured 100 kg input can produce 78 kg of measured finished
 material, 17 kg of derived trim, and 2 kg of measured waste, with the remaining
@@ -114,17 +115,17 @@ registered posting authority.
 
 #### Phase 3 — Material units and Lot/Unit Genealogy
 
-- [ ] Identify lots and individual units where the handling process needs them.
-- [ ] Link input identities to output identities for material transformations.
-- [ ] Expose backward and forward genealogy reads from Inventory's public contract.
+- [x] Identify lots and individual units where the handling process needs them. Evidence: [b-dom-factory#6](https://github.com/BelimbingApp/b-dom-factory/pull/6). claude/claude-opus-5.5
+- [x] Link input identities to output identities for material transformations. Evidence: [b-dom-factory#6](https://github.com/BelimbingApp/b-dom-factory/pull/6). claude/claude-opus-5.5
+- [x] Expose backward and forward genealogy reads from Inventory's public contract. Evidence: [b-dom-factory#6](https://github.com/BelimbingApp/b-dom-factory/pull/6). claude/claude-opus-5.5
 
 Validation: a transformed output traces to its source receipt, and a receipt traces to its descendants.
 
 #### Phase 4 — Factory integration proof
 
-- [ ] Prove that catalog, ledger, stock-position, and genealogy operations work without invoking Production Execution.
-- [ ] Prove that Production Execution's contract posts actual inputs and outputs to Inventory with optional opaque context and atomic execution evidence.
-- [ ] Add architecture tests proving that Inventory does not depend on Production Execution, that production and transform postings are refused with no authority registered, that a registered Production Execution posting is accepted, and that an Extension cannot register or post production context.
-- [ ] Validate the reusable contract against distinct factory workflows without putting customer process rules or source mappings in Inventory.
+- [x] Prove that catalog, ledger, stock-position, and genealogy operations work without invoking Production Execution. Evidence: [b-dom-factory#8](https://github.com/BelimbingApp/b-dom-factory/pull/8). claude/claude-opus-5.5
+- [x] Prove that Production Execution's contract posts actual inputs and outputs to Inventory with optional opaque context and atomic execution evidence. Evidence: [b-dom-factory#8](https://github.com/BelimbingApp/b-dom-factory/pull/8). claude/claude-opus-5.5
+- [x] Add architecture tests proving that Inventory does not depend on Production Execution, that production and transform postings are refused with no authority registered, that a registered Production Execution posting is accepted, and that an Extension cannot register or post production context. Evidence: [b-dom-factory#8](https://github.com/BelimbingApp/b-dom-factory/pull/8). claude/claude-opus-5.5
+- [x] Validate the reusable contract against distinct factory workflows without putting customer process rules or source mappings in Inventory. Evidence: [b-dom-factory#8](https://github.com/BelimbingApp/b-dom-factory/pull/8). claude/claude-opus-5.5
 
 Validation: distinct factory workflows reconcile from Inventory transactions without changing Inventory's durable history. The customer sequence is in the [rollout plan](../domain-extension-layer-rollout.md).

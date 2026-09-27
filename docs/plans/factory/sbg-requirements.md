@@ -1,7 +1,7 @@
 # docs/plans/factory/sbg-requirements.md
 
-**Status:** Proposed customer requirements
-**Last Updated:** 2026-09-25
+**Status:** Validated in Factory scenarios; plant confirmations pending
+**Last Updated:** 2026-09-27
 **Sources:**
 - [`docs/plans/factory/0000-factory-domain.md`](0000-factory-domain.md)
 - [`docs/plans/factory/0010-inventory-module.md`](0010-inventory-module.md)
@@ -17,10 +17,11 @@
 - SBG `docs/ax-connector/ax-connector-extraction-plan.md`
 - SBG transition capability and access-gap notes
 - [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
+- [BelimbingApp/b-dom-factory](https://github.com/BelimbingApp/b-dom-factory) — Factory Domain implementation
 
 **Agents:** codex/gpt-5.6-luna (earlier work),
 codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6-sol-medium (Factory boundary revision),
-claude/claude-opus-5.5 (no-mistakes review agent)
+claude/claude-opus-5.5 (no-mistakes review agent, shipped-status update)
 
 ## Problem Essence
 
@@ -202,14 +203,14 @@ boundary before planning or dashboards depend on it.
 
 - **SBG receives:** BA, BOPP, glue, coating, and other mapped material facts
   with native UOM, location, lot, source, freshness, and provenance.
-- [ ] Mount Factory and prove Inventory receiving, balanced posting, idempotent
+- [x] Mount Factory and prove Inventory receiving, balanced posting, idempotent
   retry, concurrent-consumption protection, reversal, and receipt lot identity
-  through its public contract.
-- [ ] Mount the `SbGroup` AX Connector with schema checks, candidate/active
-  source batches, provenance, freshness, and tenant/company mapping.
+  through its public contract. Evidence: [b-dom-factory#4](https://github.com/BelimbingApp/b-dom-factory/pull/4), [b-dom-factory#6](https://github.com/BelimbingApp/b-dom-factory/pull/6), [b-dom-factory#13](https://github.com/BelimbingApp/b-dom-factory/pull/13), [b-ext-sbg#1](https://github.com/SB-Tape/b-ext-sbg/pull/1). claude/claude-opus-5.5
+- [x] Mount the `SbGroup` AX Connector with schema checks, candidate/active
+  source batches, provenance, freshness, and tenant/company mapping. Evidence: [b-ext-sbg#1](https://github.com/SB-Tape/b-ext-sbg/pull/1), [b-ext-sbg#2](https://github.com/SB-Tape/b-ext-sbg/pull/2). claude/claude-opus-5.5
 - [ ] Confirm which AX production, item, inventory, purchase-order, and value
   facts are available for the first source slice.
-- [ ] Keep all AX writes and raw AX SQL out of Factory; AX production history waits for Phase 2's execution/import contract.
+- [x] Keep all AX writes and raw AX SQL out of Factory; AX production history waits for Phase 2's execution/import contract. Evidence: [b-ext-sbg#2](https://github.com/SB-Tape/b-ext-sbg/pull/2) (read-only capture in the Extension; no AX code in Factory). claude/claude-opus-5.5
 
 Validation: an SBG material receipt and its AX source evidence reconcile by
 quantity, UOM, lot, period, source, and freshness without a second ledger.
@@ -226,10 +227,10 @@ This phase connects SBG's glue, coating, and slitting work to Factory's Producti
 - [ ] Submit live production facts and historical AX actuals through
   Production Execution's import contract so validation, Inventory effects, and
   any required override evidence commit together.
-- [ ] Link coating and slitting production-order facts, line, consumption,
-  good output, and yield to Inventory transactions and Production Execution trace.
-- [ ] Mark unavailable wastage reasons, energy, labour hours, GSM, and stopped
-  COA fields as gaps; never fill them with inferred values.
+- [x] Link coating and slitting production-order facts, line, consumption,
+  good output, and yield to Inventory transactions and Production Execution trace. Evidence: SBG scenario in [b-dom-factory#13](https://github.com/BelimbingApp/b-dom-factory/pull/13), [b-dom-factory#16](https://github.com/BelimbingApp/b-dom-factory/pull/16) (synthetic data). claude/claude-opus-5.5
+- [x] Mark unavailable wastage reasons, energy, labour hours, GSM, and stopped
+  COA fields as gaps; never fill them with inferred values. Evidence: SBG scenario in [b-dom-factory#13](https://github.com/BelimbingApp/b-dom-factory/pull/13). claude/claude-opus-5.5
 - [ ] Keep recipe details restricted and ensure external AI receives only
   approved redacted or synthetic information.
 
