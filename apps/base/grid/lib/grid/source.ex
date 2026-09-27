@@ -10,6 +10,10 @@ defmodule Bilimbi.Base.Grid.Source do
   because only the owner knows where the tenant lives on its table, and it
   never reads a table whose owner did not declare it.
 
+  `query/1` only builds the query; it must not read the database. The
+  catalog calls it at boot, before any tenant or migration exists, to learn
+  the keys the query selects.
+
   The query must expose every declared field under the column named in the
   field declaration, either by selecting the schema struct (the default) or
   by selecting a map with those keys. A computed field is a map key the
