@@ -21,6 +21,8 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
   alias Bilimbi.Base.Grid.Result
   alias Bilimbi.Base.Grid.SavedViews
   alias Bilimbi.Base.Grid.View
+  alias Bilimbi.Base.Grid.Column
+  alias Bilimbi.Base.Grid.Lens
   alias Bilimbi.Base.Grid.Table
   alias Bilimbi.Base.Grid.Web.Host
   alias Bilimbi.Base.Grid.Zoom
@@ -75,6 +77,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
      |> assign(:pending_delete, nil)
      |> assign(:follow_options, [])
      |> assign(:delta?, false)
+     |> assign(:pivot, nil)
      |> assign(:focus, nil)
      |> assign(:focus_label, nil)}
   end
@@ -217,14 +220,23 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
         )
       end
 
+    pivot = pivot(catalog, table, columns, view, focus)
+
     socket =
       socket
       |> assign(:page_title, table.label)
       |> assign(:view, view)
       |> assign(:columns, columns)
-      |> assign(:column_views, Host.column_views(columns, view))
-      |> assign(:result, result)
-      |> assign(:rows, if(mode == :full, do: Host.rows(result, view), else: []))
+      |> assign(
+        :column_views,
+        if(pivot, do: pivot.columns, else: Host.column_views(columns, view))
+      )
+      |> assign(
+        :result,
+        if(pivot, do: %{result | total_entries: pivot.total_entries}, else: result)
+      )
+      |> assign(:pivot, pivot)
+      |> assign(:rows, rows_for(mode, pivot, result, view))
       |> assign(:mode, mode)
       |> assign(:expanded, %{})
       |> assign(:window, nil)
@@ -297,8 +309,58 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
 
   defp since_at(%View{} = view), do: NaiveDateTime.new!(View.since(view), ~T[00:00:00])
 
+  # A pivoted grid: the grouped column's values as rows, the pivoted
+  # column's values as columns, counted in one statement; nil when the view
+  # is not pivoted or names columns the grid does not show.
+  defp pivot(_catalog, _table, _columns, %View{pivot: nil}, _focus), do: nil
+  defp pivot(_catalog, _table, _columns, %View{group: nil}, _focus), do: nil
+
+  defp pivot(catalog, table, columns, %View{group: group, pivot: pivot} = view, focus) do
+    with %Column{} = rows_column <- Enum.find(columns, &(&1.spec == group)),
+         %Column{} = across_column <- Enum.find(columns, &(&1.spec == pivot)),
+         true <- rows_column != across_column do
+      result =
+        Grid.pivot(catalog, table, rows_column, across_column, search: view.search, focus: focus)
+
+      lens = Host.lens(view, across_column)
+      columns = Enum.map(result.columns, &%{&1 | lens: lens})
+      counted = pivot_count_column(across_column)
+
+      rows =
+        Enum.map(result.rows, fn row ->
+          cells =
+            Map.new(columns, fn column ->
+              {column.id,
+               Lens.cell(
+                 Map.get(row.cells, column.id),
+                 counted,
+                 Map.get(result.stats, column.id),
+                 lens
+               )}
+            end)
+
+          %{key: row.key, cells: cells}
+        end)
+
+      %{result | columns: columns, rows: rows}
+    else
+      _other -> nil
+    end
+  end
+
+  # A pivot cell is a count; the lens reads it as one whatever column it counts.
+  defp pivot_count_column(%Column{} = across),
+    do: %{across | kind: :rollup, agg: :count, type: :integer}
+
+  defp rows_for(:full, nil, result, view), do: Host.rows(result, view)
+
+  defp rows_for(:full, pivot, _result, %View{page: page, page_size: size}),
+    do: pivot.rows |> Enum.drop((page - 1) * size) |> Enum.take(size)
+
+  defp rows_for(_canvas, _pivot, _result, _view), do: []
+
   defp clamp_page(socket, %Result{} = result, %View{} = view) do
-    page = Result.page(result)
+    page = page_of(result, view)
 
     cond do
       socket.assigns.mode != :full ->
@@ -395,6 +457,17 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
           )
 
         {:noreply, assign(socket, :expanded, expanded)}
+
+      {:window, offset, limit, detail} when not is_nil(socket.assigns.pivot) ->
+        pivot = socket.assigns.pivot
+        rows = pivot.rows |> Enum.drop(offset) |> Enum.take(limit)
+
+        {:noreply,
+         push_event(
+           socket,
+           "#{Map.get(params, "id", "grid")}:window",
+           Host.window_payload_from_rows(rows, pivot.columns, offset, pivot.total_entries, detail)
+         )}
 
       {:window, offset, limit, detail} ->
         sort = Enum.find(columns, &(&1.spec == view.sort))
@@ -671,6 +744,13 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
 
   # A patch from a gesture is an unsaved change, so it leaves the saved
   # view's name behind; opening a saved view is done by `v` alone.
+  # A pivot's pages are slices of its rows; the result's window is the grid's.
+  defp page_of(%Result{} = result, %View{pivot: nil}), do: Result.page(result)
+
+  defp page_of(%Result{total_entries: total}, %View{page: page, page_size: size}) do
+    %{page: page, page_size: size, total_entries: total, total_pages: div(total + size - 1, size)}
+  end
+
   defp path(%View{table: table} = view),
     do: ~p"/grid/#{table}?#{View.to_params(%{view | slug: nil})}"
 
@@ -805,6 +885,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
                 cost={Host.cost(@result)}
                 expanded={@expanded}
                 group={@view.group}
+                pivot={@view.pivot}
                 caption={@table.label}
               >
                 <:empty
@@ -830,7 +911,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
             <.pagination
               :if={@mode == :full}
               id="grid-pagination"
-              page={Result.page(@result)}
+              page={page_of(@result, @view)}
               page_sizes={View.page_sizes()}
               filters_form={@filters_form}
               filters_event="grid_filters"

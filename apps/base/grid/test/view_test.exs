@@ -14,6 +14,7 @@ defmodule Bilimbi.Base.Grid.ViewTest do
       "page" => "2",
       "per_page" => "50",
       "group" => "status",
+      "pivot" => "company.name",
       "follow" => "company",
       "focus" => "73",
       "since" => "2026-08-01",
@@ -25,7 +26,8 @@ defmodule Bilimbi.Base.Grid.ViewTest do
     assert view.lenses == %{"employees:count" => "bar"}
     assert view.zoom == 12 and view.sort == "employees:count" and view.dir == :desc
     assert view.search == "acme" and view.page == 2 and view.page_size == 50
-    assert view.group == "status" and view.follow == "company" and view.focus == "73"
+    assert view.group == "status" and view.pivot == "company.name"
+    assert view.follow == "company" and view.focus == "73"
     assert view.since == ~D[2026-08-01] and View.since(view) == ~D[2026-08-01]
     assert view.slug == "desk"
 
@@ -39,6 +41,7 @@ defmodule Bilimbi.Base.Grid.ViewTest do
              page: 2,
              per_page: 50,
              group: "status",
+             pivot: "company.name",
              follow: "company",
              focus: "73",
              since: "2026-08-01",
@@ -81,5 +84,8 @@ defmodule Bilimbi.Base.Grid.ViewTest do
     refute Map.has_key?(map, "focus")
     restored = View.from_map(map)
     assert restored.follow == "company" and restored.focus == nil and restored.columns == ["name"]
+
+    pivoted = View.from_params(%{"cols" => "a,b", "group" => "a", "pivot" => "b"}, "t")
+    assert View.remove_column(pivoted, "b").pivot == nil
   end
 end

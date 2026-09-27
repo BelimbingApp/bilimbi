@@ -584,4 +584,35 @@ defmodule Bilimbi.Base.Grid.Web.GridLiveTest do
     assert [[73, [_name, ["2", _n, _band, :sequential, series]]], _retail] = rows
     assert length(series) == 12 and Enum.sum(series) == 2.0
   end
+
+  test "a heading dropped in the pivot corner pivots a grouped grid, and the corner unpivots",
+       %{conn: conn} do
+    grant_capabilities!(@all)
+
+    {:ok, view, _html} =
+      conn |> log_in_as() |> live(~p"/grid/users?cols=name%2Ccompany.name%2Cemail")
+
+    # Without a group the drop groups first.
+    render_hook(view, "grid", %{"op" => "pivot", "spec" => "company.name"})
+    path = assert_patch(view)
+    query = URI.decode_query(URI.parse(path).query)
+    assert query["group"] == "company.name" and not Map.has_key?(query, "pivot")
+
+    # Grouped, the next drop pivots: one column per name, a total, one row per company.
+    render_hook(view, "grid", %{"op" => "pivot", "spec" => "name"})
+    path = assert_patch(view)
+    assert URI.decode_query(URI.parse(path).query)["pivot"] == "name"
+    assert has_element?(view, "#grid-pivoted", "Pivoted by name")
+    assert has_element?(view, "#grid-head-pv-total", "Total")
+    assert has_element?(view, "#grid-head-pv-0", "Ada Lovelace")
+    assert has_element?(view, "#grid-cell-Bilimbi_20Industries-pv-total", "2")
+    assert has_element?(view, "#grid-cell-Bilimbi_20Retail-pv-total", "1")
+    assert has_element?(view, "#grid-pagination-summary", "Showing 1 to 2 of 2 results")
+
+    view |> element("#grid-unpivot") |> render_click()
+    path = assert_patch(view)
+    refute Map.has_key?(URI.decode_query(URI.parse(path).query), "pivot")
+    refute has_element?(view, "#grid-pivoted")
+    assert has_element?(view, "#grid-row-91")
+  end
 end
