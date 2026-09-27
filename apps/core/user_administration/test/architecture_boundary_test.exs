@@ -20,6 +20,7 @@ defmodule Bilimbi.Core.UserAdministration.ArchitectureBoundaryTest do
              dependencies: [
                "base/authz",
                "base/database",
+               "base/grid",
                "base/module_registry",
                "base/tenancy",
                "base/ui",
