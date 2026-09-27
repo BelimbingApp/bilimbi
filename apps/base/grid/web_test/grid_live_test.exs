@@ -263,4 +263,128 @@ defmodule Bilimbi.Base.Grid.Web.GridLiveTest do
 
     assert has_element?(view, "#grid-grouped", "Grouped by name")
   end
+
+  test "grouping by a column sorts by it and heads each run of equal values", %{conn: conn} do
+    grant_capabilities!(@all)
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/grid/users?cols=name%2Ccompany.name&group=company.name&sort=company.name")
+
+    assert has_element?(view, "#grid-group-0 th", "Name: Bilimbi Industries")
+    assert has_element?(view, "#grid-group-0 th", "(2)")
+    assert has_element?(view, "#grid-group-1 th", "Name: Bilimbi Retail")
+    assert has_element?(view, "#grid-grouped", "Grouped by company.name")
+
+    view |> element("#grid-ungroup") |> render_click()
+    path = assert_patch(view)
+    refute Map.has_key?(URI.decode_query(URI.parse(path).query), "group")
+    refute has_element?(view, "#grid-group-0")
+  end
+
+  test "a view is saved under a name, reopened by its slug, and deleted through the confirmation",
+       %{conn: conn} do
+    grant_capabilities!(@all)
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/grid/users?cols=name%2Ccompany.name&z=32&sort=name&dir=desc")
+
+    assert has_element?(view, "#grid-views-empty")
+
+    view |> element("#grid-save-view") |> render_click()
+    assert has_element?(view, "#grid-save-dialog")
+    view |> form("#grid-save-form", %{view: %{label: "Ops desk"}}) |> render_submit()
+    assert_patch(view, ~p"/grid/users?v=ops-desk")
+    assert render(view) =~ "View “Ops desk” saved."
+
+    assert has_element?(view, "#grid-view-own-ops-desk", "Ops desk")
+    assert has_element?(view, "#grid-chip-company-name")
+    assert has_element?(view, "#grid-zoom-full[aria-pressed='true']")
+    assert has_element?(view, "#grid-zoom-level[title='Row height 32 px']")
+    assert has_element?(view, "#grid-head-name[aria-sort='descending']")
+
+    # A gesture on a saved view is an unsaved change: the URL spells it out and drops the name.
+    view |> element("#grid-remove-company-name") |> render_click()
+    path = assert_patch(view)
+
+    assert URI.decode_query(URI.parse(path).query) == %{
+             "cols" => "name",
+             "z" => "32",
+             "sort" => "name",
+             "dir" => "desc"
+           }
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/grid/users?v=ops-desk")
+    assert has_element?(view, "#grid-chip-company-name")
+
+    assert has_element?(
+             view,
+             "#grid-view-own-ops-desk-tile[href='/workspace?t=%2Fgrid%2Fusers%3Fv%3Dops-desk']"
+           )
+
+    view |> element("#grid-view-own-ops-desk-delete") |> render_click()
+    assert has_element?(view, "#grid-delete-view-confirm")
+    view |> element("#grid-delete-view-confirm button", "Delete") |> render_click()
+    assert render(view) =~ "View “Ops desk” deleted."
+    path = assert_patch(view)
+
+    assert URI.decode_query(URI.parse(path).query) == %{
+             "cols" => "name,company.name",
+             "z" => "32",
+             "sort" => "name",
+             "dir" => "desc"
+           }
+
+    assert has_element?(view, "#grid-views-empty")
+
+    {:ok, view, html} = conn |> log_in_as() |> live(~p"/grid/users?v=ops-desk")
+    assert html =~ "That saved view no longer exists."
+    assert has_element?(view, "#grid-chip-name")
+  end
+
+  test "a shared view needs the company settings capability and is seen by another account", %{
+    conn: conn
+  } do
+    grant_capabilities!(@all)
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/grid/users?cols=name")
+
+    view |> element("#grid-save-view") |> render_click()
+    refute has_element?(view, "#grid-save-shared")
+    # The checkbox is withheld, so the flag can only arrive by hand; the handler refuses it.
+    view
+    |> form("#grid-save-form", %{view: %{label: "Team"}})
+    |> render_submit(%{"view" => %{"shared" => "true"}})
+
+    assert render(view) =~ "You do not have permission to share views with the company."
+
+    grant_capabilities!(~w(base.settings.company.manage))
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/grid/users?cols=name")
+    view |> element("#grid-save-view") |> render_click()
+    assert has_element?(view, "#grid-save-shared")
+    view |> form("#grid-save-form", %{view: %{label: "Team", shared: "true"}}) |> render_submit()
+    assert_patch(view, ~p"/grid/users?v=shared%3Ateam")
+    assert has_element?(view, "#grid-view-shared-team", "shared")
+
+    grant_capabilities!(@all, user_id: 92, company_id: 74)
+
+    {:ok, other, _html} =
+      conn |> log_in_as(%{"user_id" => 92, "company_id" => 74}) |> live(~p"/grid/users")
+
+    refute has_element?(other, "#grid-view-shared-team")
+
+    grant_capabilities!(@all, user_id: 93)
+
+    {:ok, colleague, _html} =
+      conn
+      |> log_in_as(%{"user_id" => 93, "company_id" => 73})
+      |> live(~p"/grid/users?v=shared%3Ateam")
+
+    assert has_element?(colleague, "#grid-view-shared-team")
+    assert has_element?(colleague, "#grid-chip-name")
+    refute has_element?(colleague, "#grid-chip-email")
+    refute has_element?(colleague, "#grid-view-shared-team-delete")
+  end
 end

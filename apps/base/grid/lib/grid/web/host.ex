@@ -192,10 +192,18 @@ defmodule Bilimbi.Base.Grid.Web.Host do
   @doc "The rows a rollup collapsed, with every value as text for the expansion table."
   @spec expansion(Catalog.t(), Table.t(), term(), Column.t()) :: [map()]
   def expansion(%Catalog{} = catalog, %Table{} = root, key, %Column{} = column) do
+    labels =
+      case Catalog.fetch_table(catalog, column.many.to) do
+        {:ok, target} -> Map.new(target.fields, fn {id, field} -> {id, field.label} end)
+        :error -> %{}
+      end
+
     case Grid.expand(catalog, root, key, column) do
       {:ok, rows} ->
         Enum.map(rows, fn row ->
-          Map.new(row, fn {field, value} -> {field, Lens.text(value, column)} end)
+          Map.new(row, fn {field, value} ->
+            {Map.get(labels, field, field), Lens.text(value, column)}
+          end)
         end)
 
       {:error, _reason} ->

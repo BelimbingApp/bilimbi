@@ -22,12 +22,12 @@ defmodule Bilimbi.Base.Grid.ContributionValidatorTest do
   test "the test domain validates into tables carrying their links" do
     %{tables: tables} = validate(TestSources.tables())
 
-    assert Map.keys(tables) |> Enum.sort() == ~w(countries customers lines orders tags)
+    assert Map.keys(tables) |> Enum.sort() == ~w(countries customers lines metrics orders tags)
 
     assert %Table{owner: "base/grid", key: "id", time_field: "placed_at"} =
              orders = tables["orders"]
 
-    assert Enum.map(Table.links(orders), & &1.id) == ~w(customer lines tags)
+    assert Enum.map(Table.links(orders), & &1.id) == ~w(customer lines tags metrics)
     assert %Link{kind: :many, via: {TestSources.Edges, :order_tags}} = orders.links["tags"]
     assert Enum.map(Table.visible_fields(orders), & &1.id) == ~w(id label amount status placed_at)
   end

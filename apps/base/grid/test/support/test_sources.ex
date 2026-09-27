@@ -93,6 +93,22 @@ defmodule Bilimbi.Base.Grid.TestSources do
     end
   end
 
+  defmodule Metrics do
+    @moduledoc false
+    @behaviour Bilimbi.Base.Grid.Source
+
+    import Ecto.Query
+
+    @columns [:order_id | Enum.map(1..60, &:"m#{&1}")]
+
+    @impl true
+    def query(_scope) do
+      from(m in "grid_test_metrics", select: map(m, ^@columns))
+    end
+
+    def columns, do: @columns
+  end
+
   defmodule Edges do
     @moduledoc false
     import Ecto.Query
@@ -205,6 +221,29 @@ defmodule Bilimbi.Base.Grid.TestSources do
           fields: [
             %{id: "id", label: "ID", type: :integer},
             %{id: "name", label: "Name", type: :string}
+          ]
+        },
+        # Sixty numeric measures per order, one row each: a wide one-link so a
+        # grid can hold a hundred columns for the performance run.
+        %{
+          id: "metrics",
+          label: "Metrics",
+          capability: "admin.test.order.view",
+          source: Metrics,
+          key: "order_id",
+          fields: [
+            %{id: "order_id", type: :integer, hidden: true}
+            | Enum.map(1..60, &%{id: "m#{&1}", label: "Measure #{&1}", type: :integer})
+          ],
+          links: [
+            %{
+              id: "metrics",
+              label: "Metrics",
+              from: "orders",
+              to: "metrics",
+              kind: :one,
+              on: {"id", "order_id"}
+            }
           ]
         }
       ]

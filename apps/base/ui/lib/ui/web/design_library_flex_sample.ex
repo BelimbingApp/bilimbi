@@ -152,7 +152,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
   def initial do
     %{
       columns: @columns,
-      sort_by: "name",
+      sort_by: "region",
       sort_dir: :asc,
       zoom: 28,
       suggestions: [],
