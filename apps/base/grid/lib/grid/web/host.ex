@@ -78,8 +78,6 @@ defmodule Bilimbi.Base.Grid.Web.Host do
   @doc "The rows `flex_table/1` takes: every cell prepared through its column's lens and the set's stats."
   @spec rows(Result.t(), View.t()) :: [%{key: term(), cells: %{String.t() => Lens.cell()}}]
   def rows(%Result{} = result, %View{} = view) do
-    since = View.since(view)
-
     Enum.map(result.rows, fn row ->
       cells =
         Map.new(result.columns, fn column ->
@@ -88,8 +86,7 @@ defmodule Bilimbi.Base.Grid.Web.Host do
           {column.id,
            Lens.cell(value, column, Map.get(result.stats, column.id), lens(view, column), %{
              series: get_in(row, [:series, column.id]),
-             before: get_in(row, [:before, column.id]),
-             since: since
+             before: get_in(row, [:before, column.id])
            })}
         end)
 
@@ -116,8 +113,6 @@ defmodule Bilimbi.Base.Grid.Web.Host do
   @spec attached_cells(%{term() => %{String.t() => term()}}, [Column.t()], map(), View.t()) ::
           %{term() => %{String.t() => Lens.cell()}}
   def attached_cells(values, columns, stats, %View{} = view) do
-    since = View.since(view)
-
     Map.new(values, fn {key, attached} ->
       cells = Map.get(attached, :cells, %{})
 
@@ -131,8 +126,7 @@ defmodule Bilimbi.Base.Grid.Web.Host do
              lens(view, column),
              %{
                series: get_in(attached, [:series, column.id]),
-               before: get_in(attached, [:before, column.id]),
-               since: since
+               before: get_in(attached, [:before, column.id])
              }
            )}
         end)
@@ -341,10 +335,11 @@ defmodule Bilimbi.Base.Grid.Web.Host do
   def apply(%{"op" => "group", "spec" => spec}, view, columns) when is_binary(spec) do
     cond do
       spec == "" ->
-        {:patch, %{view | group: nil}}
+        {:patch, %{view | group: nil, pivot: nil}}
 
       Enum.any?(columns, &(&1.spec == spec and &1.sortable)) ->
-        {:patch, %{view | group: spec, sort: spec, dir: :asc, page: 1}}
+        pivot = if spec == view.group and spec != view.pivot, do: view.pivot
+        {:patch, %{view | group: spec, pivot: pivot, sort: spec, dir: :asc, page: 1}}
 
       true ->
         :noop

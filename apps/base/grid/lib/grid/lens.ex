@@ -36,9 +36,8 @@ defmodule Bilimbi.Base.Grid.Lens do
 
   @doc """
   The lenses a column's values allow. A count or sum over a dated
-  many-link can show its trend and its change since a date; a date or
-  datetime field can show its distance from a date; anything numeric
-  scales to a bar; everything bands.
+  many-link can show its trend and its change since a date; anything
+  numeric scales to a bar; everything bands.
   """
   @spec available(Column.t()) :: [lens()]
   def available(%Column{kind: :rollup, agg: agg} = column) when agg in [:count, :sum] do
@@ -46,9 +45,6 @@ defmodule Bilimbi.Base.Grid.Lens do
       do: [:value, :bar, :band, :trend, :delta],
       else: [:value, :bar, :band]
   end
-
-  def available(%Column{kind: :field, type: type}) when type in [:date, :datetime],
-    do: [:value, :band, :delta]
 
   def available(%Column{} = column) do
     if Column.numeric?(column), do: [:value, :bar, :band], else: [:value, :band]
@@ -91,9 +87,9 @@ defmodule Bilimbi.Base.Grid.Lens do
   falls in. Text and enum values get a categorical band from a stable hash,
   booleans a binary one, so a colour carpet reads them too.
 
-  `extras` may carry `series` (a trend's twelve values), `before` (the
-  aggregate as of the delta date) and `since` (that date); a delta lens
-  then states the change in the text.
+  `extras` may carry `series` (a trend's twelve values) and `before` (the
+  aggregate as of the delta date); a delta lens then states the change in
+  the text.
   """
   @spec cell(term(), Column.t(), %{min: term(), max: term()} | nil, lens(), map()) :: cell()
   def cell(value, %Column{} = column, stats, lens, extras \\ %{}) do
@@ -112,23 +108,13 @@ defmodule Bilimbi.Base.Grid.Lens do
   end
 
   # The change: a rollup's value now against the same aggregate as of the
-  # date; a date field's distance from the date in days, after it positive.
+  # date.
   defp delta(_value, _column, lens, _extras) when lens != :delta, do: nil
 
   defp delta(value, %Column{kind: :rollup}, :delta, extras) do
     case {to_number(value), to_number(Map.get(extras, :before))} do
       {now, before} when is_number(now) and is_number(before) -> now - before
       {now, nil} when is_number(now) -> now
-      _other -> nil
-    end
-  end
-
-  defp delta(value, %Column{kind: :field, type: type}, :delta, extras)
-       when type in [:date, :datetime] do
-    with %Date{} = since <- Map.get(extras, :since),
-         %Date{} = date <- to_date(value) do
-      Date.diff(date, since)
-    else
       _other -> nil
     end
   end
@@ -153,11 +139,6 @@ defmodule Bilimbi.Base.Grid.Lens do
   defp sign(delta) when delta < 0, do: "−"
   defp sign(delta) when delta > 0, do: "+"
   defp sign(_zero), do: "±"
-
-  defp to_date(%Date{} = date), do: date
-  defp to_date(%NaiveDateTime{} = naive), do: NaiveDateTime.to_date(naive)
-  defp to_date(%DateTime{} = datetime), do: DateTime.to_date(datetime)
-  defp to_date(_other), do: nil
 
   defp position(nil, _column, _stats), do: {nil, nil}
 

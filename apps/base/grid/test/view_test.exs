@@ -87,5 +87,11 @@ defmodule Bilimbi.Base.Grid.ViewTest do
 
     pivoted = View.from_params(%{"cols" => "a,b", "group" => "a", "pivot" => "b"}, "t")
     assert View.remove_column(pivoted, "b").pivot == nil
+    assert View.from_map(View.to_map(pivoted)).pivot == "b"
+
+    # A pivot needs a group, and a column other than the grouped one.
+    assert View.from_params(%{"cols" => "a,b", "pivot" => "b"}, "t").pivot == nil
+    assert View.from_params(%{"cols" => "a,b", "group" => "b", "pivot" => "b"}, "t").pivot == nil
+    assert View.from_map(%{"columns" => ["a", "b"], "pivot" => "b"}).pivot == nil
   end
 end

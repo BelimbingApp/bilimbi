@@ -71,7 +71,7 @@ heading onto another reorders.
 Lenses are `value`, `bar`, `band`, and, for a count or sum over a dated
 many-link, `trend` (the aggregate per calendar month over the last twelve,
 a sparkline) and `delta` (the aggregate as of a date, through a FILTER in
-the same grouped subquery; a date field reads its distance from the date).
+the same grouped subquery).
 The date lives in the view.
 
 Inside a tiled workspace a grid can follow what another tile selects: a

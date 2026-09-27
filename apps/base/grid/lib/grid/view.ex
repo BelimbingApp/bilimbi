@@ -75,13 +75,19 @@ defmodule Bilimbi.Base.Grid.View do
       page: positive(Map.get(params, "page"), 1),
       page_size: page_size(Map.get(params, "per_page")),
       group: blank_to_nil(Map.get(params, "group")),
-      pivot: blank_to_nil(Map.get(params, "pivot")),
+      pivot: params |> Map.get("pivot") |> blank_to_nil() |> pivot_of(Map.get(params, "group")),
       follow: params |> Map.get("follow") |> blank_to_nil() |> follow_name(),
       focus: params |> Map.get("focus") |> blank_to_nil() |> focus_key(),
       since: params |> Map.get("since") |> parse_date(),
       slug: blank_to_nil(Map.get(params, "v"))
     }
   end
+
+  # A pivot needs grouped rows, and a column other than the grouped one.
+  defp pivot_of(nil, _group), do: nil
+
+  defp pivot_of(pivot, group),
+    do: if(blank_to_nil(group) in [nil, pivot], do: nil, else: pivot)
 
   defp parse_date(%Date{} = date), do: date
 
@@ -157,7 +163,7 @@ defmodule Bilimbi.Base.Grid.View do
       page: 1,
       page_size: page_size(Map.get(map, "page_size")),
       group: blank_to_nil(Map.get(map, "group")),
-      pivot: blank_to_nil(Map.get(map, "pivot")),
+      pivot: map |> Map.get("pivot") |> blank_to_nil() |> pivot_of(Map.get(map, "group")),
       follow: map |> Map.get("follow") |> blank_to_nil() |> follow_name(),
       since: map |> Map.get("since") |> parse_date()
     }
