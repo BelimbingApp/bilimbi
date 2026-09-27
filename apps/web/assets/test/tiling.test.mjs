@@ -253,25 +253,14 @@ test("a server patch that did not follow a keyboard move leaves focus alone", ()
   assert.equal(focused(), "tile-t1-header-title")
 })
 
-// Chrome can keep a tile's or divider's old CSSStyleDeclaration after a patch
-// writes a new style attribute, painting the previous layout. happy-dom keeps
-// the two in step, so each element here is given the declaration it had
-// before the patch, as Chrome leaves it.
-function keepPaintedStyle(element) {
-  const painted = document.createElement("div")
-  painted.style.cssText = element.getAttribute("style")
-  Object.defineProperty(element, "style", {value: painted.style, configurable: true})
-}
-
 test("a patch that moves tiles and dividers repaints both to the server's geometry", () => {
   const tile = document.getElementById("tile-t2")
   const handle = document.getElementById("split-s3")
-  tile.setAttribute("style", "left: 50%; top: 0%; width: 50%; height: 100%")
-  keepPaintedStyle(tile)
-  keepPaintedStyle(handle)
+  tile.dataset.place = "left: 50%; top: 0%; width: 50%; height: 100%"
+  control.hook.updated()
 
-  tile.setAttribute("style", "left: 70%; top: 0%; width: 30%; height: 100%")
-  handle.setAttribute("style", "left: 70%; top: 0%; height: 100%")
+  tile.dataset.place = "left: 70%; top: 0%; width: 30%; height: 100%"
+  handle.dataset.place = "left: 70%; top: 0%; height: 100%"
   assert.equal(tile.style.left, "50%")
   control.hook.updated()
 

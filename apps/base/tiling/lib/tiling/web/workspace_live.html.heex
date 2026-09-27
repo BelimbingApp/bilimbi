@@ -211,9 +211,13 @@
       <:description>
         {if @layout_mode == "master",
           do:
-            gettext("The page joins the master layout's stack. Every tile is a live page, so many tiles cost as much as many tabs."),
+            gettext(
+              "The page joins the master layout's stack. Every tile is a live page, so many tiles cost as much as many tabs."
+            ),
           else:
-            gettext("The page opens in a new tile beside the focused one. Every tile is a live page, so many tiles cost as much as many tabs.")}
+            gettext(
+              "The page opens in a new tile beside the focused one. Every tile is a live page, so many tiles cost as much as many tabs."
+            )}
       </:description>
       <div id="workspace-picker-pages" class="-mx-1 max-h-96 space-y-0.5 overflow-y-auto">
         <button

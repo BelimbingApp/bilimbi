@@ -550,7 +550,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
       assert has_element?(view, "#workspace[data-layout='master'][data-tile-count='3']")
       assert has_element?(view, "#tile-t4-header-make-master", "Make master")
       view |> element("#tile-t4-header-make-master") |> render_click()
-      assert has_element?(view, "#tile-t4[style*='left: 0.0%']")
+      assert has_element?(view, "#tile-t4[data-place*='left: 0.0%']")
       assert has_element?(view, "#tile-t4-header", "Master")
 
       render_hook(view, "open-layout", %{"n" => 2})
@@ -570,7 +570,11 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
       {:ok, _} = SavedLayouts.save(@settings_scope, "Lookups", "/companies")
 
       {:ok, view, _html} = open(conn, "/workspace/records")
-      assert has_element?(view, "#split-s4[aria-orientation='horizontal'][style*='top: 70.0%']")
+
+      assert has_element?(
+               view,
+               "#split-s4[aria-orientation='horizontal'][data-place*='top: 70.0%']"
+             )
 
       render_hook(view, "resize-split", %{"id" => "s4", "ratio" => 0.6})
 
@@ -579,7 +583,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
         "/workspace/records?t=h.5%28%2Fcompanies%2Cv.6%28%2Fcompanies%2C%2Fcompanies%29%29"
       )
 
-      assert has_element?(view, "#split-s4[style*='top: 60.0%']")
+      assert has_element?(view, "#split-s4[data-place*='top: 60.0%']")
 
       render_hook(view, "focus-tile", %{"id" => "t3"})
       render_hook(view, "resize-step", %{"side" => "up"})
@@ -589,19 +593,19 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
         "/workspace/records?t=h.5%28%2Fcompanies%2Cv.55%28%2Fcompanies%2C%2Fcompanies%29%29"
       )
 
-      assert has_element?(view, "#split-s4[style*='top: 55.0%']")
+      assert has_element?(view, "#split-s4[data-place*='top: 55.0%']")
 
       render_hook(view, "open-layout", %{"n" => 2})
       assert_patch(view, "/workspace/lookups")
       render_hook(view, "open-layout", %{"n" => 1})
       assert_patch(view, "/workspace/records")
       assert has_element?(view, "#workspace[data-layout='master']")
-      assert has_element?(view, "[data-split][style*='top: 70.0%']")
+      assert has_element?(view, "[data-split][data-place*='top: 70.0%']")
 
       {:ok, view, _html} =
         open(conn, "/workspace/records?t=h.5(/companies,v.55(/companies,/companies))")
 
-      assert has_element?(view, "[data-split][style*='top: 55.0%']")
+      assert has_element?(view, "[data-split][data-place*='top: 55.0%']")
     end
 
     test "closing the last tile of a master layout empties the workspace", %{conn: conn} do
