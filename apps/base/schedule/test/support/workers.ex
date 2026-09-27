@@ -64,3 +64,17 @@ defmodule Bilimbi.Base.Schedule.FinalizeFailureTestWorker do
     :ok
   end
 end
+
+defmodule Bilimbi.Base.Schedule.SystemPrincipalTestWorker do
+  @moduledoc false
+
+  use Bilimbi.Base.Schedule.Worker,
+    id: "test/schedule-system-principal",
+    system_principal: "test.schedule_principal"
+
+  @impl true
+  def validate_scheduled_args(%{}), do: {:ok, %{}}
+
+  @impl true
+  def handle_scheduled_job(_args, _execution), do: :ok
+end

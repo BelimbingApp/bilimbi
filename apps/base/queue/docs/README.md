@@ -79,6 +79,13 @@ gone since enqueue, cancels it with `:system_principal_unavailable`. The
 principal holds only what an administrator granted it in that company, decided
 by Base Authz when the job asks.
 
+A Schedule worker cannot declare a principal; Base Schedule refuses one at
+boot, because a schedule definition names no tenant or company. To run
+scheduled work as a principal, schedule a plain worker whose job builds the
+tenant scope with `Bilimbi.Base.Tenancy.scope/1` and calls
+`Queue.enqueue_as_system/4` with that scope, the company, and the principal
+worker.
+
 ## Delivery semantics
 
 Queue delivery is at least once. Oban uniqueness reduces duplicate insertion;

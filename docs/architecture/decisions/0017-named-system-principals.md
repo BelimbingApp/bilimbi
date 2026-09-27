@@ -131,5 +131,13 @@ identity or grant it anything.
   `enqueue/2` jobs run as nobody and hold no authority.
 - Factory's import check and the first scheduled import job are the first
   consumers. Each lives in its own repository and is wired in its own change.
+- Base Schedule does not run a principal worker: a schedule definition names
+  no tenant or company, and Schedule enqueues every occurrence through plain
+  `enqueue`. Its contribution validator refuses, at boot, a Schedule worker
+  that declares a system principal. Scheduled work that must run as a
+  principal takes two hops: a plain Schedule worker builds the tenant scope
+  with `Bilimbi.Base.Tenancy.scope/1` and calls
+  `Bilimbi.Base.Queue.enqueue_as_system/4` with that scope, the company, the
+  principal worker, and its arguments.
 - There is no administration screen yet. Grants are made through the API or
   the mix task.
