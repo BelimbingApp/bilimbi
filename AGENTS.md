@@ -99,11 +99,10 @@ apps/core/compatibility/
 apps/web/
 ```
 
-The current production scope contains no optional Domain or Extension. Add
-production capabilities only through the composition rollout and a real
-business requirement. Disposable repositories used by the approved composition
-proof are allowed, must remain outside the Platform Git history, and must be
-removed when the proof ends.
+The Platform repository contains no optional Domain or Extension. Those live
+in their own repositories mounted under `apps/domains/` and `apps/extensions/`
+(see `apps/domains/AGENTS.md`). Add production capabilities only through that
+composition model and a real business requirement.
 
 The initial goal is compatibility with Belimbing's existing PostgreSQL schema.
 Bilimbi maps that schema accurately and owns Ecto migrations that can create a

@@ -1,7 +1,7 @@
 # docs/plans/factory/0000-factory-domain.md
 
-**Status:** Proposed
-**Last Updated:** 2026-09-25
+**Status:** Implemented (initial modules), see b-dom-factory; later modules Planned
+**Last Updated:** 2026-09-27
 **Sources:**
 - [`docs/plans/factory/0010-inventory-module.md`](0010-inventory-module.md)
 - [`docs/plans/factory/mr-packaging-requirements.md`](mr-packaging-requirements.md)
@@ -11,10 +11,11 @@
 - [`AGENTS.md`](../../../AGENTS.md) §§4–6
 - [Pull request 800](https://github.com/BelimbingApp/bilimbi/pull/800)
 - [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
+- [BelimbingApp/b-dom-factory](https://github.com/BelimbingApp/b-dom-factory) — Factory Domain implementation
 
 **Agents:** codex/gpt-5.6-luna (earlier work),
 codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6-sol-medium (Factory boundary revision),
-claude/claude-opus-5.5 (earlier review)
+claude/claude-opus-5.5 (earlier review, shipped-status update)
 
 ## Problem Essence
 
@@ -101,7 +102,7 @@ Factory Inventory, Product Definition, and Production Execution give other modul
 
 ### Inventory module
 
-- [ ] Deliver Factory's catalog, locations, Material Transaction ledger, and Lot/Unit Genealogy through the public contract in [`0010-inventory-module.md`](0010-inventory-module.md).
+- [x] Deliver Factory's catalog, locations, Material Transaction ledger, and Lot/Unit Genealogy through the public contract in [`0010-inventory-module.md`](0010-inventory-module.md). Evidence: [b-dom-factory#2](https://github.com/BelimbingApp/b-dom-factory/pull/2), [b-dom-factory#4](https://github.com/BelimbingApp/b-dom-factory/pull/4), [b-dom-factory#6](https://github.com/BelimbingApp/b-dom-factory/pull/6), [b-dom-factory#8](https://github.com/BelimbingApp/b-dom-factory/pull/8). claude/claude-opus-5.5
 
 Validation: receiving, storage, and production reconcile through one material history across distinct factory workflows. The customer sequence is in the [rollout plan](../domain-extension-layer-rollout.md).
 
@@ -109,9 +110,9 @@ Validation: receiving, storage, and production reconcile through one material hi
 
 #### Phase 1 — Products, BOMs, and routings
 
-- [ ] Link product definitions to Inventory items and define versioned Formula/BOM contracts.
-- [ ] Define versioned routings, logical operations, inputs, outputs, and allowed work centres/resources.
-- [ ] Keep process families, tolerances, output roles, and material hold rules as configuration data.
+- [x] Link product definitions to Inventory items and define versioned Formula/BOM contracts. Evidence: [b-dom-factory#3](https://github.com/BelimbingApp/b-dom-factory/pull/3). claude/claude-opus-5.5
+- [x] Define versioned routings, logical operations, inputs, outputs, and allowed work centres/resources. Evidence: [b-dom-factory#3](https://github.com/BelimbingApp/b-dom-factory/pull/3). claude/claude-opus-5.5
+- [x] Keep process families, tolerances, output roles, and material hold rules as configuration data. Evidence: [b-dom-factory#3](https://github.com/BelimbingApp/b-dom-factory/pull/3). claude/claude-opus-5.5
 
 Validation: an order can select a specific product and routing revision without relying on a customer Extension.
 
@@ -119,28 +120,28 @@ Validation: an order can select a specific product and routing revision without 
 
 #### Phase 1 — Orders, execution, and Inventory posting
 
-- [ ] Record a production order or batch and its actual operation executions.
-- [ ] Capture actual input, output, quantity, time, operator, resource, and variance.
-- [ ] Register as Inventory's initial production posting authority at boot.
-- [ ] Accept live production commands and historical production imports through the same execution/import contract; post material effects through Inventory's public contract with optional opaque execution, order or batch, and resource references.
-- [ ] Commit execution completion, Inventory effects, and any required override evidence as one all-or-nothing operation.
-- [ ] Preserve which definition versions governed the recorded work.
+- [x] Record a production order or batch and its actual operation executions. Evidence: [b-dom-factory#5](https://github.com/BelimbingApp/b-dom-factory/pull/5). claude/claude-opus-5.5
+- [x] Capture actual input, output, quantity, time, operator, resource, and variance. Evidence: [b-dom-factory#5](https://github.com/BelimbingApp/b-dom-factory/pull/5). claude/claude-opus-5.5
+- [x] Register as Inventory's initial production posting authority at boot. Evidence: [b-dom-factory#4](https://github.com/BelimbingApp/b-dom-factory/pull/4), [b-dom-factory#5](https://github.com/BelimbingApp/b-dom-factory/pull/5). claude/claude-opus-5.5
+- [x] Accept live production commands and historical production imports through the same execution/import contract; post material effects through Inventory's public contract with optional opaque execution, order or batch, and resource references. Evidence: [b-dom-factory#5](https://github.com/BelimbingApp/b-dom-factory/pull/5). claude/claude-opus-5.5
+- [x] Commit execution completion, Inventory effects, and any required override evidence as one all-or-nothing operation. Evidence: [b-dom-factory#5](https://github.com/BelimbingApp/b-dom-factory/pull/5), [b-dom-factory#9](https://github.com/BelimbingApp/b-dom-factory/pull/9). claude/claude-opus-5.5
+- [x] Preserve which definition versions governed the recorded work. Evidence: [b-dom-factory#5](https://github.com/BelimbingApp/b-dom-factory/pull/5). claude/claude-opus-5.5
 
 Validation: repeated submission cannot duplicate material use, and each execution's material effects appear in the same Inventory ledger as warehouse movements.
 
 #### Phase 2 — Material holds and overrides
 
-- [ ] Refuse consumption of material that has not met its configured hold by default.
-- [ ] Allow an override only with an explicit Base Authz capability and a mandatory reason.
-- [ ] Record the override's actor, time, reason, and affected unit immutably, in the same transaction as the consumption.
+- [x] Refuse consumption of material that has not met its configured hold by default. Evidence: [b-dom-factory#9](https://github.com/BelimbingApp/b-dom-factory/pull/9). claude/claude-opus-5.5
+- [x] Allow an override only with an explicit Base Authz capability and a mandatory reason. Evidence: [b-dom-factory#9](https://github.com/BelimbingApp/b-dom-factory/pull/9), [b-dom-factory#14](https://github.com/BelimbingApp/b-dom-factory/pull/14). claude/claude-opus-5.5
+- [x] Record the override's actor, time, reason, and affected unit immutably, in the same transaction as the consumption. Evidence: [b-dom-factory#9](https://github.com/BelimbingApp/b-dom-factory/pull/9), [b-dom-factory#14](https://github.com/BelimbingApp/b-dom-factory/pull/14). claude/claude-opus-5.5
 
 Validation: a held unit is refused without the capability, and an authorised override leaves one immutable record beside its Inventory effect.
 
 #### Phase 3 — Production trace
 
-- [ ] Build trace as a read model over Inventory genealogy.
-- [ ] Show the production runs, operations, and resources associated with material ancestry.
-- [ ] Prove backward trace from output to source and forward trace from receipt to produced outputs.
+- [x] Build trace as a read model over Inventory genealogy. Evidence: [b-dom-factory#7](https://github.com/BelimbingApp/b-dom-factory/pull/7). claude/claude-opus-5.5
+- [x] Show the production runs, operations, and resources associated with material ancestry. Evidence: [b-dom-factory#7](https://github.com/BelimbingApp/b-dom-factory/pull/7). claude/claude-opus-5.5
+- [x] Prove backward trace from output to source and forward trace from receipt to produced outputs. Evidence: [b-dom-factory#7](https://github.com/BelimbingApp/b-dom-factory/pull/7). claude/claude-opus-5.5
 
 Validation: trace reads Inventory's ancestry and stores no second parent/child ledger.
 
