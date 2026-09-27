@@ -35,6 +35,7 @@ defmodule Bilimbi.Base.Grid.View do
             group: nil,
             follow: nil,
             focus: nil,
+            since: nil,
             slug: nil
 
   @type t :: %__MODULE__{
@@ -50,6 +51,7 @@ defmodule Bilimbi.Base.Grid.View do
           group: String.t() | nil,
           follow: String.t() | nil,
           focus: String.t() | nil,
+          since: Date.t() | nil,
           slug: String.t() | nil
         }
 
@@ -73,9 +75,21 @@ defmodule Bilimbi.Base.Grid.View do
       group: blank_to_nil(Map.get(params, "group")),
       follow: params |> Map.get("follow") |> blank_to_nil() |> follow_name(),
       focus: params |> Map.get("focus") |> blank_to_nil() |> focus_key(),
+      since: params |> Map.get("since") |> parse_date(),
       slug: blank_to_nil(Map.get(params, "v"))
     }
   end
+
+  defp parse_date(%Date{} = date), do: date
+
+  defp parse_date(text) when is_binary(text) do
+    case Date.from_iso8601(text) do
+      {:ok, date} -> date
+      _other -> nil
+    end
+  end
+
+  defp parse_date(_other), do: nil
 
   defp follow_name(nil), do: nil
   defp follow_name(name), do: if(Regex.match?(~r/^[a-z][a-z0-9_]*$/, name), do: name)
@@ -98,6 +112,7 @@ defmodule Bilimbi.Base.Grid.View do
     |> put_unless(:group, view.group, nil)
     |> put_unless(:follow, view.follow, nil)
     |> put_unless(:focus, view.focus, nil)
+    |> put_unless(:since, view.since && Date.to_iso8601(view.since), nil)
     |> put_unless(:v, view.slug, nil)
   end
 
@@ -114,7 +129,8 @@ defmodule Bilimbi.Base.Grid.View do
       "search" => view.search,
       "page_size" => view.page_size,
       "group" => view.group,
-      "follow" => view.follow
+      "follow" => view.follow,
+      "since" => view.since && Date.to_iso8601(view.since)
     }
   end
 
@@ -136,7 +152,8 @@ defmodule Bilimbi.Base.Grid.View do
       page: 1,
       page_size: page_size(Map.get(map, "page_size")),
       group: blank_to_nil(Map.get(map, "group")),
-      follow: map |> Map.get("follow") |> blank_to_nil() |> follow_name()
+      follow: map |> Map.get("follow") |> blank_to_nil() |> follow_name(),
+      since: map |> Map.get("since") |> parse_date()
     }
   end
 
@@ -175,6 +192,11 @@ defmodule Bilimbi.Base.Grid.View do
       view
     end
   end
+
+  @doc "The date a delta lens compares against: the view's, or thirty days ago."
+  @spec since(t()) :: Date.t()
+  def since(%__MODULE__{since: %Date{} = since}), do: since
+  def since(%__MODULE__{}), do: Date.add(Date.utc_today(), -30)
 
   @doc "Sets a column's lens; `value` drops the entry so the URL stays short."
   @spec put_lens(t(), String.t(), String.t()) :: t()

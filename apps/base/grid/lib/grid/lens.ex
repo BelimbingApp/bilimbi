@@ -1,41 +1,64 @@
 defmodule Bilimbi.Base.Grid.Lens do
   @moduledoc """
   A lens is how one column's values are shown: the raw value, a bar scaled
-  to the column's range, or a colour band. The same column can be switched
-  between the lenses its type allows; the data does not change, the reading
-  does. `:trend` is in the vocabulary for the sparkline a rollup over a
-  dated table will offer; no column offers it yet.
+  to the column's range, a colour band, a trend (the last twelve months of
+  a rollup as a sparkline), or the change since a date. The same column can
+  be switched between the lenses its type allows; the data does not change,
+  the reading does.
 
-  `cell/4` prepares one value for every mode at once: its text, its
-  position on the column's range as a number from 0 to 1, and the band
-  (0 to 4) that position falls in, so the table, the compact view and the
-  heat carpet all draw from one prepared cell.
+  `cell/5` prepares one value for every mode at once: its text, its
+  position on the column's range as a number from 0 to 1, the band (0 to 4)
+  that position falls in, the series a trend draws, and the change a delta
+  states, so the table, the compact view and the heat carpet all draw from
+  one prepared cell.
   """
 
   alias Bilimbi.Base.Grid.Column
 
-  @lenses [:value, :bar, :band, :trend]
+  @lenses [:value, :bar, :band, :trend, :delta]
   @bands 5
 
-  @type lens :: :value | :bar | :band | :trend
+  @type lens :: :value | :bar | :band | :trend | :delta
 
   @type cell :: %{
           text: String.t(),
           value: term(),
           n: float() | nil,
           band: non_neg_integer() | nil,
-          scale: :sequential | :categorical | :binary | nil
+          scale: :sequential | :categorical | :binary | nil,
+          series: [float()] | nil,
+          delta: number() | nil
         }
 
   @doc "Every lens name."
   @spec all() :: [lens()]
   def all, do: @lenses
 
-  @doc "The lenses a column's values allow."
+  @doc """
+  The lenses a column's values allow. A count or sum over a dated
+  many-link can show its trend and its change since a date; a date or
+  datetime field can show its distance from a date; anything numeric
+  scales to a bar; everything bands.
+  """
   @spec available(Column.t()) :: [lens()]
+  def available(%Column{kind: :rollup, agg: agg} = column) when agg in [:count, :sum] do
+    if dated_target?(column),
+      do: [:value, :bar, :band, :trend, :delta],
+      else: [:value, :bar, :band]
+  end
+
+  def available(%Column{kind: :field, type: type}) when type in [:date, :datetime],
+    do: [:value, :band, :delta]
+
   def available(%Column{} = column) do
     if Column.numeric?(column), do: [:value, :bar, :band], else: [:value, :band]
   end
+
+  # The many-link's target is the dated table; a tail hop's date would be
+  # another table's and is not offered.
+  defp dated_target?(%Column{many: nil}), do: false
+  defp dated_target?(%Column{tail: [], table: table}), do: not is_nil(table.time_field)
+  defp dated_target?(%Column{}), do: false
 
   @doc "The lens a column shows by default."
   @spec default(Column.t()) :: lens()
@@ -60,25 +83,81 @@ defmodule Bilimbi.Base.Grid.Lens do
   def label(:bar), do: "Bar"
   def label(:band), do: "Colour band"
   def label(:trend), do: "Trend"
+  def label(:delta), do: "Change since a date"
 
   @doc """
   Prepares one value: its text, its 0..1 position within `stats` (the
   column's `%{min, max}` over the whole set), and the band that position
   falls in. Text and enum values get a categorical band from a stable hash,
   booleans a binary one, so a colour carpet reads them too.
+
+  `extras` may carry `series` (a trend's twelve values), `before` (the
+  aggregate as of the delta date) and `since` (that date); a delta lens
+  then states the change in the text.
   """
-  @spec cell(term(), Column.t(), %{min: term(), max: term()} | nil, lens()) :: cell()
-  def cell(value, %Column{} = column, stats, _lens) do
+  @spec cell(term(), Column.t(), %{min: term(), max: term()} | nil, lens(), map()) :: cell()
+  def cell(value, %Column{} = column, stats, lens, extras \\ %{}) do
     {n, scale} = position(value, column, stats)
+    delta = delta(value, column, lens, extras)
 
     %{
-      text: text(value, column),
+      text: delta_text(text(value, column), delta, lens),
       value: value,
       n: n,
       band: band(n, scale, value),
-      scale: scale
+      scale: scale,
+      series: if(lens == :trend, do: Map.get(extras, :series)),
+      delta: delta
     }
   end
+
+  # The change: a rollup's value now against the same aggregate as of the
+  # date; a date field's distance from the date in days, after it positive.
+  defp delta(_value, _column, lens, _extras) when lens != :delta, do: nil
+
+  defp delta(value, %Column{kind: :rollup}, :delta, extras) do
+    case {to_number(value), to_number(Map.get(extras, :before))} do
+      {now, before} when is_number(now) and is_number(before) -> now - before
+      {now, nil} when is_number(now) -> now
+      _other -> nil
+    end
+  end
+
+  defp delta(value, %Column{kind: :field, type: type}, :delta, extras)
+       when type in [:date, :datetime] do
+    with %Date{} = since <- Map.get(extras, :since),
+         %Date{} = date <- to_date(value) do
+      Date.diff(date, since)
+    else
+      _other -> nil
+    end
+  end
+
+  defp delta(_value, _column, _lens, _extras), do: nil
+
+  defp delta_text(text, nil, _lens), do: text
+  defp delta_text("", _delta, _lens), do: ""
+  defp delta_text(text, delta, :delta), do: text <> " (" <> signed(delta) <> ")"
+  defp delta_text(text, _delta, _lens), do: text
+
+  defp signed(delta) when is_float(delta) do
+    rounded = Float.round(delta, 2)
+
+    if rounded == trunc(rounded),
+      do: signed(trunc(rounded)),
+      else: sign(rounded) <> :erlang.float_to_binary(abs(rounded), decimals: 2)
+  end
+
+  defp signed(delta) when is_integer(delta), do: sign(delta) <> Integer.to_string(abs(delta))
+
+  defp sign(delta) when delta < 0, do: "−"
+  defp sign(delta) when delta > 0, do: "+"
+  defp sign(_zero), do: "±"
+
+  defp to_date(%Date{} = date), do: date
+  defp to_date(%NaiveDateTime{} = naive), do: NaiveDateTime.to_date(naive)
+  defp to_date(%DateTime{} = datetime), do: DateTime.to_date(datetime)
+  defp to_date(_other), do: nil
 
   defp position(nil, _column, _stats), do: {nil, nil}
 

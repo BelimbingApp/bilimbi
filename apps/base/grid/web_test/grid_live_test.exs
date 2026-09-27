@@ -210,7 +210,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLiveTest do
     })
 
     assert_push_event(view, "grid:window", %{offset: 0, total: 3, rows: rows})
-    assert [[91, [[nil, _n, _band, :categorical], _email]], [92, _], [93, _]] = rows
+    assert [[91, [[nil, _n, _band, :categorical, nil], _email]], [92, _], [93, _]] = rows
 
     assert render_hook(view, "grid", %{"op" => "cell", "row" => 1, "col" => "email"}) =~
              "grid-canvas"
@@ -531,5 +531,57 @@ defmodule Bilimbi.Base.Grid.Web.GridLiveTest do
     |> render_submit(%{"view" => %{"roles" => ["not_here"]}})
 
     assert render(view) =~ "Choose role codes from this company."
+  end
+
+  test "a rollup over dated rows offers the trend and the change since a date", %{conn: conn} do
+    grant_capabilities!(@all)
+
+    {:ok, view, _html} =
+      conn |> log_in_as() |> live(~p"/grid/companies?cols=name%2Cusers%3Acount")
+
+    assert has_element?(view, "#grid-lens-users_count-trend")
+    assert has_element?(view, "#grid-lens-users_count-delta")
+    refute has_element?(view, "#grid-since")
+
+    view |> element("#grid-lens-users_count-trend") |> render_click()
+    assert_patch(view, ~p"/grid/companies?cols=name%2Cusers%3Acount&lens=users%3Acount%7Ctrend")
+    assert has_element?(view, "#grid-cell-73-users_count polyline[points]")
+    assert has_element?(view, "#grid-cell-73-users_count", "2")
+
+    # The fixture dates no user, and an undated row never counts as already
+    # there: date them in January so the change since a date can be read.
+    Bilimbi.Base.Repo.query!("UPDATE users SET created_at = $1", [~N[2026-01-15 09:00:00]])
+
+    view |> element("#grid-lens-users_count-delta") |> render_click()
+    assert_patch(view, ~p"/grid/companies?cols=name%2Cusers%3Acount&lens=users%3Acount%7Cdelta")
+    assert has_element?(view, "#grid-since")
+    # Thirty days ago every user already existed: no change since then.
+    assert has_element?(view, "#grid-cell-73-users_count", "2 (±0)")
+    assert has_element?(view, "#grid-cell-74-users_count", "1 (±0)")
+
+    # Since the start of the year, every user is new.
+    view |> form("#grid-filters", %{filters: %{since: "2026-01-01"}}) |> render_change()
+    path = assert_patch(view)
+    assert URI.decode_query(URI.parse(path).query)["since"] == "2026-01-01"
+    assert has_element?(view, "#grid-cell-73-users_count", "2 (+2)")
+    assert has_element?(view, "#grid-cell-74-users_count", "1 (+1)")
+
+    # The carpet window carries the series for the compact sparkline.
+    view |> element("#grid-zoom-mid") |> render_click()
+    assert_patch(view)
+    view |> element("#grid-lens-users_count-trend") |> render_click()
+    assert_patch(view)
+
+    render_hook(view, "grid", %{
+      "op" => "window",
+      "id" => "grid",
+      "offset" => 0,
+      "limit" => 50,
+      "detail" => "text"
+    })
+
+    assert_push_event(view, "grid:window", %{rows: rows})
+    assert [[73, [_name, ["2", _n, _band, :sequential, series]]], _retail] = rows
+    assert length(series) == 12 and Enum.sum(series) == 2.0
   end
 end

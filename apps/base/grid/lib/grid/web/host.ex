@@ -78,24 +78,49 @@ defmodule Bilimbi.Base.Grid.Web.Host do
   @doc "The rows `flex_table/1` takes: every cell prepared through its column's lens and the set's stats."
   @spec rows(Result.t(), View.t()) :: [%{key: term(), cells: %{String.t() => Lens.cell()}}]
   def rows(%Result{} = result, %View{} = view) do
+    since = View.since(view)
+
     Enum.map(result.rows, fn row ->
       cells =
         Map.new(result.columns, fn column ->
           value = Map.get(row.cells, column.id)
 
           {column.id,
-           Lens.cell(value, column, Map.get(result.stats, column.id), lens(view, column))}
+           Lens.cell(value, column, Map.get(result.stats, column.id), lens(view, column), %{
+             series: get_in(row, [:series, column.id]),
+             before: get_in(row, [:before, column.id]),
+             since: since
+           })}
         end)
 
       %{key: row.key, cells: cells}
     end)
   end
 
+  @doc "The columns whose lens is `lens` in the view."
+  @spec with_lens([Column.t()], View.t(), Lens.lens()) :: [Column.t()]
+  def with_lens(columns, %View{} = view, lens),
+    do: Enum.filter(columns, &(lens(view, &1) == lens))
+
+  @doc "The `:trend` and `:delta` options `Grid.query/4` and `Grid.attach/5` take for this view."
+  @spec lens_options([Column.t()], View.t()) :: keyword()
+  def lens_options(columns, %View{} = view) do
+    [
+      trend: with_lens(columns, view, :trend),
+      delta:
+        {with_lens(columns, view, :delta), NaiveDateTime.new!(View.since(view), ~T[00:00:00])}
+    ]
+  end
+
   @doc "Prepared cells for rows a page already has, from values `Grid.attach/4` returned."
   @spec attached_cells(%{term() => %{String.t() => term()}}, [Column.t()], map(), View.t()) ::
           %{term() => %{String.t() => Lens.cell()}}
   def attached_cells(values, columns, stats, %View{} = view) do
-    Map.new(values, fn {key, cells} ->
+    since = View.since(view)
+
+    Map.new(values, fn {key, attached} ->
+      cells = Map.get(attached, :cells, %{})
+
       prepared =
         Map.new(columns, fn column ->
           {column.id,
@@ -103,7 +128,12 @@ defmodule Bilimbi.Base.Grid.Web.Host do
              Map.get(cells, column.id),
              column,
              Map.get(stats, column.id),
-             lens(view, column)
+             lens(view, column),
+             %{
+               series: get_in(attached, [:series, column.id]),
+               before: get_in(attached, [:before, column.id]),
+               since: since
+             }
            )}
         end)
 
@@ -125,7 +155,7 @@ defmodule Bilimbi.Base.Grid.Web.Host do
         cells =
           Enum.map(result.columns, fn column ->
             cell = Map.fetch!(row.cells, column.id)
-            [if(detail == :text, do: cell.text), cell.n, cell.band, cell.scale]
+            [if(detail == :text, do: cell.text), cell.n, cell.band, cell.scale, cell.series]
           end)
 
         [row.key, cells]
@@ -173,8 +203,17 @@ defmodule Bilimbi.Base.Grid.Web.Host do
         cells =
           Enum.map(column_views, fn column ->
             case Map.get(row.cells, column.id) do
-              nil -> [nil, nil, nil, nil]
-              cell -> [if(detail == :text, do: cell.text), cell.n, cell.band, cell.scale]
+              nil ->
+                [nil, nil, nil, nil, nil]
+
+              cell ->
+                [
+                  if(detail == :text, do: cell.text),
+                  cell.n,
+                  cell.band,
+                  cell.scale,
+                  Map.get(cell, :series)
+                ]
             end
           end)
 

@@ -122,8 +122,16 @@ defmodule Bilimbi.Base.Grid.QueryTest do
     values = Grid.attach(ctx.catalog, ctx.orders, [102, 101, 999], columns)
 
     assert values == %{
-             101 => %{"customer-country-name" => "Malaysia", "lines_count" => 3},
-             102 => %{"customer-country-name" => "Singapore", "lines_count" => 1}
+             101 => %{
+               cells: %{"customer-country-name" => "Malaysia", "lines_count" => 3},
+               series: %{},
+               before: %{}
+             },
+             102 => %{
+               cells: %{"customer-country-name" => "Singapore", "lines_count" => 1},
+               series: %{},
+               before: %{}
+             }
            }
 
     assert Grid.attach(ctx.catalog, ctx.orders, [], columns) == %{}
@@ -194,5 +202,55 @@ defmodule Bilimbi.Base.Grid.QueryTest do
              "test/order",
              "test/customer"
            ]
+  end
+
+  test "a trend is the rollup per calendar month over the last twelve, a delta the rollup as of a date",
+       ctx do
+    {:ok, [count, total] = columns} =
+      Grid.resolve(ctx.catalog, ctx.orders, ~w(lines:count lines.qty:sum))
+
+    months = Bilimbi.Base.Grid.Query.trend_months()
+    assert length(months) == 12
+
+    result =
+      Grid.query(ctx.catalog, ctx.orders, columns,
+        trend: [count, total],
+        delta: {[count, total], ~N[2026-02-01 00:00:00]}
+      )
+
+    a = Enum.find(result.rows, &(&1.key == 101))
+    b = Enum.find(result.rows, &(&1.key == 102))
+    c = Enum.find(result.rows, &(&1.key == 103))
+
+    # Order A's three lines are all in January 2026; order B's one in February.
+    at = fn series, {year, month} ->
+      Enum.at(series, Enum.find_index(months, &(&1 == {year, month})))
+    end
+
+    assert at.(a.series["lines_count"], {2026, 1}) == 3.0
+    assert at.(a.series["lines-qty_sum"], {2026, 1}) == 6.0
+    assert Enum.sum(a.series["lines_count"]) == 3.0
+    assert at.(b.series["lines_count"], {2026, 2}) == 1.0
+    assert Enum.sum(b.series["lines_count"]) == 1.0
+    assert c.series["lines_count"] == List.duplicate(0.0, 12)
+
+    # As of 1 February, order A already had its lines and order B had none.
+    assert a.before["lines_count"] == 3 and a.before["lines-qty_sum"] == 6
+    assert b.before["lines_count"] == 0 and b.before["lines-qty_sum"] == nil
+    assert c.before["lines_count"] == 0
+
+    # Neither is asked for: the plain shape stays.
+    plain = Grid.query(ctx.catalog, ctx.orders, columns)
+    assert hd(plain.rows).series == %{} and hd(plain.rows).before == %{}
+
+    # A window through attach carries them too.
+    attached =
+      Grid.attach(ctx.catalog, ctx.orders, [102], columns,
+        trend: [count],
+        delta: {[count], ~N[2026-03-01 00:00:00]}
+      )
+
+    assert attached[102].before["lines_count"] == 1
+    assert Enum.sum(attached[102].series["lines_count"]) == 1.0
   end
 end

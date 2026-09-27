@@ -194,7 +194,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
           row.key,
           Enum.map(state.columns, fn column ->
             cell = Map.fetch!(row.cells, column.id)
-            [cell.text, cell.n, cell.band, cell.scale]
+            [cell.text, cell.n, cell.band, cell.scale, nil]
           end)
         ]
       end)
@@ -413,7 +413,8 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
 
   defp number(_other), do: nil
 
-  defp cell(nil, _column, _stats), do: %{text: "", value: nil, n: nil, band: nil, scale: nil}
+  defp cell(nil, _column, _stats),
+    do: %{text: "", value: nil, n: nil, band: nil, scale: nil, series: nil, delta: nil}
 
   defp cell(value, column, stats) do
     {n, scale} =
@@ -428,7 +429,7 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
       end
 
     band = if scale == :sequential, do: min(trunc(n * 5), 4), else: round(n * 7)
-    %{text: text(value), value: value, n: n, band: band, scale: scale}
+    %{text: text(value), value: value, n: n, band: band, scale: scale, series: nil, delta: nil}
   end
 
   defp text(float) when is_float(float), do: :erlang.float_to_binary(float, decimals: 2)

@@ -61,7 +61,10 @@ defmodule Bilimbi.Base.Grid do
   Options: `:offset` and `:limit` (at most #{@max_limit}) choose the window,
   `:sort` a `{column, :asc | :desc}` pair, `:search` text matched against the
   root's searchable fields, `:focus` a `{:root | column, key}` pair that keeps
-  only the rows reaching one record (see `focus_column/3`), and `:stats`,
+  only the rows reaching one record (see `focus_column/3`), `:trend` the
+  rollup columns whose last twelve months come back as a `series`, `:delta`
+  a `{columns, since}` pair whose aggregate as of `since` comes back as
+  `before`, and `:stats`,
   `:cost` and `:count` (each default
   true) switch the extra statements off when a caller does not show them or
   already holds the total; with `count: false` the result's `total_entries`
@@ -74,7 +77,13 @@ defmodule Bilimbi.Base.Grid do
     {sort_column, dir} = Keyword.get(opts, :sort, {nil, :asc})
 
     focus = Keyword.get(opts, :focus)
-    plan = Query.plan(catalog, root, columns, extra: focus_columns(focus))
+
+    plan =
+      Query.plan(catalog, root, columns,
+        extra: focus_columns(focus),
+        trend: Keyword.get(opts, :trend, []),
+        delta: Keyword.get(opts, :delta)
+      )
 
     base =
       plan.query
@@ -90,7 +99,7 @@ defmodule Bilimbi.Base.Grid do
 
     %Result{
       columns: columns,
-      rows: rows_query |> Repo.all() |> Query.rows(columns),
+      rows: rows_query |> Repo.all() |> Query.rows(plan),
       total_entries:
         if(Keyword.get(opts, :count, true),
           do: Query.count(base, plan),
@@ -176,20 +185,25 @@ defmodule Bilimbi.Base.Grid do
   A page that already lists rows of its own uses this to add the columns a
   person walked to, without giving up its own query, filters or sort.
   """
-  @spec attach(Catalog.t(), Table.t(), [term()], [Column.t()]) ::
-          %{term() => %{String.t() => term()}}
-  def attach(%Catalog{}, %Table{}, [], _columns), do: %{}
-  def attach(%Catalog{}, %Table{}, _keys, []), do: %{}
+  @spec attach(Catalog.t(), Table.t(), [term()], [Column.t()], keyword()) ::
+          %{term() => %{cells: map(), series: map(), before: map()}}
+  def attach(catalog, root, keys, columns, opts \\ [])
+  def attach(%Catalog{}, %Table{}, [], _columns, _opts), do: %{}
+  def attach(%Catalog{}, %Table{}, _keys, [], _opts), do: %{}
 
-  def attach(%Catalog{} = catalog, %Table{} = root, keys, columns) when is_list(keys) do
-    plan = Query.plan(catalog, root, columns)
+  def attach(%Catalog{} = catalog, %Table{} = root, keys, columns, opts) when is_list(keys) do
+    plan =
+      Query.plan(catalog, root, columns,
+        trend: Keyword.get(opts, :trend, []),
+        delta: Keyword.get(opts, :delta)
+      )
 
     plan.query
     |> Query.with_keys(plan, keys)
     |> Query.select_rows(plan)
     |> Repo.all()
-    |> Query.rows(columns)
-    |> Map.new(&{&1.key, &1.cells})
+    |> Query.rows(plan)
+    |> Map.new(&{&1.key, Map.take(&1, [:cells, :series, :before])})
   end
 
   @doc "The value range of numeric `columns` over every root row, for scaling bars and colours."

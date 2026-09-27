@@ -42,6 +42,14 @@ defmodule Bilimbi.Base.Grid.Query do
   def plan(%Catalog{scope: scope} = catalog, %Table{} = root, selected, opts \\ [])
       when is_list(selected) do
     columns = selected ++ Keyword.get(opts, :extra, [])
+    indexed = Enum.with_index(columns)
+    trend_indexes = indexes_of(indexed, Keyword.get(opts, :trend, []))
+
+    {delta_indexes, since} =
+      case Keyword.get(opts, :delta) do
+        {delta_columns, %NaiveDateTime{} = since} -> {indexes_of(indexed, delta_columns), since}
+        _none -> {[], nil}
+      end
 
     if length(columns) > @max_columns do
       raise ArgumentError, "a grid holds at most #{@max_columns} columns"
@@ -55,7 +63,9 @@ defmodule Bilimbi.Base.Grid.Query do
       tables: %{[] => root},
       next: 1,
       scope: scope,
-      catalog: catalog
+      catalog: catalog,
+      delta_indexes: delta_indexes,
+      since: since
     }
 
     state =
@@ -73,10 +83,13 @@ defmodule Bilimbi.Base.Grid.Query do
       |> Enum.sort_by(fn {group_key, _members} -> group_key end)
       |> Enum.reduce({state, %{}}, &join_rollup/2)
 
+    {state, trend_bindings} =
+      indexed
+      |> Enum.filter(fn {_column, index} -> index in trend_indexes end)
+      |> Enum.reduce({state, %{}}, &join_trend/2)
+
     selects =
-      columns
-      |> Enum.with_index()
-      |> Map.new(fn {column, index} ->
+      Map.new(indexed, fn {column, index} ->
         {column, select_expr(column, index, state, rollup_bindings)}
       end)
 
@@ -87,8 +100,14 @@ defmodule Bilimbi.Base.Grid.Query do
       selects: selects,
       key: dynamic([root: r], field(r, ^key_column)),
       key_column: key_column,
-      columns: selected
+      columns: selected,
+      trends: Map.new(trend_indexes, &{&1, trend_expr(&1, trend_bindings)}),
+      deltas: Map.new(delta_indexes, &{&1, delta_expr(Enum.at(columns, &1), &1, rollup_bindings)})
     }
+  end
+
+  defp indexes_of(indexed, wanted) do
+    for {column, index} <- indexed, column in wanted, column.kind == :rollup, do: index
   end
 
   @doc """
@@ -209,6 +228,17 @@ defmodule Bilimbi.Base.Grid.Query do
     aggregates =
       Map.new(members, fn {column, index} ->
         {:"c#{index}", aggregate_expr(column, inner_state)}
+      end)
+
+    # A change-since-a-date lens wants the same aggregate over the rows
+    # that already existed at the date: the aggregate with a FILTER, in
+    # the same grouped subquery, so the two never disagree.
+    aggregates =
+      Enum.reduce(members, aggregates, fn {column, index}, acc ->
+        if index in state.delta_indexes and target.time_field,
+          do:
+            Map.put(acc, :"d#{index}", aggregate_before(column, inner_state, target, state.since)),
+          else: acc
       end)
 
     inner =
@@ -342,6 +372,129 @@ defmodule Bilimbi.Base.Grid.Query do
     end
   end
 
+  # The aggregate as it stood at `since`: only rows the target dated before it.
+  defp aggregate_before(%Column{agg: :count}, _inner_state, target, since) do
+    key = Table.key_field(target).column
+    time = Map.fetch!(target.fields, target.time_field).column
+    dynamic([t0: t], count(field(t, ^key)) |> filter(field(t, ^time) < ^since))
+  end
+
+  defp aggregate_before(%Column{agg: :sum, field: field, tail: tail}, inner_state, target, since) do
+    binding = Map.fetch!(inner_state.bindings, link_ids(tail))
+    column = field.column
+    time = Map.fetch!(target.fields, target.time_field).column
+
+    dynamic(
+      [{^binding, t}, t0: t0],
+      sum(field(t, ^column)) |> filter(field(t0, ^time) < ^since)
+    )
+  end
+
+  defp aggregate_before(%Column{agg: agg}, _inner_state, _target, _since),
+    do: raise(ArgumentError, "a change since a date is only known for count and sum, not #{agg}")
+
+  # A trend is the same aggregate per calendar month over the last twelve:
+  # a subquery grouped by parent key and month, folded into two ordered
+  # arrays per parent, joined like a rollup.
+  defp join_trend({%Column{kind: :rollup, agg: agg} = column, index}, {state, trend_bindings})
+       when agg in [:count, :sum] do
+    hop_ids = link_ids(column.hops)
+    parent = Map.fetch!(state.bindings, hop_ids)
+    parent_table = Map.fetch!(state.tables, hop_ids)
+    %Link{} = many = column.many
+    target = target_table!(many, state)
+
+    case target.time_field do
+      nil ->
+        {state, trend_bindings}
+
+      time_field ->
+        time = Map.fetch!(target.fields, time_field).column
+        binding = :"s#{state.next}"
+
+        {inner, key_expr, inner_state} =
+          rollup_base(many, parent_table, target, state.scope, state.catalog)
+
+        {inner, inner_state} =
+          column.tail
+          |> prefixes()
+          |> Enum.sort_by(&length/1)
+          |> Enum.reduce({inner, inner_state}, &join_tail/2)
+
+        start = NaiveDateTime.new!(months_ago(12), ~T[00:00:00])
+        month = dynamic([t0: t], fragment("date_trunc('month', ?)", field(t, ^time)))
+        value = aggregate_expr(column, inner_state)
+
+        by_month =
+          inner
+          |> where([t0: t], field(t, ^time) >= ^start)
+          |> group_by(^[key_expr, month])
+          |> select(^%{key: key_expr, month: month, value: value})
+
+        folded =
+          from(s in subquery(by_month),
+            group_by: s.key,
+            select: %{
+              key: s.key,
+              months: fragment("array_agg(? ORDER BY ?)", s.month, s.month),
+              values: fragment("array_agg(?::float ORDER BY ?)", s.value, s.month)
+            }
+          )
+
+        parent_join_column =
+          case many.on do
+            {from_field, _to_field} -> Map.fetch!(parent_table.fields, from_field).column
+            nil -> Table.key_field(parent_table).column
+          end
+
+        query =
+          join(state.query, :left, [{^parent, p}], s in subquery(folded),
+            as: ^binding,
+            on: field(p, ^parent_join_column) == s.key
+          )
+
+        {%{state | query: query, next: state.next + 1}, Map.put(trend_bindings, index, binding)}
+    end
+  end
+
+  defp join_trend(_other, acc), do: acc
+
+  defp trend_expr(index, trend_bindings) do
+    case Map.fetch(trend_bindings, index) do
+      {:ok, binding} -> {dynamic([{^binding, s}], s.months), dynamic([{^binding, s}], s.values)}
+      :error -> nil
+    end
+  end
+
+  defp delta_expr(%Column{agg: :count}, index, rollups) do
+    binding = Map.fetch!(rollups, index)
+    name = :"d#{index}"
+    dynamic([{^binding, r}], coalesce(field(r, ^name), 0))
+  end
+
+  defp delta_expr(%Column{}, index, rollups) do
+    binding = Map.fetch!(rollups, index)
+    name = :"d#{index}"
+    dynamic([{^binding, r}], field(r, ^name))
+  end
+
+  @doc "The first day of the month `count` months before this one."
+  @spec months_ago(non_neg_integer()) :: Date.t()
+  def months_ago(count) do
+    today = Date.utc_today()
+    total = today.year * 12 + (today.month - 1) - count
+    Date.new!(div(total, 12), rem(total, 12) + 1, 1)
+  end
+
+  @doc "The last twelve calendar months, oldest first, as `{year, month}` pairs."
+  @spec trend_months() :: [{pos_integer(), pos_integer()}]
+  def trend_months do
+    for i <- 11..0//-1 do
+      date = months_ago(i)
+      {date.year, date.month}
+    end
+  end
+
   defp select_expr(%Column{kind: :field} = column, _index, state, _rollups) do
     binding = Map.fetch!(state.bindings, link_ids(column.hops))
     dynamic([{^binding, t}], field(t, ^column.field.column))
@@ -374,15 +527,30 @@ defmodule Bilimbi.Base.Grid.Query do
 
   @doc "`query` (the plan's statement, perhaps filtered) selecting the key and every column by index."
   @spec select_rows(Ecto.Query.t(), plan()) :: Ecto.Query.t()
-  def select_rows(query, %{selects: selects, key: key, columns: columns}) do
+  def select_rows(query, %{selects: selects, key: key, columns: columns} = plan) do
     cells =
       columns
       |> Enum.with_index()
       |> Map.new(fn {column, index} -> {:"c#{index}", Map.fetch!(selects, column)} end)
 
+    extras =
+      Enum.reduce(Map.get(plan, :trends, %{}), %{}, fn
+        {index, {months, values}}, acc ->
+          acc |> Map.put(:"m#{index}", months) |> Map.put(:"v#{index}", values)
+
+        {_index, nil}, acc ->
+          acc
+      end)
+
+    extras =
+      Enum.reduce(Map.get(plan, :deltas, %{}), extras, fn {index, expr}, acc ->
+        Map.put(acc, :"d#{index}", expr)
+      end)
+
     query
     |> select(^%{key: key})
     |> select_merge(^cells)
+    |> select_merge(^extras)
   end
 
   @doc "Orders by a column, or by the key when `column` is nil, always tie-broken by key."
@@ -491,14 +659,47 @@ defmodule Bilimbi.Base.Grid.Query do
 
   defp ensure_float(text), do: if(String.contains?(text, "."), do: text, else: text <> ".0")
 
-  @doc "Turns selected maps into rows of `%{key, cells}` keyed by column id."
-  @spec rows([map()], [Column.t()]) :: [%{key: term(), cells: %{String.t() => term()}}]
-  def rows(selected, columns) do
+  @doc """
+  Turns selected maps into rows of `%{key, cells, series, before}` keyed by
+  column id: `series` the trend of the last twelve months for the trend
+  columns, `before` the aggregate as of the date for the delta columns.
+  """
+  @spec rows([map()], plan()) :: [
+          %{key: term(), cells: %{String.t() => term()}, series: map(), before: map()}
+        ]
+  def rows(selected, %{columns: columns} = plan) do
     indexed = Enum.with_index(columns)
+    trends = plan |> Map.get(:trends, %{}) |> Enum.reject(fn {_index, expr} -> is_nil(expr) end)
+    deltas = Map.get(plan, :deltas, %{})
+    months = trend_months()
 
     Enum.map(selected, fn row ->
       cells = Map.new(indexed, fn {column, index} -> {column.id, Map.get(row, :"c#{index}")} end)
-      %{key: row.key, cells: cells}
+
+      series =
+        Map.new(trends, fn {index, _expr} ->
+          {Enum.at(columns, index).id,
+           series(months, Map.get(row, :"m#{index}"), Map.get(row, :"v#{index}"))}
+        end)
+
+      before =
+        Map.new(deltas, fn {index, _expr} ->
+          {Enum.at(columns, index).id, Map.get(row, :"d#{index}")}
+        end)
+
+      %{key: row.key, cells: cells, series: series, before: before}
     end)
   end
+
+  # The twelve months in order, a month with no rows counting zero.
+  defp series(months, db_months, db_values) when is_list(db_months) and is_list(db_values) do
+    lookup =
+      db_months
+      |> Enum.zip(db_values)
+      |> Map.new(fn {month, value} -> {{month.year, month.month}, value * 1.0} end)
+
+    Enum.map(months, &Map.get(lookup, &1, 0.0))
+  end
+
+  defp series(months, _db_months, _db_values), do: Enum.map(months, fn _month -> 0.0 end)
 end

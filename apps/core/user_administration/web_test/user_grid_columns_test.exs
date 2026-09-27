@@ -128,7 +128,13 @@ defmodule Bilimbi.Core.UserAdministration.Web.GridColumnsTest do
 
     assert_push_event(view, "users:window", %{total: 2, rows: rows})
 
-    assert [[91, [["Ada Lovelace", nil, nil, nil], ["ada@example.com", nil, nil, nil]]], [92, _]] =
+    assert [
+             [
+               91,
+               [["Ada Lovelace", nil, nil, nil, nil], ["ada@example.com", nil, nil, nil, nil]]
+             ],
+             [92, _]
+           ] =
              rows
   end
 
