@@ -418,14 +418,12 @@ defmodule Bilimbi.Base.UI.Web.DesignLibraryFlexSample do
 
   defp cell(value, column, stats) do
     {n, scale} =
-      cond do
-        column.type in [:integer, :float, :decimal, :datetime, :date] and is_map(stats) ->
-          v = number(value)
-          span = stats.max - stats.min
-          {if(span == 0, do: 0.5, else: (v - stats.min) / span), :sequential}
-
-        true ->
-          {:erlang.phash2(to_string(value), 8) / 7, :categorical}
+      if column.type in [:integer, :float, :decimal, :datetime, :date] and is_map(stats) do
+        v = number(value)
+        span = stats.max - stats.min
+        {if(span == 0, do: 0.5, else: (v - stats.min) / span), :sequential}
+      else
+        {:erlang.phash2(to_string(value), 8) / 7, :categorical}
       end
 
     band = if scale == :sequential, do: min(trunc(n * 5), 4), else: round(n * 7)

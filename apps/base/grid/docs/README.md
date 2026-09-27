@@ -48,10 +48,9 @@ table. `Bilimbi.Base.Grid.Zoom` fixes the bands (row height at most 6 px is
 the carpet, at most 20 px compact, above that the table) and
 `Bilimbi.Base.Grid.Lens` prepares a cell for every mode at once: text, its
 position on the column's range, and the band that position falls in.
-Lenses are `value`, `bar` and `band`; `trend` is reserved.
 
-`Bilimbi.Base.Grid.View` is the whole state of a grid and lives in the URL
-(`cols`, `lens`, `z`, `sort`, `dir`, `q`, `page`, `per_page`, `group`, `v`).
+`Bilimbi.Base.Grid.View` is the whole state of a grid and lives in the URL;
+its module doc lists the keys, and `v` names a saved view.
 `Bilimbi.Base.Grid.Web.GridLive` is `/grid` and `/grid/:table`.
 `Bilimbi.Base.Grid.Web.PageColumns` lets a list page keep its own query
 and gain walked columns; the users and companies lists use it.
@@ -65,7 +64,10 @@ it is not a GROUP BY. Dragging a heading onto the group corner groups, and
 onto the pivot corner pivots a grouped grid: `Grid.pivot/5` counts root rows
 per pair of values in one GROUP BY statement, the grouped column's values
 as rows and the pivoted column's values (the first 24 by name, the rest
-folded into "Other") as columns, with a total. Dragging a chip or a
+folded into "Other") as columns, with a total, after a first column that
+names each row. It reads a bounded number of pairs; a row the bound cut
+short is left out, never shown with a partial total, and the page says the
+pivot is truncated. Dragging a chip or a
 heading onto another reorders.
 
 Lenses are `value`, `bar`, `band`, and, for a count or sum over a dated
