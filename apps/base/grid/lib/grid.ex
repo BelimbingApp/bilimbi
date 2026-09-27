@@ -17,6 +17,7 @@ defmodule Bilimbi.Base.Grid do
 
   alias Bilimbi.Base.Grid.Catalog
   alias Bilimbi.Base.Grid.Column
+  alias Bilimbi.Base.Grid.Lens
   alias Bilimbi.Base.Grid.Query
   alias Bilimbi.Base.Grid.Result
   alias Bilimbi.Base.Grid.Table
@@ -315,6 +316,101 @@ defmodule Bilimbi.Base.Grid do
       {:ok, table} -> table
       :error -> raise ArgumentError, "table #{inspect(id)} is not in this catalog"
     end
+  end
+
+  @max_pivot_values 24
+
+  @doc """
+  Pivots the grid: one row per distinct value of `rows_column`, one column
+  per distinct value of `across_column` (the first #{@max_pivot_values} by
+  name, the rest folded into "Other"), each cell the number of root rows
+  with both values, plus a total. One GROUP BY statement over the same
+  joined plan; `:search` and `:focus` narrow it as they narrow the grid.
+  The result's columns are plain component column maps, its rows keyed by
+  the row value's text, its stats over every cell so a band or a bar
+  scales to the whole pivot.
+  """
+  @spec pivot(Catalog.t(), Table.t(), Column.t(), Column.t(), keyword()) :: %{
+          columns: [map()],
+          rows: [%{key: String.t(), cells: %{String.t() => term()}}],
+          total_entries: non_neg_integer(),
+          stats: %{String.t() => %{min: term(), max: term()}},
+          more: non_neg_integer()
+        }
+  def pivot(%Catalog{} = catalog, %Table{} = root, %Column{} = rows_column, %Column{} = across_column, opts \\ []) do
+    focus = Keyword.get(opts, :focus)
+    plan = Query.plan(catalog, root, [rows_column, across_column], extra: focus_columns(focus))
+
+    base =
+      plan.query
+      |> Query.search(root, Keyword.get(opts, :search))
+      |> focus_rows(plan, focus)
+
+    triples = Query.pivot_counts(base, plan, rows_column, across_column)
+
+    across_values =
+      triples |> Enum.map(&Lens.text(&1.across, across_column)) |> Enum.uniq() |> Enum.sort()
+
+    {shown, folded} = Enum.split(across_values, @max_pivot_values)
+    other? = folded != []
+
+    columns =
+      Enum.with_index(shown, fn value, index ->
+        pivot_column("pv-#{index}", if(value == "", do: "—", else: value), across_column)
+      end) ++
+        if(other?, do: [pivot_column("pv-other", "Other", across_column)], else: []) ++
+        [pivot_column("pv-total", "Total", across_column)]
+
+    index_of = shown |> Enum.with_index() |> Map.new(fn {value, index} -> {value, "pv-#{index}"} end)
+
+    rows =
+      triples
+      |> Enum.group_by(&Lens.text(&1.rows, rows_column))
+      |> Enum.map(fn {row_text, group} ->
+        counts =
+          Enum.reduce(group, %{}, fn triple, acc ->
+            id = Map.get(index_of, Lens.text(triple.across, across_column), "pv-other")
+            Map.update(acc, id, triple.count, &(&1 + triple.count))
+          end)
+
+        cells =
+          columns
+          |> Enum.map(& &1.id)
+          |> Map.new(fn
+            "pv-total" -> {"pv-total", counts |> Map.values() |> Enum.sum()}
+            id -> {id, Map.get(counts, id, 0)}
+          end)
+
+        %{key: if(row_text == "", do: "—", else: row_text), cells: cells}
+      end)
+      |> Enum.sort_by(& &1.key)
+
+    values = rows |> Enum.flat_map(&Map.values(&1.cells)) |> Enum.reject(&is_nil/1)
+    range = if values == [], do: nil, else: %{min: Enum.min(values), max: Enum.max(values)}
+
+    %{
+      columns: columns,
+      rows: rows,
+      total_entries: length(rows),
+      stats: Map.new(columns, &{&1.id, range}),
+      more: length(folded)
+    }
+  end
+
+  defp pivot_column(id, label, %Column{} = across) do
+    %{
+      id: id,
+      spec: id,
+      label: "#{across.label}: #{label}",
+      short_label: label,
+      type: :integer,
+      kind: :field,
+      lens: :value,
+      lenses: [:value, :bar, :band],
+      sortable: false,
+      removable: false,
+      align: :right
+    }
   end
 
   @doc "The largest window `query/4` serves."

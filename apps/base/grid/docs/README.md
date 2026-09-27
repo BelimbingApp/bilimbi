@@ -61,15 +61,31 @@ a saved view opens at `/grid/<table>?v=<slug>` (or `v=shared:<slug>`),
 and the same address opens in a workspace tile.
 
 Grouping sorts by the grouped column and heads each run of equal values;
-it is not a GROUP BY. Dragging a heading onto the drop zone groups;
-dragging a chip or a heading onto another reorders.
+it is not a GROUP BY. Dragging a heading onto the group corner groups, and
+onto the pivot corner pivots a grouped grid: `Grid.pivot/5` counts root rows
+per pair of values in one GROUP BY statement, the grouped column's values
+as rows and the pivoted column's values (the first 24 by name, the rest
+folded into "Other") as columns, with a total. Dragging a chip or a
+heading onto another reorders.
+
+Lenses are `value`, `bar`, `band`, and, for a count or sum over a dated
+many-link, `trend` (the aggregate per calendar month over the last twelve,
+a sparkline) and `delta` (the aggregate as of a date, through a FILTER in
+the same grouped subquery; a date field reads its distance from the date).
+The date lives in the view.
+
+Inside a tiled workspace a grid can follow what another tile selects: a
+table declares the module kind whose facts name its rows (`record_kind`),
+the page tells the workspace the kinds it follows itself
+(`Bilimbi.Base.UI.Workspace.follow/2`), and a selection narrows the grid
+to the rows reaching that record, kept in the address as `follow` and
+`focus`. Shared views may be limited to role codes, as shared workspace
+layouts are.
 
 ## What remains
 
-- A pivot (rows by a second column's values) and a cross-tile join drag.
-- The `trend` lens: per-period counts over a dated many-link as a
-  sparkline, and a change-since-a-date lens.
-- Server-side grouping with per-group aggregates.
+- In-cell editing at full zoom: the table shows full text but does not edit.
+- Cross-tile join by drag.
+- Server-side grouping with per-group aggregates beyond the pivot's counts.
 - Per-column filters beyond the root text search.
-- Refiltering following tiles from a grid's follow channel.
 - Base Authz tables (roles, grants) in the catalog.

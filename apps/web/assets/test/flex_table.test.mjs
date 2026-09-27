@@ -20,6 +20,7 @@ function table(mode, zoom) {
         </ul>
         <form id="grid-add-column"><input id="grid-add-column-input" name="add" type="search" /></form>
         <div id="grid-group-zone" data-group-zone class="hidden">Drop a column here to group by it</div>
+        <div id="grid-pivot-zone" data-pivot-zone class="hidden">Drop a column here to pivot by it</div>
       </div>
       <div id="grid-viewport" data-viewport tabindex="0">
         ${
@@ -76,6 +77,19 @@ test("dropping a heading on the group zone pushes a group", () => {
   zone.dispatchEvent(Object.assign(new Event("dragover", {bubbles: true, cancelable: true}), {dataTransfer, clientX: 0}))
   zone.dispatchEvent(Object.assign(new Event("drop", {bubbles: true, cancelable: true}), {dataTransfer, clientX: 0}))
   assert.deepEqual(control.pushes.at(-1).payload, {op: "group", spec: "users:count"})
+})
+
+test("dropping a heading on the pivot corner pushes a pivot", () => {
+  const el = render(table("full", 28), "grid")
+  control = mountHook(FlexTable, el)
+  const heading = document.getElementById("grid-head-code")
+  const dataTransfer = {data: {}, setData(k, v) { this.data[k] = v }, effectAllowed: "", dropEffect: ""}
+  heading.dispatchEvent(Object.assign(new Event("dragstart", {bubbles: true}), {dataTransfer}))
+  const zone = document.getElementById("grid-pivot-zone")
+  zone.dispatchEvent(Object.assign(new Event("dragover", {bubbles: true, cancelable: true}), {dataTransfer, clientX: 0}))
+  assert.equal(zone.dataset.drop, "pivot")
+  zone.dispatchEvent(Object.assign(new Event("drop", {bubbles: true, cancelable: true}), {dataTransfer, clientX: 0}))
+  assert.deepEqual(control.pushes.at(-1).payload, {op: "pivot", spec: "code"})
 })
 
 test("Ctrl+wheel and the plus and minus keys zoom", () => {

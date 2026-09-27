@@ -665,10 +665,17 @@ dragged rectangle zooms so that it fills the viewport, back to the table
 when it is small. A hover on the canvas reads the cell's real value, and
 only the visible window is ever queried or drawn. The URL holds the whole
 view, so a reload or a shared link reopens the same grid, and a view can
-be saved under a name, shared with the company, and opened in a workspace
-tile. A grouped table sorts by the grouped column and heads each run of
-equal values with the value and its count. A heavy statement says so in the
-toolbar with the planner's estimate; nothing is refused.
+be saved under a name, shared with the company or limited to its roles,
+and opened in a workspace tile. A grouped table sorts by the grouped column
+and heads each run of equal values with the value and its count; a heading
+dropped in the pivot corner turns a grouped table into a pivot, the grouped
+values as rows and the dropped column's values as counted columns with a
+total. A count or sum over dated rows reads as a trend (twelve months as a
+sparkline) or as the change since a date, the date beside the search while
+that lens is on. Inside a workspace a grid can follow another tile's
+selection and narrows to the rows reaching it, saying so with the way back.
+A heavy statement says so in the toolbar with the planner's estimate;
+nothing is refused.
 
 ### Navigation menu conventions
 

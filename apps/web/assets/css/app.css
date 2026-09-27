@@ -564,3 +564,4 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
 .flex-table [data-drop='before'] { box-shadow: inset 2px 0 0 var(--color-brand-strong); }
 .flex-table [data-drop='after'] { box-shadow: inset -2px 0 0 var(--color-brand-strong); }
 .flex-table[data-drag-active='true'] [data-group-zone] { display: flex; }
+.flex-table[data-drag-active='true'] [data-pivot-zone] { display: flex; }

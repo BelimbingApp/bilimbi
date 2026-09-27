@@ -642,6 +642,23 @@ defmodule Bilimbi.Base.Grid.Query do
     end
   end
 
+  @doc "The root rows counted per pair of values of two columns, in one GROUP BY."
+  @spec pivot_counts(Ecto.Query.t(), plan(), Column.t(), Column.t()) ::
+          [%{rows: term(), across: term(), count: non_neg_integer()}]
+  def pivot_counts(query, %{selects: selects, key_column: key_column}, rows_column, across_column) do
+    rows_expr = Map.fetch!(selects, rows_column)
+    across_expr = Map.fetch!(selects, across_column)
+
+    query
+    |> exclude(:order_by)
+    |> exclude(:limit)
+    |> exclude(:offset)
+    |> group_by(^[rows_expr, across_expr])
+    |> select(^%{rows: rows_expr, across: across_expr})
+    |> select_merge([root: r], %{count: count(field(r, ^key_column))})
+    |> Repo.all()
+  end
+
   @doc "PostgreSQL's estimated total cost for the statement, from EXPLAIN."
   @spec estimated_cost(Ecto.Query.t()) :: float() | nil
   def estimated_cost(query) do

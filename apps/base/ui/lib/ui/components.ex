@@ -3997,6 +3997,7 @@ defmodule Bilimbi.Base.UI.Components do
   )
 
   attr(:group, :string, default: nil, doc: "the spec the rows are grouped by, if any")
+  attr(:pivot, :string, default: nil, doc: "the spec whose values are the columns, if pivoted")
   attr(:caption, :string, default: nil, doc: "sr-only caption naming the table")
 
   attr(:row_id, :any,
@@ -4211,12 +4212,34 @@ defmodule Bilimbi.Base.UI.Components do
             phx-value-spec=""
           />
         </p>
+        <p :if={@pivot} id={"#{@id}-pivoted"} class="flex items-center gap-1 text-xs text-ink-muted">
+          {gettext("Pivoted by %{column}", column: @pivot)}
+          <.icon_button
+            icon="close"
+            context={:inline}
+            label={gettext("Stop pivoting")}
+            id={"#{@id}-unpivot"}
+            phx-click={@event}
+            phx-target={@target}
+            phx-value-op="pivot"
+            phx-value-spec=""
+          />
+        </p>
         <div
           id={"#{@id}-group-zone"}
           data-group-zone
           class="hidden h-7 items-center rounded-md border border-dashed border-high-contrast-line px-2 text-xs text-ink-muted"
         >
           {gettext("Drop a column here to group by it")}
+        </div>
+        <div
+          id={"#{@id}-pivot-zone"}
+          data-pivot-zone
+          class="hidden h-7 items-center rounded-md border border-dashed border-high-contrast-line px-2 text-xs text-ink-muted"
+        >
+          {if @group,
+            do: gettext("Drop a column here to pivot by it"),
+            else: gettext("Drop here to group first; the next drop pivots")}
         </div>
       </div>
       <div

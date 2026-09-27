@@ -33,6 +33,7 @@ defmodule Bilimbi.Base.Grid.View do
             page: 1,
             page_size: 25,
             group: nil,
+            pivot: nil,
             follow: nil,
             focus: nil,
             since: nil,
@@ -49,6 +50,7 @@ defmodule Bilimbi.Base.Grid.View do
           page: pos_integer(),
           page_size: pos_integer(),
           group: String.t() | nil,
+          pivot: String.t() | nil,
           follow: String.t() | nil,
           focus: String.t() | nil,
           since: Date.t() | nil,
@@ -73,6 +75,7 @@ defmodule Bilimbi.Base.Grid.View do
       page: positive(Map.get(params, "page"), 1),
       page_size: page_size(Map.get(params, "per_page")),
       group: blank_to_nil(Map.get(params, "group")),
+      pivot: blank_to_nil(Map.get(params, "pivot")),
       follow: params |> Map.get("follow") |> blank_to_nil() |> follow_name(),
       focus: params |> Map.get("focus") |> blank_to_nil() |> focus_key(),
       since: params |> Map.get("since") |> parse_date(),
@@ -110,6 +113,7 @@ defmodule Bilimbi.Base.Grid.View do
     |> put_unless(:page, view.page, 1)
     |> put_unless(:per_page, view.page_size, 25)
     |> put_unless(:group, view.group, nil)
+    |> put_unless(:pivot, view.pivot, nil)
     |> put_unless(:follow, view.follow, nil)
     |> put_unless(:focus, view.focus, nil)
     |> put_unless(:since, view.since && Date.to_iso8601(view.since), nil)
@@ -129,6 +133,7 @@ defmodule Bilimbi.Base.Grid.View do
       "search" => view.search,
       "page_size" => view.page_size,
       "group" => view.group,
+      "pivot" => view.pivot,
       "follow" => view.follow,
       "since" => view.since && Date.to_iso8601(view.since)
     }
@@ -152,6 +157,7 @@ defmodule Bilimbi.Base.Grid.View do
       page: 1,
       page_size: page_size(Map.get(map, "page_size")),
       group: blank_to_nil(Map.get(map, "group")),
+      pivot: blank_to_nil(Map.get(map, "pivot")),
       follow: map |> Map.get("follow") |> blank_to_nil() |> follow_name(),
       since: map |> Map.get("since") |> parse_date()
     }
@@ -171,7 +177,8 @@ defmodule Bilimbi.Base.Grid.View do
       | columns: List.delete(view.columns, spec),
         lenses: Map.delete(view.lenses, spec),
         sort: if(view.sort == spec, do: nil, else: view.sort),
-        group: if(view.group == spec, do: nil, else: view.group)
+        group: if(view.group == spec, do: nil, else: view.group),
+        pivot: if(view.pivot == spec, do: nil, else: view.pivot)
     }
   end
 

@@ -141,14 +141,14 @@ const FlexTable = {
 
   dragOver(event) {
     if (!this.drag) return
-    const zone = event.target.closest("[data-group-zone]")
+    const zone = event.target.closest("[data-group-zone], [data-pivot-zone]")
     const over = event.target.closest("[data-chip], [data-header]")
     if (!zone && !over) return
     event.preventDefault()
     event.dataTransfer.dropEffect = "move"
     this.clearDropMarks()
     if (zone) {
-      zone.dataset.drop = "group"
+      zone.dataset.drop = zone.hasAttribute("data-pivot-zone") ? "pivot" : "group"
     } else if (over) {
       const spec = over.dataset.chip || over.dataset.header
       if (spec !== this.drag.spec) over.dataset.drop = this.before(event, over) ? "before" : "after"
@@ -156,18 +156,18 @@ const FlexTable = {
   },
 
   dragLeave(event) {
-    const left = event.target.closest && event.target.closest("[data-chip], [data-header], [data-group-zone]")
+    const left = event.target.closest && event.target.closest("[data-chip], [data-header], [data-group-zone], [data-pivot-zone]")
     if (left) delete left.dataset.drop
   },
 
   drop(event) {
     if (!this.drag) return
     event.preventDefault()
-    const zone = event.target.closest("[data-group-zone]")
+    const zone = event.target.closest("[data-group-zone], [data-pivot-zone]")
     const over = event.target.closest("[data-chip], [data-header]")
     const spec = this.drag.spec
     if (zone) {
-      this.push({op: "group", spec})
+      this.push({op: zone.hasAttribute("data-pivot-zone") ? "pivot" : "group", spec})
     } else if (over) {
       const target = over.dataset.chip || over.dataset.header
       if (target !== spec) {

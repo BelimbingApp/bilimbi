@@ -351,6 +351,27 @@ defmodule Bilimbi.Base.Grid.Web.Host do
     end
   end
 
+  # A heading dropped in the pivot corner: with a grouped grid it pivots by
+  # that column; without one it groups by it first, since a pivot needs rows.
+  def apply(%{"op" => "pivot", "spec" => spec}, view, columns) when is_binary(spec) do
+    cond do
+      spec == "" ->
+        {:patch, %{view | pivot: nil}}
+
+      not Enum.any?(columns, &(&1.spec == spec)) ->
+        :noop
+
+      is_nil(view.group) ->
+        {:patch, %{view | group: spec, sort: spec, dir: :asc, page: 1}}
+
+      spec == view.group ->
+        :noop
+
+      true ->
+        {:patch, %{view | pivot: spec, page: 1}}
+    end
+  end
+
   def apply(%{"op" => "window"} = params, _view, _columns) do
     offset = integer(params["offset"], 0)
     limit = params["limit"] |> integer(200) |> max(1) |> min(Grid.max_limit())

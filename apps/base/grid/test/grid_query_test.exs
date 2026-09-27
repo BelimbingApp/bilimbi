@@ -253,4 +253,27 @@ defmodule Bilimbi.Base.Grid.QueryTest do
     assert attached[102].before["lines_count"] == 1
     assert Enum.sum(attached[102].series["lines_count"]) == 1.0
   end
+
+  test "a pivot counts root rows per pair of values in one statement, folding the long tail",
+       ctx do
+    {:ok, [status, country]} =
+      Grid.resolve(ctx.catalog, ctx.orders, ~w(status customer.country.name))
+
+    pivot = Grid.pivot(ctx.catalog, ctx.orders, status, country)
+
+    assert Enum.map(pivot.columns, & &1.short_label) == ["—", "Malaysia", "Singapore", "Total"]
+    assert Enum.map(pivot.columns, & &1.id) == ["pv-0", "pv-1", "pv-2", "pv-total"]
+    assert Enum.map(pivot.rows, & &1.key) == ["open", "paid", "void"]
+
+    paid = Enum.find(pivot.rows, &(&1.key == "paid"))
+    assert paid.cells == %{"pv-0" => 0, "pv-1" => 1, "pv-2" => 0, "pv-total" => 1}
+    void = Enum.find(pivot.rows, &(&1.key == "void"))
+    # Order C's customer is in another tenant, so its country is unknown here.
+    assert void.cells == %{"pv-0" => 1, "pv-1" => 0, "pv-2" => 0, "pv-total" => 1}
+    assert pivot.total_entries == 3 and pivot.more == 0
+    assert pivot.stats["pv-total"] == %{min: 0, max: 1}
+
+    narrowed = Grid.pivot(ctx.catalog, ctx.orders, status, country, search: "order b")
+    assert Enum.map(narrowed.rows, & &1.key) == ["open"]
+  end
 end
