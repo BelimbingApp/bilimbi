@@ -290,6 +290,7 @@ defmodule Bilimbi.Base.Grid.QueryTest do
     assert pivot.total_entries == 3 and pivot.more == false and is_float(pivot.cost)
     assert pivot.stats["pv-total"] == %{min: 0, max: 1}
     refute Map.has_key?(pivot.stats, "pv-rows")
+    assert Enum.all?(pivot.rows, &(&1.cells["pv-rows"] == &1.key))
 
     narrowed = Grid.pivot(ctx.catalog, ctx.orders, status, country, search: "order b")
     assert Enum.map(narrowed.rows, & &1.key) == ["open"]
@@ -316,5 +317,17 @@ defmodule Bilimbi.Base.Grid.QueryTest do
     assert bounded.more == true
     assert Enum.map(bounded.rows, & &1.key) == ["open"]
     assert hd(bounded.rows).cells["pv-total"] == hd(all.rows).cells["pv-total"]
+  end
+
+  test "a pivot bound inside its first row shows no row rather than a short one", ctx do
+    {:ok, lines} = Grid.fetch_table(ctx.catalog, "lines")
+    {:ok, [order, sku]} = Grid.resolve(ctx.catalog, lines, ~w(order.label sku))
+
+    all = Grid.pivot(ctx.catalog, lines, order, sku)
+    first = hd(all.rows)
+    assert first.key == "Order A" and first.cells["pv-total"] >= 2
+
+    cut = Grid.pivot(ctx.catalog, lines, order, sku, max_pairs: 1)
+    assert cut.more == true and cut.rows == [] and cut.total_entries == 0
   end
 end

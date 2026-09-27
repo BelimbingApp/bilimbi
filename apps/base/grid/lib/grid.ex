@@ -422,11 +422,7 @@ defmodule Bilimbi.Base.Grid do
   defp bounded_pairs(pairs, max) do
     read = Enum.take(pairs, max)
     last = List.last(read).rows
-
-    case Enum.reject(read, &(&1.rows == last)) do
-      [] -> {read, true}
-      complete -> {complete, true}
-    end
+    {Enum.reject(read, &(&1.rows == last)), true}
   end
 
   defp rows_label_column(%Column{} = rows) do
