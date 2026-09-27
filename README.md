@@ -26,8 +26,9 @@ and audit before any business value appears.
 
 - Bilimbi ships the foundation once, production-grade, so a new capability
   starts at the business logic.
-- Every write through the platform is audited, every read is tenant-scoped,
-  and every action is authorized. Add-ons inherit these guarantees.
+- Module APIs take a tenant scope and check capabilities, and writes through
+  the platform's database layer are audited. Add-ons build on the same
+  mechanisms.
 - Add-ons are separate Git repositories mounted into a checkout. Mounting one
   is the installation; there is no registry to maintain.
 - Modules hide their tables and queries behind small public APIs, so a company
@@ -52,8 +53,8 @@ The platform (Base and Core) ships these capabilities:
   impersonation.
 - Authorization: capabilities, roles, direct grants, and decision logs.
   Unknown capabilities fail closed.
-- Audit history of every data mutation and every recorded action, including
-  database console commands.
+- Audit history of data changes made through the platform's database layer
+  and of recorded actions, including database console commands.
 - Settings with immutable definitions and tenant-, company-, and user-scoped
   values.
 - Scheduled recurring jobs with occurrence history and downtime coalescing.
