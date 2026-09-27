@@ -1,336 +1,181 @@
 # Bilimbi
 
-Bilimbi is the Phoenix and Elixir implementation of the Belimbing application
-platform. It is designed to preserve Belimbing's business model, product
-principles, and PostgreSQL schema while using the BEAM runtime and Phoenix
-conventions.
+An open-source business application platform: one shared foundation, your own
+business capabilities on top.
 
-The project is MIT licensed. See [LICENSE](./LICENSE).
+## Vision
 
-## What Bilimbi is
+Companies should own the business system they run on, not rent a suite they
+cannot change.
 
-Bilimbi provides a durable foundation for building business applications:
+- Bilimbi provides the platform every business application needs: companies,
+  people, sign-in, permissions, settings, audit, scheduling, and a shared UI.
+- A company composes its own application from that platform plus the business
+  capabilities it selects, up to a complete ERP.
+- Everything is ordinary Elixir and PostgreSQL. The data stays in plain tables
+  the company can read, back up, and query.
+- The codebase is built from the beginning by coding agents. `AGENTS.md` and
+  `DESIGN.md` are part of the product: they define how it is extended and how
+  it should feel to use.
 
-- Base infrastructure for database access, authentication, authorization,
-  tenancy, settings, auditability, and shared platform behaviour.
-- Core business modules for users, companies, employees, addresses, and other
-  required enterprise primitives.
-- A Phoenix web interface using LiveView, HEEx, Tailwind CSS, and verified
-  routes.
-- Bilimbi-owned Ecto baselines compatible with Belimbing's existing PostgreSQL
-  tables, constraints, and data conventions.
+## The problem Bilimbi solves
 
-Bilimbi is a general business-application platform, not a fixed business
-suite. An ERP is one intended kind of application that can be composed from its
-Platform Baseline, business Domains, and deployment-owned Extensions.
+Business software forces a bad choice: a monolithic suite that dictates your
+processes, or a custom build that spends years re-creating login, permissions,
+and audit before any business value appears.
 
-Bilimbi is being built from the beginning by coding agents. The repository's
-`AGENTS.md` and `DESIGN.md` are part of the engineering system: they describe
-how the application should be extended and how it should feel to use.
+- Bilimbi ships the foundation once, production-grade, so a new capability
+  starts at the business logic.
+- Every write through the platform is audited, every read is tenant-scoped,
+  and every action is authorized. Add-ons inherit these guarantees.
+- Add-ons are separate Git repositories mounted into a checkout. Mounting one
+  is the installation; there is no registry to maintain.
+- Modules hide their tables and queries behind small public APIs, so a company
+  can replace or extend one part without a rewrite.
 
-## Current status
+## Who it's for
 
-Bilimbi is in its foundation phase. The repository uses a Mix umbrella rooted
-at the repository. Base, Core, and Web are its top-level composition
-applications; each declared deep module below Base or Core is a self-contained
-local Mix package discovered from its descriptor. The current foundation owns
-Ecto migrations that can create the compatible Base Session, Settings,
-Tenancy, Authz, and Audit plus Core Company, Geonames, Address, Employee, and
-User schema, or
-verify and adopt an existing Belimbing database. Optional Domains and
-deployment-owned Extensions are intentionally not implemented yet.
+- **Businesses** that want an extensible system they own, from a single
+  company to a multi-tenant deployment.
+- **Developers** who build business capabilities on a ready platform, in
+  Elixir, Phoenix LiveView, and PostgreSQL.
+- **AI coding agents** working alongside them. The repository's guides are
+  written so an agent can install, extend, and verify the system.
 
-The first major compatibility target is the existing Belimbing PostgreSQL
-schema. Bilimbi maps that schema accurately instead of creating a second,
-similar data model. Belimbing remains the reference for table names, durable
-identities, existing data, and business meaning while the port is underway.
+## What you get today
 
-Belimbing is the reference, but is not perfect. When we discover
-inconsistencies, mistakes, or entropy during development, we do not blindly
-build that entropy into Bilimbi. We correct the defect cleanly in Bilimbi, and
-raise an issue in Belimbing so that both projects benefit from our discovery.
+The platform (Base and Core) ships these capabilities:
 
-## Development setup
+- Companies, employees, department and employee types, and addresses with
+  Geonames reference data for countries, regions, postcodes, and cities.
+- Users with sign-in, password reset, email verification, and operator
+  impersonation.
+- Authorization: capabilities, roles, direct grants, and decision logs.
+  Unknown capabilities fail closed.
+- Audit history of every data mutation and every recorded action, including
+  database console commands.
+- Settings with immutable definitions and tenant-, company-, and user-scoped
+  values.
+- Scheduled recurring jobs with occurrence history and downtime coalescing.
+- Dashboard with configurable sections and layout.
+- Design Library: the shared UI components, live, with their specifications.
+- Locale and time display, system information, and performance health.
+- **Factory** is the first add-on: Inventory, Product Definition, and
+  Production Execution for manufacturers.
 
-The repository pins the local Erlang and Elixir toolchain in `.mise.toml`.
-Install those versions with mise, then run:
+## Add-ons: Domains and Extensions
 
-```bash
-mix setup
-mix bilimbi.server
-```
+The main repository is the platform. Business capabilities are add-ons in
+their own repositories.
 
-Open [http://localhost:4000](http://localhost:4000).
+- A **Domain** is a business capability with meaning of its own, such as
+  Factory. Repository `BelimbingApp/b-dom-<id>`, mounted at
+  `apps/domains/<id>`.
+- An **Extension** adapts the platform, a Domain, or another Extension to one
+  company's needs. Repository `BelimbingApp/b-ext-<id>`, mounted at
+  `apps/extensions/<id>`.
+- The mount folder is the container ID with hyphens turned into underscores,
+  so `b-ext-mr-packaging` mounts at `apps/extensions/mr_packaging`.
+- Bilimbi discovers a mounted repository from its `bilimbi.container.exs`.
+  Removing the folder removes the code from the next build and keeps its data.
 
-`mix setup` creates the database, runs the Base and Core compatibility
-migrations, and builds the web assets. The baseline creates no tenant or
-company rows; platform-operator and primary-company provisioning are explicit
-setup steps and numeric IDs carry no runtime meaning.
-
-To use an existing Belimbing database, configure its connection and adopt it
-instead of running fresh creation migrations:
-
-```bash
-mix bilimbi.schema.verify
-mix bilimbi.schema.adopt
-mix bilimbi.cutover.remap --dry-run
-mix bilimbi.cutover.remap
-mix bilimbi.server
-```
-
-Adoption refuses schema drift and records the verified baselines in
-`bilimbi_schema_migrations`. Laravel's `migrations` table is never changed.
-
-The schemas already match, so the remaining cutover work is stored values
-Bilimbi reads differently. `mix bilimbi.cutover.remap` remaps pin and
-notification URLs (always recomputing the pin hash) and `heroicon-` names, and
-reports what it must not fix by itself: grants naming capabilities Bilimbi does
-not declare, and pins with no Bilimbi equivalent. It deletes nothing and is
-idempotent, so `--dry-run` first and read its residue before opening traffic.
-See [Database Architecture](./docs/architecture/database.md) for the full
-sequence and `mix help bilimbi.cutover.remap` for the options.
-
-After a fresh migration or an unprovisioned adoption, establish explicit
-operator identity with:
+To add Factory, from the Bilimbi root:
 
 ```bash
-mix bilimbi.platform.provision \
-  --tenant-name "Platform operator" \
-  --company-name "Example Operations" \
-  --company-code "example_operations"
-```
-
-The operation is idempotent: rerunning it resolves the existing marked tenant
-and primary-company assignment rather than relying on a numeric ID.
-
-Provision a customer tenant and its primary company atomically with:
-
-```bash
-mix bilimbi.tenant.provision \
-  --tenant-name "Acme tenant" \
-  --company-name "Acme Sdn. Bhd." \
-  --company-code "acme"
-```
-
-Useful commands:
-
-```bash
-mix format
-mix test
+git clone https://github.com/BelimbingApp/b-dom-factory.git apps/domains/factory
+mix deps.get
 mix bilimbi.migrate
-mix bilimbi.migrations
-mix bilimbi.schema.verify
-mix help bilimbi.platform.provision
-mix help bilimbi.tenant.provision
-mix help bilimbi.server
-mix precommit
+mix bilimbi.server
 ```
 
-`mix bilimbi.server` checks the compiled module metadata before starting
-Phoenix. If it finds stale or missing workspace-graph metadata, it rebuilds
-the dependencies once and retries; other startup errors are reported without
-automatic recovery.
+The rules for building an add-on are in
+[the composition model](./docs/architecture/0010_composition-model.md) and
+[`apps/domains/AGENTS.md`](./apps/domains/AGENTS.md).
 
-`mix precommit` is the required final check for a change. It compiles with
-warnings as errors, unlocks unused dependencies, formats the project, runs the
-LiveView hook tests in Node (`mix assets.test`), and runs the test suite. The
-hook tests need Node.js 22 or later, with npm, on the `PATH`; `.mise.toml` does
-not pin it.
+## Install with AI
 
-## Architecture at a glance
+Paste this into your AI coding agent. It checks prerequisites, installs, and
+verifies.
 
 ```text
-apps/
-├── base/                         # Mandatory composition application
-│   ├── bilimbi.container.exs     # Declares the Base layer
-│   ├── database/                 # base/database module package
-│   ├── module_registry/          # Runtime installed-module registry
-│   ├── session/                  # Opaque compatible session persistence
-│   ├── settings/                 # Immutable definitions and scoped values
-│   ├── tenancy/                  # base/tenancy module package
-│   ├── authz/                    # Capability, role, grant, and decision engine
-│   ├── audit/                    # base/audit module package
-│   └── system/                   # Read-only instance facts (System Info)
-├── core/                         # Mandatory composition application
-│   ├── bilimbi.container.exs     # Declares the Core layer
-│   ├── company/                  # core/company module package
-│   ├── geonames/                 # Geographic reference-data package
-│   ├── address/                  # core/address module package
-│   ├── employee/                 # core/employee module package
-│   ├── user/                     # core/user module package
-│   └── compatibility/            # Shared migration/adoption coordinator
-└── web/                          # Phoenix endpoint and shared UI shell
+Install Bilimbi (https://github.com/BelimbingApp/bilimbi) on this machine and
+verify it runs.
+
+1. Prerequisites. Confirm `git` is installed. Confirm `mise` is installed
+   (https://mise.jdx.dev); it installs the pinned Erlang and Elixir. Confirm a
+   PostgreSQL 18 server is running and note its host, port, and a role that
+   can create databases. Stop and tell me what is missing.
+2. Clone: `git clone https://github.com/BelimbingApp/bilimbi.git` and work
+   inside the `bilimbi` folder for every following step.
+3. Toolchain: run `mise trust` then `mise install`. It reads `.mise.toml`
+   (Erlang 28.5, Elixir 1.20.3). Run every `mix` command below through
+   `mise exec -- mix ...` unless mise is activated in the shell.
+4. Database connection. The defaults in `config/dev.exs` expect role
+   `bilimbi`, password `bilimbi_dev_ca658ad7d8b5`, host `localhost`, port
+   `5433`, database `bilimbi_dev`. Either create that role with CREATEDB, or
+   export `DATABASE_URL=postgres://USER:PASSWORD@HOST:PORT/bilimbi_dev` for
+   the server you have. Use the same value in every later shell.
+5. Setup: run `mix setup`. It fetches dependencies, creates the database,
+   runs every installed migration, and builds the web assets.
+6. Development identity: run `mix bilimbi.dev.seed`. It creates the platform
+   tenant, a company, and the login `ai@agent.my` / `bilimbi-dev`.
+7. Run: start `mix bilimbi.server` in the background and wait until it logs
+   that the endpoint is running on port 4000.
+8. Verify: `curl -sS -o /dev/null -w '%{http_code}' http://localhost:4000`
+   must print 200. Then open http://localhost:4000 in a browser, sign in with
+   the login from step 6, and confirm the workspace loads. Report the result
+   and how to stop the server.
 ```
 
-The complete physical boundary of Base Tenancy is `apps/base/tenancy/`, not a
-directory below its `lib/`. Consequently its source begins at
-`apps/base/tenancy/lib/tenancy.ex` while the Elixir namespace remains
-`Bilimbi.Base.Tenancy`. The same rule applies to Session, Settings, Authz,
-Audit, Company, Geonames, Address, Employee, User, and every future declared
-module.
+## Quick start
 
-A composition container never lists child packages by name. Every immediate
-child directory containing `bilimbi.module.exs` is an installed module; the
-shared discovery code validates all installed descriptors and generates the
-container's local Mix path dependencies. Mounting `apps/base/mailer/` or a
-future `apps/sales/order/` is therefore the source-installation action.
-Dependency resolution and compilation must still run afterward.
+For people installing by hand. Requirements are in the next section.
 
-The discovery helper itself belongs to `apps/base/module_registry/mix/` and is
-covered by that package's formatter and tests. Mix writes its validated,
-resolved module position and graph fingerprint into OTP application metadata;
-a shared compiler refreshes that metadata across all module packages whenever
-the installed descriptor set changes. Runtime migration discovery consumes
-that approved order instead of maintaining a second graph algorithm. Because
-runtime discovery can see only loaded OTP applications, the Compatibility
-descriptor declares stable dependencies on every current migration or schema
-contract contributor even though its code contains no module-specific paths.
+1. Clone and enter the repository:
 
-The descriptor is the source of truth for stable module ID, layer, OTP
-application ID, namespace, declared module dependencies, and migration
-contribution. Discovery rejects malformed or missing descriptors, duplicate
-stable or OTP IDs, missing dependencies, cycles, container/layer mismatches,
-and upward dependency edges. Modules are ordered dependency-first with stable
-module ID as the deterministic tie-breaker.
+   ```bash
+   git clone https://github.com/BelimbingApp/bilimbi.git
+   cd bilimbi
+   ```
 
-Future optional Domains are composition applications below `apps/`. For
-example, a Sales distribution can compose a self-contained Order module at
-`apps/sales/order/`, with namespace `Bilimbi.Sales.Order`. A module
-directory may be mounted as a nested Git repository and composed as a local Mix
-path dependency without scattering its files through the platform tree. See
-[ADR 0003](./docs/architecture/decisions/0003-physical-deep-module-packages.md).
+2. Install the pinned toolchain:
 
-Base and Core are ownership boundaries, not superclass hierarchies. A domain
-module exposes a small public API and hides its schemas, queries, and internal
-workflow. Web modules call those APIs; business modules do not depend on the
-web layer.
+   ```bash
+   mise trust && mise install
+   ```
 
-Views may be colocated with their LiveView module through `embed_templates` or
-HEEx files, while remaining under `BilimbiWeb`. This keeps presentation close
-to the workflow without mixing Phoenix concerns into the domain API.
+3. Point Bilimbi at PostgreSQL. Create a role `bilimbi` with password
+   `bilimbi_dev_ca658ad7d8b5` that can create databases on port 5433, or set
+   `DATABASE_URL` to an existing server:
 
-## Compatibility with Belimbing
+   ```bash
+   export DATABASE_URL=postgres://USER:PASSWORD@localhost:5432/bilimbi_dev
+   ```
 
-Compatibility means that Bilimbi can use the same PostgreSQL database and
-preserve the same logical records. It does not mean copying Laravel classes or
-reproducing Laravel internals.
+4. Create the database, run migrations, build assets, and seed a login:
 
-The intended operating model is one active application runtime at a time. The
-compatibility goal is a seamless schema and data-model transition, not
-concurrent Laravel/Phoenix access or dual writes.
+   ```bash
+   mix setup
+   mix bilimbi.dev.seed
+   ```
 
-The compatibility work includes:
+5. Start the server and open [http://localhost:4000](http://localhost:4000).
+   Sign in with `ai@agent.my` and `bilimbi-dev`.
 
-- exact table and column names;
-- primary keys, foreign keys, sequences, indexes, and constraints;
-- JSON and timestamp representations;
-- soft-delete behaviour and status values;
-- tenant, company, user, and employee relationships;
-- polymorphic records and stable persisted identities;
-- migration and seed data safety.
+   ```bash
+   mix bilimbi.server
+   ```
 
-Ecto schemas and queries should be written against the compatibility contract.
-Do not invent a cleaner parallel schema without an explicit migration decision.
+Setup for real tenants, production mail, and the developer commands are in
+[`docs/development.md`](./docs/development.md).
 
-The current contract uses `tenants.is_platform_operator` for the installation
-operator and `tenant_primary_companies` for each tenant's designated company.
-`companies.tenant_id` is always explicit and has no database default. ID 1 is
-only historical migration input in Belimbing, never a Bilimbi runtime role.
+## Requirements
 
-Bilimbi-owned migrations live inside their owning module, currently
-`apps/base/session/priv/repo/migrations`,
-`apps/base/settings/priv/repo/migrations`,
-`apps/base/tenancy/priv/repo/migrations`,
-`apps/base/authz/priv/repo/migrations`,
-`apps/base/audit/priv/repo/migrations`,
-`apps/core/company/priv/repo/migrations`,
-`apps/core/geonames/priv/repo/migrations`,
-`apps/core/address/priv/repo/migrations`,
-`apps/core/employee/priv/repo/migrations`, and
-`apps/core/user/priv/repo/migrations`. The Compatibility coordinator obtains
-these paths from installed module descriptors; it contains no per-module path
-list. Each migration module uses its owning public namespace. Structural and
-live-data invariants are likewise implemented by the contributing module's
-schema contract and invoked generically by Compatibility. Fresh installations use
-`mix bilimbi.migrate`; existing databases use the explicit verify-and-adopt
-workflow described in
-[ADR 0002](./docs/architecture/decisions/0002-compatible-schema-baselines.md).
+- Erlang/OTP 28.5 and Elixir 1.20.3, pinned in `.mise.toml`.
+- PostgreSQL 18.
+- Node.js 22 or later, only to run the LiveView hook tests in
+  `mix precommit`.
+- Linux or macOS. CI runs on Ubuntu 24.04. Windows works through WSL2.
 
-Core Geonames preserves Belimbing's country, administrative-division,
-postcode, and city tables behind read models and lookup APIs. Fresh schemas
-contain no reference rows until a separately owned import or seeding step runs.
-Core Address preserves Belimbing's camel-cased legacy columns and polymorphic
-Company identity behind a snake-cased Elixir API. Every Address operation takes
-an explicit tenant, and its Geonames normalization foreign keys are now part of
-the required verified contract.
-
-Core Employee preserves Belimbing's employee and employee-type tables and
-completes the Company department-head foreign key. Core User preserves the
-user, password-reset, pin, saved-query, and notification tables and completes
-Company's external-access user contribution. Both modules own their baselines,
-contracts, and tenant/company-scoped APIs while Compatibility only coordinates
-their descriptor-declared contributions.
-
-Core User also owns the credential lifecycle behind those compatible tables:
-Argon2id account creation, Laravel Argon2 and legacy `$2y$` bcrypt login,
-transparent bcrypt upgrade, neutral password-reset requests, signed email
-verification, and the four canonical user-scoped settings. This is a Core API,
-not a public signup surface; Phoenix Web still owns routes, rate limiting,
-delivery, cookies, and the authenticated session adapter.
-
-### Production mail delivery
-
-Production uses SMTP with mandatory authentication and certificate verification.
-Set these environment variables before the release starts:
-
-| Variable | Purpose |
-|---|---|
-| `MAIL_HOST` | SMTP relay hostname. |
-| `MAIL_PORT` | Relay port (`587` for STARTTLS or commonly `465` for implicit TLS). |
-| `MAIL_USERNAME` / `MAIL_PASSWORD` | SMTP credentials. |
-| `MAIL_TLS_MODE` | `starttls` or `implicit_tls`; unencrypted delivery is not supported. |
-| `MAIL_FROM_NAME` / `MAIL_FROM_ADDRESS` | Sender identity used for product email. |
-
-An absent or invalid value stops a production release during configuration, so a
-password-reset request cannot be the first time a mail misconfiguration is
-discovered. Development uses Swoosh's local mailbox and test uses its test
-adapter instead.
-
-Base Session preserves Belimbing's root `sessions` table as an opaque durable
-store with no dependency on Core User or Web. Its operational listing omits
-payloads, termination protects the caller's current session, and unreadable
-Laravel payloads remain a future authentication-adapter concern.
-
-Base Authz keeps capability definitions in immutable module contributions and
-assignments in the five compatible `base_authz_*` tables. Unknown capability
-keys fail closed. System-role reconciliation is an explicit production-seed
-operation and never deletes principal grants. Core Company owns the later
-restricted company foreign key and exact system/custom-role ownership check,
-so Base does not depend upward on Core.
-
-Base Audit preserves Belimbing's `base_audit_mutations` and
-`base_audit_actions` tables: jsonb payloads, `inet` `ip_address`, nullable
-`tenant_id`, no foreign keys, and `occurred_at` as the only timestamp.
-
-## Documentation
-
-| Topic | Link |
-|---|---|
-| Agent and coding rules | [AGENTS.md](./AGENTS.md) |
-| Product and interface design | [DESIGN.md](./DESIGN.md) |
-| Database architecture | [Database Architecture](./docs/architecture/database.md) |
-| Original Mix umbrella topology | [ADR 0001](./docs/architecture/decisions/0001-mix-umbrella-topology.md) |
-| Compatible schema baselines | [ADR 0002](./docs/architecture/decisions/0002-compatible-schema-baselines.md) |
-| Physical deep-module packages | [ADR 0003](./docs/architecture/decisions/0003-physical-deep-module-packages.md) |
-| Module contribution contract | [ADR 0004](./docs/architecture/decisions/0004-module-contribution-contract.md) |
-| Source Belimbing project | [BelimbingApp/belimbing](https://github.com/BelimbingApp/belimbing) |
-| Phoenix documentation | [phoenix.hexdocs.pm](https://phoenix.hexdocs.pm/) |
-| Elixir documentation | [hexdocs.pm/elixir](https://hexdocs.pm/elixir/) |
-
-## Contributors
-
-See [`CONTRIBUTORS.md`](./CONTRIBUTORS.md) for the team of architects and AI contributors building Bilimbi.
-
-## License
-
-Bilimbi is released under the [MIT License](./LICENSE).
+More documentation is in [`docs/`](./docs/README.md). Bilimbi is released
+under the [MIT License](./LICENSE).
