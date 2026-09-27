@@ -1,9 +1,9 @@
-# docs/plans/factory/mr-packaging-requirements.md
+# docs/plans/factory/packaging-manufacturer-requirements.md
 
 **Status:** Validated in Factory scenarios; plant confirmations pending
 **Last Updated:** 2026-09-27
 **Sources:**
-- Client meeting notes, Mr Packaging Sdn Bhd, Muar LDPE foam plant (2026-08-15)
+- Client meeting notes, a packaging manufacturer (2026-08-15)
 - [`docs/plans/factory/0000-factory-domain.md`](0000-factory-domain.md)
 - [`docs/plans/factory/0010-inventory-module.md`](0010-inventory-module.md)
 - [`docs/plans/domain-extension-layer-rollout.md`](../domain-extension-layer-rollout.md)
@@ -19,30 +19,30 @@ claude/claude-opus-5.5 (no-mistakes review agent, shipped-status update)
 
 ## Problem Essence
 
-Manual material records do not let Mr Packaging Sdn Bhd explain the gap between what arrived, what production used, and what shipped. Mr Packaging Sdn Bhd manufactures LDPE foam in Muar, Johor. The requirements below are treated as candidate generic factory capabilities, with plant-specific values and workflow details confirmed during discovery.
+Manual material records do not let a packaging manufacturer explain the gap between what arrived, what production used, and what shipped. The requirements below are treated as candidate generic factory capabilities, with plant-specific values and workflow details confirmed during discovery.
 
 - Supplier receipts, extrusion, cure, lamination, cutting, packing, and despatch are not connected by reliable material identity.
 - Current records cannot separate short-weighted receipts, material loss, theft, trim, and waste using measured evidence.
-- Foam rolls wait 7–10 days to cure, but their identity, location, and cure age are hard to confirm after the wait.
+- Rolls wait 7–10 days to cure, but their identity, location, and cure age are hard to confirm after the wait.
 - Monthly production forecasts are not consistently tied to cut yield and finished stock.
 
 ## Desired Outcome
 
-Mr Packaging Sdn Bhd can reconcile a representative month from supplier receipt to shipped pack with clear measurements and a light data-entry flow. As the first Factory build's validation case, it proves the shared modules and their configuration against a complete receipt-to-despatch workflow.
+A packaging manufacturer can reconcile a representative month from supplier receipt to shipped pack with clear measurements and a light data-entry flow. As the first Factory build's validation case, it proves the shared modules and their configuration against a complete receipt-to-despatch workflow.
 
 - A clerk records each lorry's declared and measured weight, including gross, tare, and net.
-- An operator labels each foam roll and can find its location and cure age.
+- An operator labels each roll and can find its location and cure age.
 - Each production step records its input, output, product, trim, waste, and measurement source.
 - A monthly view explains material balance and variance by supplier, run, operation, resource, location, and period.
 - The current scope is expected to use Factory without a customer-specific Extension. Plant-specific products, process values, resources, labels, and permissions use Factory's public contracts; create an Extension only for a confirmed gap.
 
 ## Top-Level Components
 
-This plan records what the Muar operation needs from [Factory](0000-factory-domain.md). Its Inventory module contract is detailed in [`0010-inventory-module.md`](0010-inventory-module.md).
+This plan records what the plant needs from [Factory](0000-factory-domain.md). Its Inventory module contract is detailed in [`0010-inventory-module.md`](0010-inventory-module.md).
 
 - **Inventory module** — records item and location, native quantity and unit, declared or measured evidence, roll identity, warehouse movements, production effects, and ancestry. Warehouse receipts and ordinary warehouse movements post directly through Inventory.
-- **Product Definition and Production Execution modules** — Product Definition defines the foam products, routings, and cure minimum. Production Execution records actual extrusion and conversion work, enforces the cure hold, and presents production trace over Inventory genealogy. Production commands and history imports use its contract; it posts Inventory effects atomically with execution and any required override evidence.
-- **Mr Packaging configuration and validation** — supplies the plant's confirmed products, process values, locations, resources, labels, and permissions to Factory. An Extension is expected to be unnecessary; add one only for a proven customer-specific gap.
+- **Product Definition and Production Execution modules** — Product Definition defines the products, routings, and cure minimum. Production Execution records actual extrusion and conversion work, enforces the cure hold, and presents production trace over Inventory genealogy. Production commands and history imports use its contract; it posts Inventory effects atomically with execution and any required override evidence.
+- **Plant configuration and validation** — supplies the plant's confirmed products, process values, locations, resources, labels, and permissions to Factory. An Extension is expected to be unnecessary; add one only for a proven customer-specific gap.
 
 ## Customer Requirements
 
@@ -60,7 +60,7 @@ The receiving flow needs to show what the supplier declared and what the plant m
 The extrusion record needs to identify the blend and each resulting roll.
 
 - Virgin resin and roughly 30% recycled material, subject to confirmation at the plant.
-- Three fixed foam colours, the extruder, production run, date and time, and the selected recipe and routing.
+- A fixed set of colours, the extruder, production run, date and time, and the selected recipe and routing.
 - One identity for each roll, with measured width, thickness, and length.
 - Inputs, output quantities, and any measured or reported variance.
 
@@ -71,7 +71,7 @@ A roll's production time must remain available while it waits for the next step.
 - Record where each roll is stored and when it was produced.
 - Show elapsed cure age against the configured minimum, which is expected to be within a 7–10 day window and must be confirmed by product.
 - Refuse under-cured consumption by default. An authorised override needs an explicit Base Authz capability and a mandatory reason, and keeps actor, time, reason, and affected roll as an immutable record.
-- Keep cure duration and process gates as Factory configuration; do not create `MrPackaging` code for values or rules the shared configuration can express.
+- Keep cure duration and process gates as Factory configuration; do not create customer-specific code for values or rules the shared configuration can express.
 
 ### Lamination, cutting, packing, and despatch
 
@@ -107,7 +107,7 @@ Cure age and cut yield attach to individual rolls, not just to an extrusion run.
 
 ## Public Contract
 
-Mr Packaging Sdn Bhd needs Factory to support these customer-facing results.
+A packaging manufacturer needs Factory to support these results.
 
 - Receiving captures supplier, vehicle, material, location, actor, date, declared weight, measured gross/tare/net, and variance.
 - Production captures blend, colour, extruder, run, time, and each roll's measured dimensions.
@@ -128,15 +128,15 @@ Mr Packaging Sdn Bhd needs Factory to support these customer-facing results.
 
 - [ ] Confirm where weighing happens and which clerk records supplier, vehicle, material, and location.
 - [ ] Confirm weight units and capture declared weight plus measured gross, tare, and net.
-- [x] Post one representative lorry receipt through Inventory and show the supplier variance. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#15](https://github.com/BelimbingApp/b-dom-factory/pull/15). claude/claude-opus-5.5
-- [x] Keep the receipt traceable as it moves into storage or production. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11). claude/claude-opus-5.5
+- [x] Post one representative lorry receipt through Inventory and show the supplier variance. Evidence: a representative scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#15](https://github.com/BelimbingApp/b-dom-factory/pull/15). claude/claude-opus-5.5
+- [x] Keep the receipt traceable as it moves into storage or production. Evidence: a representative scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11). claude/claude-opus-5.5
 
 Validation: a clerk records a lorry in one flow and can explain the source of every recorded weight.
 
 #### Phase 2 — Roll labels and storage locations
 
 - [ ] Confirm label material, placement, survivability, and network coverage at the plant.
-- [x] Set up the cure-storage locations and the unit identity that roll labels will carry. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11) (representative locations and labels). claude/claude-opus-5.5
+- [x] Set up the cure-storage locations and the unit identity that roll labels will carry. Evidence: a representative scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11) (representative locations and labels). claude/claude-opus-5.5
 - [ ] Prove a test label can be scanned and moved between locations as an ordinary warehouse movement.
 
 Validation: a labelled unit can be located through Inventory after a physical move, without any production posting.
@@ -146,10 +146,10 @@ Validation: a labelled unit can be located through Inventory after a physical mo
 #### Phase 3 — Blend, extrusion, and cure
 
 - [ ] Confirm blend proportions, colours, measured dimensions, and applicable cure minimum with plant staff.
-- [x] Configure foam process families, routes, output roles, conversion bases, and cure gates as Factory data. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11) (representative configuration). claude/claude-opus-5.5
-- [x] Record an extrusion execution that consumes the received material and creates each labelled roll with its identity, production time, and dimensions. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#16](https://github.com/BelimbingApp/b-dom-factory/pull/16). claude/claude-opus-5.5
-- [x] Prove that each roll traces to its input receipt through Inventory genealogy and can be located after the physical cure delay. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#16](https://github.com/BelimbingApp/b-dom-factory/pull/16). claude/claude-opus-5.5
-- [x] Verify the default hold for under-cured material and the authorised override evidence. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#14](https://github.com/BelimbingApp/b-dom-factory/pull/14). claude/claude-opus-5.5
+- [x] Configure process families, routes, output roles, conversion bases, and cure gates as Factory data. Evidence: a representative scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11) (representative configuration). claude/claude-opus-5.5
+- [x] Record an extrusion execution that consumes the received material and creates each labelled roll with its identity, production time, and dimensions. Evidence: a representative scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#16](https://github.com/BelimbingApp/b-dom-factory/pull/16). claude/claude-opus-5.5
+- [x] Prove that each roll traces to its input receipt through Inventory genealogy and can be located after the physical cure delay. Evidence: a representative scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#16](https://github.com/BelimbingApp/b-dom-factory/pull/16). claude/claude-opus-5.5
+- [x] Verify the default hold for under-cured material and the authorised override evidence. Evidence: a representative scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#14](https://github.com/BelimbingApp/b-dom-factory/pull/14). claude/claude-opus-5.5
 - [ ] Keep this workflow in Factory when the confirmed process fits its public contracts and configuration; document a concrete gap before proposing an Extension.
 
 Validation: an operator can identify each roll, trace it to its receipt, see its cure age, and explain any consumed under-cured roll.
@@ -157,9 +157,9 @@ Validation: an operator can identify each roll, trace it to its receipt, see its
 #### Phase 4 — Lamination, cutting, packing, and despatch
 
 - [ ] Confirm the demand source before building matching; do not assume sales-order backlog.
-- [x] Configure lamination, cutting, packing, and despatch routes and resources. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11) (representative configuration). claude/claude-opus-5.5
-- [x] Record product, trim/offcut, and waste as identified outputs and report yield per roll and run. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#16](https://github.com/BelimbingApp/b-dom-factory/pull/16). claude/claude-opus-5.5
-- [x] Trace a finished pack to its roll and receipt, then trace the receipt forward. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11). claude/claude-opus-5.5
+- [x] Configure lamination, cutting, packing, and despatch routes and resources. Evidence: a representative scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11) (representative configuration). claude/claude-opus-5.5
+- [x] Record product, trim/offcut, and waste as identified outputs and report yield per roll and run. Evidence: a representative scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#16](https://github.com/BelimbingApp/b-dom-factory/pull/16). claude/claude-opus-5.5
+- [x] Trace a finished pack to its roll and receipt, then trace the receipt forward. Evidence: a representative scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11). claude/claude-opus-5.5
 
 Validation: the known 1200 mm to 800 mm cut and a representative shipment reconcile to identified material.
 
@@ -168,15 +168,15 @@ Validation: the known 1200 mm to 800 mm cut and a representative shipment reconc
 - [ ] Report expected and actual quantities by supplier, operation, resource, location, and period.
 - [ ] Separate measured differences from derived-measurement uncertainty and show each unexplained discrepancy.
 - [x] Verify duplicate-safe retries, concurrent consumption, late entry, reversal, tenant scope, and append-only correction. Evidence: [b-dom-factory#2](https://github.com/BelimbingApp/b-dom-factory/pull/2), [b-dom-factory#4](https://github.com/BelimbingApp/b-dom-factory/pull/4), [b-dom-factory#6](https://github.com/BelimbingApp/b-dom-factory/pull/6). claude/claude-opus-5.5
-- [x] Confirm the requirements against Factory's contracts and configuration; document a specific gap before proposing any Extension code. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11) (gaps listed in its scenario doc). claude/claude-opus-5.5
+- [x] Confirm the requirements against Factory's contracts and configuration; document a specific gap before proposing any Extension code. Evidence: a representative scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11) (gaps listed in its scenario doc). claude/claude-opus-5.5
 - [ ] Confirm a representative month with the customer and retain the source evidence for each reported total.
 
-Validation: Mr Packaging Sdn Bhd can reconcile a representative month and carry each unresolved difference as an open investigation.
+Validation: a packaging manufacturer can reconcile a representative month and carry each unresolved difference as an open investigation.
 
 ## Open Assumptions
 
 - Selling and packing units remain unconfirmed for pricing; they do not block native measurements in the ledger.
 - Label survivability, weighing locations, network coverage, demand source, and certification scope need on-site validation.
-- AutoCard is assumed replaced rather than integrated; confirm this before any import or synchronization work.
+- The previous recording system is assumed replaced rather than integrated; confirm this before any import or synchronization work.
 - Paper or spreadsheet weigh tickets and cut-yield records may provide known examples during rollout.
 - This plan supports evidence and traceability; it does not claim ISO 9001, ISO 14001, ISO 45001, or customer certification.

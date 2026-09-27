@@ -86,7 +86,7 @@ defmodule Bilimbi.Base.UI.ComponentsConfirmDialogTest do
     assert confirm_tag =~ ~r/\stext-danger[\s"]/
     # A solid fill (`bg-danger`) is the treatment DESIGN.md rules out; the
     # quiet hover surface (`hover:bg-danger-surface`) is the one it asks for.
-    refute confirm_tag =~ ~r/\sbg-danger[\s"]/
+    refute confirm_tag =~ ~r/[[:space:]]bg-danger[[:space:]"]/
     refute confirm_tag =~ "bg-action"
 
     assert html =~ ~r/id="delete-type-confirm-confirm"[^>]*>\s*Delete\s*<\/button>/

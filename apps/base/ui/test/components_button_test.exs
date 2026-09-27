@@ -171,9 +171,9 @@ defmodule Bilimbi.Base.UI.ComponentsButtonTest do
 
     # The spin does not render under prefers-reduced-motion, so the well and
     # the swapped glyph carry the state on their own.
-    assert busy =~ ~r/\sbg-surface-sunken/
+    assert busy =~ ~r/[[:space:]]bg-surface-sunken/
     assert busy =~ "ring-1 ring-line"
-    refute disabled =~ ~r/\sbg-surface-sunken/
+    refute disabled =~ ~r/[[:space:]]bg-surface-sunken/
   end
 
   test "a navigation control ignores busy instead of claiming a wait it cannot enforce" do
