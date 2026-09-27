@@ -1,20 +1,23 @@
 # Bilimbi Composition Model
 
 **Document Type:** Normative architecture standard
-**Status:** Current — implementation pending realization proof
+**Status:** Current — realized; the proof passed on 2026-09-26
 **Architecture ID:** 0010 (reserved; do not reuse for an ADR)
-**Agents:** claude/claude-opus-5, amp/medium-sol, codex/gpt-6-sol-medium
+**Agents:** claude/claude-opus-5, amp/medium-sol, codex/gpt-6-sol-medium,
+claude/claude-fable-5-1 (realization outcome)
 **Scope:** Platform, Domain, Extension, composition, and nested-Git rules
-**Last Updated:** 2026-09-25
+**Last Updated:** 2026-09-27
 
 ## Purpose
 
 This document is Bilimbi's normative source of truth for composition. The three
 principles define the product model, the constraints protect its boundaries,
-and the nested-Git section defines the target mechanism.
+and the nested-Git section defines the mechanism.
 
-The realization proof must validate the mechanism before optional capabilities
-ship. If it fails, revise this standard rather than silently weakening it.
+The realization proof validated the mechanism before optional capabilities
+shipped; [Realization outcome](#realization-outcome) records what it chose.
+Any later result that changes these rules must revise this standard rather
+than silently weakening it.
 
 ## Vocabulary
 
@@ -239,8 +242,8 @@ Web hosts selected presentation contributions without knowing Domain or
 Extension names. Contributors retain ownership of their business rules and
 presentation adapters. Invalid or conflicting contributions fail the build.
 
-The proof must determine the smallest compile-time and runtime mechanisms that
-meet these requirements.
+The compile-time and runtime mechanisms that meet these requirements are
+recorded under [Realization outcome](#realization-outcome).
 
 ## Deferred alternatives
 
@@ -265,6 +268,70 @@ that Bilimbi can:
 6. remove their code and contributions without deleting durable data; and
 7. produce a binary that boots without source, Mix, or a compiler.
 
-The implementation plan must use the proof to choose router integration,
-migration coordination, generated metadata, or other concrete mechanisms. Any
-result that changes these rules must revise this standard explicitly.
+The implementation plan used the proof to choose the concrete mechanisms
+below. Any result that changes these rules must revise this standard
+explicitly.
+
+## Realization outcome
+
+Three disposable workspaces ran the proof on 2026-09-26 with four throwaway
+repositories (two Domains, two Extensions, with a cross-repository Domain edge
+and an Extension-to-Extension edge). All seven items passed once three gaps
+were closed: a mounted Hex dependency rewrote the Platform's tracked lock, the
+migration ledger refused an unmounted repository's applied versions, and a
+mounted route overlapping a Core parameter route was served by Core. The
+production mechanism shipped the same day and is exercised by the first two
+real compositions, the public Factory Domain
+(`BelimbingApp/b-dom-factory`, mounted at `apps/domains/factory`) and a
+private Extension (`SB-Tape/b-ext-sbg`, mounted at `apps/extensions/sbg`).
+The rollout record is `docs/plans/domain-extension-layer-rollout.md`.
+
+The chosen mechanisms, each owned where it is enforced:
+
+- **Discovery.** Mounted containers are found one level below the two role
+  roots with no list naming them; the container ID equals its directory and
+  its OTP application name, the layer must match the root, and `base`,
+  `core`, and `web` are reserved. Same-layer edges may cross repositories.
+  Owner: `apps/base/module_registry/docs/README.md`.
+- **Runtime visibility.** The host application's OTP closure is the
+  discovered graph: Web takes a path dependency on every discovered container
+  through `optional_container_dependencies/1`, and the `bilimbi` release is
+  built around Web. Every production entry point (host boot, the database Mix
+  tasks, and the release migrate and seed commands) calls
+  `ModuleRegistry.complete_modules!/0` first and refuses a runtime that has
+  loaded only part of the graph. Package-local test runs may see a subset.
+  The rejected alternatives were a generated graph manifest loaded at
+  runtime, a runtime scan of the code path, and Core Compatibility depending
+  on mounted containers; the last is an upward dependency this standard
+  forbids. Owner: `apps/base/module_registry/docs/README.md` and
+  `docs/architecture/database.md`.
+- **Routes.** `BilimbiWeb.RouteOverlap` runs after the host router compiles
+  and fails `mix compile` when two routes of the compiled table can match the
+  same request, owner taken from descriptor layer and source. A stricter
+  route placed earlier by the same owner is the one allowed overlap. Owner:
+  `apps/web/lib/bilimbi_web/route_overlap.ex`.
+- **Migrations and durable data.** Mounted migrations run through the one
+  ledger from the host closure, and `bilimbi_migration_provenance` records
+  each applied version's owner, disposition, and checksum, so unmounting keeps
+  data and ledger valid and a remount cannot change an applied file. Owner:
+  `docs/architecture/database.md`.
+- **Dependency lock.** The composition lock overlay and pinned manifest in
+  [Composition dependency lock](#composition-dependency-lock).
+- **Contributions.** Mounted modules use the same descriptor-owned provider as
+  Base and Core, and one snapshot serves every consumer. Conflicts fail
+  `mix bilimbi.contributions.verify`, host boot, and the release seed command;
+  `mix compile` and `mix release` do not run them, so precommit and CI are the
+  build gate for this rule.
+- **Mounted-code traversal.** Formatter subdirectories, guard scans, Tailwind
+  sources, `precommit.test`, and `compile.strict` derive their paths from
+  discovery rather than fixed-depth globs.
+- **Repository CI.** A mounted repository's CI checks out the Platform at a
+  pinned revision, mounts itself, resolves the composition lock, and runs the
+  Platform's precommit, once mounted and once absent; the Factory workflow is
+  the reference shape.
+
+One item remains open and is tracked in the rollout plan: a production-profile
+release boot is not checked in CI; the proof booted a development-profile
+release without source or Mix. The cross-repository same-layer edge is proven
+mechanism with no production user yet; the first real one must pass the
+business-necessity test above.

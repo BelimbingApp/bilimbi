@@ -1,7 +1,7 @@
 # docs/plans/factory/mr-packaging-requirements.md
 
-**Status:** Proposed customer requirements
-**Last Updated:** 2026-09-25
+**Status:** Validated in Factory scenarios; plant confirmations pending
+**Last Updated:** 2026-09-27
 **Sources:**
 - Client meeting notes, Mr Packaging Sdn Bhd, Muar LDPE foam plant (2026-08-15)
 - [`docs/plans/factory/0000-factory-domain.md`](0000-factory-domain.md)
@@ -10,11 +10,12 @@
 - [`docs/architecture/0010_composition-model.md`](../../architecture/0010_composition-model.md)
 - [Pull request 800](https://github.com/BelimbingApp/bilimbi/pull/800)
 - [Pull request 804](https://github.com/BelimbingApp/bilimbi/pull/804)
+- [BelimbingApp/b-dom-factory](https://github.com/BelimbingApp/b-dom-factory) — Factory Domain implementation
 
 **Agents:** claude/claude-opus-5 (earlier work),
 amp/medium-sol (architecture review only), codex/gpt-5 (earlier work),
 codex/gpt-5.6-luna (earlier work), codex/gpt-6-luna-xhigh (earlier work), codex/gpt-6-sol-medium (Factory boundary revision),
-claude/claude-opus-5.5 (no-mistakes review agent)
+claude/claude-opus-5.5 (no-mistakes review agent, shipped-status update)
 
 ## Problem Essence
 
@@ -127,15 +128,15 @@ Mr Packaging Sdn Bhd needs Factory to support these customer-facing results.
 
 - [ ] Confirm where weighing happens and which clerk records supplier, vehicle, material, and location.
 - [ ] Confirm weight units and capture declared weight plus measured gross, tare, and net.
-- [ ] Post one representative lorry receipt through Inventory and show the supplier variance.
-- [ ] Keep the receipt traceable as it moves into storage or production.
+- [x] Post one representative lorry receipt through Inventory and show the supplier variance. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#15](https://github.com/BelimbingApp/b-dom-factory/pull/15). claude/claude-opus-5.5
+- [x] Keep the receipt traceable as it moves into storage or production. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11). claude/claude-opus-5.5
 
 Validation: a clerk records a lorry in one flow and can explain the source of every recorded weight.
 
 #### Phase 2 — Roll labels and storage locations
 
 - [ ] Confirm label material, placement, survivability, and network coverage at the plant.
-- [ ] Set up the cure-storage locations and the unit identity that roll labels will carry.
+- [x] Set up the cure-storage locations and the unit identity that roll labels will carry. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11) (representative locations and labels). claude/claude-opus-5.5
 - [ ] Prove a test label can be scanned and moved between locations as an ordinary warehouse movement.
 
 Validation: a labelled unit can be located through Inventory after a physical move, without any production posting.
@@ -145,10 +146,10 @@ Validation: a labelled unit can be located through Inventory after a physical mo
 #### Phase 3 — Blend, extrusion, and cure
 
 - [ ] Confirm blend proportions, colours, measured dimensions, and applicable cure minimum with plant staff.
-- [ ] Configure foam process families, routes, output roles, conversion bases, and cure gates as Factory data.
-- [ ] Record an extrusion execution that consumes the received material and creates each labelled roll with its identity, production time, and dimensions.
-- [ ] Prove that each roll traces to its input receipt through Inventory genealogy and can be located after the physical cure delay.
-- [ ] Verify the default hold for under-cured material and the authorised override evidence.
+- [x] Configure foam process families, routes, output roles, conversion bases, and cure gates as Factory data. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11) (representative configuration). claude/claude-opus-5.5
+- [x] Record an extrusion execution that consumes the received material and creates each labelled roll with its identity, production time, and dimensions. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#16](https://github.com/BelimbingApp/b-dom-factory/pull/16). claude/claude-opus-5.5
+- [x] Prove that each roll traces to its input receipt through Inventory genealogy and can be located after the physical cure delay. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#16](https://github.com/BelimbingApp/b-dom-factory/pull/16). claude/claude-opus-5.5
+- [x] Verify the default hold for under-cured material and the authorised override evidence. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#14](https://github.com/BelimbingApp/b-dom-factory/pull/14). claude/claude-opus-5.5
 - [ ] Keep this workflow in Factory when the confirmed process fits its public contracts and configuration; document a concrete gap before proposing an Extension.
 
 Validation: an operator can identify each roll, trace it to its receipt, see its cure age, and explain any consumed under-cured roll.
@@ -156,9 +157,9 @@ Validation: an operator can identify each roll, trace it to its receipt, see its
 #### Phase 4 — Lamination, cutting, packing, and despatch
 
 - [ ] Confirm the demand source before building matching; do not assume sales-order backlog.
-- [ ] Configure lamination, cutting, packing, and despatch routes and resources.
-- [ ] Record product, trim/offcut, and waste as identified outputs and report yield per roll and run.
-- [ ] Trace a finished pack to its roll and receipt, then trace the receipt forward.
+- [x] Configure lamination, cutting, packing, and despatch routes and resources. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11) (representative configuration). claude/claude-opus-5.5
+- [x] Record product, trim/offcut, and waste as identified outputs and report yield per roll and run. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11), [b-dom-factory#16](https://github.com/BelimbingApp/b-dom-factory/pull/16). claude/claude-opus-5.5
+- [x] Trace a finished pack to its roll and receipt, then trace the receipt forward. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11). claude/claude-opus-5.5
 
 Validation: the known 1200 mm to 800 mm cut and a representative shipment reconcile to identified material.
 
@@ -166,8 +167,8 @@ Validation: the known 1200 mm to 800 mm cut and a representative shipment reconc
 
 - [ ] Report expected and actual quantities by supplier, operation, resource, location, and period.
 - [ ] Separate measured differences from derived-measurement uncertainty and show each unexplained discrepancy.
-- [ ] Verify duplicate-safe retries, concurrent consumption, late entry, reversal, tenant scope, and append-only correction.
-- [ ] Confirm the requirements against Factory's contracts and configuration; document a specific gap before proposing any Extension code.
+- [x] Verify duplicate-safe retries, concurrent consumption, late entry, reversal, tenant scope, and append-only correction. Evidence: [b-dom-factory#2](https://github.com/BelimbingApp/b-dom-factory/pull/2), [b-dom-factory#4](https://github.com/BelimbingApp/b-dom-factory/pull/4), [b-dom-factory#6](https://github.com/BelimbingApp/b-dom-factory/pull/6). claude/claude-opus-5.5
+- [x] Confirm the requirements against Factory's contracts and configuration; document a specific gap before proposing any Extension code. Evidence: Mr Packaging scenario in [b-dom-factory#11](https://github.com/BelimbingApp/b-dom-factory/pull/11) (gaps listed in its scenario doc). claude/claude-opus-5.5
 - [ ] Confirm a representative month with the customer and retain the source evidence for each reported total.
 
 Validation: Mr Packaging Sdn Bhd can reconcile a representative month and carry each unresolved difference as an open investigation.

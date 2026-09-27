@@ -10,14 +10,14 @@ An Extension adapts installed capabilities through declared public contracts and
 
 ## Repository names
 
-An optional Domain repository is named `BelimbingApp/b-dom-<id>`, and an Extension repository `BelimbingApp/b-ext-<id>`. Clone it into a folder named after the container ID, with hyphens turned into underscores, because discovery requires the folder name to equal the snake_case container ID.
+An optional Domain repository is named `b-dom-<id>` and an Extension repository `b-ext-<id>`, in whichever GitHub organization owns it. Clone it into a folder named after the container ID, with hyphens turned into underscores, because discovery requires the folder name to equal the snake_case container ID.
 
 ```bash
-git clone https://github.com/BelimbingApp/b-dom-<id>.git apps/domains/<id_with_underscores>
-git clone https://github.com/BelimbingApp/b-ext-<id>.git apps/extensions/<id_with_underscores>
+git clone https://github.com/<owner>/b-dom-<id>.git apps/domains/<id_with_underscores>
+git clone https://github.com/<owner>/b-ext-<id>.git apps/extensions/<id_with_underscores>
 ```
 
-`b-dom-factory` mounts at `apps/domains/factory`. `b-ext-mr-packaging` mounts at `apps/extensions/mr_packaging`. `b-ext-sb-group` mounts at `apps/extensions/sb_group`.
+`BelimbingApp/b-dom-factory` mounts at `apps/domains/factory`. `SB-Tape/b-ext-sbg` (private) mounts at `apps/extensions/sbg`. A Mr Packaging Extension, if one is ever needed, would be `b-ext-mr-packaging` at `apps/extensions/mr_packaging`.
 
 ## Mounting
 

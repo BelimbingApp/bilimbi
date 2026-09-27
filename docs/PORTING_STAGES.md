@@ -2,7 +2,7 @@
 
 **Document Type:** Team delivery roadmap
 **Status:** Provisional and stage-gated
-**Last Updated:** 2026-08-24
+**Last Updated:** 2026-09-27
 
 The AI team ports capabilities in dependency order, not by translating files
 or racing through a module list. Each stage exits only when its contracts,
@@ -130,34 +130,62 @@ authorization, settings, audit, and operational foundations are trustworthy.
 
 ## S5 — Optional Domains
 
-**Purpose:** Introduce the first real optional business Domain only after Base
-and Core are stable.
+**Purpose:** Introduce real optional business Domains as independent
+repositories on the composition model in
+[`architecture/0010_composition-model.md`](architecture/0010_composition-model.md).
 
-Port one Domain bundle at a time. Its physical container and child modules use
-the same descriptor discovery and nested-Git boundary as Base/Core. A second
-real Domain is the test of whether shared Domain conventions are justified.
+A Domain is one repository mounted at `apps/domains/<id>`; Bilimbi discovers
+it with no list naming it, its migrations run through the one ledger from the
+host closure, and its own CI checks out a pinned Platform revision, mounts the
+repository, and runs the Platform's precommit both mounted and absent. Port
+one Domain at a time. A second real Domain is the test of whether shared
+Domain conventions are justified.
 
 **Exit gate per Domain:**
 
-- install/remove source composition is deterministic;
-- dependencies point only to allowed lower layers or declared sibling modules;
-- migrations and durable data remain safe when source code is absent;
+- install/remove source composition is deterministic, proven by the
+  repository's mounted and absent CI jobs and a missing-dependency refusal;
+- dependencies point only to allowed lower layers or declared, business-
+  justified same-layer modules, and discovery rejects the rest;
+- migrations and durable data remain safe when source code is absent, through
+  the migration provenance record;
 - the Domain works through public Base/Core contracts;
-- its complete tests travel with its module directories.
+- its complete tests travel with its module directories and run under the
+  Platform's precommit.
+
+**State:** First Domain, Factory (`BelimbingApp/b-dom-factory`: Inventory,
+Product Definition, Production Execution), shipped 2026-09-26 with each gate
+item covered by its CI; see the rollout plan
+`plans/domain-extension-layer-rollout.md`, Phase 3. The second-Domain test is
+open.
 
 ## S6 — Extensions and distribution hardening
 
 **Purpose:** Prove independent development, nested-Git delivery, upgrades,
-diagnostics, and deployment-owned Extensions.
+diagnostics, and company-owned Extensions, whose ownership, visibility, and
+licensing are independent of their architectural role.
 
 **Exit gate:**
 
-- distribution bundles can mount modules without central child lists;
-- version/dependency/update diagnostics are clear to operators;
-- migration ordering and cleanup remain safe across installed sources;
-- Extensions cannot create hidden upward or peer dependency layers;
+- repositories mount modules without central child lists (met: discovery,
+  the Web host closure, and the `bilimbi` release);
+- version, dependency, and update diagnostics are clear to operators
+  (partly met: discovery names each graph error, and the composition lock's
+  pinned manifest refuses a changed revision, mounted set, or lock; upgrade
+  guidance is open);
+- migration ordering and cleanup remain safe across installed sources (met:
+  one ledger with migration provenance; unmounting keeps data);
+- Extensions cannot create hidden upward or peer dependency layers: upward
+  edges are rejected, and a peer edge exists only when declared, acyclic, and
+  justified under 0010 (met);
 - release, upgrade, rollback, and provenance workflows are documented and
-  tested.
+  tested (partly met: release migrate and seed commands, rollback task, and
+  provenance are documented and tested; a production-profile release boot in
+  CI and an upgrade workflow are open).
+
+**State:** First Extension, SBG's AX Connector (`SB-Tape/b-ext-sbg`,
+private), shipped 2026-09-26 with mounted, absent, and removal CI jobs; see
+the rollout plan, Phase 4. The open gate items above remain.
 
 ## Stage-change rule
 
@@ -165,3 +193,16 @@ Only the coordination steward proposes a stage transition, and only the
 integration steward records evidence for its gates. The user approves material
 scope changes. Starting research for the next stage is allowed when read-only;
 starting its implementation is not.
+
+### Recorded scope changes
+
+- **2026-09-26 — S5 and S6 started ahead of S2–S4.** The user approved
+  starting the Factory build after the composition proof, before the S2, S3,
+  and S4 gates closed; the approval is quoted in the intent of Bilimbi
+  [pull request 812](https://github.com/BelimbingApp/bilimbi/pull/812) and
+  the later Phase 2 pull requests. The scope change: S5 and S6 gate evidence
+  is recorded per repository, in the mounted repository's own CI against a
+  pinned Platform revision, rather than inside Bilimbi; S0's composition
+  kernel was extended with nested-root discovery, the composition lock, route
+  overlap rejection, and migration provenance to make that possible. S2–S4
+  keep their gates and their order for the Platform itself.
