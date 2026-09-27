@@ -1,7 +1,7 @@
 # Base Tiling
 
 Base Tiling owns the tiled workspace at `/workspace`: several Bilimbi pages
-side by side in one browser tab, arranged by a Hyprland-style dwindle tree
+side by side in one browser tab, arranged by a Hyprland-style dwindle or master tree
 with keyboard control, drag resizing, drag-to-swap, monocle, and layouts
 saved per account.
 
@@ -29,6 +29,10 @@ tile menu's monocle fills the workspace with it.
 `Bilimbi.Base.Tiling.Layout` is the pure tree: open, close, resize, move,
 swap, flip, directional neighbours, the rectangles every tile and divider
 occupies, and the compact URL form (`h.5(/companies,v.6(/users,/audit))`).
+Master mode keeps the first tile as master and divides the remaining column
+evenly when a tile opens or closes; a dragged stack ratio is kept. A stack
+tile can be promoted without reloading its frame, and the master direction
+can be flipped; mode and tree are saved together per layout.
 `Bilimbi.Base.Tiling.SavedLayouts` keeps an account's saved layouts and its
 default in the `ui.workspace.layouts` and `ui.workspace.default` settings at
 user scope, through the shared Settings API, so every write is audited.
@@ -71,5 +75,4 @@ This module depends on Authz, Settings and UI. The host page lives here
 rather than in Base UI because Settings itself depends on Base UI for its own
 screens, so Base UI cannot read saved layouts.
 
-Deferred to later slices: the master layout, Domain-contributed default
-layouts, and nested-LiveView tiles.
+Deferred to later slices: Domain-contributed default layouts and nested-LiveView tiles.

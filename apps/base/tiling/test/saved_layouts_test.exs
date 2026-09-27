@@ -124,4 +124,21 @@ defmodule Bilimbi.Base.Tiling.SavedLayoutsTest do
     assert {:ok, %{"slug" => "shared-layouts-2"}} =
              SavedLayouts.save(@scope, "Shared layouts", "/companies")
   end
+
+  test "each saved layout keeps its selected tiling mode and tree" do
+    {:ok, _} = SavedLayouts.save(@scope, "Records", "/companies")
+    {:ok, _} = SavedLayouts.save(@scope, "Lookups", "/users")
+
+    assert {:ok, %{"layout" => "master", "tree" => "h.55(/companies,/users)"}} =
+             SavedLayouts.set_layout(@scope, "records", "master", "h.55(/companies,/users)")
+
+    assert {:ok, %{"layout" => "master"}} = SavedLayouts.fetch(@scope, "records")
+    assert {:ok, %{"layout" => "dwindle"}} = SavedLayouts.fetch(@scope, "lookups")
+    assert {:ok, %{"layout" => "master"}} = SavedLayouts.save(@scope, "Records", "/a")
+    assert SavedLayouts.set_layout(@scope, "records", "grid", "/a") == {:error, :layout}
+    assert SavedLayouts.set_layout(@scope, "records", "master", "") == {:error, :tree}
+
+    assert SavedLayouts.set_layout(@scope, "missing", "master", "/a") ==
+             {:error, :not_found}
+  end
 end

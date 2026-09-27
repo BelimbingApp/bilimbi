@@ -1,6 +1,6 @@
 defmodule Bilimbi.Base.Tiling.Layout do
   @moduledoc """
-  The pure dwindle tree behind a tiled workspace.
+  The pure dwindle and master trees behind a tiled workspace.
 
   A layout is a binary space partition: a leaf is one tile showing a page at
   a path, and a split divides its rectangle between two children along one
@@ -82,6 +82,141 @@ defmodule Bilimbi.Base.Tiling.Layout do
   @doc "How many tiles the workspace holds."
   @spec count(t()) :: non_neg_integer()
   def count(layout), do: length(leaves(layout))
+
+  @doc """
+  Arranges the existing tiles as one master and an evenly divided stack.
+
+  The first tile becomes master. Existing leaf ids survive so changing modes
+  never reloads a frame. Rebuilding a master tree keeps its orientation and
+  master share, including after a divider drag.
+  """
+  @spec master(t()) :: t()
+  def master(%__MODULE__{} = layout), do: master_rebuild(layout, leaves(layout))
+
+  @doc "Whether the tree is already one master beside a single-axis stack."
+  @spec master?(t()) :: boolean()
+  def master?(%__MODULE__{root: root}) do
+    case root do
+      nil ->
+        true
+
+      %{type: :leaf} ->
+        true
+
+      %{type: :split, first: %{type: :leaf}} = split ->
+        stack?(split.second, other_axis(split.direction))
+
+      _other ->
+        false
+    end
+  end
+
+  defp stack?(%{type: :leaf}, _direction), do: true
+
+  defp stack?(
+         %{type: :split, direction: direction, first: %{type: :leaf}, second: second},
+         direction
+       ),
+       do: stack?(second, direction)
+
+  defp stack?(_node, _direction), do: false
+
+  defp master_rebuild(layout, tiles) do
+    case tiles do
+      [] ->
+        %{layout | root: nil}
+
+      [leaf] ->
+        %{layout | root: leaf}
+
+      [first | stack] ->
+        {direction, ratio} = master_shape(layout.root)
+        {stack_root, layout} = master_stack(stack, other_axis(direction), layout)
+        {id, layout} = master_root_id(layout)
+
+        %{
+          layout
+          | root: %{
+              type: :split,
+              id: id,
+              direction: direction,
+              ratio: ratio,
+              first: first,
+              second: stack_root
+            }
+        }
+    end
+  end
+
+  @doc "Opens a tile at the end of the master stack."
+  @spec master_open(t(), String.t()) :: {:ok, t(), String.t()}
+  def master_open(%__MODULE__{} = layout, path) when is_binary(path) and path != "" do
+    {leaf, layout} = new_leaf(layout, path)
+    {:ok, master_rebuild(layout, leaves(layout) ++ [leaf]), leaf.id}
+  end
+
+  @doc "Closes a master tile and divides the remaining stack evenly."
+  @spec master_close(t(), String.t()) :: t()
+  def master_close(%__MODULE__{} = layout, id) do
+    if fetch_leaf(layout, id) do
+      master_rebuild(layout, Enum.reject(leaves(layout), &(&1.id == id)))
+    else
+      layout
+    end
+  end
+
+  @doc "Turns a side-by-side master into a top-and-bottom master, or back."
+  @spec toggle_master_orientation(t()) :: t()
+  def toggle_master_orientation(%__MODULE__{root: root} = layout),
+    do: %{layout | root: flip(root)}
+
+  defp flip(%{type: :split} = split),
+    do: %{
+      split
+      | direction: other_axis(split.direction),
+        first: flip(split.first),
+        second: flip(split.second)
+    }
+
+  defp flip(node), do: node
+
+  @doc "Makes the named tile master by exchanging it with the first tile."
+  @spec promote_master(t(), String.t()) :: t()
+  def promote_master(%__MODULE__{} = layout, id) do
+    case leaves(layout) do
+      [first | _] -> swap(layout, first.id, id)
+      [] -> layout
+    end
+  end
+
+  defp master_shape(%{type: :split, first: %{type: :leaf}, direction: direction, ratio: ratio}),
+    do: {direction, ratio}
+
+  defp master_shape(_root), do: {:h, 0.55}
+
+  defp master_root_id(%__MODULE__{root: %{type: :split, id: id}} = layout),
+    do: {id, layout}
+
+  defp master_root_id(layout), do: next_id(layout, "s")
+
+  defp master_stack([leaf], _direction, layout), do: {leaf, layout}
+
+  defp master_stack([first | rest] = leaves, direction, layout) do
+    {second, layout} = master_stack(rest, direction, layout)
+    {id, layout} = next_id(layout, "s")
+
+    {%{
+       type: :split,
+       id: id,
+       direction: direction,
+       ratio: 1 / length(leaves),
+       first: first,
+       second: second
+     }, layout}
+  end
+
+  defp other_axis(:h), do: :v
+  defp other_axis(:v), do: :h
 
   @doc "The leaf with this id, or nil."
   @spec fetch_leaf(t(), String.t()) :: leaf() | nil

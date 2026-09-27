@@ -253,6 +253,22 @@ test("a server patch that did not follow a keyboard move leaves focus alone", ()
   assert.equal(focused(), "tile-t1-header-title")
 })
 
+test("a patch that moves tiles and dividers repaints both to the server's geometry", () => {
+  const tile = document.getElementById("tile-t2")
+  const handle = document.getElementById("split-s3")
+  tile.dataset.place = "left: 50%; top: 0%; width: 50%; height: 100%"
+  control.hook.updated()
+
+  tile.dataset.place = "left: 70%; top: 0%; width: 30%; height: 100%"
+  handle.dataset.place = "left: 70%; top: 0%; height: 100%"
+  assert.equal(tile.style.left, "50%")
+  control.hook.updated()
+
+  assert.equal(tile.style.left, "70%")
+  assert.equal(tile.style.width, "30%")
+  assert.equal(handle.style.left, "70%")
+})
+
 test("arrow keys on a focused handle nudge its divider", () => {
   const handle = document.getElementById("split-s3")
   handle.focus()

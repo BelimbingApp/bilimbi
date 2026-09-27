@@ -518,6 +518,122 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
   end
 
   describe "saved layouts" do
+    test "a saved layout switches between master and dwindle, with numbered access", %{conn: conn} do
+      {:ok, _} = SavedLayouts.save(@settings_scope, "Records", "h.5(/companies,/companies)")
+      {:ok, _} = SavedLayouts.save(@settings_scope, "Lookups", "/companies")
+
+      {:ok, view, _html} = open(conn, "/workspace/records")
+      view |> element("#workspace-open-layouts") |> render_click()
+      view |> element("#workspace-layout-mode-records") |> render_click()
+      assert_patch(view, "/workspace/records?t=h.5%28%2Fcompanies%2C%2Fcompanies%29")
+      assert has_element?(view, "#workspace[data-layout='master']")
+      assert has_element?(view, "#workspace-layout-mode-records", "Master")
+      assert {:ok, %{"layout" => "master"}} = SavedLayouts.fetch(@settings_scope, "records")
+
+      view
+      |> form("#workspace-save-form", %{"layout" => %{"label" => "Master copy"}})
+      |> render_submit()
+
+      assert_patch(view, "/workspace/master-copy")
+
+      assert {:ok, %{"layout" => "master"}} =
+               SavedLayouts.fetch(@settings_scope, "master-copy")
+
+      view |> element("#workspace-add-page") |> render_click()
+      view |> element("#workspace-pick-admin-company") |> render_click()
+
+      assert_patch(
+        view,
+        "/workspace/master-copy?t=h.5%28%2Fcompanies%2Cv.5%28%2Fcompanies%2C%2Fcompanies%29%29"
+      )
+
+      assert has_element?(view, "#workspace[data-layout='master'][data-tile-count='3']")
+      assert has_element?(view, "#tile-t4-header-make-master", "Make master")
+      view |> element("#tile-t4-header-make-master") |> render_click()
+      assert has_element?(view, "#tile-t4[data-place*='left: 0.0%']")
+      assert has_element?(view, "#tile-t4-header", "Master")
+
+      render_hook(view, "open-layout", %{"n" => 2})
+      assert_patch(view, "/workspace/lookups")
+      assert has_element?(view, "#workspace[data-layout='dwindle']")
+    end
+
+    test "a stack divider in master mode keeps the ratio it is given", %{conn: conn} do
+      {:ok, _} =
+        SavedLayouts.save(
+          @settings_scope,
+          "Records",
+          "h.5(/companies,v.7(/companies,/companies))",
+          "master"
+        )
+
+      {:ok, _} = SavedLayouts.save(@settings_scope, "Lookups", "/companies")
+
+      {:ok, view, _html} = open(conn, "/workspace/records")
+
+      assert has_element?(
+               view,
+               "#split-s4[aria-orientation='horizontal'][data-place*='top: 70.0%']"
+             )
+
+      render_hook(view, "resize-split", %{"id" => "s4", "ratio" => 0.6})
+
+      assert_patch(
+        view,
+        "/workspace/records?t=h.5%28%2Fcompanies%2Cv.6%28%2Fcompanies%2C%2Fcompanies%29%29"
+      )
+
+      assert has_element?(view, "#split-s4[data-place*='top: 60.0%']")
+
+      render_hook(view, "focus-tile", %{"id" => "t3"})
+      render_hook(view, "resize-step", %{"side" => "up"})
+
+      assert_patch(
+        view,
+        "/workspace/records?t=h.5%28%2Fcompanies%2Cv.55%28%2Fcompanies%2C%2Fcompanies%29%29"
+      )
+
+      assert has_element?(view, "#split-s4[data-place*='top: 55.0%']")
+
+      render_hook(view, "open-layout", %{"n" => 2})
+      assert_patch(view, "/workspace/lookups")
+      render_hook(view, "open-layout", %{"n" => 1})
+      assert_patch(view, "/workspace/records")
+      assert has_element?(view, "#workspace[data-layout='master']")
+      assert has_element?(view, "[data-split][data-place*='top: 70.0%']")
+
+      {:ok, view, _html} =
+        open(conn, "/workspace/records?t=h.5(/companies,v.55(/companies,/companies))")
+
+      assert has_element?(view, "[data-split][data-place*='top: 55.0%']")
+    end
+
+    test "closing the last tile of a master layout empties the workspace", %{conn: conn} do
+      {:ok, _} = SavedLayouts.save(@settings_scope, "Records", "/companies", "master")
+
+      {:ok, view, _html} = open(conn, "/workspace/records")
+      view |> element("#tile-t1-header-close") |> render_click()
+      assert_patch(view, "/workspace/records?t=")
+      assert has_element?(view, "#workspace[data-layout='master'][data-tile-count='0']")
+      refute has_element?(view, "#tile-t1")
+    end
+
+    test "changing the mode of the open layout leaves its unsaved tiles unsaved", %{conn: conn} do
+      {:ok, _} = SavedLayouts.save(@settings_scope, "Records", "h.5(/companies,/companies)")
+
+      {:ok, view, _html} = open(conn, "/workspace/records")
+      view |> element("#tile-t2-header-close") |> render_click()
+      assert_patch(view, "/workspace/records?t=%2Fcompanies")
+
+      view |> element("#workspace-open-layouts") |> render_click()
+      view |> element("#workspace-layout-mode-records") |> render_click()
+      assert_patch(view, "/workspace/records?t=%2Fcompanies")
+      assert has_element?(view, "#workspace[data-layout='master'][data-tile-count='1']")
+
+      assert {:ok, %{"layout" => "master", "tree" => "h.5(/companies,/companies)"}} =
+               SavedLayouts.fetch(@settings_scope, "records")
+    end
+
     test "saving names the layout, gives it an address, and lists it", %{conn: conn} do
       {:ok, view, _html} = open(conn, "/workspace?t=h.5(/companies,/companies)")
 

@@ -67,7 +67,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   @write_guard_opt_out ~w(add-tile close-tile move-tile swap-tile toggle-monocle toggle-split
                           resize-split nudge-split resize-step save-layout update-layout
                           rename-layout delete-layout confirm-delete-layout set-default-layout
-                          clear-default-layout copy-layout)
+                          clear-default-layout copy-layout set-layout-mode make-master)
 
   # The root layout's title suffix, stripped from what a frame reports so
   # the tile bar shows the page's own name. Keep in step with
@@ -102,6 +102,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
      |> assign(:slug, nil)
      |> assign(:in_place?, false)
      |> assign(:shared?, false)
+     |> assign(:layout_mode, "dwindle")
      |> assign(:focused, nil)
      |> assign(:monocle, false)
      |> assign(:viewport, {1600, 900})
@@ -140,7 +141,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
         {:noreply, open_saved(socket, params["slug"], params["t"])}
 
       is_binary(params["t"]) ->
-        {:noreply, apply_encoded(socket, params["t"])}
+        {:noreply, apply_encoded(socket, "dwindle", params["t"])}
 
       true ->
         open_default(socket)
@@ -156,16 +157,32 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   defp load_tree(socket, %{"slug" => slug} = params) when is_binary(slug),
     do: open_saved(socket, slug, params["t"])
 
-  defp load_tree(socket, params), do: apply_encoded(socket, params["t"] || "")
+  defp load_tree(socket, params), do: apply_encoded(socket, "dwindle", params["t"] || "")
 
-  # A patch this page pushed itself carries the tree it already holds.
-  defp apply_encoded(%{assigns: %{encoded: encoded}} = socket, encoded), do: socket
+  # A patch this page pushed already holds the tree and stable divider ids.
+  # Only a tree that is not yet master-shaped is rearranged, so a stack
+  # divider the user moved keeps its ratio.
+  defp apply_encoded(%{assigns: %{encoded: encoded, layout_mode: mode}} = socket, mode, encoded),
+    do: socket
 
-  defp apply_encoded(socket, encoded) do
+  defp apply_encoded(socket, mode, encoded),
+    do: decode_encoded(assign(socket, :layout_mode, mode), encoded)
+
+  defp decode_encoded(socket, encoded) do
     case Layout.decode(encoded) do
       {:ok, incoming} ->
         layout = Layout.reconcile(socket.assigns.tree, incoming)
-        socket |> put_layout(layout) |> assign(:encoded, encoded) |> keep_focus()
+
+        layout =
+          if socket.assigns.layout_mode == "master" and not Layout.master?(layout),
+            do: Layout.master(layout),
+            else: layout
+
+        socket = socket |> put_layout(layout) |> assign(:encoded, encoded) |> keep_focus()
+
+        if Layout.encode(layout) == encoded,
+          do: socket,
+          else: sync_url(socket, replace: true)
 
       :error ->
         socket
@@ -182,7 +199,8 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   defp open_saved(socket, slug, encoded) do
     case SavedLayouts.fetch(socket.assigns.settings_scope, slug) do
       {:ok, entry} ->
-        apply_encoded(socket, encoded || entry["tree"])
+        mode = if entry["layout"] == "master", do: "master", else: "dwindle"
+        apply_encoded(socket, mode, encoded || entry["tree"])
 
       :error ->
         socket
@@ -198,7 +216,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
            socket.assigns.role_codes
          ) do
       {:ok, entry} ->
-        apply_encoded(socket, encoded || entry["tree"])
+        apply_encoded(socket, "dwindle", encoded || entry["tree"])
 
       :error ->
         socket
@@ -210,7 +228,13 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   defp open_default(socket) do
     case SavedLayouts.default_slug(socket.assigns.settings_scope) do
       nil ->
-        socket = socket |> put_layout(Layout.empty()) |> assign(:encoded, nil) |> keep_focus()
+        socket =
+          socket
+          |> assign(:layout_mode, "dwindle")
+          |> put_layout(Layout.empty())
+          |> assign(:encoded, nil)
+          |> keep_focus()
+
         {:noreply, assign(socket, picker_open?: Layout.empty?(socket.assigns.tree))}
 
       slug ->
@@ -237,7 +261,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
   defp tile_page(socket, path, at) do
     {layout, id} =
-      Layout.open(socket.assigns.tree, path, at: at, viewport: socket.assigns.viewport)
+      open_tile(socket, socket.assigns.tree, path, at)
 
     socket
     |> put_layout(layout)
@@ -322,12 +346,22 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     end
   end
 
+  def handle_event("make-master", %{"id" => id}, %{assigns: %{layout_mode: "master"}} = socket) do
+    layout = Layout.promote_master(socket.assigns.tree, id)
+    {:noreply, socket |> put_layout(layout) |> focus(id) |> sync_url()}
+  end
+
+  def handle_event("make-master", _params, socket), do: {:noreply, socket}
+
   # Closing down to one tile leaves a workspace entered by tiling in place
   # for that page's own URL: it began from a full page, and it ends as one.
   # A page the account may not open stays in its tile, where the refusal is
   # readable.
   def handle_event("close-tile", %{"id" => id}, socket) do
-    layout = Layout.close(socket.assigns.tree, id)
+    layout =
+      if socket.assigns.layout_mode == "master",
+        do: Layout.master_close(socket.assigns.tree, id),
+        else: Layout.close(socket.assigns.tree, id)
 
     socket =
       socket
@@ -370,7 +404,12 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   end
 
   def handle_event("toggle-split", %{"id" => id}, socket) do
-    {:noreply, socket |> put_layout(Layout.toggle_split(socket.assigns.tree, id)) |> sync_url()}
+    layout =
+      if socket.assigns.layout_mode == "master",
+        do: Layout.toggle_master_orientation(socket.assigns.tree),
+        else: Layout.toggle_split(socket.assigns.tree, id)
+
+    {:noreply, socket |> put_layout(layout) |> sync_url()}
   end
 
   def handle_event("resize-split", %{"id" => id, "ratio" => ratio}, socket)
@@ -459,7 +498,8 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     case SavedLayouts.save(
            socket.assigns.settings_scope,
            label,
-           Layout.encode(socket.assigns.tree)
+           Layout.encode(socket.assigns.tree),
+           socket.assigns.layout_mode
          ) do
       {:ok, entry} ->
         {:noreply,
@@ -495,7 +535,12 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
     with {:ok, entry} <- SavedLayouts.fetch(scope, slug),
          {:ok, entry} <-
-           SavedLayouts.save(scope, entry["label"], Layout.encode(socket.assigns.tree)) do
+           SavedLayouts.save(
+             scope,
+             entry["label"],
+             Layout.encode(socket.assigns.tree),
+             socket.assigns.layout_mode
+           ) do
       {:noreply,
        socket
        |> load_saved()
@@ -547,6 +592,33 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
       {:error, _other} ->
         {:noreply, put_flash(socket, :error, gettext("The layout could not be renamed."))}
+    end
+  end
+
+  def handle_event("set-layout-mode", %{"id" => slug, "mode" => mode}, socket) do
+    scope = socket.assigns.settings_scope
+
+    with true <- mode in ["dwindle", "master"],
+         {:ok, entry} <- SavedLayouts.fetch(scope, slug),
+         {:ok, stored} <- Layout.decode(entry["tree"]) do
+      stored = to_mode(stored, entry["layout"], mode)
+
+      case SavedLayouts.set_layout(scope, slug, mode, Layout.encode(stored)) do
+        {:ok, _} ->
+          socket = load_saved(socket)
+
+          if socket.assigns.slug == slug do
+            live = to_mode(socket.assigns.tree, socket.assigns.layout_mode, mode)
+            {:noreply, socket |> assign(:layout_mode, mode) |> put_layout(live) |> sync_url()}
+          else
+            {:noreply, socket}
+          end
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, gettext("The layout could not be changed."))}
+      end
+    else
+      _ -> {:noreply, socket}
     end
   end
 
@@ -718,6 +790,15 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
     socket |> assign(:tree, layout) |> assign(:follows, kinds) |> derive()
   end
 
+  defp to_mode(layout, from, "master") when from != "master", do: Layout.master(layout)
+  defp to_mode(layout, _from, _to), do: layout
+
+  defp open_tile(%{assigns: %{layout_mode: "master"}}, layout, path, _at),
+    do: Layout.master_open(layout, path) |> then(fn {:ok, tree, id} -> {tree, id} end)
+
+  defp open_tile(socket, layout, path, at),
+    do: Layout.open(layout, path, at: at, viewport: socket.assigns.viewport)
+
   defp current_leaf(layout, id) when is_binary(id) do
     if Layout.fetch_leaf(layout, id), do: id
   end
@@ -790,6 +871,10 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
     %{leaves: leaves, handles: handles} = Layout.rects(layout)
 
+    master_id =
+      if socket.assigns.layout_mode == "master" and leaves != [],
+        do: hd(leaves) |> elem(0) |> Map.fetch!(:id)
+
     tiles =
       for {leaf, rect} <- leaves do
         focused? = leaf.id == focused
@@ -800,6 +885,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
           title: Map.get(titles, leaf.id) || leaf.path,
           place: if(monocle and focused?, do: @full_place, else: rect_place(rect)),
           focused?: focused?,
+          master?: leaf.id == master_id,
           access: access(current_scope, leaf.path),
           following?: is_binary(leaf.follow),
           on_follow: follow_command(leaf)

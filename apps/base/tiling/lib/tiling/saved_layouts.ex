@@ -63,12 +63,16 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
 
   @doc """
   Saves `tree` under `label`. A label already in use replaces that layout's
-  tree and keeps its slug; a new label gets a slug of its own.
+  tree and keeps its slug; a new label gets a slug of its own. Passing a mode
+  saves that mode with the tree. Without one, a replacement keeps its mode
+  and a new layout starts in dwindle mode.
   """
-  @spec save(Scope.t(), String.t(), String.t()) ::
-          {:ok, entry()} | {:error, :label | :tree | Ecto.Changeset.t()}
-  def save(%Scope{type: :user} = scope, label, tree) when is_binary(label) and is_binary(tree) do
-    with {:ok, label} <- clean_label(label),
+  @spec save(Scope.t(), String.t(), String.t(), String.t() | nil) ::
+          {:ok, entry()} | {:error, :label | :tree | :layout | Ecto.Changeset.t()}
+  def save(%Scope{type: :user} = scope, label, tree, mode \\ nil)
+      when is_binary(label) and is_binary(tree) do
+    with true <- mode in [nil, "dwindle", "master"],
+         {:ok, label} <- clean_label(label),
          {:ok, tree} <- clean_tree(tree) do
       entries = list(scope)
       slug = unique_slug(slug(label), entries)
@@ -76,15 +80,25 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
       {entries, entry} =
         case Enum.find_index(entries, &(&1["label"] == label)) do
           nil ->
-            entry = %{"slug" => slug, "label" => label, "layout" => "dwindle", "tree" => tree}
+            entry = %{
+              "slug" => slug,
+              "label" => label,
+              "layout" => mode || "dwindle",
+              "tree" => tree
+            }
+
             {entries ++ [entry], entry}
 
           index ->
-            entry = Map.put(Enum.at(entries, index), "tree", tree)
+            entry = Enum.at(entries, index)
+            entry = entry |> Map.put("tree", tree) |> Map.put("layout", mode || entry["layout"])
             {List.replace_at(entries, index, entry), entry}
         end
 
       with {:ok, _} <- Settings.put(@layouts_key, entries, scope), do: {:ok, entry}
+    else
+      false -> {:error, :layout}
+      other -> other
     end
   end
 
@@ -100,6 +114,24 @@ defmodule Bilimbi.Base.Tiling.SavedLayouts do
 
       with {:ok, _} <- Settings.put(@layouts_key, entries, scope), do: {:ok, entry}
     else
+      :error -> {:error, :not_found}
+      other -> other
+    end
+  end
+
+  @doc "Sets the tiling mode and its converted tree for one saved layout."
+  @spec set_layout(Scope.t(), String.t(), String.t(), String.t()) ::
+          {:ok, entry()} | {:error, :layout | :tree | :not_found | Ecto.Changeset.t()}
+  def set_layout(%Scope{type: :user} = scope, slug, mode, tree)
+      when is_binary(slug) and is_binary(mode) and is_binary(tree) do
+    with true <- mode in ["dwindle", "master"],
+         {:ok, tree} <- clean_tree(tree),
+         {:ok, entry} <- fetch(scope, slug) do
+      entry = entry |> Map.put("layout", mode) |> Map.put("tree", tree)
+      entries = Enum.map(list(scope), &if(&1["slug"] == slug, do: entry, else: &1))
+      with {:ok, _} <- Settings.put(@layouts_key, entries, scope), do: {:ok, entry}
+    else
+      false -> {:error, :layout}
       :error -> {:error, :not_found}
       other -> other
     end
