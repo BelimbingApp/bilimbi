@@ -101,7 +101,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLiveTest do
       ~p"/grid/users?cols=id%2Cname%2Cemail%2Cemail_verified_at%2Ccreated_at%2Cupdated_at%2Ccompany.name"
     )
 
-    assert has_element?(view, "#grid-chip-company-name", "Name")
+    assert has_element?(view, "#grid-chip-company-name", "Company name")
     assert has_element?(view, "#grid-head-company-name[title='Company › Name']")
     assert has_element?(view, "#grid-cell-91-company-name", "Bilimbi Industries")
     assert has_element?(view, "#grid-cell-92-company-name", "Bilimbi Retail")
@@ -272,9 +272,9 @@ defmodule Bilimbi.Base.Grid.Web.GridLiveTest do
       |> log_in_as()
       |> live(~p"/grid/users?cols=name%2Ccompany.name&group=company.name&sort=company.name")
 
-    assert has_element?(view, "#grid-group-0 th", "Name: Bilimbi Industries")
+    assert has_element?(view, "#grid-group-0 th", "Company name: Bilimbi Industries")
     assert has_element?(view, "#grid-group-0 th", "(2)")
-    assert has_element?(view, "#grid-group-1 th", "Name: Bilimbi Retail")
+    assert has_element?(view, "#grid-group-1 th", "Company name: Bilimbi Retail")
     assert has_element?(view, "#grid-grouped", "Grouped by company.name")
 
     view |> element("#grid-ungroup") |> render_click()
@@ -303,7 +303,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLiveTest do
     assert has_element?(view, "#grid-view-own-ops-desk", "Ops desk")
     assert has_element?(view, "#grid-chip-company-name")
     assert has_element?(view, "#grid-zoom-full[aria-pressed='true']")
-    assert has_element?(view, "#grid-zoom-level[title='Row height 32 px']")
+    assert has_element?(view, "#grid-zoom-level", "32 px")
     assert has_element?(view, "#grid-head-name[aria-sort='descending']")
 
     # A gesture on a saved view is an unsaved change: the URL spells it out and drops the name.

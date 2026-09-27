@@ -168,7 +168,7 @@ defmodule Bilimbi.Base.Grid.Column do
        spec: spec,
        id: dom_id(spec),
        label: label(walk.hops, [], field.label),
-       short_label: field.label,
+       short_label: short_label(walk.hops, field.label),
        type: field.type,
        kind: :field,
        root: root,
@@ -208,12 +208,21 @@ defmodule Bilimbi.Base.Grid.Column do
     links = walk.hops ++ [many] ++ walk.tail
     short = if field, do: "#{field.label} (#{agg_label(agg)})", else: agg_label(:count)
 
+    heading =
+      case field do
+        nil ->
+          "#{many.label} #{String.downcase(agg_label(:count))}"
+
+        field ->
+          "#{List.last(links).label} #{lower_first(field.label)} #{String.downcase(agg_label(agg))}"
+      end
+
     {:ok,
      %__MODULE__{
        spec: spec,
        id: dom_id(spec),
        label: label(links, [], short),
-       short_label: short,
+       short_label: heading,
        type: rollup_type(agg, field),
        kind: :rollup,
        root: root,
@@ -235,6 +244,18 @@ defmodule Bilimbi.Base.Grid.Column do
 
   defp label([], [], short), do: short
   defp label(links, _acc, short), do: Enum.map_join(links, " › ", & &1.label) <> " › " <> short
+
+  # The heading a column scans by: a walked field carries the link it came
+  # through ("Company name"), a rollup the link and the word for its
+  # aggregate ("Users count"), so three counts side by side stay apart.
+  defp short_label([], field_label), do: field_label
+  defp short_label(hops, field_label), do: "#{List.last(hops).label} #{lower_first(field_label)}"
+
+  # "Name" reads as "name" after a link's label; an acronym such as "SKU" keeps its case.
+  defp lower_first(<<first, second, rest::binary>>) when first in ?A..?Z and second in ?a..?z,
+    do: String.downcase(<<first>>) <> <<second, rest::binary>>
+
+  defp lower_first(label), do: label
 
   @doc "The aggregate's word in a label."
   @spec agg_label(agg()) :: String.t()
