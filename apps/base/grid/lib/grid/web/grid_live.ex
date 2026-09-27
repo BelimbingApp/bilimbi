@@ -39,6 +39,16 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
                           save-view request-delete-view cancel-delete-view delete-view)
 
   @share_capability "base.settings.company.manage"
+  @pivot_column [label: nil, root: nil, table: nil, hops: [], many: nil, tail: [], field: nil]
+  @pivot_label struct!(
+                 Column,
+                 [spec: "pv-rows", id: "pv-rows", kind: :field, type: :string, agg: nil] ++
+                   @pivot_column
+               )
+  @pivot_count struct!(
+                 Column,
+                 [spec: "pv", id: "pv", kind: :field, type: :integer, agg: nil] ++ @pivot_column
+               )
 
   @impl true
   def mount(_params, _session, socket) do
@@ -197,26 +207,32 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
 
     result =
       if mode == :full do
-        Grid.query(catalog, table, columns,
-          offset: (view.page - 1) * view.page_size,
-          limit: view.page_size,
-          sort: {sort, view.dir},
-          search: view.search,
-          focus: focus,
-          trend: Host.with_lens(columns, view, :trend),
-          delta: {Host.with_lens(columns, view, :delta), since_at(view)}
+        Grid.query(
+          catalog,
+          table,
+          columns,
+          [
+            offset: (view.page - 1) * view.page_size,
+            limit: view.page_size,
+            sort: {sort, view.dir},
+            search: view.search,
+            focus: focus
+          ] ++ Host.lens_options(columns, view)
         )
       else
         # The hook asks for the window it can show; this run brings the total,
         # the ranges every colour scales to, and the planner's estimate.
-        Grid.query(catalog, table, columns,
-          offset: 0,
-          limit: 1,
-          sort: {sort, view.dir},
-          search: view.search,
-          focus: focus,
-          trend: Host.with_lens(columns, view, :trend),
-          delta: {Host.with_lens(columns, view, :delta), since_at(view)}
+        Grid.query(
+          catalog,
+          table,
+          columns,
+          [
+            offset: 0,
+            limit: 1,
+            sort: {sort, view.dir},
+            search: view.search,
+            focus: focus
+          ] ++ Host.lens_options(columns, view)
         )
       end
 
@@ -233,7 +249,10 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
       )
       |> assign(
         :result,
-        if(pivot, do: %{result | total_entries: pivot.total_entries}, else: result)
+        if(pivot,
+          do: %{result | total_entries: pivot.total_entries, cost: pivot.cost},
+          else: result
+        )
       )
       |> assign(:pivot, pivot)
       |> assign(:rows, rows_for(mode, pivot, result, view))
@@ -307,8 +326,6 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
   defp focus_label(nil, _view), do: nil
   defp focus_label({_target, key}, %View{focus: focus}), do: focus || to_string(key)
 
-  defp since_at(%View{} = view), do: NaiveDateTime.new!(View.since(view), ~T[00:00:00])
-
   # A pivoted grid: the grouped column's values as rows, the pivoted
   # column's values as columns, counted in one statement; nil when the view
   # is not pivoted or names columns the grid does not show.
@@ -322,35 +339,50 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
       result =
         Grid.pivot(catalog, table, rows_column, across_column, search: view.search, focus: focus)
 
-      lens = Host.lens(view, across_column)
-      columns = Enum.map(result.columns, &%{&1 | lens: lens})
-      counted = pivot_count_column(across_column)
+      lens = pivot_lens(Host.lens(view, across_column))
+
+      columns =
+        Enum.map(result.columns, fn
+          %{id: "pv-rows"} = column -> column
+          column -> %{column | lens: lens}
+        end)
 
       rows =
         Enum.map(result.rows, fn row ->
           cells =
-            Map.new(columns, fn column ->
-              {column.id,
-               Lens.cell(
-                 Map.get(row.cells, column.id),
-                 counted,
-                 Map.get(result.stats, column.id),
-                 lens
-               )}
+            Map.new(columns, fn
+              %{id: "pv-rows"} ->
+                {"pv-rows", Lens.cell(row.key, @pivot_label, nil, :value)}
+
+              column ->
+                {column.id,
+                 Lens.cell(
+                   Map.get(row.cells, column.id),
+                   @pivot_count,
+                   Map.get(result.stats, column.id),
+                   lens
+                 )}
             end)
 
           %{key: row.key, cells: cells}
         end)
 
-      %{result | columns: columns, rows: rows}
+      %{
+        columns: columns,
+        rows: rows,
+        total_entries: result.total_entries,
+        more: result.more,
+        cost: result.cost
+      }
     else
       _other -> nil
     end
   end
 
-  # A pivot cell is a count; the lens reads it as one whatever column it counts.
-  defp pivot_count_column(%Column{} = across),
-    do: %{across | kind: :rollup, agg: :count, type: :integer}
+  # A pivot cell is a count whatever column it counts, so it reads as a
+  # value, a bar or a band; a trend or a change belongs to the column.
+  defp pivot_lens(lens) when lens in [:bar, :band], do: lens
+  defp pivot_lens(_lens), do: :value
 
   defp rows_for(:full, nil, result, view), do: Host.rows(result, view)
 
@@ -360,7 +392,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
   defp rows_for(_canvas, _pivot, _result, _view), do: []
 
   defp clamp_page(socket, %Result{} = result, %View{} = view) do
-    page = page_of(result, view)
+    page = page_of(result, socket.assigns.pivot, view)
 
     cond do
       socket.assigns.mode != :full ->
@@ -475,18 +507,21 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
         # The load already counted the set and scaled every colour to it; a
         # window only needs its rows.
         result =
-          Grid.query(catalog, table, columns,
-            offset: offset,
-            limit: limit,
-            sort: {sort, view.dir},
-            search: view.search,
-            focus: socket.assigns.focus,
-            trend: Host.with_lens(columns, view, :trend),
-            delta: {Host.with_lens(columns, view, :delta), since_at(view)},
-            stats: false,
-            cost: false,
-            count: false,
-            total: socket.assigns.result.total_entries
+          Grid.query(
+            catalog,
+            table,
+            columns,
+            [
+              offset: offset,
+              limit: limit,
+              sort: {sort, view.dir},
+              search: view.search,
+              focus: socket.assigns.focus,
+              stats: false,
+              cost: false,
+              count: false,
+              total: socket.assigns.result.total_entries
+            ] ++ Host.lens_options(columns, view)
           )
 
         result = %{result | stats: socket.assigns.result.stats}
@@ -745,9 +780,9 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
   # A patch from a gesture is an unsaved change, so it leaves the saved
   # view's name behind; opening a saved view is done by `v` alone.
   # A pivot's pages are slices of its rows; the result's window is the grid's.
-  defp page_of(%Result{} = result, %View{pivot: nil}), do: Result.page(result)
+  defp page_of(%Result{} = result, nil, _view), do: Result.page(result)
 
-  defp page_of(%Result{total_entries: total}, %View{page: page, page_size: size}) do
+  defp page_of(%Result{total_entries: total}, _pivot, %View{page: page, page_size: size}) do
     %{page: page, page_size: size, total_entries: total, total_pages: div(total + size - 1, size)}
   end
 
@@ -868,6 +903,16 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
             </p>
           </div>
 
+          <p
+            :if={@pivot && @pivot.more}
+            id="grid-pivot-truncated"
+            class="flex items-center gap-1 text-xs text-warning-ink"
+          >
+            <.icon name="warning" class="size-3.5" />
+            {gettext(
+              "The pivot shows its first rows only; there are too many values to count at once. A filter would narrow it."
+            )}
+          </p>
           <.card id="grid-card" inner_class="p-0">
             <div class="p-2">
               <.flex_table
@@ -885,7 +930,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
                 cost={Host.cost(@result)}
                 expanded={@expanded}
                 group={@view.group}
-                pivot={@view.pivot}
+                pivot={@pivot && @view.pivot}
                 caption={@table.label}
               >
                 <:empty
@@ -911,7 +956,7 @@ defmodule Bilimbi.Base.Grid.Web.GridLive do
             <.pagination
               :if={@mode == :full}
               id="grid-pagination"
-              page={page_of(@result, @view)}
+              page={page_of(@result, @pivot, @view)}
               page_sizes={View.page_sizes()}
               filters_form={@filters_form}
               filters_event="grid_filters"

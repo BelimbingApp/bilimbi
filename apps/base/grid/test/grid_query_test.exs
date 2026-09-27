@@ -261,19 +261,60 @@ defmodule Bilimbi.Base.Grid.QueryTest do
 
     pivot = Grid.pivot(ctx.catalog, ctx.orders, status, country)
 
-    assert Enum.map(pivot.columns, & &1.short_label) == ["—", "Malaysia", "Singapore", "Total"]
-    assert Enum.map(pivot.columns, & &1.id) == ["pv-0", "pv-1", "pv-2", "pv-total"]
+    assert Enum.map(pivot.columns, & &1.short_label) ==
+             [status.short_label, "—", "Malaysia", "Singapore", "Total"]
+
+    assert Enum.map(pivot.columns, & &1.id) == ["pv-rows", "pv-0", "pv-1", "pv-2", "pv-total"]
     assert Enum.map(pivot.rows, & &1.key) == ["open", "paid", "void"]
 
     paid = Enum.find(pivot.rows, &(&1.key == "paid"))
-    assert paid.cells == %{"pv-0" => 0, "pv-1" => 1, "pv-2" => 0, "pv-total" => 1}
+
+    assert paid.cells == %{
+             "pv-rows" => "paid",
+             "pv-0" => 0,
+             "pv-1" => 1,
+             "pv-2" => 0,
+             "pv-total" => 1
+           }
+
     void = Enum.find(pivot.rows, &(&1.key == "void"))
     # Order C's customer is in another tenant, so its country is unknown here.
-    assert void.cells == %{"pv-0" => 1, "pv-1" => 0, "pv-2" => 0, "pv-total" => 1}
-    assert pivot.total_entries == 3 and pivot.more == 0
+    assert void.cells == %{
+             "pv-rows" => "void",
+             "pv-0" => 1,
+             "pv-1" => 0,
+             "pv-2" => 0,
+             "pv-total" => 1
+           }
+
+    assert pivot.total_entries == 3 and pivot.more == false and is_float(pivot.cost)
     assert pivot.stats["pv-total"] == %{min: 0, max: 1}
+    refute Map.has_key?(pivot.stats, "pv-rows")
 
     narrowed = Grid.pivot(ctx.catalog, ctx.orders, status, country, search: "order b")
     assert Enum.map(narrowed.rows, & &1.key) == ["open"]
+  end
+
+  test "a pivot reads a bounded number of pairs and leaves out a row it could not finish",
+       ctx do
+    {:ok, [status, country]} =
+      Grid.resolve(ctx.catalog, ctx.orders, ~w(status customer.country.name))
+
+    all = Grid.pivot(ctx.catalog, ctx.orders, status, country)
+
+    pairs =
+      Enum.map(
+        all.rows,
+        &Enum.count(&1.cells, fn {id, n} -> id not in ["pv-rows", "pv-total"] and n > 0 end)
+      )
+
+    exact = Grid.pivot(ctx.catalog, ctx.orders, status, country, max_pairs: Enum.sum(pairs))
+    assert exact.more == false and exact.rows == all.rows
+
+    first = hd(pairs)
+    bounded = Grid.pivot(ctx.catalog, ctx.orders, status, country, max_pairs: first + 1)
+    assert bounded.more == true
+    assert Enum.map(bounded.rows, & &1.key) == ["open"]
+    assert hd(bounded.rows).cells["pv-total"] == hd(all.rows).cells["pv-total"]
   end
 end

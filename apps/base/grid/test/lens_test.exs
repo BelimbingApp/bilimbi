@@ -28,7 +28,7 @@ defmodule Bilimbi.Base.Grid.LensTest do
     assert Lens.available(resolve.("lines.qty:sum")) == [:value, :bar, :band, :trend, :delta]
     assert Lens.available(resolve.("lines.price:avg")) == [:value, :bar, :band]
     assert Lens.available(resolve.("tags:count")) == [:value, :bar, :band]
-    assert Lens.available(resolve.("placed_at")) == [:value, :band, :delta]
+    assert Lens.available(resolve.("placed_at")) == [:value, :bar, :band]
     assert Lens.available(resolve.("amount")) == [:value, :bar, :band]
     assert Lens.available(resolve.("label")) == [:value, :band]
     assert Lens.available(resolve.("lines.sku:list")) == [:value, :band]
@@ -50,10 +50,6 @@ defmodule Bilimbi.Base.Grid.LensTest do
     trend = Lens.cell(3, count, stats, :trend, %{series: [0.0, 1.0, 2.0]})
     assert trend.series == [0.0, 1.0, 2.0] and trend.text == "3" and trend.delta == nil
     assert Lens.cell(3, count, stats, :value, %{series: [1.0]}).series == nil
-
-    placed = resolve.("placed_at")
-    cell = Lens.cell(~N[2026-03-01 11:00:00], placed, nil, :delta, %{since: ~D[2026-02-01]})
-    assert cell.text == "2026-03-01 11:00:00 (+28)"
-    assert cell.delta == 28
+    assert Lens.normalize("delta", resolve.("placed_at")) == :value
   end
 end

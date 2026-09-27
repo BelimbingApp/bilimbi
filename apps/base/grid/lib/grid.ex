@@ -319,23 +319,27 @@ defmodule Bilimbi.Base.Grid do
   end
 
   @max_pivot_values 24
+  @max_pivot_pairs 5000
 
   @doc """
   Pivots the grid: one row per distinct value of `rows_column`, one column
   per distinct value of `across_column` (the first #{@max_pivot_values} by
   name, the rest folded into "Other"), each cell the number of root rows
   with both values, plus a total. One GROUP BY statement over the same
-  joined plan; `:search` and `:focus` narrow it as they narrow the grid.
-  The result's columns are plain component column maps, its rows keyed by
-  the row value's text, its stats over every cell so a band or a bar
-  scales to the whole pivot.
+  joined plan, reading at most `:max_pairs` pairs (#{@max_pivot_pairs} by
+  default); `:search` and `:focus` narrow it as they narrow the grid. The result's first column
+  (`pv-rows`) names each row's value; the rest are counts. Its rows are
+  keyed by the row value's text, its stats over every count so a band or a
+  bar scales to the whole pivot, `more` whether the bound left row values
+  out, and `cost` the planner's estimate for the statement.
   """
   @spec pivot(Catalog.t(), Table.t(), Column.t(), Column.t(), keyword()) :: %{
           columns: [map()],
           rows: [%{key: String.t(), cells: %{String.t() => term()}}],
           total_entries: non_neg_integer(),
           stats: %{String.t() => %{min: term(), max: term()}},
-          more: non_neg_integer()
+          more: boolean(),
+          cost: float() | nil
         }
   def pivot(
         %Catalog{} = catalog,
@@ -352,7 +356,9 @@ defmodule Bilimbi.Base.Grid do
       |> Query.search(root, Keyword.get(opts, :search))
       |> focus_rows(plan, focus)
 
-    triples = Query.pivot_counts(base, plan, rows_column, across_column)
+    max_pairs = Keyword.get(opts, :max_pairs, @max_pivot_pairs)
+    statement = Query.pivot_counts(base, plan, rows_column, across_column, max_pairs + 1)
+    {triples, more} = bounded_pairs(Repo.all(statement), max_pairs)
 
     across_values =
       triples |> Enum.map(&Lens.text(&1.across, across_column)) |> Enum.uniq() |> Enum.sort()
@@ -360,7 +366,7 @@ defmodule Bilimbi.Base.Grid do
     {shown, folded} = Enum.split(across_values, @max_pivot_values)
     other? = folded != []
 
-    columns =
+    count_columns =
       Enum.with_index(shown, fn value, index ->
         pivot_column("pv-#{index}", if(value == "", do: "—", else: value), across_column)
       end) ++
@@ -380,27 +386,62 @@ defmodule Bilimbi.Base.Grid do
             Map.update(acc, id, triple.count, &(&1 + triple.count))
           end)
 
-        cells =
-          columns
-          |> Enum.map(& &1.id)
-          |> Map.new(fn
-            "pv-total" -> {"pv-total", counts |> Map.values() |> Enum.sum()}
-            id -> {id, Map.get(counts, id, 0)}
-          end)
+        label = if(row_text == "", do: "—", else: row_text)
 
-        %{key: if(row_text == "", do: "—", else: row_text), cells: cells}
+        cells =
+          count_columns
+          |> Map.new(fn
+            %{id: "pv-total"} -> {"pv-total", counts |> Map.values() |> Enum.sum()}
+            %{id: id} -> {id, Map.get(counts, id, 0)}
+          end)
+          |> Map.put("pv-rows", label)
+
+        %{key: label, cells: cells}
       end)
       |> Enum.sort_by(& &1.key)
 
-    values = rows |> Enum.flat_map(&Map.values(&1.cells)) |> Enum.reject(&is_nil/1)
+    values =
+      Enum.flat_map(rows, fn row -> row.cells |> Map.delete("pv-rows") |> Map.values() end)
+
     range = if values == [], do: nil, else: %{min: Enum.min(values), max: Enum.max(values)}
 
     %{
-      columns: columns,
+      columns: [rows_label_column(rows_column) | count_columns],
       rows: rows,
       total_entries: length(rows),
-      stats: Map.new(columns, &{&1.id, range}),
-      more: length(folded)
+      stats: Map.new(count_columns, &{&1.id, range}),
+      more: more,
+      cost: Query.estimated_cost(statement)
+    }
+  end
+
+  # The bound cuts the pairs in rows order, so the last row value read may
+  # be missing some of its pairs; it is left out rather than shown short.
+  defp bounded_pairs(pairs, max) when length(pairs) <= max, do: {pairs, false}
+
+  defp bounded_pairs(pairs, max) do
+    read = Enum.take(pairs, max)
+    last = List.last(read).rows
+
+    case Enum.reject(read, &(&1.rows == last)) do
+      [] -> {read, true}
+      complete -> {complete, true}
+    end
+  end
+
+  defp rows_label_column(%Column{} = rows) do
+    %{
+      id: "pv-rows",
+      spec: "pv-rows",
+      label: rows.label,
+      short_label: rows.short_label,
+      type: :string,
+      kind: :field,
+      lens: :value,
+      lenses: [:value],
+      sortable: false,
+      removable: false,
+      align: nil
     }
   end
 
@@ -413,7 +454,7 @@ defmodule Bilimbi.Base.Grid do
       type: :integer,
       kind: :field,
       lens: :value,
-      lenses: [:value, :bar, :band],
+      lenses: [:value],
       sortable: false,
       removable: false,
       align: :right

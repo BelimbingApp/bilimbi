@@ -421,7 +421,7 @@ defmodule Bilimbi.Base.Grid.Query do
           |> Enum.sort_by(&length/1)
           |> Enum.reduce({inner, inner_state}, &join_tail/2)
 
-        start = NaiveDateTime.new!(months_ago(12), ~T[00:00:00])
+        start = NaiveDateTime.new!(months_ago(11), ~T[00:00:00])
         month = dynamic([t0: t], fragment("date_trunc('month', ?)", field(t, ^time)))
         value = aggregate_expr(column, inner_state)
 
@@ -642,10 +642,20 @@ defmodule Bilimbi.Base.Grid.Query do
     end
   end
 
-  @doc "The root rows counted per pair of values of two columns, in one GROUP BY."
-  @spec pivot_counts(Ecto.Query.t(), plan(), Column.t(), Column.t()) ::
-          [%{rows: term(), across: term(), count: non_neg_integer()}]
-  def pivot_counts(query, %{selects: selects, key_column: key_column}, rows_column, across_column) do
+  @doc """
+  The statement counting root rows per pair of values of two columns: one
+  GROUP BY, ordered by the pair, at most `limit` pairs. Each row it selects
+  is `%{rows: term(), across: term(), count: non_neg_integer()}`.
+  """
+  @spec pivot_counts(Ecto.Query.t(), plan(), Column.t(), Column.t(), pos_integer()) ::
+          Ecto.Query.t()
+  def pivot_counts(
+        query,
+        %{selects: selects, key_column: key_column},
+        rows_column,
+        across_column,
+        limit
+      ) do
     rows_expr = Map.fetch!(selects, rows_column)
     across_expr = Map.fetch!(selects, across_column)
 
@@ -654,9 +664,10 @@ defmodule Bilimbi.Base.Grid.Query do
     |> exclude(:limit)
     |> exclude(:offset)
     |> group_by(^[rows_expr, across_expr])
+    |> order_by(^[asc: rows_expr, asc: across_expr])
+    |> limit(^limit)
     |> select(^%{rows: rows_expr, across: across_expr})
     |> select_merge([root: r], %{count: count(field(r, ^key_column))})
-    |> Repo.all()
   end
 
   @doc "PostgreSQL's estimated total cost for the statement, from EXPLAIN."

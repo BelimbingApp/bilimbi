@@ -607,12 +607,51 @@ defmodule Bilimbi.Base.Grid.Web.GridLiveTest do
     assert has_element?(view, "#grid-head-pv-0", "Ada Lovelace")
     assert has_element?(view, "#grid-cell-Bilimbi_20Industries-pv-total", "2")
     assert has_element?(view, "#grid-cell-Bilimbi_20Retail-pv-total", "1")
+    assert has_element?(view, "#grid-cell-Bilimbi_20Industries-pv-rows", "Bilimbi Industries")
+    assert has_element?(view, "#grid-cell-Bilimbi_20Retail-pv-rows", "Bilimbi Retail")
     assert has_element?(view, "#grid-pagination-summary", "Showing 1 to 2 of 2 results")
+    refute has_element?(view, "#grid-pivot-truncated")
 
     view |> element("#grid-unpivot") |> render_click()
     path = assert_patch(view)
     refute Map.has_key?(URI.decode_query(URI.parse(path).query), "pivot")
     refute has_element?(view, "#grid-pivoted")
     assert has_element?(view, "#grid-row-91")
+  end
+
+  test "ungrouping a pivoted grid unpivots it", %{conn: conn} do
+    grant_capabilities!(@all)
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_as()
+      |> live(~p"/grid/users?cols=name%2Ccompany.name%2Cemail&group=company.name&pivot=name")
+
+    assert has_element?(view, "#grid-pivoted", "Pivoted by name")
+
+    view |> element("#grid-ungroup") |> render_click()
+    path = assert_patch(view)
+    query = URI.decode_query(URI.parse(path).query)
+    refute Map.has_key?(query, "group") or Map.has_key?(query, "pivot")
+    refute has_element?(view, "#grid-pivoted")
+    assert has_element?(view, "#grid-row-91")
+  end
+
+  test "a pivot's counts take no lens of their own and read a change lens as values",
+       %{conn: conn} do
+    grant_capabilities!(@all)
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_as()
+      |> live(
+        ~p"/grid/companies?cols=name%2Cusers%3Acount&lens=users%3Acount%7Cdelta&group=name&pivot=users%3Acount"
+      )
+
+    assert has_element?(view, "#grid-pivoted", "Pivoted by users:count")
+    refute has_element?(view, "#grid-lens-pv-total")
+    assert has_element?(view, "#grid-cell-Bilimbi_20Industries-pv-rows", "Bilimbi Industries")
+    assert has_element?(view, "#grid-cell-Bilimbi_20Industries-pv-total", "1")
+    refute has_element?(view, "#grid-cell-Bilimbi_20Industries-pv-total", "(+")
   end
 end
