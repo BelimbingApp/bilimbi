@@ -13,7 +13,7 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
   alias Bilimbi.Base.Audit.Page
 
   @sortable ~w(occurred_at actor_type event url trace_id)
-  @actor_types ~w(user agent guest console scheduler queue)
+  @actor_types ~w(user agent guest console scheduler queue system)
   @event_families ~w(http auth console database queue domain)
   @results ~w(failure retained)
   @diagnostics ~w(hide show)
@@ -227,6 +227,9 @@ defmodule Bilimbi.Base.Audit.Web.ActionsLive do
   defp actor_label(%{actor_type: "console"}), do: "Console"
   defp actor_label(%{actor_type: "scheduler"}), do: "Scheduler"
   defp actor_label(%{actor_type: "queue"}), do: "Queue"
+
+  defp actor_label(%{actor_type: "system", system_principal: name}) when is_binary(name),
+    do: "System · #{name}"
 
   defp actor_label(%{actor_type: type, actor_id: id}) when is_integer(id) and id > 0,
     do: "#{String.capitalize(type)} ##{id}"

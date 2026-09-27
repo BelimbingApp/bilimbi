@@ -20,7 +20,12 @@ defmodule Bilimbi.Base.UI.CapabilityCheckSpellingTest do
 
   # `Authz.Evaluator` compares against the capability *registry*, not a scope's
   # granted list, so it is a different question and legitimately spelled this way.
-  @allowed_paths ["apps/base/authz/lib/authz/evaluator.ex"]
+  # `Authz.SystemPrincipalService` asks the same registry question, and whether a
+  # system principal's module declared the capability (ADR 0017).
+  @allowed_paths [
+    "apps/base/authz/lib/authz/evaluator.ex",
+    "apps/base/authz/lib/authz/system_principal_service.ex"
+  ]
 
   test "no screen hand-rolls a capability check" do
     offenders =

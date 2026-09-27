@@ -21,12 +21,15 @@ defmodule Bilimbi.Base.Authz do
   alias Bilimbi.Base.Authz.Evaluator
   alias Bilimbi.Base.Authz.Resource
   alias Bilimbi.Base.Authz.RoleService
+  alias Bilimbi.Base.Authz.SystemPrincipalGrant
+  alias Bilimbi.Base.Authz.SystemPrincipalService
   alias Bilimbi.Base.Authz.SystemRoleReconciler
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Tenancy.Actor, as: TenancyActor
   alias Bilimbi.Base.Tenancy.Scope
+  alias Bilimbi.Base.Tenancy.SystemPrincipals
 
   @doc """
   Builds an authorization principal from IDs the caller names.
@@ -46,7 +49,9 @@ defmodule Bilimbi.Base.Authz do
   @doc """
   The authorization principal for the user who performs the scope's work.
 
-  A system scope names nobody, so it has no principal.
+  A system scope names no user, so it has no principal. That includes a
+  named system principal: it may hold capabilities (ask `can/4`), but it is
+  never a user who can approve or be recorded as one.
   """
   @spec scope_actor(Scope.t()) :: {:ok, Actor.t()} | {:error, :no_authenticated_actor}
   def scope_actor(%Scope{} = scope) do
@@ -91,17 +96,51 @@ defmodule Bilimbi.Base.Authz do
   Given a `Bilimbi.Base.Tenancy.Scope`, the principal is the scope's
   authenticated user (see `scope_actor/1`). That is the form for "may the
   person performing this do it": the answer cannot be steered by naming
-  somebody else. A system scope names nobody and is denied with
+  somebody else. An anonymous system scope names nobody and is denied with
   `:denied_no_authenticated_actor`; there is no principal to log.
+
+  A scope whose actor is a named system principal (a job enqueued with
+  `Bilimbi.Base.Queue.enqueue_as_system/4`, ADR 0017) is judged against that
+  principal's grants in the actor's company, and nothing else: no roles, no
+  `grant_all`, and only capabilities its module declared. The decision is
+  logged with `actor_type` `"system"`, `actor_id` `0`, and the principal's
+  name in the logged context.
   """
   @spec can(Actor.t() | Scope.t(), String.t(), Resource.t() | nil, map()) :: Decision.t()
   def can(principal, capability, resource \\ nil, context \\ %{})
 
   def can(%Scope{} = scope, capability, resource, context)
       when is_binary(capability) and is_map(context) do
-    case scope_actor(scope) do
-      {:ok, actor} -> can(actor, capability, resource, context)
-      {:error, :no_authenticated_actor} -> Decision.deny(:denied_no_authenticated_actor)
+    case Scope.actor(scope) do
+      %TenancyActor{type: :system, system_principal: name, company_id: company_id}
+      when is_binary(name) ->
+        decision =
+          SystemPrincipalService.evaluate(
+            scope,
+            name,
+            company_id,
+            capability,
+            resource,
+            registry!()
+          )
+
+        :ok =
+          DatabaseDecisionLogger.log_system_principal(
+            name,
+            company_id,
+            capability,
+            resource,
+            decision,
+            context
+          )
+
+        decision
+
+      _person_or_nobody ->
+        case scope_actor(scope) do
+          {:ok, actor} -> can(actor, capability, resource, context)
+          {:error, :no_authenticated_actor} -> Decision.deny(:denied_no_authenticated_actor)
+        end
     end
   end
 
@@ -309,6 +348,100 @@ defmodule Bilimbi.Base.Authz do
           Bilimbi.Base.Authz.Page.t(Bilimbi.Base.Authz.DecisionLogSummary.t())
   def list_decision_logs(%Scope{} = scope, opts \\ []) when is_list(opts) do
     Administration.list_decision_logs(scope, opts, registry!())
+  end
+
+  @doc """
+  The system principals installed modules declare, with the capabilities
+  each may be granted (ADR 0017).
+  """
+  @spec list_system_principals() :: [SystemPrincipals.principal()]
+  def list_system_principals, do: SystemPrincipals.list()
+
+  @doc """
+  Lists the capabilities granted to system principals in the scope's companies.
+
+  Option `:principal` limits the list to one name. The caller must be a user
+  holding `admin.authz.system-principal.list`.
+  """
+  @spec list_system_capabilities(Scope.t(), keyword()) ::
+          {:ok, [SystemPrincipalGrant.t()]} | {:error, :forbidden}
+  def list_system_capabilities(%Scope{} = scope, opts \\ []) when is_list(opts) do
+    with {:ok, _granter} <- administrator(scope, "admin.authz.system-principal.list") do
+      {:ok, SystemPrincipalService.list(scope, opts, registry!())}
+    end
+  end
+
+  @doc """
+  Grants a declared capability to a system principal in one of the scope's companies.
+
+  Grants are explicit: a principal holds nothing until an administrator
+  grants it, per company, and only capabilities its module declared for it.
+  The caller must be a signed-in user holding
+  `admin.authz.system-principal.grant`; a system scope, named or not, is
+  `:forbidden`, so a principal can never grant itself. The grant and an
+  `authz.system_principal.granted` audit action naming the granter commit
+  together. Granting an existing grant is `{:ok, :existing}` and records
+  nothing.
+  """
+  @spec grant_system_capability(Scope.t(), pos_integer(), String.t(), String.t()) ::
+          {:ok, :granted | :existing}
+          | {:error,
+             :forbidden
+             | :undeclared_system_principal
+             | :capability_not_declared
+             | :company_not_found
+             | :audit_unavailable
+             | {:unknown_capabilities, [String.t()]}}
+  def grant_system_capability(%Scope{} = scope, company_id, principal, capability) do
+    with {:ok, granter} <- administrator(scope, "admin.authz.system-principal.grant") do
+      SystemPrincipalService.grant(scope, company_id, principal, capability, granter, registry!())
+    end
+  end
+
+  @doc """
+  Revokes a system principal's capability in one of the scope's companies.
+
+  The caller must be a signed-in user holding
+  `admin.authz.system-principal.revoke`. The deletion and an
+  `authz.system_principal.revoked` audit action naming who revoked it commit
+  together. A grant that does not exist, or is outside the scope, is
+  `{:ok, :not_found}`.
+  """
+  @spec revoke_system_capability(Scope.t(), pos_integer(), String.t(), String.t()) ::
+          {:ok, :revoked | :not_found} | {:error, :forbidden | :audit_unavailable}
+  def revoke_system_capability(%Scope{} = scope, company_id, principal, capability) do
+    with {:ok, granter} <- administrator(scope, "admin.authz.system-principal.revoke") do
+      SystemPrincipalService.revoke(
+        scope,
+        company_id,
+        principal,
+        capability,
+        granter,
+        registry!()
+      )
+    end
+  end
+
+  # Administering system principals is a person's act: the granter is the
+  # sealed user on the scope, never an argument, and a system scope is refused.
+  defp administrator(%Scope{} = scope, capability) do
+    case Scope.actor(scope) do
+      %TenancyActor{type: :user} = actor ->
+        if can(scope, capability).allowed do
+          {:ok,
+           %{
+             actor_type: "user",
+             actor_id: actor.user_id,
+             company_id: actor.company_id,
+             impersonator_id: actor.impersonator_id
+           }}
+        else
+          {:error, :forbidden}
+        end
+
+      %TenancyActor{type: :system} ->
+        {:error, :forbidden}
+    end
   end
 
   @spec reconcile_system_roles(keyword()) ::

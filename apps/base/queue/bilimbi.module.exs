@@ -5,7 +5,7 @@
   required: true,
   otp_app: :bilimbi_base_queue,
   namespace: Bilimbi.Base.Queue,
-  dependencies: ["base/database", "base/module_registry", "base/tenancy"],
+  dependencies: ["base/audit", "base/database", "base/module_registry", "base/tenancy"],
   migrations: "priv/repo/migrations",
   migration_dispositions: %{
     20_260_820_130_000 => :bilimbi_only

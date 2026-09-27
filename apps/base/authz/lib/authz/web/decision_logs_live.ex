@@ -202,6 +202,7 @@ defmodule Bilimbi.Base.Authz.Web.DecisionLogsLive do
 
   defp actor_label(%{actor_type: "agent"}), do: "Employee"
   defp actor_label(%{actor_type: "user"}), do: "User"
+  defp actor_label(%{actor_type: "system"}), do: "System"
   defp actor_label(%{actor_type: other}), do: to_string(other)
 
   defp resource_label(%{resource_type: nil}), do: "—"

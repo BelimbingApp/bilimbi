@@ -16,6 +16,10 @@ defmodule Bilimbi.Base.Authz.DecisionLogSummary do
   A later naming seam would be a directory callback spanning User and Employee
   (the same shape as `Bilimbi.Base.Authz.CompanyDirectory` / #183), not a field
   on this struct. See #185.
+
+  A named system principal (ADR 0017) has no numeric ID: its row is
+  `actor_type` `"system"`, `actor_id` `0`, and `system_principal` carries the
+  name recorded with the decision. It is `nil` on every other row.
   """
 
   alias Bilimbi.Base.Authz.DecisionLog
@@ -27,6 +31,7 @@ defmodule Bilimbi.Base.Authz.DecisionLogSummary do
     :actor_type,
     :actor_id,
     :acting_for_user_id,
+    :system_principal,
     :capability,
     :resource_type,
     :resource_id,
@@ -47,6 +52,7 @@ defmodule Bilimbi.Base.Authz.DecisionLogSummary do
       actor_type: log.actor_type,
       actor_id: log.actor_id,
       acting_for_user_id: log.acting_for_user_id,
+      system_principal: system_principal(log),
       capability: log.capability,
       resource_type: log.resource_type,
       resource_id: log.resource_id,
@@ -56,4 +62,13 @@ defmodule Bilimbi.Base.Authz.DecisionLogSummary do
       occurred_at: log.occurred_at
     }
   end
+
+  defp system_principal(%DecisionLog{
+         actor_type: "system",
+         context: %{"system_principal" => name}
+       })
+       when is_binary(name),
+       do: name
+
+  defp system_principal(%DecisionLog{}), do: nil
 end

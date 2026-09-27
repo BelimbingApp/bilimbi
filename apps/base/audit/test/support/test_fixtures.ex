@@ -29,7 +29,8 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
         new_values jsonb,
         trace_id varchar(12),
         occurred_at timestamp(0) without time zone NOT NULL,
-        impersonator_id bigint
+        impersonator_id bigint,
+        system_principal varchar(100)
       ) ON COMMIT PRESERVE ROWS
       """,
       []
@@ -41,6 +42,16 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
       CREATE INDEX IF NOT EXISTS base_audit_mutations_impersonator_id_index
         ON base_audit_mutations (impersonator_id)
         WHERE impersonator_id IS NOT NULL
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      """
+      CREATE INDEX IF NOT EXISTS base_audit_mutations_system_principal_index
+        ON base_audit_mutations (system_principal)
+        WHERE system_principal IS NOT NULL
       """,
       []
     )
@@ -181,7 +192,8 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
         trace_id varchar(12),
         is_retained boolean NOT NULL DEFAULT false,
         occurred_at timestamp(0) without time zone NOT NULL,
-        impersonator_id bigint
+        impersonator_id bigint,
+        system_principal varchar(100)
       ) ON COMMIT PRESERVE ROWS
       """,
       []
@@ -193,6 +205,16 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
       CREATE INDEX IF NOT EXISTS base_audit_actions_impersonator_id_index
         ON base_audit_actions (impersonator_id)
         WHERE impersonator_id IS NOT NULL
+      """,
+      []
+    )
+
+    SQL.query!(
+      Repo,
+      """
+      CREATE INDEX IF NOT EXISTS base_audit_actions_system_principal_index
+        ON base_audit_actions (system_principal)
+        WHERE system_principal IS NOT NULL
       """,
       []
     )
