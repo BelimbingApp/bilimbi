@@ -662,6 +662,16 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
              |> live("/workspace/shared/team-desk")
   end
 
+  test "a shared workspace does not replace the empty workspace", %{conn: conn} do
+    {:ok, _} = SharedLayouts.publish(Settings.Scope.company(73), "Team desk", "/companies", [])
+
+    {:ok, view, _html} = open(conn)
+    assert has_element?(view, "#workspace-empty-state", "No pages open")
+
+    view |> element("#workspace-open-layouts") |> render_click()
+    assert has_element?(view, "#workspace-shared-open-team-desk")
+  end
+
   test "a role-limited workspace is visible only to assigned people in its company", %{conn: conn} do
     {:ok, scope} = Tenancy.scope(41)
     {:ok, role} = Authz.create_role(scope, 73, %{name: "Reviewer", code: "reviewer"})

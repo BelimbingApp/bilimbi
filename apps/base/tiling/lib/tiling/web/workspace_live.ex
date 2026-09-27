@@ -209,18 +209,8 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   defp open_default(socket) do
     case SavedLayouts.default_slug(socket.assigns.settings_scope) do
       nil ->
-        preferred =
-          Enum.find(socket.assigns.shared, &(&1["roles"] != [])) ||
-            List.first(socket.assigns.shared)
-
-        case preferred do
-          %{"slug" => slug} ->
-            {:noreply, push_navigate(socket, to: ~p"/workspace/shared/#{slug}")}
-
-          nil ->
-            socket = socket |> put_layout(Layout.empty()) |> assign(:encoded, nil) |> keep_focus()
-            {:noreply, assign(socket, picker_open?: Layout.empty?(socket.assigns.tree))}
-        end
+        socket = socket |> put_layout(Layout.empty()) |> assign(:encoded, nil) |> keep_focus()
+        {:noreply, assign(socket, picker_open?: Layout.empty?(socket.assigns.tree))}
 
       slug ->
         {:noreply, push_navigate(socket, to: ~p"/workspace/#{slug}")}
