@@ -112,4 +112,33 @@ defmodule Bilimbi.Base.Grid.SavedViewsTest do
     assert {:error, :label} = SavedViews.save(@own, :own, "   ", view())
     assert {:error, :label} = SavedViews.save(@own, :own, String.duplicate("x", 61), view())
   end
+
+  test "a shared view limited to roles opens only for accounts holding one of them" do
+    {:ok, everyone} = SavedViews.save(@company, :shared, "Everyone", view())
+
+    {:ok, reviewers} =
+      SavedViews.save(@company, :shared, "Reviewers", view(), ["reviewer", "auditor"])
+
+    assert SavedViews.roles(everyone) == []
+    assert SavedViews.roles(reviewers) == ["reviewer", "auditor"]
+
+    assert Enum.map(SavedViews.visible_shared(@company, "users", []), & &1["slug"]) == [
+             "everyone"
+           ]
+
+    assert Enum.map(SavedViews.visible_shared(@company, "users", ["auditor"]), & &1["slug"]) ==
+             ["everyone", "reviewers"]
+
+    assert SavedViews.visible_shared(nil, "users", ["auditor"]) == []
+    assert SavedViews.fetch(@own, @company, "users", "shared:reviewers", ["clerk"]) == :error
+
+    assert {:ok, ^reviewers, :shared} =
+             SavedViews.fetch(@own, @company, "users", "shared:reviewers", ["reviewer"])
+
+    assert {:error, :roles} = SavedViews.save(@company, :shared, "Bad", view(), ["Not A Code"])
+
+    # An own view never carries an audience.
+    {:ok, own} = SavedViews.save(@own, :own, "Mine", view(), ["reviewer"])
+    refute Map.has_key?(own, "roles")
+  end
 end
