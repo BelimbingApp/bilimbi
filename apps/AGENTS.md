@@ -2,6 +2,19 @@
 
 Read this before editing a LiveView, a template, or a test. The component that can make a mistake impossible owns the rule: its comment is the text to follow, and `DESIGN.md` is the design source. This note only holds what no component owns.
 
+## Flexible columns on a list
+
+A list page that lets people add, remove, reorder or zoom columns renders
+`<.flex_table>` through `Bilimbi.Base.Grid.Web.PageColumns`: declare the
+page's own columns as built-ins, merge `PageColumns.params/1` into every
+path the page patches to, and delegate the `"grid"` event to
+`PageColumns.handle/3`. The users and companies lists are the two
+examples. Do not hand-roll a column picker, a per-page `cols` parser or a
+second table over the same rows; the module doc on `PageColumns` and the
+component comment on `flex_table/1` own the contract. A module puts its
+tables in the catalog through a `:grid` contribution and a
+`Bilimbi.Base.Grid.Source`; see `apps/base/grid/docs/README.md`.
+
 ## List filters and pagination
 
 Use `<.filter_toolbar>` and `<.pagination>` for an operational list. A hand-written filter form or Previous/Next row is how Performance, Menu Inspector, Schedule history, and Database Queries drifted apart. The comments on `filter_toolbar/1` and `pagination/1` in `apps/base/ui/lib/ui/components.ex` own the framing; the URL contract is `DESIGN.md` "Pagination controls". A pager over unsaved editor state, such as database-query results, still uses `<.pagination>` and must not reload the saved record when the page changes.

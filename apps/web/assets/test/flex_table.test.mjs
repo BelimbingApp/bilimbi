@@ -18,7 +18,7 @@ function table(mode, zoom) {
           <li id="grid-chip-count" data-chip="users:count" draggable="true">Count</li>
           <li id="grid-chip-code" data-chip="code" draggable="true">Code</li>
         </ul>
-        <form id="grid-add"><input id="grid-add-input" name="add" type="search" /></form>
+        <form id="grid-add-column"><input id="grid-add-column-input" name="add" type="search" /></form>
         <div id="grid-group-zone" data-group-zone class="hidden">Drop a column here to group by it</div>
       </div>
       <div id="grid-viewport" data-viewport tabindex="0">
