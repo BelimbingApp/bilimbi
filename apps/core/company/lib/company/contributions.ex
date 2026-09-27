@@ -53,6 +53,7 @@ defmodule Bilimbi.Core.Company.Contributions do
       # (#459/#447); Company keeps the management surface and writes it
       # through the public Settings API under its own capability.
       settings: %{definitions: %{}, runtime_claims: []},
+      grid: Bilimbi.Core.Company.GridTables.tables(),
       authz: %{
         domains: %{"core" => "Core platform modules"},
         capabilities: [

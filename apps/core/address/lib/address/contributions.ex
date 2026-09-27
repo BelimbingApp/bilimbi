@@ -14,6 +14,7 @@ defmodule Bilimbi.Core.Address.Contributions do
   @impl true
   def contributions do
     %{
+      grid: Bilimbi.Core.Address.GridTables.tables(),
       menu: [
         %{
           id: "admin.address",

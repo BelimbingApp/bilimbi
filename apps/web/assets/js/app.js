@@ -21,6 +21,7 @@ import FlashAutoDismiss from "./flash_auto_dismiss"
 import ClipboardCopy from "./clipboard_copy"
 import TabStrip from "./tab_strip"
 import Tiling from "./tiling"
+import FlexTable from "./flex_table"
 
 // A page framed inside the tiled workspace shares the tab's history with the
 // workspace page around it. LiveView records every live navigation with
@@ -37,7 +38,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, InlineLongText, DashboardSort, DisclosureDismiss, Combobox, SecretReveal, SecretClear, SecretStored, Modal, FlashAutoDismiss, ClipboardCopy, TabStrip, Tiling},
+  hooks: {...colocatedHooks, AppShell, DateTime, BrowserTimeZone, InlineEdit, InlineLongText, DashboardSort, DisclosureDismiss, Combobox, SecretReveal, SecretClear, SecretStored, Modal, FlashAutoDismiss, ClipboardCopy, TabStrip, Tiling, FlexTable},
 })
 
 // The loading bar uses the orientation colour from the theme. Canvas cannot

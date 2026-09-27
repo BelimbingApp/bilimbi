@@ -95,6 +95,9 @@ defmodule Bilimbi.Base.UI.IconRegistryTest do
              "fullscreen" => "hero-arrows-pointing-out",
              "fullscreen-exit" => "hero-arrows-pointing-in",
              "inspect" => "hero-document-magnifying-glass",
+             "zoom-in" => "hero-magnifying-glass-plus",
+             "zoom-out" => "hero-magnifying-glass-minus",
+             "columns" => "hero-table-cells",
              "dashboard" => "hero-squares-2x2",
              "status" => "hero-signal"
            }

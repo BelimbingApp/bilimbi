@@ -6,6 +6,7 @@ defmodule Bilimbi.Core.Geonames.Contributions do
   @impl true
   def contributions do
     %{
+      grid: Bilimbi.Core.Geonames.GridTables.tables(),
       menu: [
         %{
           id: "admin.geonames",

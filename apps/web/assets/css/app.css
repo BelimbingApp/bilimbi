@@ -15,7 +15,7 @@
 @source "../../../../apps/extensions";
 /* Menu contributions provide bare icon names at runtime. Keep the generated
  * Heroicon utilities available for their rail-only rendering. */
-@source inline("hero-{building-library,building-office-2,chart-bar,circle-stack,clipboard-document-list,cog-6-tooth,flag,globe-alt,information-circle,key,map,map-pin,magnifying-glass,paint-brush,puzzle-piece,shield-check,squares-2x2,user-circle,user-group,users}");
+@source inline("hero-{building-library,building-office-2,chart-bar,circle-stack,clipboard-document-list,cog-6-tooth,flag,globe-alt,information-circle,key,map,map-pin,magnifying-glass,magnifying-glass-minus,magnifying-glass-plus,paint-brush,puzzle-piece,shield-check,squares-2x2,table-cells,user-circle,user-group,users}");
 
 @plugin "../vendor/heroicons";
 
@@ -115,6 +115,24 @@
   --color-danger-surface: var(--color-red-50);
   --color-danger-line: var(--color-red-200);
   --color-danger-ink: var(--color-red-900);
+
+  /* Data colour for the grid's lenses. A sequential scale for values that
+     order on a number line (small to large), a categorical palette for
+     values that only differ. Neither uses brand, success, warning or danger,
+     so a heat carpet never reads as status. */
+  --color-scale-1: var(--color-sky-100);
+  --color-scale-2: var(--color-sky-200);
+  --color-scale-3: var(--color-sky-400);
+  --color-scale-4: var(--color-sky-600);
+  --color-scale-5: var(--color-sky-800);
+  --color-cat-1: var(--color-teal-500);
+  --color-cat-2: var(--color-orange-400);
+  --color-cat-3: var(--color-violet-500);
+  --color-cat-4: var(--color-cyan-500);
+  --color-cat-5: var(--color-fuchsia-500);
+  --color-cat-6: var(--color-lime-500);
+  --color-cat-7: var(--color-indigo-500);
+  --color-cat-8: var(--color-rose-400);
 }
 
 /*
@@ -172,6 +190,19 @@
     --color-danger-surface: var(--color-red-950);
     --color-danger-line: var(--color-red-800);
     --color-danger-ink: var(--color-red-200);
+    --color-scale-1: var(--color-sky-950);
+    --color-scale-2: var(--color-sky-900);
+    --color-scale-3: var(--color-sky-700);
+    --color-scale-4: var(--color-sky-500);
+    --color-scale-5: var(--color-sky-300);
+    --color-cat-1: var(--color-teal-400);
+    --color-cat-2: var(--color-orange-400);
+    --color-cat-3: var(--color-violet-400);
+    --color-cat-4: var(--color-cyan-400);
+    --color-cat-5: var(--color-fuchsia-400);
+    --color-cat-6: var(--color-lime-400);
+    --color-cat-7: var(--color-indigo-400);
+    --color-cat-8: var(--color-rose-400);
   }
 }
 
@@ -219,6 +250,19 @@
   --color-danger-surface: var(--color-red-950);
   --color-danger-line: var(--color-red-800);
   --color-danger-ink: var(--color-red-200);
+  --color-scale-1: var(--color-sky-950);
+  --color-scale-2: var(--color-sky-900);
+  --color-scale-3: var(--color-sky-700);
+  --color-scale-4: var(--color-sky-500);
+  --color-scale-5: var(--color-sky-300);
+  --color-cat-1: var(--color-teal-400);
+  --color-cat-2: var(--color-orange-400);
+  --color-cat-3: var(--color-violet-400);
+  --color-cat-4: var(--color-cyan-400);
+  --color-cat-5: var(--color-fuchsia-400);
+  --color-cat-6: var(--color-lime-400);
+  --color-cat-7: var(--color-indigo-400);
+  --color-cat-8: var(--color-rose-400);
 }
 
 [data-phx-session],
@@ -600,3 +644,28 @@ body:has(dialog:modal) #flash-group > #connection-server-error {
     transition-timing-function: ease-out;
   }
 }
+
+/* Grid lenses. A band is painted by a data attribute the server renders,
+   because the CSP refuses inline style; the bar's width is the one value
+   the FlexTable hook writes through CSSOM. Sequential bands run light to
+   strong; categorical bands take the palette in order. */
+.flex-table [data-band='0'][data-scale='sequential'] { background-color: var(--color-scale-1); }
+.flex-table [data-band='1'][data-scale='sequential'] { background-color: var(--color-scale-2); }
+.flex-table [data-band='2'][data-scale='sequential'] { background-color: var(--color-scale-3); }
+.flex-table [data-band='3'][data-scale='sequential'] { background-color: var(--color-scale-4); color: var(--color-ink-inverse); }
+.flex-table [data-band='4'][data-scale='sequential'] { background-color: var(--color-scale-5); color: var(--color-ink-inverse); }
+.flex-table [data-band='0'][data-scale='binary'] { background-color: var(--color-surface-sunken); }
+.flex-table [data-band='4'][data-scale='binary'] { background-color: var(--color-scale-4); color: var(--color-ink-inverse); }
+.flex-table [data-band='0'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-1); }
+.flex-table [data-band='1'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-2); }
+.flex-table [data-band='2'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-3); }
+.flex-table [data-band='3'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-4); }
+.flex-table [data-band='4'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-5); }
+.flex-table [data-band='5'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-6); }
+.flex-table [data-band='6'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-7); }
+.flex-table [data-band='7'][data-scale='categorical'] { box-shadow: inset 3px 0 0 var(--color-cat-8); }
+.flex-table [data-bar] { background-color: var(--color-scale-4); }
+.flex-table [data-dragging='true'] { opacity: 0.5; }
+.flex-table [data-drop='before'] { box-shadow: inset 2px 0 0 var(--color-brand-strong); }
+.flex-table [data-drop='after'] { box-shadow: inset -2px 0 0 var(--color-brand-strong); }
+.flex-table[data-drag-active='true'] [data-group-zone] { display: flex; }
