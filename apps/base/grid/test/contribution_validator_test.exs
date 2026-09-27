@@ -106,6 +106,30 @@ defmodule Bilimbi.Base.Grid.ContributionValidatorTest do
     end
   end
 
+  test "a field with no column resolves to the source key its id names" do
+    %{tables: %{"orders" => orders}} = validate(orders_only())
+
+    assert orders.fields["placed_at"].column == :placed_at
+    assert orders.fields["customer_id"].column == :customer_id
+  end
+
+  test "a field no source key answers to is refused at boot, naming the field" do
+    [orders] = orders_only().tables
+    fields = orders.fields ++ [%{id: "missing", type: :string}]
+
+    assert_raise ArgumentError,
+                 ~r/field missing of table orders names no key its source .*Orders selects; it selects \[:id, :label/,
+                 fn -> validate(orders_only(%{fields: fields})) end
+  end
+
+  test "an explicit column wins over the field id" do
+    [orders] = orders_only().tables
+    fields = orders.fields ++ [%{id: "title", type: :string, column: :label}]
+    %{tables: %{"orders" => orders}} = validate(orders_only(%{fields: fields}))
+
+    assert orders.fields["title"].column == :label
+  end
+
   test "a link names two declared tables and joins on declared fields" do
     assert_raise ArgumentError, ~r/names table "nowhere", which no module declares/, fn ->
       validate(%{

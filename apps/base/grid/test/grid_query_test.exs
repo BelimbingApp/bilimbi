@@ -60,7 +60,7 @@ defmodule Bilimbi.Base.Grid.QueryTest do
     assert c["tags-name_list"] == nil
   end
 
-  test "the other tenant sees only its own rows through the same catalog vocabulary", ctx do
+  test "the other tenant sees only its own rows through the same catalog vocabulary", _ctx do
     other = Grid.catalog(TestFixtures.other_tenant_scope(TestSources.capabilities()))
     {:ok, orders} = Grid.fetch_table(other, "orders")
     {:ok, columns} = Grid.resolve(other, orders, ~w(label customer.name lines:count))
