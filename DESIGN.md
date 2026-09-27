@@ -593,6 +593,12 @@ page for that page's own address, so tiling in place ends the way it began;
 a workspace opened from the picker or a saved layout keeps its one tile. On
 a narrow screen the control opens the page normally.
 
+A saved layout may use master mode: one tile takes the master area, with the
+other tiles stacked evenly beside it. Its saved mode and tree stay together;
+the tile menu can make a stack tile master or turn the master arrangement,
+and the saved-layouts dialog switches between master and dwindle. The first nine
+saved layouts open with `1` to `9` in tiling mode.
+
 A compact `h-6` bar above each tile carries the page's title and a menu with
 every operation: monocle (one tile fills the workspace, the others stay
 mounted), swap, flip the split, open alone, close. The bar is also the grip:

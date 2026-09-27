@@ -3624,6 +3624,9 @@ defmodule Bilimbi.Base.UI.Components do
   path, the screen-reader name of the frame below it, and `DESIGN.md`'s rule
   against withheld controls all need it.
 
+  In master mode the bar marks the master tile, offers "Make master" for a
+  stack tile, and names the layout-wide orientation control accordingly.
+
   ## Examples
 
       <.tile_header
@@ -3653,6 +3656,9 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:on_monocle, JS, required: true, doc: "toggles monocle for this tile")
   attr(:on_split, JS, required: true, doc: "flips the split holding this tile")
   attr(:on_swap, JS, required: true, doc: "swaps this tile with its neighbour")
+  attr(:master_layout, :boolean, default: false)
+  attr(:master_tile, :boolean, default: false)
+  attr(:on_make_master, JS, default: %JS{}, doc: "promotes this tile in master mode")
 
   attr(:following, :boolean,
     default: false,
@@ -3706,6 +3712,7 @@ defmodule Bilimbi.Base.UI.Components do
       >
         {@title}
       </button>
+      <span :if={@master_tile} class="text-[10px] text-ink-muted">{gettext("Master")}</span>
       <button
         id={@menu}
         type="button"
@@ -3741,12 +3748,23 @@ defmodule Bilimbi.Base.UI.Components do
           {gettext("Swap with neighbour")}
         </button>
         <button
+          :if={@master_layout and not @master_tile}
+          type="button"
+          id={"#{@id}-make-master"}
+          phx-click={dismiss_after(@on_make_master, @dismiss)}
+          class={@entry_class}
+        >
+          {gettext("Make master")}
+        </button>
+        <button
           type="button"
           id={"#{@id}-split"}
           phx-click={dismiss_after(@on_split, @dismiss)}
           class={@entry_class}
         >
-          {gettext("Flip split direction")}
+          {if @master_layout,
+            do: gettext("Flip master direction"),
+            else: gettext("Flip split direction")}
         </button>
         <button
           :if={@on_follow}

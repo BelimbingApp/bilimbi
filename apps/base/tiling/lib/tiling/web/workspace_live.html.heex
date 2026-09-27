@@ -51,6 +51,7 @@
       phx-hook="Tiling"
       data-focused={@focused}
       data-monocle={to_string(@monocle)}
+      data-layout={@layout_mode}
       data-tile-count={length(@tiles)}
       class="flex h-full min-h-0 flex-col"
     >
@@ -128,6 +129,8 @@
               title={tile.title}
               focused={tile.focused?}
               monocle={@monocle and tile.focused?}
+              master_layout={@layout_mode == "master"}
+              master_tile={tile.master?}
               open_alone={tile.path}
               on_focus={JS.push("focus-tile", value: %{id: tile.id})}
               on_close={JS.push("close-tile", value: %{id: tile.id})}
@@ -136,6 +139,7 @@
               on_swap={JS.push("swap-tile", value: %{id: tile.id})}
               following={tile.following?}
               on_follow={tile.on_follow}
+              on_make_master={JS.push("make-master", value: %{id: tile.id})}
             />
             <%= case tile.access do %>
               <% :ok -> %>
@@ -205,9 +209,11 @@
       flash={@flash}
     >
       <:description>
-        {gettext(
-          "The page opens in a new tile beside the focused one. Every tile is a live page, so many tiles cost as much as many tabs."
-        )}
+        {if @layout_mode == "master",
+          do:
+            gettext("The page joins the master layout's stack. Every tile is a live page, so many tiles cost as much as many tabs."),
+          else:
+            gettext("The page opens in a new tile beside the focused one. Every tile is a live page, so many tiles cost as much as many tabs.")}
       </:description>
       <div id="workspace-picker-pages" class="-mx-1 max-h-96 space-y-0.5 overflow-y-auto">
         <button
@@ -297,6 +303,23 @@
             >
               {gettext("Default")}
             </span>
+          </:col>
+          <:col :let={entry} label={gettext("Tiling layout")}>
+            <button
+              type="button"
+              id={"workspace-layout-mode-" <> entry["slug"]}
+              phx-click="set-layout-mode"
+              phx-value-id={entry["slug"]}
+              phx-value-mode={if entry["layout"] == "master", do: "dwindle", else: "master"}
+              class="rounded-md px-2 py-1 text-xs text-link hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+              aria-label={
+                if entry["layout"] == "master",
+                  do: gettext("Use dwindle layout for %{label}", label: entry["label"]),
+                  else: gettext("Use master layout for %{label}", label: entry["label"])
+              }
+            >
+              {if entry["layout"] == "master", do: gettext("Master"), else: gettext("Dwindle")}
+            </button>
           </:col>
           <:action :let={entry}>
             <div class="flex items-center justify-end gap-1">

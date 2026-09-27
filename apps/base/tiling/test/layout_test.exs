@@ -111,6 +111,50 @@ defmodule Bilimbi.Base.Tiling.LayoutTest do
     end
   end
 
+  describe "master layout" do
+    test "conversion keeps tile identities and makes one master with an even stack" do
+      {layout, a} = open!(Layout.empty(), "/companies")
+      {layout, b} = open!(layout, "/users")
+      {layout, c} = open!(layout, "/employees")
+      master = Layout.master(layout)
+
+      assert Enum.map(Layout.leaves(master), & &1.id) == [a, b, c]
+      assert Layout.encode(master) == "h.5(/companies,v.5(/users,/employees))"
+      assert rect(master, a).w == 0.5
+      assert rect(master, b).h == 0.5
+      assert rect(master, c).h == 0.5
+
+      master = Layout.toggle_master_orientation(master)
+      assert Layout.encode(master) == "v.5(/companies,h.5(/users,/employees))"
+      assert rect(master, a).h == 0.5
+
+      promoted = Layout.promote_master(master, c)
+      assert Enum.map(Layout.leaves(promoted), & &1.id) == [c, b, a]
+      assert rect(promoted, c).h == 0.5
+      assert Layout.promote_master(master, "missing") == master
+    end
+
+    test "opening and closing stack tiles redivide it and preserve master width" do
+      {layout, a} = open!(Layout.empty(), "/companies")
+      {:ok, layout, b} = Layout.master_open(layout, "/users")
+      [{root, _}] = Layout.rects(layout).handles
+      layout = Layout.resize(layout, root.id, 0.6)
+      {:ok, layout, c} = Layout.master_open(layout, "/employees")
+      {:ok, layout, d} = Layout.master_open(layout, "/addresses")
+
+      assert Layout.encode(layout) ==
+               "h.6(/companies,v.333(/users,v.5(/employees,/addresses)))"
+
+      layout = Layout.master_close(layout, b)
+      assert Layout.encode(layout) == "h.6(/companies,v.5(/employees,/addresses))"
+      assert Layout.master_close(layout, "missing") == layout
+
+      layout = Layout.master_close(layout, a)
+      assert Enum.map(Layout.leaves(layout), & &1.id) == [c, d]
+      assert Layout.encode(layout) == "h.6(/employees,/addresses)"
+    end
+  end
+
   describe "resize" do
     test "resize/3 clamps the ratio" do
       {layout, a} = open!(Layout.empty(), "/companies")

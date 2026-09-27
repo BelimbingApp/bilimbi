@@ -555,7 +555,7 @@
               inner_class="space-y-4 p-4"
             >
               <p class="text-xs text-ink-muted">
-                The compact bar above each tile of the tiled workspace: the page's title and a menu carrying every operation the tiling keyboard mode offers. The focused tile's title takes the brand accent; the menu closes when focus leaves it or Escape is pressed.
+                The compact bar above each tile of the tiled workspace: the page's title and a menu carrying every operation the tiling keyboard mode offers. The focused tile's title takes the brand accent; a master tile is marked in its bar. The menu closes when focus leaves it or Escape is pressed.
               </p>
               <div
                 id="design-library-tile-header-focused"
@@ -565,12 +565,32 @@
                   id="design-library-tile-header-a"
                   title="Companies"
                   focused
+                  master_layout
+                  master_tile
                   open_alone={~p"/system/design-library/components"}
                   on_focus={JS.push("test_click")}
                   on_close={JS.push("test_click")}
                   on_monocle={JS.push("test_click")}
                   on_split={JS.push("test_click")}
                   on_swap={JS.push("test_click")}
+                  on_make_master={JS.push("test_click")}
+                />
+              </div>
+              <div
+                id="design-library-tile-header-master-stack"
+                class="overflow-hidden rounded-md border border-line"
+              >
+                <.tile_header
+                  id="design-library-tile-header-c"
+                  title="Employees, in the master stack"
+                  master_layout
+                  open_alone={~p"/system/design-library/components"}
+                  on_focus={JS.push("test_click")}
+                  on_close={JS.push("test_click")}
+                  on_monocle={JS.push("test_click")}
+                  on_split={JS.push("test_click")}
+                  on_swap={JS.push("test_click")}
+                  on_make_master={JS.push("test_click")}
                 />
               </div>
               <div
