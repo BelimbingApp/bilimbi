@@ -36,6 +36,8 @@ defmodule Bilimbi.Base.UI.RouteContractTest do
     assert {:ok, %{path: "/dashboard", capability: nil}} = RouteContract.fetch_route("/dashboard")
     assert RouteContract.fetch_route("/nowhere") == :error
     assert RouteContract.fetch_route("/session") == :error
+    assert RouteContract.fetch_route("//evil.example/") == :error
+    assert RouteContract.fetch_route("https://evil.example/dashboard") == :error
   end
 
   test "navigable_paths lists the GET route patterns and drops the rest" do

@@ -197,7 +197,12 @@ defmodule Bilimbi.Base.Tiling.LayoutTest do
             "/a,/b",
             "h.0(/a,/b)",
             ",",
-            "%zz"
+            "%zz",
+            "//evil.example/login",
+            "%2F%2Fevil.example%2Flogin",
+            "h.5(/a,%2F%2Fevil.example)",
+            "https%3A%2F%2Fevil.example%2F",
+            "/%5Cevil.example"
           ] do
         assert Layout.decode(bad) == :error, "expected #{inspect(bad)} to be rejected"
       end

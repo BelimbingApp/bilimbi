@@ -367,6 +367,19 @@ defmodule Bilimbi.Base.Tiling.Layout do
   end
 
   @doc """
+  Whether `path` names a page on this origin: one leading `/`, never `//host`,
+  a scheme, or a backslash a browser would read as `/`. Every tile path holds
+  to it, so a tile can only ever show, or link to, a Bilimbi page.
+  """
+  @spec page_path?(term()) :: boolean()
+  def page_path?("/" <> _ = path) do
+    not String.starts_with?(path, "//") and not String.contains?(path, "\\") and
+      match?(%URI{scheme: nil, host: nil, path: "/" <> _}, URI.parse(path))
+  end
+
+  def page_path?(_path), do: false
+
+  @doc """
   Reads the URL form back into a tree with fresh ids. `""` is the empty
   workspace. Anything else that is not exactly the grammar, or holds more than
   `max_tiles/0` tiles, is `:error`.
@@ -399,9 +412,7 @@ defmodule Bilimbi.Base.Tiling.Layout do
          second: second
        }, rest, layout}
     else
-      # A leaf whose path starts with h or v, such as `/history`, parses as
-      # a leaf when the split grammar does not fit.
-      _ -> parse_leaf(<<direction, rest::binary>>, layout)
+      _ -> :error
     end
   end
 
@@ -421,7 +432,7 @@ defmodule Bilimbi.Base.Tiling.Layout do
 
     with false <- raw == "",
          path when is_binary(path) <- safe_decode(raw),
-         "/" <> _ <- path do
+         true <- page_path?(path) do
       {leaf, layout} = new_leaf(layout, path)
       {:ok, leaf, rest, layout}
     else

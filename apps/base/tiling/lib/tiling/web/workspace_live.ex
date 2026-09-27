@@ -30,6 +30,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   use Bilimbi.Base.UI, :live_view
 
   alias Bilimbi.Base.Settings
+  alias Bilimbi.Base.Tenancy.Scope
   alias Bilimbi.Base.Tiling.Layout
   alias Bilimbi.Base.Tiling.SavedLayouts
   alias Bilimbi.Base.UI.Nav
@@ -269,7 +270,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   def handle_event("open-layout", %{"n" => n}, socket) when is_integer(n) do
     case Enum.at(socket.assigns.saved, n - 1) do
       %{"slug" => slug} when n >= 1 ->
-        {:noreply, push_navigate(socket, to: ~p"/workspace/#{slug}")}
+        {:noreply, push_patch(socket, to: ~p"/workspace/#{slug}")}
 
       _ ->
         {:noreply, socket}
@@ -285,7 +286,10 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
       {:noreply, put_flash(socket, :info, tile_cap_notice())}
     else
       {:noreply,
-       assign(socket, picker_open?: true, picker_for: params["id"] || socket.assigns.focused)}
+       assign(socket,
+         picker_open?: true,
+         picker_for: current_leaf(socket.assigns.tree, params["id"])
+       )}
     end
   end
 
@@ -295,7 +299,10 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
 
   def handle_event("add-tile", %{"path" => path}, socket) do
     layout = socket.assigns.tree
-    at = socket.assigns.picker_for || socket.assigns.focused
+
+    at =
+      current_leaf(layout, socket.assigns.picker_for) ||
+        current_leaf(layout, socket.assigns.focused)
 
     with true <- Enum.any?(socket.assigns.pages, &(&1.route == path)),
          {:ok, layout, id} <- Layout.open(layout, path, at: at, viewport: socket.assigns.viewport) do
@@ -342,7 +349,8 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
          socket
          |> put_flash(:success, gettext("Saved the layout “%{label}”.", label: entry["label"]))
          |> assign(layouts_open?: false, save_form: to_form(%{"label" => ""}, as: :layout))
-         |> push_navigate(to: ~p"/workspace/#{entry["slug"]}")}
+         |> load_saved()
+         |> push_patch(to: ~p"/workspace/#{entry["slug"]}")}
 
       {:error, :label} ->
         {:noreply,
@@ -421,7 +429,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
         if socket.assigns.slug == slug,
           do:
             {:noreply,
-             push_navigate(socket, to: ~p"/workspace?t=#{Layout.encode(socket.assigns.tree)}")},
+             push_patch(socket, to: ~p"/workspace?t=#{Layout.encode(socket.assigns.tree)}")},
           else: {:noreply, socket}
 
       {:error, _changeset} ->
@@ -459,6 +467,12 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   # ------------------------------------------------------------------
 
   defp put_layout(socket, %Layout{} = layout), do: socket |> assign(:tree, layout) |> derive()
+
+  defp current_leaf(layout, id) when is_binary(id) do
+    if Layout.fetch_leaf(layout, id), do: id
+  end
+
+  defp current_leaf(_layout, _id), do: nil
 
   defp focus(socket, id) do
     case Layout.fetch_leaf(socket.assigns.tree, id) do
@@ -583,13 +597,22 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
       :error ->
         :unserved
 
-      {:ok, %{capability: nil}} ->
-        :ok
-
-      {:ok, %{capability: capability}} ->
-        if allowed?(current_scope, capability), do: :ok, else: :forbidden
+      {:ok, route} ->
+        if operator_allows?(current_scope, route) and capability_allows?(current_scope, route),
+          do: :ok,
+          else: :forbidden
     end
   end
+
+  defp operator_allows?(%{scope: %Scope{} = scope}, %{operator: true}),
+    do: Scope.platform_operator?(scope)
+
+  defp operator_allows?(_current_scope, %{operator: operator}), do: not operator
+
+  defp capability_allows?(_current_scope, %{capability: nil}), do: true
+
+  defp capability_allows?(current_scope, %{capability: capability}),
+    do: allowed?(current_scope, capability)
 
   # The pages the picker offers: every leaf of the navigation this account
   # sees, which is already limited to served routes, minus this page itself.
@@ -616,11 +639,7 @@ defmodule Bilimbi.Base.Tiling.Web.WorkspaceLive do
   # A frame reports its own location. It is trusted only as far as the
   # route manifest goes: a relative path this deployment serves, never an
   # absolute URL, so a frame can only ever show a Bilimbi page.
-  defp tile_path?("/" <> rest = path) when is_binary(rest) do
-    not String.starts_with?(path, "//") and Nav.served?(URI.parse(path).path || "/")
-  end
-
-  defp tile_path?(_path), do: false
+  defp tile_path?(path), do: Layout.page_path?(path) and Nav.served?(URI.parse(path).path)
 
   defp clean_title(title) when is_binary(title) do
     title = title |> String.replace_suffix(@title_suffix, "") |> String.trim()

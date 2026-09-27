@@ -43,8 +43,8 @@ import Tiling from "./tiling"
 // pushState, so Back would step through each page a tile visited before it
 // left the workspace. Replacing instead keeps the tab's history the
 // workspace's own: Back leaves the workspace, as a person expects. The
-// workspace host learns the tile's URL from `phx:navigate` on the frame
-// window, so nothing here has to report it.
+// workspace host reads the tile's URL itself on the frame's `load` and
+// `phx:page-loading-stop` events, so nothing here has to report it.
 if (window.parent !== window) {
   history.pushState = (state, title, url) => history.replaceState(state, title, url)
 }

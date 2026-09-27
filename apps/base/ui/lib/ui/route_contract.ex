@@ -49,13 +49,20 @@ defmodule Bilimbi.Base.UI.RouteContract do
 
   The same policy `RouteAccess` enforces at mount, asked ahead of time: a
   workspace tile that would only redirect with a refusal can say so in place
-  instead. A query string is ignored; only the path decides the route.
+  instead. A query string is ignored; only the path decides the route, and
+  a URL naming a scheme or host is served by nothing.
   """
   @spec fetch_route(String.t()) ::
           {:ok, %{path: String.t(), capability: String.t() | nil, operator: boolean()}} | :error
   def fetch_route(path) when is_binary(path) do
-    segments =
-      path |> URI.parse() |> Map.get(:path) |> Kernel.||("") |> String.split("/", trim: true)
+    case URI.parse(path) do
+      %URI{scheme: nil, host: nil, path: "/" <> _ = path} -> fetch_served(path)
+      _other -> :error
+    end
+  end
+
+  defp fetch_served(path) do
+    segments = String.split(path, "/", trim: true)
 
     @routes
     |> Enum.filter(&(Map.get(&1, :verb, :get) == :get))

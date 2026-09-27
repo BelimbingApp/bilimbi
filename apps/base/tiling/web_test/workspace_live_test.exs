@@ -108,6 +108,84 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
     assert has_element?(view, "#tile-t3-unserved", "This page is not available")
   end
 
+  test "an operator-only page is refused in place outside the platform-operator tenant",
+       %{conn: conn} do
+    CompanyFixtures.insert_tenant!(%{
+      id: 51,
+      name: "Ordinary tenant",
+      is_platform_operator: false
+    })
+
+    CompanyFixtures.insert_company!(%{
+      id: 83,
+      tenant_id: 51,
+      name: "Ordinary Co",
+      code: "ordinary"
+    })
+
+    UserFixtures.insert_user!(%{
+      id: 95,
+      company_id: 83,
+      name: "Nadia",
+      email: "nadia@example.com"
+    })
+
+    grant_capabilities!(["admin.system.database-table.list"],
+      tenant_id: 51,
+      company_id: 83,
+      user_id: 95
+    )
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_as(session_user(%{"user_id" => 95, "company_id" => 83}))
+      |> live("/workspace?t=/admin/system/database-queries")
+
+    assert has_element?(view, "#tile-t1-forbidden")
+    refute has_element?(view, "#tile-t1-page")
+
+    grant_capabilities!("admin.system.database-table.list")
+    {:ok, view, _html} = open(conn, "/workspace?t=/admin/system/database-queries")
+    assert has_element?(view, "#tile-t1-page")
+  end
+
+  test "a tree naming another origin never becomes a tile", %{conn: conn} do
+    for tree <- [
+          "%2F%2Fevil.example%2Flogin",
+          "h.5(/companies,%2F%2Fevil.example%2Flogin)",
+          "https%3A%2F%2Fevil.example%2Flogin",
+          "%2F%5Cevil.example%2Flogin"
+        ] do
+      {:ok, view, html} = open(conn, "/workspace?t=" <> tree)
+
+      assert html =~ "could not be read"
+      assert has_element?(view, "#workspace-empty-state")
+      refute has_element?(view, "[data-tile]")
+    end
+
+    {:ok, view, _html} = open(conn, "/workspace?t=/companies")
+    render_hook(view, "tile-navigated", %{"id" => "t1", "path" => "//evil.example/login"})
+    assert has_element?(view, "#tile-t1-page[src='/companies']")
+  end
+
+  test "the picker opens at a current tile only, however the tree changed", %{conn: conn} do
+    {:ok, view, _html} = open(conn, "/workspace?t=h.5(/companies,/companies)")
+
+    render_hook(view, "focus-tile", %{"id" => "t2"})
+    render_hook(view, "open-picker", %{"id" => "t2"})
+    render_patch(view, "/workspace?t=/companies")
+    refute has_element?(view, "#tile-t2")
+
+    view |> element("#workspace-pick-admin-company") |> render_click()
+    assert_patch(view, "/workspace?t=h.5%28%2Fcompanies%2C%2Fcompanies%29")
+    assert has_element?(view, "#tile-t1")
+
+    render_patch(view, "/workspace?t=/companies")
+    render_hook(view, "open-picker", %{"id" => "t9"})
+    view |> element("#workspace-pick-admin-company") |> render_click()
+    assert_patch(view, "/workspace?t=h.5%28%2Fcompanies%2C%2Fcompanies%29")
+  end
+
   test "the tile menu and the hook's events operate the tree", %{conn: conn} do
     {:ok, view, _html} = open(conn, "/workspace?t=h.5(/companies,/companies)")
 
@@ -239,7 +317,8 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
       |> form("#workspace-save-form", %{"layout" => %{"label" => "Orders desk"}})
       |> render_submit()
 
-      assert_redirect(view, "/workspace/orders-desk")
+      assert_patch(view, "/workspace/orders-desk")
+      assert has_element?(view, "#tile-t1-page")
 
       assert [%{"slug" => "orders-desk", "tree" => "h.5(/companies,/companies)"}] =
                SavedLayouts.list(@settings_scope)
@@ -289,7 +368,7 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
 
       # The keyboard's 2 opens the second saved layout.
       render_hook(view, "open-layout", %{"n" => 2})
-      assert_redirect(view, "/workspace/people")
+      assert_patch(view, "/workspace/people")
 
       {:ok, view, _html} = open(conn, "/workspace/orders")
       view |> element("#workspace-add-page") |> render_click()
@@ -322,7 +401,8 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
       # Deleting the layout on screen keeps the tiles and drops the address.
       view |> element("#workspace-layout-delete-orders") |> render_click()
       view |> element("#workspace-delete-layout-confirm") |> render_click()
-      assert_redirect(view, "/workspace?t=h.5%28%2Fcompanies%2C%2Fcompanies%29")
+      assert_patch(view, "/workspace?t=h.5%28%2Fcompanies%2C%2Fcompanies%29")
+      assert has_element?(view, "#tile-t1-page")
     end
   end
 end

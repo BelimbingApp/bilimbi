@@ -5,7 +5,7 @@
   required: true,
   otp_app: :bilimbi_base_tiling,
   namespace: Bilimbi.Base.Tiling,
-  dependencies: ["base/menu", "base/module_registry", "base/settings", "base/ui"],
+  dependencies: ["base/menu", "base/module_registry", "base/settings", "base/tenancy", "base/ui"],
   migrations: nil,
   web: "priv/web_routes.exs",
   schema_contract: nil,
