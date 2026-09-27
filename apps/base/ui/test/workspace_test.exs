@@ -115,7 +115,16 @@ defmodule Bilimbi.Base.UI.WorkspaceTest do
                )
 
       assert %{token: @token, topic: ^topic, follows: []} = socket.assigns.workspace
-      assert_receive {:workspace_joined}
+      assert_receive {:workspace_joined} = joined
+
+      # Messages meant for the host never reach the page's own handle_info.
+      assert {:halt, ^socket} = run_hook(socket, :handle_info, [joined])
+
+      assert {:halt, ^socket} =
+               run_hook(socket, :handle_info, [{:workspace_fact, %{kind: "core/company", id: 7}}])
+
+      assert {:halt, ^socket} = run_hook(socket, :handle_info, [{:workspace_follows, :bad}])
+      assert {:cont, ^socket} = run_hook(socket, :handle_info, [:poll])
 
       # The host says which kinds are followed; the page keeps them.
       :ok = Workspace.broadcast(topic, {:workspace_follows, ["core/company", "bad kind"]})

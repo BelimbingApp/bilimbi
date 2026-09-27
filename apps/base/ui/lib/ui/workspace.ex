@@ -181,7 +181,8 @@ defmodule Bilimbi.Base.UI.Workspace do
 
   With a token and a signed-in scope the page gets a `@workspace` assign,
   subscribes to the topic once connected, says it joined, follows the
-  host's `{:workspace_follows, kinds}` messages, and answers the
+  host's `{:workspace_follows, kinds}` messages, keeps every other
+  workspace message away from the page's own `handle_info/2`, and answers the
   `workspace:select` event `<.record_link>` sends: an announcement when
   some tile follows the kind, otherwise a navigation to the record's page.
   Without a token the assign is `nil` and nothing else happens.
@@ -212,6 +213,9 @@ defmodule Bilimbi.Base.UI.Workspace do
     {:halt, assign(socket, :workspace, workspace)}
   end
 
+  defp handle_info({:workspace_follows, _kinds}, socket), do: {:halt, socket}
+  defp handle_info({:workspace_joined}, socket), do: {:halt, socket}
+  defp handle_info({:workspace_fact, _fact}, socket), do: {:halt, socket}
   defp handle_info(_message, socket), do: {:cont, socket}
 
   defp handle_event("workspace:select", %{"kind" => kind, "id" => id} = params, socket) do
