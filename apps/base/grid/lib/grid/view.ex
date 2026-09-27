@@ -11,6 +11,12 @@ defmodule Bilimbi.Base.Grid.View do
       cols=name,company.name,employees:count
       lens=employees:count|bar
       z=12  sort=employees:count  dir=desc  q=acme  page=2  per_page=50  group=status
+      follow=company  focus=73
+
+  `follow` names how the grid follows a workspace selection: `self` for the
+  root table's own record, or a one-link whose target records the selected
+  kind; `focus` is the key of the record last selected, which narrows the
+  rows to the ones reaching it.
   """
 
   alias Bilimbi.Base.Grid.Zoom
@@ -27,6 +33,8 @@ defmodule Bilimbi.Base.Grid.View do
             page: 1,
             page_size: 25,
             group: nil,
+            follow: nil,
+            focus: nil,
             slug: nil
 
   @type t :: %__MODULE__{
@@ -40,6 +48,8 @@ defmodule Bilimbi.Base.Grid.View do
           page: pos_integer(),
           page_size: pos_integer(),
           group: String.t() | nil,
+          follow: String.t() | nil,
+          focus: String.t() | nil,
           slug: String.t() | nil
         }
 
@@ -61,9 +71,17 @@ defmodule Bilimbi.Base.Grid.View do
       page: positive(Map.get(params, "page"), 1),
       page_size: page_size(Map.get(params, "per_page")),
       group: blank_to_nil(Map.get(params, "group")),
+      follow: params |> Map.get("follow") |> blank_to_nil() |> follow_name(),
+      focus: params |> Map.get("focus") |> blank_to_nil() |> focus_key(),
       slug: blank_to_nil(Map.get(params, "v"))
     }
   end
+
+  defp follow_name(nil), do: nil
+  defp follow_name(name), do: if(Regex.match?(~r/^[a-z][a-z0-9_]*$/, name), do: name)
+
+  defp focus_key(nil), do: nil
+  defp focus_key(key), do: if(byte_size(key) <= 64 and not (key =~ ~r{[/?#\s]}), do: key)
 
   @doc "Writes the view as URL params, leaving defaults out so the address stays short."
   @spec to_params(t()) :: map()
@@ -78,6 +96,8 @@ defmodule Bilimbi.Base.Grid.View do
     |> put_unless(:page, view.page, 1)
     |> put_unless(:per_page, view.page_size, 25)
     |> put_unless(:group, view.group, nil)
+    |> put_unless(:follow, view.follow, nil)
+    |> put_unless(:focus, view.focus, nil)
     |> put_unless(:v, view.slug, nil)
   end
 
@@ -93,7 +113,8 @@ defmodule Bilimbi.Base.Grid.View do
       "dir" => Atom.to_string(view.dir),
       "search" => view.search,
       "page_size" => view.page_size,
-      "group" => view.group
+      "group" => view.group,
+      "follow" => view.follow
     }
   end
 
@@ -114,7 +135,8 @@ defmodule Bilimbi.Base.Grid.View do
       search: map |> Map.get("search", "") |> to_string(),
       page: 1,
       page_size: page_size(Map.get(map, "page_size")),
-      group: blank_to_nil(Map.get(map, "group"))
+      group: blank_to_nil(Map.get(map, "group")),
+      follow: map |> Map.get("follow") |> blank_to_nil() |> follow_name()
     }
   end
 

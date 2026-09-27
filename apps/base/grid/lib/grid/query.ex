@@ -33,9 +33,16 @@ defmodule Bilimbi.Base.Grid.Query do
           columns: [Column.t()]
         }
 
-  @doc "Builds the joined statement for `columns` on `root`, without select, order or paging."
-  @spec plan(Catalog.t(), Table.t(), [Column.t()]) :: plan()
-  def plan(%Catalog{scope: scope} = catalog, %Table{} = root, columns) when is_list(columns) do
+  @doc """
+  Builds the joined statement for `columns` on `root`, without select,
+  order or paging. `extra:` columns are joined and expressed like the
+  others, for a filter to use, but never selected.
+  """
+  @spec plan(Catalog.t(), Table.t(), [Column.t()], keyword()) :: plan()
+  def plan(%Catalog{scope: scope} = catalog, %Table{} = root, selected, opts \\ [])
+      when is_list(selected) do
+    columns = selected ++ Keyword.get(opts, :extra, [])
+
     if length(columns) > @max_columns do
       raise ArgumentError, "a grid holds at most #{@max_columns} columns"
     end
@@ -80,8 +87,23 @@ defmodule Bilimbi.Base.Grid.Query do
       selects: selects,
       key: dynamic([root: r], field(r, ^key_column)),
       key_column: key_column,
-      columns: columns
+      columns: selected
     }
+  end
+
+  @doc """
+  Restricts the rows to the one record a workspace selection named:
+  `:root` for the root's own key, or a column whose value is the key of
+  the selected table, reached through one-links.
+  """
+  @spec focus(Ecto.Query.t(), plan(), :root | Column.t(), term()) :: Ecto.Query.t()
+  def focus(query, %{key_column: key_column}, :root, id) do
+    where(query, [root: r], field(r, ^key_column) == ^id)
+  end
+
+  def focus(query, %{selects: selects}, %Column{} = column, id) do
+    expr = Map.fetch!(selects, column)
+    where(query, ^dynamic([], ^expr == ^id))
   end
 
   defp prefixes(hops) do

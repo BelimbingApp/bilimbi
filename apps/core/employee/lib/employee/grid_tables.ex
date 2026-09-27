@@ -17,6 +17,7 @@ defmodule Bilimbi.Core.Employee.GridTables do
       tables: [
         %{
           id: "employees",
+          record_kind: "core/employee",
           label: "Employees",
           capability: "admin.employee.list",
           source: EmployeesSource,

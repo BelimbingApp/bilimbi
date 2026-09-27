@@ -30,6 +30,7 @@ defmodule Bilimbi.Base.Grid.ContributionValidator do
       end)
 
     table_map = reject_duplicate_ids!(tables)
+    reject_duplicate_record_kinds!(tables)
 
     table_map =
       Enum.reduce(links, table_map, fn {%Link{} = link, owner}, acc ->
@@ -126,6 +127,25 @@ defmodule Bilimbi.Base.Grid.ContributionValidator do
     end
 
     Map.new(tables, &{&1.id, &1})
+  end
+
+  # A workspace fact names one row of one table, so two tables cannot both
+  # answer to the same kind.
+  defp reject_duplicate_record_kinds!(tables) do
+    duplicates =
+      tables
+      |> Enum.filter(& &1.record_kind)
+      |> Enum.group_by(& &1.record_kind)
+      |> Enum.filter(fn {_kind, group} -> length(group) > 1 end)
+
+    if duplicates != [] do
+      detail =
+        Enum.map_join(duplicates, "; ", fn {kind, group} ->
+          "#{kind} by #{Enum.map_join(group, ", ", & &1.id)}"
+        end)
+
+      raise ArgumentError, "duplicate grid record kinds: #{detail}"
+    end
   end
 
   defp validate_link!(%Link{} = link, owner, tables) do

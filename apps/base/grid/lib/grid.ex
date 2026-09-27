@@ -60,7 +60,9 @@ defmodule Bilimbi.Base.Grid do
 
   Options: `:offset` and `:limit` (at most #{@max_limit}) choose the window,
   `:sort` a `{column, :asc | :desc}` pair, `:search` text matched against the
-  root's searchable fields, and `:stats`, `:cost` and `:count` (each default
+  root's searchable fields, `:focus` a `{:root | column, key}` pair that keeps
+  only the rows reaching one record (see `focus_column/3`), and `:stats`,
+  `:cost` and `:count` (each default
   true) switch the extra statements off when a caller does not show them or
   already holds the total; with `count: false` the result's `total_entries`
   is the `:total` option, or 0.
@@ -71,8 +73,13 @@ defmodule Bilimbi.Base.Grid do
     offset = opts |> Keyword.get(:offset, 0) |> max(0)
     {sort_column, dir} = Keyword.get(opts, :sort, {nil, :asc})
 
-    plan = Query.plan(catalog, root, columns)
-    base = Query.search(plan.query, root, Keyword.get(opts, :search))
+    focus = Keyword.get(opts, :focus)
+    plan = Query.plan(catalog, root, columns, extra: focus_columns(focus))
+
+    base =
+      plan.query
+      |> Query.search(root, Keyword.get(opts, :search))
+      |> focus_rows(plan, focus)
 
     rows_query =
       base
@@ -94,6 +101,73 @@ defmodule Bilimbi.Base.Grid do
       stats: if(Keyword.get(opts, :stats, true), do: Query.stats(base, plan), else: %{}),
       cost: if(Keyword.get(opts, :cost, true), do: Query.estimated_cost(rows_query), else: nil)
     }
+  end
+
+  defp focus_columns({%Column{} = column, _id}), do: [column]
+  defp focus_columns(_focus), do: []
+
+  defp focus_rows(query, plan, {:root, id}), do: Query.focus(query, plan, :root, id)
+  defp focus_rows(query, plan, {%Column{} = column, id}), do: Query.focus(query, plan, column, id)
+  defp focus_rows(query, _plan, _focus), do: query
+
+  @doc """
+  What a grid follows for a selected record of `kind`: `{:root, key_field}`
+  when the root table records that kind, or `{column, key_field}` for the
+  one-link `follow` whose target does, the column being that target's key
+  reached through the link. `:error` when neither holds, so a follow
+  written into a URL for another table means nothing here.
+
+  A selected key arrives as text; `key_field` tells the caller how to read
+  it before passing it as `focus:`.
+  """
+  @spec focus_column(Catalog.t(), Table.t(), String.t()) ::
+          {:ok, :root | Column.t(), Bilimbi.Base.Grid.Field.t(), String.t()} | :error
+  def focus_column(%Catalog{}, %Table{record_kind: kind} = root, "self") when is_binary(kind) do
+    {:ok, :root, Table.key_field(root), kind}
+  end
+
+  def focus_column(%Catalog{} = catalog, %Table{} = root, follow) when is_binary(follow) do
+    with %{kind: :one, to: to} <- Map.get(root.links, follow),
+         {:ok, %Table{record_kind: kind} = target} when is_binary(kind) <-
+           fetch_table(catalog, to),
+         {:ok, [column]} <- resolve(catalog, root, ["#{follow}.#{target.key}"]) do
+      {:ok, column, Table.key_field(target), kind}
+    else
+      _other -> :error
+    end
+  end
+
+  def focus_column(%Catalog{}, %Table{}, _follow), do: :error
+
+  @doc """
+  The ways this grid can follow a workspace selection: `"self"` when the
+  root table records a kind, and each one-link whose target does, with the
+  kind followed and the label to offer.
+  """
+  @spec follow_options(Catalog.t(), Table.t()) :: [
+          %{follow: String.t(), kind: String.t(), label: String.t()}
+        ]
+  def follow_options(%Catalog{} = catalog, %Table{} = root) do
+    own =
+      if root.record_kind,
+        do: [%{follow: "self", kind: root.record_kind, label: root.label}],
+        else: []
+
+    linked =
+      root
+      |> Table.links()
+      |> Enum.filter(&(&1.kind == :one))
+      |> Enum.flat_map(fn link ->
+        case fetch_table(catalog, link.to) do
+          {:ok, %Table{record_kind: kind}} when is_binary(kind) ->
+            [%{follow: link.id, kind: kind, label: link.label}]
+
+          _other ->
+            []
+        end
+      end)
+
+    own ++ linked
   end
 
   @doc """

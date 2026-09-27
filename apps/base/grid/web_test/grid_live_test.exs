@@ -387,4 +387,101 @@ defmodule Bilimbi.Base.Grid.Web.GridLiveTest do
     refute has_element?(colleague, "#grid-chip-email")
     refute has_element?(colleague, "#grid-view-shared-team-delete")
   end
+
+  defp framed(conn), do: put_req_header(conn, "sec-fetch-dest", "iframe")
+
+  test "in a workspace the grid follows a selection and narrows to the record it names", %{
+    conn: conn
+  } do
+    grant_capabilities!(@all)
+    token = Bilimbi.Base.UI.Workspace.host_token("phx-a-host")
+    topic = Bilimbi.Base.UI.Workspace.topic(41, 91, token)
+    :ok = Bilimbi.Base.UI.Workspace.subscribe(topic)
+
+    {:ok, view, _html} =
+      conn
+      |> log_in_as()
+      |> framed()
+      |> live(~p"/grid/users?cols=name%2Ccompany.name&ws=#{token}")
+
+    assert_receive {:workspace_joined}
+    assert has_element?(view, "#grid-follow-select option[value='self']")
+    assert has_element?(view, "#grid-follow-select option[value='company']")
+    refute has_element?(view, "#grid-follow-waiting")
+    assert has_element?(view, "#grid-row-91")
+    assert has_element?(view, "#grid-row-92")
+
+    # Choosing to follow the selected company tells the host the kind.
+    view |> form("#grid-follow-form", %{follow: %{follow: "company"}}) |> render_change()
+    path = assert_patch(view)
+    assert URI.decode_query(URI.parse(path).query)["follow"] == "company"
+    assert_receive {:workspace_page_follows, pid, ["core/company"]}
+    assert pid == view.pid
+    assert has_element?(view, "#grid-follow-waiting")
+
+    # A fact of that kind narrows the rows; one of another kind is ignored.
+    :ok =
+      Bilimbi.Base.UI.Workspace.broadcast(topic, {:workspace_fact, %{kind: "core/user", id: 92}})
+
+    :ok =
+      Bilimbi.Base.UI.Workspace.broadcast(
+        topic,
+        {:workspace_fact, %{kind: "core/company", id: 74}}
+      )
+
+    path = assert_patch(view)
+    assert URI.decode_query(URI.parse(path).query)["focus"] == "74"
+    assert has_element?(view, "#grid-focus", "74")
+    assert has_element?(view, "#grid-row-92")
+    refute has_element?(view, "#grid-row-91")
+
+    # The way back keeps the follow and drops the record.
+    view |> element("#grid-unfocus") |> render_click()
+    path = assert_patch(view)
+    query = URI.decode_query(URI.parse(path).query)
+    assert query["follow"] == "company" and not Map.has_key?(query, "focus")
+    assert has_element?(view, "#grid-row-91")
+
+    # Following the grid's own records narrows to that row.
+    view |> form("#grid-follow-form", %{follow: %{follow: "self"}}) |> render_change()
+    assert_patch(view)
+    assert_receive {:workspace_page_follows, _pid, ["core/user"]}
+
+    :ok =
+      Bilimbi.Base.UI.Workspace.broadcast(topic, {:workspace_fact, %{kind: "core/user", id: 93}})
+
+    assert_patch(view)
+    assert has_element?(view, "#grid-row-93")
+    refute has_element?(view, "#grid-row-91")
+
+    # A key that does not read as one is no selection.
+    :ok =
+      Bilimbi.Base.UI.Workspace.broadcast(
+        topic,
+        {:workspace_fact, %{kind: "core/user", id: "abc"}}
+      )
+
+    assert_patch(view)
+    assert has_element?(view, "#grid-follow-waiting")
+    assert has_element?(view, "#grid-row-91")
+  end
+
+  test "outside a workspace a focus in the address still narrows, with the way back, and nothing to follow",
+       %{conn: conn} do
+    grant_capabilities!(@all)
+
+    {:ok, view, _html} =
+      conn |> log_in_as() |> live(~p"/grid/users?cols=name&follow=company&focus=74")
+
+    refute has_element?(view, "#grid-follow-select")
+    refute has_element?(view, "#grid-follow-waiting")
+    assert has_element?(view, "#grid-focus", "74")
+    assert has_element?(view, "#grid-row-92")
+    refute has_element?(view, "#grid-row-91")
+
+    view |> element("#grid-unfocus") |> render_click()
+    assert_patch(view)
+    refute has_element?(view, "#grid-follow")
+    assert has_element?(view, "#grid-row-91")
+  end
 end

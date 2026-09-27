@@ -133,6 +133,7 @@ defmodule Bilimbi.Base.Grid.TestSources do
           capability: "admin.test.order.view",
           source: Orders,
           key: "id",
+          record_kind: "test/order",
           label_field: "label",
           time_field: "placed_at",
           fields: [
@@ -161,6 +162,7 @@ defmodule Bilimbi.Base.Grid.TestSources do
           capability: "admin.test.customer.view",
           source: Customers,
           key: "id",
+          record_kind: "test/customer",
           label_field: "name",
           fields: [
             %{id: "id", label: "ID", type: :integer},

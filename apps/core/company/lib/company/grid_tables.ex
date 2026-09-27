@@ -16,6 +16,7 @@ defmodule Bilimbi.Core.Company.GridTables do
       tables: [
         %{
           id: "companies",
+          record_kind: "core/company",
           label: "Companies",
           capability: "admin.company.list",
           source: CompaniesSource,
