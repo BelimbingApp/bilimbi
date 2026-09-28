@@ -212,7 +212,6 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
   defp source_note(%{source_scope: :global}), do: "Inherited from the default"
   defp source_note(%{source_scope: scope}), do: "Inherited from #{scope}"
 
-  defp input_type(%{encrypted?: true}), do: "password"
   defp input_type(%{definition: %{type: type}}) when type in [:integer, :float], do: "number"
   defp input_type(_field), do: "text"
 

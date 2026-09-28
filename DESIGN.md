@@ -499,6 +499,14 @@ Use the shared `<.input>` and `<.form>` components for forms where available.
 Keep forms driven by a `to_form/2` assign and give important forms and controls
 stable DOM IDs for tests and accessibility.
 
+Use `<.secret_input>` for passwords, API keys, credentials, and encrypted
+settings. It starts masked, offers an eye to confirm the entry by default,
+and takes `reveal={false}` when the workflow should omit that control. Name
+the value with `subject`, such as `"password"` or `"API key"`. A stored
+encrypted value is represented by a keep-current mask, never plaintext;
+its Clear action empties the submitted field so the owner can apply its
+clear policy. Sign-in keeps the existing password input without the eye.
+
 Function components are the default reuse mechanism. Use a LiveComponent only
 when it needs its own state and event lifecycle; do not introduce one merely to
 split markup into another file.

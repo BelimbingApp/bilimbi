@@ -62,8 +62,21 @@
             wrapper_class="mb-0 mt-2.5"
           />
 
+          <.secret_input
+            :if={field.encrypted?}
+            id={"input-#{String.replace(field.key, ".", "-")}"}
+            name={"settings[#{field.key}]"}
+            value={input_value(field)}
+            stored?={field.value == Form.secret_mask()}
+            mask={Form.secret_mask()}
+            subject={field.definition.label}
+            autocomplete="off"
+            wrapper_class="mt-2.5"
+            class="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/30"
+          />
+
           <input
-            :if={!boolean_field?(field)}
+            :if={!boolean_field?(field) && !field.encrypted?}
             type={input_type(field)}
             id={"input-#{String.replace(field.key, ".", "-")}"}
             name={"settings[#{field.key}]"}
