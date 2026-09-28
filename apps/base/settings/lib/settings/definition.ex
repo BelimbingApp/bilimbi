@@ -17,6 +17,7 @@ defmodule Bilimbi.Base.Settings.Definition do
     :capability,
     :minimum,
     :maximum,
+    reveal_duration_ms: 10_000,
     scopes: [],
     nullable: false,
     encrypted: false
@@ -59,6 +60,7 @@ defmodule Bilimbi.Base.Settings.Definition do
       help: optional_string!(Map.get(attributes, :help), key, :help),
       editable: optional_string!(Map.get(attributes, :editable), key, :editable),
       capability: optional_string!(Map.get(attributes, :capability), key, :capability),
+      reveal_duration_ms: reveal_duration!(Map.get(attributes, :reveal_duration_ms, 10_000), key),
       minimum: optional_bound!(Map.get(attributes, :minimum), type, key, :minimum),
       maximum: optional_bound!(Map.get(attributes, :maximum), type, key, :maximum)
     }
@@ -131,6 +133,13 @@ defmodule Bilimbi.Base.Settings.Definition do
 
   defp boolean!(value, _key, _field) when is_boolean(value), do: value
   defp boolean!(_value, key, field), do: invalid!(key, "#{field} must be boolean")
+
+  defp reveal_duration!(value, _key) when is_integer(value) and value in 1_000..60_000,
+    do: value
+
+  defp reveal_duration!(_value, key),
+    do: invalid!(key, "reveal_duration_ms must be between 1000 and 60000")
+
   defp optional_string!(nil, _key, _field), do: nil
 
   defp optional_string!(value, _key, _field) when is_binary(value) and value != "",

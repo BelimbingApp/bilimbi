@@ -209,6 +209,27 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
     assert html =~ "Clear API key"
   end
 
+  test "stored reveal is a separate opt-in control" do
+    html =
+      render_component(fn assigns ->
+        ~H"""
+        <.secret_input
+          id="stored"
+          name="stored"
+          subject="API key"
+          stored?={true}
+          stored_reveal={%{event: "request_secret_reveal", key: "service.key"}}
+        />
+        """
+      end)
+
+    assert html =~ ~s(id="stored-show-stored")
+    assert html =~ ~s(phx-click="request_secret_reveal")
+    assert html =~ ~s(phx-value-key="service.key")
+    assert html =~ ~s(phx-hook="SecretStored")
+    refute render_component(&dedicated_secret/1, stored?: true) =~ ~s(id="credential-show-stored")
+  end
+
   test "secret input uses a form field's name, value, and validation error" do
     form =
       to_form(%{"credential" => "typed-value"},

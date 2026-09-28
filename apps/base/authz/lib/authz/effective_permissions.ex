@@ -85,6 +85,12 @@ defmodule Bilimbi.Base.Authz.EffectivePermissions do
     permissions.direct_denies |> MapSet.to_list() |> Enum.sort()
   end
 
+  @spec directly_allowed?(Actor.t(), String.t()) :: boolean()
+  def directly_allowed?(%Actor{} = actor, capability) when is_binary(capability) do
+    {denies, allows} = direct_grants(actor)
+    MapSet.member?(allows, capability) and not MapSet.member?(denies, capability)
+  end
+
   defp direct_grants(actor) do
     rows =
       from(grant in PrincipalCapability,

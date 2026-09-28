@@ -184,6 +184,21 @@ defmodule Bilimbi.Base.Authz do
     }
   end
 
+  @doc "Whether the authenticated actor holds an explicit direct allow for a known capability."
+  @spec directly_allowed?(Scope.t(), String.t()) :: boolean()
+  def directly_allowed?(%Scope{} = scope, capability) when is_binary(capability) do
+    registry = registry!()
+
+    if capability in registry.capabilities do
+      case scope_actor(scope) do
+        {:ok, actor} -> EffectivePermissions.directly_allowed?(actor, capability)
+        {:error, :no_authenticated_actor} -> false
+      end
+    else
+      false
+    end
+  end
+
   @spec list_roles(Scope.t()) :: [Bilimbi.Base.Authz.RoleSummary.t()]
   def list_roles(%Scope{} = scope), do: RoleService.list_roles(scope, registry!())
 

@@ -45,6 +45,7 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
      |> assign(:page_title, page.title)
      |> assign(:active_tab, hd(page.groups))
      |> assign(:pending_restore, nil)
+     |> assign(:pending_reveal, nil)
      |> load_fields()}
   end
 
@@ -54,6 +55,55 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
       {:noreply, assign(socket, :active_tab, group)}
     else
       {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("request_secret_reveal", %{"key" => key}, socket) do
+    field = Enum.find(socket.assigns.fields, &(&1.key == key and &1.encrypted?))
+
+    if field && field.value == Form.secret_mask() &&
+         secret_service().available?(socket.assigns.current_scope) do
+      {:noreply, assign(socket, :pending_reveal, key)}
+    else
+      # Even a forged request is recorded as a refused reveal by the host edge.
+      secret_service().reveal(socket.assigns.current_scope, key, scope(socket), "")
+      {:noreply, put_flash(socket, :error, "Stored value cannot be shown.")}
+    end
+  end
+
+  @impl true
+  def handle_event("cancel_secret_reveal", _params, socket) do
+    {:noreply, assign(socket, :pending_reveal, nil)}
+  end
+
+  @impl true
+  def handle_event("confirm_secret_reveal", %{"reveal" => %{"password" => password}}, socket) do
+    case socket.assigns.pending_reveal do
+      nil ->
+        {:noreply, socket}
+
+      key ->
+        case secret_service().reveal(socket.assigns.current_scope, key, scope(socket), password) do
+          {:ok, value} ->
+            field = Enum.find(socket.assigns.fields, &(&1.key == key))
+            id = "input-#{String.replace(key, ".", "-")}"
+
+            {:noreply,
+             socket
+             |> assign(:pending_reveal, nil)
+             |> push_event("secret:reveal", %{
+               id: id,
+               value: value,
+               duration_ms: field.definition.reveal_duration_ms
+             })}
+
+          {:error, :throttled} ->
+            {:noreply, put_flash(socket, :error, "Too many attempts. Try again later.")}
+
+          {:error, _reason} ->
+            {:noreply, put_flash(socket, :error, "Password was not accepted.")}
+        end
     end
   end
 
@@ -138,7 +188,12 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
 
     socket
     |> assign(:fields, fields)
+    |> assign(:can_reveal_secret, secret_service().available?(socket.assigns.current_scope))
     |> assign(:withheld_capabilities, withheld_capabilities(withheld))
+  end
+
+  defp secret_service do
+    Application.fetch_env!(:bilimbi_base_settings, :secret_reveal_service)
   end
 
   # Per group, the capabilities the withheld fields require, in the key form

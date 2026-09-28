@@ -68,6 +68,11 @@
             name={"settings[#{field.key}]"}
             value={input_value(field)}
             stored?={field.value == Form.secret_mask()}
+            stored_reveal={
+              if @can_reveal_secret && field.value == Form.secret_mask(),
+                do: %{event: "request_secret_reveal", key: field.key},
+                else: nil
+            }
             mask={Form.secret_mask()}
             subject={field.definition.label}
             autocomplete="off"
@@ -123,6 +128,17 @@
         </div>
       </div>
     </form>
+
+    <div :if={@pending_reveal} id="secret-reveal-confirm" class="mt-4 rounded-xl border border-line bg-surface p-4">
+      <p class="mb-2 text-sm text-ink">Enter your password to show this stored value briefly.</p>
+      <.form for={to_form(%{}, as: :reveal)} id="secret-reveal-form" phx-submit="confirm_secret_reveal">
+        <.secret_input id="secret-reveal-password" name="reveal[password]" label="Your password" subject="password" reveal={false} autocomplete="current-password" required />
+        <div class="flex gap-2">
+          <.button type="submit" id="secret-reveal-confirm-button">Show value</.button>
+          <.button type="button" id="secret-reveal-cancel" phx-click="cancel_secret_reveal">Cancel</.button>
+        </div>
+      </.form>
+    </div>
 
     <.confirm_dialog
       :if={@pending_restore}

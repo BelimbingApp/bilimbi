@@ -5,6 +5,7 @@ const SecretClear = {
     this.input = document.getElementById(this.el.dataset.inputId)
     this.clear = () => {
       this.input.value = ""
+      this.input.dispatchEvent(new Event("secret:cleared"))
       this.input.focus()
     }
     this.el.addEventListener("click", this.clear)

@@ -644,6 +644,7 @@ defmodule Bilimbi.Base.UI.Components do
   attr(:subject, :string, required: true)
   attr(:reveal, :boolean, default: true)
   attr(:stored?, :boolean, default: false)
+  attr(:stored_reveal, :map, default: nil)
   attr(:mask, :string, default: "••••••••")
   attr(:hint, :string, default: nil)
   attr(:wrapper_class, :any, default: nil)
@@ -683,8 +684,19 @@ defmodule Bilimbi.Base.UI.Components do
         class={@class}
         wrapper_class={if @stored?, do: "mb-1.5", else: "mb-0"}
         autocomplete={@autocomplete}
+        phx-hook={@stored? && "SecretStored"}
         {@input_rest}
       />
+      <button
+        :if={@stored? && @stored_reveal}
+        id={"#{@secret_id}-show-stored"}
+        type="button"
+        phx-click={@stored_reveal.event}
+        phx-value-key={@stored_reveal.key}
+        class="mr-3 text-xs font-medium text-ink hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+      >
+        {gettext("Show stored value")}
+      </button>
       <button
         :if={@stored?}
         id={"#{@secret_id}-clear"}
