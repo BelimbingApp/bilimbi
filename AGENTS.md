@@ -141,7 +141,10 @@ allows design freedom, not shortcuts.
   operator could reasonably set (servers and credentials, schedules, limits,
   scopes, mappings, codes, visibility, and approvers) are settings with an
   operator UI, not code constants, config files, or environment-only values.
-  Secrets are stored encrypted and never displayed back or logged.
+  Secrets are stored encrypted and never displayed back or logged. Only
+  bootstrap values needed before the settings store is reachable (database
+  URL, secret key base, pool size, host, and port) stay in the runtime
+  environment.
 
 ## 4. Application ownership and dependency direction
 
