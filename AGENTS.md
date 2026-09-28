@@ -137,6 +137,11 @@ allows design freedom, not shortcuts.
 - **Opinionated defaults:** Prefer one good blessed path over option sprawl.
   Business modules remain adaptable; the shared shell and platform conventions
   should be clear.
+- **Configurable:** Never hard-code what should be configurable. Values an
+  operator could reasonably set (servers and credentials, schedules, limits,
+  scopes, mappings, codes, visibility, and approvers) are settings with an
+  operator UI, not code constants, config files, or environment-only values.
+  Secrets are stored encrypted and never displayed back or logged.
 
 ## 4. Application ownership and dependency direction
 
