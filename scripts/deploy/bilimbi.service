@@ -1,0 +1,28 @@
+[Unit]
+Description=Bilimbi Phoenix release
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=bilimbi
+Group=bilimbi
+WorkingDirectory=/opt/bilimbi/current
+EnvironmentFile=/etc/bilimbi/bilimbi.env
+Environment=PHX_SERVER=true
+ExecStart=/opt/bilimbi/current/bin/bilimbi start
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+MemoryMax=2G
+TasksMax=512
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/bilimbi
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
