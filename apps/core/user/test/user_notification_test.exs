@@ -23,7 +23,11 @@ defmodule Bilimbi.Core.User.UserNotificationTest do
       code: "company_73"
     })
 
-    CompanyFixtures.insert_tenant!(%{id: 99, name: "Tenant 99"})
+    CompanyFixtures.insert_tenant!(%{
+      id: 99,
+      name: "Tenant 99",
+      is_platform_operator: false
+    })
 
     CompanyFixtures.insert_company!(%{
       id: 88,

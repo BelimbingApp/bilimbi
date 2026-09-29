@@ -162,7 +162,11 @@ defmodule BilimbiWeb.SessionsLiveTest do
   test "keeps the id for a user outside the actor's tenant", %{conn: conn} do
     grant_capabilities!("admin.system.session.list")
 
-    CompanyFixtures.insert_tenant!(%{id: 42, name: "Other Tenant"})
+    CompanyFixtures.insert_tenant!(%{
+      id: 42,
+      name: "Other Tenant",
+      is_platform_operator: false
+    })
 
     CompanyFixtures.insert_company!(%{
       id: 74,

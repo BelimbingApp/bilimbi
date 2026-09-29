@@ -162,7 +162,11 @@ defmodule BilimbiWeb.AuthzPrincipalRolesLiveTest do
     conn: conn,
     scope: scope
   } do
-    CompanyFixtures.insert_tenant!(%{id: 42, name: "Other Tenant"})
+    CompanyFixtures.insert_tenant!(%{
+      id: 42,
+      name: "Other Tenant",
+      is_platform_operator: false
+    })
 
     CompanyFixtures.insert_company!(%{
       id: 74,
