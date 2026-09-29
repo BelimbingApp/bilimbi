@@ -4,6 +4,9 @@ Read the component comment before fighting a default. `DESIGN.md` is the design 
 
 ## Defaults the component owns
 
+Use `<.secret_input>` for password and encrypted-value forms, not a hand-written password field. Its comment in `lib/ui/components.ex` owns masking, the default eye, the accessible noun, and the stored-value clear action; the owning form decides what a submitted mask or blank means.
+The optional stored-value reveal button is separate from the eye. Wire its `stored_reveal` event only after the server checks an explicit grant; `BilimbiWeb.SecretReveal` rechecks, confirms the viewer's password, audits, and sends one timed value.
+
 A table is flat. `table/1` takes no radius, so a rounded table is hand-written markup. See `DESIGN.md` "Table geometry" and the comment on `table/1`.
 
 A caller's `inner_class` padding wins over the card's `p-2`. `inner_padding/1` resolves that before the classes reach the markup; two utilities of equal specificity are decided by stylesheet order, where a caller's `p-0` would lose.

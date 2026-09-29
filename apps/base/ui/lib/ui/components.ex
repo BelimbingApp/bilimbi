@@ -627,6 +627,92 @@ defmodule Bilimbi.Base.UI.Components do
   end
 
   @doc """
+  Renders a masked secret field with a reveal control by default.
+
+  `subject` is the noun used by the control's accessible name. For a stored
+  encrypted value, pass `stored?={true}` and the owner's keep-current `mask`.
+  The component discards `value` in that state: plaintext must never be sent
+  back to the browser. The Clear button empties the live input, so submitting
+  it lets the owning form apply its explicit clear policy. A reveal of the
+  keep-current mask reveals only the mask, never the stored value.
+  """
+  attr(:field, Phoenix.HTML.FormField, default: nil)
+  attr(:id, :string, default: nil)
+  attr(:name, :string, default: nil)
+  attr(:value, :any, default: nil)
+  attr(:label, :string, default: nil)
+  attr(:subject, :string, required: true)
+  attr(:reveal, :boolean, default: true)
+  attr(:stored?, :boolean, default: false)
+  attr(:stored_reveal, :map, default: nil)
+  attr(:mask, :string, default: "••••••••")
+  attr(:hint, :string, default: nil)
+  attr(:wrapper_class, :any, default: nil)
+  attr(:class, :any, default: nil)
+
+  attr(:rest, :global,
+    include:
+      ~w(autocomplete disabled form maxlength minlength pattern placeholder readonly required)
+  )
+
+  def secret_input(assigns) do
+    assigns =
+      assigns
+      |> assign(
+        :secret_value,
+        if(assigns.stored?,
+          do: assigns.mask,
+          else: assigns.value || (assigns.field && assigns.field.value)
+        )
+      )
+      |> assign(:secret_name, assigns.name || (assigns.field && assigns.field.name))
+      |> assign(:secret_id, assigns.id || (assigns.field && assigns.field.id) || assigns.name)
+      |> assign(:autocomplete, assigns.rest[:autocomplete] || "new-password")
+      |> assign(:input_rest, Map.delete(assigns.rest, :autocomplete))
+
+    ~H"""
+    <div class={@wrapper_class || "mb-4"}>
+      <.input
+        field={@field}
+        id={@secret_id}
+        name={@secret_name}
+        value={@secret_value}
+        type="password"
+        label={@label}
+        reveal={@reveal && @subject}
+        hint={@hint}
+        class={@class}
+        wrapper_class={if @stored?, do: "mb-1.5", else: "mb-0"}
+        autocomplete={@autocomplete}
+        phx-hook={@stored? && "SecretStored"}
+        {@input_rest}
+      />
+      <button
+        :if={@stored? && @stored_reveal}
+        id={"#{@secret_id}-show-stored"}
+        type="button"
+        phx-click={@stored_reveal.event}
+        phx-value-key={@stored_reveal.key}
+        class="mr-3 text-xs font-medium text-ink hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40"
+      >
+        {gettext("Show stored value")}
+      </button>
+      <button
+        :if={@stored?}
+        id={"#{@secret_id}-clear"}
+        type="button"
+        phx-hook="SecretClear"
+        data-input-id={@secret_id}
+        disabled={@rest[:disabled] || @rest[:readonly]}
+        class="text-xs font-medium text-danger-ink hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-strong/40 disabled:opacity-50"
+      >
+        {gettext("Clear %{subject}", subject: @subject)}
+      </button>
+    </div>
+    """
+  end
+
+  @doc """
   Renders an input with label and error messages.
 
   A `Phoenix.HTML.FormField` may be passed as argument,
@@ -930,6 +1016,8 @@ defmodule Bilimbi.Base.UI.Components do
           name={@name}
           id={@id}
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
+          aria-invalid={@errors != [] && "true"}
+          aria-describedby={described_by(@id, @hint, @errors)}
           class={[field_class(@class, @error_class, @errors), "pr-10"]}
           {@rest}
         />
@@ -956,8 +1044,8 @@ defmodule Bilimbi.Base.UI.Components do
           </span>
         </button>
       </div>
-      <p :if={@hint} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
-      <.error :for={msg <- @errors}>{msg}</.error>
+      <p :if={@hint} id={"#{@id}-hint"} class="mt-1.5 text-xs text-ink-subtle">{@hint}</p>
+      <.error :for={{msg, i} <- Enum.with_index(@errors)} id={"#{@id}-error-#{i}"}>{msg}</.error>
     </div>
     """
   end

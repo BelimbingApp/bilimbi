@@ -27,6 +27,10 @@ config :web, BilimbiWeb.Endpoint,
 config :bilimbi_core_user,
   pubsub_server: BilimbiWeb.PubSub
 
+# Web owns account reauthentication and request throttling; Base Settings
+# calls this host seam without a forbidden Base -> Core User dependency.
+config :bilimbi_base_settings, secret_reveal_service: BilimbiWeb.SecretReveal
+
 # The follow channel between workspace tiles (Bilimbi.Base.UI.Workspace)
 # rides the host's PubSub, as user notifications do.
 config :bilimbi_base_ui,

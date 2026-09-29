@@ -112,20 +112,20 @@ defmodule BilimbiWeb.ResetPasswordLive do
             autofocus
           />
 
-          <.input
+          <.secret_input
             field={@form[:password]}
             id="reset-password"
-            type="password"
             label="New password"
+            subject="password"
             autocomplete="new-password"
             required
           />
 
-          <.input
+          <.secret_input
             field={@form[:password_confirmation]}
             id="reset-password-confirmation"
-            type="password"
             label="Confirm new password"
+            subject="password"
             autocomplete="new-password"
             required
           />

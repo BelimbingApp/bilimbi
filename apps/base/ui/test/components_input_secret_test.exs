@@ -164,4 +164,91 @@ defmodule Bilimbi.Base.UI.ComponentsInputSecretTest do
       render_component(&input/1, id: "email", name: "email", type: "email", reveal: true)
     end
   end
+
+  defp dedicated_secret(assigns) do
+    assigns =
+      assigns
+      |> assign_new(:stored?, fn -> false end)
+      |> assign_new(:reveal, fn -> true end)
+      |> assign_new(:value, fn -> "newly typed" end)
+
+    ~H"""
+    <.secret_input
+      id="credential"
+      name="credential"
+      label="API key"
+      subject="API key"
+      value={@value}
+      stored?={@stored?}
+      reveal={@reveal}
+    />
+    """
+  end
+
+  test "secret input is masked, names its reveal action, and can omit the eye" do
+    html = render_component(&dedicated_secret/1)
+
+    assert html =~ ~s(type="password")
+    assert html =~ ~s(value="newly typed")
+    assert html =~ ~s(autocomplete="new-password")
+    assert html =~ ~s(id="credential-reveal")
+    assert html =~ ~s(aria-label="Show API key, currently hidden")
+
+    hidden = render_component(&dedicated_secret/1, reveal: false)
+    refute hidden =~ ~s(id="credential-reveal")
+  end
+
+  test "stored secret discards plaintext and exposes a clear action" do
+    html = render_component(&dedicated_secret/1, stored?: true, value: "never-send-this")
+
+    assert html =~ ~s(value="••••••••")
+    refute html =~ "never-send-this"
+    assert html =~ ~s(id="credential-clear")
+    assert html =~ ~s(phx-hook="SecretClear")
+    assert html =~ ~s(data-input-id="credential")
+    assert html =~ "Clear API key"
+  end
+
+  test "stored reveal is a separate opt-in control" do
+    html =
+      render_component(fn assigns ->
+        ~H"""
+        <.secret_input
+          id="stored"
+          name="stored"
+          subject="API key"
+          stored?={true}
+          stored_reveal={%{event: "request_secret_reveal", key: "service.key"}}
+        />
+        """
+      end)
+
+    assert html =~ ~s(id="stored-show-stored")
+    assert html =~ ~s(phx-click="request_secret_reveal")
+    assert html =~ ~s(phx-value-key="service.key")
+    assert html =~ ~s(phx-hook="SecretStored")
+    refute render_component(&dedicated_secret/1, stored?: true) =~ ~s(id="credential-show-stored")
+  end
+
+  test "secret input uses a form field's name, value, and validation error" do
+    form =
+      to_form(%{"credential" => "typed-value"},
+        as: :account,
+        errors: [credential: {"is invalid", []}]
+      )
+
+    html =
+      render_component(fn assigns ->
+        assigns = assign(assigns, :form, form)
+
+        ~H"""
+        <.secret_input field={@form[:credential]} label="Credential" subject="credential" />
+        """
+      end)
+
+    assert html =~ ~s(name="account[credential]")
+    assert html =~ ~s(value="typed-value")
+    assert html =~ ~s(aria-invalid="true")
+    assert html =~ "is invalid"
+  end
 end

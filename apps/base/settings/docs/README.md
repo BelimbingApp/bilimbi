@@ -24,3 +24,12 @@ Encrypted definitions use the Laravel AES-256-CBC envelope so adopted values
 remain readable when `BELIMBING_APP_KEY` is supplied. The key is optional until
 an encrypted row is read or written, never logged, and never stored in this
 table.
+
+The group screen never renders a stored encrypted value; it shows a
+keep-current mask. A viewer explicitly granted `base.settings.secret.view`
+may ask to show one stored value after re-entering their own password. Base
+Settings calls the host seam `Bilimbi.Base.Settings.SecretRevealService`
+(configured as `:secret_reveal_service`), which the Web host implements in
+`BilimbiWeb.SecretReveal` to check the grant and password, throttle failures,
+and audit every attempt without the value. The value stays visible for the
+definition's `reveal_duration_ms` (default 10 000, bounded 1 000–60 000).

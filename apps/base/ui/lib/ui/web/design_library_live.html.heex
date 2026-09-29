@@ -1263,20 +1263,39 @@
                   <.input field={@sample_form[:month_field]} type="month" label="Month" />
                   <.input field={@sample_form[:week_field]} type="week" label="Week" />
                 </div>
-                <.input
+                <.secret_input
                   field={@sample_form[:password_field]}
-                  type="password"
-                  label="Secret"
+                  label="Password"
+                  subject="password"
                   autocomplete="new-password"
                 />
-                <.input
+                <.secret_input
                   field={@sample_form[:api_key_field]}
-                  type="password"
                   label="API key"
-                  reveal="API key"
+                  subject="API key"
                   autocomplete="off"
                   wrapper_class="mb-0"
-                  hint="Reveal is a caller option. Sign-in keeps its password masked; a key a user copies from elsewhere earns the control."
+                  hint="The eye shows a newly entered value for confirmation."
+                />
+              </.card>
+
+              <.card id="component-secret_input" title="Stored secret" inner_class="p-4">
+                <.secret_input
+                  id="design-library-stored-key"
+                  name="stored_key"
+                  label="Stored API key"
+                  subject="API key"
+                  stored?={true}
+                  value="never-render-this-plaintext"
+                  autocomplete="off"
+                  hint="Leave the mask to keep the saved value, or clear it explicitly."
+                />
+                <.secret_input
+                  id="design-library-no-eye"
+                  field={@sample_form[:password_field]}
+                  aria-label="Password without reveal"
+                  subject="password"
+                  reveal={false}
                 />
               </.card>
 

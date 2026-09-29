@@ -109,7 +109,7 @@ defmodule Bilimbi.Core.User.Web.FormLive do
           <.input field={@form[:name]} id="user-name" label="Name" autocomplete="name" placeholder="Enter user name" required />
           <.input field={@form[:email]} id="user-email" type="email" label="Email" autocomplete="email" placeholder="Enter email address" required />
 
-          <.input field={@form[:password]} id="user-password" type="password" label="Password" autocomplete="new-password" placeholder="Enter password" required />
+          <.secret_input field={@form[:password]} id="user-password" label="Password" subject="password" autocomplete="new-password" placeholder="Enter password" required />
 
           <div class="mt-2 flex items-center gap-4">
             <.button id="user-save" variant="primary" type="submit" phx-disable-with="Saving…">Create User</.button>

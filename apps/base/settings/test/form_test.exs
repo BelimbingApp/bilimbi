@@ -147,6 +147,17 @@ defmodule Bilimbi.Base.Settings.FormTest do
       assert Settings.get("tests.secret") == "hunter2"
     end
 
+    test "explicitly clearing a stored secret removes its override" do
+      assert {:ok, _} = Settings.put("tests.secret", "hunter2")
+      fields = Form.fields(["operator"], nil)
+
+      assert {:ok, %{cleared: ["tests.secret"]}} =
+               Form.save(%{"tests.secret" => ""}, fields, nil)
+
+      refute Settings.overridden?("tests.secret")
+      assert Settings.get("tests.secret") == nil
+    end
+
     test "a genuinely changed secret is written" do
       assert {:ok, _} = Settings.put("tests.secret", "hunter2")
       fields = Form.fields(["operator"], nil)

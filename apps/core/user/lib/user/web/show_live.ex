@@ -1844,15 +1844,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 class="space-y-4"
               >
                 <div>
-                  <label for="user-new-password" class="mb-1.5 block text-sm font-medium text-ink">New Password</label>
-                  <input
-                    type="password"
+                  <.secret_input
                     name="password"
                     id="user-new-password"
+                    label="New Password"
+                    subject="password"
                     required
                     autocomplete="new-password"
                     placeholder="Enter new password"
-                    class="block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-2 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/20"
+                    wrapper_class="mb-0"
                   />
                   <p
                     :if={@password_errors[:password]}
@@ -1864,18 +1864,15 @@ defmodule Bilimbi.Core.User.Web.ShowLive do
                 </div>
 
                 <div>
-                  <label
-                    for="user-new-password-confirmation"
-                    class="mb-1.5 block text-sm font-medium text-ink"
-                  >Confirm New Password</label>
-                  <input
-                    type="password"
+                  <.secret_input
                     name="password_confirmation"
                     id="user-new-password-confirmation"
+                    label="Confirm New Password"
+                    subject="password"
                     required
                     autocomplete="new-password"
                     placeholder="Confirm new password"
-                    class="block w-full rounded-md border border-high-contrast-line bg-surface px-3 py-2 text-sm text-ink shadow-xs transition placeholder:text-ink-faint focus:border-brand-strong focus:outline-none focus:ring-2 focus:ring-brand-strong/20"
+                    wrapper_class="mb-0"
                   />
                   <p
                     :if={@password_errors[:password_confirmation]}
