@@ -193,7 +193,7 @@ defmodule Bilimbi.Base.Authz do
   def explicitly_allowed?(%Scope{} = scope, capability) when is_binary(capability) do
     registry = registry!()
 
-    if capability in registry.capabilities do
+    if capability in capabilities() do
       case scope_actor(scope) do
         {:ok, actor} ->
           EffectivePermissions.explicitly_allowed?(actor, capability, directory!(registry))
