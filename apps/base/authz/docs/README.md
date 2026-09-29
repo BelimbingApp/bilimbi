@@ -79,6 +79,11 @@ removes one visible assignment by its durable ID.
 visible persisted direct rule by durable grant ID, including a stale capability
 key, so evaluation falls back to roles and the normal fail-closed behavior.
 
+`explicitly_allowed?/2` answers whether the scope's user holds a known
+capability through a direct allow or a role that names it; a `grant_all` role
+does not count and a direct deny wins. Use it, together with `can/4`, only for
+a capability that must never be conferred implicitly.
+
 The pinned Belimbing screens search and sort joined User and Company names
 before pagination. This Base-only facade intentionally does not promise those
 cross-module totals or filters: its read models never join Core User or Core

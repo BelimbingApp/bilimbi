@@ -73,7 +73,7 @@ Phase 0 verified every row against both live products. A row whose `Bilimbi now`
 | INP-03 [(contradicted)](#targets-the-evidence-contradicts) | Search | Generic search type | Add clear, empty, loading and result-update behavior. |
 | INP-04 | Select, multi-select, checkbox and radio | Shared components for all four, including `<.radio_group>`; state coverage partial | Complete open/close, summary, no-options, outside-click, Escape and keyboard behavior. |
 | INP-05 | Date, time, datetime and integer entry | Mostly native generic inputs | Define tabular display, step controls, validation and locale/timezone behavior. |
-| INP-06 | Secret input | Password field only | Distinguish saved mask, reveal, replacement and explicit clearing. |
+| INP-06 | Secret input | Shared `<.secret_input>` ships the keep-current mask, the default eye, explicit clearing and a reauthenticated, audited, timed reveal of a stored Settings value | Distinguish saved mask, reveal, replacement and explicit clearing. |
 | INP-07 | Searchable and editable combobox | Shared `<.combobox>` ships the single-value, client-filtered case: a hidden field carries the committed value, typing filters and highlights the first match without a round trip, arrow keys move, Enter commits the highlighted option and never submits the form, Escape or leaving restores the last choice, and no-options and no-matches states are distinct; async loading and free-text editing do not exist | Adopt the useful Belimbing behavior with full keyboard, async, no-result and commit/cancel states. |
 | INP-08 | Country and currency lookup | Country uses `<.combobox>` with module-owned options on `/companies/create`, the Company jurisdiction fact and every Address country field; currency lookup is missing | Build only the generic visual/interaction seam; domain data stays with its owning module. |
 | INP-09 | Segmented control | Missing | Add for short peer choices when a real Bilimbi workflow needs it. |
@@ -159,7 +159,7 @@ rather than being quietly reconciled.
 | INP-03 Search | Adopt adapted — narrowed to the magnifier only | INP-01; clear → INT-05 |
 | INP-04 Choice controls | Adopt adapted (multi-select) / Keep Bilimbi (radio group) | INP-01 |
 | INP-05 Date, time, integer | Adopt adapted — narrow, `tabular-nums` | INP-01 |
-| INP-06 Secret | Adopt adapted — excluding reveal-a-saved-secret | INP-01 |
+| INP-06 Secret | Adopt adapted — reveal-a-saved-secret only behind an explicit grant, password reauthentication and audit | INP-01 |
 | INP-07 Combobox | Adopt adapted | INP-01, INP-04 |
 | INP-08 Country and currency | Adopt adapted — seam only | INP-07 |
 | INP-09 Segmented control | Adopt adapted | INP-01, FND-05 |
