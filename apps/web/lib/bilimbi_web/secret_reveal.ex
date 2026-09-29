@@ -102,5 +102,15 @@ defmodule BilimbiWeb.SecretReveal do
       is_retained: true,
       occurred_at: NaiveDateTime.utc_now()
     })
+  rescue
+    # A missing actions table is the same pre-canonical / unavailable store
+    # state MutationCapture and UserAuth tolerate for best-effort trails.
+    # Reveal cannot be best-effort: without a durable row the value stays in.
+    error in Postgrex.Error ->
+      if match?(%{postgres: %{code: :undefined_table}}, error) do
+        {:error, :audit_unavailable}
+      else
+        reraise error, __STACKTRACE__
+      end
   end
 end

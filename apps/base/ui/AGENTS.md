@@ -5,7 +5,7 @@ Read the component comment before fighting a default. `DESIGN.md` is the design 
 ## Defaults the component owns
 
 Use `<.secret_input>` for password and encrypted-value forms, not a hand-written password field. Its comment in `lib/ui/components.ex` owns masking, the default eye, the accessible noun, and the stored-value clear action; the owning form decides what a submitted mask or blank means.
-The optional stored-value reveal button is separate from the eye. Wire its `stored_reveal` event only after the server checks an explicit grant; `BilimbiWeb.SecretReveal` rechecks, confirms the viewer's password, audits, and sends one timed value.
+The optional stored-value reveal button is separate from the eye. Wire its `stored_reveal` event only after the server checks an explicit grant; `BilimbiWeb.SecretReveal` rechecks, confirms the viewer's password, audits, and sends one timed value. If that audit write cannot land, refuse the reveal and send nothing — see the `:audit_unavailable` path in `BilimbiWeb.SecretReveal` and its LiveView coverage in `apps/base/settings/web_test/settings_live_test.exs`.
 
 A table is flat. `table/1` takes no radius, so a rounded table is hand-written markup. See `DESIGN.md` "Table geometry" and the comment on `table/1`.
 
