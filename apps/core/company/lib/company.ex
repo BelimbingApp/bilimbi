@@ -231,19 +231,24 @@ defmodule Bilimbi.Core.Company do
   Belimbing's tenant-wide user list joins `companies` with a raw SQL left join,
   so Company's SoftDeletes scope never applies and users whose company is
   soft-deleted remain visible. Core User must not query `companies`; this
-  Company-owned id list is the seam that preserves that visibility without
-  leaking a queryable across the module boundary.
+  Company-owned id list is the seam that preserves that visibility.
   """
   @spec list_tenant_company_ids(Scope.t()) :: {:ok, [pos_integer()]}
   def list_tenant_company_ids(%Scope{} = scope) do
-    ids =
-      from(company in Tenancy.scope_query(Schema, scope),
-        order_by: company.id,
-        select: company.id
-      )
-      |> Repo.all()
+    {:ok, scope |> tenant_company_ids_query() |> Repo.all()}
+  end
 
-    {:ok, ids}
+  @doc """
+  The query behind `list_tenant_company_ids/1`, selecting only `id`, for a
+  caller that must build a statement without reading the database, such as
+  a grid source composing it as a subquery.
+  """
+  @spec tenant_company_ids_query(Scope.t()) :: Ecto.Query.t()
+  def tenant_company_ids_query(%Scope{} = scope) do
+    from(company in Tenancy.scope_query(Schema, scope),
+      order_by: company.id,
+      select: company.id
+    )
   end
 
   @spec platform_operator_company() :: {:ok, Summary.t()} | {:error, lookup_error()}

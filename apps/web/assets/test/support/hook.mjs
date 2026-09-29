@@ -20,6 +20,9 @@ export function mountHook(Hook, el) {
   hook.el = el
   hook.pushEvent = (event, payload, reply) => pushes.push({event, payload, reply})
   hook.pushEventTo = (target, event, payload, reply) => pushes.push({target, event, payload, reply})
+  // Server-pushed events: a hook registers with `handleEvent`; a test delivers
+  // one with `serverEvent`, which fails when the hook handles no such event,
+  // or `receive`, which ignores it.
   hook.handleEvent = (event, callback) => handlers.set(event, callback)
   hook.liveSocket = {execJS: (_el, encoded) => run(encoded)}
   hook.js = () => ({exec: run})
@@ -32,7 +35,9 @@ export function mountHook(Hook, el) {
     callback(payload)
   }
 
-  return {hook, pushes, exec: run, serverEvent}
+  const receive = (event, payload) => handlers.get(event)?.(payload)
+
+  return {hook, pushes, exec: run, serverEvent, receive}
 }
 
 function applyCommands(encoded, pushes) {

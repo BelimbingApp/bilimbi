@@ -62,6 +62,18 @@ An operational list keeps its page, search, filters, sort and page size in URL s
 
 Those filters are `<.filter_toolbar>` and that pager is `<.pagination>`. A local form or Previous/Next pair is the pair those two replaced. The comments on `filter_toolbar/1` and `pagination/1` own the framing.
 
+## Flexible tables
+
+A table whose columns a person adds, removes, reorders or zooms is
+`<.flex_table>`, hosted by the grid page or by a list page through
+`Bilimbi.Base.Grid.Web.PageColumns`. It is presentation only: it never
+touches a catalog or a query, and its one event carries an `op`. Bars and
+bands are painted from `data-bar`, `data-band` and `data-scale` (the CSP
+refuses inline style; the `FlexTable` hook writes the bar width), the
+compact and carpet modes draw on a canvas from pushed windows, and the
+mode is the host's decision from the zoom. See the component comment and
+`Bilimbi.Base.UI.FlexTable`.
+
 ## Summaries
 
 A dashboard card of labelled values is `<.stat_strip>`; a hand-written card with the same title-and-cells anatomy is what it replaced. A feed of entries is not a stat strip and keeps its own markup, commented as such. An icon-only link is `<.icon_button navigate>`, which carries the accessible name a bare `<.link>` around an icon lacks.

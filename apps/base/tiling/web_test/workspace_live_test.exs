@@ -62,8 +62,11 @@ defmodule Bilimbi.Base.Tiling.WorkspaceLiveTest do
   test "the picker lists only pages this account may open", %{conn: conn} do
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/workspace")
 
+    # Grid, like the workspace, is open to every signed-in account: each table
+    # on it is read under its own capability. Companies needs a grant.
     refute has_element?(view, "#workspace-pick-admin-company")
-    assert has_element?(view, "#workspace-picker-empty", "No pages to add")
+    assert has_element?(view, "#workspace-pick-grid", "Grid")
+    refute has_element?(view, "#workspace-picker-empty")
   end
 
   test "adding pages splits the focused tile and writes the tree into the URL", %{conn: conn} do

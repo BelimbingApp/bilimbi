@@ -12,6 +12,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Grid.Web.PageColumns
   alias Bilimbi.Core.Company
   alias Bilimbi.Core.Company.AdministrationPage
 
@@ -26,6 +27,32 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
   @default_sort_by :name
   @default_sort_dir :asc
   @default_page 1
+
+  # The columns this page draws itself; walked catalog columns join them
+  # through PageColumns.
+  @builtins [
+    %{id: "name", label: "Name", type: :string, sort: "name", sort_id: "companies-sort-name"},
+    %{id: "code", label: "Code", type: :string},
+    %{id: "parent_name", label: "Parent", type: :string},
+    %{
+      id: "status",
+      label: "Status",
+      type: :enum,
+      sort: "status",
+      sort_id: "companies-sort-status"
+    },
+    %{
+      id: "jurisdiction",
+      label: "Jurisdiction",
+      type: :string,
+      sort: "jurisdiction",
+      sort_id: "companies-sort-jurisdiction"
+    }
+  ]
+
+  # Column, lens and zoom operations rearrange the reading of the list; the
+  # page writes nothing through them.
+  @write_guard_opt_out ~w(grid)
 
   defmodule State do
     @moduledoc false
@@ -46,13 +73,18 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
      |> assign(:page_sizes, @page_sizes)
      |> assign(:index_state, %State{})
      |> assign(:companies_page, empty_page())
-     |> assign(:filters_form, to_form(filters_form_params(%State{}), as: :filters))}
+     |> assign(:filters_form, to_form(filters_form_params(%State{}), as: :filters))
+     |> assign(
+       :columns,
+       PageColumns.mount(socket.assigns.current_scope.scope, "companies", @builtins)
+     )}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
     state = state_from_params(params)
-    {:noreply, load_page(socket, state)}
+    columns = PageColumns.from_params(socket.assigns.columns, params)
+    {:noreply, socket |> assign(:columns, columns) |> load_page(state)}
   end
 
   @impl true
@@ -64,12 +96,36 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
       |> Map.put(:per_page, normalize_page_size(Map.get(filters, "perPage")))
       |> Map.put(:page, 1)
 
-    {:noreply, push_patch(socket, to: companies_path(state))}
+    {:noreply, push_patch(socket, to: companies_path(state, socket.assigns.columns))}
   end
 
   def handle_event("sort", %{"sort" => sort_by}, socket) do
     {:noreply,
-     push_patch(socket, to: companies_path(next_sort(socket.assigns.index_state, sort_by)))}
+     push_patch(socket,
+       to: companies_path(next_sort(socket.assigns.index_state, sort_by), socket.assigns.columns)
+     )}
+  end
+
+  def handle_event("grid", params, socket) do
+    case PageColumns.handle(socket.assigns.columns, params, "companies") do
+      {:patch, columns} ->
+        {:noreply, push_patch(socket, to: companies_path(socket.assigns.index_state, columns))}
+
+      {:update, columns} ->
+        {:noreply, assign(socket, :columns, columns)}
+
+      {:sort, key} ->
+        handle_event("sort", %{"sort" => key}, socket)
+
+      {:window, event, payload} ->
+        {:noreply, push_event(socket, event, payload)}
+
+      {:reply, text} ->
+        {:reply, %{text: text}, socket}
+
+      :noop ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("page", %{"page" => page}, socket) do
@@ -80,7 +136,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
       end
 
     state = Map.put(socket.assigns.index_state, :page, target_page)
-    {:noreply, push_patch(socket, to: companies_path(state))}
+    {:noreply, push_patch(socket, to: companies_path(state, socket.assigns.columns))}
   end
 
   defp load_page(socket, state) do
@@ -99,27 +155,45 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
       {:ok, %AdministrationPage{total_pages: total_pages}}
       when total_pages > 0 and state.page > total_pages ->
         clamped_state = %{state | page: total_pages}
-        push_patch(socket, to: companies_path(clamped_state))
+        push_patch(socket, to: companies_path(clamped_state, socket.assigns.columns))
 
       {:ok, %AdministrationPage{total_pages: 0}} when state.page > 1 ->
         clamped_state = %{state | page: 1}
-        push_patch(socket, to: companies_path(clamped_state))
+        push_patch(socket, to: companies_path(clamped_state, socket.assigns.columns))
 
       {:ok, %AdministrationPage{} = page} ->
         socket
         |> assign(:index_state, state)
         |> assign(:companies_page, page)
         |> assign(:filters_form, to_form(filters_form_params(state), as: :filters))
-        |> stream(:companies, page.entries, reset: true)
+        |> assign(
+          :columns,
+          PageColumns.load(socket.assigns.columns, page.entries, & &1.id, &builtin_cells/1)
+        )
 
       {:error, _reason} ->
         socket
         |> put_flash(:error, "Failed to load companies.")
         |> assign(:index_state, state)
         |> assign(:companies_page, empty_page())
-        |> stream(:companies, [], reset: true)
+        |> assign(
+          :columns,
+          PageColumns.load(socket.assigns.columns, [], & &1.id, &builtin_cells/1)
+        )
     end
   end
+
+  defp builtin_cells(company) do
+    %{
+      "name" => company.name,
+      "code" => company.code,
+      "parent_name" => company.parent_name,
+      "status" => company.status,
+      "jurisdiction" => company.jurisdiction
+    }
+  end
+
+  defp listed(page, id), do: Enum.find(page.entries, &(&1.id == id))
 
   defp empty_page do
     %AdministrationPage{
@@ -218,7 +292,7 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
     }
   end
 
-  defp companies_path(state) do
+  defp companies_path(state, columns \\ nil) do
     search_val = if state.search not in [nil, ""], do: state.search
     status_val = if state.status_filter != :all, do: to_string(state.status_filter)
     sort_val = if state.sort_by != @default_sort_by, do: to_string(state.sort_by)
@@ -234,6 +308,8 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
       |> maybe_put(:dir, dir_val)
       |> maybe_put(:page, page_val)
       |> maybe_put(:per_page, per_page_val)
+
+    params = if columns, do: params ++ Enum.to_list(PageColumns.params(columns)), else: params
 
     case params do
       [] -> ~p"/companies"
@@ -360,16 +436,24 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
           <h2 id="companies-table-title" class="sr-only">Companies</h2>
 
 
-          <.table
-            id="companies"
-            rows={@streams.companies}
-            row_id={fn {id, _company} -> id end}
-            row_item={fn {_id, company} -> company end}
-            sort_by={@index_state.sort_by}
-            sort_dir={@index_state.sort_dir}
-            framed={false}
-          >
-            <:col :let={company} label="Name" sort="name" sort_id="companies-sort-name">
+          <div class="p-2">
+            <.flex_table
+              id="companies"
+              columns={@columns.column_views}
+              rows={@columns.rows}
+              mode={@columns.mode}
+              zoom={@columns.view.zoom}
+              sort_by={to_string(@index_state.sort_by)}
+              sort_dir={PageColumns.sort_dir(@index_state.sort_dir)}
+              suggestions={@columns.suggestions}
+              add_query={@columns.add_query}
+              total={@columns.total}
+              expanded={@columns.expanded}
+              row_id={&"companies-#{&1}"}
+              caption="Companies"
+            >
+              <:col :let={%{key: id}} id="name">
+                <% company = listed(@companies_page, id) %>
               <%!-- The name leads every surface; the legal name is formal
                    detail (#614 identity-line ruling). Display now matches
                    the sort field. --%>
@@ -389,35 +473,30 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
                 {company.legal_name}
               </span>
             </:col>
-
-            <:col :let={company} label="Code">
+              <:col :let={%{key: id}} id="code">
+                <% company = listed(@companies_page, id) %>
               <code class="text-xs font-medium tabular-nums">{company.code}</code>
             </:col>
-
-            <:col :let={company} label="Parent">
+              <:col :let={%{key: id}} id="parent_name">
+                <% company = listed(@companies_page, id) %>
               <span class={[is_nil(company.parent_name) && "text-ink-faint"]}>
                 {company.parent_name || "None"}
               </span>
             </:col>
-
-            <:col :let={company} label="Status" sort="status" sort_id="companies-sort-status">
+              <:col :let={%{key: id}} id="status">
+                <% company = listed(@companies_page, id) %>
               <.badge kind={status_badge_kind(company.status)}>
                 {company.status}
               </.badge>
             </:col>
-
-            <:col
-              :let={company}
-              label="Jurisdiction"
-              sort="jurisdiction"
-              sort_id="companies-sort-jurisdiction"
-            >
+              <:col :let={%{key: id}} id="jurisdiction">
+                <% company = listed(@companies_page, id) %>
               <span class={[is_nil(company.jurisdiction) && "text-ink-faint"]}>
                 {company.jurisdiction || "—"}
               </span>
             </:col>
-
-            <:action :let={company}>
+              <:action :let={%{key: id}}>
+                <% company = listed(@companies_page, id) %>
               <div class="flex items-center justify-end gap-3">
                 <.badge :if={company.primary?} kind={:neutral}>Primary</.badge>
                 <.icon_button
@@ -427,7 +506,6 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
                 />
               </div>
             </:action>
-
             <%!-- Two different absences, two different sentences: a search or
                  filter that matched nothing offers the way back; a tenant with no
                  companies yet offers the first create to an actor who may make
@@ -455,7 +533,8 @@ defmodule Bilimbi.Core.Company.Web.IndexLive do
                 <.icon name="create" class="size-4" /> Add Company
               </.button>
             </:empty>
-          </.table>
+            </.flex_table>
+          </div>
 
           <.pagination
             id="companies-pagination"

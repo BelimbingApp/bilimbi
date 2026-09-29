@@ -638,6 +638,45 @@ tile steers the tiles that follow. The follow is kept in the address and in
 saved layouts. Nothing follows unless the person asks, and a followed tile
 never moves for a record of another kind.
 
+### Flexible tables
+
+A flexible table lets a person pick columns by walking links, never by
+writing a join: the add bar suggests paths (`Company › Parent company ›
+Name`) as they type, a chip per column can be dragged to reorder and
+removed, and a many-link becomes one rollup cell (a count, a sum, the
+latest value, a list) that expands its rows in place beneath the row. A
+walked column carries its whole path as the heading's tooltip and its last
+word as the heading, so a wide table still scans.
+
+The same column is read through a lens: the value, a bar scaled to the
+column's range across the whole set, or a colour band. Data colour is its
+own family (`scale-1` to `scale-5` for values that order, `cat-1` to
+`cat-8` for values that only differ) and never brand, success, warning or
+danger, so a heat carpet never reads as status; a categorical band paints a
+left edge, a sequential band the cell. A bar's width is written by the hook,
+because the CSP refuses inline style.
+
+Zoom is semantic and stated in words: **Table** is the full row with links
+and actions; **Compact** shows numbers, bars and short text on a canvas;
+**Carpet** is every cell a coloured square, so thousands of rows by
+hundreds of columns fit one screen and a control-room wall. Ctrl+wheel,
+the plus and minus keys, and the three preset buttons change it; a
+dragged rectangle zooms so that it fills the viewport, back to the table
+when it is small. A hover on the canvas reads the cell's real value, and
+only the visible window is ever queried or drawn. The URL holds the whole
+view, so a reload or a shared link reopens the same grid, and a view can
+be saved under a name, shared with the company or limited to its roles,
+and opened in a workspace tile. A grouped table sorts by the grouped column
+and heads each run of equal values with the value and its count; a heading
+dropped in the pivot corner turns a grouped table into a pivot, the grouped
+values as rows and the dropped column's values as counted columns with a
+total. A count or sum over dated rows reads as a trend (twelve months as a
+sparkline) or as the change since a date, the date beside the search while
+that lens is on. Inside a workspace a grid can follow another tile's
+selection and narrows to the rows reaching it, saying so with the way back.
+A heavy statement says so in the toolbar with the planner's estimate;
+nothing is refused.
+
 ### Navigation menu conventions
 
 - **Typography & Font:** `Instrument Sans`, `0.8125rem` (`13px`), normal/light

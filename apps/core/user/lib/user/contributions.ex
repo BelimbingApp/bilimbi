@@ -70,6 +70,7 @@ defmodule Bilimbi.Core.User.Contributions do
         }
       ],
       settings: %{definitions: @settings, runtime_claims: []},
+      grid: Bilimbi.Core.User.GridTables.tables(),
       principal_directory: Bilimbi.Core.User.PrincipalDirectoryProvider,
       actor_verifier: Bilimbi.Core.User.ActorVerifier,
       authz: %{
