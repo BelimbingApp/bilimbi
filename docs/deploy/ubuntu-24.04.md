@@ -51,19 +51,17 @@ workspace. Publish both artifacts from the same job.
 
 ## 2. Prepare the server once
 
-Connect over SSH, confirm the actual SSH port, then run:
+Connect over SSH, then run:
 
 ```bash
-sudo bash scripts/deploy/setup-ubuntu.sh <ssh-port> <Area/City>
+sudo bash scripts/deploy/setup-ubuntu.sh
 ```
 
 Copy the script to the server first if it has no source checkout. The script
-installs PostgreSQL 18 from the PGDG apt repository, Caddy, UFW, unattended
-security updates, time sync, a `bilimbi` system user, and owned directories.
+installs PostgreSQL 18 from the PGDG apt repository, Caddy, a `bilimbi` system
+user, and owned directories.
 It prompts for a PostgreSQL role password only when creating the role. Save that
 password in your secret store. The database and role are both named `bilimbi`.
-The script allows the supplied SSH port plus ports 80 and 443 before enabling
-UFW. Keep your current SSH session open and verify a second login afterward.
 PostgreSQL remains local; do not open port 5432 publicly.
 
 Create `/etc/bilimbi/bilimbi.env` from
@@ -84,20 +82,16 @@ only in the protected environment file, never in Git. Other operational
 settings belong in Bilimbi's operator UI. Preserve `SECRET_KEY_BASE` across
 deployments; rotating it invalidates signed sessions and queued actor jobs.
 
-Install the unit, Caddy site, and backup timer:
+Install the unit and Caddy site:
 
 ```bash
 sudo install -o root -g root -m 0644 scripts/deploy/bilimbi.service /etc/systemd/system/bilimbi.service
-sudo install -o root -g root -m 0644 scripts/deploy/bilimbi-backup.service /etc/systemd/system/bilimbi-backup.service
-sudo install -o root -g root -m 0644 scripts/deploy/bilimbi-backup.timer /etc/systemd/system/bilimbi-backup.timer
-sudo install -o root -g root -m 0755 scripts/deploy/backup.sh /usr/local/sbin/bilimbi-backup
 sudo install -o root -g root -m 0644 scripts/deploy/Caddyfile.example /etc/caddy/Caddyfile
 sudoedit /etc/caddy/Caddyfile
 sudo caddy validate --config /etc/caddy/Caddyfile
 sudo systemctl daemon-reload
-sudo systemctl enable caddy bilimbi-backup.timer
+sudo systemctl enable caddy
 sudo systemctl restart caddy
-sudo systemctl start bilimbi-backup.timer
 ```
 
 Replace `example.com` in Caddy with the public name in `PHX_HOST`. Point
@@ -165,33 +159,3 @@ sudo bash bootstrap-admin.sh \
 Use an address you control and verify the account's email through the normal
 application flow. If an existing Belimbing database already has administrators,
 inspect its identity and role assignments before creating another.
-
-## 5. Back up and restore
-
-The timer runs a nightly PostgreSQL custom-format dump at 02:30 server local
-time and retains 14 days:
-
-```bash
-sudo systemctl list-timers bilimbi-backup.timer
-sudo systemctl start bilimbi-backup.service
-sudo ls -lh /var/backups/bilimbi/
-```
-
-Copy encrypted backups off the server on a separate schedule. A same-host
-backup cannot survive loss of the VPS. Monitor backup failures through
-`journalctl -u bilimbi-backup.service`.
-
-Test restoration into a **separate disposable database** with PostgreSQL 18:
-
-```bash
-sudo -u postgres createdb bilimbi_restore_test
-sudo -u postgres pg_restore --exit-on-error --no-owner --dbname=bilimbi_restore_test \
-  /var/backups/bilimbi/<dump-file>.dump
-sudo -u postgres psql -d bilimbi_restore_test -c 'SELECT count(*) FROM bilimbi_schema_migrations;'
-sudo -u postgres dropdb bilimbi_restore_test
-```
-
-Confirm representative tenant, account, and business rows in the restored
-database as well. For an actual incident, stop Bilimbi, preserve the damaged
-database, restore to a new database, point `DATABASE_URL` at it, then start
-Bilimbi and verify sign-in and business workflows.
