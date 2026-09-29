@@ -52,22 +52,36 @@ defmodule BilimbiWeb.SystemMenuInspectorLiveTest do
   end
 
   # The installed platform contributes more menu items than one 25-row page, so
-  # the unfiltered listing is the complement of the single-page guard above.
+  # the unfiltered listing is the complement of the single-page guard above. Any
+  # extension may add items, so the last page is derived from the listed total.
   test "a listing holding more than one page still names the page it is on", %{conn: conn} do
     grant_capabilities!("admin.system.menu-inspector.view")
 
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/menu-inspector")
 
     assert has_element?(view, "#menu-inspector-pagination-summary", "Showing 1 to 25 of")
+
+    [_, total] =
+      Regex.run(
+        ~r/of\s+(\d+)/,
+        view |> element("#menu-inspector-pagination-summary") |> render()
+      )
+
+    last_page = total |> String.to_integer() |> Kernel.+(24) |> div(25)
+    assert last_page >= 2
+
     assert has_element?(view, "#menu-inspector-pagination-previous[disabled]")
     assert has_element?(view, "#menu-inspector-pagination-page-1[aria-current='page']")
     assert has_element?(view, "#menu-inspector-pagination-next")
 
-    view |> element("#menu-inspector-pagination-next") |> render_click()
+    for page <- 2..last_page do
+      view |> element("#menu-inspector-pagination-next") |> render_click()
 
-    assert_patch(view, ~p"/system/menu-inspector?page=2&page_size=25")
-    assert has_element?(view, "#menu-inspector-pagination-page-2[aria-current='page']")
-    assert has_element?(view, "#menu-inspector-pagination-previous")
+      assert_patch(view, ~p"/system/menu-inspector?page=#{page}&page_size=25")
+      assert has_element?(view, "#menu-inspector-pagination-page-#{page}[aria-current='page']")
+      assert has_element?(view, "#menu-inspector-pagination-previous")
+    end
+
     assert has_element?(view, "#menu-inspector-pagination-next[disabled]")
   end
 
