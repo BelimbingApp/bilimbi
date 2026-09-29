@@ -41,7 +41,7 @@ defmodule BilimbiWeb.SettingsLiveTest do
     conn |> log_in_as() |> live(~p"/system/settings")
   end
 
-  test "stored secret starts masked and has no reveal action without a direct grant", %{
+  test "stored secret starts masked and grant_all confers no reveal action", %{
     conn: conn
   } do
     install_secret!()
@@ -53,6 +53,23 @@ defmodule BilimbiWeb.SettingsLiveTest do
     refute html =~ "private-example"
     assert has_element?(view, "#input-tests-operator_api_key[value='••••••••']")
     refute has_element?(view, "#input-tests-operator_api_key-show-stored")
+  end
+
+  test "a role that names the reveal capability offers the reveal action", %{conn: conn} do
+    install_secret!()
+    assert {:ok, _} = Settings.put(@stored_secret, "private-example")
+    role_id = UserFixtures.grant_role!(73, 91, "secret_viewer")
+    {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
+
+    assert {:ok, 1} =
+             Bilimbi.Base.Authz.replace_role_capabilities(scope, role_id, [
+               "base.settings.secret.view"
+             ])
+
+    {:ok, view, html} = open(conn)
+
+    refute html =~ "private-example"
+    assert has_element?(view, "#input-tests-operator_api_key-show-stored")
   end
 
   test "wrong password refuses and audits a reveal; correct password sends one timed value", %{

@@ -184,15 +184,22 @@ defmodule Bilimbi.Base.Authz do
     }
   end
 
-  @doc "Whether the authenticated actor holds an explicit direct allow for a known capability."
-  @spec directly_allowed?(Scope.t(), String.t()) :: boolean()
-  def directly_allowed?(%Scope{} = scope, capability) when is_binary(capability) do
+  @doc """
+  Whether the authenticated actor holds a known capability through a direct
+  allow or a role that names it. A `grant_all` role does not count, and a
+  direct deny wins.
+  """
+  @spec explicitly_allowed?(Scope.t(), String.t()) :: boolean()
+  def explicitly_allowed?(%Scope{} = scope, capability) when is_binary(capability) do
     registry = registry!()
 
     if capability in registry.capabilities do
       case scope_actor(scope) do
-        {:ok, actor} -> EffectivePermissions.directly_allowed?(actor, capability)
-        {:error, :no_authenticated_actor} -> false
+        {:ok, actor} ->
+          EffectivePermissions.explicitly_allowed?(actor, capability, directory!(registry))
+
+        {:error, :no_authenticated_actor} ->
+          false
       end
     else
       false

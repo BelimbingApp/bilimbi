@@ -2,8 +2,8 @@ defmodule BilimbiWeb.SecretReveal do
   @moduledoc """
   Reauthentication and audit edge for displaying one stored encrypted setting.
 
-  A direct grant is required even when a role has `grant_all`; no role gets
-  stored-secret reveal merely because a capability was added to the vocabulary.
+  The capability must be granted explicitly, directly or through a role that
+  names it; a `grant_all` role does not confer stored-secret reveal.
   Every attempted reveal records the outcome before plaintext can leave here.
   """
 
@@ -25,7 +25,7 @@ defmodule BilimbiWeb.SecretReveal do
   def available?(%{scope: %Scope{} = scope}) do
     case Scope.actor(scope) do
       %Actor{type: :user, impersonator_id: nil} ->
-        Authz.directly_allowed?(scope, @capability) and Authz.can(scope, @capability).allowed
+        Authz.explicitly_allowed?(scope, @capability) and Authz.can(scope, @capability).allowed
 
       _ ->
         false

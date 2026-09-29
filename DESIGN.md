@@ -507,7 +507,8 @@ encrypted value is represented by a keep-current mask, never plaintext;
 its Clear action empties the submitted field so the owner can apply its
 clear policy. Sign-in keeps the existing password input without the eye.
 Stored encrypted Settings values may offer a separate "Show stored value"
-action only to a directly granted viewer. The viewer re-enters their own
+action only to a viewer granted that capability directly or by a role that
+names it; `grant_all` does not confer it. The viewer re-enters their own
 password; a successful reveal lasts about ten seconds by default, then the
 field masks again. A failed or successful attempt is audited without its
 value. The ordinary eye confirms a newly entered value or the mask, and
