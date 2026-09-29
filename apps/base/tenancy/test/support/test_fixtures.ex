@@ -21,6 +21,16 @@ defmodule Bilimbi.Base.Tenancy.TestFixtures do
       """,
       []
     )
+
+    SQL.query!(
+      Repo,
+      """
+      CREATE UNIQUE INDEX tenants_one_platform_operator
+      ON tenants (is_platform_operator)
+      WHERE is_platform_operator = TRUE
+      """,
+      []
+    )
   end
 
   def insert_tenant!(attributes \\ %{}) do
