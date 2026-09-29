@@ -12,10 +12,10 @@ defmodule BilimbiWeb.SettingsLiveTest do
 
   import Phoenix.LiveViewTest
 
+  alias Bilimbi.Base.Audit
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Definition
-  alias Bilimbi.Base.Audit
   alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
