@@ -33,6 +33,14 @@ defmodule Bilimbi.Base.Tenancy.TestFixtures do
     )
   end
 
+  @doc """
+  Inserts a tenant that is the platform operator unless `is_platform_operator:
+  false` is passed.
+
+  Pass that flag for every ordinary tenant. The table carries production's
+  `tenants_one_platform_operator` index, so a second operator fails at the
+  insert instead of making `Tenancy.platform_operator/0` raise later.
+  """
   def insert_tenant!(attributes \\ %{}) do
     attributes =
       Map.merge(

@@ -34,7 +34,7 @@ Take the person who performed an operation (an approver, an overrider, a request
 
 Assert what the running system does. Do not add a test that reads or pattern-matches a source file to prove a bug is gone: two did that and passed while the problem they claimed to catch was still in the tree. A security or database boundary makes PostgreSQL do the refusing; for the SQL console that is `QueryExecutor`'s `READ ONLY` transaction. See `apps/base/database/AGENTS.md`.
 
-When `Company.TestFixtures.insert_tenant!/1` creates an ordinary tenant, pass `is_platform_operator: false` explicitly; the fixture defaults that marker to `true` for tests that intentionally create the operator.
+`insert_tenant!/1` creates the platform operator by default; pass `is_platform_operator: false` for any other tenant. See `Bilimbi.Base.Tenancy.TestFixtures.insert_tenant!/1`.
 
 For source guard scans and container checks, use `Bilimbi.Base.ModuleRegistry.MixDiscovery`'s validated module and container paths. A fixed `apps/*/*` glob misses mounted Domain and Extension packages. See `module_source_files/2`, `module_route_files/1`, and `container_paths/1` in `apps/base/module_registry/mix/module_discovery.exs`.
 
