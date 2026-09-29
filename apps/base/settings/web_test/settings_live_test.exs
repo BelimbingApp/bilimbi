@@ -139,6 +139,42 @@ defmodule BilimbiWeb.SettingsLiveTest do
     refute render(view) =~ "private-example"
   end
 
+  test "an unavailable audit store refuses the reveal and never sends the value", %{conn: conn} do
+    install_secret!()
+    assert {:ok, _} = Settings.put(@stored_secret, "private-example")
+    grant_capabilities!("base.settings.secret.view")
+    {:ok, view, _html} = open(conn)
+    view |> element("#input-tests-operator_api_key-show-stored") |> render_click()
+
+    # Same store-unavailable simulation as Schedule and Perf recorder tests:
+    # rename the actions table so the reveal's audit write cannot land.
+    Ecto.Adapters.SQL.query!(
+      Bilimbi.Base.Repo,
+      "ALTER TABLE base_audit_actions RENAME TO unavailable_audit_actions",
+      []
+    )
+
+    try do
+      view |> form("#secret-reveal-form", reveal: %{password: "password"}) |> render_submit()
+
+      assert has_element?(
+               view,
+               "#flash-error",
+               "The reveal could not be recorded, so the value was not shown"
+             )
+
+      refute_push_event(view, "secret:reveal", %{})
+      refute render(view) =~ "private-example"
+      assert has_element?(view, "#secret-reveal-form")
+    after
+      Ecto.Adapters.SQL.query!(
+        Bilimbi.Base.Repo,
+        "ALTER TABLE unavailable_audit_actions RENAME TO base_audit_actions",
+        []
+      )
+    end
+  end
+
   defp reveal_actions do
     {:ok, scope} = Bilimbi.Base.Tenancy.scope(41)
 
