@@ -146,33 +146,23 @@ defmodule BilimbiWeb.SettingsLiveTest do
     {:ok, view, _html} = open(conn)
     view |> element("#input-tests-operator_api_key-show-stored") |> render_click()
 
-    # Same store-unavailable simulation as Schedule and Perf recorder tests:
-    # rename the actions table so the reveal's audit write cannot land.
-    Ecto.Adapters.SQL.query!(
-      Bilimbi.Base.Repo,
-      "ALTER TABLE base_audit_actions RENAME TO unavailable_audit_actions",
-      []
-    )
+    # Remove only this sandbox connection's temporary fixture, and search only
+    # the temporary schema so the insert cannot fall through to a persistent
+    # `public.base_audit_actions`. Both are rolled back with the sandbox.
+    Ecto.Adapters.SQL.query!(Bilimbi.Base.Repo, "SET LOCAL search_path TO pg_temp", [])
+    Ecto.Adapters.SQL.query!(Bilimbi.Base.Repo, "DROP TABLE pg_temp.base_audit_actions", [])
 
-    try do
-      view |> form("#secret-reveal-form", reveal: %{password: "password"}) |> render_submit()
+    view |> form("#secret-reveal-form", reveal: %{password: "password"}) |> render_submit()
 
-      assert has_element?(
-               view,
-               "#flash-error",
-               "The reveal could not be recorded, so the value was not shown"
-             )
+    assert has_element?(
+             view,
+             "#flash-error",
+             "The reveal could not be recorded, so the value was not shown"
+           )
 
-      refute_push_event(view, "secret:reveal", %{})
-      refute render(view) =~ "private-example"
-      assert has_element?(view, "#secret-reveal-form")
-    after
-      Ecto.Adapters.SQL.query!(
-        Bilimbi.Base.Repo,
-        "ALTER TABLE unavailable_audit_actions RENAME TO base_audit_actions",
-        []
-      )
-    end
+    refute_push_event(view, "secret:reveal", %{})
+    refute render(view) =~ "private-example"
+    assert has_element?(view, "#secret-reveal-form")
   end
 
   defp reveal_actions do
