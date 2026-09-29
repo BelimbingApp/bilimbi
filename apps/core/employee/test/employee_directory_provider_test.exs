@@ -22,7 +22,13 @@ defmodule Bilimbi.Core.Employee.EmployeeDirectoryProviderTest do
     CompanyFixtures.insert_tenant!(%{id: 41, name: "Tenant 41"})
     CompanyFixtures.insert_company!(%{id: 73, tenant_id: 41})
     CompanyFixtures.insert_company!(%{id: 76, tenant_id: 41, name: "Sibling", code: "sibling"})
-    CompanyFixtures.insert_tenant!(%{id: 42, name: "Tenant 42"})
+
+    CompanyFixtures.insert_tenant!(%{
+      id: 42,
+      name: "Tenant 42",
+      is_platform_operator: false
+    })
+
     CompanyFixtures.insert_company!(%{id: 74, tenant_id: 42, name: "Other", code: "other"})
 
     :ok = Employee.ensure_system_types()

@@ -10,7 +10,11 @@ defmodule Bilimbi.Core.Employee.EmployeeTypeTest do
   setup do
     create_employee_tables!()
 
-    CompanyFixtures.insert_tenant!(%{id: 51, name: "Tenant 1"})
+    CompanyFixtures.insert_tenant!(%{
+      id: 51,
+      name: "Tenant 1",
+      is_platform_operator: false
+    })
 
     CompanyFixtures.insert_company!(%{
       id: 81,
