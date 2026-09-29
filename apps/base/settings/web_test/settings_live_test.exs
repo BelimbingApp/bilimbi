@@ -106,6 +106,22 @@ defmodule BilimbiWeb.SettingsLiveTest do
     assert Enum.map(reveal_actions(), & &1.payload["result"]) == ["refused", "succeeded"]
   end
 
+  test "a value deleted while confirming is reported as unavailable, not as a wrong password",
+       %{conn: conn} do
+    install_secret!()
+    assert {:ok, _} = Settings.put(@stored_secret, "private-example")
+    grant_capabilities!("base.settings.secret.view")
+    {:ok, view, _html} = open(conn)
+    view |> element("#input-tests-operator_api_key-show-stored") |> render_click()
+
+    Settings.delete(@stored_secret)
+    view |> form("#secret-reveal-form", reveal: %{password: "password"}) |> render_submit()
+
+    assert has_element?(view, "#flash-error", "This stored value cannot be shown")
+    refute has_element?(view, "#secret-reveal-form")
+    assert [%{payload: %{"result" => "refused"}}] = reveal_actions()
+  end
+
   test "failed passwords are throttled and each refusal is audited", %{conn: conn} do
     install_secret!()
     assert {:ok, _} = Settings.put(@stored_secret, "private-example")

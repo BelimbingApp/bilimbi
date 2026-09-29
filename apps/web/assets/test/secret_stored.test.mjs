@@ -53,3 +53,20 @@ test("clearing during a reveal stays blank when the reveal window expires", asyn
   clear.hook.destroyed()
   stored.hook.destroyed()
 })
+
+test("a value typed during a reveal survives the window and a disconnect", async () => {
+  const input = render('<input id="stored" type="password" value="••••••••">', "stored")
+  const {hook, serverEvent} = mountHook(SecretStored, input)
+  serverEvent("secret:reveal", {id: "stored", value: "private-example", duration_ms: 20})
+
+  input.value = "private-example-2"
+  input.dispatchEvent(new Event("input"))
+  assert.equal(input.type, "password")
+
+  await new Promise((resolve) => setTimeout(resolve, 30))
+  assert.equal(input.value, "private-example-2")
+  assert.equal(input.type, "password")
+
+  hook.destroyed()
+  assert.equal(input.value, "private-example-2")
+})

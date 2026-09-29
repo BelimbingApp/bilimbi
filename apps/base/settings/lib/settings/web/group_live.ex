@@ -101,8 +101,22 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
           {:error, :throttled} ->
             {:noreply, put_flash(socket, :error, "Too many attempts. Try again later.")}
 
-          {:error, _reason} ->
+          {:error, :invalid_password} ->
             {:noreply, put_flash(socket, :error, "Password was not accepted.")}
+
+          {:error, :audit_unavailable} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "The reveal could not be recorded, so the value was not shown. Try again later."
+             )}
+
+          {:error, _reason} ->
+            {:noreply,
+             socket
+             |> assign(:pending_reveal, nil)
+             |> put_flash(:error, "This stored value cannot be shown.")}
         end
     end
   end
