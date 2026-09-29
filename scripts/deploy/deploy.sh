@@ -19,7 +19,8 @@ root=/opt/bilimbi
 releases=$root/releases
 target=$releases/$version
 current=$root/current
-previous=$(readlink -f "$current" 2>/dev/null || true)
+previous=
+[[ -L "$current" ]] && previous=$(readlink -e "$current" || true)
 if [[ -n "$previous" && "$previous" == "$target" ]]; then
   echo "Version $version is already current"
   exit 0
@@ -56,8 +57,9 @@ mv -Tf "$root/.current.next" "$current"
 systemctl restart bilimbi || true
 healthy=false
 for _ in $(seq 1 30); do
-  if curl --silent --fail --output /dev/null --max-time 2 \
-      --header 'Host: localhost' "http://127.0.0.1:${PORT:-4000}/"; then
+  status=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 2 \
+      --header 'Host: localhost' "http://127.0.0.1:${PORT:-4000}/" || true)
+  if [[ "$status" == 200 ]]; then
     healthy=true
     break
   fi

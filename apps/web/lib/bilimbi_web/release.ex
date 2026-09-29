@@ -36,11 +36,7 @@ defmodule BilimbiWeb.Release do
   """
   @spec seed() :: :ok
   def seed do
-    load_closure!(@app)
-    ModuleRegistry.complete_modules!()
-    disable_workers()
-    {:ok, _started} = Application.ensure_all_started(seed_applications())
-    ContributionRegistry.install!()
+    start_without_workers()
 
     case Database.run_production_seeds(Database.installed_production_seeds!()) do
       {:ok, results} ->
@@ -49,6 +45,20 @@ defmodule BilimbiWeb.Release do
       {:error, failure} ->
         raise "production seed #{failure.seed_id} failed: #{inspect(failure.reason)}"
     end
+  end
+
+  @doc """
+  Starts the module applications without the endpoint, job processing, or
+  the scheduler, so a one-off `eval` can call module APIs beside a live node.
+  """
+  @spec start_without_workers() :: :ok
+  def start_without_workers do
+    load_closure!(@app)
+    ModuleRegistry.complete_modules!()
+    disable_workers()
+    {:ok, _started} = Application.ensure_all_started(seed_applications())
+    ContributionRegistry.install!()
+    :ok
   end
 
   @doc false

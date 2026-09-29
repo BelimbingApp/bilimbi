@@ -121,10 +121,10 @@ curl -fsS -o /dev/null -w '%{http_code}\n' https://<your-domain>/
 Copy [`deploy.sh`](../../scripts/deploy/deploy.sh) to the server first. The
 script verifies SHA-256, unpacks into `/opt/bilimbi/releases/<version>`, runs
 `BilimbiWeb.Release.migrate()`, switches `/opt/bilimbi/current`, restarts the
-service, and checks the local sign-in page for HTTP 200. On a failed health
-check it restores the previous symlink and restarts it. It keeps at least the
-current and previous releases plus the newest requested count. A failed first
-deployment stops the service. It never reverses migrated schema or data.
+service, and requires HTTP 200 from the local sign-in page at `/`. On a failed
+health check it restores the previous symlink and restarts it. It keeps at
+least the current and previous releases plus the newest requested count. A
+failed first deployment stops the service. It never reverses migrated schema or data.
 
 Use `sudo systemctl start|stop|restart|status bilimbi` for service control,
 and `sudo journalctl -u bilimbi -f` for live logs. The first deploy should

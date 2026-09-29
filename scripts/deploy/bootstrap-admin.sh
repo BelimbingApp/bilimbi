@@ -15,7 +15,7 @@ export BOOT_TENANT_NAME=$1 BOOT_COMPANY_NAME=$2 BOOT_COMPANY_CODE=$3
 export BOOT_ADMIN_NAME=$4 BOOT_ADMIN_EMAIL=$5
 unset PHX_SERVER
 runuser -u bilimbi -- /opt/bilimbi/current/bin/bilimbi eval '
-  {:ok, _} = Application.ensure_all_started(:web)
+  :ok = BilimbiWeb.Release.start_without_workers()
   {:ok, result} = Bilimbi.Core.Company.provision_platform_operator(
     System.fetch_env!("BOOT_TENANT_NAME"),
     %{name: System.fetch_env!("BOOT_COMPANY_NAME"),
