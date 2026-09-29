@@ -1,0 +1,7 @@
+[Unit]
+Description=Back up Bilimbi PostgreSQL database
+After=postgresql.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/bilimbi-backup 14

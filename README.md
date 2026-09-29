@@ -180,3 +180,6 @@ Setup for real tenants, production mail, and the developer commands are in
 
 More documentation is in [`docs/`](./docs/README.md). Bilimbi is released
 under the [MIT License](./LICENSE).
+
+Production installation on Ubuntu 24.04 is covered by the
+[deployment guide](./docs/deploy/ubuntu-24.04.md).
