@@ -10,8 +10,8 @@ defmodule Bilimbi.Base.Artifacts do
   """
   import Ecto.Query
 
-  alias Bilimbi.Base.{Audit, Repo, Settings, Tenancy}
   alias Bilimbi.Base.Artifacts.{Schema, Storage}
+  alias Bilimbi.Base.{Audit, Repo, Settings, Tenancy}
   alias Bilimbi.Base.Tenancy.Scope
 
   @type document_ref :: Bilimbi.Base.Artifacts.Owner.document_ref()

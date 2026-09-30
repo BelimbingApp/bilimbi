@@ -26,9 +26,8 @@ defmodule Bilimbi.Base.Artifacts.Storage do
          {:ok, file} <- File.open(path(root, id), [:write, :binary, :exclusive]) do
       result =
         with :ok <- File.chmod(path(root, id), 0o600),
-             :ok <- IO.binwrite(file, bytes),
-             :ok <- :file.sync(file) do
-          :ok
+             :ok <- IO.binwrite(file, bytes) do
+          :file.sync(file)
         end
 
       File.close(file)
