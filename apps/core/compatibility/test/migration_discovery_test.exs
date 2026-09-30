@@ -30,6 +30,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              "base/settings",
              "base/tenancy",
              "base/audit",
+             "base/artifacts",
              "base/authz",
              "base/queue",
              "base/schedule",
@@ -83,7 +84,8 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Core.User.Migrations.AddUserAccountForeignKeyIndexes,
              Bilimbi.Base.Audit.Migrations.AddImpersonatorToAuditRows,
              Bilimbi.Base.Audit.Migrations.AddSystemPrincipalToAuditRows,
-             Bilimbi.Base.Authz.Migrations.CreateSystemPrincipalCapabilities
+             Bilimbi.Base.Authz.Migrations.CreateSystemPrincipalCapabilities,
+             Bilimbi.Base.Artifacts.Migrations.CreateArtifacts
            ]
 
     assert Enum.map(entries, &elem(&1, 2)) == [
@@ -99,6 +101,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              :compatible_baseline,
              :compatible_baseline,
              :compatible_baseline,
+             :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,
