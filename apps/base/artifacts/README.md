@@ -85,6 +85,8 @@ settings; documents and retention operations remain tenant/company scoped.
 | `artifacts.retention_days` | Required positive period; initially unset. Expiry is captured at creation. Changes affect new documents. |
 | `artifacts.max_bytes` | Maximum uploaded/generated size; safety default 10 MiB. |
 | `artifacts.purge_batch_size` | Maximum records considered per owner/company maintenance call; default 100. |
+| `artifacts.purge_retry_minutes` | Wait before retention retries a failed or refused purge; default 60. |
+| `artifacts.purge_max_attempts` | Failed or refused purges before a document is held for an operator; default 5. |
 
 Provision the root with mode `0700` for the application OS account. Files use
 random UUID names and mode `0600`. Base rejects relative roots, symlink path
@@ -113,8 +115,18 @@ enumerate arbitrary companies. Monitor errors in that calling workflow.
 Expiry refuses reads immediately, even before maintenance runs. There is no
 unbounded retention or implied legal hold. The owner resolves its retention
 obligations before storage; an unset period refuses uploads. The owner must
-authorize retention deletion appropriately; a refusal leaves private bytes
-for an operator to resolve.
+authorize retention deletion appropriately.
+
+A failed or refused purge records its attempt count, last error and attempt
+time, and records `artifacts.purge_failed`. Retention skips that document until
+the retry interval passes, so later expired documents are always reached. After
+the maximum attempts it records `artifacts.purge_held` and the batch excludes it.
+`list_purge_holds(scope, company_id, DocumentOwner)` lists held documents with
+their reason and attempts for the owner's operator workflow.
+`retry_purge/4` releases a hold (`artifacts.purge_released`) and purges now,
+rechecking delete access. `resolve_purge/4` records `artifacts.purge_resolved`
+for bytes an operator removed out of band and refuses while the file exists.
+All three require `:purge` authorization.
 
 A committed reservation precedes file creation. It stays unreadable until the
 file is complete, synced and publication is authorized. Creation holds the

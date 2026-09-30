@@ -46,6 +46,10 @@ defmodule Bilimbi.Base.Artifacts.SchemaContract do
           "ready_at" => column({:timestamp, 6}),
           "deleted_at" => column({:timestamp, 6}),
           "purged_at" => column({:timestamp, 6}),
+          "purge_attempts" => column(:integer, false, {:integer, 0}),
+          "purge_last_error" => column({:varchar, 255}),
+          "purge_attempted_at" => column({:timestamp, 6}),
+          "purge_held_at" => column({:timestamp, 6}),
           "inserted_at" => column({:timestamp, 6}, false),
           "updated_at" => column({:timestamp, 6}, false)
         },
@@ -70,6 +74,8 @@ defmodule Bilimbi.Base.Artifacts.SchemaContract do
     ]
   end
 
-  defp column(type, nullable \\ true), do: %{type: type, nullable: nullable, default: nil}
+  defp column(type, nullable \\ true, default \\ nil),
+    do: %{type: type, nullable: nullable, default: default}
+
   defp index(columns, unique \\ false), do: %{columns: columns, unique: unique, where: nil}
 end

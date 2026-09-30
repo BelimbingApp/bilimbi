@@ -17,7 +17,8 @@ defmodule Bilimbi.Base.Artifacts.TestOwner do
       operation == :create and is_integer(deny_after) and create_count > deny_after
 
     if Bilimbi.Base.Tenancy.Scope.tenant_id(scope) == 41 and company in [51, 52] and
-         not Process.get({:deny, operation}, false) and not publication_denied?,
+         not Process.get({:deny, operation}, false) and not publication_denied? and
+         not (is_map(ref) and Process.get({:deny, operation, ref.subject}, false)),
        do: :ok,
        else: {:error, :forbidden}
   end

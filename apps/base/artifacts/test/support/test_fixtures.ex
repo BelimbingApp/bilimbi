@@ -20,6 +20,8 @@ defmodule Bilimbi.Base.Artifacts.TestFixtures do
         storage_root text NOT NULL,
         expires_at timestamp(6) NOT NULL,
         ready_at timestamp(6), deleted_at timestamp(6), purged_at timestamp(6),
+        purge_attempts integer NOT NULL DEFAULT 0, purge_last_error varchar(255),
+        purge_attempted_at timestamp(6), purge_held_at timestamp(6),
         inserted_at timestamp(6) NOT NULL, updated_at timestamp(6) NOT NULL
       ) ON COMMIT PRESERVE ROWS
       """,

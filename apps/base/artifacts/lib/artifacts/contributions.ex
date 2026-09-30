@@ -43,6 +43,22 @@ defmodule Bilimbi.Base.Artifacts.Contributions do
           "Document purge batch size",
           "Maximum documents considered by each owner-scoped retention call.",
           minimum: 1
+        ),
+      "artifacts.purge_retry_minutes" =>
+        setting(
+          :integer,
+          60,
+          "Document purge retry interval (minutes)",
+          "Minimum wait before retention retries a document whose purge failed or was refused.",
+          minimum: 1
+        ),
+      "artifacts.purge_max_attempts" =>
+        setting(
+          :integer,
+          5,
+          "Document purge attempts before hold",
+          "Failed or refused purges after which a document is held for an operator to retry or resolve.",
+          minimum: 1
         )
     }
   end

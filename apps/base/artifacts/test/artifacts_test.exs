@@ -66,7 +66,8 @@ defmodule Bilimbi.Base.ArtifactsTest do
     fields = Bilimbi.Base.Settings.Form.fields(["operator"], nil)
 
     assert Enum.sort(Enum.map(fields, & &1.key)) ==
-             ~w(artifacts.max_bytes artifacts.purge_batch_size artifacts.retention_days artifacts.storage_root)
+             ~w(artifacts.max_bytes artifacts.purge_batch_size artifacts.purge_max_attempts
+                artifacts.purge_retry_minutes artifacts.retention_days artifacts.storage_root)
   end
 
   test "rechecks access on every read, audits it, and exposes no private location", c do
@@ -195,6 +196,103 @@ defmodule Bilimbi.Base.ArtifactsTest do
     assert {:error, :not_found} = Artifacts.read(c.scope, 51, TestOwner, doc.id)
   end
 
+  test "refused purges no longer block later expired documents in the batch", c do
+    Settings.put("artifacts.purge_batch_size", 2)
+    base = DateTime.add(DateTime.utc_now(), -3, :hour)
+
+    [first, second, later] =
+      for {subject, offset} <- [{"refused-1", 0}, {"refused-2", 1}, {"later", 2}] do
+        ref = %{subject: subject, kind: "evidence"}
+        {:ok, doc} = Artifacts.put(c.scope, 51, TestOwner, ref, subject, "text/plain")
+        expire!(doc.id, DateTime.add(base, offset, :minute))
+        doc
+      end
+
+    Process.put({:deny, :delete, "refused-1"}, true)
+    Process.put({:deny, :delete, "refused-2"}, true)
+
+    assert {:ok, %{deleted: [], errors: errors}} = Artifacts.purge_expired(c.scope, 51, TestOwner)
+    assert errors == [{first.id, :forbidden}, {second.id, :forbidden}]
+
+    assert {:ok, %{deleted: [id], errors: []}} = Artifacts.purge_expired(c.scope, 51, TestOwner)
+    assert id == later.id
+    assert File.exists?(Path.join(c.root, first.id))
+
+    row = Repo.get!(Schema, first.id)
+    assert {row.purge_attempts, row.purge_last_error, row.purge_held_at} == {1, "forbidden", nil}
+    assert row.purge_attempted_at
+
+    {:ok, actions} = Audit.list_actions(c.scope)
+    failed = Enum.filter(actions, &(&1.event == "artifacts.purge_failed"))
+
+    assert Enum.sort(Enum.map(failed, & &1.payload["artifact_id"])) ==
+             Enum.sort([first.id, second.id])
+
+    assert Enum.all?(
+             failed,
+             &(&1.payload["reason"] == "forbidden" and &1.payload["attempts"] == 1)
+           )
+  end
+
+  test "a failed purge is retried only after the operator retry interval", c do
+    {:ok, doc} = Artifacts.put(c.scope, 51, TestOwner, c.ref, "bytes", "text/plain")
+    expire!(doc.id, DateTime.utc_now())
+    Process.put({:deny, :delete}, true)
+
+    assert {:ok, %{errors: [{_, :forbidden}]}} = Artifacts.purge_expired(c.scope, 51, TestOwner)
+    Process.put({:deny, :delete}, false)
+    assert {:ok, %{deleted: [], errors: []}} = Artifacts.purge_expired(c.scope, 51, TestOwner)
+
+    Settings.put("artifacts.purge_retry_minutes", 10)
+    attempted_at = DateTime.add(DateTime.utc_now(), -11, :minute)
+    Repo.get!(Schema, doc.id) |> change(purge_attempted_at: attempted_at) |> Repo.update!()
+
+    assert {:ok, %{deleted: [id], errors: []}} = Artifacts.purge_expired(c.scope, 51, TestOwner)
+    assert id == doc.id
+    refute File.exists?(Path.join(c.root, doc.id))
+  end
+
+  test "held purges are listed with the reason, excluded, and can be retried or resolved", c do
+    Settings.put("artifacts.purge_max_attempts", 1)
+    {:ok, retried} = Artifacts.put(c.scope, 51, TestOwner, c.ref, "retry", "text/plain")
+    {:ok, resolved} = Artifacts.put(c.scope, 51, TestOwner, c.ref, "resolve", "text/plain")
+    for doc <- [retried, resolved], do: expire!(doc.id, DateTime.utc_now())
+    Process.put({:deny, :delete}, true)
+
+    assert {:ok, %{errors: [_, _]}} = Artifacts.purge_expired(c.scope, 51, TestOwner)
+    assert {:ok, holds} = Artifacts.list_purge_holds(c.scope, 51, TestOwner)
+    assert Enum.sort(Enum.map(holds, & &1.id)) == Enum.sort([retried.id, resolved.id])
+    assert Enum.all?(holds, &(&1.attempts == 1 and &1.last_error == "forbidden" and &1.held_at))
+    refute Enum.any?(holds, &Map.has_key?(&1, :storage_root))
+
+    Repo.update_all(Schema, set: [purge_attempted_at: DateTime.add(DateTime.utc_now(), -1, :day)])
+    assert {:ok, %{deleted: [], errors: []}} = Artifacts.purge_expired(c.scope, 51, TestOwner)
+
+    Process.put({:deny, :purge}, true)
+    assert {:error, :forbidden} = Artifacts.list_purge_holds(c.scope, 51, TestOwner)
+    assert {:error, :forbidden} = Artifacts.retry_purge(c.scope, 51, TestOwner, retried.id)
+    Process.put({:deny, :purge}, false)
+
+    Process.put({:deny, :delete}, false)
+    assert {:ok, :deleted} = Artifacts.retry_purge(c.scope, 51, TestOwner, retried.id)
+    refute File.exists?(Path.join(c.root, retried.id))
+    assert {:error, :not_found} = Artifacts.retry_purge(c.scope, 51, TestOwner, retried.id)
+
+    assert {:error, :bytes_present} =
+             Artifacts.resolve_purge(c.scope, 51, TestOwner, resolved.id)
+
+    File.rm!(Path.join(c.root, resolved.id))
+    assert {:ok, :resolved} = Artifacts.resolve_purge(c.scope, 51, TestOwner, resolved.id)
+    assert Repo.get!(Schema, resolved.id).purged_at
+    assert {:ok, []} = Artifacts.list_purge_holds(c.scope, 51, TestOwner)
+
+    {:ok, actions} = Audit.list_actions(c.scope)
+    events = Enum.frequencies(Enum.map(actions, & &1.event))
+    assert events["artifacts.purge_held"] == 2
+    assert events["artifacts.purge_released"] == 1
+    assert events["artifacts.purge_resolved"] == 1
+  end
+
   test "failed physical cleanup stays denied and can be retried", c do
     {:ok, doc} = Artifacts.put(c.scope, 51, TestOwner, c.ref, "bytes", "text/plain")
     File.chmod!(c.root, 0o755)
@@ -302,4 +400,7 @@ defmodule Bilimbi.Base.ArtifactsTest do
       Repo.get!(Schema, doc.id) |> change(tenant_id: 999) |> Repo.update!(mode: :savepoint)
     end
   end
+
+  defp expire!(id, at),
+    do: Repo.get!(Schema, id) |> change(expires_at: at) |> Repo.update!()
 end

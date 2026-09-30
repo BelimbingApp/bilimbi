@@ -59,6 +59,16 @@ defmodule Bilimbi.Base.Artifacts.Storage do
     end
   end
 
+  def absent(root, id) do
+    with :ok <- validate_root(root) do
+      case File.lstat(path(root, id)) do
+        {:error, :enoent} -> :ok
+        {:ok, _} -> {:error, :bytes_present}
+        {:error, _} -> {:error, :storage_unavailable}
+      end
+    end
+  end
+
   defp path(root, id) do
     # IDs come only from Ecto.UUID generation or loaded UUID columns.
     {:ok, ^id} = Ecto.UUID.cast(id)

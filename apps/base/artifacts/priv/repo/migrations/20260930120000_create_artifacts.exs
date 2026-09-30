@@ -20,6 +20,10 @@ defmodule Bilimbi.Base.Artifacts.Migrations.CreateArtifacts do
       add(:ready_at, :utc_datetime_usec)
       add(:deleted_at, :utc_datetime_usec)
       add(:purged_at, :utc_datetime_usec)
+      add(:purge_attempts, :integer, null: false, default: 0)
+      add(:purge_last_error, :string)
+      add(:purge_attempted_at, :utc_datetime_usec)
+      add(:purge_held_at, :utc_datetime_usec)
       timestamps(type: :utc_datetime_usec)
     end
 

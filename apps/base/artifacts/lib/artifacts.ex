@@ -94,31 +94,32 @@ defmodule Bilimbi.Base.Artifacts do
     end
   end
 
-  @doc "Processes a bounded owner/company batch of expired documents and unfinished deletes."
+  @doc """
+  Processes a bounded owner/company batch of expired documents and unfinished deletes.
+
+  A failed or refused purge records its attempt and is skipped until the retry
+  interval passes; after the configured maximum attempts it is held for an operator.
+  """
   @spec purge_expired(Scope.t(), pos_integer(), module()) :: {:ok, map()} | {:error, term()}
   def purge_expired(%Scope{} = scope, company, owner) do
     outside_transaction!()
 
     with :ok <- authorize(scope, company, owner, :purge, nil) do
-      owner_id = owner.artifact_owner_id()
-      adapter = Atom.to_string(owner)
       now = DateTime.utc_now()
-      limit = Settings.get("artifacts.purge_batch_size")
+      retry_before = DateTime.add(now, -Settings.get("artifacts.purge_retry_minutes"), :minute)
 
       ids =
-        Schema
-        |> Tenancy.scope_query(scope)
-        |> where(
-          [a],
-          a.company_id == ^company and a.owner_id == ^owner_id and a.owner_adapter == ^adapter
-        )
-        |> where([a], is_nil(a.purged_at) and (a.expires_at <= ^now or not is_nil(a.deleted_at)))
+        scope
+        |> owned_query(company, owner)
+        |> where([a], is_nil(a.purged_at) and is_nil(a.purge_held_at))
+        |> where([a], a.expires_at <= ^now or not is_nil(a.deleted_at))
+        |> where([a], is_nil(a.purge_attempted_at) or a.purge_attempted_at <= ^retry_before)
         |> order_by([a], asc: a.expires_at, asc: a.id)
-        |> limit(^limit)
+        |> limit(^Settings.get("artifacts.purge_batch_size"))
         |> select([a], a.id)
         |> Repo.all()
 
-      results = Enum.map(ids, &{&1, delete(scope, company, owner, &1)})
+      results = Enum.map(ids, &{&1, purge(scope, company, owner, &1)})
 
       {:ok,
        %{
@@ -126,6 +127,140 @@ defmodule Bilimbi.Base.Artifacts do
          errors: for({id, {:error, reason}} <- results, do: {id, reason})
        }}
     end
+  end
+
+  @doc "Lists the owner/company documents whose purge is held for an operator."
+  @spec list_purge_holds(Scope.t(), pos_integer(), module()) ::
+          {:ok, [map()]} | {:error, term()}
+  def list_purge_holds(%Scope{} = scope, company, owner) do
+    with :ok <- authorize(scope, company, owner, :purge, nil) do
+      holds =
+        scope
+        |> owned_query(company, owner)
+        |> where([a], is_nil(a.purged_at) and not is_nil(a.purge_held_at))
+        |> order_by([a], asc: a.purge_held_at, asc: a.id)
+        |> Repo.all()
+        |> Enum.map(fn row ->
+          Map.merge(metadata(row), %{
+            attempts: row.purge_attempts,
+            last_error: row.purge_last_error,
+            last_attempted_at: row.purge_attempted_at,
+            held_at: row.purge_held_at
+          })
+        end)
+
+      {:ok, holds}
+    end
+  end
+
+  @doc "Releases a held purge and attempts it immediately, rechecking delete access."
+  @spec retry_purge(Scope.t(), pos_integer(), module(), String.t()) ::
+          {:ok, :deleted} | {:error, term()}
+  def retry_purge(%Scope{} = scope, company, owner, id) do
+    outside_transaction!()
+
+    with :ok <- authorize(scope, company, owner, :purge, nil),
+         {:ok, _} <-
+           transaction(fn ->
+             row = fetch_held!(scope, company, owner, id)
+             audit!(scope, row, "artifacts.purge_released", purge_payload(row))
+
+             row
+             |> Ecto.Changeset.change(
+               purge_attempts: 0,
+               purge_last_error: nil,
+               purge_attempted_at: nil,
+               purge_held_at: nil
+             )
+             |> Repo.update!()
+           end) do
+      purge(scope, company, owner, id)
+    end
+  end
+
+  @doc """
+  Resolves a held purge whose bytes an operator has removed out of band.
+
+  Refuses while the private file is still present.
+  """
+  @spec resolve_purge(Scope.t(), pos_integer(), module(), String.t()) ::
+          {:ok, :resolved} | {:error, term()}
+  def resolve_purge(%Scope{} = scope, company, owner, id) do
+    outside_transaction!()
+
+    with :ok <- authorize(scope, company, owner, :purge, nil),
+         {:ok, _} <-
+           transaction(fn ->
+             row = fetch_held!(scope, company, owner, id)
+             require_ok!(Storage.absent(row.storage_root, row.id))
+             audit!(scope, row, "artifacts.purge_resolved", purge_payload(row))
+             now = DateTime.utc_now()
+
+             row
+             |> Ecto.Changeset.change(
+               deleted_at: row.deleted_at || now,
+               purged_at: now,
+               purge_held_at: nil
+             )
+             |> Repo.update!()
+           end) do
+      {:ok, :resolved}
+    end
+  end
+
+  defp purge(scope, company, owner, id) do
+    case delete(scope, company, owner, id) do
+      {:error, reason} = error ->
+        record_purge_failure(scope, company, owner, id, reason)
+        error
+
+      deleted ->
+        deleted
+    end
+  end
+
+  defp record_purge_failure(scope, company, owner, id, reason) do
+    error = if is_atom(reason), do: String.slice(Atom.to_string(reason), 0, 255), else: "error"
+    max_attempts = Settings.get("artifacts.purge_max_attempts")
+
+    transaction(fn ->
+      now = DateTime.utc_now()
+      row = fetch!(scope, company, owner, id)
+      attempts = row.purge_attempts + 1
+      held_at = if attempts >= max_attempts, do: now
+
+      row =
+        row
+        |> Ecto.Changeset.change(
+          purge_attempts: attempts,
+          purge_last_error: error,
+          purge_attempted_at: now,
+          purge_held_at: held_at
+        )
+        |> Repo.update!()
+
+      audit!(scope, row, "artifacts.purge_failed", purge_payload(row))
+      if held_at, do: audit!(scope, row, "artifacts.purge_held", purge_payload(row))
+    end)
+  end
+
+  defp fetch_held!(scope, company, owner, id) do
+    row = fetch!(scope, company, owner, id)
+    if row.purge_held_at && is_nil(row.purged_at), do: row, else: Repo.rollback(:not_found)
+  end
+
+  defp purge_payload(row), do: %{attempts: row.purge_attempts, reason: row.purge_last_error}
+
+  defp owned_query(scope, company, owner) do
+    owner_id = owner.artifact_owner_id()
+    adapter = Atom.to_string(owner)
+
+    Schema
+    |> Tenancy.scope_query(scope)
+    |> where(
+      [a],
+      a.company_id == ^company and a.owner_id == ^owner_id and a.owner_adapter == ^adapter
+    )
   end
 
   defp reserve(scope, company, owner, ref, bytes, content_type, root, days) do
@@ -220,17 +355,10 @@ defmodule Bilimbi.Base.Artifacts do
 
     case Ecto.UUID.cast(id) do
       {:ok, uuid} ->
-        adapter = Atom.to_string(owner)
-        owner_id = owner.artifact_owner_id()
-
         row =
-          Schema
-          |> Tenancy.scope_query(scope)
-          |> where(
-            [a],
-            a.id == ^uuid and a.company_id == ^company and a.owner_id == ^owner_id and
-              a.owner_adapter == ^adapter
-          )
+          scope
+          |> owned_query(company, owner)
+          |> where([a], a.id == ^uuid)
           |> lock("FOR UPDATE")
           |> Repo.one()
 
@@ -275,7 +403,7 @@ defmodule Bilimbi.Base.Artifacts do
     end
   end
 
-  defp audit!(scope, row, event) do
+  defp audit!(scope, row, event, details \\ %{}) do
     actor = Scope.actor(scope)
 
     attrs = %{
@@ -284,7 +412,7 @@ defmodule Bilimbi.Base.Artifacts do
       actor_id: actor.user_id || 0,
       impersonator_id: actor.impersonator_id,
       event: event,
-      payload: %{artifact_id: row.id, owner_id: row.owner_id},
+      payload: Map.merge(details, %{artifact_id: row.id, owner_id: row.owner_id}),
       occurred_at: NaiveDateTime.utc_now()
     }
 
