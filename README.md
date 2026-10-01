@@ -1,68 +1,19 @@
 # Bilimbi
 
-An open-source business application platform: one shared foundation, your own
-business capabilities on top.
+An open-source platform for building and running ownable operational systems. Traditionally, software is built by programmers who do not know much about the subject matter. With Bilimbi and the help of AI coding agents, the subject matter experts can build what they want without relying on programmers. 
 
-## Vision
+## Motivation
 
-Companies should own the business system they run on, not rent a suite they
-cannot change.
+In the age of AI, companies should own the business system they run on without the perpetual license fees. Business software is expensive, often inflexible, and carries vendor lock-in; Bilimbi empowers businesses to build, customize, and own their operational systems, removing the SMB digitization bottleneck so it is practical to ship production-grade systems with in-house subject matter experts.
 
-- Bilimbi provides the platform every business application needs: companies,
-  people, sign-in, permissions, settings, audit, scheduling, and a shared UI.
-- A company composes its own application from that platform plus the business
-  capabilities it selects, up to a complete ERP.
-- Everything is ordinary Elixir and PostgreSQL. The data stays in plain tables
-  the company can read, back up, and query.
-- The codebase is built from the beginning by coding agents. `AGENTS.md` and
-  `DESIGN.md` are part of the product: they define how it is extended and how
-  it should feel to use.
+## Kosong (Malay for empty) Architecture
 
-## The problem Bilimbi solves
+Bilimbi is designed for AI as the programmers so that builders with minimum programming knowledge can build. It shipped with essential functions encapsulated as the `Base` and `Core`. `Domains` and `Extensions` are where the applications live.
 
-Business software forces a bad choice: a monolithic suite that dictates your
-processes, or a custom build that spends years re-creating login, permissions,
-and audit before any business value appears.
-
-- Bilimbi ships the foundation once, production-grade, so a new capability
-  starts at the business logic.
-- Module APIs take a tenant scope and check capabilities, and writes through
-  the platform's database layer are audited. Add-ons build on the same
-  mechanisms.
-- Add-ons are separate Git repositories mounted into a checkout. Mounting one
-  is the installation; there is no registry to maintain.
-- Modules hide their tables and queries behind small public APIs, so a company
-  can replace or extend one part without a rewrite.
-
-## Who it's for
-
-- **Businesses** that want an extensible system they own, from a single
-  company to a multi-tenant deployment.
-- **Developers** who build business capabilities on a ready platform, in
-  Elixir, Phoenix LiveView, and PostgreSQL.
-- **AI coding agents** working alongside them. The repository's guides are
-  written so an agent can install, extend, and verify the system.
-
-## What you get today
-
-The platform (Base and Core) ships these capabilities:
-
-- Companies, employees, department and employee types, and addresses with
-  Geonames reference data for countries, regions, postcodes, and cities.
-- Users with sign-in, password reset, email verification, and operator
-  impersonation.
-- Authorization: capabilities, roles, direct grants, and decision logs.
-  Unknown capabilities fail closed.
-- Audit history of data changes made through the platform's database layer
-  and of recorded actions, including database console commands.
-- Settings with immutable definitions and tenant-, company-, and user-scoped
-  values.
-- Scheduled recurring jobs with occurrence history and downtime coalescing.
-- Dashboard with configurable sections and layout.
-- Design Library: the shared UI components, live, with their specifications.
-- Locale and time display, system information, and performance health.
-- **Factory** is the first add-on: Inventory, Product Definition, and
-  Production Execution for manufacturers.
+- **Base** is the framework infrastructure: authz, audit, schedules, and other essentials
+- **Core** contains the core modules: users, companies, employees, and address.
+- **Domains** is where the subject matter applications live
+- **Extensions** is for customization for specific use cases
 
 ## Add-ons: Domains and Extensions
 
