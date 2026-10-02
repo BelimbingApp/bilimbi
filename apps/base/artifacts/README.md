@@ -69,8 +69,49 @@ Base authorizes before rendering, checks the PDF header, applies the configured
 size limit and stores through the upload seam as `application/pdf`. It rechecks
 authority before publication. The renderer owns valid PDF construction,
 templates and data selection; the header check is not a complete PDF validator.
-This slice selects no rendering engine, executable command, external service or
-business template. Renderers must not fetch untrusted resources or log contents.
+Use `Bilimbi.Base.Artifacts.PDF.Renderer.render/1` for simple text and table
+documents instead of maintaining a domain-local PDF serializer. It is a pure
+Elixir serializer with no additional dependency, executable or external service.
+The owner still selects business data and templates and implements the existing
+PDF behaviour; this helper does not authorize or store anything on its own.
+Renderers must not fetch untrusted resources or log contents.
+
+```elixir
+# Inside the trusted owner's render_pdf/4 callback, after selecting permitted data:
+Bilimbi.Base.Artifacts.PDF.Renderer.render(%{
+  title: "Record summary",
+  metadata: %{author: "Document owner", subject: "Record review", keywords: "summary"},
+  blocks: [
+    {:text, "Facts selected by the owning module.\nA second line."},
+    {:table, ["Record", "Value"], [["A", "12.50"], ["B", "8.00"]]},
+    :page_break,
+    {:text, "Additional notes"}
+  ]
+})
+```
+
+`title` and `blocks` are required; `metadata` is optional. All text and table
+cells must be strings; format dates and exact numbers in the owning module.
+Tables have 1–20 columns and each row must match the header's cell count.
+Metadata accepts only `author`, `subject` and `keywords`. Invalid shapes or
+invalid UTF-8 return `{:error, :invalid_document}` without including input data.
+
+The fixed A4 layout uses built-in Courier at 10 points, 85 characters per line,
+and 48 lines per page. Columns share the available width equally. Text and cells
+wrap without truncation, including long words; blank lines are preserved, tabs
+become spaces and CR/CRLF become newlines. Table headers repeat after page breaks.
+Rows that fit a page stay together; larger rows continue across pages. A header
+must leave room for its separator and at least one data line. Explicit breaks
+create no empty trailing pages.
+
+Body text supports printable ASCII and Latin-1 U+00A0–U+00FF through the font's
+WinAnsi encoding. Unsupported characters and controls return
+`{:error, :unsupported_text}`; they are never silently replaced. PDF metadata
+supports Unicode. Owners requiring other scripts or richer layouts need a
+separately selected renderer behind the same behaviour. Content operands are
+escaped and metadata uses hex strings, so text cannot inject PDF instructions.
+Identical input produces identical bytes: the serializer adds no timestamps,
+random IDs or environment-derived metadata. It never interprets HTML or URLs.
 
 ## Operator settings and storage
 
