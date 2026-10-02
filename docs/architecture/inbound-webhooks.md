@@ -61,7 +61,10 @@ by `base.settings.global.manage`:
 Size enforcement counts actual accumulated bytes, including chunked bodies,
 without trusting Content-Length. Admission is atomic and has two stages.
 Before the body is read, each sender address (the connection's remote IP) has
-its own allowance per handler, so one sender cannot exhaust another's. An
+its own allowance per handler, so one sender cannot exhaust another's. The
+address is the client a trusted reverse proxy reports (`BilimbiWeb.ForwardedFor`,
+configured by `TRUSTED_PROXIES` in the deployment guide), never a forwarded
+header from an untrusted peer. An
 attempt whose body is oversized or unreadable, or whose verification fails,
 counts against the handler's failure bucket and never against verified
 capacity. Only after verification succeeds does a delivery draw from the

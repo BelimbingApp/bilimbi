@@ -75,7 +75,8 @@ sudo install -o root -g root -m 0600 bilimbi.env /etc/bilimbi/bilimbi.env
 ```
 
 The file stays outside each release. `DATABASE_URL`, `SECRET_KEY_BASE`,
-`PHX_HOST`, `PORT`, and `POOL_SIZE` are boot settings. The current Web
+`PHX_HOST`, `PORT`, `POOL_SIZE`, and the optional `TRUSTED_PROXIES` are boot
+settings. The current Web
 release also **requires** `MAIL_*` SMTP and sender variables at startup; its
 mail adapter has not yet moved them into operator settings. Keep these secrets
 only in the protected environment file, never in Git. Other operational
@@ -106,6 +107,15 @@ local host with the VPS firewall; Caddy is the public entry. The provided unit
 sets automatic restart, a file descriptor limit, memory and task caps, and
 journald logging. Adjust resource limits for measured production load.
 If `PORT` differs from 4000, change the Caddy upstream to the same value.
+
+Bilimbi takes the client address from `X-Forwarded-For` only when the direct
+peer is a trusted proxy, reading right to left past trusted hops; a header from
+any other peer is ignored. `TRUSTED_PROXIES` lists those proxies as
+comma-separated CIDRs and defaults to loopback (`127.0.0.0/8,::1/128`), which
+matches the local Caddy upstream. Set it only when a proxy reaches Bilimbi
+from another address. Login throttling, audit addresses and webhook sender
+limits all use this client address, so a missing proxy entry makes every
+client look like the proxy.
 
 ## 3. Deploy and verify
 

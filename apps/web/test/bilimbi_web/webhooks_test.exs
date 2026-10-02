@@ -121,6 +121,46 @@ defmodule BilimbiWeb.WebhooksTest do
            ]
   end
 
+  test "through a trusted proxy, forwarded clients get separate sender buckets" do
+    assert {:ok, _} = Settings.put("webhooks.sender_rate_limit", 2)
+
+    for _attempt <- 1..5 do
+      conn =
+        machine_conn()
+        |> put_req_header("x-forwarded-for", "198.51.100.7")
+        |> post("/webhooks/test-example", "{}")
+
+      assert response(conn, 403)
+    end
+
+    assert response(delivery("{}", [{"x-forwarded-for", "203.0.113.20"}]), 202)
+    assert_received {:webhook_body, "{}"}
+  end
+
+  test "a forwarded header from an untrusted peer is ignored" do
+    assert {:ok, _} = Settings.put("webhooks.sender_rate_limit", 1)
+    peer = {192, 0, 2, 9}
+
+    first =
+      machine_conn(peer)
+      |> put_req_header("x-forwarded-for", "198.51.100.1")
+      |> post("/webhooks/test-example", "{}")
+
+    assert response(first, 403)
+
+    body = "{}"
+    signature = :crypto.mac(:hmac, :sha256, "test-only-key", body) |> Base.encode16(case: :lower)
+
+    second =
+      machine_conn(peer)
+      |> put_req_header("x-forwarded-for", "198.51.100.2")
+      |> put_req_header("x-signature", signature)
+      |> post("/webhooks/test-example", body)
+
+    assert response(second, 403)
+    refute_received {:webhook_body, _}
+  end
+
   test "settings are read once per window" do
     assert response(delivery("{}"), 202)
     assert {:ok, _} = Settings.put("webhooks.rate_limit", 1)

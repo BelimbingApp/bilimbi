@@ -12,6 +12,10 @@ if geonames_cache_dir = System.get_env("GEONAMES_CACHE_DIR") do
   config :bilimbi_core_geonames, :cache_dir, geonames_cache_dir
 end
 
+if trusted_proxies = System.get_env("TRUSTED_PROXIES") do
+  config :web, :trusted_proxies, BilimbiWeb.ForwardedFor.parse!(trusted_proxies)
+end
+
 config :web, BilimbiWeb.Endpoint, http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
 if config_env() == :dev do
