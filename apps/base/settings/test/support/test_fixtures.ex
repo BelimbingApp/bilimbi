@@ -2,7 +2,20 @@ defmodule Bilimbi.Base.Settings.TestFixtures do
   @moduledoc false
 
   alias Bilimbi.Base.Repo
+  alias Bilimbi.Base.Settings.Schema
+  alias Bilimbi.Base.Settings.Scope
   alias Ecto.Adapters.SQL
+
+  # Stores a plain override row without the definition's write validation, so
+  # a test can stand in for a value that predates validation or was adopted
+  # from Belimbing at cutover. `Settings.put/3` refuses such a value.
+  def put_stored_value!(key, value, scope \\ nil) do
+    {scope_type, scope_id} = Scope.database_identity(scope)
+
+    %{key: key, value: value, is_encrypted: false, scope_type: scope_type, scope_id: scope_id}
+    |> Schema.changeset()
+    |> Repo.insert!()
+  end
 
   # Idempotent on purpose: `BilimbiWeb.ConnCase` creates this table for every
   # web test so that a settings call never raises `undefined_table` and gets

@@ -10,6 +10,7 @@ defmodule BilimbiWeb.CompanyLiveTest do
   alias Bilimbi.Base.Repo
   alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Scope, as: SettingsScope
+  alias Bilimbi.Base.Settings.TestFixtures, as: SettingsFixtures
   alias Bilimbi.Base.Tenancy
   alias Bilimbi.Core.Address
   alias Bilimbi.Core.Address.TestFixtures, as: AddressFixtures
@@ -1483,7 +1484,11 @@ defmodule BilimbiWeb.CompanyLiveTest do
     test "an unset company under an unconvertible tenant zone names UTC", %{conn: conn} do
       grant_capabilities!(["admin.company.list", "admin.company.view", "admin.company.update"])
 
-      {:ok, _} = Settings.put("localization.timezone", "Mars/Olympus", SettingsScope.tenant(41))
+      SettingsFixtures.put_stored_value!(
+        "localization.timezone",
+        "Mars/Olympus",
+        SettingsScope.tenant(41)
+      )
 
       {:ok, view, _html} = conn |> log_in_as() |> live(~p"/companies/73")
 

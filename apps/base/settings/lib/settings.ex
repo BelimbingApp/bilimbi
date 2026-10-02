@@ -119,14 +119,22 @@ defmodule Bilimbi.Base.Settings do
         updated_at: now
       })
 
-    changeset
-    |> Repo.insert(
-      on_conflict: {:replace, [:value, :is_encrypted, :updated_at]},
-      conflict_target: conflict_target(scope)
-    )
-    |> case do
-      {:ok, _setting} -> {:ok, value}
-      {:error, changeset} -> {:error, changeset}
+    case definition && Definition.validate(definition, value) do
+      {:error, message} ->
+        changeset
+        |> Ecto.Changeset.add_error(:value, message)
+        |> Ecto.Changeset.apply_action(:insert)
+
+      _valid ->
+        changeset
+        |> Repo.insert(
+          on_conflict: {:replace, [:value, :is_encrypted, :updated_at]},
+          conflict_target: conflict_target(scope)
+        )
+        |> case do
+          {:ok, _setting} -> {:ok, value}
+          {:error, changeset} -> {:error, changeset}
+        end
     end
   end
 

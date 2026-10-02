@@ -62,6 +62,34 @@ defmodule Bilimbi.Base.SettingsTest do
              })
   end
 
+  test "a declared validator must name an exported rule" do
+    attributes = %{type: :string, scopes: [:global], default: "ok"}
+
+    assert_raise ArgumentError, ~r/validator must be \{module, function, message\}/, fn ->
+      Definition.new!("tests.validated", "tests/settings", Map.put(attributes, :validator, :x))
+    end
+
+    assert_raise ArgumentError, ~r/is not exported/, fn ->
+      Definition.new!(
+        "tests.validated",
+        "tests/settings",
+        Map.put(attributes, :validator, {String, :no_such_rule, "is wrong"})
+      )
+    end
+
+    printable = {String, :printable?, "must be printable"}
+
+    definition =
+      Definition.new!(
+        "tests.validated",
+        "tests/settings",
+        Map.put(attributes, :validator, printable)
+      )
+
+    assert Definition.validate(definition, "b") == :ok
+    assert Definition.validate(definition, <<0>>) == {:error, "must be printable"}
+  end
+
   test "distinguishes an absent declared row from an undeclared key" do
     assert Settings.get("tests.personal", Scope.user(10)) == "system"
     assert Settings.definition!("tests.personal").owner == "tests/settings"

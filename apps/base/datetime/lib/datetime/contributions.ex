@@ -19,7 +19,8 @@ defmodule Bilimbi.Base.DateTime.Contributions do
             label: "Timezone",
             help: "Default timezone for this company.",
             editable: "company.profile",
-            capability: "admin.company.update"
+            capability: "admin.company.update",
+            validator: {Bilimbi.Base.DateTime, :valid_timezone?, "must be a valid IANA timezone"}
           },
           "ui.timezone.mode" => %{
             type: :string,

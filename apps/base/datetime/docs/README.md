@@ -10,9 +10,11 @@ and deadline semantics, and canonical storage stays UTC.
 ## The two settings
 
 - `localization.timezone` — company-scoped IANA identifier, default `UTC`.
-  Declared here as the policy owner; Core Company keeps the management
-  surface and resolution, writing through the public Settings API under its
-  own `admin.company.update` capability. Base never queries Core.
+  Declared here as the policy owner, with `valid_timezone?/1` as its Settings
+  validator so every write refuses an invalid zone. Core Company keeps
+  resolution and its profile editor; the shared settings page's company scope
+  also edits it. Both write through the public Settings API under
+  `admin.company.update`. Base never queries Core.
 - `ui.timezone.mode` — user-scoped `company | local | utc`, default
   `company`. Mutation derives the account from the authenticated context;
   a request can never name another user.

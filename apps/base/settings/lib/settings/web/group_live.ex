@@ -20,7 +20,9 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
 
   use Bilimbi.Base.UI, :live_view
 
+  alias Bilimbi.Base.Settings
   alias Bilimbi.Base.Settings.Form
+  alias Bilimbi.Base.Settings.Scope
 
   # Belimbing titles a page from its group config. Bilimbi's groups are bare
   # ids, so the page carries its own copy -- the same information, declared
@@ -29,7 +31,7 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
     "operator" => %{
       groups: ["operator"],
       title: "Operator Settings",
-      subtitle: "Instance-wide settings contributed by installed modules.",
+      subtitle: "Settings contributed by installed modules.",
       nav: "admin.system.settings",
       capability: "base.settings.global.manage"
     }
@@ -46,7 +48,39 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
      |> assign(:active_tab, hd(page.groups))
      |> assign(:pending_restore, nil)
      |> assign(:pending_reveal, nil)
+     |> assign(:setting_scope, nil)
+     |> assign(:scope_form, scope_form(nil))
+     |> assign(
+       :can_manage_company,
+       allowed?(socket.assigns.current_scope, "base.settings.company.manage")
+     )
+     |> assign(:companies, company_service().companies(socket.assigns.current_scope))
      |> load_fields()}
+  end
+
+  @impl true
+  def handle_event("switch_scope", %{"scope" => %{"company_id" => "global"}}, socket) do
+    {:noreply, select_scope(socket, nil)}
+  end
+
+  def handle_event("switch_scope", %{"scope" => %{"company_id" => id}}, socket)
+      when is_binary(id) do
+    with {id, ""} when id > 0 <- Integer.parse(id),
+         {:ok, scope} <- company_service().authorize(socket.assigns.current_scope, id) do
+      {:noreply, select_scope(socket, scope)}
+    else
+      _ ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "You do not have permission to manage this company's settings."
+         )}
+    end
+  end
+
+  def handle_event("switch_scope", _params, socket) do
+    {:noreply, put_flash(socket, :error, "Choose an available settings scope.")}
   end
 
   @impl true
@@ -62,7 +96,7 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
   def handle_event("request_secret_reveal", %{"key" => key}, socket) do
     field = Enum.find(socket.assigns.fields, &(&1.key == key and &1.encrypted?))
 
-    if field && field.value == Form.secret_mask() &&
+    if scope_authorized?(socket) && field && field.value == Form.secret_mask() &&
          secret_service().available?(socket.assigns.current_scope) do
       {:noreply, assign(socket, :pending_reveal, key)}
     else
@@ -84,7 +118,10 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
         {:noreply, socket}
 
       key ->
-        case secret_service().reveal(socket.assigns.current_scope, key, scope(socket), password) do
+        result =
+          secret_service().reveal(socket.assigns.current_scope, key, scope(socket), password)
+
+        case result do
           {:ok, value} ->
             field = Enum.find(socket.assigns.fields, &(&1.key == key))
             id = "input-#{String.replace(key, ".", "-")}"
@@ -123,31 +160,11 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
 
   @impl true
   def handle_event("save", params, socket) do
-    submitted = Map.get(params, "settings", %{})
-
-    case Form.save(submitted, socket.assigns.fields, scope(socket)) do
-      # The kind follows the outcome: a save that wrote or cleared nothing
-      # informs, one that changed storage confirms.
-      {:ok, %{written: [], cleared: []} = outcome} ->
-        {:noreply,
-         socket
-         |> load_fields()
-         |> put_flash(:info, saved_message(outcome))}
-
-      {:ok, outcome} ->
-        {:noreply,
-         socket
-         |> load_fields()
-         |> put_flash(:success, saved_message(outcome))}
-
-      {:error, key, message} ->
-        # Nothing was written -- Form.save/3 plans before it writes and rolls
-        # back on a persistence error -- so the form is redrawn from storage
-        # rather than from the rejected submission.
-        {:noreply,
-         socket
-         |> load_fields()
-         |> put_flash(:error, "#{label_for(socket, key)}: #{message}")}
+    if scope_authorized?(socket) do
+      save(params, load_fields(socket))
+    else
+      {:noreply,
+       put_flash(socket, :error, "You do not have permission to manage this company's settings.")}
     end
   end
 
@@ -176,19 +193,115 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
     do: {:noreply, socket}
 
   def handle_event("restore_defaults", _params, socket) do
-    {:ok, cleared} = Form.restore_defaults(socket.assigns.fields, scope(socket))
+    if scope_authorized?(socket) do
+      restore(socket)
+    else
+      {:noreply,
+       socket
+       |> assign(:pending_restore, nil)
+       |> put_flash(:error, "You do not have permission to manage this company's settings.")}
+    end
+  end
+
+  @impl true
+  def handle_event("request_clear", %{"key" => key}, socket) do
+    case Enum.find(socket.assigns.fields, &(&1.key == key and &1.overridden?)) do
+      nil -> {:noreply, socket}
+      field -> {:noreply, assign(socket, :pending_restore, [field])}
+    end
+  end
+
+  defp select_scope(socket, scope) do
+    groups = if scope, do: company_groups(), else: @pages["operator"].groups
+
+    socket
+    |> assign(:setting_scope, scope)
+    |> assign(:scope_form, scope_form(scope))
+    |> assign(:page, %{socket.assigns.page | groups: groups})
+    |> assign(:active_tab, List.first(groups))
+    |> assign(:pending_restore, nil)
+    |> assign(:pending_reveal, nil)
+    |> clear_flash()
+    |> load_fields()
+    |> select_available_group()
+  end
+
+  defp select_available_group(socket) do
+    group =
+      Enum.find(socket.assigns.page.groups, List.first(socket.assigns.page.groups), fn group ->
+        fields_in(socket.assigns.fields, group) != []
+      end)
+
+    assign(socket, :active_tab, group)
+  end
+
+  defp company_groups do
+    Settings.definitions()
+    |> Map.values()
+    |> Enum.filter(&(:company in &1.scopes and is_binary(&1.editable)))
+    |> Enum.map(& &1.editable)
+    |> Enum.uniq()
+    |> Enum.sort()
+  end
+
+  defp save(params, socket) do
+    submitted = Map.get(params, "settings", %{})
+
+    case Form.save(submitted, socket.assigns.fields, scope(socket)) do
+      # The kind follows the outcome: a save that wrote or cleared nothing
+      # informs, one that changed storage confirms.
+      {:ok, %{written: [], cleared: []} = outcome} ->
+        {:noreply,
+         socket
+         |> load_fields()
+         |> put_flash(:info, saved_message(outcome))}
+
+      {:ok, outcome} ->
+        {:noreply,
+         socket
+         |> load_fields()
+         |> put_flash(:success, saved_message(outcome))}
+
+      {:error, key, message} ->
+        # Nothing was written -- Form.save/3 plans before it writes and rolls
+        # back on a persistence error -- so the form is redrawn from storage
+        # rather than from the rejected submission.
+        {:noreply,
+         socket
+         |> load_fields()
+         |> put_flash(:error, "#{label_for(socket, key)}: #{message}")}
+    end
+  end
+
+  defp restore(socket) do
+    # Recheck definition permissions and act only on the fields confirmed.
+    held_keys = Enum.map(socket.assigns.pending_restore, & &1.key)
+    socket = load_fields(socket)
+    fields = Enum.filter(socket.assigns.fields, &(&1.key in held_keys))
+    {:ok, cleared} = Form.restore_defaults(fields, scope(socket))
 
     {:noreply,
      socket
      |> assign(:pending_restore, nil)
      |> load_fields()
-     |> put_flash(:success, restored_message(cleared))}
+     |> put_flash(if(cleared == [], do: :info, else: :success), restored_message(cleared))}
   end
 
-  # This page edits the global scope, which is what `operator` settings declare.
-  # A user- or company-scoped page passes a `Settings.Scope` here instead; the
-  # form resolves each field at the nearest scope its definition allows.
-  defp scope(_socket), do: nil
+  defp scope_form(scope) do
+    to_form(%{"company_id" => if(scope, do: to_string(scope.id), else: "global")}, as: :scope)
+  end
+
+  defp scope(socket), do: socket.assigns.setting_scope
+
+  defp scope_authorized?(%{assigns: %{setting_scope: nil}}), do: true
+
+  defp scope_authorized?(socket) do
+    match?({:ok, _}, company_service().authorize(socket.assigns.current_scope, scope(socket).id))
+  end
+
+  defp company_service do
+    Application.fetch_env!(:bilimbi_base_settings, :company_scope_service)
+  end
 
   # A field the actor may not see is withheld here, not by the form, so the
   # page also knows what it withheld. A group left empty by that filter is
@@ -198,6 +311,7 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
     {fields, withheld} =
       socket.assigns.page.groups
       |> Form.fields(scope(socket))
+      |> Enum.filter(&(is_nil(scope(socket)) or :company in &1.definition.scopes))
       |> Enum.split_with(&authorized_field?(socket.assigns.current_scope, &1))
 
     socket
@@ -224,6 +338,10 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
 
   defp authorized_field?(current_scope, %{definition: %{capability: capability}}) do
     allowed?(current_scope, capability)
+  end
+
+  defp group_label(group) do
+    group |> String.replace([".", "_"], " ") |> String.capitalize()
   end
 
   defp fields_in(fields, group) do
@@ -271,15 +389,22 @@ defmodule Bilimbi.Base.Settings.Web.GroupLive do
   defp restored_message([]), do: "Nothing to restore; every setting shown is already inherited."
 
   defp restored_message(cleared),
-    do: "#{count(cleared, "override")} cleared. Values now come from their defaults."
+    do: "#{count(cleared, "override")} cleared. Values now come from what they inherit."
 
   defp count([], _noun), do: nil
   defp count([_one], noun), do: "1 #{noun}"
   defp count(many, noun), do: "#{length(many)} #{noun}s"
 
-  defp source_note(%{overridden?: true}), do: nil
-  defp source_note(%{source_scope: :global}), do: "Inherited from the default"
-  defp source_note(%{source_scope: scope}), do: "Inherited from #{scope}"
+  defp source_note(%{overridden?: true}, _scope), do: nil
+
+  defp source_note(%{source_scope: :global} = field, %Scope{type: :company}) do
+    if :global in field.definition.scopes and Settings.overridden?(field.key),
+      do: "Inherited from global",
+      else: "Inherited from the default"
+  end
+
+  defp source_note(%{source_scope: :global}, _scope), do: "Inherited from the default"
+  defp source_note(%{source_scope: scope}, _selected_scope), do: "Inherited from #{scope}"
 
   defp input_type(%{definition: %{type: type}}) when type in [:integer, :float], do: "number"
   defp input_type(_field), do: "text"

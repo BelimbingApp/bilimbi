@@ -9,11 +9,32 @@ descriptor-owned contribution provider. Each definition owns its value type,
 allowed scopes, default, encryption policy, and module provenance. A missing
 row resolves to that declared default; an undeclared and unclaimed key raises.
 
+A definition may declare `validator: {module, function, message}` when its
+owner has a rule beyond the value type, such as `localization.timezone`
+requiring a valid IANA timezone. `Settings.put/3` and every settings screen
+run it; an invalid value is refused with that message and never stored.
+
 An editable definition may declare a capability in addition to its UI group.
 The generic settings screen filters its server-owned field plan by the live
 scope's capabilities; a hidden key is therefore excluded from forged/direct
 submissions as well as from rendering. The route's group capability controls
 access to the screen, while the definition capability controls each field.
+
+The operator page at `/system/settings` starts at Global. Accounts granted
+`base.settings.company.manage` can choose a live company they may target;
+other companies in the tenant also require `admin.company.tenant-wide.manage`.
+The selector uses the host's `Bilimbi.Base.Settings.CompanyScopeService`
+implementation, configured as `:company_scope_service`, so Base does not depend
+on Core business implementations. Every save, clear, and stored-value reveal
+rechecks the company target.
+
+Company scope discovers every editable group with company-scoped definitions.
+It shows effective values and distinguishes a company override from inheritance
+from global, tenant, or the declared default. Global-only fields are excluded,
+including from direct submissions. Clear override confirms and deletes only
+that company's value; the shared restore action clears the confirmed fields.
+Changing scope drops pending confirmations and reloads storage. Saves and clears
+use the existing validated Form API and Repo mutation audit trail.
 
 The database lookup cascade is user → company → tenant → global. A definition
 may opt into any subset. `scope_type` and `scope_id` deliberately have no
