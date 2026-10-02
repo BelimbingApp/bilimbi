@@ -87,11 +87,14 @@ signature or retry context is exposed. Only POST is routed.
 Delivery attempts record unscoped guest `webhook.delivery` Base Audit actions.
 Every attempt admitted past the sender stage records its own action with the
 sender address: accepted, refused by its handler, and every oversized,
-unreadable or unverified body. Those writes are bounded per sender address by
-`webhooks.sender_rate_limit`. Rate-limited attempts and unknown identifiers
-write no row per request; when the window closes, each handler (or the one `unknown` bucket)
-gets one action per reason with a `count`, so unauthenticated traffic cannot
-force a database write per request. The payload carries the registered
+unreadable or unverified body. An unsigned request admitted past the sender
+stage therefore writes one row. That is bounded only per sender address, by
+`webhooks.sender_rate_limit`, so a sender with many addresses can still force
+about one database write per request; cap that at ingress if it matters.
+Rate-limited attempts and unknown identifiers write no row per request; when
+the window closes, each handler (or the one `unknown` bucket) gets one action
+per reason with a `count`, so those refusals cannot force a database write per
+request. The payload carries the registered
 identifier (or `unknown`), a host-owned reason, `succeeded`/`refused` and, on
 aggregated actions, `count`; it never stores request bodies, headers, query
 strings, callback context, secrets or exception details. Aggregated counts
