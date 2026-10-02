@@ -7,6 +7,7 @@ defmodule BilimbiWeb.Application do
   def start(_type, _args) do
     Bilimbi.Base.ModuleRegistry.complete_modules!()
     Bilimbi.Base.ModuleRegistry.ContributionRegistry.install!()
+    BilimbiWeb.Webhooks.validate!()
 
     children = [
       BilimbiWeb.Telemetry,
@@ -14,6 +15,7 @@ defmodule BilimbiWeb.Application do
       {DNSCluster, query: Application.get_env(:web, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: BilimbiWeb.PubSub},
       BilimbiWeb.RateLimit,
+      BilimbiWeb.WebhookRateLimit,
       BilimbiWeb.Endpoint
     ]
 

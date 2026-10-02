@@ -82,7 +82,7 @@ defmodule BilimbiWeb.DiscoveredRoutesTest do
       )
 
     # Embed contributions share the manifest with routes and carry no :path.
-    host_paths = MapSet.new(host_routes, & &1.path)
+    host_paths = MapSet.new(Enum.filter(host_routes, &Map.has_key?(&1, :path)), & &1.path)
 
     module_paths =
       for route <- user_routes ++ administration_routes,

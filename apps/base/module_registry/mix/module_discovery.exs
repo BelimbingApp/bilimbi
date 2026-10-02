@@ -358,6 +358,11 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
 
     entries = module_routes ++ host_routes
     validate_unique_embed_keys!(entries)
+    webhooks = Enum.filter(entries, &Map.has_key?(&1, :webhook))
+
+    if length(Enum.uniq_by(webhooks, & &1.webhook)) != length(webhooks) do
+      raise ArgumentError, "duplicate webhook identifier"
+    end
 
     contents = inspect(entries, pretty: true, limit: :infinity) <> "\n"
     manifest = route_manifest_path(workspace_root)
@@ -1006,11 +1011,38 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     end
   end
 
+  # Webhook callbacks are trusted compiled code, never browser routes. The host
+  # owns the reserved /webhooks scope and raw-body handling.
+  defp normalize_route!(%{webhook: identifier} = entry, source, layer) do
+    unless is_binary(identifier) and Regex.match?(~r/\A[a-z][a-z0-9_-]{0,79}\z/, identifier) and
+             Enum.sort(Map.keys(entry)) == [:handle, :verify, :webhook] do
+      raise ArgumentError, "webhook declaration requires identifier, verify and handle only"
+    end
+
+    Enum.each([:verify, :handle], fn key ->
+      case entry[key] do
+        {module, function}
+        when is_atom(module) and not is_nil(module) and
+               is_atom(function) and not is_nil(function) ->
+          :ok
+
+        _ ->
+          raise ArgumentError, "webhook callback must be {module, function}"
+      end
+    end)
+
+    entry |> Map.put(:source, source) |> Map.put(:layer, layer)
+  end
+
   defp normalize_route!(route, source, layer) when is_map(route) do
     path = Map.get(route, :path)
 
     unless is_binary(path) and String.starts_with?(path, "/") do
       raise ArgumentError, "route path must be a binary starting with /"
+    end
+
+    if source != "web" and (path == "/webhooks" or String.starts_with?(path, "/webhooks/")) do
+      raise ArgumentError, "the /webhooks namespace is reserved for host webhook registrations"
     end
 
     if Map.has_key?(route, :live) do

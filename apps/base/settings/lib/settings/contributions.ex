@@ -6,7 +6,7 @@ defmodule Bilimbi.Base.Settings.Contributions do
   @impl true
   def contributions do
     %{
-      settings: %{definitions: %{}, runtime_claims: []},
+      settings: %{definitions: webhook_definitions(), runtime_claims: []},
       # Belimbing declares this item in Base/System, which Bilimbi has no
       # equivalent of; the page lives here, so the item does too. Same id.
       menu: [
@@ -31,5 +31,35 @@ defmodule Bilimbi.Base.Settings.Contributions do
         ]
       }
     }
+  end
+
+  # The host consumes these platform-wide settings; the existing Settings
+  # operator UI renders them with its normal authorization and validation.
+  defp webhook_definitions do
+    Map.new(
+      [
+        {"max_bytes", 1_048_576, 67_108_864, "Webhook body limit",
+         "Maximum bytes per inbound webhook."},
+        {"rate_limit", 120, 1_000_000, "Webhook delivery limit",
+         "Maximum deliveries per registered handler per window, on each host node."},
+        {"window_ms", 60_000, 3_600_000, "Webhook rate window", "Rate window in milliseconds."},
+        {"read_timeout_ms", 15_000, 120_000, "Webhook read timeout",
+         "Maximum wait in milliseconds for each body read."}
+      ],
+      fn {key, default, maximum, label, help} ->
+        {"webhooks." <> key,
+         %{
+           type: :integer,
+           scopes: [:global],
+           default: default,
+           minimum: 1,
+           maximum: maximum,
+           label: label,
+           help: help,
+           editable: "operator",
+           capability: "base.settings.global.manage"
+         }}
+      end
+    )
   end
 end
