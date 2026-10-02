@@ -9,12 +9,18 @@ defmodule Bilimbi.Base.UI do
   """
 
   @doc """
-  Whether the scope (or assign map) lists `capability` among its effective allows.
+  Whether the scope (or assign map) allows a string capability or at least
+  one key of an `{:any_of, keys}` requirement through its effective allows.
   """
-  @spec allowed?(map() | nil, String.t()) :: boolean()
+  @spec allowed?(map() | nil, Bilimbi.Base.Menu.Capability.t()) :: boolean()
   def allowed?(%{capabilities: capabilities}, capability)
       when is_list(capabilities) and is_binary(capability) do
     capability in capabilities
+  end
+
+  def allowed?(%{capabilities: capabilities}, {:any_of, _} = requirement)
+      when is_list(capabilities) do
+    Bilimbi.Base.Menu.Capability.allowed?(requirement, &(&1 in capabilities))
   end
 
   def allowed?(_current_scope, _capability), do: false

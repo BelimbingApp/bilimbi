@@ -9,8 +9,8 @@ defmodule Bilimbi.Base.Menu do
 
   Visibility is presentation only. `visible_tree/1` hides what an actor may not
   reach, but hiding a link is never authorization — the route must enforce the
-  same capability at mount. Belimbing works the same way: the menu filters on
-  `permission`, and the route carries `authz:<capability>` middleware.
+  same capability requirement at mount. Belimbing similarly filters the menu
+  on `permission` and guards the route with `authz:<capability>` middleware.
   """
 
   alias Bilimbi.Base.Menu.Item
@@ -37,9 +37,10 @@ defmodule Bilimbi.Base.Menu do
   `Bilimbi.Base.Authz.can/4` for the current actor; Menu deliberately does not
   depend on Authz, so the caller supplies the decision.
 
-  Two rules, both taken from Belimbing:
+  Visibility rules:
 
-    * an item carrying a capability is hidden unless `allowed?` returns true;
+    * a string capability requires `allowed?` to return true;
+    * `{:any_of, keys}` requires `allowed?` to return true for at least one key;
     * a **container is hidden when it has no visible child**, so a section
       never renders as an empty heading. This is also what keeps unported
       Domain roots out of the menu until their modules are installed.
@@ -61,8 +62,8 @@ defmodule Bilimbi.Base.Menu do
     end
   end
 
-  defp permitted?(%Item{capability: nil}, _allowed?), do: true
-  defp permitted?(%Item{capability: capability}, allowed?), do: allowed?.(capability)
+  defp permitted?(%Item{capability: capability}, allowed?),
+    do: Bilimbi.Base.Menu.Capability.allowed?(capability, allowed?)
 
   defp build_tree(items) do
     by_parent = Enum.group_by(items, & &1.parent)
