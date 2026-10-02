@@ -134,7 +134,8 @@ The module descriptor gains a `web:` key naming a route data file:
 
 The value is `nil` or a path to a plain-data route file (the same pattern as
 `migrations:`). The data file contains route terms as maps: path string,
-LiveView or controller module atom, capability string, live session name, and
+LiveView or controller module atom, capability requirement (string or
+`{:any_of, keys}`), live session name, and
 pipeline data. The module atoms are data, not compiled modules — they resolve
 at runtime when Phoenix dispatches the route.
 
@@ -252,7 +253,7 @@ because:
 
 2. **No compile-time coupling.** Module LiveViews do not need to compile
    against the auth hooks. The host router attaches `on_mount` hooks from
-   route data — each route's capability string and live session name are
+   route data — each route's capability requirement and live session name are
    data the host macro interprets, selecting the appropriate hook from
    `BilimbiWeb.UserAuth`. The LiveView module itself only needs `base/ui`
    for components and `~p` verification; the hooks run in the LiveView

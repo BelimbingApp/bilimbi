@@ -1067,8 +1067,27 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
 
     capability = Map.get(route, :capability)
 
-    unless is_nil(capability) or is_binary(capability) do
-      raise ArgumentError, "route capability must be a binary or nil"
+    # Discovery runs before packages compile; mirror Menu.Capability's plain
+    # declaration shape here. Embed policies remain single-capability.
+    valid_capability? =
+      case capability do
+        nil ->
+          true
+
+        key when is_binary(key) ->
+          true
+
+        {:any_of, keys} when is_list(keys) and keys != [] ->
+          Enum.all?(keys, &(is_binary(&1) and String.trim(&1) != "")) and
+            length(Enum.uniq(keys)) == length(keys)
+
+        _ ->
+          false
+      end
+
+    unless valid_capability? do
+      raise ArgumentError,
+            "route capability must be a binary, nil, or {:any_of, non-empty distinct strings}"
     end
 
     if Map.has_key?(route, :controller) do

@@ -44,7 +44,7 @@ defmodule Bilimbi.Base.UI.RouteContract do
 
   @doc """
   The declared GET route that serves `path`, as `{:ok, route}` with the
-  capability its mount requires (`nil` for any signed-in account) and whether
+  capability requirement its mount requires (`nil` for any signed-in account) and whether
   it is operator-only; `:error` when nothing serves it.
 
   The same policy `RouteAccess` enforces at mount, asked ahead of time: a
@@ -76,13 +76,13 @@ defmodule Bilimbi.Base.UI.RouteContract do
   end
 
   @typedoc """
-  A declared GET route: its path pattern, the capability its mount
+  A declared GET route: its path pattern, the capability requirement its mount
   requires (`nil` for any signed-in account), whether it is operator-only,
   and the stable id of the module that declared it (`"core/company"`).
   """
   @type route :: %{
           path: String.t(),
-          capability: String.t() | nil,
+          capability: Bilimbi.Base.Menu.Capability.t(),
           operator: boolean(),
           source: String.t() | nil
         }

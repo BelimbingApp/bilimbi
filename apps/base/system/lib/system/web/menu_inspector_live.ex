@@ -136,7 +136,7 @@ defmodule Bilimbi.Base.System.Web.MenuInspectorLive do
         label: item.label,
         parent: item.parent,
         kind: if(Menu.Item.container?(item), do: "container", else: "leaf"),
-        capability: item.capability,
+        capability: Bilimbi.Base.Menu.Capability.label(item.capability),
         route: item.route,
         source: item.source,
         served?: is_nil(item.route) or Nav.served?(item.route),

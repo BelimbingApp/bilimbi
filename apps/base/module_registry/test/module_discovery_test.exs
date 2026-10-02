@@ -650,6 +650,36 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
            ] = routes
   end
 
+  test "route manifest validates and preserves any-of requirements", %{root: root} do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    File.mkdir_p!(Path.join(module_root, "priv"))
+    route_file = Path.join(module_root, "priv/web_routes.exs")
+    requirement = {:any_of, ["self.summary", "self.performance"]}
+    route = %{path: "/standing", live: Test.StandingLive, capability: requirement}
+    File.write!(route_file, inspect([route]))
+    MixDiscovery.write_route_manifest!(root)
+    {routes, _} = Code.eval_file(MixDiscovery.route_manifest_path(root))
+    assert [%{capability: ^requirement}] = routes
+
+    for bad <- [
+          {:any_of, []},
+          {:any_of, [""]},
+          {:any_of, [" "]},
+          {:any_of, ["a", nil]},
+          {:any_of, ["a", "a"]},
+          {:any_of, "a"},
+          {:all_of, ["a"]},
+          ["a", "b"]
+        ] do
+      File.write!(route_file, inspect([%{route | capability: bad}]))
+
+      assert_raise ArgumentError, ~r/route capability must be/, fn ->
+        MixDiscovery.write_route_manifest!(root)
+      end
+    end
+  end
+
   test "route manifest appends host routes with source web", %{root: root} do
     put_container!(root, "base", :base)
     module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")

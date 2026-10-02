@@ -512,17 +512,18 @@ defmodule BilimbiWeb.UserAuth do
   end
 
   @doc """
-  Requires a live Authz allow for `capability`. Denied requests redirect to
+  Requires a live Authz allow for a string capability or at least one key in
+  `{:any_of, keys}`. Denied requests redirect to
   the dashboard; UI hiding is not this plug's job.
   """
-  def require_capability(conn, capability) when is_binary(capability) do
+  def require_capability(conn, capability) do
     case conn.assigns[:current_scope] do
       %{actor: actor} ->
-        case Authz.can(actor, capability) do
-          %Decision{allowed: true} ->
+        case capability_allowed?(actor, capability) do
+          true ->
             conn
 
-          %Decision{} ->
+          false ->
             conn
             |> put_flash(:error, @denied_message)
             |> redirect(to: ~p"/dashboard")
@@ -602,15 +603,14 @@ defmodule BilimbiWeb.UserAuth do
     end
   end
 
-  def on_mount({:require_capability, capability}, _params, _session, socket)
-      when is_binary(capability) do
+  def on_mount({:require_capability, capability}, _params, _session, socket) do
     actor = socket.assigns.current_scope.actor
 
-    case Authz.can(actor, capability) do
-      %Decision{allowed: true} ->
+    case capability_allowed?(actor, capability) do
+      true ->
         {:cont, socket}
 
-      %Decision{} ->
+      false ->
         {:halt,
          socket
          |> Phoenix.LiveView.put_flash(:error, @denied_message)
@@ -627,6 +627,14 @@ defmodule BilimbiWeb.UserAuth do
        |> Phoenix.LiveView.put_flash(:error, @denied_message)
        |> Phoenix.LiveView.redirect(to: ~p"/dashboard")}
     end
+  end
+
+  defp capability_allowed?(_actor, nil), do: false
+
+  defp capability_allowed?(actor, requirement) do
+    Bilimbi.Base.Menu.Capability.allowed?(requirement, fn key ->
+      match?(%Decision{allowed: true}, Authz.can(actor, key))
+    end)
   end
 
   # An operator-only screen (#650) requires the actor's tenant to be the platform
