@@ -166,8 +166,16 @@ defmodule BilimbiWeb.LoginLive do
 
   defp peer_ip(socket) do
     case Phoenix.LiveView.get_connect_info(socket, :peer_data) do
-      %{address: address} -> :inet.ntoa(address) |> to_string()
-      _ -> "unknown"
+      %{address: address} ->
+        address
+        |> BilimbiWeb.ForwardedFor.client_address(
+          Phoenix.LiveView.get_connect_info(socket, :x_headers) || []
+        )
+        |> :inet.ntoa()
+        |> to_string()
+
+      _ ->
+        "unknown"
     end
   end
 

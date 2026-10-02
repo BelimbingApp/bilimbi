@@ -161,6 +161,14 @@ defmodule BilimbiWeb.WebhooksTest do
     refute_received {:webhook_body, _}
   end
 
+  test "a close with no open window leaves admission working" do
+    close_window()
+    close_window()
+    assert response(delivery("{}"), 202)
+    close_window()
+    assert response(delivery("{}"), 202)
+  end
+
   test "settings are read once per window" do
     assert response(delivery("{}"), 202)
     assert {:ok, _} = Settings.put("webhooks.rate_limit", 1)

@@ -750,7 +750,7 @@ defmodule BilimbiWeb.UserAuth do
   # disconnected render's request left in the Logger metadata.
   defp request_facts(%Phoenix.LiveView.Socket{} = socket) do
     %{
-      ip_address: socket |> connect_info(:peer_data) |> peer_ip(),
+      ip_address: socket |> connect_info(:peer_data) |> peer_ip(connect_info(socket, :x_headers)),
       user_agent: connect_info(socket, :user_agent)
     }
   end
@@ -760,10 +760,14 @@ defmodule BilimbiWeb.UserAuth do
 
   defp connect_info(_child_socket, _key), do: nil
 
-  defp peer_ip(%{address: address}) when is_tuple(address),
-    do: address |> :inet.ntoa() |> to_string()
+  defp peer_ip(%{address: address}, headers) when is_tuple(address) do
+    address
+    |> BilimbiWeb.ForwardedFor.client_address(headers || [])
+    |> :inet.ntoa()
+    |> to_string()
+  end
 
-  defp peer_ip(_peer_data), do: nil
+  defp peer_ip(_peer_data, _headers), do: nil
 
   defp impersonator_id(%{impersonator: %{id: id}}) when is_integer(id) and id > 0, do: id
   defp impersonator_id(_current_scope), do: nil

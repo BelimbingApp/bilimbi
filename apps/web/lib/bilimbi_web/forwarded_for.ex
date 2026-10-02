@@ -8,21 +8,28 @@ defmodule BilimbiWeb.ForwardedFor do
   before an untrusted address is found, leaves `remote_ip` unchanged.
 
   The list is `:web, :trusted_proxies`, set at boot from the comma-separated
-  `TRUSTED_PROXIES` CIDRs, and defaults to loopback.
+  `TRUSTED_PROXIES` CIDRs, and defaults to loopback. LiveView resolves its
+  transport peer and `x-` headers through `client_address/2` by the same rule.
   """
   @behaviour Plug
   import Bitwise
 
+  # 127.0.0.0/8 and ::1/128
+  @default [{0x7F000000, 32, 8}, {1, 128, 128}]
+
   def init(opts), do: opts
 
-  def call(conn, _opts) do
-    proxies = Application.get_env(:web, :trusted_proxies, default())
+  def call(conn, _opts),
+    do: %{conn | remote_ip: client_address(conn.remote_ip, conn.req_headers)}
 
-    with true <- trusted?(conn.remote_ip, proxies),
-         {:ok, client} <- client(conn, proxies) do
-      %{conn | remote_ip: client}
+  def client_address(peer, headers) do
+    proxies = Application.get_env(:web, :trusted_proxies, @default)
+
+    with true <- trusted?(peer, proxies),
+         {:ok, client} <- client(headers, proxies) do
+      client
     else
-      _ -> conn
+      _ -> peer
     end
   end
 
@@ -39,11 +46,8 @@ defmodule BilimbiWeb.ForwardedFor do
     end)
   end
 
-  defp default, do: parse!("127.0.0.0/8,::1/128")
-
-  defp client(conn, proxies) do
-    conn
-    |> Plug.Conn.get_req_header("x-forwarded-for")
+  defp client(headers, proxies) do
+    for({"x-forwarded-for", value} <- headers, do: value)
     |> Enum.flat_map(&String.split(&1, ","))
     |> Enum.reverse()
     |> Enum.reduce_while(:error, fn hop, :error ->

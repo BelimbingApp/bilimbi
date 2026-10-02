@@ -29,18 +29,28 @@ defmodule BilimbiWeb.WebhookRateLimit do
 
   def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
 
-  def admit_sender(handler, remote_ip),
-    do: GenServer.call(__MODULE__, {:sender, handler, remote_ip})
+  def admit_sender(handler, remote_ip), do: call({:sender, handler, remote_ip})
+  def admit_verified(handler), do: call({:verified, handler})
+  def record_failure(handler, reason), do: call({:failed, handler, reason})
+  def refuse(handler, reason), do: call({:refuse, handler, reason})
 
-  def admit_verified(handler), do: GenServer.call(__MODULE__, {:verified, handler})
-  def record_failure(handler, reason), do: GenServer.call(__MODULE__, {:failed, handler, reason})
-  def refuse(handler, reason), do: GenServer.call(__MODULE__, {:refuse, handler, reason})
+  defp call(request) do
+    case GenServer.call(__MODULE__, request) do
+      {:error, :settings_unavailable} -> exit(:settings_unavailable)
+      reply -> reply
+    end
+  end
 
   @impl true
   def init(_opts), do: {:ok, nil}
 
   @impl true
-  def handle_call(request, from, nil), do: handle_call(request, from, open())
+  def handle_call(request, from, nil) do
+    case open() do
+      {:ok, state} -> handle_call(request, from, state)
+      :error -> {:reply, {:error, :settings_unavailable}, nil}
+    end
+  end
 
   def handle_call({:sender, handler, remote_ip}, _from, state) do
     case take(state, {:sender, handler, remote_ip}, :sender_rate_limit) do
@@ -67,15 +77,22 @@ defmodule BilimbiWeb.WebhookRateLimit do
     do: {:reply, :ok, absorb(state, handler, reason)}
 
   @impl true
+  def handle_info(:close, nil), do: {:noreply, nil}
+
   def handle_info(:close, state) do
+    Process.cancel_timer(state.timer)
     for {{handler, reason}, count} <- state.refused, do: record(handler, reason, count)
     {:noreply, nil}
   end
 
   defp open do
     settings = Map.new(@settings, &{&1, Settings.get("webhooks.#{&1}")})
-    Process.send_after(self(), :close, settings.window_ms)
-    %{settings: settings, counts: %{}, refused: %{}}
+    timer = Process.send_after(self(), :close, settings.window_ms)
+    {:ok, %{settings: settings, timer: timer, counts: %{}, refused: %{}}}
+  rescue
+    _ -> :error
+  catch
+    :exit, _ -> :error
   end
 
   defp take(state, key, limit) do
