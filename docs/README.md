@@ -12,6 +12,7 @@ install it. These pages hold the detail.
 | Product and interface design | [DESIGN.md](../DESIGN.md) |
 | Composition model: Platform, Domains, Extensions | [0010 Composition model](./architecture/0010_composition-model.md) |
 | Database architecture | [Database Architecture](./architecture/database.md) |
+| Inbound webhooks: module registration, limits, audit | [Inbound webhooks](./architecture/inbound-webhooks.md) |
 | Original Mix umbrella topology | [ADR 0001](./architecture/decisions/0001-mix-umbrella-topology.md) |
 | Compatible schema baselines | [ADR 0002](./architecture/decisions/0002-compatible-schema-baselines.md) |
 | Physical deep-module packages | [ADR 0003](./architecture/decisions/0003-physical-deep-module-packages.md) |
