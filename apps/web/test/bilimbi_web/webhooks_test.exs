@@ -86,7 +86,6 @@ defmodule BilimbiWeb.WebhooksTest do
   test "a flood of unsigned requests does not refuse a genuine signed delivery" do
     assert {:ok, _} = Settings.put("webhooks.rate_limit", 1)
     assert {:ok, _} = Settings.put("webhooks.sender_rate_limit", 2)
-    assert {:ok, _} = Settings.put("webhooks.failure_limit", 1)
 
     for host <- 1..10, _attempt <- 1..3 do
       conn = post(machine_conn({10, 0, 0, host}), "/webhooks/test-example", "{}")
@@ -103,20 +102,14 @@ defmodule BilimbiWeb.WebhooksTest do
     aggregated = audit_payloads() -- per_attempt
 
     assert Enum.frequencies_by(per_attempt, & &1["reason"]) ==
-             %{"verification_refused" => 1, "accepted" => 1}
+             %{"verification_refused" => 20, "accepted" => 1}
 
-    assert Enum.sort_by(aggregated, & &1["reason"]) == [
+    assert aggregated == [
              %{
                "handler" => "test-example",
                "reason" => "rate_limited",
                "result" => "refused",
                "count" => 11
-             },
-             %{
-               "handler" => "test-example",
-               "reason" => "verification_refused",
-               "result" => "refused",
-               "count" => 19
              }
            ]
   end

@@ -5,13 +5,11 @@ defmodule BilimbiWeb.WebhookRateLimit do
   and holds them until it closes. Within a window it counts:
 
     * attempts per sender (remote IP) per handler, before the body is read;
-    * failed attempts per handler, the first `failure_limit` of which the
-      caller audits individually;
     * verified deliveries per handler.
 
-  Failures never consume verified capacity. Refusals absorbed here (rate
-  limits, unknown handlers and failures past the failure limit) become one
-  audit row per handler and reason, with a count, when the window closes.
+  Failed attempts never consume verified capacity. Refusals absorbed here
+  (rate limits and unknown handlers) become one audit row per handler and
+  reason, with a count, when the window closes.
   Keys are restricted to compiled registrations, one unknown-handler bucket
   and the senders seen in the open window; closing clears all state.
   """
@@ -22,7 +20,6 @@ defmodule BilimbiWeb.WebhookRateLimit do
     :max_bytes,
     :rate_limit,
     :sender_rate_limit,
-    :failure_limit,
     :window_ms,
     :read_timeout_ms
   ]
@@ -31,7 +28,6 @@ defmodule BilimbiWeb.WebhookRateLimit do
 
   def admit_sender(handler, remote_ip), do: call({:sender, handler, remote_ip})
   def admit_verified(handler), do: call({:verified, handler})
-  def record_failure(handler, reason), do: call({:failed, handler, reason})
   def refuse(handler, reason), do: call({:refuse, handler, reason})
 
   defp call(request) do
@@ -63,13 +59,6 @@ defmodule BilimbiWeb.WebhookRateLimit do
     case take(state, {:verified, handler}, :rate_limit) do
       {:ok, state} -> {:reply, :ok, state}
       :exhausted -> {:reply, {:error, :rate_limited}, absorb(state, handler, :rate_limited)}
-    end
-  end
-
-  def handle_call({:failed, handler, reason}, _from, state) do
-    case take(state, {:failed, handler}, :failure_limit) do
-      {:ok, state} -> {:reply, :audit, state}
-      :exhausted -> {:reply, :aggregated, absorb(state, handler, reason)}
     end
   end
 

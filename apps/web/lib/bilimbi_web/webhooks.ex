@@ -86,11 +86,11 @@ defmodule BilimbiWeb.Webhooks do
 
         case callback(registration.verify, [request]) do
           {:ok, context} -> handle(conn, registration, request, context)
-          _ -> failed(conn, registration, :verification_refused)
+          _ -> {conn, :verification_refused, :audit}
         end
 
       {:error, reason, conn} ->
-        failed(conn, registration, reason)
+        {conn, reason, :audit}
     end
   end
 
@@ -108,9 +108,6 @@ defmodule BilimbiWeb.Webhooks do
         {conn, :rate_limited, :aggregated}
     end
   end
-
-  defp failed(conn, registration, reason),
-    do: {conn, reason, WebhookRateLimit.record_failure(registration.webhook, reason)}
 
   defp read_body(conn, settings, remaining, chunks) do
     case Plug.Conn.read_body(conn,

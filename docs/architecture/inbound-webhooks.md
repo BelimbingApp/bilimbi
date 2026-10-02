@@ -54,7 +54,6 @@ by `base.settings.global.manage`:
 | `webhooks.max_bytes` | 1048576 | Maximum raw body bytes per registered delivery |
 | `webhooks.rate_limit` | 120 | Verified deliveries per handler per window per host node |
 | `webhooks.sender_rate_limit` | 120 | Attempts per sender address per handler per window per host node, before verification |
-| `webhooks.failure_limit` | 60 | Failed attempts per handler per window audited individually |
 | `webhooks.window_ms` | 60000 | Fixed rate window in milliseconds |
 | `webhooks.read_timeout_ms` | 15000 | Maximum wait per body read in milliseconds |
 
@@ -66,8 +65,7 @@ address is the client a trusted reverse proxy reports (`BilimbiWeb.ForwardedFor`
 configured by `TRUSTED_PROXIES` in the deployment guide), never a forwarded
 header from an untrusted peer. An
 attempt whose body is oversized or unreadable, or whose verification fails,
-counts against the handler's failure bucket and never against verified
-capacity. Only after verification succeeds does a delivery draw from the
+never draws on verified capacity. Only after verification succeeds does a delivery draw from the
 handler's verified budget. A flood of unsigned requests therefore cannot cause
 a genuine signed delivery from another sender to be refused. Senders behind
 one address share its allowance; set `webhooks.sender_rate_limit` at least as
@@ -87,11 +85,11 @@ size/rate refusal, verification refusal, and callback failure. No reason,
 signature or retry context is exposed. Only POST is routed.
 
 Delivery attempts record unscoped guest `webhook.delivery` Base Audit actions.
-An attempt admitted past the sender stage records its own action with the
-sender address: accepted, refused by its handler, and the first
-`webhooks.failure_limit` failures per handler per window. Rate-limited
-attempts, unknown identifiers and failures past that limit write no row per
-request; when the window closes, each handler (or the one `unknown` bucket)
+Every attempt admitted past the sender stage records its own action with the
+sender address: accepted, refused by its handler, and every oversized,
+unreadable or unverified body. Those writes are bounded per sender address by
+`webhooks.sender_rate_limit`. Rate-limited attempts and unknown identifiers
+write no row per request; when the window closes, each handler (or the one `unknown` bucket)
 gets one action per reason with a `count`, so unauthenticated traffic cannot
 force a database write per request. The payload carries the registered
 identifier (or `unknown`), a host-owned reason, `succeeded`/`refused` and, on
