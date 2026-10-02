@@ -96,6 +96,27 @@ defmodule Bilimbi.Base.MenuTest do
       end
     end
 
+    test "rejects malformed any-of policies during contribution validation" do
+      for requirement <- [
+            {:any_of, []},
+            {:any_of, [""]},
+            {:any_of, [" "]},
+            {:any_of, ["a", nil]},
+            {:any_of, ["a", "a"]},
+            {:any_of, "a"},
+            {:all_of, ["a"]},
+            ["a", "b"]
+          ] do
+        assert_raise ArgumentError, ~r/capability must be/, fn ->
+          Validator.validate_contributions!([
+            entry("core/example", [
+              %{id: "standing", label: "Standing", route: "/standing", capability: requirement}
+            ])
+          ])
+        end
+      end
+    end
+
     test "rejects a malformed item" do
       assert_raise ArgumentError, ~r/needs a non-empty label/, fn ->
         Validator.validate_contributions!([entry("core/a", [%{id: "ok", label: ""}])])
@@ -152,6 +173,31 @@ defmodule Bilimbi.Base.MenuTest do
 
       assert [%{item: %Item{id: "dash"}}] = Menu.visible_tree(fn _ -> false end)
     end
+  end
+
+  test "any-of leaves are visible with either grant and hidden with neither" do
+    items =
+      Validator.validate_contributions!([
+        entry("core/example", [
+          %{id: "self", label: "Self"},
+          %{
+            id: "self.standing",
+            label: "Standing",
+            parent: "self",
+            route: "/standing",
+            capability: {:any_of, ["self.summary", "self.performance"]}
+          }
+        ])
+      ])
+
+    install!(items)
+
+    for grant <- ["self.summary", "self.performance"] do
+      assert [%{item: %Item{id: "self"}, children: [%{item: %Item{id: "self.standing"}}]}] =
+               Menu.visible_tree(&(&1 == grant))
+    end
+
+    assert Menu.visible_tree(&(&1 == "unrelated")) == []
   end
 
   test "fetch_item/1" do

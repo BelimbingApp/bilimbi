@@ -100,7 +100,9 @@ defmodule Bilimbi.Core.MenuRouteIntegrityTest do
 
     # An actor holding every declared capability sees the widest possible tree,
     # so this covers every item any actor could reach.
-    scope = %{capabilities: Enum.flat_map(Menu.items(), &List.wrap(&1.capability))}
+    scope = %{
+      capabilities: Enum.flat_map(Menu.items(), &Bilimbi.Base.Menu.Capability.keys(&1.capability))
+    }
 
     unreachable =
       scope
@@ -118,7 +120,9 @@ defmodule Bilimbi.Core.MenuRouteIntegrityTest do
     # The pruning above fails safe: a mistake in it, or a manifest that failed
     # to write, empties the sidebar rather than breaking a page. That is the
     # regression this catches, and it is one nothing else would report.
-    scope = %{capabilities: Enum.flat_map(Menu.items(), &List.wrap(&1.capability))}
+    scope = %{
+      capabilities: Enum.flat_map(Menu.items(), &Bilimbi.Base.Menu.Capability.keys(&1.capability))
+    }
 
     rendered = scope |> Nav.tree() |> flatten() |> Enum.filter(& &1.route)
 

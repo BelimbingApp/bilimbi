@@ -2,9 +2,10 @@ defmodule Bilimbi.Base.Menu.Item do
   @moduledoc """
   One navigation entry contributed by an installed module.
 
-  Mirrors Belimbing's `Config/menu.php` item shape — `id`, `label`, `icon`,
-  `route`, `permission`, `parent` — so the tree is portable between the two
-  products. `capability` is the Bilimbi name for Belimbing's `permission`.
+  Uses Belimbing's established navigation fields — `id`, `label`, `icon`,
+  `route`, `permission`, `parent`. `capability` is the Bilimbi name for
+  `permission`; it accepts a string or an any-of requirement as documented
+  by `Bilimbi.Base.Menu.Capability`.
   `source` records the contributing module descriptor id (e.g. `core/user`).
   """
 
@@ -16,7 +17,7 @@ defmodule Bilimbi.Base.Menu.Item do
           label: String.t(),
           icon: String.t() | nil,
           route: String.t() | nil,
-          capability: String.t() | nil,
+          capability: Bilimbi.Base.Menu.Capability.t(),
           parent: String.t() | nil,
           source: String.t() | nil,
           order: integer()
@@ -47,8 +48,9 @@ defmodule Bilimbi.Base.Menu.Item do
       raise ArgumentError, "menu item #{item.id} needs a non-empty label"
     end
 
-    unless is_nil(item.capability) or is_binary(item.capability) do
-      raise ArgumentError, "menu item #{item.id} capability must be a string or nil"
+    unless Bilimbi.Base.Menu.Capability.valid?(item.capability) do
+      raise ArgumentError,
+            "menu item #{item.id} capability must be a string, nil, or {:any_of, non-empty distinct strings}"
     end
 
     unless is_nil(item.route) or is_binary(item.route) do

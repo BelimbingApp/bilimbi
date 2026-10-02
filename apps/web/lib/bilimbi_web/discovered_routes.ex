@@ -116,7 +116,7 @@ defmodule BilimbiWeb.DiscoveredRoutes do
 
         quote do
           pipeline unquote(name) do
-            plug :require_capability, unquote(capability)
+            plug :require_capability, unquote(Macro.escape(capability))
           end
 
           scope "/" do

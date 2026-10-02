@@ -35,6 +35,37 @@ defmodule BilimbiWeb.SystemMenuInspectorLiveTest do
     assert has_element?(view, "#nav-admin-system-menu-inspector[aria-current='page']")
   end
 
+  test "formats and searches any-of leaves and shows the second grant as allowed", %{conn: conn} do
+    alias Bilimbi.Base.Menu.Item
+    alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
+
+    grant_capabilities!(["admin.system.menu-inspector.view", "admin.company.list"])
+    snapshot = ContributionRegistry.snapshot!()
+    on_exit(fn -> ContributionRegistry.put_snapshot_for_test!(snapshot) end)
+
+    item =
+      Item.new!(%{
+        id: "anyof",
+        label: "Combined",
+        route: "/companies",
+        capability: {:any_of, ["admin.user.list", "admin.company.list"]}
+      })
+
+    snapshot = put_in(snapshot.consumers.menu, [item | snapshot.consumers.menu])
+    ContributionRegistry.put_snapshot_for_test!(snapshot)
+
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/menu-inspector?search=anyof")
+    assert has_element?(view, "#menu-inspector", "admin.user.list or admin.company.list")
+    assert has_element?(view, "#menu-inspector tr td:last-child", "yes")
+    assert has_element?(view, "#nav-anyof")
+
+    view
+    |> form("#menu-inspector-filters", %{"filters" => %{"search" => "admin.user.list"}})
+    |> render_change()
+
+    assert has_element?(view, "#menu-inspector", "Combined")
+  end
+
   test "search narrows by id, label, or source", %{conn: conn} do
     grant_capabilities!("admin.system.menu-inspector.view")
 
