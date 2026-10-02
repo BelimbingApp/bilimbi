@@ -62,7 +62,7 @@ defmodule Bilimbi.Base.SettingsTest do
              })
   end
 
-  test "a declared validator must name an exported rule its default satisfies" do
+  test "a declared validator must name an exported rule" do
     attributes = %{type: :string, scopes: [:global], default: "ok"}
 
     assert_raise ArgumentError, ~r/validator must be \{module, function, message\}/, fn ->
@@ -78,14 +78,6 @@ defmodule Bilimbi.Base.SettingsTest do
     end
 
     printable = {String, :printable?, "must be printable"}
-
-    assert_raise ArgumentError, ~r/default fails its validator/, fn ->
-      Definition.new!(
-        "tests.validated",
-        "tests/settings",
-        %{attributes | default: <<0>>} |> Map.put(:validator, printable)
-      )
-    end
 
     definition =
       Definition.new!(

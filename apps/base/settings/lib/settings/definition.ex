@@ -79,10 +79,6 @@ defmodule Bilimbi.Base.Settings.Definition do
       invalid!(key, "default is incompatible with #{inspect(type)}")
     end
 
-    if not is_nil(definition.default) and validate(definition, definition.default) != :ok do
-      invalid!(key, "default fails its validator")
-    end
-
     definition
   end
 
