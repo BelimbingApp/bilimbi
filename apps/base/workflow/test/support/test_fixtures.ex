@@ -40,9 +40,9 @@ defmodule Bilimbi.Base.Workflow.TestFixtures do
   def entry,
     do: %{
       descriptor: %{
-        id: "base/workflow",
+        id: "domain/example",
         otp_app: :bilimbi_base_workflow,
-        dependencies: [],
+        dependencies: ["base/workflow"],
         graph_fingerprint: "workflow-test",
         contribution_provider: TestContributions
       },

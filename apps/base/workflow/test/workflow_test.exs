@@ -239,7 +239,7 @@ defmodule Bilimbi.Base.WorkflowTest do
       Repo,
       """
       INSERT INTO base_workflow_subject_bindings (tenant_id, flow, flow_id, subject_type, subject_id, owner, created_at)
-      VALUES (2, 'example_flow', $1, 'example.record', $2, 'base/workflow', now())
+      VALUES (2, 'example_flow', $1, 'example.record', $2, 'domain/example', now())
       """,
       [subject.id, to_string(subject.id)]
     )
@@ -304,7 +304,7 @@ defmodule Bilimbi.Base.WorkflowTest do
       Repo,
       """
       INSERT INTO base_workflow_subject_bindings (tenant_id, flow, flow_id, subject_type, subject_id, owner, created_at)
-      VALUES (1, 'earlier_flow', $1, 'example.record', $2, 'base/workflow', now())
+      VALUES (1, 'earlier_flow', $1, 'example.record', $2, 'domain/example', now())
       """,
       [subject.id, to_string(subject.id)]
     )

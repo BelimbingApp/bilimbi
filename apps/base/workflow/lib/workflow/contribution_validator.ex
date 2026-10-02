@@ -19,9 +19,8 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
   end
 
   defp collect!(%{descriptor: descriptor, payload: payload}, registry) do
-    unless "base/workflow" in Map.get(descriptor, :dependencies, []) or
-             descriptor.id == "base/workflow",
-           do: invalid!("#{descriptor.id} must declare base/workflow")
+    unless "base/workflow" in Map.get(descriptor, :dependencies, []),
+      do: invalid!("#{descriptor.id} must declare base/workflow")
 
     keys!(payload, [:subjects, :guards, :actions, :flows])
 

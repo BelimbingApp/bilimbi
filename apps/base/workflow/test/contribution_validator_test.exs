@@ -5,7 +5,7 @@ defmodule Bilimbi.Base.Workflow.ContributionValidatorTest do
 
   test "snapshot consumes definitions with owner provenance" do
     snapshot = ContributionRegistry.build!([TestFixtures.entry().descriptor])
-    assert snapshot.consumers.workflow.subjects["example.record"].owner == "base/workflow"
+    assert snapshot.consumers.workflow.subjects["example.record"].owner == "domain/example"
     assert snapshot.consumers.workflow.flows["example_flow"].subject == "example.record"
 
     assert snapshot.consumers.workflow.aliases[{:guards, "Legacy\\Example\\Guard"}] ==
@@ -35,7 +35,7 @@ defmodule Bilimbi.Base.Workflow.ContributionValidatorTest do
       ContributionValidator.validate_contributions!([bad])
     end
 
-    bad = put_in(entry.descriptor.id, "domain/example")
+    bad = put_in(entry.descriptor.dependencies, [])
 
     assert_raise ArgumentError, ~r/must declare base\/workflow/, fn ->
       ContributionValidator.validate_contributions!([bad])
