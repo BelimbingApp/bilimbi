@@ -26,7 +26,7 @@ defmodule Bilimbi.Umbrella.MixProject do
 
   def cli do
     [
-      preferred_envs: [precommit: :test]
+      preferred_envs: [precommit: :test, "precommit.test": :test]
     ]
   end
 
@@ -82,23 +82,37 @@ defmodule Bilimbi.Umbrella.MixProject do
     Mix.Task.run("deps.get")
   end
 
-  defp precommit_test(_args) do
+  defp precommit_test(args) do
     mix = System.find_executable("mix") || Mix.raise("could not find mix executable")
-    containers = ["apps/core", "apps/base", "apps/web"] ++ module_paths([:domain, :extension])
+
+    # Each package still owns its helper, OTP state, and test VM. Run packages
+    # directly so every one receives profiling flags, rather than a container
+    # alias forwarding them only to its last child. Keep execution serial:
+    # compatibility tests mount source and refresh the shared build graph.
+    projects =
+      module_paths([:core]) ++
+        module_paths([:base]) ++ ["apps/web"] ++ module_paths([:domain, :extension])
 
     _ =
-      Enum.reduce_while(containers, containers, fn container, remaining ->
-        Mix.shell().info("==> #{container}")
+      Enum.reduce_while(projects, projects, fn project, remaining ->
+        Mix.shell().info("==> #{project}")
+        started = System.monotonic_time(:millisecond)
 
-        case System.cmd(mix, ["test"],
-               cd: Path.expand(container, __DIR__),
-               into: IO.stream(:stdio, :line),
-               stderr_to_stdout: true
-             ) do
-          {_output, 0} ->
+        {_output, status} =
+          System.cmd(mix, ["test" | args],
+            cd: Path.expand(project, __DIR__),
+            into: IO.stream(:stdio, :line),
+            stderr_to_stdout: true
+          )
+
+        elapsed = (System.monotonic_time(:millisecond) - started) / 1_000
+        Mix.shell().info("Finished #{project} in #{Float.round(elapsed, 2)}s (exit #{status})")
+
+        case status do
+          0 ->
             {:cont, tl(remaining)}
 
-          {_output, status} ->
+          status ->
             report_skipped_precommit_tests(tl(remaining))
             exit({:shutdown, status})
         end
@@ -171,7 +185,7 @@ defmodule Bilimbi.Umbrella.MixProject do
 
   defp report_skipped_precommit_tests(skipped) do
     Mix.shell().error("""
-    Precommit stopped before running these test containers:
+    Precommit stopped before running these test projects:
     #{Enum.map_join(skipped, "\n", &"  - #{&1}")}
     """)
   end

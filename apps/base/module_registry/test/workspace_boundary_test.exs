@@ -70,7 +70,7 @@ defmodule Bilimbi.Base.ModuleRegistry.WorkspaceBoundaryTest do
     mounted_roots =
       web_root
       |> MixDiscovery.optional_container_dependencies()
-      |> Enum.map(fn {_app, path: path} -> Path.expand(path, web_root) end)
+      |> Enum.map(fn {_app, options} -> Path.expand(Keyword.fetch!(options, :path), web_root) end)
 
     host_apps =
       [@base_root, @core_root | mounted_roots]

@@ -146,7 +146,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     |> discover_workspace!()
     |> Enum.filter(&(&1.container_path == container_root))
     |> Enum.map(fn descriptor ->
-      {descriptor.otp_app, path: Path.relative_to(descriptor.path, container_root)}
+      local_dependency(descriptor.otp_app, Path.relative_to(descriptor.path, container_root))
     end)
   end
 
@@ -170,8 +170,10 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     |> discover_containers!()
     |> Enum.reject(&(&1.layer in @platform_layers))
     |> Enum.map(fn container ->
-      {String.to_atom(container.id),
-       path: Path.relative_to(container.path, project_root, force: true)}
+      local_dependency(
+        String.to_atom(container.id),
+        Path.relative_to(container.path, project_root, force: true)
+      )
     end)
   end
 
@@ -232,8 +234,19 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
     modules
     |> Enum.filter(&MapSet.member?(dependency_ids, &1.id))
     |> Enum.map(fn dependency ->
-      {dependency.otp_app, path: Path.relative_to(dependency.path, module_root)}
+      local_dependency(dependency.otp_app, Path.relative_to(dependency.path, module_root))
     end)
+  end
+
+  # All local packages share _build/<env>. Mix defaults path dependencies to
+  # :prod, even in _build/test, which drops test/support and recompiles them
+  # whenever they alternate between a dependency and the project under test.
+  # Propagate :test through the entire local closure so those builds agree.
+  # Other environments keep Mix's production dependency default.
+  defp local_dependency(app, path) do
+    options = [path: path]
+    options = if Mix.env() == :test, do: options ++ [env: :test], else: options
+    {app, options}
   end
 
   @doc "Returns application metadata generated from the module descriptor."
@@ -266,19 +279,28 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   end
 
   defp workspace_fingerprint(workspace_root, modules) do
-    descriptor_files =
+    container_files =
       [
         Path.join(workspace_root, "apps/*/#{@container_file}"),
-        Path.join(workspace_root, "apps/*/*/#{@module_file}"),
-        Path.join(workspace_root, "apps/*/*/priv/web_routes.exs"),
-        Path.join(workspace_root, "apps/{domains,extensions}/*/#{@container_file}"),
-        Path.join(workspace_root, "apps/{domains,extensions}/*/*/#{@module_file}"),
-        Path.join(workspace_root, "apps/{domains,extensions}/*/*/priv/web_routes.exs"),
-        Path.join(workspace_root, "apps/web/priv/web_routes.exs")
+        Path.join(workspace_root, "apps/{domains,extensions}/*/#{@container_file}")
       ]
       |> Enum.flat_map(&Path.wildcard/1)
-      |> Enum.uniq()
-      |> Enum.sort()
+
+    # Discovery already validated every module and route path. Use those paths
+    # instead of walking the module tree again for every .app and graph marker.
+    # Declared routes need not use the conventional priv/web_routes.exs name.
+    module_files =
+      Enum.flat_map(modules, fn descriptor ->
+        files = [Path.join(descriptor.path, @module_file)]
+
+        case descriptor.web do
+          nil -> files
+          path -> [Path.join(descriptor.path, path) | files]
+        end
+      end)
+
+    host_file = Path.join(workspace_root, "apps/web/priv/web_routes.exs")
+    host_files = if File.regular?(host_file), do: [host_file], else: []
 
     migration_files =
       modules
@@ -292,7 +314,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
         end
       end)
 
-    files = Enum.sort(Enum.uniq(descriptor_files ++ migration_files))
+    files = Enum.sort(Enum.uniq(container_files ++ module_files ++ host_files ++ migration_files))
 
     # The metadata this file writes into every .app is part of the graph too:
     # hashing its own source makes a change to that shape rewrite every
@@ -578,13 +600,7 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   end
 
   defp evaluate_descriptor!(path, label) do
-    source = File.read!(path)
-    key = {__MODULE__, :literal_descriptor, path}
-
-    case Process.get(key) do
-      {^source, value} -> value
-      _other -> evaluate_descriptor_source!(source, path, key)
-    end
+    evaluate_plain_data!(path)
   rescue
     error ->
       reraise ArgumentError,
@@ -596,10 +612,20 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   end
 
   # Mix calls project/application repeatedly for every reloadable path package.
-  # Reuse only plain literal descriptors; executable descriptors still evaluate
+  # Reuse only plain literal data; executable source still evaluates
   # every time. Read the bytes on every call (not just mtime), and always run the
   # graph, directory and migration validation outside this tiny parse cache.
-  defp evaluate_descriptor_source!(source, path, key) do
+  defp evaluate_plain_data!(path) do
+    source = File.read!(path)
+    key = {__MODULE__, :literal_data, path}
+
+    case Process.get(key) do
+      {^source, value} -> value
+      _other -> evaluate_plain_data_source!(source, path, key)
+    end
+  end
+
+  defp evaluate_plain_data_source!(source, path, key) do
     quoted =
       source
       |> Code.string_to_quoted!(file: path)
@@ -949,11 +975,11 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscovery do
   defp valid_optional_module?(_module), do: false
 
   defp eval_routes!(path) do
-    case Code.eval_file(path) do
-      {routes, _binding} when is_list(routes) ->
+    case evaluate_plain_data!(path) do
+      routes when is_list(routes) ->
         routes
 
-      {_other, _binding} ->
+      _other ->
         raise ArgumentError, "route data file #{path} must return a list of maps"
     end
   end
