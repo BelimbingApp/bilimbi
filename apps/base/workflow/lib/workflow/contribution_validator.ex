@@ -183,8 +183,7 @@ defmodule Bilimbi.Base.Workflow.ContributionValidator do
   end
 
   defp validate_flow_links!(registry, flow) do
-    subject = owned!(registry.subjects, flow.subject, flow.owner)
-    _ = subject
+    owned!(registry.subjects, flow.subject, flow.owner)
     codes = Enum.map(flow.statuses, & &1.code)
 
     for edge <- flow.transitions do
