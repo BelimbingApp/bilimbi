@@ -5,6 +5,18 @@ defmodule Bilimbi.Base.ModuleRegistry.CompositionLockTest do
   Code.require_file(@helper)
 
   setup do
+    # Synthetic compositions derive their own locks; pinned subprocesses opt in explicitly.
+    pinned = System.get_env("BILIMBI_COMPOSITION_PINNED")
+    System.delete_env("BILIMBI_COMPOSITION_PINNED")
+
+    on_exit(fn ->
+      if pinned == nil do
+        System.delete_env("BILIMBI_COMPOSITION_PINNED")
+      else
+        System.put_env("BILIMBI_COMPOSITION_PINNED", pinned)
+      end
+    end)
+
     root = Path.join(System.tmp_dir!(), "bilimbi-lock-#{System.unique_integer([:positive])}")
     File.mkdir_p!(root)
     File.write!(Path.join(root, "mix.lock"), "%{}\n")
