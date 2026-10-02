@@ -1,4 +1,6 @@
 defmodule Bilimbi.Domain.HookFixture.Web.Clash do
+  @moduledoc false
+
   use Phoenix.Component
 
   def first(assigns) do

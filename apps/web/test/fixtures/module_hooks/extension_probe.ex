@@ -1,4 +1,6 @@
 defmodule Bilimbi.Extension.HookFixture.Web.Probe do
+  @moduledoc false
+
   use Phoenix.Component
 
   def render(assigns) do
