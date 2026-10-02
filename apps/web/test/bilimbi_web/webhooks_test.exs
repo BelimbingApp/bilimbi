@@ -10,8 +10,8 @@ defmodule BilimbiWeb.WebhooksTest do
     :ok
   end
 
-  defp machine_conn do
-    build_conn()
+  defp machine_conn(remote_ip \\ {127, 0, 0, 1}) do
+    %{build_conn() | remote_ip: remote_ip}
     |> put_private(:plug_skip_csrf_protection, false)
     |> put_req_header("content-type", "application/json")
   end
@@ -28,6 +28,16 @@ defmodule BilimbiWeb.WebhooksTest do
       Enum.reduce(headers, conn, fn {key, value}, conn -> put_req_header(conn, key, value) end)
 
     post(conn, "/webhooks/test-example", body)
+  end
+
+  # Closes the open admission window, writing its aggregated refusal rows.
+  defp close_window do
+    send(WebhookRateLimit, :close)
+    _ = :sys.get_state(WebhookRateLimit)
+  end
+
+  defp audit_payloads do
+    "webhook.delivery" |> Bilimbi.Base.Audit.TestFixtures.action_payloads() |> List.flatten()
   end
 
   test "endpoint preserves exact JSON bytes, bypasses CSRF and does not decode" do
@@ -65,7 +75,7 @@ defmodule BilimbiWeb.WebhooksTest do
     refute_received {:webhook_body, _}
   end
 
-  test "actual byte size is bounded regardless of content length and setting changes apply immediately" do
+  test "actual byte size is bounded regardless of content length" do
     assert {:ok, _} = Settings.put("webhooks.max_bytes", 3)
     assert response(delivery("123"), 202)
     assert_received {:webhook_body, "123"}
@@ -73,20 +83,61 @@ defmodule BilimbiWeb.WebhooksTest do
     refute_received {:webhook_body, "1234"}
   end
 
-  test "refusals consume the same atomic per-handler rate window" do
+  test "a flood of unsigned requests does not refuse a genuine signed delivery" do
     assert {:ok, _} = Settings.put("webhooks.rate_limit", 1)
-    bad = post(machine_conn(), "/webhooks/test-example", "{}")
-    assert response(bad, 403)
+    assert {:ok, _} = Settings.put("webhooks.sender_rate_limit", 2)
+    assert {:ok, _} = Settings.put("webhooks.failure_limit", 1)
+
+    for host <- 1..10, _attempt <- 1..3 do
+      conn = post(machine_conn({10, 0, 0, host}), "/webhooks/test-example", "{}")
+      assert response(conn, 403)
+    end
+
+    assert response(delivery("{}"), 202)
+    assert_received {:webhook_body, "{}"}
     assert response(delivery("{}"), 403)
     refute_received {:webhook_body, _}
+
+    per_attempt = audit_payloads()
+    close_window()
+    aggregated = audit_payloads() -- per_attempt
+
+    assert Enum.frequencies_by(per_attempt, & &1["reason"]) ==
+             %{"verification_refused" => 1, "accepted" => 1}
+
+    assert Enum.sort_by(aggregated, & &1["reason"]) == [
+             %{
+               "handler" => "test-example",
+               "reason" => "rate_limited",
+               "result" => "refused",
+               "count" => 11
+             },
+             %{
+               "handler" => "test-example",
+               "reason" => "verification_refused",
+               "result" => "refused",
+               "count" => 19
+             }
+           ]
+  end
+
+  test "settings are read once per window" do
+    assert response(delivery("{}"), 202)
+    assert {:ok, _} = Settings.put("webhooks.rate_limit", 1)
+    assert response(delivery("{}"), 202)
+    close_window()
+    assert response(delivery("{}"), 202)
+    assert response(delivery("{}"), 403)
   end
 
   test "audit records accepted and refused deliveries without signature, body or callback data" do
     body = "secret body"
     assert response(delivery(body), 202)
     assert response(post(machine_conn(), "/webhooks/untrusted-name", body), 403)
-    rows = Bilimbi.Base.Audit.TestFixtures.action_payloads("webhook.delivery")
-    assert [[accepted], [refused]] = rows
+    assert response(post(machine_conn(), "/webhooks/other-name", body), 403)
+    assert [accepted] = audit_payloads()
+    close_window()
+    assert [^accepted, refused] = audit_payloads()
 
     assert accepted == %{
              "handler" => "test-example",
@@ -97,7 +148,8 @@ defmodule BilimbiWeb.WebhooksTest do
     assert refused == %{
              "handler" => "unknown",
              "reason" => "unknown_handler",
-             "result" => "refused"
+             "result" => "refused",
+             "count" => 2
            }
   end
 
@@ -129,16 +181,21 @@ defmodule BilimbiWeb.WebhooksTest do
     assert response(BilimbiWeb.Webhooks.deliver(conn, "test-example"), 202)
     assert_received {:webhook_body, ^body}
     assert {:ok, _} = Settings.put("webhooks.max_bytes", 4)
+    close_window()
     assert response(BilimbiWeb.Webhooks.deliver(conn, "test-example"), 403)
     refute_received {:webhook_body, _}
   end
 
   test "atomic limiter admits exactly the configured count under concurrent requests" do
+    assert {:ok, _} = Settings.put("webhooks.sender_rate_limit", 5)
+
     results =
       1..40
-      |> Task.async_stream(fn _ -> WebhookRateLimit.admit("test-example", 5, 60_000) end)
+      |> Task.async_stream(fn _ ->
+        WebhookRateLimit.admit_sender("test-example", {127, 0, 0, 1})
+      end)
       |> Enum.map(fn {:ok, value} -> value end)
 
-    assert Enum.count(results, &(&1 == :ok)) == 5
+    assert Enum.count(results, &match?({:ok, _}, &1)) == 5
   end
 end

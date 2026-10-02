@@ -13,10 +13,12 @@ defmodule BilimbiWeb.Webhooks do
 
   Never decode, log or audit bodies, headers, signatures, callback errors or
   verified context here. Refusals expose one fixed response. Audit records use
-  only registered identifiers and host-owned reason codes.
+  only registered identifiers and host-owned reason codes. Admission and
+  aggregated refusal records belong to `BilimbiWeb.WebhookRateLimit`.
   """
   import Plug.Conn
-  alias Bilimbi.Base.{Audit, Settings}
+  alias Bilimbi.Base.Audit
+  alias BilimbiWeb.WebhookRateLimit
 
   @manifest_path Path.expand(
                    "../../../../_build/#{Application.compile_env!(:web, :mix_env)}/bilimbi_routes.exs",
@@ -44,73 +46,77 @@ defmodule BilimbiWeb.Webhooks do
   end
 
   def deliver(conn, identifier) do
-    registration = Map.get(@registrations, identifier)
-    outcome = attempt(conn, registration)
-    {conn, result} = outcome
-    id = if registration, do: identifier, else: "unknown"
+    handler = if Map.has_key?(@registrations, identifier), do: identifier, else: "unknown"
+    {conn, result, record} = attempt(conn, Map.get(@registrations, identifier))
 
-    case audit(conn, id, result) do
-      {:ok, _} -> respond(conn, result)
-      {:error, _} -> respond(conn, :audit_unavailable)
-    end
+    if record == :aggregated or match?({:ok, _}, audit(conn, handler, result)),
+      do: respond(conn, result),
+      else: respond(conn, :audit_unavailable)
   end
 
   defp attempt(conn, nil) do
-    result =
-      case admit(:unknown) do
-        :ok -> :unknown_handler
-        {:error, :rate_limited} -> :rate_limited
-      end
-
-    {conn, result}
+    :ok = WebhookRateLimit.refuse("unknown", :unknown_handler)
+    {conn, :unknown_handler, :aggregated}
   rescue
-    _ -> {conn, :host_unavailable}
+    _ -> {conn, :host_unavailable, :audit}
   catch
-    :exit, _ -> {conn, :host_unavailable}
+    :exit, _ -> {conn, :host_unavailable, :audit}
   end
 
   defp attempt(conn, registration) do
-    with :ok <- admit(registration.webhook),
-         {:ok, body, conn} <- read_body(conn, Settings.get("webhooks.max_bytes"), []) do
-      request = %{
-        body: body,
-        headers: conn.req_headers,
-        remote_ip: conn.remote_ip,
-        method: conn.method
-      }
-
-      result =
-        with {:ok, context} <- callback(registration.verify, [request]),
-             :ok <- callback(registration.handle, [request, context]) do
-          :accepted
-        else
-          _ -> :callback_refused
-        end
-
-      {conn, result}
-    else
-      {:error, reason, conn} -> {conn, reason}
-      {:error, :rate_limited} -> {conn, :rate_limited}
+    case WebhookRateLimit.admit_sender(registration.webhook, conn.remote_ip) do
+      {:ok, settings} -> verify(conn, registration, settings)
+      {:error, :rate_limited} -> {conn, :rate_limited, :aggregated}
     end
   rescue
-    _ -> {conn, :host_unavailable}
+    _ -> {conn, :host_unavailable, :audit}
   catch
-    :exit, _ -> {conn, :host_unavailable}
+    :exit, _ -> {conn, :host_unavailable, :audit}
   end
 
-  defp admit(identifier) do
-    BilimbiWeb.WebhookRateLimit.admit(
-      identifier,
-      Settings.get("webhooks.rate_limit"),
-      Settings.get("webhooks.window_ms")
-    )
+  defp verify(conn, registration, settings) do
+    case read_body(conn, settings, settings.max_bytes, []) do
+      {:ok, body, conn} ->
+        request = %{
+          body: body,
+          headers: conn.req_headers,
+          remote_ip: conn.remote_ip,
+          method: conn.method
+        }
+
+        case callback(registration.verify, [request]) do
+          {:ok, context} -> handle(conn, registration, request, context)
+          _ -> failed(conn, registration, :verification_refused)
+        end
+
+      {:error, reason, conn} ->
+        failed(conn, registration, reason)
+    end
   end
 
-  defp read_body(conn, remaining, chunks) do
+  defp handle(conn, registration, request, context) do
+    case WebhookRateLimit.admit_verified(registration.webhook) do
+      :ok ->
+        result =
+          if callback(registration.handle, [request, context]) == :ok,
+            do: :accepted,
+            else: :handler_refused
+
+        {conn, result, :audit}
+
+      {:error, :rate_limited} ->
+        {conn, :rate_limited, :aggregated}
+    end
+  end
+
+  defp failed(conn, registration, reason),
+    do: {conn, reason, WebhookRateLimit.record_failure(registration.webhook, reason)}
+
+  defp read_body(conn, settings, remaining, chunks) do
     case Plug.Conn.read_body(conn,
            length: remaining + 1,
            read_length: remaining + 1,
-           read_timeout: Settings.get("webhooks.read_timeout_ms")
+           read_timeout: settings.read_timeout_ms
          ) do
       {status, chunk, conn} when status in [:ok, :more] ->
         remaining = remaining - byte_size(chunk)
@@ -118,7 +124,7 @@ defmodule BilimbiWeb.Webhooks do
         cond do
           remaining < 0 -> {:error, :body_too_large, conn}
           status == :ok -> {:ok, IO.iodata_to_binary(Enum.reverse([chunk | chunks])), conn}
-          true -> read_body(conn, remaining, [chunk | chunks])
+          true -> read_body(conn, settings, remaining, [chunk | chunks])
         end
 
       {:error, _} ->
@@ -136,7 +142,7 @@ defmodule BilimbiWeb.Webhooks do
     _, _ -> {:error, :callback_failed}
   end
 
-  defp audit(conn, id, result) do
+  defp audit(conn, handler, result) do
     Audit.record_action(:unscoped, %{
       actor_type: "guest",
       actor_id: 0,
@@ -145,7 +151,7 @@ defmodule BilimbiWeb.Webhooks do
       occurred_at: NaiveDateTime.utc_now(),
       is_retained: false,
       payload: %{
-        "handler" => id,
+        "handler" => handler,
         "reason" => Atom.to_string(result),
         "result" => if(result == :accepted, do: "succeeded", else: "refused")
       }

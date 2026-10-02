@@ -41,7 +41,11 @@ defmodule Bilimbi.Base.Settings.Contributions do
         {"max_bytes", 1_048_576, 67_108_864, "Webhook body limit",
          "Maximum bytes per inbound webhook."},
         {"rate_limit", 120, 1_000_000, "Webhook delivery limit",
-         "Maximum deliveries per registered handler per window, on each host node."},
+         "Maximum verified deliveries per registered handler per window, on each host node."},
+        {"sender_rate_limit", 120, 1_000_000, "Webhook sender limit",
+         "Maximum attempts per sender address per registered handler per window, on each host node, before verification."},
+        {"failure_limit", 60, 1_000_000, "Webhook failure audit limit",
+         "Failed attempts per registered handler per window audited individually; later failures are counted in one audit row when the window closes."},
         {"window_ms", 60_000, 3_600_000, "Webhook rate window", "Rate window in milliseconds."},
         {"read_timeout_ms", 15_000, 120_000, "Webhook read timeout",
          "Maximum wait in milliseconds for each body read."}
