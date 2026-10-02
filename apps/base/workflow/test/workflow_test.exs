@@ -250,6 +250,71 @@ defmodule Bilimbi.Base.WorkflowTest do
     assert {:ok, %{entries: []}} = Workflow.history(scope, subject)
   end
 
+  test "transition tat skips recorded comments but not legacy facts", %{
+    scope: scope,
+    subject: subject
+  } do
+    assert {:ok, initial} = Workflow.record_initial(scope, subject)
+
+    SQL.query!(
+      Repo,
+      "UPDATE base_workflow_status_history SET transitioned_at = transitioned_at - interval '1 hour' WHERE id = $1",
+      [initial.id]
+    )
+
+    assert {:ok, comment} = Workflow.record_comment(scope, subject, %{comment: "A note"})
+    assert is_nil(comment.tat)
+    assert {:ok, %{history: history}} = Workflow.transition(scope, subject, "review")
+    assert history.tat >= 3600
+
+    other = subject!()
+    now = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+    SQL.query!(
+      Repo,
+      """
+      INSERT INTO base_workflow_status_history (flow, flow_id, status, metadata, transitioned_at)
+      VALUES ('example_flow', $1, 'draft', '{"note":true}', $2),
+             ('example_flow', $1, 'draft', NULL, $3)
+      """,
+      [other.id, NaiveDateTime.add(now, -3600), now]
+    )
+
+    assert {:ok, _} = Workflow.adopt_subject(scope, other)
+    assert {:ok, %{history: legacy}} = Workflow.transition(scope, other, "review")
+    assert legacy.tat < 3600
+  end
+
+  test "an inactive current status lists no transitions", %{scope: scope, subject: subject} do
+    SQL.query!(
+      Repo,
+      "UPDATE base_workflow_status_configs SET is_active = false WHERE code = 'draft'",
+      []
+    )
+
+    assert {:ok, []} = Workflow.available_transitions(scope, subject)
+    assert {:error, :invalid_edge} = Workflow.transition(scope, subject, "closed")
+  end
+
+  test "a subject bound under another flow refuses instead of raising", %{
+    scope: scope,
+    subject: subject
+  } do
+    SQL.query!(
+      Repo,
+      """
+      INSERT INTO base_workflow_subject_bindings (tenant_id, flow, flow_id, subject_type, subject_id, owner, created_at)
+      VALUES (1, 'earlier_flow', $1, 'example.record', $2, 'base/workflow', now())
+      """,
+      [subject.id, to_string(subject.id)]
+    )
+
+    assert {:error, :subject_binding_conflict} = Workflow.adopt_subject(scope, subject)
+    assert {:error, :subject_binding_conflict} = Workflow.transition(scope, subject, "closed")
+    assert state(subject.id).status == "draft"
+    assert Repo.all(HistorySchema) == []
+  end
+
   test "impersonation remains attributed", %{system: system, subject: subject} do
     scope =
       Authentication.sign_in(system, 7, 10,

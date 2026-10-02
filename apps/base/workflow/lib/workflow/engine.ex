@@ -87,9 +87,13 @@ defmodule Bilimbi.Base.Workflow.Engine do
     with {:ok, ref} <- Definitions.subject(ref),
          {:ok, subject} <- load(scope, ref, :read, :read),
          {:ok, _flow} <- Definitions.flow(ref, :read) do
+      candidates =
+        if Definitions.status?(ref.flow, subject.status, :read),
+          do: Definitions.edges(ref.flow, subject.status, :read),
+          else: []
+
       edges =
-        Definitions.edges(ref.flow, subject.status, :read)
-        |> Enum.flat_map(fn stored ->
+        Enum.flat_map(candidates, fn stored ->
           with {:ok, edge} <- normalize_edge(ref, stored),
                true <- Definitions.status?(ref.flow, edge.to, :read),
                :ok <- capability(scope, ref, subject, edge.capability) do
@@ -234,22 +238,24 @@ defmodule Bilimbi.Base.Workflow.Engine do
       created_at: now()
     }
 
-    Repo.insert_all(BindingSchema, [attrs],
-      on_conflict: :nothing,
-      conflict_target: [:flow, :flow_id]
-    )
+    Repo.insert_all(BindingSchema, [attrs], on_conflict: :nothing)
 
     binding =
-      Repo.one!(
+      Repo.one(
         from b in BindingSchema,
           where: b.flow == ^ref.flow and b.flow_id == ^ref.id,
           lock: "FOR UPDATE"
       )
 
-    if binding.tenant_id == attrs.tenant_id and binding.subject_type == ref.type and
-         binding.subject_id == attrs.subject_id and binding.owner == ref.owner,
-       do: :ok,
-       else: {:error, :subject_binding_conflict}
+    case binding do
+      %{tenant_id: tenant_id, subject_type: type, subject_id: id, owner: owner}
+      when tenant_id == attrs.tenant_id and type == ref.type and id == attrs.subject_id and
+             owner == ref.owner ->
+        :ok
+
+      _ ->
+        {:error, :subject_binding_conflict}
+    end
   end
 
   defp record_allowed(ref, subject, :record_initial, _context) do
@@ -265,23 +271,28 @@ defmodule Bilimbi.Base.Workflow.Engine do
 
   defp record_allowed(_ref, _subject, :record_comment, _context), do: {:error, :comment_required}
 
-  defp latest(ref),
+  defp latest(ref), do: Repo.one(latest_query(ref))
+
+  defp tat_anchor(ref),
     do:
       Repo.one(
-        from h in HistorySchema,
-          where: h.flow == ^ref.flow and h.flow_id == ^ref.id,
-          order_by: [desc: h.transitioned_at, desc: h.id],
-          limit: 1
+        from h in latest_query(ref),
+          where:
+            fragment("(?->'_workflow'->>'kind') IS DISTINCT FROM 'record_comment'", h.metadata)
       )
+
+  defp latest_query(ref) do
+    from h in HistorySchema,
+      where: h.flow == ^ref.flow and h.flow_id == ^ref.id,
+      order_by: [desc: h.transitioned_at, desc: h.id],
+      limit: 1
+  end
 
   defp append(scope, ref, subject, status, kind, context) do
     actor = Scope.actor(scope)
     time = now()
-    previous = latest(ref)
-
-    tat =
-      if kind == :transition and previous,
-        do: max(0, NaiveDateTime.diff(time, previous.transitioned_at))
+    previous = if kind == :transition, do: tat_anchor(ref)
+    tat = if previous, do: max(0, NaiveDateTime.diff(time, previous.transitioned_at))
 
     provenance = %{
       "subject_type" => ref.type,

@@ -42,10 +42,16 @@ sealed actor/subject attribution. Tenant/actor claims are rejected. All refusal
 results roll back status, hook effects, bindings, history and the semantic Audit
 fact. Owner policy must separately refuse system principals on human approvals.
 
-`available_transitions/2` lists active edges whose capability and adapters are
-available. Context-dependent guards run only during execution; availability is
+`available_transitions/2` lists active edges between active statuses whose
+capability and adapters are available. Context-dependent guards run only during execution; availability is
 not authorization to perform a transition. `record_initial/3` refuses existing
 history; `record_comment/3` appends a same-status fact without a state change.
+A transition fact's `tat` is the whole seconds since the subject's latest earlier
+history fact, skipping only facts whose `_workflow.kind` provenance is
+`record_comment`. Legacy facts carry no such provenance and always count, so a
+legacy same-status note restarts the measure. `tat` is `nil` on the first
+transition without earlier history and on `record_initial/3` or
+`record_comment/3` facts.
 `history/3` returns `%{entries: facts, next_cursor: cursor}`, ordered oldest first
 by timestamp then id. Pass `after: cursor` and `limit: 1..500` (default 50).
 Historical nullable actors, agent IDs, JSON arrays and inactive status codes are
