@@ -62,7 +62,8 @@ defmodule Bilimbi.Base.Settings.Form do
   def secret_mask, do: "••••••••"
 
   @doc """
-  Every editable field in `groups`, ordered by group then key.
+  Every editable field in `groups` with an allowed scope in the lookup chain,
+  ordered by group then key.
 
   Ordering is by group first so a screen can render each group as its own tab
   or section in the order it asked for them, and by key within a group so the
@@ -76,7 +77,10 @@ defmodule Bilimbi.Base.Settings.Form do
     |> Enum.with_index()
     |> Enum.flat_map(fn {group, position} ->
       definitions
-      |> Enum.filter(fn {_key, definition} -> definition.editable == group end)
+      |> Enum.filter(fn {_key, definition} ->
+        definition.editable == group and
+          Enum.any?(Scope.chain(scope), &Definition.allows_scope?(definition, &1))
+      end)
       |> Enum.sort_by(fn {key, _definition} -> key end)
       |> Enum.map(fn {key, definition} -> {position, build_field(key, definition, scope)} end)
     end)

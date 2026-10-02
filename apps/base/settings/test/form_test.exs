@@ -44,6 +44,12 @@ defmodule Bilimbi.Base.Settings.FormTest do
       assert Form.fields(["nope"], @user) == []
     end
 
+    test "omits definitions with no allowed scope in the lookup chain" do
+      fields = Form.fields(["profile", "appearance"], nil)
+      assert Enum.map(fields, & &1.key) == ["tests.theme"]
+      assert Form.fields(["appearance"], Scope.company(20)) == []
+    end
+
     test "groups/0 lists what screens may ask for" do
       assert Form.groups() == ["appearance", "operator", "profile"]
     end

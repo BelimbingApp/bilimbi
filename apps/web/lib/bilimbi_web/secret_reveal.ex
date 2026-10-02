@@ -50,7 +50,7 @@ defmodule BilimbiWeb.SecretReveal do
     throttle_key = {:stored_secret_reveal, Scope.tenant_id(current_scope.scope), actor.user_id}
 
     cond do
-      not available?(current_scope) ->
+      not available?(current_scope) or not setting_scope_allowed?(current_scope, setting_scope) ->
         {:error, :forbidden}
 
       not stored_encrypted?(current_scope.scope, key, setting_scope) ->
@@ -72,6 +72,12 @@ defmodule BilimbiWeb.SecretReveal do
         end
     end
   end
+
+  defp setting_scope_allowed?(current_scope, %SettingScope{type: :company, id: id}) do
+    match?({:ok, _}, BilimbiWeb.SettingsCompanyScope.authorize(current_scope, id))
+  end
+
+  defp setting_scope_allowed?(_current_scope, _setting_scope), do: true
 
   defp stored_encrypted?(scope, key, setting_scope) do
     case Settings.definition(key) do

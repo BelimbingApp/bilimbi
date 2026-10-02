@@ -15,6 +15,19 @@
       <:subtitle>{@page.subtitle}</:subtitle>
     </.header>
 
+    <.form :if={@can_manage_company} for={@scope_form}
+      id="settings-scope-form" phx-change="switch_scope" phx-submit="switch_scope" class="mt-4">
+      <.input type="select" field={@scope_form[:company_id]} id="settings-company"
+        label="Settings scope"
+        options={[{"Global", "global"} | Enum.map(@companies, &{&1.name, to_string(&1.id)})]} />
+    </.form>
+    <.empty_state :if={!@can_manage_company} id="company-settings-withheld"
+      forbidden="manage company settings" />
+    <.empty_state :if={@can_manage_company && @companies == []} id="company-settings-no-targets"
+      title="No companies are available to manage." reason="Ask an operator to review your company access." />
+    <.empty_state :if={@setting_scope && @page.groups == []} id="company-settings-empty"
+      title="No installed module contributes editable company settings." />
+
     <.tabs
       :if={length(@page.groups) > 1}
       id="settings-tabs"
@@ -28,7 +41,7 @@
         click="switch_tab"
         value={group}
       >
-        {group}
+        {group_label(group)}
       </:tab>
     </.tabs>
 
@@ -91,8 +104,11 @@
           />
 
           <div class="mt-1.5 flex items-center gap-2 text-xs">
-            <.badge :if={field.overridden?}>Set here</.badge>
-            <span :if={source_note(field)} class="text-ink-faint">{source_note(field)}</span>
+            <.badge :if={field.overridden?}>{if @setting_scope, do: "Company override", else: "Set here"}</.badge>
+            <.button :if={@setting_scope && field.overridden?} type="button"
+              id={"clear-#{String.replace(field.key, ".", "-")}"}
+              phx-click="request_clear" phx-value-key={field.key}>Clear override</.button>
+            <span :if={source_note(field, @setting_scope)} class="text-ink-faint">{source_note(field, @setting_scope)}</span>
             <span :if={field.encrypted?} class="text-ink-faint">
               Stored encrypted; leave the mask to keep the current value
             </span>
@@ -122,7 +138,7 @@
         </p>
         <div class="flex gap-2">
           <.button id="settings-restore" type="button" phx-click="request_restore">
-            Restore Defaults
+            {if @setting_scope, do: "Clear overrides", else: "Restore Defaults"}
           </.button>
           <.button id="settings-save" type="submit" variant="primary">Save</.button>
         </div>
