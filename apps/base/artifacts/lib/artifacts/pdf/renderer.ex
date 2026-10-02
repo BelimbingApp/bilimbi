@@ -168,6 +168,12 @@ defmodule Bilimbi.Base.Artifacts.PDF.Renderer do
     ["<FEFF", Base.encode16(encoded), ">"]
   end
 
+  defp info_value(:title, title, _metadata), do: title
+  defp info_value(key, _title, metadata), do: Map.get(metadata, key)
+
+  defp info_entry(_name, nil), do: []
+  defp info_entry(name, value), do: [" /", name, " ", info_string(value)]
+
   defp serialize(pages, title, metadata) do
     count = length(pages)
     page_ids = for n <- 0..(count - 1), do: 5 + n * 2
@@ -175,12 +181,7 @@ defmodule Bilimbi.Base.Artifacts.PDF.Renderer do
     info =
       Enum.map(
         [{:title, "Title"}, {:author, "Author"}, {:subject, "Subject"}, {:keywords, "Keywords"}],
-        fn {key, name} ->
-          case if(key == :title, do: title, else: Map.get(metadata, key)) do
-            nil -> []
-            value -> [" /", name, " ", info_string(value)]
-          end
-        end
+        fn {key, name} -> info_entry(name, info_value(key, title, metadata)) end
       )
 
     objects =
