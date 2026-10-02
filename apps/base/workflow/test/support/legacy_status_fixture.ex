@@ -1,7 +1,7 @@
 defmodule Bilimbi.Base.Workflow.LegacyStatusFixture do
   @moduledoc false
-  alias Ecto.Adapters.SQL
   alias Bilimbi.Base.Database.SchemaVerifier
+  alias Ecto.Adapters.SQL
 
   def create!(repo, prefix) do
     quoted = SchemaVerifier.quote_identifier!(prefix)

@@ -1,7 +1,7 @@
 defmodule Bilimbi.Base.Workflow.ContributionValidatorTest do
   use ExUnit.Case, async: true
-  alias Bilimbi.Base.Workflow.{ContributionValidator, TestContributions, TestFixtures}
   alias Bilimbi.Base.ModuleRegistry.ContributionRegistry
+  alias Bilimbi.Base.Workflow.{ContributionValidator, TestContributions, TestFixtures}
 
   test "snapshot consumes definitions with owner provenance" do
     snapshot = ContributionRegistry.build!([TestFixtures.entry().descriptor])
