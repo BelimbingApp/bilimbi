@@ -1,9 +1,9 @@
 defmodule BilimbiWeb.RouteAccessTest do
   use BilimbiWeb.ConnCase, async: false
 
-  alias BilimbiWeb.{RouteAccess, UserAuth}
   alias Bilimbi.Core.Company.TestFixtures, as: CompanyFixtures
   alias Bilimbi.Core.User.TestFixtures, as: UserFixtures
+  alias BilimbiWeb.{RouteAccess, UserAuth}
 
   defmodule GuardRouter do
     use Phoenix.Router
