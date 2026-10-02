@@ -307,7 +307,10 @@ defmodule Bilimbi.Base.Settings.Form do
   """
   @spec cast(term(), Definition.t()) :: {:ok, term()} | {:error, String.t()}
   def cast(value, %Definition{} = definition) do
-    convert(trim(value), definition)
+    with {:ok, converted} <- convert(trim(value), definition),
+         :ok <- Definition.validate(definition, converted) do
+      {:ok, converted}
+    end
   end
 
   defp trim(value) when is_binary(value), do: String.trim(value)

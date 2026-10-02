@@ -9,6 +9,11 @@ descriptor-owned contribution provider. Each definition owns its value type,
 allowed scopes, default, encryption policy, and module provenance. A missing
 row resolves to that declared default; an undeclared and unclaimed key raises.
 
+A definition may declare `validator: {module, function, message}` when its
+owner has a rule beyond the value type, such as `localization.timezone`
+requiring a valid IANA timezone. `Settings.put/3` and every settings screen
+run it; an invalid value is refused with that message and never stored.
+
 An editable definition may declare a capability in addition to its UI group.
 The generic settings screen filters its server-owned field plan by the live
 scope's capabilities; a hidden key is therefore excluded from forged/direct

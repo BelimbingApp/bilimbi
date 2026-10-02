@@ -17,6 +17,7 @@ defmodule Bilimbi.Base.Settings.Definition do
     :capability,
     :minimum,
     :maximum,
+    :validator,
     reveal_duration_ms: 10_000,
     scopes: [],
     nullable: false,
@@ -62,7 +63,8 @@ defmodule Bilimbi.Base.Settings.Definition do
       capability: optional_string!(Map.get(attributes, :capability), key, :capability),
       reveal_duration_ms: reveal_duration!(Map.get(attributes, :reveal_duration_ms, 10_000), key),
       minimum: optional_bound!(Map.get(attributes, :minimum), type, key, :minimum),
-      maximum: optional_bound!(Map.get(attributes, :maximum), type, key, :maximum)
+      maximum: optional_bound!(Map.get(attributes, :maximum), type, key, :maximum),
+      validator: optional_validator!(Map.get(attributes, :validator), key)
     }
 
     if definition.minimum && definition.maximum && definition.minimum > definition.maximum do
@@ -75,6 +77,10 @@ defmodule Bilimbi.Base.Settings.Definition do
 
     unless accepts?(definition, definition.default) do
       invalid!(key, "default is incompatible with #{inspect(type)}")
+    end
+
+    if not is_nil(definition.default) and validate(definition, definition.default) != :ok do
+      invalid!(key, "default fails its validator")
     end
 
     definition
@@ -100,6 +106,21 @@ defmodule Bilimbi.Base.Settings.Definition do
   def accepts?(%__MODULE__{type: :integer}, _value), do: false
   def accepts?(%__MODULE__{type: :string}, value), do: is_binary(value)
   def accepts?(%__MODULE__{type: :mixed}, _value), do: true
+
+  @doc """
+  Runs the definition's declared validator on a value it already accepts.
+
+  The validator is the owning module's rule, named as `{module, function,
+  message}` so it survives as a plain term in the contribution snapshot. Every
+  write path asks this, so a rule the owner enforces on its own screen holds on
+  every other screen and through the API too.
+  """
+  @spec validate(t(), term()) :: :ok | {:error, String.t()}
+  def validate(%__MODULE__{validator: nil}, _value), do: :ok
+
+  def validate(%__MODULE__{validator: {module, function, message}}, value) do
+    if apply(module, function, [value]) == true, do: :ok, else: {:error, message}
+  end
 
   @spec matches?(t(), String.t()) :: boolean()
   def matches?(%__MODULE__{key: pattern}, key) do
@@ -146,6 +167,20 @@ defmodule Bilimbi.Base.Settings.Definition do
     do: value
 
   defp optional_string!(_value, key, field), do: invalid!(key, "#{field} must be non-empty")
+
+  defp optional_validator!(nil, _key), do: nil
+
+  defp optional_validator!({module, function, message} = validator, key)
+       when is_atom(module) and is_atom(function) and is_binary(message) and message != "" do
+    unless Code.ensure_loaded?(module) and function_exported?(module, function, 1) do
+      invalid!(key, "validator #{inspect(module)}.#{function}/1 is not exported")
+    end
+
+    validator
+  end
+
+  defp optional_validator!(_validator, key),
+    do: invalid!(key, "validator must be {module, function, message}")
 
   defp optional_bound!(nil, _type, _key, _field), do: nil
   defp optional_bound!(value, :integer, _key, _field) when is_integer(value), do: value

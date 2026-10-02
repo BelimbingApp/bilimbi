@@ -739,6 +739,84 @@ defmodule BilimbiWeb.SettingsLiveTest do
     assert Settings.get(@company_setting, target) == 18
   end
 
+  test "company scope refuses an invalid timezone with the owner's rule and saves a valid one",
+       %{conn: conn} do
+    grant_capabilities!(["base.settings.company.manage", "admin.company.update"])
+    company_scope = Settings.Scope.company(73, 41)
+    {:ok, view, _} = open(conn)
+    switch_company(view, "73")
+
+    if has_element?(view, "#settings-tab-company\\.profile") do
+      view |> element("#settings-tab-company\\.profile") |> render_click()
+    end
+
+    view
+    |> form("#settings-form", %{"settings[localization.timezone]" => "Asia/Kuala_Lumpr"})
+    |> render_submit()
+
+    assert has_element?(view, "#flash-error", "must be a valid IANA timezone")
+    refute Settings.overridden?("localization.timezone", company_scope)
+
+    view
+    |> form("#settings-form", %{"settings[localization.timezone]" => "Asia/Kuala_Lumpur"})
+    |> render_submit()
+
+    assert Settings.get("localization.timezone", company_scope) == "Asia/Kuala_Lumpur"
+  end
+
+  test "global scope runs a definition's validator before saving", %{conn: conn} do
+    installed = ContributionRegistry.snapshot!()
+    on_exit(fn -> ContributionRegistry.put_snapshot_for_test!(installed) end)
+
+    definition =
+      Definition.new!("tests.operator_timezone", "tests/timezone", %{
+        type: :string,
+        scopes: [:global],
+        default: "UTC",
+        label: "Operator timezone",
+        help: "Timezone for operator reports.",
+        editable: "operator",
+        capability: "base.settings.global.manage",
+        validator: {Bilimbi.Base.DateTime, :valid_timezone?, "must be a valid IANA timezone"}
+      })
+
+    ContributionRegistry.put_snapshot_for_test!(
+      update_in(
+        installed,
+        [:consumers, :settings, :definitions],
+        &Map.put(&1, "tests.operator_timezone", definition)
+      )
+    )
+
+    {:ok, view, _} = open(conn)
+
+    view
+    |> form("#settings-form", %{"settings[tests.operator_timezone]" => "Mars/Olympus"})
+    |> render_submit()
+
+    assert has_element?(view, "#flash-error", "must be a valid IANA timezone")
+    refute Settings.overridden?("tests.operator_timezone")
+
+    view
+    |> form("#settings-form", %{"settings[tests.operator_timezone]" => "Europe/Paris"})
+    |> render_submit()
+
+    assert Settings.get("tests.operator_timezone") == "Europe/Paris"
+  end
+
+  test "the Settings API refuses an invalid timezone with the validator message" do
+    company_scope = Settings.Scope.company(73, 41)
+
+    assert {:error, changeset} =
+             Settings.put("localization.timezone", "Asia/Kuala_Lumpr", company_scope)
+
+    assert {"must be a valid IANA timezone", _} = changeset.errors[:value]
+    refute Settings.overridden?("localization.timezone", company_scope)
+
+    assert {:ok, "Asia/Kuala_Lumpur"} =
+             Settings.put("localization.timezone", "Asia/Kuala_Lumpur", company_scope)
+  end
+
   defp switch_company(view, id) do
     view |> form("#settings-scope-form", %{"scope[company_id]" => id}) |> render_change()
   end
