@@ -163,6 +163,9 @@ defmodule BilimbiWeb.ModuleHooksTest do
   end
 
   defp bundled_hooks!(context) do
+    assert File.exists?(Esbuild.bin_path()),
+           "the esbuild binary is missing; run `mix assets.setup` in apps/web"
+
     output = Path.join(context.root, "bundle.cjs")
 
     {result, status} =
