@@ -49,6 +49,9 @@ config :web, BilimbiWeb.Endpoint,
   code_reloader: true,
   reloadable_apps:
     Bilimbi.Base.ModuleRegistry.MixDiscovery.reloadable_apps(Path.expand("..", __DIR__)),
+  # Phoenix reloads a subset of Mix compilers. Collect changed module hooks
+  # after Elixir and application metadata, before esbuild watches the entry.
+  reloadable_compilers: [:phoenix_live_view, :gettext, :elixir, :app, :bilimbi_hooks],
   debug_errors: true,
   secret_key_base: "JLKsxHDXUNLBR8WIgU06I8gkdAmnpr1yLlN9mLPa3XNGisoNFgS6GuVuABPfqtwQ",
   watchers: [

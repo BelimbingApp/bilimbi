@@ -1,6 +1,8 @@
 Code.require_file(Path.expand("../../mix/composition_lock.exs", __DIR__))
 Code.require_file(Path.expand("../base/module_registry/mix/module_discovery.exs", __DIR__))
 
+Code.require_file("mix/module_hooks.exs", __DIR__)
+
 defmodule Bilimbi.Web.MixProject do
   use Mix.Project
 
@@ -15,10 +17,12 @@ defmodule Bilimbi.Web.MixProject do
       elixir: "~> 1.20",
       elixirc_paths: elixirc_paths(Mix.env()),
       test_paths: test_paths(Mix.env()),
+      # Compiled explicitly by ModuleHooksTest, outside the host application.
+      test_ignore_filters: [~r{^test/fixtures/module_hooks/.*\.ex$}],
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
-      compilers: [:bilimbi_graph, :phoenix_live_view] ++ Mix.compilers(),
+      compilers: [:bilimbi_graph, :phoenix_live_view] ++ Mix.compilers() ++ [:bilimbi_hooks],
       bilimbi_workspace_root: Path.expand("../..", __DIR__),
       listeners: [Phoenix.CodeReloader]
     ]
@@ -94,6 +98,7 @@ defmodule Bilimbi.Web.MixProject do
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind bilimbi_web", "esbuild bilimbi_web"],
       "assets.deploy": [
+        "compile",
         "tailwind bilimbi_web --minify",
         "esbuild bilimbi_web --minify",
         "phx.digest"

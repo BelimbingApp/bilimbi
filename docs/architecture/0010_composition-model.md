@@ -6,7 +6,7 @@
 **Agents:** claude/claude-opus-5, amp/medium-sol, codex/gpt-6-sol-medium,
 claude/claude-fable-5-1 (realization outcome)
 **Scope:** Platform, Domain, Extension, composition, and nested-Git rules
-**Last Updated:** 2026-09-27
+**Last Updated:** 2026-10-03
 
 ## Purpose
 
@@ -232,6 +232,15 @@ Selected modules may contribute routes, migrations, schema contracts, settings,
 authorization definitions, menus, and other supported metadata. Generic
 Platform tooling consumes them without naming or depending on optional
 capabilities.
+
+Module-owned LiveView colocated hooks are also collected at build time from
+the validated selected graph into the Web host's static JavaScript bundle.
+Unmounted modules contribute no hooks, even if their compiled files remain.
+Phoenix's declaring-module namespace plus local hook name identifies each
+hook; fully qualified clashes fail the build. This is compiled trusted source,
+with no runtime script installation or CSP relaxation. The
+[module author contract](../../apps/web/mix/README.md) describes naming,
+compilation, and development reload behavior.
 
 The composition graph declares database contributors and their dependencies;
 the ownership, migration, verification, and adoption semantics are defined in
