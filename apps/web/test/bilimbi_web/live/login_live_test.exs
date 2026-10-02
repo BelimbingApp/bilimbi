@@ -254,6 +254,52 @@ defmodule BilimbiWeb.LoginLiveTest do
     BilimbiWeb.RateLimit.reset({:login, "grace@example.com", "127.0.0.1"})
   end
 
+  test "through a trusted proxy, forwarded clients get separate throttle buckets",
+       %{conn: conn} do
+    Company.TestFixtures.insert_tenant!(%{id: 41})
+    Company.TestFixtures.insert_company!(%{id: 73, tenant_id: 41})
+
+    loud = put_req_header(conn, "x-forwarded-for", "198.51.100.1")
+    quiet = put_req_header(build_conn(), "x-forwarded-for", "198.51.100.2")
+
+    assert fail_logins(loud, 6) =~ "Too many sign-in attempts"
+    refute fail_logins(quiet, 1) =~ "Too many sign-in attempts"
+
+    BilimbiWeb.RateLimit.reset({:login, "ada@example.com", "198.51.100.1"})
+    BilimbiWeb.RateLimit.reset({:login, "ada@example.com", "198.51.100.2"})
+  end
+
+  test "a forwarded header from an untrusted peer does not change the throttle bucket",
+       %{conn: conn} do
+    Company.TestFixtures.insert_tenant!(%{id: 41})
+    Company.TestFixtures.insert_company!(%{id: 73, tenant_id: 41})
+    peer = %{address: {192, 0, 2, 9}, port: 4000, ssl_cert: nil}
+
+    first =
+      conn |> Plug.Test.put_peer_data(peer) |> put_req_header("x-forwarded-for", "198.51.100.1")
+
+    second =
+      build_conn()
+      |> Plug.Test.put_peer_data(peer)
+      |> put_req_header("x-forwarded-for", "198.51.100.2")
+
+    refute fail_logins(first, 5) =~ "Too many sign-in attempts"
+    assert fail_logins(second, 1) =~ "Too many sign-in attempts"
+
+    BilimbiWeb.RateLimit.reset({:login, "ada@example.com", "192.0.2.9"})
+  end
+
+  defp fail_logins(conn, attempts) do
+    {:ok, view, _html} = live(conn, ~p"/")
+
+    for _ <- 1..attempts, reduce: nil do
+      _ ->
+        view
+        |> form("#login-form", login: %{email: "ada@example.com", password: "wr0ng-wr0ng"})
+        |> render_submit()
+    end
+  end
+
   test "shows the live platform workspace identity below the card", %{conn: conn} do
     assert {:ok, identity} =
              Company.provision_platform_operator("Platform operator", %{

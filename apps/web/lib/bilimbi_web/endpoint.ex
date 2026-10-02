@@ -12,11 +12,11 @@ defmodule BilimbiWeb.Endpoint do
   ]
 
   socket "/live", Phoenix.LiveView.Socket,
-    websocket: [connect_info: [:peer_data, :user_agent, session: @session_options]],
+    websocket: [connect_info: [:peer_data, :x_headers, :user_agent, session: @session_options]],
     # A fallback poll is transport traffic, not a request to compile all local
     # packages. HTTP page requests still compile edits in development.
     longpoll: [
-      connect_info: [:peer_data, :user_agent, session: @session_options],
+      connect_info: [:peer_data, :x_headers, :user_agent, session: @session_options],
       code_reloader: false
     ]
 
@@ -45,10 +45,11 @@ defmodule BilimbiWeb.Endpoint do
     param_key: "request_logger",
     cookie_key: "request_logger"
 
+  plug BilimbiWeb.ForwardedFor
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
-  plug Plug.Parsers,
+  plug BilimbiWeb.WebhookParsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
     json_decoder: Phoenix.json_library()

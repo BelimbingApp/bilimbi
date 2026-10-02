@@ -4,6 +4,12 @@ defmodule Bilimbi.Base.Audit.TestFixtures do
   alias Bilimbi.Base.Repo
   alias Ecto.Adapters.SQL
 
+  def action_payloads(event) do
+    SQL.query!(Repo, "SELECT payload FROM base_audit_actions WHERE event = $1 ORDER BY id", [
+      event
+    ]).rows
+  end
+
   def create_audit_tables! do
     SQL.query!(
       Repo,

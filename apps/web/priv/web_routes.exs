@@ -10,3 +10,9 @@
   %{path: "/companies", live: BilimbiWeb.CompanyLive.Index, session: :auth, capability: "admin.company.list"},
   %{path: "/companies/:id", live: BilimbiWeb.CompanyLive.Show, session: :auth, capability: "admin.company.view"},
 ]
+ ++ if Mix.env() == :test do
+  [%{webhook: "test-example", verify: {BilimbiWeb.WebhookExample, :verify},
+     handle: {BilimbiWeb.WebhookExample, :handle}}]
+else
+  []
+end

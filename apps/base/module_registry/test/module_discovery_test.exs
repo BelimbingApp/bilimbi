@@ -583,6 +583,44 @@ defmodule Bilimbi.Base.ModuleRegistry.MixDiscoveryTest do
     end
   end
 
+  test "webhook registrations retain ownership and reject duplicates and mixed route keys", %{
+    root: root
+  } do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    File.mkdir_p!(Path.join(module_root, "priv"))
+    route_file = Path.join(module_root, "priv/web_routes.exs")
+
+    declaration = %{
+      webhook: "test-hook",
+      verify: {Test.Hook, :verify},
+      handle: {Test.Hook, :handle}
+    }
+
+    File.write!(route_file, inspect([declaration]))
+    MixDiscovery.write_route_manifest!(root)
+    {entries, _} = Code.eval_file(MixDiscovery.route_manifest_path(root))
+    assert [Map.merge(declaration, %{source: "base/ui", layer: :base})] == entries
+
+    for bad <- [
+          [declaration, declaration],
+          [Map.put(declaration, :path, "/unsafe")],
+          [Map.put(declaration, :webhook, "../unsafe")],
+          [Map.put(declaration, :verify, nil)]
+        ] do
+      File.write!(route_file, inspect(bad))
+      assert_raise ArgumentError, fn -> MixDiscovery.write_route_manifest!(root) end
+    end
+  end
+
+  test "mounted browser routes cannot occupy the raw webhook namespace", %{root: root} do
+    put_container!(root, "base", :base)
+    module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")
+    File.mkdir_p!(Path.join(module_root, "priv"))
+    File.write!(Path.join(module_root, "priv/web_routes.exs"), "[%{path: \"/webhooks/unsafe\"}]")
+    assert_raise ArgumentError, ~r/reserved/, fn -> MixDiscovery.write_route_manifest!(root) end
+  end
+
   test "route manifest includes a module live route with its source", %{root: root} do
     put_container!(root, "base", :base)
     module_root = put_module!(root, "base", "ui", web: "priv/web_routes.exs")

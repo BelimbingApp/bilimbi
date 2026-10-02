@@ -227,8 +227,9 @@ defmodule BilimbiWeb.SettingsLiveTest do
   end
 
   test "a group whose settings the account may not see names the capabilities", %{conn: conn} do
-    # Only the page capability: every operator setting also needs a capability of
-    # its own, so the group is empty for this account while modules do contribute.
+    # Keep the fixture's fields behind permissions this account does not hold.
+    # Some installed fields legitimately use the page capability itself.
+    only_operator_settings_needing!(operator_capabilities() -- ["base.settings.global.manage"])
     grant_capabilities!("base.settings.global.manage")
     {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/settings")
 
@@ -313,7 +314,36 @@ defmodule BilimbiWeb.SettingsLiveTest do
     refute has_element?(view, "#setting-authz-decision_log_retention_days", "Set here")
   end
 
+  test "webhook protection settings can be edited and invalid limits are refused", %{conn: conn} do
+    grant_capabilities!("base.settings.global.manage")
+    {:ok, view, _html} = conn |> log_in_as() |> live(~p"/system/settings")
+
+    values = %{
+      "webhooks.max_bytes" => 4096,
+      "webhooks.rate_limit" => 20,
+      "webhooks.window_ms" => 30_000,
+      "webhooks.read_timeout_ms" => 5000
+    }
+
+    for {key, _value} <- values do
+      assert has_element?(view, "#input-#{String.replace(key, ".", "-")}[type='number']")
+    end
+
+    params = Map.new(values, fn {key, value} -> {"settings[#{key}]", to_string(value)} end)
+    view |> form("#settings-form", params) |> render_submit()
+
+    for {key, value} <- values do
+      assert Settings.get(key) == value
+      assert has_element?(view, "#setting-#{String.replace(key, ".", "-")}", "Set here")
+    end
+
+    view |> form("#settings-form", %{"settings[webhooks.max_bytes]" => "0"}) |> render_submit()
+    assert has_element?(view, "#flash-error")
+    assert Settings.get("webhooks.max_bytes") == 4096
+  end
+
   test "saving marks the field as set here", %{conn: conn} do
+    only_operator_settings_needing!("admin.authz.decision-log.list")
     {:ok, view, _html} = open(conn)
 
     view |> form("#settings-form", %{@input => "45"}) |> render_submit()
@@ -376,6 +406,7 @@ defmodule BilimbiWeb.SettingsLiveTest do
   end
 
   test "submitting the default value still creates an override", %{conn: conn} do
+    only_operator_settings_needing!("admin.authz.decision-log.list")
     {:ok, view, _html} = open(conn)
 
     view |> form("#settings-form", %{@input => "90"}) |> render_submit()
@@ -469,15 +500,16 @@ defmodule BilimbiWeb.SettingsLiveTest do
   end
 
   # The installed snapshot keeping only the operator settings gated by
-  # `capability`, restored on exit.
-  defp only_operator_settings_needing!(capability) do
+  # the named capabilities, restored on exit.
+  defp only_operator_settings_needing!(capabilities) do
+    capabilities = List.wrap(capabilities)
     installed = ContributionRegistry.snapshot!()
     on_exit(fn -> ContributionRegistry.put_snapshot_for_test!(installed) end)
 
     ContributionRegistry.put_snapshot_for_test!(
       update_in(installed, [:consumers, :settings, :definitions], fn definitions ->
         Map.reject(definitions, fn {_key, definition} ->
-          definition.editable == "operator" and definition.capability != capability
+          definition.editable == "operator" and definition.capability not in capabilities
         end)
       end)
     )

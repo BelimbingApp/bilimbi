@@ -40,6 +40,12 @@ defmodule BilimbiWeb.Router do
     plug :fetch_current_scope
   end
 
+  # Signed machine traffic uses only this reserved scope. Browser routes keep
+  # their CSRF and session checks, including discovered :none routes.
+  scope "/webhooks", BilimbiWeb do
+    post "/:identifier", WebhookController, :create
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
