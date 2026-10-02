@@ -40,7 +40,7 @@ defmodule BilimbiWeb.ForwardedFor do
       [address | prefix] = cidr |> String.trim() |> String.split("/", parts: 2)
       {:ok, address} = address |> String.to_charlist() |> :inet.parse_strict_address()
       bits = if tuple_size(address) == 4, do: 32, else: 128
-      prefix = if prefix == [], do: bits, else: String.to_integer(hd(prefix))
+      {prefix, ""} = if prefix == [], do: {bits, ""}, else: Integer.parse(hd(prefix))
       true = prefix in 0..bits
       {to_integer(address), bits, prefix}
     end)
