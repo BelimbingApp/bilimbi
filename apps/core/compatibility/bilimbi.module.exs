@@ -23,6 +23,7 @@
     "base/settings",
     "base/system",
     "base/tenancy",
+    "base/workflow",
     "base/tiling",
     "base/audit",
     "core/company",

@@ -1,3 +1,7 @@
+Code.require_file(
+  Path.expand("../../../base/workflow/test/support/legacy_status_fixture.ex", __DIR__)
+)
+
 defmodule Bilimbi.Core.CompatibilityTest do
   use ExUnit.Case, async: false
 
@@ -519,6 +523,153 @@ defmodule Bilimbi.Core.CompatibilityTest do
       """,
       []
     )
+  end
+
+  test "adoption preserves independently created Workflow configuration, history and sequences",
+       %{schema: schema} do
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
+
+    tables =
+      ~w(base_workflow base_workflow_status_configs base_workflow_status_transitions base_workflow_status_history base_workflow_kanban_columns)
+
+    for table <- tables,
+        do: SQL.query!(MigrationTestRepo, ~s(DROP TABLE "#{schema}"."#{table}"), [])
+
+    Bilimbi.Base.Workflow.LegacyStatusFixture.create!(MigrationTestRepo, schema)
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".base_workflow (code, label, model_class, settings)
+      VALUES ('example_flow', 'Example flow', $1, '{"legacy": [1, true]}')
+      """,
+      ["Legacy\\Example\\Record"]
+    )
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".base_workflow_status_configs (flow, code, label, pic, is_active)
+      VALUES ('example_flow', 'old_state', 'Historical state', '[1, {"kind":"role"}]', false)
+      """,
+      []
+    )
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".base_workflow_status_transitions (flow, from_code, to_code, guard_class, action_class, metadata, is_active)
+      VALUES ('example_flow', 'old_state', 'draft', $1, $2, '[{"legacy":true}]', false)
+      """,
+      ["Legacy\\Example\\Guard", "Legacy\\Example\\Action"]
+    )
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".base_workflow_kanban_columns (flow, code, label, settings)
+      VALUES ('example_flow', 'archive', 'Archive', '["preserved"]')
+      """,
+      []
+    )
+
+    for {type, actor, status} <- [
+          {nil, 7, "old_state"},
+          {"agent", 7, "draft"},
+          {"guest", nil, "draft"}
+        ] do
+      SQL.query!(
+        MigrationTestRepo,
+        """
+        INSERT INTO "#{schema}".base_workflow_status_history
+          (flow, flow_id, status, actor_type, actor_id, assignees, attachments, metadata, transitioned_at)
+        VALUES ('example_flow', 41, $1, $2, $3, '[{"kind":"role"}]', '["file"]', '[1,{"legacy":true}]', '2026-01-01 00:00:00')
+        """,
+        [status, type, actor]
+      )
+    end
+
+    before = workflow_snapshot(MigrationTestRepo, schema, tables)
+    drop_bilimbi_ledger!(MigrationTestRepo, schema)
+    assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
+    assert {:ok, :adopted} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
+    assert workflow_snapshot(MigrationTestRepo, schema, tables) == before
+    assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) != []
+    assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
+    assert workflow_snapshot(MigrationTestRepo, schema, tables) == before
+
+    assert [[0]] =
+             SQL.query!(
+               MigrationTestRepo,
+               ~s|SELECT count(*) FROM "#{schema}".base_workflow_subject_bindings|,
+               []
+             ).rows
+
+    assert [[4]] =
+             SQL.query!(
+               MigrationTestRepo,
+               """
+               INSERT INTO "#{schema}".base_workflow_status_history (flow, flow_id, status, transitioned_at)
+               VALUES ('example_flow', 41, 'draft', '2026-01-01 00:00:01') RETURNING id
+               """,
+               []
+             ).rows
+  end
+
+  test "Workflow adoption refuses JSON drift and a sequence behind retained history", %{
+    schema: schema
+  } do
+    Compatibility.migrate_baseline(MigrationTestRepo, prefix: schema, log: false)
+    drop_bilimbi_ledger!(MigrationTestRepo, schema)
+
+    SQL.query!(
+      MigrationTestRepo,
+      ~s(ALTER TABLE "#{schema}".base_workflow ALTER COLUMN settings TYPE jsonb USING settings::jsonb),
+      []
+    )
+
+    assert {:error, {:schema_drift, errors}} =
+             Compatibility.adopt(MigrationTestRepo, prefix: schema)
+
+    assert Enum.any?(errors, &String.contains?(&1, "settings"))
+    assert relation(MigrationTestRepo, schema, "bilimbi_schema_migrations") == nil
+
+    SQL.query!(
+      MigrationTestRepo,
+      ~s(ALTER TABLE "#{schema}".base_workflow ALTER COLUMN settings TYPE json USING settings::json),
+      []
+    )
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".base_workflow_status_history (id, flow, flow_id, status, transitioned_at)
+      VALUES (90, 'example_flow', 41, 'draft', '2026-01-01 00:00:00')
+      """,
+      []
+    )
+
+    assert {:error, {:schema_drift, errors}} =
+             Compatibility.adopt(MigrationTestRepo, prefix: schema)
+
+    assert Enum.any?(errors, &String.contains?(&1, "sequence would reuse"))
+    assert relation(MigrationTestRepo, schema, "bilimbi_schema_migrations") == nil
+  end
+
+  defp workflow_snapshot(repo, schema, tables) do
+    Map.new(tables, fn table ->
+      rows =
+        SQL.query!(
+          repo,
+          ~s|SELECT row_to_json(t)::text FROM "#{schema}"."#{table}" t ORDER BY id|,
+          []
+        ).rows
+
+      sequence =
+        SQL.query!(repo, ~s(SELECT last_value, is_called FROM "#{schema}"."#{table}_id_seq"), []).rows
+
+      {table, {rows, sequence}}
+    end)
   end
 
   defp drop_bilimbi_ledger!(repo, schema) do

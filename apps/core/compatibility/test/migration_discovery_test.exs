@@ -36,6 +36,7 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              "base/schedule",
              "base/perf",
              "base/session",
+             "base/workflow",
              "core/geonames",
              "core/company",
              "core/employee",
@@ -85,7 +86,9 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              Bilimbi.Base.Audit.Migrations.AddImpersonatorToAuditRows,
              Bilimbi.Base.Audit.Migrations.AddSystemPrincipalToAuditRows,
              Bilimbi.Base.Authz.Migrations.CreateSystemPrincipalCapabilities,
-             Bilimbi.Base.Artifacts.Migrations.CreateArtifacts
+             Bilimbi.Base.Artifacts.Migrations.CreateArtifacts,
+             Bilimbi.Base.Workflow.Migrations.CreateStatusCompatibilityBaseline,
+             Bilimbi.Base.Workflow.Migrations.CreateSubjectBindings
            ]
 
     assert Enum.map(entries, &elem(&1, 2)) == [
@@ -111,6 +114,8 @@ defmodule Bilimbi.Core.Compatibility.MigrationDiscoveryTest do
              :bilimbi_only,
              :bilimbi_only,
              :bilimbi_only,
+             :bilimbi_only,
+             :compatible_baseline,
              :bilimbi_only
            ]
 

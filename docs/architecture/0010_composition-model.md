@@ -238,6 +238,11 @@ the ownership, migration, verification, and adoption semantics are defined in
 [Database Architecture](./database.md). Do not create a separate database
 dependency graph beside the module descriptors.
 
+Workflow status definitions use the same snapshot through the `:workflow`
+consumer ([ADR 0018](./decisions/0018-workflow-status-contribution-consumer.md)).
+Owner-proven adapters execute business rules; exact legacy aliases interpret
+retained data without introducing an upward dependency or another registry.
+
 Web hosts selected presentation contributions without knowing Domain or
 Extension names. Contributors retain ownership of their business rules and
 presentation adapters. Invalid or conflicting contributions fail the build.
