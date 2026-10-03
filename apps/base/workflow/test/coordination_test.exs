@@ -545,6 +545,212 @@ defmodule Bilimbi.Base.Workflow.CoordinationTest do
     assert Repo.get!(RunSchema, run.id).status == "paused"
   end
 
+  test "an adopted paused run resumes with its original items", c do
+    subject = subject!(%{id: 41})
+
+    saved =
+      Bilimbi.Base.Workflow.LegacyCoordinationFixture.insert_in_flight!(
+        Repo,
+        Bilimbi.Base.Database.DataCase.temporary_schema!()
+      )
+
+    Repo.update_all(from(r in RunSchema, where: r.id == ^saved.run_id),
+      set: [status: "paused", paused_at: ~N[2026-01-01 00:00:00], pause_reason: "legacy pause"]
+    )
+
+    assert {:ok, %{entries: []}} = Workflow.pending_work(c.scope)
+
+    assert {:error, :run_not_running} =
+             Workflow.complete_work(
+               c.scope,
+               saved.run_id,
+               saved.items["second"],
+               request("example.second")
+             )
+
+    assert {:ok, %{status: "running", pause_reason: nil, paused_at: nil}} =
+             Workflow.resume_run(c.scope, saved.run_id)
+
+    assert {:ok, %{status: "running"}} = Workflow.resume_run(c.scope, saved.run_id)
+    assert {:ok, %{entries: entries}} = Workflow.pending_work(c.scope, subject: subject)
+
+    assert Enum.map(entries, & &1.id) == [saved.items["second"], saved.items["third"]]
+    assert "process.resumed" in Enum.map(events!(c.scope, saved.run_id), & &1.type)
+
+    assert {:ok, %{status: "paused", pause_reason: "Owner hold"}} =
+             Workflow.pause_run(c.scope, saved.run_id, "Owner hold")
+
+    assert {:ok, %{status: "paused", pause_reason: "Owner hold"}} =
+             Workflow.pause_run(c.scope, saved.run_id, "Second hold")
+
+    assert {:error, :reason_required} = Workflow.pause_run(c.scope, saved.run_id, " ")
+    assert {:ok, nil} = Workflow.claim_work(c.scope, "worker-1")
+    assert Repo.aggregate(RunSchema, :count) == 1 and Repo.aggregate(WorkSchema, :count) == 3
+  end
+
+  test "an adopted leased item is completed by the worker holding its lease", c do
+    subject!(%{id: 41})
+
+    saved =
+      Bilimbi.Base.Workflow.LegacyCoordinationFixture.insert_in_flight!(
+        Repo,
+        Bilimbi.Base.Database.DataCase.temporary_schema!()
+      )
+
+    token = "0b7d3f62-4c1e-4a55-9f0e-2d6c7a1b9e30"
+    time = NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+
+    Repo.update_all(from(w in WorkSchema, where: w.id == ^saved.items["second"]),
+      set: [
+        status: "leased",
+        attempts: 1,
+        lease_owner: "legacy-worker",
+        lease_token: token,
+        lease_expires_at: NaiveDateTime.add(time, 300),
+        heartbeat_at: time
+      ]
+    )
+
+    claim = %{run_id: saved.run_id, work_item_id: saved.items["second"], lease_token: token}
+    done = %{outcome: "completed", output: %{"worker_fact" => 9}, result_ref: nil}
+
+    assert {:error, :lease_not_owned} =
+             Workflow.complete_claimed_work(
+               c.scope,
+               %{claim | lease_token: "1b7d3f62-4c1e-4a55-9f0e-2d6c7a1b9e30"},
+               done
+             )
+
+    assert {:error, :work_not_available} =
+             Workflow.complete_work(
+               c.scope,
+               saved.run_id,
+               saved.items["second"],
+               request("example.second")
+             )
+
+    assert {:ok, %{work_item: item}} = Workflow.complete_claimed_work(c.scope, claim, done)
+    assert %{status: "completed", output: %{"worker_fact" => 9}, version: 2} = item
+    refute Map.has_key?(item, :lease_token)
+    assert %{lease_token: nil, lease_owner: nil} = Repo.get!(WorkSchema, item.id)
+    assert {:ok, %{work_item: ^item}} = Workflow.complete_claimed_work(c.scope, claim, done)
+
+    assert {:ok, %{run: %{status: "running"}, work_items: [first, second, third]}} =
+             Workflow.get_run(c.scope, saved.run_id)
+
+    assert first.output == %{"saved_fact" => 74} and second == item
+    assert third.status == "available"
+  end
+
+  test "workers claim, heartbeat, retry with backoff and finally fail", c do
+    assert {:ok, run} =
+             Workflow.start_run(c.scope, "example.retry", c.subject, idempotency_key: "retry:1")
+
+    assert {:error, :invalid_claim} = Workflow.claim_work(c.scope, " ")
+    assert {:ok, nil} = Workflow.claim_work(c.scope, "worker-1", executor_keys: [])
+
+    assert {:ok, %{claim: claim, work_item: leased}} =
+             Workflow.claim_work(c.scope, "worker-1", run_ids: [run.id], lease_seconds: 60)
+
+    assert %{status: "leased", attempts: 1, step_key: "work"} = leased
+    refute Map.has_key?(leased, :lease_token)
+    assert claim.run_id == run.id and claim.work_item_id == leased.id
+    assert {:ok, nil} = Workflow.claim_work(c.scope, "worker-2")
+
+    assert {:ok, %{work_item: beat}} = Workflow.heartbeat_work(c.scope, claim, 600)
+    assert NaiveDateTime.compare(beat.lease_expires_at, leased.lease_expires_at) == :gt
+
+    assert {:error, :lease_not_owned} =
+             Workflow.heartbeat_work(c.scope, %{claim | lease_token: "stale-token"})
+
+    retry_at =
+      NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second) |> NaiveDateTime.add(120)
+
+    assert {:ok, %{work_item: pending}} =
+             Workflow.fail_work(c.scope, claim, "Upstream timeout",
+               retry_at: retry_at,
+               failure_category: "transport"
+             )
+
+    assert %{status: "pending", available_at: ^retry_at, last_error: "Upstream timeout"} =
+             pending
+
+    assert {:error, :lease_not_owned} = Workflow.heartbeat_work(c.scope, claim)
+    assert {:ok, nil} = Workflow.claim_work(c.scope, "worker-2")
+
+    assert %{"failure" => %{"retryable" => true, "category" => "transport"}} =
+             Enum.find(events!(c.scope, run.id), &(&1.type == "work.retry_scheduled")).payload
+
+    Repo.update_all(from(w in WorkSchema, where: w.id == ^leased.id),
+      set: [available_at: NaiveDateTime.add(retry_at, -600)]
+    )
+
+    assert {:ok, %{claim: second, work_item: %{attempts: 2}}} =
+             Workflow.claim_work(c.scope, "worker-2", executor_keys: ["example.work"])
+
+    Repo.update_all(from(w in WorkSchema, where: w.id == ^leased.id),
+      set: [lease_expires_at: NaiveDateTime.add(retry_at, -600)]
+    )
+
+    assert {:error, :lease_expired} = Workflow.fail_work(c.scope, second, "Too late")
+
+    Repo.update_all(from(w in WorkSchema, where: w.id == ^leased.id),
+      set: [lease_expires_at: NaiveDateTime.add(retry_at, 600)]
+    )
+
+    assert {:ok, %{run: %{status: "failed"}, work_item: %{status: "failed", outcome: "failed"}}} =
+             Workflow.fail_work(c.scope, second, "Still failing")
+
+    assert {:ok, %{work_item: %{status: "failed"}}} =
+             Workflow.complete_claimed_work(c.scope, second, %{
+               outcome: "completed",
+               output: [],
+               result_ref: nil
+             })
+
+    assert {:ok, %{work_items: [_, %{status: "blocked"}]}} = Workflow.get_run(c.scope, run.id)
+  end
+
+  test "waive, block and claimed block finish unfinished work with reasons", c do
+    run = start!(c)
+
+    assert {:error, :reason_required} =
+             Workflow.waive_work(c.scope, run.id, %{step_key: "first"}, " ")
+
+    assert {:ok,
+            %{work_item: %{status: "waived", outcome: "not-needed", last_error: "Owner skip"}}} =
+             Workflow.waive_work(
+               c.scope,
+               run.id,
+               %{step_key: "first"},
+               "Owner skip",
+               "not-needed"
+             )
+
+    assert {:ok, %{work_item: %{status: "blocked", last_error: "Owner refused"}}} =
+             Workflow.block_work(c.scope, run.id, %{step_key: "second"}, "Owner refused")
+
+    assert {:ok, %{work_item: %{status: "waived"}}} =
+             Workflow.block_work(c.scope, run.id, %{step_key: "first"}, "Too late")
+
+    assert {:ok, %{claim: claim}} =
+             Workflow.claim_work(c.scope, "worker-1", executor_keys: ["example.third"])
+
+    assert {:ok, %{run: %{status: "blocked"}, work_item: blocked}} =
+             Workflow.block_claimed_work(c.scope, claim, "Bad input",
+               output: %{"diagnostic" => 1},
+               result_ref: "owner-result:9"
+             )
+
+    assert %{status: "blocked", output: %{"diagnostic" => 1}, result_ref: "owner-result:9"} =
+             blocked
+
+    types = Enum.map(events!(c.scope, run.id), & &1.type)
+    assert Enum.all?(~w(work.waived work.blocked work.claimed process.blocked), &(&1 in types))
+    assert {:error, :run_not_paused} = Workflow.resume_run(c.scope, run.id)
+    assert {:error, :run_not_running} = Workflow.pause_run(c.scope, run.id, "Hold")
+  end
+
   defp start!(c, opts \\ []) do
     assert {:ok, run} =
              Workflow.start_run(

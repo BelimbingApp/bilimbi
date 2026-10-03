@@ -2,8 +2,7 @@ defmodule Bilimbi.Base.Workflow.ProcessFingerprint do
   @moduledoc false
   # Belimbing v1 hashes ordered key/version/steps, with recursively sorted
   # input/metadata objects and preserved list order. A saved fingerprint is
-  # never replaced. Unsupported legacy float serialization fails explicitly;
-  # owners can use :bilimbi_v1 on a new definition version for floating values.
+  # never replaced. Unsupported legacy float serialization fails explicitly.
   # No PHP class name in a definition is executable.
 
   def digest(definition) do
@@ -12,11 +11,6 @@ defmodule Bilimbi.Base.Workflow.ProcessFingerprint do
     document =
       object([{"key", definition.key}, {"version", definition.version}, {"steps", steps}])
       |> encode()
-
-    document =
-      if definition.fingerprint_format == :bilimbi_v1,
-        do: ["bilimbi_v1:", document],
-        else: document
 
     :crypto.hash(:sha256, IO.iodata_to_binary(document)) |> Base.encode16(case: :lower)
   end

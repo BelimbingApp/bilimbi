@@ -3,7 +3,7 @@ defmodule Bilimbi.Base.Workflow.TestProcessContributions do
   alias Bilimbi.Base.Workflow.TestProcessAdapter
 
   def processes do
-    [parallel(), dependencies(), gate()]
+    [parallel(), dependencies(), gate(), retry()]
   end
 
   def parallel do
@@ -58,6 +58,19 @@ defmodule Bilimbi.Base.Workflow.TestProcessContributions do
       subject: "example.record",
       adapter: TestProcessAdapter,
       steps: [%{key: "fact", label: "Fact", required_signal: "owner.ready", delay_seconds: 60}]
+    }
+  end
+
+  def retry do
+    %{
+      key: "example.retry",
+      version: 1,
+      subject: "example.record",
+      adapter: TestProcessAdapter,
+      steps: [
+        %{key: "work", label: "Work", executor_key: "example.work", max_attempts: 2},
+        %{key: "after", label: "After", dependencies: [%{step_key: "work"}]}
+      ]
     }
   end
 end

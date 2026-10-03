@@ -101,7 +101,9 @@ in-flight runs need them. Definitions are plain terms with no I/O and are saved
 insert-only when an authorized owner starts a run; boot never starts runs.
 
 `ProcessAdapter.authorize/4` receives the locked subject and plain run facts for
-`:start`, `:read`, `:complete`, `:supersede`, `:reconcile` and `:signal`. A new start
+`:start`, `:read`, `:complete`, `:supersede`, `:reconcile`, `:signal`, `:pause`,
+`:resume`, `:claim`, `:heartbeat`, `:fail`, `:block_claim`, `:waive` and `:block`;
+leaseholder completion is `:complete`. A new start
 has no saved ID; replay repeats `:start` with the saved ID and input. Both the
 subject and process adapters must enforce access. The owner enforces capabilities,
 company eligibility, and current round/attempt binding, using its own public
@@ -145,7 +147,26 @@ remaining attempts return it to pending. Live leases remain untouched.
 `supersede_run/3` requires a reason and refuses live leases. It preserves completed
 facts, blocks unfinished work, aggregates the terminal run state, and appends
 `process.superseded`. Supersede's durable state is `"blocked"`; there is no new
-`"superseded"` status. Paused runs remain paused, including reasons and work state.
+`"superseded"` status.
+
+`pause_run/3` pauses a running run with a reason and appends `process.paused`;
+a paused run releases no work until resumed. Signals and `complete_work/4` are
+refused, while a live lease may still finish its item.
+`resume_run/2` clears the pause, appends `process.resumed` and reconciles the
+saved graph, so an adopted paused run continues with its original items.
+
+Workers lease due work with `claim_work(scope, "worker-1", lease_seconds: 300)`,
+optionally filtered by `:definition_key`, `:executor_keys` or `:run_ids`. Due
+pending work and expired leases are reconciled before the lease is taken. The
+result's `claim: %{run_id, work_item_id, lease_token}` is required by
+`heartbeat_work/3`, `complete_claimed_work/3`, `fail_work/4` and
+`block_claimed_work/4`; a mismatched or expired token is refused, and a repeated
+call on a terminal item returns it unchanged. Adopted leases keep their saved
+tokens, so a worker holding one completes it through the same calls.
+`fail_work/4` returns retryable work with attempts remaining to pending at
+`:retry_at` (the caller's backoff; default now) and records `work.retry_scheduled`;
+otherwise the item fails. `waive_work/5` and `block_work/4` are the owner or
+operator path for unfinished work and need a reason.
 
 `pending_work/2` returns `%{entries: facts, next_cursor: cursor}`. Pass `:after`,
 `:limit` (1..500, default 50), and optional `:subject`, `:run_id`, `:definition_key`
@@ -162,9 +183,14 @@ leases, dependency edges, events, JSON shapes, timestamps and sequences. It
 rejects structural drift or contradictory graph tenant identity, without guessing
 an unresolved run's tenant or translating its owner. Unknown/retired definitions,
 aliases, fingerprints and unresolved runs stay preserved and fail execution;
-they are never replaced by a fresh run. The default `:legacy_v1` fingerprints
+they are never replaced by a fresh run. `:legacy_v1` fingerprints
 match ordered PHP v1 JSON for supported values, including empty lists, sorted
 objects and Unicode separators. Floating values fail explicitly because PHP's
 number serialization differs. Numeric object keys also refuse explicitly because
-PHP arrays coerce/sort them and can become lists; express those as lists or use a new `:bilimbi_v1` version supports those values with a distinct fingerprint domain. Compatible owner mappings belong in private
+PHP arrays coerce/sort them and can become lists; express those as lists.
+`:legacy_v1` is the only fingerprint format. Compatible owner mappings belong in private
 extensions, not the public platform.
+
+`base_workflow_human_action_requests` belongs to slice 3, the human action
+gate. This baseline neither creates nor reads it; adopting a database that has
+it leaves its rows untouched.

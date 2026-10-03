@@ -3,12 +3,10 @@ defmodule Bilimbi.Base.Workflow.ProcessDefinition do
   alias Bilimbi.Base.Workflow.{JSON, ProcessFingerprint}
 
   def validate!(definition) do
-    keys!(definition, [:key, :version, :subject, :adapter, :steps, :fingerprint_format])
+    keys!(definition, [:key, :version, :subject, :adapter, :steps])
     key!(definition.key)
     key!(definition.subject)
     integer!(definition.version, 1)
-    format = Map.get(definition, :fingerprint_format, :legacy_v1)
-    unless format in [:legacy_v1, :bilimbi_v1], do: invalid!("unknown fingerprint format")
 
     unless is_list(definition.steps) and definition.steps != [],
       do: invalid!("steps must be nonempty")
@@ -26,17 +24,13 @@ defmodule Bilimbi.Base.Workflow.ProcessDefinition do
       visit!(by_key, step.key, MapSet.new(), visited)
     end)
 
-    if format == :legacy_v1 and Enum.any?(steps, &(float?(&1.input) or float?(&1.metadata))),
-      do: invalid!("legacy_v1 cannot fingerprint floats exactly; use a new bilimbi_v1 version")
+    if Enum.any?(steps, &(float?(&1.input) or float?(&1.metadata))),
+      do: invalid!("legacy_v1 cannot fingerprint floats exactly; use integers or strings")
 
-    if format == :legacy_v1 and
-         Enum.any?(steps, &(numeric_keys?(&1.input) or numeric_keys?(&1.metadata))),
-       do:
-         invalid!(
-           "legacy_v1 cannot fingerprint numeric object keys exactly; use lists or a new bilimbi_v1 version"
-         )
+    if Enum.any?(steps, &(numeric_keys?(&1.input) or numeric_keys?(&1.metadata))),
+      do: invalid!("legacy_v1 cannot fingerprint numeric object keys exactly; use lists")
 
-    definition = Map.merge(definition, %{steps: steps, fingerprint_format: format})
+    definition = %{definition | steps: steps}
     Map.put(definition, :fingerprint, ProcessFingerprint.digest(definition))
   end
 

@@ -18,6 +18,7 @@ defmodule Bilimbi.Base.Workflow.Coordination do
 
   @terminal_work ~w(completed failed waived blocked)
   @terminal_run ~w(completed failed blocked)
+  @claim_attempts 8
 
   def start(scope, definition_key, subject_ref, opts) do
     Scope.actor(scope)
@@ -77,22 +78,232 @@ defmodule Bilimbi.Base.Workflow.Coordination do
         time = now()
         item = find_item(items, item_ref)
 
-        with :ok <- available(run, item, request, time),
-             {:ok, item} <-
-               finish(item, "completed", request.outcome, request.output, nil, time, %{
-                 result_ref: request.result_ref
-               }),
-             :ok <-
-               append_event(scope, run, item, "work.completed", %{
-                 "outcome" => item.outcome,
-                 "output" => item.output,
-                 "result_ref" => item.result_ref
-               }),
-             {:ok, run} <- settle(scope, run, replace(items, item), dependencies, time) do
-          {:ok, %{run: run_fact(run), work_item: work_fact(item)}}
+        with :ok <- available(run, item, request, time) do
+          complete_item(scope, run, items, dependencies, item, request, time)
         end
       end)
     end
+  end
+
+  def pause(scope, run_id, reason) do
+    if present?(reason) do
+      with_run(scope, run_id, :pause, fn run, _items, _dependencies, _definition ->
+        time = now()
+
+        case run.status do
+          "paused" ->
+            {:ok, run_fact(run)}
+
+          "running" ->
+            run =
+              update!(run, %{
+                status: "paused",
+                paused_at: time,
+                pause_reason: reason,
+                heartbeat_at: time,
+                updated_at: time
+              })
+
+            :ok = append_event(scope, run, nil, "process.paused", %{"reason" => reason})
+            {:ok, run_fact(run)}
+
+          _ ->
+            {:error, :run_not_running}
+        end
+      end)
+    else
+      {:error, :reason_required}
+    end
+  end
+
+  def resume(scope, run_id) do
+    with_run(scope, run_id, :resume, fn run, items, dependencies, _definition ->
+      time = now()
+
+      case run.status do
+        "running" ->
+          {:ok, run_fact(run)}
+
+        "paused" ->
+          run =
+            update!(run, %{
+              status: "running",
+              paused_at: nil,
+              pause_reason: nil,
+              heartbeat_at: time,
+              updated_at: time
+            })
+
+          :ok = append_event(scope, run, nil, "process.resumed", nil)
+          {:ok, run} = settle(scope, run, items, dependencies, time)
+          {:ok, run_fact(run)}
+
+        _ ->
+          {:error, :run_not_paused}
+      end
+    end)
+  end
+
+  # Selection is optimistic and unlocked so the database never chooses a lock
+  # order; with_run then takes subject -> run -> items and proves eligibility
+  # again after reconciling. A candidate refused by owner policy or contention
+  # is skipped, as in the bounded worklist.
+  def claim(scope, worker, opts) do
+    Scope.actor(scope)
+
+    opts =
+      Keyword.validate!(opts,
+        lease_seconds: 300,
+        definition_key: nil,
+        executor_keys: nil,
+        run_ids: nil
+      )
+
+    cond do
+      not (text?(worker) and lease_seconds?(opts[:lease_seconds]) and
+             (is_nil(opts[:definition_key]) or text?(opts[:definition_key])) and
+             (is_nil(opts[:executor_keys]) or
+                (is_list(opts[:executor_keys]) and Enum.all?(opts[:executor_keys], &text?/1))) and
+               (is_nil(opts[:run_ids]) or
+                  (is_list(opts[:run_ids]) and
+                     Enum.all?(opts[:run_ids], &(is_integer(&1) and &1 > 0))))) ->
+        {:error, :invalid_claim}
+
+      opts[:executor_keys] == [] or opts[:run_ids] == [] ->
+        {:ok, nil}
+
+      true ->
+        claim_next(scope, worker, opts, [], @claim_attempts)
+    end
+  end
+
+  def heartbeat(scope, claim, lease_seconds) do
+    if claim?(claim) and lease_seconds?(lease_seconds) do
+      with_run(scope, claim.run_id, :heartbeat, fn run, items, _dependencies, _definition ->
+        time = now()
+
+        with {:ok, item} <- leased(items, claim, time, false) do
+          item =
+            update!(item, %{
+              heartbeat_at: time,
+              lease_expires_at: NaiveDateTime.add(time, lease_seconds),
+              updated_at: time
+            })
+
+          run = update!(run, %{heartbeat_at: time, updated_at: time})
+
+          :ok =
+            append_event(scope, run, item, "work.heartbeat", %{
+              "lease_expires_at" => NaiveDateTime.to_iso8601(item.lease_expires_at)
+            })
+
+          {:ok, %{run: run_fact(run), work_item: work_fact(item)}}
+        end
+      end)
+    else
+      {:error, :invalid_claim}
+    end
+  end
+
+  def complete_claimed(scope, claim, request) do
+    if claim?(claim) and claimed_completion?(request) do
+      with_claim(scope, claim, :complete, fn run, items, dependencies, item, time ->
+        complete_item(scope, run, items, dependencies, item, request, time)
+      end)
+    else
+      {:error, :invalid_claim}
+    end
+  end
+
+  def fail(scope, claim, error, opts) do
+    opts =
+      Keyword.validate!(opts, retry_at: nil, retryable: true, failure_category: "unclassified")
+
+    if claim?(claim) and present?(error) and text?(opts[:failure_category]) and
+         is_boolean(opts[:retryable]) and whole_second?(opts[:retry_at]) do
+      with_claim(scope, claim, :fail, fn run, items, dependencies, item, time ->
+        failure = %{"retryable" => opts[:retryable], "category" => opts[:failure_category]}
+
+        item =
+          if opts[:retryable] and item.attempts < item.max_attempts do
+            item =
+              update!(item, %{
+                status: "pending",
+                available_at: opts[:retry_at] || time,
+                lease_owner: nil,
+                lease_token: nil,
+                lease_expires_at: nil,
+                heartbeat_at: nil,
+                version: item.version + 1,
+                last_error: error,
+                updated_at: time
+              })
+
+            :ok =
+              append_event(scope, run, item, "work.retry_scheduled", %{
+                "error" => error,
+                "failure" => failure,
+                "available_at" => NaiveDateTime.to_iso8601(item.available_at)
+              })
+
+            item
+          else
+            {:ok, item} = finish(item, "failed", "failed", %{"failure" => failure}, error, time)
+
+            :ok =
+              append_event(scope, run, item, "work.failed", %{
+                "error" => error,
+                "failure" => failure
+              })
+
+            item
+          end
+
+        {:ok, run} = settle(scope, run, replace(items, item), dependencies, time)
+        {:ok, %{run: run_fact(run), work_item: work_fact(item)}}
+      end)
+    else
+      {:error, :invalid_failure}
+    end
+  end
+
+  def block_claimed(scope, claim, reason, opts) do
+    opts = Keyword.validate!(opts, output: [], result_ref: nil)
+
+    if claim?(claim) and present?(reason) and match?({:ok, _}, JSON.cast(opts[:output])) and
+         (is_nil(opts[:result_ref]) or text?(opts[:result_ref])) do
+      with_claim(scope, claim, :block_claim, fn run, items, dependencies, item, time ->
+        {:ok, item} =
+          finish(item, "blocked", "blocked", opts[:output], reason, time, %{
+            result_ref: opts[:result_ref] || item.result_ref
+          })
+
+        :ok =
+          append_event(scope, run, item, "work.blocked", %{
+            "outcome" => "blocked",
+            "reason" => reason,
+            "output" => item.output,
+            "result_ref" => item.result_ref
+          })
+
+        {:ok, run} = settle(scope, run, replace(items, item), dependencies, time)
+        {:ok, %{run: run_fact(run), work_item: work_fact(item)}}
+      end)
+    else
+      {:error, :invalid_block}
+    end
+  end
+
+  def waive(scope, run_id, item_ref, reason, outcome) do
+    if present?(reason) and text?(outcome),
+      do: administratively_finish(scope, run_id, item_ref, :waive, "waived", outcome, reason),
+      else: {:error, :reason_required}
+  end
+
+  def block(scope, run_id, item_ref, reason) do
+    if present?(reason),
+      do: administratively_finish(scope, run_id, item_ref, :block, "blocked", "blocked", reason),
+      else: {:error, :reason_required}
   end
 
   def supersede(scope, run_id, reason) when is_binary(reason) do
@@ -220,6 +431,180 @@ defmodule Bilimbi.Base.Workflow.Coordination do
       {:ok, %{entries: Enum.map(page, &fact/1), next_cursor: cursor}}
     end)
   end
+
+  defp complete_item(scope, run, items, dependencies, item, request, time) do
+    {:ok, item} =
+      finish(item, "completed", request.outcome, request.output, nil, time, %{
+        result_ref: request.result_ref || item.result_ref
+      })
+
+    :ok =
+      append_event(scope, run, item, "work.completed", %{
+        "outcome" => item.outcome,
+        "output" => item.output,
+        "result_ref" => item.result_ref
+      })
+
+    {:ok, run} = settle(scope, run, replace(items, item), dependencies, time)
+    {:ok, %{run: run_fact(run), work_item: work_fact(item)}}
+  end
+
+  defp administratively_finish(scope, run_id, item_ref, operation, status, outcome, reason) do
+    with_run(scope, run_id, operation, fn run, items, dependencies, _definition ->
+      time = now()
+
+      case find_item(items, item_ref) do
+        nil ->
+          {:error, :work_not_found}
+
+        %{status: current} = item when current in @terminal_work ->
+          {:ok, %{run: run_fact(run), work_item: work_fact(item)}}
+
+        item ->
+          {:ok, item} = finish(item, status, outcome, nil, reason, time)
+
+          :ok =
+            append_event(scope, run, item, "work." <> status, %{
+              "outcome" => outcome,
+              "reason" => reason
+            })
+
+          {:ok, run} = settle(scope, run, replace(items, item), dependencies, time)
+          {:ok, %{run: run_fact(run), work_item: work_fact(item)}}
+      end
+    end)
+  end
+
+  defp claim_next(_scope, _worker, _opts, _excluded, 0), do: {:ok, nil}
+
+  defp claim_next(scope, worker, opts, excluded, attempts) do
+    case Repo.one(claim_candidate(scope, opts, excluded, now())) do
+      nil ->
+        {:ok, nil}
+
+      candidate ->
+        claim = fn run, items, dependencies, _definition ->
+          lease(scope, run, items, dependencies, candidate.id, worker, opts)
+        end
+
+        case with_run(scope, candidate.run_id, :claim, claim) do
+          {:ok, %{claim: _} = claimed} -> {:ok, claimed}
+          _ -> claim_next(scope, worker, opts, [candidate.id | excluded], attempts - 1)
+        end
+    end
+  end
+
+  # Due pending work and expired leases become available when the locked run
+  # is reconciled, so they are candidates as well as already available work.
+  defp claim_candidate(scope, opts, excluded, time) do
+    query =
+      from(w in Tenancy.scope_query(WorkSchema, scope),
+        join: r in subquery(Tenancy.scope_query(RunSchema, scope)),
+        on: r.id == w.process_run_id,
+        where:
+          r.scope_type == "tenant" and r.status == "running" and is_nil(r.last_error) and
+            r.available_at <= ^time and w.id not in ^excluded and
+            ((w.status in ["available", "pending"] and w.available_at <= ^time) or
+               (w.status == "leased" and w.lease_expires_at <= ^time)),
+        order_by: [desc: r.priority, desc: w.priority, asc: w.available_at, asc: w.id],
+        limit: 1,
+        select: %{id: w.id, run_id: r.id}
+      )
+
+    query =
+      if opts[:definition_key],
+        do: from([_w, r] in query, where: r.definition_key == ^opts[:definition_key]),
+        else: query
+
+    query =
+      if opts[:executor_keys],
+        do: from([w, _r] in query, where: w.executor_key in ^opts[:executor_keys]),
+        else: query
+
+    if opts[:run_ids], do: from([_w, r] in query, where: r.id in ^opts[:run_ids]), else: query
+  end
+
+  defp lease(scope, run, items, dependencies, item_id, worker, opts) do
+    time = now()
+    {:ok, run} = settle(scope, run, items, dependencies, time)
+    item = find_item(items, item_id)
+    item = item && Repo.reload!(item)
+
+    if not is_nil(item) and run.status == "running" and is_nil(run.last_error) and
+         due?(run.available_at, time) and item.status == "available" and
+         due?(item.available_at, time) do
+      token = Ecto.UUID.generate()
+
+      item =
+        update!(item, %{
+          status: "leased",
+          attempts: item.attempts + 1,
+          lease_owner: worker,
+          lease_token: token,
+          lease_expires_at: NaiveDateTime.add(time, opts[:lease_seconds]),
+          heartbeat_at: time,
+          updated_at: time
+        })
+
+      run = update!(run, %{heartbeat_at: time, updated_at: time})
+
+      :ok =
+        append_event(scope, run, item, "work.claimed", %{
+          "worker" => worker,
+          "attempt" => item.attempts,
+          "lease_expires_at" => NaiveDateTime.to_iso8601(item.lease_expires_at)
+        })
+
+      {:ok,
+       %{
+         run: run_fact(run),
+         work_item: work_fact(item),
+         claim: %{run_id: run.id, work_item_id: item.id, lease_token: token}
+       }}
+    else
+      {:ok, nil}
+    end
+  end
+
+  # A terminal item answers a repeated worker call unchanged; any other state
+  # requires the caller's still-live lease token.
+  defp with_claim(scope, claim, operation, fun) do
+    with_run(scope, claim.run_id, operation, fn run, items, dependencies, _definition ->
+      time = now()
+
+      case leased(items, claim, time, true) do
+        {:terminal, item} -> {:ok, %{run: run_fact(run), work_item: work_fact(item)}}
+        {:ok, item} -> fun.(run, items, dependencies, item, time)
+        {:error, _} = error -> error
+      end
+    end)
+  end
+
+  defp leased(items, claim, time, allow_terminal?) do
+    item = find_item(items, claim.work_item_id)
+
+    cond do
+      is_nil(item) ->
+        {:error, :work_not_found}
+
+      allow_terminal? and item.status in @terminal_work ->
+        {:terminal, item}
+
+      item.status != "leased" or not token?(item.lease_token, claim.lease_token) ->
+        {:error, :lease_not_owned}
+
+      not live_lease?(item, time) ->
+        {:error, :lease_expired}
+
+      true ->
+        {:ok, item}
+    end
+  end
+
+  defp token?(saved, given) when is_binary(saved) and byte_size(saved) == byte_size(given),
+    do: :crypto.hash_equals(saved, given)
+
+  defp token?(_saved, _given), do: false
 
   # Lock order is subject -> run -> items. The first scoped run read resolves
   # identity only; all authority, graph and state are reread under the lock.
@@ -857,6 +1242,29 @@ defmodule Bilimbi.Base.Workflow.Coordination do
   end
 
   defp completion_request(_request), do: {:error, :invalid_completion}
+
+  defp claimed_completion?(request) when is_map(request) and not is_struct(request) do
+    Enum.sort(Map.keys(request)) == [:outcome, :output, :result_ref] and
+      text?(request.outcome) and (is_nil(request.result_ref) or text?(request.result_ref)) and
+      match?({:ok, _}, JSON.cast(request.output))
+  end
+
+  defp claimed_completion?(_request), do: false
+
+  defp claim?(%{run_id: run_id, work_item_id: item_id, lease_token: token} = claim)
+       when map_size(claim) == 3,
+       do:
+         is_integer(run_id) and run_id > 0 and is_integer(item_id) and item_id > 0 and
+           text?(token)
+
+  defp claim?(_claim), do: false
+
+  defp lease_seconds?(value), do: is_integer(value) and value in 1..2_147_483_647
+
+  defp whole_second?(value),
+    do: is_nil(value) or match?(%NaiveDateTime{microsecond: {0, 0}}, value)
+
+  defp present?(value), do: is_binary(value) and String.valid?(value) and String.trim(value) != ""
 
   defp start_options(opts) do
     valid? =

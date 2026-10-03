@@ -7,7 +7,8 @@ defmodule Bilimbi.Base.Workflow.SubjectAdapter do
   in the kernel's shared Repo transaction. `authorize/3` enforces owner policy
   even when an edge has no capability; operations are :read, :transition,
   :record_initial, :record_comment, :adopt, :start, :complete, :supersede,
-  :reconcile and :signal. Adoption requires explicit
+  :reconcile, :signal, :pause, :resume, :claim, :heartbeat, :fail,
+  :block_claim, :waive and :block. Adoption requires explicit
   owner authority and real subject ownership, never a tenant guessed from history.
 
   `persist/4` writes only the proven subject, from the locked status to the

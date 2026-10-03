@@ -62,7 +62,11 @@ scoped worklist rechecks owner policy and exposes no sibling-private relations.
 - Bounded scoped history retains initial entries, comments, inactive codes and
   nullable or agent actor identities with deterministic timestamp/id cursors.
 - Human actions and external dispatch remain later slices. The coordinator
-  resumes supported durable runs; pending legacy outbox rows remain retained
-  without delivery in this slice.
+  resumes supported durable runs, including pause/resume and the worker lease
+  API (claim, heartbeat, leaseholder completion, failure with retry, waive,
+  block and claimed block); pending legacy outbox rows remain retained without
+  delivery in this slice. `base_workflow_human_action_requests` belongs to
+  slice 3, the human action gate: this baseline does not create or read it, and
+  adoption leaves its rows untouched.
 - The public API and contribution shape are documented in
   `apps/base/workflow/docs/README.md`; validation owns the executable contract.

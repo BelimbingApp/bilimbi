@@ -695,14 +695,52 @@ defmodule Bilimbi.Core.CompatibilityTest do
       []
     )
 
-    before = workflow_snapshot(MigrationTestRepo, schema, tables)
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      CREATE TABLE "#{schema}".base_workflow_human_action_requests (
+        id bigserial PRIMARY KEY,
+        tenant_id bigint NOT NULL,
+        idempotency_key varchar(255) NOT NULL,
+        intent_hash char(64) NOT NULL,
+        action_key varchar(255) NOT NULL,
+        subject_type varchar(255) NOT NULL,
+        subject_id varchar(255) NOT NULL,
+        process_run_id bigint,
+        work_item_id bigint,
+        actor_type varchar(255) NOT NULL,
+        actor_id bigint NOT NULL,
+        result json,
+        completed_at timestamp(0) without time zone,
+        created_at timestamp(0) without time zone,
+        updated_at timestamp(0) without time zone,
+        CONSTRAINT base_workflow_human_request_unique UNIQUE (tenant_id, idempotency_key)
+      )
+      """,
+      []
+    )
+
+    SQL.query!(
+      MigrationTestRepo,
+      """
+      INSERT INTO "#{schema}".base_workflow_human_action_requests
+        (tenant_id, idempotency_key, intent_hash, action_key, subject_type, subject_id,
+         process_run_id, work_item_id, actor_type, actor_id, result, completed_at)
+      VALUES (1, 'retained-request', $1, 'example.approve', 'Legacy\\Example\\Record', '41',
+        $2, $3, 'human_user', 7, '{"saved":true}', '2026-01-01')
+      """,
+      [String.duplicate("c", 64), saved.run_id, saved.items["second"]]
+    )
+
+    retained = ["base_workflow_human_action_requests" | tables]
+    before = workflow_snapshot(MigrationTestRepo, schema, retained)
     drop_bilimbi_ledger!(MigrationTestRepo, schema)
     assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
     assert {:ok, :adopted} = Compatibility.adopt(MigrationTestRepo, prefix: schema)
-    assert workflow_snapshot(MigrationTestRepo, schema, tables) == before
+    assert workflow_snapshot(MigrationTestRepo, schema, retained) == before
     assert Compatibility.migrate(MigrationTestRepo, prefix: schema, log: false) != []
     assert :ok = Compatibility.verify(MigrationTestRepo, prefix: schema)
-    assert workflow_snapshot(MigrationTestRepo, schema, tables) == before
+    assert workflow_snapshot(MigrationTestRepo, schema, retained) == before
 
     SQL.query!(
       MigrationTestRepo,

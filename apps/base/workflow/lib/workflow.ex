@@ -74,6 +74,63 @@ defmodule Bilimbi.Base.Workflow do
   def supersede_run(%Scope{} = scope, run_id, reason),
     do: Coordination.supersede(scope, run_id, reason)
 
+  @doc "Pauses a running run with a reason. Paused runs keep their work state and release nothing until resumed."
+  @spec pause_run(Scope.t(), pos_integer(), String.t()) :: {:ok, map()} | {:error, term()}
+  def pause_run(%Scope{} = scope, run_id, reason), do: Coordination.pause(scope, run_id, reason)
+
+  @doc "Resumes a paused run and reconciles its saved graph. Resuming a running run is a no-op."
+  @spec resume_run(Scope.t(), pos_integer()) :: {:ok, map()} | {:error, term()}
+  def resume_run(%Scope{} = scope, run_id), do: Coordination.resume(scope, run_id)
+
+  @doc """
+  Leases one due work item to `worker`, returning `{:ok, nil}` when none is claimable.
+
+  Options are `:lease_seconds` (default 300), `:definition_key`, `:executor_keys`
+  and `:run_ids`. The result carries `claim: %{run_id, work_item_id, lease_token}`;
+  every worker-owned call needs that claim, so a late worker cannot overwrite a
+  reassignment.
+  """
+  @spec claim_work(Scope.t(), String.t(), keyword()) :: {:ok, map() | nil} | {:error, term()}
+  def claim_work(%Scope{} = scope, worker, opts \\ []),
+    do: Coordination.claim(scope, worker, opts)
+
+  @doc "Extends the caller's live lease by `lease_seconds` from now."
+  @spec heartbeat_work(Scope.t(), map(), pos_integer()) :: {:ok, map()} | {:error, term()}
+  def heartbeat_work(%Scope{} = scope, claim, lease_seconds \\ 300),
+    do: Coordination.heartbeat(scope, claim, lease_seconds)
+
+  @doc "Completes leased work with `%{outcome: ..., output: ..., result_ref: ...}`. A terminal item is returned unchanged."
+  @spec complete_claimed_work(Scope.t(), map(), map()) :: {:ok, map()} | {:error, term()}
+  def complete_claimed_work(%Scope{} = scope, claim, request),
+    do: Coordination.complete_claimed(scope, claim, request)
+
+  @doc """
+  Fails leased work. Retryable failures with attempts remaining return to pending
+  at `:retry_at` (default now); others fail the item. Options are `:retry_at`,
+  `:retryable` (default true) and `:failure_category` (default "unclassified").
+  """
+  @spec fail_work(Scope.t(), map(), String.t(), keyword()) :: {:ok, map()} | {:error, term()}
+  def fail_work(%Scope{} = scope, claim, error, opts \\ []),
+    do: Coordination.fail(scope, claim, error, opts)
+
+  @doc "Blocks leased work with a reason, keeping the worker's `:output` and `:result_ref`."
+  @spec block_claimed_work(Scope.t(), map(), String.t(), keyword()) ::
+          {:ok, map()} | {:error, term()}
+  def block_claimed_work(%Scope{} = scope, claim, reason, opts \\ []),
+    do: Coordination.block_claimed(scope, claim, reason, opts)
+
+  @doc "Administratively waives unfinished work with a reason and outcome (default \"waived\")."
+  @spec waive_work(Scope.t(), pos_integer(), pos_integer() | map(), String.t(), String.t()) ::
+          {:ok, map()} | {:error, term()}
+  def waive_work(%Scope{} = scope, run_id, item, reason, outcome \\ "waived"),
+    do: Coordination.waive(scope, run_id, item, reason, outcome)
+
+  @doc "Administratively blocks unfinished work with a reason."
+  @spec block_work(Scope.t(), pos_integer(), pos_integer() | map(), String.t()) ::
+          {:ok, map()} | {:error, term()}
+  def block_work(%Scope{} = scope, run_id, item, reason),
+    do: Coordination.block(scope, run_id, item, reason)
+
   @doc "Recovers expired leases and releases dependencies/timers on the existing graph. Paused and terminal runs are retained."
   @spec reconcile_run(Scope.t(), pos_integer()) :: {:ok, map()} | {:error, term()}
   def reconcile_run(%Scope{} = scope, run_id), do: Coordination.reconcile(scope, run_id)

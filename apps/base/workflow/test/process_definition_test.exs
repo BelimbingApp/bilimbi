@@ -102,18 +102,17 @@ defmodule Bilimbi.Base.Workflow.ProcessDefinitionTest do
     assert_raise ArgumentError, ~r/duplicate processes/, fn -> registry([base, base]) end
   end
 
-  test "unsupported legacy float serialization refuses explicitly; new formats distinguish their identity" do
+  test "unsupported legacy float and numeric-key serialization refuses explicitly" do
     base = TestProcessContributions.parallel()
     [first | rest] = base.steps
     float = %{base | steps: [%{first | input: %{"weight" => 1.0}} | rest]}
     assert_raise ArgumentError, ~r/cannot fingerprint floats/, fn -> validate(float) end
-    assert is_binary(validate(Map.put(float, :fingerprint_format, :bilimbi_v1)).fingerprint)
     numeric = %{base | steps: [%{first | input: %{"10" => "ten", "2" => "two"}} | rest]}
     assert_raise ArgumentError, ~r/numeric object keys/, fn -> validate(numeric) end
-    assert is_binary(validate(Map.put(numeric, :fingerprint_format, :bilimbi_v1)).fingerprint)
 
-    refute validate(base).fingerprint ==
-             validate(Map.put(base, :fingerprint_format, :bilimbi_v1)).fingerprint
+    assert_raise ArgumentError, ~r/unknown process fields/, fn ->
+      validate(Map.put(base, :fingerprint_format, :legacy_v1))
+    end
   end
 
   defp validate(definition),
