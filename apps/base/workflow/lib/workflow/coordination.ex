@@ -704,8 +704,7 @@ defmodule Bilimbi.Base.Workflow.Coordination do
 
   defp authorize(scope, ref, subject, definition, run, operation) do
     with :ok <- ref.adapter.authorize(scope, subject, operation),
-         :ok <- definition.adapter.authorize(scope, subject, run_fact(run), operation),
-         do: :ok
+         do: definition.adapter.authorize(scope, subject, run_fact(run), operation)
   end
 
   defp definition(key, nil) do
